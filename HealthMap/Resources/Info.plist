@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>fr</string>
+    <key>CFBundleDisplayName</key>
+    <string>HealthMap</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColorName</key>
+        <string>LaunchScreenBackground</string>
+    </dict>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+    </dict>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+    </dict>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <!-- Runtime config injected from Config.xcconfig via build settings.
+         AppConfig.swift reads these at launch; missing keys cause a fatalError in DEBUG. -->
+    <key>APP_ENVIRONMENT</key>
+    <string>$(APP_ENVIRONMENT)</string>
+    <key>SUPABASE_URL</key>
+    <string>$(SUPABASE_URL)</string>
+    <key>SUPABASE_ANON_KEY</key>
+    <string>$(SUPABASE_ANON_KEY)</string>
+    <key>CLERK_PUBLISHABLE_KEY</key>
+    <string>$(CLERK_PUBLISHABLE_KEY)</string>
+    <key>REVENUECAT_API_KEY</key>
+    <string>$(REVENUECAT_API_KEY)</string>
+    <key>SENTRY_DSN</key>
+    <string>$(SENTRY_DSN)</string>
+    <key>POSTHOG_API_KEY</key>
+    <string>$(POSTHOG_API_KEY)</string>
+    <key>POSTHOG_HOST</key>
+    <string>$(POSTHOG_HOST)</string>
+    <!-- Privacy usage descriptions (required by App Store review) -->
+    <!-- Photo library only: meal scan flow relies on UIImagePickerController in .photoLibrary mode. -->
+    <key>NSCameraUsageDescription</key>
+    <string>HealthMap utilise la caméra pour photographier tes repas et analyser leur composition nutritionnelle.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>HealthMap accède à vos photos pour importer des images de repas ou d'étiquettes nutritionnelles que vous souhaitez analyser.</string>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+    </array>
+    <!-- Push notifications (silent + user-facing) -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>remote-notification</string>
+    </array>
+    <!-- Deep Linking -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>healthmap</string>
+            </array>
+            <key>CFBundleURLName</key>
+            <string>fr.healthmap.app</string>
+        </dict>
+    </array>
+</dict>
+</plist>

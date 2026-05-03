@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HealthMap iOS — Preview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  :root {
+    --blue: #007AFF;
+    --blue-dark: #0056CC;
+    --blue-light: #E8F4FD;
+    --bg: #FAFAFA;
+    --card: #FFFFFF;
+    --text: #1A1A1A;
+    --secondary: #6B7280;
+    --muted: #9CA3AF;
+    --good: #34C759;
+    --low: #FF9500;
+    --deficient: #FF3B30;
+    --purple: #AF52DE;
+    --teal: #5AC8FA;
+    --indigo: #5856D6;
+    --pink: #FF2D55;
+    --brown: #A2845E;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+    color: var(--text);
+  }
+
+  h1.page-title {
+    color: white;
+    font-size: 32px;
+    font-weight: 800;
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+  }
+  .page-subtitle {
+    color: rgba(255,255,255,0.5);
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+
+  /* Screen Selector */
+  .screen-nav {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .screen-btn {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .screen-btn:hover { background: rgba(255,255,255,0.15); color: white; }
+  .screen-btn.active {
+    background: var(--blue);
+    color: white;
+    border-color: var(--blue);
+  }
+
+  /* iPhone Frame */
+  .iphone-frame {
+    width: 393px;
+    height: 852px;
+    background: var(--bg);
+    border-radius: 50px;
+    box-shadow: 0 0 0 12px #1a1a1a, 0 0 0 14px #333, 0 30px 80px rgba(0,0,0,0.6);
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  /* Dynamic Island */
+  .dynamic-island {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 37px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 100;
+  }
+
+  /* Status Bar */
+  .status-bar {
+    height: 59px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 30px 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .status-bar .time { font-weight: 700; font-size: 15px; }
+  .status-bar .icons { display: flex; gap: 5px; align-items: center; font-size: 12px; }
+
+  /* Screen Content */
+  .screen {
+    display: none;
+    height: calc(852px - 59px - 83px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .screen.active { display: block; }
+  .screen::-webkit-scrollbar { display: none; }
+
+  /* Tab Bar */
+  .tab-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 83px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 0.5px solid rgba(0,0,0,0.08);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-around;
+    padding-top: 8px;
+    z-index: 50;
+  }
+  .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 60px;
+  }
+  .tab-item svg { width: 24px; height: 24px; }
+  .tab-item .tab-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .tab-item.active svg { color: var(--blue); }
+  .tab-item.active .tab-label { color: var(--blue); font-weight: 600; }
+
+  /* Navigation Title */
+  .nav-title-large {
+    padding: 8px 24px 12px;
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin: 0 16px 12px;
+    padding: 16px;
+  }
+
+  /* Score Ring SVG */
+  .score-ring-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .score-ring-label {
+    position: absolute;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  /* Highlight Grid */
+  .highlight-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 0 16px 12px;
+  }
+  .highlight-card {
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    box-shadow: var(--shadow);
+  }
+  .highlight-card .icon-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .highlight-card .hl-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--secondary);
+    margin-bottom: 2px;
+  }
+  .highlight-card .hl-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* Nutrient Row */
+  .nutrient-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    margin: 0 16px 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  }
+  .nutrient-row .color-bar {
+    width: 4px;
+    height: 40px;
+    border-radius: 2px;
+  }
+  .nutrient-row .emoji-wrap {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .nutrient-row .n-label {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+  }
+  .nutrient-row .n-score {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .mini-bar {
+    width: 52px;
+    height: 5px;
+    background: rgba(0,0,0,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .mini-bar .fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  /* Section Header */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 24px 6px;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .section-header .badge {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-left: auto;
+  }
+
+  /* Action Card */
+  .action-card {
+    margin: 0 16px 12px;
+    padding: 16px;
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .action-card .action-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .action-card .action-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+  }
+  .action-card .action-tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .action-card .action-text {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .action-card .action-desc {
+    font-size: 13px;
+    color: var(--secondary);
+  }
+
+  /* Nav Link Row */
+  .nav-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    margin: 0 16px 6px;
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  }
+  .nav-row .color-line {
+    width: 3px;
+    height: 32px;
+    border-radius: 2px;
+  }
+  .nav-row .nr-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    flex: 1;
+  }
+  .nav-row .chevron {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* Badges Grid */
+  .badges-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+  .badge-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .badge-item .badge-icon {
+    font-size: 20px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .badge-item .badge-label {
+    font-size: 8px;
+    color: var(--text);
+    text-align: center;
+  }
+  .badge-item.locked { opacity: 0.3; }
+
+  /* Disclaimer */
+  .disclaimer {
+    display: flex;
+    gap: 8px;
+    padding: 10px 24px;
+    font-size: 11px;
+    color: var(--muted);
+    align-items: flex-start;
+  }
+
+  /* Segmented Control */
+  .segmented {
+    display: flex;
+    background: rgba(0,0,0,0.06);
+    border-radius: 8px;
+    margin: 0 16px 12px;
+    padding: 2px;
+  }
+  .seg-btn {
+    flex: 1;
+    text-align: center;
+    padding: 7px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--secondary);
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .seg-btn.active {
+    background: white;
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  /* Summary Grid (Checkin) */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 0 16px 12px;
+  }
+  .summary-card {
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    box-shadow: var(--shadow);
+  }
+  .summary-card .sc-icon { font-size: 14px; margin-bottom: 4px; }
+  .summary-card .sc-title { font-size: 11px; font-weight: 500; color: var(--secondary); }
+  .summary-card .sc-value { font-size: 16px; font-weight: 800; color: var(--text); margin: 2px 0; }
+  .summary-card .sc-bar {
+    height: 4px;
+    background: rgba(0,0,0,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .summary-card .sc-bar-fill { height: 100%; border-radius: 2px; }
+
+  /* Checkin row */
+  .checkin-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    margin: 0 16px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--card);
+  }
+  .checkin-row.done { background: rgba(52,199,89,0.04); }
+  .checkin-row .check-icon { font-size: 22px; }
+  .checkin-row .check-text { font-size: 14px; font-weight: 500; color: var(--text); flex: 1; }
+  .checkin-row.done .check-text { color: var(--secondary); text-decoration: line-through; }
+  .checkin-row .cat-pill {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 100px;
+  }
+
+  /* Photo capture zone */
+  .capture-zone {
+    margin: 0 16px 12px;
+    height: 200px;
+    border: 2px dashed var(--muted);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--secondary);
+  }
+  .capture-zone .cam-icon { font-size: 40px; color: var(--blue); }
+  .capture-zone .cam-text { font-size: 15px; font-weight: 600; color: var(--blue); }
+  .capture-zone .cam-sub { font-size: 12px; color: var(--muted); }
+
+  /* Plan Phase Card */
+  .phase-card {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    margin: 0 16px 8px;
+    background: var(--card);
+    border-radius: var(--radius-sm);
+  }
+  .phase-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: white;
+    flex-shrink: 0;
+  }
+  .phase-content { flex: 1; }
+  .phase-content .phase-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .phase-content .phase-dur {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 100px;
+    margin-bottom: 4px;
+  }
+  .phase-content .phase-desc { font-size: 13px; color: var(--secondary); line-height: 1.4; }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 0 16px 12px;
+  }
+  .stat-card {
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    box-shadow: var(--shadow);
+  }
+  .stat-card .st-emoji { font-size: 20px; margin-bottom: 4px; }
+  .stat-card .st-label { font-size: 11px; font-weight: 500; color: var(--secondary); }
+  .stat-card .st-value { font-size: 20px; font-weight: 800; color: var(--text); }
+  .stat-card .st-unit { font-size: 10px; font-weight: 500; }
+
+  /* Premium CTA */
+  .premium-cta {
+    margin: 0 16px 12px;
+    padding: 24px;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--blue), var(--indigo));
+    color: white;
+    text-align: center;
+  }
+  .premium-cta .crown { font-size: 28px; margin-bottom: 8px; }
+  .premium-cta .cta-title { font-size: 18px; font-weight: 800; margin-bottom: 12px; }
+  .premium-cta .cta-bullets { text-align: left; margin-bottom: 16px; }
+  .premium-cta .cta-bullet {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    margin-bottom: 6px;
+    opacity: 0.9;
+  }
+  .premium-cta .cta-btn {
+    background: white;
+    color: var(--blue);
+    border: none;
+    border-radius: var(--radius);
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    width: 100%;
+    cursor: pointer;
+  }
+  .premium-cta .cta-price {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 8px;
+  }
+
+  /* List Section (Profile) */
+  .list-section {
+    margin: 0 16px 20px;
+  }
+  .list-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 0 4px 6px;
+  }
+  .list-group {
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 0.5px solid rgba(0,0,0,0.06);
+  }
+  .list-row:last-child { border-bottom: none; }
+  .list-row .lr-icon { font-size: 16px; width: 24px; text-align: center; }
+  .list-row .lr-label { font-size: 16px; color: var(--text); flex: 1; }
+  .list-row .lr-value { font-size: 16px; color: var(--secondary); }
+  .list-row .lr-chevron { color: var(--muted); font-size: 13px; }
+  .list-row.destructive .lr-label { color: var(--deficient); }
+
+  /* Toggle */
+  .toggle-track {
+    width: 51px;
+    height: 31px;
+    border-radius: 16px;
+    background: rgba(0,0,0,0.1);
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-track.on { background: var(--good); }
+  .toggle-track .toggle-thumb {
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+  }
+  .toggle-track.on .toggle-thumb { transform: translateX(20px); }
+
+  /* Interaction Card */
+  .interaction-card {
+    padding: 14px;
+    margin: 0 16px 8px;
+    background: var(--card);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--blue);
+  }
+  .interaction-card .ic-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .interaction-card .ic-desc { font-size: 13px; color: var(--secondary); line-height: 1.4; }
+  .interaction-card .ic-nutrients {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .interaction-card .ic-pill {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 100px;
+    background: rgba(0,122,255,0.1);
+    color: var(--blue);
+  }
+
+  /* Onboarding */
+  .onboarding-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 40px 32px;
+    text-align: center;
+    background: var(--bg);
+  }
+  .onboarding-screen .ob-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: var(--blue-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    margin-bottom: 32px;
+  }
+  .onboarding-screen .ob-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 12px;
+    letter-spacing: -0.3px;
+  }
+  .onboarding-screen .ob-desc {
+    font-size: 15px;
+    color: var(--secondary);
+    line-height: 1.5;
+    margin-bottom: 40px;
+  }
+  .onboarding-screen .ob-dots {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .onboarding-screen .ob-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.15);
+  }
+  .onboarding-screen .ob-dot.active {
+    width: 10px;
+    height: 10px;
+    background: var(--blue);
+  }
+  .ob-btn {
+    background: var(--blue);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 700;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  /* Responsive */
+  @media (max-width: 430px) {
+    .iphone-frame {
+      width: 100%;
+      max-width: 393px;
+      border-radius: 0;
+      box-shadow: none;
+      height: 100vh;
+    }
+    body { padding: 0; }
+    h1.page-title, .page-subtitle, .screen-nav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">HealthMap iOS</h1>
+<p class="page-subtitle">Preview du rendu natif SwiftUI — 47 fichiers, 10 357 lignes de Swift</p>
+
+<nav class="screen-nav" id="screenNav">
+  <button class="screen-btn" data-screen="onboarding">Onboarding</button>
+  <button class="screen-btn active" data-screen="dashboard">Bilan</button>
+  <button class="screen-btn" data-screen="checkin">Suivi</button>
+  <button class="screen-btn" data-screen="scanner">Scanner</button>
+  <button class="screen-btn" data-screen="plan">Mon Plan</button>
+  <button class="screen-btn" data-screen="profil">Profil</button>
+</nav>
+
+<div class="iphone-frame">
+  <div class="dynamic-island"></div>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <span class="icons">
+      <svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 8h2v4H1zM5 5h2v7H5zM9 3h2v9H9zM13 0h2v12h-2z" fill="currentColor"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 3a7 7 0 00-5 2.1l1.4 1.4A5 5 0 018 5a5 5 0 013.6 1.5L13 5.1A7 7 0 008 3zm0 4a3.5 3.5 0 00-2.5 1.1L7 9.5A1.5 1.5 0 018 9a1.5 1.5 0 011 .5l1.5-1.4A3.5 3.5 0 008 7z" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x="0" y="1" width="22" height="10" rx="2.5" stroke="currentColor" fill="none" stroke-width="1"/><rect x="23" y="4" width="2" height="4" rx="1" fill="currentColor"/><rect x="2" y="3" width="16" height="6" rx="1" fill="var(--good)"/></svg>
+    </span>
+  </div>
+
+  <!-- ===== ONBOARDING ===== -->
+  <div class="screen" id="screen-onboarding">
+    <div class="onboarding-screen">
+      <div class="ob-circle">🍴</div>
+      <div class="ob-title">Analyse ton alimentation</div>
+      <div class="ob-desc">Reponds a quelques questions sur ton mode de vie et ton alimentation. Notre algorithme evalue 10 nutriments essentiels.</div>
+      <div class="ob-dots">
+        <div class="ob-dot active"></div>
+        <div class="ob-dot"></div>
+        <div class="ob-dot"></div>
+      </div>
+      <button class="ob-btn">Suivant</button>
+    </div>
+  </div>
+
+  <!-- ===== DASHBOARD ===== -->
+  <div class="screen active" id="screen-dashboard">
+    <div class="nav-title-large">Mon Bilan</div>
+
+    <!-- Hero Score Card -->
+    <div class="card" style="display:flex;align-items:center;gap:16px">
+      <div class="score-ring-wrap">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="36" fill="none" stroke="#E8F4FD" stroke-width="6"/>
+          <circle cx="40" cy="40" r="36" fill="none" stroke="var(--blue)" stroke-width="6"
+            stroke-linecap="round" transform="rotate(-90 40 40)"
+            style="stroke-dasharray:226;stroke-dashoffset:74"/>
+        </svg>
+        <span class="score-ring-label">67</span>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px;font-weight:800">Bonjour Arthur</span>
+          <span style="background:rgba(255,149,0,0.12);color:#FF9500;font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px">🔥 12</span>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:var(--blue);margin-top:2px">Bon</div>
+        <div style="font-size:12px;color:var(--secondary)">Score global de sante</div>
+      </div>
+    </div>
+
+    <!-- Highlight Grid -->
+    <div class="highlight-grid">
+      <div class="highlight-card">
+        <div class="icon-wrap" style="background:rgba(52,199,89,0.12);color:var(--good)">📈</div>
+        <div class="hl-title">Points forts</div>
+        <div class="hl-value">7 nutriments</div>
+        <div style="font-size:10px;color:var(--muted)">Score >= 60</div>
+      </div>
+      <div class="highlight-card">
+        <div class="icon-wrap" style="background:rgba(255,149,0,0.12);color:var(--low)">⚠️</div>
+        <div class="hl-title">A surveiller</div>
+        <div class="hl-value">3 carences</div>
+      </div>
+      <div class="highlight-card">
+        <div class="icon-wrap" style="background:rgba(175,82,222,0.12);color:var(--purple)">⚡</div>
+        <div class="hl-title">Interactions</div>
+        <div class="hl-value">2 detectees</div>
+      </div>
+      <div class="highlight-card">
+        <div class="icon-wrap" style="background:rgba(0,122,255,0.12);color:var(--blue)">🎯</div>
+        <div class="hl-title">Action prioritaire</div>
+        <div class="hl-value">Ajouter du magnesi...</div>
+      </div>
+    </div>
+
+    <!-- Carences -->
+    <div class="section-header">
+      <span style="color:var(--deficient)">🔍</span>
+      <span>Carences detectees</span>
+      <span class="badge" style="background:rgba(255,59,48,0.12);color:var(--deficient)">3</span>
+    </div>
+
+    <div class="nutrient-row">
+      <div class="color-bar" style="background:var(--deficient)"></div>
+      <div class="emoji-wrap" style="background:rgba(175,82,222,0.12)">🔩</div>
+      <div class="n-label">Fer</div>
+      <div class="n-score" style="color:var(--deficient)">32%</div>
+      <div class="mini-bar"><div class="fill" style="width:32%;background:var(--deficient)"></div></div>
+      <span style="color:var(--muted);font-size:12px">›</span>
+    </div>
+
+    <div class="nutrient-row">
+      <div class="color-bar" style="background:var(--deficient)"></div>
+      <div class="emoji-wrap" style="background:rgba(88,86,214,0.12)">🧂</div>
+      <div class="n-label">Iode</div>
+      <div class="n-score" style="color:var(--deficient)">38%</div>
+      <div class="mini-bar"><div class="fill" style="width:38%;background:var(--deficient)"></div></div>
+      <span style="color:var(--muted);font-size:12px">›</span>
+    </div>
+
+    <div class="nutrient-row">
+      <div class="color-bar" style="background:var(--low)"></div>
+      <div class="emoji-wrap" style="background:rgba(90,200,250,0.12)">💎</div>
+      <div class="n-label">Magnesium</div>
+      <div class="n-score" style="color:var(--low)">45%</div>
+      <div class="mini-bar"><div class="fill" style="width:45%;background:var(--low)"></div></div>
+      <span style="color:var(--muted);font-size:12px">›</span>
+    </div>
+
+    <!-- Action du jour -->
+    <div class="action-card" style="background:var(--blue-light)">
+      <div class="action-badge">
+        <div class="action-icon" style="background:var(--blue)">⚡</div>
+        <span class="action-tag" style="color:var(--blue)">ACTION DU JOUR</span>
+      </div>
+      <div class="action-text">Ajouter 200mg de magnesium bisglycinate</div>
+      <div class="action-desc">Prendre le soir, avant le coucher pour optimiser l'absorption.</div>
+    </div>
+
+    <!-- Nav cards -->
+    <div class="nav-row">
+      <div class="color-line" style="background:var(--purple)"></div>
+      <span style="font-size:18px">🔗</span>
+      <span class="nr-label">Interactions (2)</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="nav-row">
+      <div class="color-line" style="background:var(--teal)"></div>
+      <span style="font-size:18px">💡</span>
+      <span class="nr-label">Pepites sante</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="nav-row">
+      <div class="color-line" style="background:var(--good)"></div>
+      <span style="font-size:18px">💊</span>
+      <span class="nr-label">Mes complements</span>
+      <span class="chevron">›</span>
+    </div>
+
+    <!-- Pepite du jour -->
+    <div class="action-card" style="background:rgba(90,200,250,0.06);border:1px solid rgba(90,200,250,0.12)">
+      <div style="display:flex;gap:10px">
+        <span style="font-size:20px">🥝</span>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--teal);letter-spacing:0.5px;margin-bottom:2px">PEPITE DU JOUR</div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">Le kiwi gold contient 3x plus de vitamine C que l'orange</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--secondary);line-height:1.4">Un seul kiwi gold couvre 100% de tes besoins quotidiens en vitamine C et ameliore l'absorption du fer.</div>
+    </div>
+
+    <!-- Badges -->
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="color:var(--blue)">🏅</span>
+        <span style="font-size:13px;font-weight:700">Mes badges</span>
+        <span style="margin-left:auto;font-size:12px;color:var(--secondary)">4/10</span>
+      </div>
+      <div class="badges-grid">
+        <div class="badge-item"><div class="badge-icon">🏁</div><div class="badge-label">Premier pas</div></div>
+        <div class="badge-item"><div class="badge-icon">📊</div><div class="badge-label">Analyste</div></div>
+        <div class="badge-item"><div class="badge-icon">🔥</div><div class="badge-label">7j serie</div></div>
+        <div class="badge-item"><div class="badge-icon">📸</div><div class="badge-label">Scanner</div></div>
+        <div class="badge-item locked"><div class="badge-icon">🏆</div><div class="badge-label">30j serie</div></div>
+        <div class="badge-item locked"><div class="badge-icon">⭐</div><div class="badge-label">Score 80+</div></div>
+        <div class="badge-item locked"><div class="badge-icon">💪</div><div class="badge-label">Zero carence</div></div>
+        <div class="badge-item locked"><div class="badge-icon">🧪</div><div class="badge-label">Scientifique</div></div>
+        <div class="badge-item locked"><div class="badge-icon">👑</div><div class="badge-label">Elite</div></div>
+        <div class="badge-item locked"><div class="badge-icon">🎓</div><div class="badge-label">Expert</div></div>
+      </div>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">
+      <span>ℹ️</span>
+      <span>HealthMap ne remplace pas un avis medical. Consultez un professionnel de sante pour toute decision medicale.</span>
+    </div>
+    <div style="height:20px"></div>
+  </div>
+
+  <!-- ===== CHECKIN ===== -->
+  <div class="screen" id="screen-checkin">
+    <div class="nav-title-large">Mon Suivi</div>
+
+    <!-- Summary Grid -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="sc-icon" style="color:var(--blue)">✅</div>
+        <div class="sc-title">Aujourd'hui</div>
+        <div class="sc-value">3/5</div>
+        <div class="sc-bar"><div class="sc-bar-fill" style="width:60%;background:var(--blue)"></div></div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-icon" style="color:orange">📊</div>
+        <div class="sc-title">Tendance 7j</div>
+        <div class="sc-value">5j actifs</div>
+        <div class="sc-bar"><div class="sc-bar-fill" style="width:71%;background:orange"></div></div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-icon" style="color:orange">🔥</div>
+        <div class="sc-title">Serie</div>
+        <div class="sc-value">12 jours</div>
+        <div class="sc-bar"><div class="sc-bar-fill" style="width:100%;background:orange"></div></div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-icon" style="color:var(--blue)">❤️</div>
+        <div class="sc-title">Score</div>
+        <div class="sc-value">67/100</div>
+        <div class="sc-bar"><div class="sc-bar-fill" style="width:67%;background:var(--blue)"></div></div>
+      </div>
+    </div>
+
+    <!-- Segmented Control -->
+    <div class="segmented">
+      <div class="seg-btn active">Aujourd'hui</div>
+      <div class="seg-btn">Semaine</div>
+      <div class="seg-btn">Alimentation</div>
+    </div>
+
+    <!-- Date Header -->
+    <div style="display:flex;justify-content:space-between;padding:8px 24px">
+      <span style="font-size:16px;font-weight:700">Jeudi 10 Avril</span>
+      <span style="font-size:14px;font-weight:800;color:var(--blue)">3/5</span>
+    </div>
+
+    <!-- Progress -->
+    <div style="margin:0 16px 12px;height:8px;background:rgba(0,0,0,0.06);border-radius:4px;overflow:hidden">
+      <div style="width:60%;height:100%;background:var(--blue);border-radius:4px"></div>
+    </div>
+
+    <!-- Action Items -->
+    <div class="checkin-row done">
+      <span class="check-icon" style="color:var(--good)">✅</span>
+      <span class="check-text">Manger un aliment riche en fer (lentilles, tofu)</span>
+      <span class="cat-pill" style="background:rgba(255,149,0,0.1);color:var(--low)">🍎 Aliment</span>
+    </div>
+    <div class="checkin-row done">
+      <span class="check-icon" style="color:var(--good)">✅</span>
+      <span class="check-text">Prendre 200mg magnesium bisglycinate</span>
+      <span class="cat-pill" style="background:rgba(175,82,222,0.1);color:var(--purple)">💊 Supplement</span>
+    </div>
+    <div class="checkin-row done">
+      <span class="check-icon" style="color:var(--good)">✅</span>
+      <span class="check-text">30 min d'activite physique</span>
+      <span class="cat-pill" style="background:rgba(0,122,255,0.1);color:var(--blue)">🏃 Mode de vie</span>
+    </div>
+    <div class="checkin-row">
+      <span class="check-icon" style="color:var(--muted);opacity:0.4">⭕</span>
+      <span class="check-text">Manger 2 portions de legumes verts</span>
+      <span class="cat-pill" style="background:rgba(255,149,0,0.1);color:var(--low)">🍎 Aliment</span>
+    </div>
+    <div class="checkin-row">
+      <span class="check-icon" style="color:var(--muted);opacity:0.4">⭕</span>
+      <span class="check-text">Boire 2L d'eau</span>
+      <span class="cat-pill" style="background:rgba(0,122,255,0.1);color:var(--blue)">🏃 Mode de vie</span>
+    </div>
+
+    <div style="height:40px"></div>
+  </div>
+
+  <!-- ===== SCANNER ===== -->
+  <div class="screen" id="screen-scanner">
+    <div class="nav-title-large">Scanner</div>
+
+    <div class="segmented">
+      <div class="seg-btn active">Analyser un repas</div>
+      <div class="seg-btn">Chercher un aliment</div>
+    </div>
+
+    <!-- Capture Zone -->
+    <div class="capture-zone">
+      <div class="cam-icon">📷</div>
+      <div class="cam-text">Prends ton repas en photo</div>
+      <div class="cam-sub">Ou choisis une photo de ta galerie</div>
+    </div>
+
+    <!-- Info -->
+    <div style="display:flex;gap:8px;margin:0 16px 12px;padding:12px;background:var(--blue-light);border-radius:var(--radius-sm)">
+      <span style="font-size:14px;color:var(--blue)">ℹ️</span>
+      <span style="font-size:13px;color:var(--secondary);line-height:1.4">Notre IA analyse les aliments visibles, estime les macros et te donne des conseils personnalises selon tes carences.</span>
+    </div>
+
+    <!-- Quick Examples -->
+    <div style="padding:0 24px 8px;font-size:13px;font-weight:700;color:var(--secondary)">Exemples rapides</div>
+
+    <div class="card" style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:32px">🥗</span>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:var(--text)">Salade composee</div>
+        <div style="font-size:12px;color:var(--secondary)">~420 kcal • Riche en fibres et vitamine C</div>
+      </div>
+      <span style="color:var(--muted)">›</span>
+    </div>
+
+    <div class="card" style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:32px">🍳</span>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:var(--text)">Petit dejeuner</div>
+        <div style="font-size:12px;color:var(--secondary)">~550 kcal • Source de proteines</div>
+      </div>
+      <span style="color:var(--muted)">›</span>
+    </div>
+
+    <div class="card" style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:32px">🍝</span>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:var(--text)">Pates bolognaise</div>
+        <div style="font-size:12px;color:var(--secondary)">~680 kcal • Source de fer et zinc</div>
+      </div>
+      <span style="color:var(--muted)">›</span>
+    </div>
+
+    <!-- Scan product teaser -->
+    <div style="padding:0 24px 8px;margin-top:8px;font-size:13px;font-weight:700;color:var(--secondary)">Scanner un produit</div>
+    <div class="card" style="text-align:center;padding:24px">
+      <div style="font-size:36px;margin-bottom:8px">📊</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Code-barres</div>
+      <div style="font-size:13px;color:var(--secondary)">Entre le code-barres d'un produit pour voir son NutriScore et son impact sur tes carences</div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>
+
+  <!-- ===== MON PLAN ===== -->
+  <div class="screen" id="screen-plan">
+    <div class="nav-title-large">Mon Plan</div>
+
+    <!-- Interactions -->
+    <div class="section-header">
+      <span style="color:var(--blue)">🔀</span>
+      <span>Interactions detectees</span>
+    </div>
+
+    <div class="interaction-card">
+      <div class="ic-title">☕ Le cafe bloque l'absorption du fer</div>
+      <div class="ic-desc">Attends 2h apres ton repas riche en fer avant de boire du cafe ou du the.</div>
+      <div class="ic-nutrients">
+        <span class="ic-pill">Fer</span>
+        <span class="ic-pill">Cafeine</span>
+      </div>
+    </div>
+
+    <div class="interaction-card" style="border-left-color:var(--purple)">
+      <div class="ic-title">💊 Le calcium reduit l'absorption du magnesium</div>
+      <div class="ic-desc">Ne prends pas tes supplements de calcium et magnesium en meme temps.</div>
+      <div class="ic-nutrients">
+        <span class="ic-pill">Calcium</span>
+        <span class="ic-pill">Magnesium</span>
+      </div>
+    </div>
+
+    <!-- Priority Actions -->
+    <div class="section-header" style="margin-top:8px">
+      <span style="color:var(--blue)">🎯</span>
+      <span>Actions prioritaires</span>
+    </div>
+
+    <div style="margin:0 16px 6px;padding:12px;background:var(--card);border-radius:var(--radius-sm);display:flex;align-items:flex-start;gap:10px;box-shadow:var(--shadow)">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">1</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)">Supplementer en fer bisglycinate 14mg/j</div>
+        <div style="font-size:11px;color:var(--blue);margin-top:4px">⚡ Impact fort • 🎚 Facile</div>
+      </div>
+    </div>
+    <div style="margin:0 16px 6px;padding:12px;background:var(--card);border-radius:var(--radius-sm);display:flex;align-items:flex-start;gap:10px;box-shadow:var(--shadow)">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">2</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)">Ajouter des algues ou sel iode 3x/sem</div>
+        <div style="font-size:11px;color:var(--blue);margin-top:4px">⚡ Impact modere • 🎚 Facile</div>
+      </div>
+    </div>
+    <div style="margin:0 16px 6px;padding:12px;background:var(--card);border-radius:var(--radius-sm);display:flex;align-items:flex-start;gap:10px;box-shadow:var(--shadow)">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">3</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)">Magnesium bisglycinate 200mg le soir</div>
+        <div style="font-size:11px;color:var(--blue);margin-top:4px">⚡ Impact modere • 🎚 Facile</div>
+      </div>
+    </div>
+
+    <!-- Plan 3 phases -->
+    <div class="section-header" style="margin-top:8px">
+      <span style="color:var(--blue)">📅</span>
+      <span>Plan personnalise</span>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-num" style="background:var(--deficient)">1</div>
+      <div class="phase-content">
+        <div class="phase-title">⚡ Correction urgente</div>
+        <span class="phase-dur" style="background:rgba(255,59,48,0.1);color:var(--deficient)">Semaines 1-2</span>
+        <div class="phase-desc">Combler les carences critiques et eliminer les interactions negatives.</div>
+      </div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-num" style="background:var(--low)">2</div>
+      <div class="phase-content">
+        <div class="phase-title">📈 Optimisation</div>
+        <span class="phase-dur" style="background:rgba(255,149,0,0.1);color:var(--low)">Semaines 3-8</span>
+        <div class="phase-desc">Ajuster l'alimentation, introduire les supplements cibles, stabiliser les scores.</div>
+      </div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-num" style="background:var(--good)">3</div>
+      <div class="phase-content">
+        <div class="phase-title">🌿 Maintenance</div>
+        <span class="phase-dur" style="background:rgba(52,199,89,0.1);color:var(--good)">A partir de S9</span>
+        <div class="phase-desc">Maintenir les acquis, reduire les supplements, focus alimentation naturelle.</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="section-header" style="margin-top:8px">
+      <span style="color:var(--blue)">📊</span>
+      <span>Tes stats</span>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="st-emoji">⚖️</div>
+        <div class="st-label">IMC</div>
+        <div class="st-value">22.5</div>
+        <div class="st-unit" style="color:var(--blue)">Normal</div>
+      </div>
+      <div class="stat-card">
+        <div class="st-emoji">🔥</div>
+        <div class="st-label">Depense</div>
+        <div class="st-value">2340</div>
+        <div class="st-unit" style="color:orange">kcal/j</div>
+      </div>
+      <div class="stat-card">
+        <div class="st-emoji">💪</div>
+        <div class="st-label">Proteines</div>
+        <div class="st-value">92</div>
+        <div class="st-unit" style="color:var(--purple)">g/jour</div>
+      </div>
+      <div class="stat-card">
+        <div class="st-emoji">🍞</div>
+        <div class="st-label">Glucides</div>
+        <div class="st-value">287</div>
+        <div class="st-unit" style="color:var(--brown)">g/jour</div>
+      </div>
+    </div>
+
+    <!-- Premium CTA -->
+    <div class="premium-cta">
+      <div class="crown">👑</div>
+      <div class="cta-title">Debloquer avec HealthMap Pro</div>
+      <div class="cta-bullets">
+        <div class="cta-bullet">✅ Solutions completes et hacks pour tes carences</div>
+        <div class="cta-bullet">✅ Scans produits illimites + impact sur tes carences</div>
+        <div class="cta-bullet">✅ Plan supplements + analyses de sang</div>
+        <div class="cta-bullet">✅ Pepites sante et astuces nutrition</div>
+      </div>
+      <button class="cta-btn">Essai gratuit 7 jours</button>
+      <div class="cta-price">Puis 4,99 EUR/mois — annule a tout moment</div>
+    </div>
+
+    <div class="disclaimer">
+      <span>ℹ️</span>
+      <span>HealthMap fournit des informations a titre indicatif. Ces recommandations ne remplacent pas un avis medical.</span>
+    </div>
+    <div style="height:20px"></div>
+  </div>
+
+  <!-- ===== PROFIL ===== -->
+  <div class="screen" id="screen-profil">
+    <div class="nav-title-large">Profil</div>
+
+    <div class="list-section">
+      <div class="list-header">Compte</div>
+      <div class="list-group">
+        <div class="list-row">
+          <span class="lr-label">Email</span>
+          <span class="lr-value">arthur@healthmap.fr</span>
+        </div>
+        <div class="list-row">
+          <span class="lr-icon" style="color:gold">👑</span>
+          <span class="lr-label" style="font-weight:600">Premium</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="list-section">
+      <div class="list-header">Mon bilan</div>
+      <div class="list-group">
+        <div class="list-row">
+          <span class="lr-icon">✏️</span>
+          <span class="lr-label">Modifier mon profil</span>
+          <span class="lr-chevron">›</span>
+        </div>
+        <div class="list-row">
+          <span class="lr-icon">📈</span>
+          <span class="lr-label">Evolution du score</span>
+          <span class="lr-chevron">›</span>
+        </div>
+        <div class="list-row">
+          <span class="lr-icon">💊</span>
+          <span class="lr-label">Mes complements</span>
+          <span class="lr-chevron">›</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="list-section">
+      <div class="list-header">Progression</div>
+      <div class="list-group">
+        <div class="list-row">
+          <span class="lr-icon" style="color:orange">🔥</span>
+          <span class="lr-label">Serie actuelle</span>
+          <span class="lr-value">12 jours</span>
+        </div>
+        <div class="list-row">
+          <span class="lr-icon" style="color:gold">⭐</span>
+          <span class="lr-label">Meilleure serie</span>
+          <span class="lr-value">18 jours</span>
+        </div>
+        <div class="list-row">
+          <span class="lr-icon" style="color:var(--blue)">✅</span>
+          <span class="lr-label">Check-ins total</span>
+          <span class="lr-value">47</span>
+        </div>
+        <div class="list-row">
+          <span class="lr-icon" style="color:var(--blue)">🏅</span>
+          <span class="lr-label">Badges</span>
+          <span class="lr-value">4/10</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="list-section">
+      <div class="list-header">Preferences</div>
+      <div class="list-group">
+        <div class="list-row">
+          <span class="lr-icon" style="color:var(--good)">🍃</span>
+          <div style="flex:1">
+            <div class="lr-label" style="font-size:16px">Mode Zen</div>
+            <div style="font-size:11px;color:var(--secondary)">Desactive badges, confetti et notifs</div>
+          </div>
+          <div class="toggle-track" id="zenToggle"><div class="toggle-thumb"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="list-section">
+      <div class="list-group">
+        <div class="list-row destructive">
+          <span class="lr-label">Se deconnecter</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar" id="tabBar">
+    <div class="tab-item active" data-tab="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        <path d="M9 14h.01M9 17h.01M12 14h3M12 17h3"/>
+      </svg>
+      <span class="tab-label">Bilan</span>
+    </div>
+    <div class="tab-item" data-tab="checkin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span class="tab-label">Suivi</span>
+    </div>
+    <div class="tab-item" data-tab="scanner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+        <circle cx="12" cy="14" r="3"/>
+      </svg>
+      <span class="tab-label">Scanner</span>
+    </div>
+    <div class="tab-item" data-tab="plan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        <path d="M9 14l2 2 4-4"/>
+      </svg>
+      <span class="tab-label">Mon Plan</span>
+    </div>
+    <div class="tab-item" data-tab="profil">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="8" r="4"/>
+        <path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/>
+      </svg>
+      <span class="tab-label">Profil</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const screenNav = document.getElementById('screenNav');
+  const tabBar = document.getElementById('tabBar');
+
+  const tabToScreen = {
+    dashboard: 'dashboard',
+    checkin: 'checkin',
+    scanner: 'scanner',
+    plan: 'plan',
+    profil: 'profil'
+  };
+
+  function switchScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const target = document.getElementById('screen-' + screenId);
+    if (target) target.classList.add('active');
+
+    document.querySelectorAll('.screen-btn').forEach(b => b.classList.remove('active'));
+    const navBtn = document.querySelector('.screen-btn[data-screen="' + screenId + '"]');
+    if (navBtn) navBtn.classList.add('active');
+
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    const tabName = Object.keys(tabToScreen).find(k => tabToScreen[k] === screenId);
+    if (tabName) {
+      const tabItem = document.querySelector('.tab-item[data-tab="' + tabName + '"]');
+      if (tabItem) tabItem.classList.add('active');
+    }
+
+    tabBar.style.display = screenId === 'onboarding' ? 'none' : 'flex';
+  }
+
+  screenNav.addEventListener('click', function(e) {
+    var btn = e.target.closest('.screen-btn');
+    if (!btn) return;
+    switchScreen(btn.dataset.screen);
+  });
+
+  tabBar.addEventListener('click', function(e) {
+    var tab = e.target.closest('.tab-item');
+    if (!tab) return;
+    switchScreen(tabToScreen[tab.dataset.tab]);
+  });
+
+  // Zen mode toggle
+  document.getElementById('zenToggle').addEventListener('click', function() {
+    this.classList.toggle('on');
+  });
+</script>
+
+</body>
+</html>

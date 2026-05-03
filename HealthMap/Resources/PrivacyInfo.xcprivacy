@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+    =============================================================================
+    HealthMap — App Privacy Manifest
+    Required by Apple since May 1, 2024 for every iOS app submitted to the App
+    Store that uses UserDefaults or any "required reason API". Missing or
+    incomplete manifests trigger automatic rejection during submission.
+
+    Read this before changing anything:
+      - NSPrivacyTracking is FALSE — HealthMap never links first-party data with
+        third-party data "for the purpose of tracking" (ATT glossary). No IDFA,
+        no cross-app/site user correlation, no ad networks. All analytics is
+        first-party (PostHog EU project dedicated to HealthMap, Supabase
+        analytics_events table owned by us).
+      - Every "Linked" collected data type has NSPrivacyCollectedDataTypeTracking
+        set to FALSE for the same reason. Product Interaction linkage exists
+        solely for product analytics keyed by Supabase user_id; it never leaves
+        our infrastructure.
+      - The only required-reason API declared is UserDefaults (CA92.1). If you
+        add new system API usage (ATTrackingManager, file timestamps, disk
+        space, system boot time, active keyboards), declare them here AND in
+        Sentry's own manifest if they're reached via Sentry.
+    =============================================================================
+    -->
+
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <!-- No tracking domains because NSPrivacyTracking is false. -->
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+
+        <!-- ==== Email address ==== -->
+        <!-- Collected at sign-up/sign-in, linked to the Supabase user_id for
+             authentication and password reset. Never used for advertising. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeEmailAddress</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+
+        <!-- ==== Name ==== -->
+        <!-- First name captured during sign-up or via Sign in with Apple on
+             the very first sign-in (Apple drops it afterwards — see
+             `DatabaseService.bootstrapAppleProfile`). Used to personalize the
+             dashboard greeting and recommendations. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeName</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
+            </array>
+        </dict>
+
+        <!-- ==== Health ==== -->
+        <!-- Questionnaire responses (diet, symptoms, medications, goals) and
+             the AI deficiency analysis derived from them. These are RGPD
+             Article 9 "special category" data — collected with explicit
+             consent during the onboarding questionnaire, stored in the
+             Supabase `profiles.questionnaire_data` JSONB column, and erased
+             on account deletion (`DatabaseService.deleteAllUserData`). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeHealth</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
+            </array>
+        </dict>
+
+        <!-- ==== Other User Content ==== -->
+        <!-- Meal photos imported from the photo library via `PhotosPicker`.
+             Sent to our AI backend for nutrient analysis, then discarded —
+             the photo itself is never persisted server-side, only the
+             derived nutrient breakdown. Still declared here because the
+             bytes transit our infrastructure. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+
+        <!-- ==== Product Interaction ==== -->
+        <!-- Tab taps, screen views, questionnaire progress, checkin events.
+             Sent to PostHog EU and to Supabase `analytics_events` with the
+             `user_id` column populated. Never leaves our infrastructure.
+             The forbidden-keys allow-list in `AnalyticsService.sanitize`
+             guarantees no PII or health content is embedded in payloads. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+
+        <!-- ==== Crash Data ==== -->
+        <!-- Captured by Sentry. Linked to the Supabase user_id because
+             `CrashReportingService.identify(userId:)` is called after
+             sign-in. `sendDefaultPii` is disabled and `beforeSend` strips
+             email / questionnaire_data / ai_analysis — see the service
+             for the full allowlist. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeCrashData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+
+        <!-- ==== Performance Data ==== -->
+        <!-- Sentry auto-performance traces (enableAutoPerformanceTracing=true
+             with a 10% prod sample rate). Linked to user_id for the same
+             reason as Crash Data. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePerformanceData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+
+    </array>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <!-- ==== UserDefaults (CA92.1) ==== -->
+        <!-- Usage sites (33 occurrences across 6 files as of audit):
+               - ContentView: @AppStorage("hasSeenOnboarding")
+               - AuthViewModel: clearLocalCaches() wipes "healthmap_*" keys
+                 on sign out (mirrors the web app's localStorage cleanup)
+               - GamificationService: streak, best streak, total checkins,
+                 earned badges, zen mode toggle
+               - ScoreHistoryService: local cache of the last N score rows
+                 for offline chart rendering
+               - ScoreHistoryView: @AppStorage for range selection
+               - CheckinViewModel: last-checkin-date throttling
+
+             All reads/writes stay inside the app sandbox. No App Group.
+             No Shared Web Credentials. CA92.1 is the correct reason. -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

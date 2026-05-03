@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ios-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "C:\\Users\\stana\\Desktop\\Claude\\Healthmap-iOS\\preview", "-l", "3456", "--no-clipboard"],
+      "port": 3456
+    }
+  ]
+}

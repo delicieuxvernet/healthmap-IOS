@@ -1,0 +1,464 @@
+import Foundation
+import SwiftUI
+import UIKit
+import Supabase
+
+@MainActor
+final class MealScanViewModel: ObservableObject {
+
+    // MARK: - State
+    @Published var selectedImage: Data?
+    @Published var isAnalyzing = false
+    @Published var analysisResult: MealAnalysisResult?
+    @Published var errorMessage: String?
+    @Published var searchQuery = ""
+    @Published var searchResults: [FoodItem] = []
+    @Published var isSearching = false
+    @Published var selectedTab: MealScanTab = .analyze
+
+    private var client: SupabaseClient { SupabaseService.shared.client }
+    private var searchTask: Task<Void, Never>?
+
+    enum MealScanTab: String, CaseIterable {
+        case analyze = "Analyser un repas"
+        case search = "Chercher un aliment"
+    }
+
+    // MARK: - Models
+
+    struct MealAnalysisResult: Identifiable {
+        let id = UUID()
+        var detectedFoods: [String]
+        var macros: MacroNutrients
+        var micros: [MicroNutrient]
+        var advice: MealAdvice
+        var warnings: [String]
+    }
+
+    struct MacroNutrients {
+        var calories: Int
+        var proteins: Double
+        var carbs: Double
+        var fats: Double
+    }
+
+    struct MicroNutrient: Identifiable {
+        let id = UUID()
+        var nutrientId: String
+        var label: String
+        var emoji: String
+        var pctRDA: Int
+        var isDeficiency: Bool
+    }
+
+    struct MealAdvice {
+        var coversDeficiencies: [String]
+        var suggestedAdditions: [String]
+        var swaps: [String]
+    }
+
+    struct FoodItem: Identifiable {
+        let id = UUID()
+        var name: String
+        var nutrients: [String: Double]
+    }
+
+    // MARK: - Edge Function Response DTOs (Decodable)
+
+    private struct EdgeMealResponse: Decodable {
+        let detectedFoods: [String]?
+        let macros: EdgeMacros?
+        let micros: [EdgeMicro]?
+        let advice: EdgeAdvice?
+        let warnings: [String]?
+        let error: String?
+
+        enum CodingKeys: String, CodingKey {
+            case detectedFoods = "detected_foods"
+            case macros, micros, advice, warnings, error
+        }
+    }
+
+    private struct EdgeMacros: Decodable {
+        let calories: Int?
+        let proteins: Double?
+        let carbs: Double?
+        let fats: Double?
+    }
+
+    private struct EdgeMicro: Decodable {
+        let nutrientId: String?
+        let label: String?
+        let emoji: String?
+        let pctRDA: Int?
+        let isDeficiency: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case nutrientId = "nutrient_id"
+            case label, emoji
+            case pctRDA = "pct_rda"
+            case isDeficiency = "is_deficiency"
+        }
+    }
+
+    private struct EdgeAdvice: Decodable {
+        let coversDeficiencies: [String]?
+        let suggestedAdditions: [String]?
+        let swaps: [String]?
+
+        enum CodingKeys: String, CodingKey {
+            case coversDeficiencies = "covers_deficiencies"
+            case suggestedAdditions = "suggested_additions"
+            case swaps
+        }
+    }
+
+    private struct CiqualFoodRow: Decodable {
+        let id: Int?
+        let name: String?
+        let calories: Double?
+        let proteins: Double?
+        let carbs: Double?
+        let fats: Double?
+        let iron: Double?
+        let vitC: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case id, name, calories, proteins, carbs, fats, iron
+            case vitC = "vit_c"
+        }
+    }
+
+    private struct EdgeSearchResponse: Decodable {
+        let results: [EdgeSearchItem]?
+    }
+
+    private struct EdgeSearchItem: Decodable {
+        let name: String?
+        let nutrients: [String: Double]?
+    }
+
+    // MARK: - Edge Function Request DTOs (Encodable)
+
+    private struct MealAnalyzeRequest: Encodable {
+        let image: String
+        let deficiencies: [String]
+    }
+
+    private struct FoodSearchRequest: Encodable {
+        let query: String
+    }
+
+    // MARK: - Image Compression
+
+    /// Resize and compress a UIImage for upload.
+    /// - Max 1024px on longest side (preserving aspect ratio)
+    /// - Progressive JPEG quality: 0.8 -> 0.6 -> 0.4 until <= 2MB
+    /// - Returns compressed Data or nil on failure
+    func compressImage(_ image: UIImage) -> Data? {
+        let maxDimension: CGFloat = 1024
+        let size = image.size
+
+        // Resize if needed
+        let resizedImage: UIImage
+        if max(size.width, size.height) > maxDimension {
+            let scale = maxDimension / max(size.width, size.height)
+            let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+            let renderer = UIGraphicsImageRenderer(size: newSize)
+            resizedImage = renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: newSize))
+            }
+        } else {
+            resizedImage = image
+        }
+
+        // Progressive JPEG compression: try decreasing quality until <= 2MB
+        let maxBytes = 2 * 1024 * 1024 // 2MB
+        for quality: CGFloat in [0.8, 0.6, 0.4] {
+            if let data = resizedImage.jpegData(compressionQuality: quality) {
+                if data.count <= maxBytes || quality == 0.4 {
+                    return data
+                }
+            }
+        }
+
+        // Fallback at lowest quality
+        return resizedImage.jpegData(compressionQuality: 0.3)
+    }
+
+    // MARK: - Analyze Photo
+
+    func analyzePhoto() async {
+        guard let imageData = selectedImage else { return }
+
+        isAnalyzing = true
+        errorMessage = nil
+
+        do {
+            // 1. Convert Data to UIImage and compress
+            guard let uiImage = UIImage(data: imageData) else {
+                errorMessage = "Impossible de lire cette image. Essaie avec une autre photo."
+                isAnalyzing = false
+                return
+            }
+
+            guard let compressedData = compressImage(uiImage) else {
+                errorMessage = "Impossible de compresser l'image. Essaie avec une autre photo."
+                isAnalyzing = false
+                return
+            }
+
+            // Check final size (reject if > 5MB after compression)
+            let maxUploadBytes = 5 * 1024 * 1024
+            guard compressedData.count <= maxUploadBytes else {
+                errorMessage = "Image trop volumineuse (> 5 Mo). Essaie avec une photo plus legere."
+                isAnalyzing = false
+                return
+            }
+
+            // 2. Base64 encode (no "data:" prefix)
+            let base64String = compressedData.base64EncodedString()
+
+            // 3. Gather user deficiencies from DashboardViewModel if available
+            // We pass nutrient IDs of current deficiencies so the AI can personalise advice
+            let userDeficiencies = await resolveUserDeficiencies()
+
+            // 4. Call Edge Function with 130s timeout
+            let requestBody = MealAnalyzeRequest(
+                image: base64String,
+                deficiencies: userDeficiencies
+            )
+
+            let response: EdgeMealResponse = try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
+                group.addTask { [client] in
+                    try await client.functions.invoke(
+                        "analyze-meal-photo",
+                        options: .init(body: requestBody)
+                    )
+                }
+
+                // Timeout task
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 130_000_000_000) // 130 seconds
+                    throw MealScanError.timeout
+                }
+
+                // Return whichever finishes first; cancel the other
+                guard let result = try await group.next() else {
+                    group.cancelAll()
+                    throw MealScanError.timeout
+                }
+                group.cancelAll()
+                return result
+            }
+
+            // 5. Check for Edge Function error in response body
+            if let errorMsg = response.error {
+                if errorMsg.lowercased().contains("not a food") || errorMsg.lowercased().contains("not analyzable") {
+                    errorMessage = "Cette image ne semble pas contenir un repas. Essaie avec une photo d'assiette."
+                } else {
+                    errorMessage = "Erreur d'analyse : \(errorMsg)"
+                }
+                isAnalyzing = false
+                return
+            }
+
+            // 6. Parse response into MealAnalysisResult
+            let macros = MacroNutrients(
+                calories: response.macros?.calories ?? 0,
+                proteins: response.macros?.proteins ?? 0,
+                carbs: response.macros?.carbs ?? 0,
+                fats: response.macros?.fats ?? 0
+            )
+
+            let micros: [MicroNutrient] = (response.micros ?? []).map { m in
+                MicroNutrient(
+                    nutrientId: m.nutrientId ?? "",
+                    label: m.label ?? "",
+                    emoji: m.emoji ?? "",
+                    pctRDA: m.pctRDA ?? 0,
+                    isDeficiency: m.isDeficiency ?? false
+                )
+            }
+
+            let advice = MealAdvice(
+                coversDeficiencies: response.advice?.coversDeficiencies ?? [],
+                suggestedAdditions: response.advice?.suggestedAdditions ?? [],
+                swaps: response.advice?.swaps ?? []
+            )
+
+            analysisResult = MealAnalysisResult(
+                detectedFoods: response.detectedFoods ?? [],
+                macros: macros,
+                micros: micros,
+                advice: advice,
+                warnings: response.warnings ?? []
+            )
+
+            // 7. Record gamification checkin + analytics
+            GamificationService.shared.recordCheckin()
+            AnalyticsService.shared.track(.mealScanned)
+
+            // Unlock meal scanned badge
+            GamificationService.shared.unlockMealScanned()
+
+        } catch is CancellationError {
+            errorMessage = nil // User cancelled, no error
+        } catch let error as MealScanError {
+            switch error {
+            case .timeout:
+                errorMessage = "L'analyse a pris trop de temps. Reessaie avec une photo plus simple."
+            case .imageTooLarge:
+                errorMessage = "Image trop volumineuse (> 5 Mo). Essaie avec une photo plus legere."
+            case .rateLimited:
+                errorMessage = "Trop de requetes. Attends quelques secondes avant de reessayer."
+            case .notAnalyzable:
+                errorMessage = "Cette image ne semble pas contenir un repas. Essaie avec une photo d'assiette."
+            case .serverError(let msg):
+                errorMessage = "Erreur serveur : \(msg)"
+            }
+        } catch {
+            // Handle HTTP / Supabase errors by inspecting the error description
+            let desc = String(describing: error).lowercased()
+            if desc.contains("429") || desc.contains("rate") {
+                errorMessage = "Trop de requetes. Attends quelques secondes avant de reessayer."
+            } else if desc.contains("413") || desc.contains("too large") || desc.contains("payload") {
+                errorMessage = "Image trop volumineuse (> 5 Mo). Essaie avec une photo plus legere."
+            } else if desc.contains("timeout") || desc.contains("timed out") {
+                errorMessage = "L'analyse a pris trop de temps. Reessaie avec une photo plus simple."
+            } else {
+                errorMessage = "Erreur lors de l'analyse. Verifie ta connexion et reessaie."
+            }
+            AppLogger.analysis.report(error, context: "MealScan analyzePhoto")
+        }
+
+        isAnalyzing = false
+    }
+
+    // MARK: - Search Foods
+
+    func searchFoods() async {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else {
+            searchResults = []
+            return
+        }
+
+        // Cancel any in-flight search
+        searchTask?.cancel()
+
+        searchTask = Task {
+            isSearching = true
+
+            do {
+                // Small debounce to avoid hammering on every keystroke
+                try await Task.sleep(nanoseconds: 300_000_000) // 300ms
+                guard !Task.isCancelled else { return }
+
+                // Try Supabase ciqual_foods table first
+                let results = try await searchCiqualTable(query: query)
+
+                guard !Task.isCancelled else { return }
+
+                if !results.isEmpty {
+                    searchResults = results
+                } else {
+                    // Fallback to Edge Function search
+                    let fallbackResults = try await searchViaEdgeFunction(query: query)
+                    guard !Task.isCancelled else { return }
+                    searchResults = fallbackResults
+                }
+            } catch is CancellationError {
+                // Cancelled by new search, ignore
+            } catch {
+                guard !Task.isCancelled else { return }
+                searchResults = []
+            }
+
+            if !Task.isCancelled {
+                isSearching = false
+            }
+        }
+
+        await searchTask?.value
+    }
+
+    /// Query the ciqual_foods Supabase table
+    private func searchCiqualTable(query: String) async throws -> [FoodItem] {
+        let rows: [CiqualFoodRow] = try await client
+            .from("ciqual_foods")
+            .select()
+            .ilike("name", pattern: "%\(query)%")
+            .limit(20)
+            .execute()
+            .value
+
+        return rows.compactMap { row in
+            guard let name = row.name, !name.isEmpty else { return nil }
+            var nutrients: [String: Double] = [:]
+            if let cal = row.calories { nutrients["calories"] = cal }
+            if let prot = row.proteins { nutrients["proteins"] = prot }
+            if let carb = row.carbs { nutrients["carbs"] = carb }
+            if let fat = row.fats { nutrients["fats"] = fat }
+            if let iron = row.iron { nutrients["iron"] = iron }
+            if let vitC = row.vitC { nutrients["vitC"] = vitC }
+            return FoodItem(name: name, nutrients: nutrients)
+        }
+    }
+
+    /// Fallback: call the search-food Edge Function
+    private func searchViaEdgeFunction(query: String) async throws -> [FoodItem] {
+        let body = FoodSearchRequest(query: query)
+        let response: EdgeSearchResponse = try await client.functions.invoke(
+            "search-food",
+            options: .init(body: body)
+        )
+
+        return (response.results ?? []).compactMap { item in
+            guard let name = item.name, !name.isEmpty else { return nil }
+            return FoodItem(name: name, nutrients: item.nutrients ?? [:])
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// Resolve user deficiencies by recomputing local nutrient scores from the saved profile.
+    /// Returns nutrient IDs with score < 60 (matches web deficiency threshold). If unavailable,
+    /// returns [] and the Edge Function still works without personalised deficiency context.
+    private func resolveUserDeficiencies() async -> [String] {
+        do {
+            guard let session = await AuthService.shared.currentSession else { return [] }
+            let userId = session.user.id.uuidString
+            guard let profileRow = try await DatabaseService.shared.loadProfile(userId: userId),
+                  let questionnaire = profileRow.questionnaireData,
+                  questionnaire.completed else {
+                return []
+            }
+            // Deterministic local scores (no network). Filter the ones below the deficiency threshold.
+            let scores = HealthCalculator.analyzeNutrientScores(profile: questionnaire)
+            return scores.filter { $0.value < 60 }.map { $0.key }
+        } catch {
+            // Best-effort: if we can't compute deficiencies, proceed without them
+            AppLogger.database.warning("Could not load deficiencies: \(error.localizedDescription, privacy: .public)")
+        }
+        return []
+    }
+
+    // MARK: - Reset
+
+    func reset() {
+        selectedImage = nil
+        analysisResult = nil
+        errorMessage = nil
+    }
+
+    // MARK: - Errors
+
+    private enum MealScanError: Error {
+        case timeout
+        case imageTooLarge
+        case rateLimited
+        case notAnalyzable
+        case serverError(String)
+    }
+}
