@@ -16,7 +16,7 @@ struct TabTourOverlay: View {
 
     private let steps: [TourStep] = [
         TourStep(tabIndex: 0, icon: "heart.text.clipboard", title: "Bilan",
-                 description: "Ton bilan sante complet en un coup d'oeil : score global, carences detectees et alertes personnalisees."),
+                 description: "Ton bilan sante complet en un coup d'oeil : score global, apports insuffisants detectes et alertes personnalisees."),
         TourStep(tabIndex: 1, icon: "checkmark.circle", title: "Suivi",
                  description: "Enregistre tes habitudes quotidiennes (sommeil, hydratation, energie) et suis ta progression semaine apres semaine."),
         TourStep(tabIndex: 2, icon: "camera", title: "Scanner",

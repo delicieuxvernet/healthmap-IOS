@@ -172,6 +172,5 @@ private struct ConfettiParticle: View {
 
 #Preview {
     CelebrationView(score: 72) {
-        print("Continue tapped")
     }
 }

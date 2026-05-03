@@ -114,6 +114,16 @@ enum RedFlagDetector {
             ))
         }
 
+        // Digestive bleeding — red flag transversal majeur (melena/rectorragie).
+        // Ne jamais conclure à un apport insuffisant en fer seul : cause sous-jacente à écarter
+        // (ulcère, polype, néoplasie). Mirror exact de health.js (web).
+        if symptoms.contains("digestive_bleeding") {
+            flags.append(RedFlag(
+                id: .digestiveBleeding, urgency: .immediate,
+                message: "Selles noires ou sang dans les selles — consultez rapidement un médecin pour écarter une cause digestive. Un bilan (ferritine + endoscopie selon avis médical) est nécessaire avant toute conclusion nutritionnelle."
+            ))
+        }
+
         return flags
     }
 }

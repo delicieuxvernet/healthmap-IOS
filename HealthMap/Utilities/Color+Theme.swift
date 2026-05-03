@@ -1,11 +1,13 @@
 import SwiftUI
 import UIKit
 
-// MARK: - HealthMap Color Palette (tout bleu, jamais de melange vert/bleu)
+// MARK: - HealthMap Color Palette (palette variée unifiée web ↔ iOS, façon FoodVisor)
 //
-// The brand palette stays identical in light mode. Neutrals (background,
-// card, ink, muted, blueLight) are declared as dynamic colors so the app
-// feels native in dark mode without requiring an Asset Catalog edit.
+// Décision produit (3 mai 2026) : abandon de la règle "tout bleu" pour les
+// nutriments et les scores. Chaque nutriment a SA couleur distincte (mémorisation),
+// alignée hex-pour-hex sur la constante NUTRIENTS du web (src/lib/health.js).
+// Les neutres (background, card, ink, muted, blueLight) restent dynamic
+// pour le dark mode.
 extension Color {
     // Primary brand (constant across modes)
     static let healthMapBlue = Color(hex: "007AFF")
@@ -50,26 +52,25 @@ extension Color {
             : UIColor(red: 0x9C/255, green: 0xA3/255, blue: 0xAF/255, alpha: 1.0)
     })
 
-    // Score colors — "tout bleu" palette (4-tier, blue nuances only)
-    // Écart de luminosité élargi pour distinguer les 4 tiers en un coup d'œil,
-    // tout en restant 100% en palette bleue (respect branding).
-    static let scoreExcellent = Color(hex: "00A3FF")   // bleu clair vibrant (très visible)
-    static let scoreGood = Color(hex: "0066CC")        // bleu moyen
-    static let scoreLow = Color(hex: "003D99")         // bleu foncé
-    static let scoreDeficient = Color(hex: "001F66")   // bleu très foncé / marine
+    // Score colors — 4 paliers VARIÉS (alignés sur la palette web).
+    // >= 75 vert, >= 60 bleu, >= 40 orange, < 40 rouge.
+    static let scoreExcellent = Color(hex: "34C759")   // vert (>= 75)
+    static let scoreGood = Color(hex: "007AFF")        // bleu (>= 60)
+    static let scoreLow = Color(hex: "FF9500")         // orange (>= 40)
+    static let scoreDeficient = Color(hex: "FF3B30")   // rouge (< 40)
 
-    // Nutrient-specific colors — all blue nuances ("tout bleu").
-    // Prior version mixed orange/red/purple/green/brown, violating brand.
-    static let nutrientVitD = Color(hex: "007AFF")        // primary
-    static let nutrientVitB12 = Color(hex: "0056CC")      // dark blue
-    static let nutrientIron = Color(hex: "5856D6")        // indigo (blue family)
-    static let nutrientMagnesium = Color(hex: "5AC8FA")   // sky blue
-    static let nutrientOmega3 = Color(hex: "007AFF")      // primary
-    static let nutrientVitC = Color(hex: "64D2FF")        // light sky
-    static let nutrientCalcium = Color(hex: "A8C5E8")     // powder blue
-    static let nutrientZinc = Color(hex: "4A90E2")        // steel blue
+    // Nutrient-specific colors — palette variée alignée sur le web (NUTRIENTS dans health.js).
+    // Chaque nutriment a SA couleur distincte pour aider la mémorisation utilisateur (façon FoodVisor).
+    static let nutrientVitD = Color(hex: "FF9500")        // orange
+    static let nutrientVitB12 = Color(hex: "FF3B30")      // rouge
+    static let nutrientIron = Color(hex: "AF52DE")        // purple
+    static let nutrientMagnesium = Color(hex: "5AC8FA")   // sky
+    static let nutrientOmega3 = Color(hex: "007AFF")      // blue
+    static let nutrientVitC = Color(hex: "34C759")        // green
+    static let nutrientCalcium = Color(hex: "8E8E93")     // gray
+    static let nutrientZinc = Color(hex: "FF2D55")        // magenta
     static let nutrientIodine = Color(hex: "5856D6")      // indigo
-    static let nutrientFiber = Color(hex: "6B8EAF")       // dusty blue
+    static let nutrientFiber = Color(hex: "A2845E")       // brown
 
     // Urgency — red kept ONLY for genuine medical alerts (Apple HIG alert semantic).
     // "Soon" and "routine" are folded into the blue family.
@@ -111,18 +112,20 @@ extension Color {
 // MARK: - Score Color Helpers
 extension Color {
     static func scoreColor(for score: Int) -> Color {
+        // 4 paliers variés (alignés sur le web) :
+        // >= 75 vert, >= 60 bleu, >= 40 orange, < 40 rouge.
         if score >= 75 { return .scoreExcellent }
-        if score >= 50 { return .scoreGood }
+        if score >= 60 { return .scoreGood }
         if score >= 40 { return .scoreLow }
         return .scoreDeficient
     }
 
     static func globalScoreColor(for score: Int) -> Color {
-        // Brand rule: scores >= 60 use the primary brand blue; below that,
-        // progressively muted blue/gray nuances signal risk without alarm.
-        if score >= 60 { return .healthMapBlue }
-        if score >= 40 { return .scoreLow }
-        return .scoreDeficient
+        // Anneau hero Dashboard : <40 rouge, <60 orange, <75 vert, >=75 bleu.
+        if score >= 75 { return .healthMapBlue }
+        if score >= 60 { return .scoreExcellent }   // vert
+        if score >= 40 { return .scoreLow }         // orange
+        return .scoreDeficient                       // rouge
     }
 
     static func nutrientColor(for id: String) -> Color {

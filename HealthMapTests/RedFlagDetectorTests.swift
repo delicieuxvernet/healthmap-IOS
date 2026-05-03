@@ -152,6 +152,18 @@ final class RedFlagDetectorTests: XCTestCase {
         XCTAssertTrue(ids.contains(.hairLossIronRisk), "Hair loss + very heavy periods should trigger hairLossIronRisk flag")
     }
 
+    // MARK: - Digestive Bleeding
+
+    /// Selles noires/sang dans les selles = red flag transversal majeur, urgency immediate.
+    /// Cause sous-jacente à écarter avant toute conclusion nutritionnelle.
+    func testDigestiveBleeding_triggered_immediate() {
+        let profile = makeProfile(symptoms: ["digestive_bleeding"])
+        let flags = RedFlagDetector.detect(profile: profile)
+        let bleedingFlag = flags.first(where: { $0.id == .digestiveBleeding })
+        XCTAssertNotNil(bleedingFlag, "digestive_bleeding symptom should trigger digestiveBleeding flag")
+        XCTAssertEqual(bleedingFlag?.urgency, .immediate, "digestiveBleeding flag must have urgency .immediate")
+    }
+
     // MARK: - Edge Cases
 
     /// A healthy profile with no risk factors should produce zero flags.
