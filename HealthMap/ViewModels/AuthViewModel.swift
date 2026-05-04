@@ -381,6 +381,32 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    /// Étape 2 du reset : valide le code à 6 chiffres reçu par email + pose le nouveau mot de passe.
+    /// Clerk n'expose pas de magic-link reset — c'est obligatoirement code + new password.
+    func completeResetPassword(code: String, newPassword: String) async -> Bool {
+        guard !code.isEmpty else {
+            errorMessage = "Veuillez saisir le code reçu par email."
+            return false
+        }
+        guard newPassword.count >= 8 else {
+            errorMessage = "Le mot de passe doit contenir au moins 8 caractères."
+            return false
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await AuthService.shared.completeResetPassword(code: code, newPassword: newPassword)
+            isLoading = false
+            return true
+        } catch {
+            errorMessage = Self.mapAuthError(error)
+            isLoading = false
+            return false
+        }
+    }
+
     // MARK: - Sign In with Google (Clerk gère l'ASWebAuthenticationSession en interne)
 
     func signInWithGoogle() async {

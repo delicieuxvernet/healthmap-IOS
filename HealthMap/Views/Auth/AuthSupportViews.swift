@@ -76,80 +76,30 @@ struct AuthSecureField: View {
 }
 
 // MARK: - Forgot Password Sheet
+//
+// Flow Clerk en 2 étapes :
+//   1. email -> Clerk envoie un code à 6 chiffres par mail
+//   2. user entre le code + son nouveau mot de passe -> session active
 struct ForgotPasswordSheet: View {
+    enum Step { case email, codeAndPassword, success }
+
     @EnvironmentObject var authVM: AuthViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var email = ""
-    @State private var sent = false
-    @State private var localError: String?
+    @State private var code = ""
+    @State private var newPassword = ""
+    @State private var step: Step = .email
 
     var body: some View {
         NavigationStack {
             VStack(spacing: Theme.spacingLG) {
-                if sent {
-                    VStack(spacing: Theme.spacingMD) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Color.scoreGood)
-                        Text("Email envoye !")
-                            .font(Theme.headlineFont)
-                        Text("Verifie ta boite mail pour reinitialiser ton mot de passe.")
-                            .font(Theme.bodyFont)
-                            .foregroundStyle(Color.healthMapSecondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.top, Theme.spacingXL)
-                    .onAppear { HapticService.shared.success() }
-                } else {
-                    Text("Entre ton adresse email pour recevoir un lien de reinitialisation.")
-                        .font(Theme.bodyFont)
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, Theme.spacingMD)
-
-                    TextField("Email", text: $email)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .padding(.horizontal, Theme.spacingMD)
-                        .frame(height: 50)
-                        .background(Color.healthMapBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
-
-                    if let err = localError ?? authVM.errorMessage {
-                        Text(err)
-                            .font(Theme.captionFont)
-                            .foregroundStyle(.red)
-                            .multilineTextAlignment(.center)
-                    }
-
-                    Button {
-                        Task {
-                            HapticService.shared.primary()
-                            let ok = await authVM.resetPassword(email: email)
-                            if ok {
-                                withAnimation(.healthMapSpring) { sent = true }
-                            } else {
-                                HapticService.shared.warning()
-                            }
-                        }
-                    } label: {
-                        HStack {
-                            if authVM.isLoading {
-                                ProgressView().tint(.white)
-                            } else {
-                                Text("Envoyer le lien")
-                                    .font(.system(size: 17, weight: .semibold))
-                            }
-                        }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(Color.healthMapBlue)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                    }
-                    .disabled(email.isEmpty || authVM.isLoading)
+                switch step {
+                case .email:
+                    emailStep
+                case .codeAndPassword:
+                    codeStep
+                case .success:
+                    successStep
                 }
 
                 Spacer()
@@ -164,6 +114,134 @@ struct ForgotPasswordSheet: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var emailStep: some View {
+        Text("Entre ton adresse email pour recevoir un code de reinitialisation.")
+            .font(Theme.bodyFont)
+            .foregroundStyle(Color.healthMapSecondary)
+            .multilineTextAlignment(.center)
+            .padding(.top, Theme.spacingMD)
+
+        TextField("Email", text: $email)
+            .textContentType(.emailAddress)
+            .keyboardType(.emailAddress)
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+            .padding(.horizontal, Theme.spacingMD)
+            .frame(height: 50)
+            .background(Color.healthMapBackground)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+
+        if let err = authVM.errorMessage {
+            Text(err)
+                .font(Theme.captionFont)
+                .foregroundStyle(.red)
+                .multilineTextAlignment(.center)
+        }
+
+        Button {
+            Task {
+                HapticService.shared.primary()
+                let ok = await authVM.resetPassword(email: email)
+                if ok {
+                    withAnimation(.healthMapSpring) { step = .codeAndPassword }
+                } else {
+                    HapticService.shared.warning()
+                }
+            }
+        } label: {
+            HStack {
+                if authVM.isLoading {
+                    ProgressView().tint(.white)
+                } else {
+                    Text("Envoyer le code")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(Color.healthMapBlue)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        }
+        .disabled(email.isEmpty || authVM.isLoading)
+    }
+
+    @ViewBuilder
+    private var codeStep: some View {
+        Text("Un code à 6 chiffres a ete envoye à \(email). Entre-le ci-dessous avec ton nouveau mot de passe.")
+            .font(Theme.bodyFont)
+            .foregroundStyle(Color.healthMapSecondary)
+            .multilineTextAlignment(.center)
+            .padding(.top, Theme.spacingMD)
+
+        TextField("Code à 6 chiffres", text: $code)
+            .textContentType(.oneTimeCode)
+            .keyboardType(.numberPad)
+            .padding(.horizontal, Theme.spacingMD)
+            .frame(height: 50)
+            .background(Color.healthMapBackground)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+
+        SecureField("Nouveau mot de passe (8 caractères min)", text: $newPassword)
+            .textContentType(.newPassword)
+            .padding(.horizontal, Theme.spacingMD)
+            .frame(height: 50)
+            .background(Color.healthMapBackground)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+
+        if let err = authVM.errorMessage {
+            Text(err)
+                .font(Theme.captionFont)
+                .foregroundStyle(.red)
+                .multilineTextAlignment(.center)
+        }
+
+        Button {
+            Task {
+                HapticService.shared.primary()
+                let ok = await authVM.completeResetPassword(code: code, newPassword: newPassword)
+                if ok {
+                    withAnimation(.healthMapSpring) { step = .success }
+                } else {
+                    HapticService.shared.warning()
+                }
+            }
+        } label: {
+            HStack {
+                if authVM.isLoading {
+                    ProgressView().tint(.white)
+                } else {
+                    Text("Reinitialiser le mot de passe")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(Color.healthMapBlue)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        }
+        .disabled(code.isEmpty || newPassword.isEmpty || authVM.isLoading)
+    }
+
+    @ViewBuilder
+    private var successStep: some View {
+        VStack(spacing: Theme.spacingMD) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.scoreGood)
+            Text("Mot de passe reinitialise !")
+                .font(Theme.headlineFont)
+            Text("Tu peux maintenant te connecter avec ton nouveau mot de passe.")
+                .font(Theme.bodyFont)
+                .foregroundStyle(Color.healthMapSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.top, Theme.spacingXL)
+        .onAppear { HapticService.shared.success() }
     }
 }
 
