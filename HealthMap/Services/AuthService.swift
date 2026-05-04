@@ -128,10 +128,9 @@ final class AuthService {
                 AppLogger.auth.report(error, context: "AuthService.currentSession.resolveProfile")
                 return nil
             }
-            // `getToken` retourne un `TokenResource?` (struct Clerk), pas un
-            // String. Le JWT brut est dans `.jwt` — c'est cette string-là qu'on
-            // passe à `HMSession.accessToken: String?`.
-            let token = try? await Clerk.shared.session?.getToken(.init(template: "supabase"))?.jwt
+            // Clerk SDK >= 0.5: `getToken(_:)` returns `String?` directly
+            // (was `TokenResource?` with `.jwt` in pre-1.0 builds).
+            let token = try? await Clerk.shared.session?.getToken(.init(template: "supabase"))
             let email = clerkUser.primaryEmailAddress?.emailAddress
                 ?? clerkUser.emailAddresses.first?.emailAddress
             let user = HMUser(
@@ -178,9 +177,7 @@ final class AuthService {
     // "entre le code et ton nouveau mot de passe" et appeler `completeResetPassword`.
     func resetPassword(email: String) async throws {
         let signIn = try await Clerk.shared.auth.signIn(email)
-        _ = try await signIn.prepareFirstFactor(
-            strategy: .resetPasswordEmailCode
-        )
+        _ = try await signIn.sendResetPasswordEmailCode()
     }
 
     /// Étape 2 du reset : valide le code email + pose le nouveau mot de passe.
@@ -188,10 +185,7 @@ final class AuthService {
         guard let signIn = Clerk.shared.auth.currentSignIn else {
             throw HealthMapError.auth(.sessionExpired)
         }
-        _ = try await signIn.attemptFirstFactor(
-            strategy: .resetPasswordEmailCode,
-            code: code
-        )
+        _ = try await signIn.verifyCode(code)
         _ = try await signIn.resetPassword(newPassword: newPassword)
     }
 
@@ -214,18 +208,23 @@ final class AuthService {
             let task = Task { [weak self] in
                 // Émet l'état initial immédiatement pour dismisser le launch screen.
                 let initial = await self?.currentSession
-                continuation.yield((event: .initialSession, session: initial))
+                continuation.yield((event: HMAuthChangeEvent.initialSession, session: initial))
 
-                for await event in Clerk.shared.events.authEventEmitter.values {
+                for await event in Clerk.shared.auth.events {
                     guard !Task.isCancelled else { break }
                     let mapped: HMAuthChangeEvent
                     switch event {
-                    case .signInCompleted:    mapped = .signedIn
-                    case .signUpCompleted:    mapped = .signedIn
-                    case .signOutCompleted:   mapped = .signedOut
-                    case .sessionTokenRefreshed: mapped = .tokenRefreshed
-                    case .userUpdated:        mapped = .userUpdated
-                    @unknown default:         continue
+                    case .signInCompleted:        mapped = .signedIn
+                    case .signUpCompleted:        mapped = .signedIn
+                    case .signedOut:              mapped = .signedOut
+                    case .accountDeleted:         mapped = .signedOut
+                    case .tokenRefreshed:         mapped = .tokenRefreshed
+                    case .sessionChanged(let old, let new):
+                        // Map session transitions to the closest legacy event.
+                        mapped = (new == nil && old != nil) ? .signedOut
+                               : (new != nil && old == nil) ? .signedIn
+                               : .userUpdated
+                    @unknown default:             continue
                     }
                     let session = await self?.currentSession
                     continuation.yield((event: mapped, session: session))

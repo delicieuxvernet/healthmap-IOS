@@ -57,7 +57,7 @@ final class SupabaseService {
             // (JWT Templates → New → "supabase"). Le `sub` claim doit pointer
             // vers `external_id` ou un custom claim contenant `profiles.id`
             // (UUID) pour que les policies RLS Supabase matchent.
-            return try await Clerk.shared.session?.getToken(.init(template: "supabase"))?.jwt
+            return try await Clerk.shared.session?.getToken(.init(template: "supabase"))
         }
 
         client = SupabaseClient(
