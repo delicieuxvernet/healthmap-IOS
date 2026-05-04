@@ -54,10 +54,11 @@ protocol SubscriptionServiceProtocol: AnyObject {
 
 // MARK: - Analytics
 
+@MainActor
 protocol AnalyticsServiceProtocol: AnyObject {
-    func track(_ event: AnalyticsEvent, properties: [String: Any]?)
+    func track(_ event: AnalyticsEvent, properties: [String: any Sendable]?)
     func trackScreen(_ name: String)
-    func identify(userId: String, traits: [String: Any]?)
+    func identify(userId: String, traits: [String: any Sendable]?)
     func reset()
 }
 

@@ -89,6 +89,12 @@ enum AnalyticsEvent: String {
 ///   - Event properties are whitelisted at the call site — don't pass arbitrary objects
 ///   - Can be fully reset on sign out via `reset()`
 ///   - PostHog host is pinned to the EU region for RGPD compliance
+///
+/// **Concurrency** : pinned to `@MainActor` because every call-site is either
+/// a SwiftUI View, a `@MainActor` ViewModel, or another `@MainActor` service.
+/// All mutable state (`isStarted`, `currentUserId`, `postHogDistinctId`) is
+/// therefore protected by MainActor isolation rather than ad-hoc dispatch.
+@MainActor
 final class AnalyticsService: AnalyticsServiceProtocol {
 
     static let shared = AnalyticsService()
@@ -98,7 +104,6 @@ final class AnalyticsService: AnalyticsServiceProtocol {
 
     private var isStarted = false
     private var currentUserId: String?
-    private let queue = DispatchQueue(label: "fr.healthmap.analytics", qos: .utility)
 
     // MARK: - Lifecycle
 
@@ -115,8 +120,10 @@ final class AnalyticsService: AnalyticsServiceProtocol {
 
     // MARK: - Tracking
 
-    func track(_ event: AnalyticsEvent, properties: [String: Any]? = nil) {
-        let safeProps = Self.sanitize(properties)
+    func track(_ event: AnalyticsEvent, properties: [String: any Sendable]? = nil) {
+        // Sanitise to `[String: String]` *before* any actor hop so the values
+        // we ship to async sinks are unconditionally `Sendable`.
+        let safeProps: [String: String] = Self.sanitize(properties)
 
         // 1. Local log
         AppLogger.analytics.debug("\(event.rawValue, privacy: .public) \(String(describing: safeProps), privacy: .public)")
@@ -124,9 +131,15 @@ final class AnalyticsService: AnalyticsServiceProtocol {
         // 2. Sentry breadcrumb (last N events before any crash/error will be attached)
         CrashReportingService.shared.breadcrumb(event.rawValue, category: "analytics", level: .info)
 
-        // 3. Supabase analytics table — fire-and-forget
-        queue.async { [weak self] in
-            Task { await self?.supabaseCapture(event: event, properties: safeProps) }
+        // 3. Supabase analytics table — fire-and-forget. Capture user-id by
+        // value so the detached Task does not need to hop back to MainActor.
+        let snapshotUserId = currentUserId
+        Task.detached { [safeProps] in
+            await Self.supabaseCapture(
+                event: event,
+                userId: snapshotUserId,
+                properties: safeProps
+            )
         }
 
         // 4. PostHog
@@ -139,7 +152,7 @@ final class AnalyticsService: AnalyticsServiceProtocol {
 
     // MARK: - Identity
 
-    func identify(userId: String, traits: [String: Any]? = nil) {
+    func identify(userId: String, traits: [String: any Sendable]? = nil) {
         currentUserId = userId
         CrashReportingService.shared.identify(userId: userId)
         postHogIdentify(userId: userId, traits: Self.sanitize(traits))
@@ -155,9 +168,18 @@ final class AnalyticsService: AnalyticsServiceProtocol {
 
     // MARK: - Supabase sink
 
-    private func supabaseCapture(event: AnalyticsEvent, properties: [String: String]) async {
+    /// Static (no-actor) helper so we don't have to hop back to MainActor for
+    /// the network write. All inputs are `Sendable` value types — the only
+    /// shared resource touched here is the global `SupabaseService.shared`
+    /// client (which is itself thread-safe per Supabase SDK documentation)
+    /// and the `OfflineQueueService` actor (which guards its own state).
+    private static func supabaseCapture(
+        event: AnalyticsEvent,
+        userId: String?,
+        properties: [String: String]
+    ) async {
         guard SupabaseService.shared.safeClient != nil else { return }
-        struct Row: Encodable {
+        struct Row: Encodable, Sendable {
             let user_id: String?
             let event: String
             let properties: [String: String]
@@ -165,8 +187,10 @@ final class AnalyticsService: AnalyticsServiceProtocol {
             let environment: String
             let created_at: String
         }
+        // `AppConfig` is a plain `final class` whose values are immutable
+        // after init — safe to read from any actor.
         let row = Row(
-            user_id: currentUserId,
+            user_id: userId,
             event: event.rawValue,
             properties: properties,
             app_version: AppConfig.shared.versionTag,
@@ -199,11 +223,15 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     /// We intentionally avoid the PostHog SDK to keep the dependency graph
     /// small and App Store review friendly. Payload shape matches
     /// https://posthog.com/docs/api/post-only-endpoints
-    private static let postHogHost = "https://eu.i.posthog.com"
+    nonisolated private static let postHogHost = "https://eu.i.posthog.com"
     private var postHogDistinctId: String?
 
     private func postHogCapture(event: AnalyticsEvent, properties: [String: String]) {
         guard let apiKey = AppConfig.shared.posthogAPIKey else { return }
+
+        // Snapshot all MainActor-isolated state into Sendable locals before
+        // the detached Task fires.
+        let distinctId = postHogDistinctId ?? "anonymous"
 
         var merged: [String: Any] = properties
         merged["$lib"] = "healthmap-ios"
@@ -212,7 +240,7 @@ final class AnalyticsService: AnalyticsServiceProtocol {
         let payload: [String: Any] = [
             "api_key": apiKey,
             "event": event.rawValue,
-            "distinct_id": postHogDistinctId ?? "anonymous",
+            "distinct_id": distinctId,
             "properties": merged,
             "timestamp": ISO8601DateFormatter().string(from: Date()),
         ]
@@ -226,16 +254,17 @@ final class AnalyticsService: AnalyticsServiceProtocol {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = body
+        let request = req // immutable copy for the detached task
 
-        Task {
+        Task.detached { [properties] in
             do {
-                _ = try await URLSession.shared.data(for: req)
+                _ = try await URLSession.shared.data(for: request)
             } catch {
                 AppLogger.analytics.notice("PostHog capture failed, queuing: \(error.localizedDescription, privacy: .public)")
                 // API key intentionally excluded from queued payload — injected at flush time
                 let queuePayload = PostHogEventPayload(
                     event: event.rawValue,
-                    distinctId: self.postHogDistinctId ?? "anonymous",
+                    distinctId: distinctId,
                     properties: properties,
                     timestamp: ISO8601DateFormatter().string(from: Date())
                 )
@@ -265,9 +294,10 @@ final class AnalyticsService: AnalyticsServiceProtocol {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = body
+        let request = req
 
-        Task {
-            _ = try? await URLSession.shared.data(for: req)
+        Task.detached {
+            _ = try? await URLSession.shared.data(for: request)
         }
     }
 
@@ -275,7 +305,7 @@ final class AnalyticsService: AnalyticsServiceProtocol {
 
     /// Converts a loose `[String: Any]?` to a `[String: String]` while stripping
     /// any key that could contain PII or sensitive health data.
-    private static let forbiddenKeys: Set<String> = [
+    nonisolated private static let forbiddenKeys: Set<String> = [
         "email", "password", "first_name", "last_name", "name",
         "questionnaire_data", "ai_analysis", "symptoms", "medications",
         "period_flow", "pregnancy_status", "height", "weight", "age", "phone"
@@ -284,11 +314,11 @@ final class AnalyticsService: AnalyticsServiceProtocol {
     /// Test hook: exposes the sanitizer so unit tests can assert PII stripping
     /// without going through the full Supabase/PostHog pipeline.
     /// NOT for production call sites — use `track(_:properties:)` instead.
-    static func sanitizeForTesting(_ properties: [String: Any]?) -> [String: String] {
+    nonisolated static func sanitizeForTesting(_ properties: [String: any Sendable]?) -> [String: String] {
         sanitize(properties)
     }
 
-    private static func sanitize(_ properties: [String: Any]?) -> [String: String] {
+    nonisolated private static func sanitize(_ properties: [String: any Sendable]?) -> [String: String] {
         guard let properties else { return [:] }
         var result: [String: String] = [:]
         for (key, value) in properties {

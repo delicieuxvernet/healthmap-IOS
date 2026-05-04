@@ -112,9 +112,14 @@ private class HMPurchasesDelegate: NSObject, PurchasesDelegate {
     static let shared = HMPurchasesDelegate()
 
     func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
+        // Capture the singleton inside the MainActor task body so Swift 6
+        // strict-concurrency does not flag a cross-actor reference: the closure
+        // body itself is `@MainActor`, so `SubscriptionService.shared` (a
+        // `@MainActor` property) is reachable without any nonisolated hop.
         Task { @MainActor in
-            SubscriptionService.shared.customerInfo = customerInfo
-            SubscriptionService.shared.isPremium = customerInfo.entitlements["premium"]?.isActive == true
+            let service = SubscriptionService.shared
+            service.customerInfo = customerInfo
+            service.isPremium = customerInfo.entitlements["premium"]?.isActive == true
         }
     }
 }
