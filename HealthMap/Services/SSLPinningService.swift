@@ -30,29 +30,30 @@ final class SSLPinningService: NSObject {
     // MARK: - Pin Database
 
     /// SHA-256 hashes of the Subject Public Key Info (SPKI) for each pinned domain.
-    /// Two hashes per domain: primary (current cert) and backup (next rotation).
+    /// Two hashes per domain: primary (leaf certificate) and backup (intermediate CA).
+    /// The intermediate hash survives leaf-cert rotation as long as the issuing CA
+    /// stays the same — gives the app a window to ship an update before pin expiry.
     ///
-    /// To extract the SPKI hash from a live certificate:
-    ///     openssl s_client -connect host:443 < /dev/null 2>/dev/null \
-    ///       | openssl x509 -pubkey -noout \
-    ///       | openssl pkey -pubin -outform DER \
-    ///       | openssl dgst -sha256 -binary \
-    ///       | base64
-    ///
-    /// IMPORTANT: Replace these placeholder hashes with real ones extracted from
-    /// your Supabase project's certificate before shipping to production.
+    /// Captured: 2026-05-04. Both leafs are Google Trust Services (CN=WE1).
+    /// Re-extract before any planned cert rotation. Command:
+    ///     echo | openssl s_client -showcerts -servername HOST -connect HOST:443 2>/dev/null \
+    ///       | awk '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/' > chain.pem
+    ///     # then for each split cert:
+    ///     openssl x509 -in cert.pem -pubkey -noout \
+    ///       | openssl pkey -pubin -outform der \
+    ///       | openssl dgst -sha256 -binary | base64
     private static let pinnedHashes: [String: Set<String>] = [
-        "supabase.co": [
-            // Primary (current Let's Encrypt / Cloudflare cert)
-            "PLACEHOLDER_SUPABASE_PRIMARY_SPKI_SHA256_BASE64",
-            // Backup (next rotation — update before expiry)
-            "PLACEHOLDER_SUPABASE_BACKUP_SPKI_SHA256_BASE64",
+        "ftwfxdfkghkemnpwtzlu.supabase.co": [
+            // Primary — leaf (CN=supabase.co)
+            "p51goejPCgGH+Oog/MU2k6PObcEfTrrr73jUcuWJ7w0=",
+            // Backup — Google Trust Services WE1 intermediate
+            "kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=",
         ],
-        "i.posthog.com": [
-            // Primary
-            "PLACEHOLDER_POSTHOG_PRIMARY_SPKI_SHA256_BASE64",
-            // Backup
-            "PLACEHOLDER_POSTHOG_BACKUP_SPKI_SHA256_BASE64",
+        "clerk.healthmap.fr": [
+            // Primary — leaf (CN=clerk.healthmap.fr)
+            "TTPUPZJN0wUqqXt7T0CWPmVfA8ghqDIVq3P3o71UwTM=",
+            // Backup — Google Trust Services WE1 intermediate (same CA as Supabase)
+            "kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=",
         ],
     ]
 
@@ -85,10 +86,9 @@ extension SSLPinningService: URLSessionDelegate {
             return
         }
 
-        // TODO: Remplacer les hashes PLACEHOLDER dans `pinnedHashes` par de vrais SPKI
-        // SHA-256 avant la release production (voir instructions ligne 30-40).
-        // Tant que les placeholders sont présents, désactiver le pinning car il
-        // bloquerait 100% des requêtes en prod (aucun hash ne matchera jamais).
+        // Defensive guard: if a future maintainer adds a new pinned domain
+        // and forgets to fill the SPKI hash (leaving a `PLACEHOLDER_…` string),
+        // we fall back to default trust for that host instead of bricking it.
         let hasPlaceholders = expectedHashes.contains { $0.hasPrefix("PLACEHOLDER_") }
         if hasPlaceholders {
             #if DEBUG
