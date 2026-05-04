@@ -89,7 +89,9 @@ final class NetworkService {
 
     private static func isTransient(_ error: HealthMapError) -> Bool {
         switch error {
-        case .network(.offline), .network(.timeout), .network(.serverError(let code)) where code >= 500:
+        case .network(.offline), .network(.timeout):
+            return true
+        case .network(.serverError(let code)) where code >= 500:
             return true
         case .network(.rateLimited):
             return true

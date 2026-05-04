@@ -5,7 +5,7 @@ import Supabase
 /// Note: tous les callers sont @MainActor (ViewModels). La classe est marquée @MainActor
 /// pour garantir la thread-safety du circuit breaker (consecutiveFailures, circuitOpenUntil).
 @MainActor
-final class AIAnalysisService {
+final class AIAnalysisService: AIAnalysisServiceProtocol {
     static let shared = AIAnalysisService()
     private var client: SupabaseClient { SupabaseService.shared.client }
     private let schemaVersion = 7

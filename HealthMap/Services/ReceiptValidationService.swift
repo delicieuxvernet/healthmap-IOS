@@ -39,10 +39,10 @@ final class ReceiptValidationService {
     /// production diagnostics, not DRM enforcement).
     func verifyAppTransaction() async {
         do {
-            let result = try AppTransaction.shared
+            let result = try await AppTransaction.shared
             switch result {
             case .verified(let transaction):
-                AppLogger.subscription.info("AppTransaction verified (appId: \(transaction.appID, privacy: .public), env: \(String(describing: transaction.environment), privacy: .public))")
+                AppLogger.subscription.info("AppTransaction verified (appId: \(String(describing: transaction.appID), privacy: .public), env: \(String(describing: transaction.environment), privacy: .public))")
                 CrashReportingService.shared.breadcrumb(
                     "AppTransaction verified",
                     category: "subscription",

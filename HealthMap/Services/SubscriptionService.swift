@@ -13,7 +13,7 @@ final class SubscriptionService: ObservableObject {
 
     private init() {
         // Listen to customer info changes
-        Purchases.shared.delegate = PurchasesDelegate.shared
+        Purchases.shared.delegate = HMPurchasesDelegate.shared
     }
 
     // MARK: - Check Premium Status
@@ -108,8 +108,8 @@ final class SubscriptionService: ObservableObject {
 }
 
 // MARK: - Purchases Delegate
-private class PurchasesDelegate: NSObject, PurchasesDelegate {
-    static let shared = PurchasesDelegate()
+private class HMPurchasesDelegate: NSObject, PurchasesDelegate {
+    static let shared = HMPurchasesDelegate()
 
     func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
         Task { @MainActor in

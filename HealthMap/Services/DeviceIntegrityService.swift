@@ -129,8 +129,17 @@ final class DeviceIntegrityService {
 
     /// On stock iOS, `fork()` returns -1 because the sandbox disallows
     /// process creation. On a jailbroken device, fork succeeds.
+    ///
+    /// `fork()` is marked unavailable in iOS SDK 26+ at the API level but the
+    /// libSystem symbol is still present at runtime — resolve it via `dlsym`
+    /// so we keep the jailbreak signal without tripping the compile-time gate.
     private func checkForkBehaviour() -> Bool {
-        let result = fork()
+        typealias ForkFn = @convention(c) () -> Int32
+        guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "fork") else {
+            return false
+        }
+        let forkFn = unsafeBitCast(sym, to: ForkFn.self)
+        let result = forkFn()
         if result >= 0 {
             // fork succeeded — either we're the parent (result > 0) or
             // the child (result == 0). Kill the child if we're the parent.
