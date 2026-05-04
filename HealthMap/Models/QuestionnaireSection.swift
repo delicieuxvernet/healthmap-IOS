@@ -471,8 +471,9 @@ extension QuestionnaireSection {
                 .init("acid_reflux", "Reflux gastrique"),
             ]
         ),
-        // These questions already have "Non concerne" as an option,
-        // so they are shown to all users regardless of gender.
+        // Gender-specific: only displayed for users who selected `femme`. Hommes
+        // don't need to see these questions at all — gender filtering is cleaner
+        // UX than asking them to pick "Non concerne".
         Question(
             id: "periodFlow",
             text: "Abondance de tes regles ?",
@@ -481,7 +482,8 @@ extension QuestionnaireSection {
                 .init("light", "Legeres"), .init("normal", "Normales"),
                 .init("heavy", "Abondantes"), .init("very_heavy", "Tres abondantes"),
                 .init("na", "Non concerne"),
-            ]
+            ],
+            showIf: { $0.gender == .femme }
         ),
         Question(
             id: "pregnancyStatus",
@@ -492,7 +494,8 @@ extension QuestionnaireSection {
                 .init("trying_to_conceive", "Projet de grossesse"),
                 .init("pregnant", "Enceinte"),
                 .init("breastfeeding", "Allaitement"),
-            ]
+            ],
+            showIf: { $0.gender == .femme }
         ),
     ]
 }
