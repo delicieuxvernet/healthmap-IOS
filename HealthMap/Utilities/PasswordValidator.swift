@@ -16,7 +16,7 @@ enum PasswordStrength: Int, Comparable {
         case .weak:      return "Faible"
         case .fair:      return "Moyen"
         case .strong:    return "Fort"
-        case .veryStrong: return "Tres fort"
+        case .veryStrong: return "Très fort"
         }
     }
 }

@@ -268,7 +268,7 @@ struct ForgotPasswordSheet: View {
         Button {
             Task {
                 HapticService.shared.selection()
-                _ = await authVM.resetPassword(email: email)
+                _ = await authVM.resendResetPasswordCode()
             }
         } label: {
             Text("Renvoyer le code")
@@ -279,9 +279,12 @@ struct ForgotPasswordSheet: View {
         .disabled(authVM.isLoading)
     }
 
-    /// True when code is 6 digits, password meets PasswordValidator, and confirm matches.
+    /// True when code is exactly 6 digits, password meets PasswordValidator,
+    /// and confirm matches. C2 : `==` au lieu de `>=` pour éviter qu'un
+    /// copier-coller accidentel de 7+ chiffres bloque le submit silencieusement
+    /// (le filtre numberPad cap déjà à 6 mais belt-and-braces).
     private var canSubmitReset: Bool {
-        code.count >= 6
+        code.count == 6
             && PasswordValidator.validate(newPassword).isEmpty
             && newPassword == confirmPassword
     }
@@ -384,6 +387,28 @@ struct EmailCodeVerificationSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                 }
                 .disabled(code.count != 6 || authVM.isLoading)
+
+                // B1 : bouton "Renvoyer le code" — utile si l'user a raté l'email,
+                // s'il a expiré, ou s'il est tombé en spam. Plafonné à 3 envois
+                // côté ViewModel pour éviter le spam (resendAttempts).
+                Button {
+                    Task {
+                        HapticService.shared.selection()
+                        let ok = await authVM.resendSignUpCode()
+                        if ok {
+                            // Reset le champ + refocus pour que l'user puisse
+                            // saisir le nouveau code immédiatement.
+                            code = ""
+                            isCodeFocused = true
+                        }
+                    }
+                } label: {
+                    Text("Renvoyer le code")
+                        .font(Theme.captionFont)
+                        .foregroundStyle(Color.healthMapBlue)
+                        .frame(minHeight: 44)
+                }
+                .disabled(authVM.isLoading)
 
                 Spacer()
             }

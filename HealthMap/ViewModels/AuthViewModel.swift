@@ -303,6 +303,14 @@ final class AuthViewModel: ObservableObject {
             // "Renvoyer le code". Pas de tracking erreur : c'est une situation
             // attendue (user qui revient le lendemain).
             errorMessage = HealthMapError.auth(.emailCodeExpired).errorDescription
+        } catch HealthMapError.auth(.sessionExpired) {
+            // B7 : le signUp Clerk a été recyclé (app fermée trop longtemps).
+            // On clear `pendingEmailVerification` pour re-router l'user vers
+            // le formulaire signup classique au lieu de le laisser bloqué sur
+            // un sheet où aucun code ne marchera plus jamais.
+            pendingEmailVerification = false
+            resendAttempts = 0
+            errorMessage = "Ta session d'inscription a expiré. Recommence l'inscription."
         } catch {
             errorMessage = Self.mapAuthError(error)
         }
@@ -600,29 +608,81 @@ final class AuthViewModel: ObservableObject {
 
     // MARK: - Error Mapping
 
+    /// B2 — mapping exhaustif des erreurs auth en messages français lisibles.
+    ///
+    /// Stratégie en 3 couches :
+    ///   1. Si l'erreur est déjà un `HealthMapError`, on prend son
+    ///      `errorDescription` localisé (déjà en français).
+    ///   2. Si c'est une `ClerkAPIError` ou similaire, on matche sur le `.code`
+    ///      string (stable across SDK versions) plutôt que sur le message
+    ///      anglais qui peut changer.
+    ///   3. Fallback : message générique français + log Sentry du code original
+    ///      pour pouvoir étendre le mapping si on observe un code récurrent.
+    ///
+    /// Codes Clerk de référence (cf. https://clerk.com/docs/errors) :
+    ///   form_identifier_exists, form_identifier_not_found,
+    ///   form_password_incorrect, form_password_pwned, form_password_validation_failed,
+    ///   form_param_format_invalid, form_param_nil, form_code_incorrect,
+    ///   form_code_expired, verification_expired, verification_failed,
+    ///   session_token_expired, client_state_invalid, too_many_requests,
+    ///   captcha_invalid, oauth_access_denied, oauth_callback_invalid.
     private static func mapAuthError(_ error: Error) -> String {
-        let description = error.localizedDescription.lowercased()
-
-        if description.contains("invalid login credentials") || description.contains("invalid_credentials") {
-            return "Email ou mot de passe incorrect."
-        }
-        if description.contains("email not confirmed") {
-            return "Veuillez confirmer votre email."
-        }
-        if description.contains("user already registered") || description.contains("already_exists") {
-            return "Un compte existe deja avec cet email."
-        }
-        if description.contains("network") || description.contains("timeout") {
-            return "Erreur reseau. Verifiez votre connexion."
-        }
-        if description.contains("weak password") || description.contains("password") {
-            return "Le mot de passe doit contenir au moins 8 caracteres."
-        }
-        if description.contains("rate limit") || description.contains("too many requests") {
-            return "Trop de tentatives. Reessayez dans quelques minutes."
+        // Couche 1 : HealthMapError déjà français
+        if let hm = error as? HealthMapError, let desc = hm.errorDescription {
+            return desc
         }
 
-        return "Une erreur est survenue. Veuillez reessayer."
+        // Couche 2 : pattern-match sur les codes Clerk via le bas du message.
+        // On cherche le code dans deux formes possibles :
+        //   - `(code: "form_identifier_exists")` (description par défaut)
+        //   - `code: form_identifier_exists` (variante)
+        let raw = error.localizedDescription
+        let lower = raw.lowercased()
+
+        let codeMatchers: [(needles: [String], message: String)] = [
+            (["form_identifier_exists", "already registered", "already_exists",
+              "that email address is taken"],
+             "Un compte existe déjà avec cet email."),
+            (["form_identifier_not_found", "user not found", "couldn't find your account"],
+             "Aucun compte trouvé avec cet email."),
+            (["form_password_incorrect", "invalid login", "invalid_credentials",
+              "incorrect password"],
+             "Email ou mot de passe incorrect."),
+            (["form_password_pwned"],
+             "Ce mot de passe figure dans une fuite de données connue. Choisis-en un autre."),
+            (["form_password_validation_failed", "password_too_short", "weak password"],
+             "Le mot de passe ne respecte pas les règles (8 caractères min, majuscule, chiffre, spécial)."),
+            (["form_code_incorrect", "verification_failed"],
+             "Code incorrect. Vérifie tes mails et réessaie."),
+            (["form_code_expired", "verification_expired"],
+             "Ce code a expiré. Demande un nouveau code."),
+            (["session_token_expired", "session_expired"],
+             "Ta session a expiré. Reconnecte-toi."),
+            (["client_state_invalid"],
+             "État invalide. Recommence depuis l'écran de connexion."),
+            (["too_many_requests", "rate limit"],
+             "Trop de tentatives. Réessaie dans quelques minutes."),
+            (["captcha_invalid", "captcha_failed"],
+             "Vérification anti-bot échouée. Réessaie."),
+            (["oauth_access_denied", "oauth_callback"],
+             "Connexion sociale annulée ou refusée."),
+            (["email not confirmed"],
+             "Vérifie ton email pour activer ton compte."),
+            (["network", "timeout", "could not connect"],
+             "Erreur réseau. Vérifie ta connexion et réessaie."),
+        ]
+
+        for matcher in codeMatchers {
+            if matcher.needles.contains(where: { lower.contains($0) }) {
+                return matcher.message
+            }
+        }
+
+        // Couche 3 : fallback. On log le message brut côté télémétrie pour
+        // pouvoir enrichir le mapping si un nouveau code apparaît, mais on
+        // n'expose JAMAIS la description anglaise à l'utilisateur — confusion.
+        AppLogger.auth.notice("Unmapped auth error: \(raw, privacy: .public)")
+        return "Une erreur d'authentification est survenue. Réessaie."
     }
 }
 

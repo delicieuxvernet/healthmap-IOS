@@ -53,7 +53,17 @@ final class LoginThrottleService {
         }
 
         let lastFailure = loadLastFailureTimestamp()
-        let elapsed = Date().timeIntervalSince1970 - lastFailure
+        let now = Self.monotonicSeconds()
+        let elapsed = now - lastFailure
+
+        // B6 : si elapsed < 0 c'est qu'on a rebooté (le clock monotone a
+        // recommencé de 0 et l'horodatage sauvé est dans le "futur"). Un
+        // reboot est une attente bien supérieure à tous nos délais (>30s
+        // garantis), donc on traite comme throttle expiré.
+        if elapsed < 0 {
+            return (allowed: true, retryAfter: nil)
+        }
+
         let remaining = delay - elapsed
 
         if remaining <= 0 {
@@ -69,13 +79,22 @@ final class LoginThrottleService {
         let current = loadFailureCount()
         let newCount = current + 1
         saveFailureCount(newCount)
-        saveLastFailureTimestamp(Date().timeIntervalSince1970)
+        saveLastFailureTimestamp(Self.monotonicSeconds())
 
         AppLogger.auth.notice("LoginThrottle: failure #\(newCount, privacy: .public)")
 
         if let delay = delayForFailures(newCount) {
             AppLogger.auth.notice("LoginThrottle: next attempt blocked for \(Int(delay), privacy: .public)s")
         }
+    }
+
+    /// Horloge monotone insensible aux changements de wall clock (B6).
+    /// Sur jailbreak, `Date()` peut être manipulé pour bypasser le throttle ;
+    /// `CLOCK_MONOTONIC_RAW` est en revanche immutable depuis l'userland.
+    /// Reset à 0 au reboot — détecté dans `canAttempt` (elapsed < 0 = reboot).
+    private static func monotonicSeconds() -> TimeInterval {
+        let nanos = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)
+        return TimeInterval(nanos) / 1_000_000_000
     }
 
     /// Resets the failure counter. Call on successful authentication.
