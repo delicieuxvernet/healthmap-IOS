@@ -120,9 +120,9 @@ struct AuthView: View {
                             Text(isSignUp ? "Creer mon compte" : "Se connecter")
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(.white)
-                                .opacity(authViewModel.isLoading ? 0 : 1)
+                                .opacity(authViewModel.isProcessing ? 0 : 1)
 
-                            if authViewModel.isLoading {
+                            if authViewModel.isProcessing {
                                 ProgressView()
                                     .tint(.white)
                             }
@@ -132,7 +132,7 @@ struct AuthView: View {
                         .background(Color.healthMapBlue)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                     }
-                    .disabled(authViewModel.isLoading)
+                    .disabled(authViewModel.isProcessing)
                     .padding(.horizontal, Theme.spacingLG)
 
                     // Divider

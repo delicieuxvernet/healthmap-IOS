@@ -11,7 +11,22 @@ final class AuthViewModel: ObservableObject {
     /// Starts `true` so the launch screen shows while the Supabase auth state
     /// listener restores the persisted Keychain session. Without this, a
     /// returning user briefly sees AuthView before being routed to MainTabView.
+    ///
+    /// IMPORTANT: this flag is owned exclusively by the session-restoration
+    /// path (init + first auth event). Per-operation in-flight state
+    /// (signIn, signUp, resetPassword…) lives in `isProcessing` instead —
+    /// flipping `isLoading` from inside those methods would force
+    /// ContentView to swap AuthView for LaunchScreenView mid-flow, which
+    /// destroys any presented sheet (e.g. the password-reset sheet
+    /// dismisses to login the moment the user taps "Envoyer le code").
     @Published var isLoading = true
+
+    /// True while a user-triggered auth call (signIn, signUp, resetPassword,
+    /// completeResetPassword, signInWithApple/Google, deleteAccount,
+    /// updatePassword, resend codes…) is in flight. Buttons disable +
+    /// show ProgressView based on this; ContentView ignores it.
+    @Published var isProcessing = false
+
     @Published var errorMessage: String?
 
     /// Set to `true` by `startRefreshTimer` when an automatic session refresh
@@ -200,7 +215,7 @@ final class AuthViewModel: ObservableObject {
             return
         }
 
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
 
         do {
@@ -224,7 +239,7 @@ final class AuthViewModel: ObservableObject {
             errorMessage = Self.mapAuthError(error)
         }
 
-        isLoading = false
+        isProcessing = false
     }
 
     // MARK: - Sign Up
@@ -249,7 +264,7 @@ final class AuthViewModel: ObservableObject {
             return
         }
 
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
 
         AnalyticsService.shared.track(.signUpStarted)
@@ -266,7 +281,7 @@ final class AuthViewModel: ObservableObject {
             errorMessage = Self.mapAuthError(error)
         }
 
-        isLoading = false
+        isProcessing = false
     }
 
     /// Étape 2 du signup : valide le code email reçu par Clerk.
@@ -276,7 +291,7 @@ final class AuthViewModel: ObservableObject {
             errorMessage = "Veuillez saisir le code reçu par email."
             return
         }
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
         do {
             try await AuthService.shared.verifySignUpCode(code)
@@ -314,13 +329,13 @@ final class AuthViewModel: ObservableObject {
         } catch {
             errorMessage = Self.mapAuthError(error)
         }
-        isLoading = false
+        isProcessing = false
     }
 
     // MARK: - Sign Out
 
     func signOut() async {
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
 
         do {
@@ -346,7 +361,7 @@ final class AuthViewModel: ObservableObject {
         // Note: .signOutCompleted is tracked by the auth listener's .signedOut
         // handler, not here — avoids double-counting in analytics.
 
-        isLoading = false
+        isProcessing = false
     }
 
     // MARK: - Delete Account (Apple 5.1.1(v) + RGPD Art. 17)
@@ -364,17 +379,17 @@ final class AuthViewModel: ObservableObject {
     ///   - On failure we do NOT touch `isAuthenticated` either — the user must
     ///     stay in the flow so they can retry or contact support.
     func deleteAccount() async -> Bool {
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
 
         do {
             try await AuthService.shared.deleteAccount()
-            isLoading = false
+            isProcessing = false
             return true
         } catch {
             AppLogger.auth.report(error, context: "AuthViewModel deleteAccount")
             errorMessage = "Erreur lors de la suppression du compte. Reessayez ou contactez le support."
-            isLoading = false
+            isProcessing = false
             return false
         }
     }
@@ -405,7 +420,7 @@ final class AuthViewModel: ObservableObject {
             return false
         }
 
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
 
         do {
@@ -415,11 +430,11 @@ final class AuthViewModel: ObservableObject {
             resetPasswordEmail = email
             resendAttempts = 0
             AnalyticsService.shared.track(.passwordResetRequested, properties: ["method": "email"])
-            isLoading = false
+            isProcessing = false
             return true
         } catch {
             errorMessage = Self.mapAuthError(error)
-            isLoading = false
+            isProcessing = false
             return false
         }
     }
@@ -437,7 +452,7 @@ final class AuthViewModel: ObservableObject {
             return false
         }
 
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
 
         do {
@@ -445,7 +460,7 @@ final class AuthViewModel: ObservableObject {
             // Succès : on nettoie l'état intermédiaire.
             resetPasswordEmail = nil
             resendAttempts = 0
-            isLoading = false
+            isProcessing = false
             return true
         } catch HealthMapError.auth(.sessionExpired) where resetPasswordEmail != nil {
             // A3 : la session Clerk de reset a expiré (app fermée trop longtemps,
@@ -461,11 +476,11 @@ final class AuthViewModel: ObservableObject {
                 errorMessage = "Le code a expiré et le renvoi a échoué. Recommence depuis l'écran email."
                 resetPasswordEmail = nil
             }
-            isLoading = false
+            isProcessing = false
             return false
         } catch {
             errorMessage = Self.mapAuthError(error)
-            isLoading = false
+            isProcessing = false
             return false
         }
     }
@@ -483,16 +498,16 @@ final class AuthViewModel: ObservableObject {
             errorMessage = HealthMapError.auth(.tooManyResendAttempts).errorDescription
             return false
         }
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
         do {
             try await AuthService.shared.resetPassword(email: email)
             resendAttempts += 1
-            isLoading = false
+            isProcessing = false
             return true
         } catch {
             errorMessage = Self.mapAuthError(error)
-            isLoading = false
+            isProcessing = false
             return false
         }
     }
@@ -508,16 +523,16 @@ final class AuthViewModel: ObservableObject {
             errorMessage = HealthMapError.auth(.tooManyResendAttempts).errorDescription
             return false
         }
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
         do {
             try await AuthService.shared.resendSignUpEmailCode()
             resendAttempts += 1
-            isLoading = false
+            isProcessing = false
             return true
         } catch {
             errorMessage = Self.mapAuthError(error)
-            isLoading = false
+            isProcessing = false
             return false
         }
     }
@@ -525,7 +540,7 @@ final class AuthViewModel: ObservableObject {
     // MARK: - Sign In with Google (Clerk gère l'ASWebAuthenticationSession en interne)
 
     func signInWithGoogle() async {
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
 
         do {
@@ -538,7 +553,7 @@ final class AuthViewModel: ObservableObject {
             errorMessage = "Erreur de connexion avec Google."
         }
 
-        isLoading = false
+        isProcessing = false
     }
 
     // MARK: - Sign In with Apple (Apple App Store guideline 4.8)
@@ -554,7 +569,7 @@ final class AuthViewModel: ObservableObject {
     ///     we persist them into `profiles` immediately — without these the
     ///     dashboard would show an empty "Bonjour, " greeting forever.
     func signInWithApple(idToken: String, rawNonce: String, firstName: String?, email: String?) async {
-        isLoading = true
+        isProcessing = true
         errorMessage = nil
 
         do {
@@ -596,7 +611,7 @@ final class AuthViewModel: ObservableObject {
             errorMessage = "Erreur de connexion avec Apple."
         }
 
-        isLoading = false
+        isProcessing = false
     }
 
     // MARK: - Password Strength (for UI binding)

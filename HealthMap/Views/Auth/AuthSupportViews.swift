@@ -165,7 +165,7 @@ struct ForgotPasswordSheet: View {
             }
         } label: {
             HStack {
-                if authVM.isLoading {
+                if authVM.isProcessing {
                     ProgressView().tint(.white)
                 } else {
                     Text("Envoyer le code")
@@ -178,7 +178,7 @@ struct ForgotPasswordSheet: View {
             .background(Color.healthMapBlue)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         }
-        .disabled(email.isEmpty || authVM.isLoading)
+        .disabled(email.isEmpty || authVM.isProcessing)
     }
 
     @ViewBuilder
@@ -250,7 +250,7 @@ struct ForgotPasswordSheet: View {
             }
         } label: {
             HStack {
-                if authVM.isLoading {
+                if authVM.isProcessing {
                     ProgressView().tint(.white)
                 } else {
                     Text("Reinitialiser le mot de passe")
@@ -263,7 +263,7 @@ struct ForgotPasswordSheet: View {
             .background(Color.healthMapBlue)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         }
-        .disabled(!canSubmitReset || authVM.isLoading)
+        .disabled(!canSubmitReset || authVM.isProcessing)
 
         Button {
             Task {
@@ -276,7 +276,7 @@ struct ForgotPasswordSheet: View {
                 .foregroundStyle(Color.healthMapBlue)
                 .frame(minHeight: 44)
         }
-        .disabled(authVM.isLoading)
+        .disabled(authVM.isProcessing)
     }
 
     /// True when code is exactly 6 digits, password meets PasswordValidator,
@@ -373,7 +373,7 @@ struct EmailCodeVerificationSheet: View {
                     }
                 } label: {
                     HStack {
-                        if authVM.isLoading {
+                        if authVM.isProcessing {
                             ProgressView().tint(.white)
                         } else {
                             Text("Valider")
@@ -386,7 +386,7 @@ struct EmailCodeVerificationSheet: View {
                     .background(Color.healthMapBlue)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                 }
-                .disabled(code.count != 6 || authVM.isLoading)
+                .disabled(code.count != 6 || authVM.isProcessing)
 
                 // B1 : bouton "Renvoyer le code" — utile si l'user a raté l'email,
                 // s'il a expiré, ou s'il est tombé en spam. Plafonné à 3 envois
@@ -408,7 +408,7 @@ struct EmailCodeVerificationSheet: View {
                         .foregroundStyle(Color.healthMapBlue)
                         .frame(minHeight: 44)
                 }
-                .disabled(authVM.isLoading)
+                .disabled(authVM.isProcessing)
 
                 Spacer()
             }
