@@ -67,7 +67,7 @@ final class RedFlagDetectorTests: XCTestCase {
     /// Pregnant without folate should raise an immediate urgency flag
     /// because folate is critical for neural tube development.
     func testPregnantNoFolate_triggered() {
-        let profile = makeProfile(pregnancyStatus: "pregnant", supplements: [], gender: .femme)
+        let profile = makeProfile(supplements: [], pregnancyStatus: "pregnant", gender: .femme)
         let ids = flagIDs(for: profile)
         XCTAssertTrue(ids.contains(.pregnantNoFolate), "Pregnant without folate should trigger pregnantNoFolate flag")
     }
@@ -81,7 +81,7 @@ final class RedFlagDetectorTests: XCTestCase {
 
     /// Trying to conceive without folate — should start supplementation 3 months before.
     func testTryingConceiveNoFolate_triggered() {
-        let profile = makeProfile(pregnancyStatus: "trying_to_conceive", supplements: [], gender: .femme)
+        let profile = makeProfile(supplements: [], pregnancyStatus: "trying_to_conceive", gender: .femme)
         let ids = flagIDs(for: profile)
         XCTAssertTrue(ids.contains(.tryingConceiveNoFolate), "Trying to conceive without folate should trigger flag")
     }
@@ -90,7 +90,7 @@ final class RedFlagDetectorTests: XCTestCase {
 
     /// Very heavy periods without iron supplement = high anaemia risk.
     func testHeavyPeriodsNoIron_triggered() {
-        let profile = makeProfile(periodFlow: "very_heavy", supplements: [], gender: .femme)
+        let profile = makeProfile(supplements: [], periodFlow: "very_heavy", gender: .femme)
         let ids = flagIDs(for: profile)
         XCTAssertTrue(ids.contains(.heavyPeriodsNoIron), "Very heavy periods without iron should trigger heavyPeriodsNoIron flag")
     }

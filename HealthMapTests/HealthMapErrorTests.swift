@@ -31,7 +31,7 @@ final class HealthMapErrorTests: XCTestCase {
     }
 
     func testServerErrorShouldBeReported() {
-        XCTAssertTrue(HealthMapError.network(.serverError(500)).shouldReport)
+        XCTAssertTrue(HealthMapError.network(.serverError(statusCode: 500)).shouldReport)
     }
 
     func testFromMapsURLErrorToNetwork() {

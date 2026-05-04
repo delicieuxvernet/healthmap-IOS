@@ -137,7 +137,6 @@ final class OfflineQueueTests: XCTestCase {
 
     func testPostHogEventPayloadRoundtrip() throws {
         let original = PostHogEventPayload(
-            apiKey: "phc_test",
             event: "screen_viewed",
             distinctId: "user-42",
             properties: ["screen": "dashboard"],
@@ -147,7 +146,6 @@ final class OfflineQueueTests: XCTestCase {
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(PostHogEventPayload.self, from: data)
 
-        XCTAssertEqual(decoded.apiKey, "phc_test")
         XCTAssertEqual(decoded.event, "screen_viewed")
         XCTAssertEqual(decoded.distinctId, "user-42")
     }
