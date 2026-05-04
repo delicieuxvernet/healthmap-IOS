@@ -39,10 +39,17 @@ struct DashboardView: View {
                     Button {
                         Task { await viewModel.regenerateAnalysis() }
                     } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 16))
-                            .foregroundStyle(Color.healthMapBlue)
-                            .symbolEffect(.rotate.byLayer, options: .repeat(.continuous), isActive: viewModel.isLoadingAnalysis)
+                        Group {
+                            if #available(iOS 18.0, *) {
+                                Image(systemName: "arrow.clockwise")
+                                    .symbolEffect(.rotate.byLayer, options: .repeat(.continuous), isActive: viewModel.isLoadingAnalysis)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .symbolEffect(.pulse, options: .repeating, isActive: viewModel.isLoadingAnalysis)
+                            }
+                        }
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.healthMapBlue)
                     }
                     .disabled(viewModel.isLoadingAnalysis)
                 }

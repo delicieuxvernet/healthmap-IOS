@@ -21,20 +21,19 @@ struct ColorBlindSafeOverlay: View {
         .accessibilityHidden(true)
     }
 
-    @ViewBuilder
-    private func patternShape(in size: CGSize) -> some Shape {
+    private func patternShape(in size: CGSize) -> AnyShape {
         if score >= 75 {
             // Excellent — no pattern needed
-            EmptyPatternShape()
+            return AnyShape(EmptyPatternShape())
         } else if score >= 50 {
             // Bon — spaced dots
-            DotPattern(size: size, spacing: 6, dotRadius: 1.2)
+            return AnyShape(DotPattern(size: size, spacing: 6, dotRadius: 1.2))
         } else if score >= 40 {
             // Insuffisant — diagonal hatching (ascending)
-            HatchPattern(size: size, spacing: 5, lineWidth: 1, crossHatch: false)
+            return AnyShape(HatchPattern(size: size, spacing: 5, lineWidth: 1, crossHatch: false))
         } else {
             // Deficient — cross hatching
-            HatchPattern(size: size, spacing: 5, lineWidth: 1, crossHatch: true)
+            return AnyShape(HatchPattern(size: size, spacing: 5, lineWidth: 1, crossHatch: true))
         }
     }
 }
