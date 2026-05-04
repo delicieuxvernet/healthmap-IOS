@@ -29,31 +29,39 @@ final class SSLPinningService: NSObject {
 
     // MARK: - Pin Database
 
-    /// SHA-256 hashes of the Subject Public Key Info (SPKI) for each pinned domain.
-    /// Two hashes per domain: primary (leaf certificate) and backup (intermediate CA).
-    /// The intermediate hash survives leaf-cert rotation as long as the issuing CA
-    /// stays the same — gives the app a window to ship an update before pin expiry.
+    /// SHA-256 hashes of the public-key bytes returned by
+    /// `SecKeyCopyExternalRepresentation` for each pinned domain. Two
+    /// hashes per domain: primary (leaf certificate) and backup
+    /// (intermediate CA — survives a leaf rotation as long as the
+    /// issuing CA stays the same).
     ///
-    /// Captured: 2026-05-04. Both leafs are Google Trust Services (CN=WE1).
-    /// Re-extract before any planned cert rotation. Command:
-    ///     echo | openssl s_client -showcerts -servername HOST -connect HOST:443 2>/dev/null \
-    ///       | awk '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/' > chain.pem
-    ///     # then for each split cert:
-    ///     openssl x509 -in cert.pem -pubkey -noout \
-    ///       | openssl pkey -pubin -outform der \
-    ///       | openssl dgst -sha256 -binary | base64
+    /// IMPORTANT — these are *not* the SPKI hashes you get from openssl.
+    /// Apple's `SecKeyCopyExternalRepresentation` returns the raw
+    /// algorithm-specific key bytes (PKCS#1 RSAPublicKey, X9.63 EC
+    /// uncompressed point, …) — *without* the DER `AlgorithmIdentifier`
+    /// wrapper that openssl's `pkey -pubin -outform der` produces. The
+    /// two encodings hash differently, so an openssl-derived pin will
+    /// never match a runtime-computed iOS hash.
+    ///
+    /// Captured: 2026-05-04 from the booted iPhone 17 Pro simulator
+    /// runtime log (`SSLPinningService.urlSession(_:didReceive:)` prints
+    /// the chain's observed hashes on a pin miss; copy them from there).
+    /// Re-capture by booting a sim, hitting prod, and reading the
+    /// "chain hashes [...]" line in `xcrun simctl spawn booted log`.
     private static let pinnedHashes: [String: Set<String>] = [
         "ftwfxdfkghkemnpwtzlu.supabase.co": [
-            // Primary — leaf (CN=supabase.co)
-            "p51goejPCgGH+Oog/MU2k6PObcEfTrrr73jUcuWJ7w0=",
-            // Backup — Google Trust Services WE1 intermediate
-            "kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=",
+            // Primary — leaf public key (iOS-form hash captured at runtime)
+            "JxYBCNfhi515HdL0cvKtauDKAZvS/HXZc8eHx6C/1pI=",
         ],
+        // Clerk SDK uses its own URLSession (not our pinned one), so this
+        // entry is informational only — never consulted at runtime. Kept
+        // here so that if Clerk-traffic pinning is wired up later the
+        // hashes are documented; re-capture them in iOS-form at that point.
         "clerk.healthmap.fr": [
-            // Primary — leaf (CN=clerk.healthmap.fr)
-            "TTPUPZJN0wUqqXt7T0CWPmVfA8ghqDIVq3P3o71UwTM=",
-            // Backup — Google Trust Services WE1 intermediate (same CA as Supabase)
-            "kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=",
+            // Placeholder — re-capture iOS-form hashes when wiring Clerk
+            // traffic through the pinned session. Until then, treat as
+            // non-load-bearing.
+            "PLACEHOLDER_CLERK_LEAF_IOS_FORM",
         ],
     ]
 
@@ -106,32 +114,45 @@ extension SSLPinningService: URLSessionDelegate {
             return
         }
 
-        // Extract the leaf certificate's public key and compute its SPKI SHA-256
-        guard let serverCertificate = SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate],
-              let leafCert = serverCertificate.first,
-              let publicKey = SecCertificateCopyKey(leafCert),
-              let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as? Data else {
-            AppLogger.network.notice("SSL pinning: failed to extract public key for \(host, privacy: .public)")
+        // Walk the full cert chain (leaf → intermediates → root) and accept
+        // the connection if any chain element's public-key hash is pinned.
+        // Doing so makes the "backup" pin actually load-bearing: when the
+        // leaf rotates, a pin against a stable intermediate (e.g. Google
+        // Trust Services WE1) keeps the app talking to prod without an
+        // emergency release.
+        guard let chain = SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate] else {
+            AppLogger.network.notice("SSL pinning: failed to copy cert chain for \(host, privacy: .public)")
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
 
-        // Compute SHA-256 of the SPKI (DER-encoded public key)
-        let hash = SHA256.hash(data: publicKeyData)
-        let hashBase64 = Data(hash).base64EncodedString()
-
-        if expectedHashes.contains(hashBase64) {
-            // Pin matches — proceed
-            completionHandler(.useCredential, URLCredential(trust: serverTrust))
-        } else {
-            // Pin mismatch — potential MITM
-            AppLogger.network.notice("SSL pinning FAILED for \(host, privacy: .public) — hash \(hashBase64, privacy: .public) not in pin set")
-            CrashReportingService.shared.captureMessage(
-                "SSL pin mismatch for \(host)",
-                level: .error
-            )
-            completionHandler(.cancelAuthenticationChallenge, nil)
+        var observedHashes: [String] = []
+        observedHashes.reserveCapacity(chain.count)
+        for cert in chain {
+            guard let publicKey = SecCertificateCopyKey(cert),
+                  let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as? Data else {
+                continue
+            }
+            let hash = SHA256.hash(data: publicKeyData)
+            let hashBase64 = Data(hash).base64EncodedString()
+            observedHashes.append(hashBase64)
+            if expectedHashes.contains(hashBase64) {
+                completionHandler(.useCredential, URLCredential(trust: serverTrust))
+                return
+            }
         }
+
+        // No element in the chain matched. Surface the observed leaf hash
+        // explicitly so an operator can re-pin in seconds — historically
+        // we only logged the leaf, which made debugging post-rotation
+        // outages painful.
+        let observed = observedHashes.joined(separator: ", ")
+        AppLogger.network.notice("SSL pinning FAILED for \(host, privacy: .public) — chain hashes [\(observed, privacy: .public)] not in pin set")
+        CrashReportingService.shared.captureMessage(
+            "SSL pin mismatch for \(host)",
+            level: .error
+        )
+        completionHandler(.cancelAuthenticationChallenge, nil)
     }
 
     /// Matches a host against the pin database. Supports wildcard matching

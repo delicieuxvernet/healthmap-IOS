@@ -297,13 +297,28 @@ struct ForgotPasswordSheet: View {
                 .foregroundStyle(Color.scoreGood)
             Text("Mot de passe reinitialise !")
                 .font(Theme.headlineFont)
-            Text("Tu peux maintenant te connecter avec ton nouveau mot de passe.")
+            Text(authVM.isAuthenticated
+                 ? "Connexion en cours…"
+                 : "Tu peux maintenant te connecter avec ton nouveau mot de passe.")
                 .font(Theme.bodyFont)
                 .foregroundStyle(Color.healthMapSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, Theme.spacingXL)
-        .onAppear { HapticService.shared.success() }
+        .onAppear {
+            HapticService.shared.success()
+            // Clerk auto-signs the user in after a successful resetPassword.
+            // AuthViewModel.completeResetPassword forces a session refresh,
+            // so `isAuthenticated` is already true here. Auto-dismiss the
+            // sheet so AuthView unmounts and ContentView routes to MainTabView.
+            // 1.2s gives the user enough time to register the green check
+            // without forcing them to tap "Fermer" themselves.
+            if authVM.isAuthenticated {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    dismiss()
+                }
+            }
+        }
     }
 }
 

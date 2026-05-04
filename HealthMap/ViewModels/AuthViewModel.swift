@@ -235,8 +235,29 @@ final class AuthViewModel: ObservableObject {
 
             AnalyticsService.shared.track(.signInCompleted, properties: ["method": "email"])
         } catch {
-            LoginThrottleService.shared.recordFailure()
-            errorMessage = Self.mapAuthError(error)
+            // session_exists recovery: Clerk already has an active session
+            // (typical post-reset-password, post-OAuth, or stale local state).
+            // Re-fetching `currentSession` flips `isAuthenticated` and routes
+            // the user to MainTabView instead of throwing the generic error.
+            // Don't increment the throttle on this branch — the user did not
+            // type a wrong password, the system was just out of sync.
+            let raw = error.localizedDescription.lowercased()
+            if raw.contains("session_exists")
+                || raw.contains("already signed in")
+                || raw.contains("you're already signed in") {
+                let fresh = await AuthService.shared.currentSession
+                self.session = fresh
+                self.user = fresh?.user
+                self.isAuthenticated = fresh != nil
+                LoginThrottleService.shared.reset()
+                if let userId = fresh?.user.id.uuidString {
+                    await SubscriptionService.shared.identify(userId: userId)
+                }
+                AnalyticsService.shared.track(.signInCompleted, properties: ["method": "session_recover"])
+            } else {
+                LoginThrottleService.shared.recordFailure()
+                errorMessage = Self.mapAuthError(error)
+            }
         }
 
         isProcessing = false
@@ -460,6 +481,21 @@ final class AuthViewModel: ObservableObject {
             // Succès : on nettoie l'état intermédiaire.
             resetPasswordEmail = nil
             resendAttempts = 0
+
+            // Clerk auto-signs the user in once `signIn.resetPassword` succeeds
+            // (Status becomes `.complete`, `Clerk.shared.session` is posted).
+            // The auth-state listener should pick this up and flip
+            // `isAuthenticated = true`, but on slow networks (or if the listener
+            // hasn't drained yet) the user lands back on AuthView with empty
+            // fields and is then rejected by Clerk's `session_exists` 400 when
+            // they try to manually sign in. Force a session pull here so the
+            // VM publishes the new state synchronously before the success
+            // sheet auto-dismisses.
+            let fresh = await AuthService.shared.currentSession
+            self.session = fresh
+            self.user = fresh?.user
+            self.isAuthenticated = fresh != nil
+
             isProcessing = false
             return true
         } catch HealthMapError.auth(.sessionExpired) where resetPasswordEmail != nil {
@@ -676,6 +712,8 @@ final class AuthViewModel: ObservableObject {
              "Ce code a expiré. Demande un nouveau code."),
             (["session_token_expired", "session_expired"],
              "Ta session a expiré. Reconnecte-toi."),
+            (["session_exists", "you're already signed in", "already signed in"],
+             "Tu es déjà connecté. Patiente un instant…"),
             (["client_state_invalid"],
              "État invalide. Recommence depuis l'écran de connexion."),
             (["too_many_requests", "rate limit"],
