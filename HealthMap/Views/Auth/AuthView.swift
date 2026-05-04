@@ -12,9 +12,9 @@ struct AuthView: View {
     @State private var isSignUp = false
     @State private var showForgotPassword = false
 
-    /// Held across the async Sign in with Apple round-trip so we can pass
-    /// the **raw** nonce to Supabase once Apple returns the identity token.
-    @State private var currentAppleNonce: AppleSignInNonce.Pair?
+    // A4 : le nonce Apple est désormais détenu par AuthViewModel
+    // (`authViewModel.pendingAppleNonce`) pour survivre aux rebuilds de view
+    // pendant le round-trip async avec Apple. Ce @State local est retiré.
 
     /// True between the moment Apple's sheet closes and the moment Supabase
     /// finishes exchanging the identity token. Drives a blocking overlay so
@@ -155,7 +155,7 @@ struct AuthView: View {
                         isSignUp ? .signUp : .signIn,
                         onRequest: { request in
                             let pair = AppleSignInNonce.make()
-                            currentAppleNonce = pair
+                            authViewModel.pendingAppleNonce = pair
                             request.requestedScopes = [.fullName, .email]
                             request.nonce = pair.hashed
                         },
@@ -273,16 +273,17 @@ struct AuthView: View {
                 let credential = auth.credential as? ASAuthorizationAppleIDCredential,
                 let tokenData = credential.identityToken,
                 let idTokenString = String(data: tokenData, encoding: .utf8),
-                let nonce = currentAppleNonce
+                let nonce = authViewModel.pendingAppleNonce
             else {
                 authViewModel.errorMessage = "Apple n'a pas renvoye de token. Reessaie."
+                authViewModel.pendingAppleNonce = nil
                 return
             }
 
             let appleFirstName = credential.fullName?.givenName?.trimmingCharacters(in: .whitespacesAndNewlines)
             let appleEmail = credential.email?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            currentAppleNonce = nil
+            authViewModel.pendingAppleNonce = nil
             isExchangingAppleToken = true
 
             Task {

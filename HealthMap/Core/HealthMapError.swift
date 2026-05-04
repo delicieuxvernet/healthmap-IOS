@@ -33,6 +33,14 @@ enum HealthMapError: LocalizedError, Equatable {
         case signUpIncomplete
         /// Clerk signIn a retourné un status != .complete (2FA, etc.).
         case signInIncomplete
+        /// Code email saisi par l'user ne correspond à aucun code valide (typo).
+        case invalidEmailCode
+        /// Code email correct mais hors délai (Clerk expire les codes après ~10 min).
+        case emailCodeExpired
+        /// Resolve `profiles.id` depuis Supabase a dépassé le timeout — réseau lent ou DB indispo.
+        case profileResolutionTimeout
+        /// Trop de demandes de renvoi de code (anti-spam local).
+        case tooManyResendAttempts
         case unknown(String)
     }
 
@@ -95,6 +103,10 @@ enum HealthMapError: LocalizedError, Equatable {
             case .signUpNeedsEmailCode: return "Code de vérification envoyé à ton email."
             case .signUpIncomplete: return "Vérification incomplète. Réessaie ou demande un nouveau code."
             case .signInIncomplete: return "Connexion incomplète. Une étape supplémentaire est requise."
+            case .invalidEmailCode: return "Ce code est incorrect. Vérifie tes mails et réessaie."
+            case .emailCodeExpired: return "Ce code a expiré. Demande un nouveau code."
+            case .profileResolutionTimeout: return "Connexion lente — impossible de charger ton profil. Réessaie."
+            case .tooManyResendAttempts: return "Trop de demandes de renvoi. Patiente une minute avant de réessayer."
             case .unknown(let msg): return "Erreur d'authentification : \(msg)"
             }
         case .database(let err):
@@ -148,7 +160,8 @@ enum HealthMapError: LocalizedError, Equatable {
         switch self {
         case .network(.offline), .network(.rateLimited):
             return false
-        case .auth(.invalidCredentials), .auth(.oauthCancelled), .auth(.sessionExpired):
+        case .auth(.invalidCredentials), .auth(.oauthCancelled), .auth(.sessionExpired),
+             .auth(.invalidEmailCode), .auth(.emailCodeExpired), .auth(.tooManyResendAttempts):
             return false
         case .subscription(.purchaseCancelled):
             return false

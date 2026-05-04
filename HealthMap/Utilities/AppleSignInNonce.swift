@@ -46,8 +46,12 @@ enum AppleSignInNonce {
             var randoms = [UInt8](repeating: 0, count: batchSize)
             let status = SecRandomCopyBytes(kSecRandomDefault, batchSize, &randoms)
             if status != errSecSuccess {
-                // SecRandomCopyBytes should never fail on iOS, but fall back to
-                // `UInt8.random(in:)` (uses `arc4random_buf` under the hood) if it does.
+                // C3 : SecRandomCopyBytes ne devrait jamais échouer sur iOS, mais
+                // si ça arrive on retombe sur `UInt8.random(in:)` (arc4random_buf
+                // en sous-jacent). On log explicitement le fallback : un sysadmin
+                // qui voit ce log saura que la source PRNG préférée a flanché et
+                // pourra investiguer (matériel défaillant, sandbox cassé, etc.).
+                AppLogger.auth.notice("SecRandomCopyBytes failed (status \(status, privacy: .public)) — falling back to arc4random for nonce generation")
                 for i in 0..<batchSize {
                     randoms[i] = UInt8.random(in: 0...255)
                 }

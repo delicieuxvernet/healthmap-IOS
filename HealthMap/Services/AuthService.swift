@@ -43,14 +43,56 @@ final class AuthService {
     }
 
     /// Étape 2 : vérifie le code email. Session active si `.complete`.
+    /// Distingue 3 cas d'échec pour l'UI :
+    ///   - code mauvais (typo) → `.invalidEmailCode`
+    ///   - code expiré (>10 min) → `.emailCodeExpired` + bouton "Renvoyer"
+    ///   - autre (status != .complete sans erreur explicite) → `.signUpIncomplete`
     func verifySignUpCode(_ code: String) async throws {
+        // B4 : on relit `currentSignUp` juste avant le verify (et pas via une
+        // reference capturée plus tôt) au cas où Clerk a refresh la session
+        // en background entre temps — sinon on opère sur un objet stale et
+        // verifyEmailCode peut retourner `.incomplete` faussement.
         guard var signUp = Clerk.shared.auth.currentSignUp else {
             throw HealthMapError.auth(.sessionExpired)
         }
-        signUp = try await signUp.verifyEmailCode(code)
-        guard signUp.status == .complete else {
+        do {
+            signUp = try await signUp.verifyEmailCode(code)
+        } catch {
+            // Clerk lève une ClerkAPIError dont le `.code` distingue les cas.
+            // On lit `.localizedDescription` car la surface publique exacte
+            // varie entre versions du SDK (struct vs enum).
+            let desc = error.localizedDescription.lowercased()
+            if desc.contains("expired") || desc.contains("verification_expired") {
+                throw HealthMapError.auth(.emailCodeExpired)
+            }
+            if desc.contains("incorrect") || desc.contains("invalid")
+                || desc.contains("verification_failed")
+                || desc.contains("form_code_incorrect") {
+                throw HealthMapError.auth(.invalidEmailCode)
+            }
+            throw error
+        }
+        if signUp.status != .complete {
+            // B4 : retry une fois — un session refresh concurrent peut faire
+            // que la première tentative voie un signUp légèrement décalé.
+            // Rare mais reproductible quand le refreshTimer tape juste pendant
+            // le verify. On relit l'objet et on réessaie sans demander un
+            // nouveau code à l'user.
+            if let fresh = Clerk.shared.auth.currentSignUp, fresh.status == .complete {
+                return
+            }
             throw HealthMapError.auth(.signUpIncomplete)
         }
+    }
+
+    /// Renvoie un nouveau code email à l'utilisateur en cours de signup.
+    /// À utiliser depuis le bouton "Renvoyer le code" dans EmailCodeVerificationSheet.
+    /// Lève `.sessionExpired` si l'utilisateur n'est plus dans un signup actif.
+    func resendSignUpEmailCode() async throws {
+        guard let signUp = Clerk.shared.auth.currentSignUp else {
+            throw HealthMapError.auth(.sessionExpired)
+        }
+        try await signUp.sendEmailCode()
     }
 
     /// Legacy one-shot signUp — DEPRECATED : utiliser signUpStart + verifySignUpCode.
@@ -85,6 +127,7 @@ final class AuthService {
             provider: .google,
             prefersEphemeralWebBrowserSession: true
         )
+        try await Self.waitForSessionActive(timeoutSeconds: 3)
     }
 
     /// Legacy signature — garde la compat avec AuthViewModel.signInWithGoogle()
@@ -104,6 +147,22 @@ final class AuthService {
     // configuré dans Clerk Dashboard valide la chaîne nonce côté serveur).
     func signInWithApple(idToken: String, rawNonce: String) async throws {
         _ = try await Clerk.shared.auth.signInWithIdToken(idToken, provider: .apple)
+        try await Self.waitForSessionActive(timeoutSeconds: 3)
+    }
+
+    /// Poll `Clerk.shared.session` jusqu'à ce qu'elle soit non-nil (= session
+    /// vraiment posée), ou jette `.signInIncomplete` après le timeout.
+    /// Couvre la fenêtre courte entre le retour de signInWithOAuth/idToken
+    /// (qui résout côté serveur) et la propagation locale du `Clerk.shared.session`.
+    private static func waitForSessionActive(timeoutSeconds: TimeInterval) async throws {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while Date() < deadline {
+            if Clerk.shared.session != nil { return }
+            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        }
+        if Clerk.shared.session == nil {
+            throw HealthMapError.auth(.signInIncomplete)
+        }
     }
 
     // MARK: - Sign Out
@@ -124,6 +183,15 @@ final class AuthService {
             let profileId: UUID
             do {
                 profileId = try await ClerkProfileResolver.shared.resolveProfileUUID(for: clerkUser)
+            } catch HealthMapError.auth(.profileResolutionTimeout) {
+                // Réseau lent / Supabase indispo. On le logge spécifiquement (pas
+                // un crash report) et on retourne nil. Le caller observe le
+                // changement d'état (still pas authenticated) et peut afficher
+                // un retry. Sans ce catch dédié, l'erreur tomberait dans le
+                // catch générique ci-dessous, qui report() à Sentry comme un
+                // bug applicatif au lieu d'un timeout réseau attendu.
+                AppLogger.auth.notice("Profile resolution timed out — clerk session active mais Supabase profile non chargé")
+                return nil
             } catch {
                 AppLogger.auth.report(error, context: "AuthService.currentSession.resolveProfile")
                 return nil

@@ -30,8 +30,15 @@ final class ClerkProfileResolver {
 
     private init() {}
 
+    /// Timeout au-delà duquel on jette `.profileResolutionTimeout` au lieu de
+    /// laisser pendre indéfiniment l'appelant (cold-start, réseau ramant, DB
+    /// surchargée). 15s = compromis entre fiabilité (le SELECT est rapide
+    /// normalement, <500ms) et patience utilisateur sur réseau dégradé.
+    private static let resolveTimeoutSeconds: TimeInterval = 15
+
     /// Résout `profiles.id` (UUID) pour un utilisateur Clerk donné.
     /// Crée la row si absente (fresh signup).
+    /// Lève `.auth(.profileResolutionTimeout)` après 15s pour éviter le pendage.
     func resolveProfileUUID(for clerkUser: User) async throws -> UUID {
         let clerkId = clerkUser.id
 
@@ -44,7 +51,10 @@ final class ClerkProfileResolver {
 
         let task = Task<UUID, Error> { [weak self] in
             defer { self?.inFlight[clerkId] = nil }
-            let uuid = try await Self.fetchOrCreateProfileUUID(clerkUser: clerkUser)
+            let uuid = try await Self.fetchOrCreateProfileUUIDWithTimeout(
+                clerkUser: clerkUser,
+                timeout: Self.resolveTimeoutSeconds
+            )
             self?.cache[clerkId] = uuid
             return uuid
         }
@@ -70,6 +80,31 @@ final class ClerkProfileResolver {
     }
 
     // MARK: - Private
+
+    /// Wrap `fetchOrCreateProfileUUID` avec un timeout. Si la query Supabase
+    /// dépasse `timeout` secondes, on jette `.profileResolutionTimeout` au
+    /// lieu de bloquer l'UI — le caller (AuthService.currentSession) propage
+    /// vers le launch screen / un retry user-driven.
+    private static func fetchOrCreateProfileUUIDWithTimeout(
+        clerkUser: User,
+        timeout: TimeInterval
+    ) async throws -> UUID {
+        try await withThrowingTaskGroup(of: UUID.self) { group in
+            group.addTask {
+                try await fetchOrCreateProfileUUID(clerkUser: clerkUser)
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                throw HealthMapError.auth(.profileResolutionTimeout)
+            }
+            // Premier qui gagne — soit la query a fini, soit le timeout a expiré.
+            guard let result = try await group.next() else {
+                throw HealthMapError.auth(.profileResolutionTimeout)
+            }
+            group.cancelAll()
+            return result
+        }
+    }
 
     private static func fetchOrCreateProfileUUID(clerkUser: User) async throws -> UUID {
         guard let client = SupabaseService.shared.safeClient else {

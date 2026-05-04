@@ -33,6 +33,25 @@ final class AuthViewModel: ObservableObject {
     /// flag est actif, et appeler `verifySignUpCode(_:)` à la soumission.
     @Published var pendingEmailVerification = false
 
+    /// Email de l'utilisateur en cours de reset password — set par
+    /// `resetPassword(email:)` et utilisé par `completeResetPassword` pour
+    /// auto-renvoyer un nouveau code si la session Clerk a été perdue entre
+    /// les 2 étapes (app fermée, kill, time elapsed > token TTL). Sans ce
+    /// flag, l'user voit "Session expirée" sans contexte ni recovery path.
+    @Published var resetPasswordEmail: String?
+
+    /// A4 : nonce Apple Sign In gardé au niveau ViewModel pour ne pas être
+    /// perdu si AuthView rebuild en plein flow (rotation, multitasking).
+    /// L'AuthView lit/écrit ce flag dans onRequest/onCompletion. Reset à nil
+    /// dès que le flow est terminé (succès, erreur, ou cancel).
+    @Published var pendingAppleNonce: AppleSignInNonce.Pair?
+
+    /// Compteur local des renvois de code (signup OU reset password) pour
+    /// éviter le spam. Reset après chaque succès de verify ou changement
+    /// d'email. Plafond géré dans `resendSignUpCode()` / resend reset.
+    @Published private(set) var resendAttempts: Int = 0
+    private static let maxResendAttempts: Int = 3
+
     // MARK: - Private
 
     private var authListenerTask: Task<Void, Never>?
@@ -262,6 +281,7 @@ final class AuthViewModel: ObservableObject {
         do {
             try await AuthService.shared.verifySignUpCode(code)
             pendingEmailVerification = false
+            resendAttempts = 0
 
             let currentSession = await AuthService.shared.currentSession
             self.session = currentSession
@@ -272,6 +292,17 @@ final class AuthViewModel: ObservableObject {
                 await SubscriptionService.shared.identify(userId: userId)
             }
             AnalyticsService.shared.track(.signUpCompleted, properties: ["method": "email"])
+        } catch HealthMapError.auth(.invalidEmailCode) {
+            // A1 : message clair (pas un crash report Sentry — c'est une faute
+            // de frappe utilisateur, signal/bruit). On ne reset PAS le throttle
+            // resend ici : la 1re erreur est une simple typo, l'user peut juste
+            // re-saisir le code reçu sans en demander un nouveau.
+            errorMessage = HealthMapError.auth(.invalidEmailCode).errorDescription
+        } catch HealthMapError.auth(.emailCodeExpired) {
+            // A1 : code expiré → message + l'UI doit afficher le bouton
+            // "Renvoyer le code". Pas de tracking erreur : c'est une situation
+            // attendue (user qui revient le lendemain).
+            errorMessage = HealthMapError.auth(.emailCodeExpired).errorDescription
         } catch {
             errorMessage = Self.mapAuthError(error)
         }
@@ -371,6 +402,10 @@ final class AuthViewModel: ObservableObject {
 
         do {
             try await AuthService.shared.resetPassword(email: email)
+            // A3 : on garde l'email pour pouvoir auto-redéclencher si la
+            // session Clerk meurt avant que l'user n'entre le code.
+            resetPasswordEmail = email
+            resendAttempts = 0
             AnalyticsService.shared.track(.passwordResetRequested, properties: ["method": "email"])
             isLoading = false
             return true
@@ -388,8 +423,9 @@ final class AuthViewModel: ObservableObject {
             errorMessage = "Veuillez saisir le code reçu par email."
             return false
         }
-        guard newPassword.count >= 8 else {
-            errorMessage = "Le mot de passe doit contenir au moins 8 caractères."
+        let validationIssues = PasswordValidator.validate(newPassword)
+        if !validationIssues.isEmpty {
+            errorMessage = validationIssues.map(\.message).joined(separator: "\n")
             return false
         }
 
@@ -398,6 +434,77 @@ final class AuthViewModel: ObservableObject {
 
         do {
             try await AuthService.shared.completeResetPassword(code: code, newPassword: newPassword)
+            // Succès : on nettoie l'état intermédiaire.
+            resetPasswordEmail = nil
+            resendAttempts = 0
+            isLoading = false
+            return true
+        } catch HealthMapError.auth(.sessionExpired) where resetPasswordEmail != nil {
+            // A3 : la session Clerk de reset a expiré (app fermée trop longtemps,
+            // ou Clerk a recyclé l'objet signIn). Au lieu de jeter "Session
+            // expirée" et obliger l'user à recommencer depuis l'écran email,
+            // on relance discrètement l'étape 1 avec l'email mémorisé et on
+            // demande à l'user d'utiliser le NOUVEAU code (l'ancien ne marche
+            // plus de toute façon).
+            do {
+                try await AuthService.shared.resetPassword(email: resetPasswordEmail!)
+                errorMessage = "Le code précédent a expiré, un nouveau a été envoyé à \(resetPasswordEmail!). Saisis-le ci-dessous."
+            } catch {
+                errorMessage = "Le code a expiré et le renvoi a échoué. Recommence depuis l'écran email."
+                resetPasswordEmail = nil
+            }
+            isLoading = false
+            return false
+        } catch {
+            errorMessage = Self.mapAuthError(error)
+            isLoading = false
+            return false
+        }
+    }
+
+    /// Renvoie un nouveau code de reset password à l'email mémorisé.
+    /// À appeler depuis le bouton "Renvoyer le code" dans ForgotPasswordSheet.
+    /// Plafond `maxResendAttempts` (3) pour éviter le spam — au-delà, message
+    /// d'erreur clair invitant à patienter.
+    func resendResetPasswordCode() async -> Bool {
+        guard let email = resetPasswordEmail else {
+            errorMessage = "Aucun reset en cours. Recommence depuis l'écran email."
+            return false
+        }
+        guard resendAttempts < Self.maxResendAttempts else {
+            errorMessage = HealthMapError.auth(.tooManyResendAttempts).errorDescription
+            return false
+        }
+        isLoading = true
+        errorMessage = nil
+        do {
+            try await AuthService.shared.resetPassword(email: email)
+            resendAttempts += 1
+            isLoading = false
+            return true
+        } catch {
+            errorMessage = Self.mapAuthError(error)
+            isLoading = false
+            return false
+        }
+    }
+
+    /// Renvoie un nouveau code email pour un signup en cours (pendingEmailVerification == true).
+    /// À appeler depuis le bouton "Renvoyer le code" dans EmailCodeVerificationSheet.
+    func resendSignUpCode() async -> Bool {
+        guard pendingEmailVerification else {
+            errorMessage = "Aucune inscription en cours."
+            return false
+        }
+        guard resendAttempts < Self.maxResendAttempts else {
+            errorMessage = HealthMapError.auth(.tooManyResendAttempts).errorDescription
+            return false
+        }
+        isLoading = true
+        errorMessage = nil
+        do {
+            try await AuthService.shared.resendSignUpEmailCode()
+            resendAttempts += 1
             isLoading = false
             return true
         } catch {
