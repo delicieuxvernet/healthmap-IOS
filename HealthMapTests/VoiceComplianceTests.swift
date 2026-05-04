@@ -23,8 +23,12 @@ final class VoiceComplianceTests: XCTestCase {
     /// keyword is used in a neutral, technical context (e.g. a doc
     /// comment referencing the web app's legacy naming).
     private let allowedFilesByKeyword: [String: Set<String>] = [
-        "diagnostic": ["AppLogger.swift", "ConnectivityService.swift"],
-        "maladie": ["RedFlagDetector.swift", "QuestionnaireSection.swift"],
+        // RedFlag.swift contains the global "ne constituent en aucun cas un diagnostic medical"
+        // disclaimer — that is the legally-required carve-out, not a brand-voice violation.
+        "diagnostic": ["AppLogger.swift", "ConnectivityService.swift", "RedFlag.swift"],
+        // EditProfileView.swift mirrors QuestionnaireSection's "Maladie coeliaque" option
+        // label — it is a clinical condition name, not user-facing diagnosis language.
+        "maladie": ["RedFlagDetector.swift", "QuestionnaireSection.swift", "EditProfileView.swift"],
     ]
 
     func testNoForbiddenWordsInSwiftSources() throws {

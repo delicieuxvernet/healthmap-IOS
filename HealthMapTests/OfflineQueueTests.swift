@@ -6,14 +6,22 @@ import XCTest
 final class OfflineQueueTests: XCTestCase {
 
     private let queueKey = "healthmap_offline_queue"
+    /// SecureStorageService prefixes every key with "healthmap_secure_" before
+    /// writing to UserDefaults. The OfflineQueue persists through SecureStorage,
+    /// so the *actual* defaults key is the prefixed one.
+    private let secureQueueKey = "healthmap_secure_healthmap_offline_queue"
 
     override func setUp() {
         super.setUp()
+        // Wipe both possible storage locations so prior runs (or the migration
+        // path in loadQueueUnsafe) cannot leak state into this test.
         UserDefaults.standard.removeObject(forKey: queueKey)
+        UserDefaults.standard.removeObject(forKey: secureQueueKey)
     }
 
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: queueKey)
+        UserDefaults.standard.removeObject(forKey: secureQueueKey)
         super.tearDown()
     }
 
@@ -28,14 +36,15 @@ final class OfflineQueueTests: XCTestCase {
         )
         OfflineQueueService.shared.enqueue(type: .scoreHistory, payload: payload)
 
-        // Verify data exists in UserDefaults
-        let data = UserDefaults.standard.data(forKey: queueKey)
-        XCTAssertNotNil(data, "Queue should persist to UserDefaults after enqueue")
+        // The queue is encrypted via SecureStorageService, which stores the
+        // ciphertext in UserDefaults under a prefixed key. We can't decode the
+        // raw blob in a test (no access to the keychain master key from here),
+        // so we check (a) that *something* was persisted and (b) the queue's
+        // public API agrees that exactly one operation is now pending.
+        let data = UserDefaults.standard.data(forKey: secureQueueKey)
+        XCTAssertNotNil(data, "Queue should persist to UserDefaults (encrypted) after enqueue")
 
-        let queue = try? JSONDecoder().decode([QueuedOperation].self, from: data!)
-        XCTAssertEqual(queue?.count, 1)
-        XCTAssertEqual(queue?.first?.type, .scoreHistory)
-        XCTAssertEqual(queue?.first?.retryCount, 0)
+        XCTAssertEqual(OfflineQueueService.shared.pendingCount, 1, "pendingCount should be 1 after a single enqueue")
     }
 
     func testEnqueueMultipleOperations() {
