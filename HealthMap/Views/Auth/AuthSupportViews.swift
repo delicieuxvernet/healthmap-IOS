@@ -82,35 +82,47 @@ struct AuthSecureField: View {
 //   2. user entre le code + son nouveau mot de passe -> session active
 struct ForgotPasswordSheet: View {
     enum Step { case email, codeAndPassword, success }
+    private enum Field: Hashable { case code, newPassword, confirmPassword }
+
+    @FocusState private var focusedField: Field?
 
     @EnvironmentObject var authVM: AuthViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var email = ""
     @State private var code = ""
     @State private var newPassword = ""
+    @State private var confirmPassword = ""
     @State private var step: Step = .email
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Theme.spacingLG) {
-                switch step {
-                case .email:
-                    emailStep
-                case .codeAndPassword:
-                    codeStep
-                case .success:
-                    successStep
+            ScrollView {
+                VStack(spacing: Theme.spacingLG) {
+                    switch step {
+                    case .email:
+                        emailStep
+                    case .codeAndPassword:
+                        codeStep
+                    case .success:
+                        successStep
+                    }
                 }
-
-                Spacer()
+                .padding(.horizontal, Theme.spacingLG)
+                .padding(.bottom, Theme.spacingXL)
             }
-            .padding(.horizontal, Theme.spacingLG)
             .navigationTitle("Mot de passe oublie")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
                         .foregroundStyle(Color.healthMapBlue)
+                }
+            }
+            .onChange(of: step) { _, newStep in
+                if newStep == .codeAndPassword {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        focusedField = .code
+                    }
                 }
             }
         }
@@ -171,7 +183,7 @@ struct ForgotPasswordSheet: View {
 
     @ViewBuilder
     private var codeStep: some View {
-        Text("Un code à 6 chiffres a ete envoye à \(email). Entre-le ci-dessous avec ton nouveau mot de passe.")
+        Text("Un code à 6 chiffres a ete envoye à \(email). Verifie tes mails (et les spams).")
             .font(Theme.bodyFont)
             .foregroundStyle(Color.healthMapSecondary)
             .multilineTextAlignment(.center)
@@ -180,17 +192,44 @@ struct ForgotPasswordSheet: View {
         TextField("Code à 6 chiffres", text: $code)
             .textContentType(.oneTimeCode)
             .keyboardType(.numberPad)
+            .focused($focusedField, equals: .code)
             .padding(.horizontal, Theme.spacingMD)
-            .frame(height: 50)
+            .frame(minHeight: 50)
             .background(Color.healthMapBackground)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
 
-        SecureField("Nouveau mot de passe (8 caractères min)", text: $newPassword)
+        SecureField("Nouveau mot de passe", text: $newPassword)
             .textContentType(.newPassword)
+            .focused($focusedField, equals: .newPassword)
             .padding(.horizontal, Theme.spacingMD)
-            .frame(height: 50)
+            .frame(minHeight: 50)
             .background(Color.healthMapBackground)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+
+        SecureField("Confirme le mot de passe", text: $confirmPassword)
+            .textContentType(.newPassword)
+            .focused($focusedField, equals: .confirmPassword)
+            .padding(.horizontal, Theme.spacingMD)
+            .frame(minHeight: 50)
+            .background(Color.healthMapBackground)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+
+        // Live password validation issues
+        if !newPassword.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(PasswordValidator.validate(newPassword), id: \.self) { issue in
+                    Label(issue.message, systemImage: "xmark.circle.fill")
+                        .font(Theme.captionFont)
+                        .foregroundStyle(.red)
+                }
+                if !confirmPassword.isEmpty && confirmPassword != newPassword {
+                    Label("Les deux mots de passe ne correspondent pas.", systemImage: "xmark.circle.fill")
+                        .font(Theme.captionFont)
+                        .foregroundStyle(.red)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
 
         if let err = authVM.errorMessage {
             Text(err)
@@ -220,11 +259,31 @@ struct ForgotPasswordSheet: View {
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(minHeight: 54)
             .background(Color.healthMapBlue)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         }
-        .disabled(code.isEmpty || newPassword.isEmpty || authVM.isLoading)
+        .disabled(!canSubmitReset || authVM.isLoading)
+
+        Button {
+            Task {
+                HapticService.shared.selection()
+                _ = await authVM.resetPassword(email: email)
+            }
+        } label: {
+            Text("Renvoyer le code")
+                .font(Theme.captionFont)
+                .foregroundStyle(Color.healthMapBlue)
+                .frame(minHeight: 44)
+        }
+        .disabled(authVM.isLoading)
+    }
+
+    /// True when code is 6 digits, password meets PasswordValidator, and confirm matches.
+    private var canSubmitReset: Bool {
+        code.count >= 6
+            && PasswordValidator.validate(newPassword).isEmpty
+            && newPassword == confirmPassword
     }
 
     @ViewBuilder
