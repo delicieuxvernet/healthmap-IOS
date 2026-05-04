@@ -20,6 +20,12 @@ final class PushNotificationService: NSObject, ObservableObject {
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published private(set) var deviceToken: String?
 
+    /// Tracks the in-flight push-token save task so we can cancel it if the
+    /// user signs out before the Supabase write completes — without this,
+    /// the token would land in the *previous* user's profile row, causing
+    /// notifications meant for user B to be delivered to user A's device.
+    private var tokenSaveTask: Task<Void, Never>?
+
     /// The latest deep-link requested by a notification tap.
     /// Views can observe this to route to the matching screen
     /// (e.g. `.dashboard`, `.recommendations`, `.checkin`, `.mealScan`).
@@ -130,18 +136,33 @@ final class PushNotificationService: NSObject, ObservableObject {
         AppLogger.push.info("APNs token received (\(tokenString.count, privacy: .public) chars)")
 
         // Persist token in Supabase `profiles.push_token` so backend can target this device.
-        Task {
+        // Track the task so a sign-out can cancel an in-flight write.
+        tokenSaveTask?.cancel()
+        tokenSaveTask = Task { [weak self] in
             do {
+                try Task.checkCancellation()
                 try await DatabaseService.shared.updatePushToken(tokenString)
+                try Task.checkCancellation()
                 CrashReportingService.shared.breadcrumb("push token saved", category: "push", level: .info)
+            } catch is CancellationError {
+                AppLogger.push.notice("push token save cancelled (sign-out)")
             } catch {
                 AppLogger.push.report(error, context: "save push token")
             }
+            self?.tokenSaveTask = nil
         }
     }
 
     func handleAPNsRegistrationFailure(error: Error) {
         AppLogger.push.report(error, context: "APNs registration failed")
+    }
+
+    /// Cancels any in-flight push-token Supabase write. Called from
+    /// AuthViewModel.signOut + the listener's `.signedOut` branch so the
+    /// token doesn't land on the wrong profile after a fast user-switch.
+    func cancelInFlightTokenSave() {
+        tokenSaveTask?.cancel()
+        tokenSaveTask = nil
     }
 }
 

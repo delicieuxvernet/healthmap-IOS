@@ -140,6 +140,16 @@ final class AuthViewModel: ObservableObject {
                     GamificationService.shared.reset()
                     AnalyticsService.shared.reset()
                     await SubscriptionService.shared.reset()
+                    // Mirror the cleanup in `signOut()` — when Clerk emits
+                    // a sign-out we didn't initiate (token revoked,
+                    // server-side delete), the per-flow flags must be
+                    // cleared too so the next user can't see stale state.
+                    self.pendingEmailVerification = false
+                    self.resetPasswordEmail = nil
+                    self.resendAttempts = 0
+                    self.pendingAppleNonce = nil
+                    PushNotificationService.shared.cancelInFlightTokenSave()
+                    LoginThrottleService.shared.reset()
                     AnalyticsService.shared.track(.signOutCompleted)
                 }
             }
@@ -156,7 +166,13 @@ final class AuthViewModel: ObservableObject {
                 guard !Task.isCancelled else { return }
                 do {
                     try await AuthService.shared.refreshSession()
+                    // Re-check cancellation after the await: the user may have
+                    // signed out *during* the refresh round-trip; in that case
+                    // we must not flip any user-facing flag, and we must not
+                    // double-call signOut.
+                    if Task.isCancelled { return }
                 } catch {
+                    if Task.isCancelled { return }
                     let desc = error.localizedDescription.lowercased()
                     if desc.contains("invalid refresh token") || desc.contains("session_not_found") {
                         // Surface a user-facing notice BEFORE signing out so
@@ -278,12 +294,14 @@ final class AuthViewModel: ObservableObject {
             return
         }
 
-        // Rate limiting check
-        let throttle = LoginThrottleService.shared.canAttempt()
-        if !throttle.allowed {
-            errorMessage = LoginThrottleService.shared.throttleMessage()
-            return
-        }
+        // Note: deliberately *not* gated by LoginThrottleService — that
+        // throttle exists to slow down credential-stuffing attacks against
+        // an existing account, not to penalise legitimate users whose
+        // signup attempt got rejected (network flake, "email already
+        // taken", "password pwned" etc.). Counting signup failures
+        // against the login throttle means a flaky signup locks the user
+        // out of *real* sign-in attempts — the opposite of what the
+        // throttle is for.
 
         isProcessing = true
         errorMessage = nil
@@ -295,10 +313,8 @@ final class AuthViewModel: ObservableObject {
             // vers un champ "entrez le code reçu" et appelle verifySignUpCode.
             try await AuthService.shared.signUpStart(email: email, password: password, firstName: firstName)
             pendingEmailVerification = true
-            LoginThrottleService.shared.reset()
             AnalyticsService.shared.track(.signUpStarted, properties: ["method": "email"])
         } catch {
-            LoginThrottleService.shared.recordFailure()
             errorMessage = Self.mapAuthError(error)
         }
 
@@ -375,10 +391,30 @@ final class AuthViewModel: ObservableObject {
         self.user = nil
         self.isAuthenticated = false
 
+        // Cross-user state hygiene: clear every per-flow flag that the
+        // previous user's auth journey may have left behind. Without this,
+        // user B opening the app right after user A signed out would see
+        // stale state (e.g. EmailCodeVerificationSheet auto-presenting,
+        // resendResetPasswordCode silently sending to user A's email).
+        self.pendingEmailVerification = false
+        self.resetPasswordEmail = nil
+        self.resendAttempts = 0
+        self.pendingAppleNonce = nil
+        self.errorMessage = nil
+
         clearLocalCaches()
         GamificationService.shared.reset()
         AnalyticsService.shared.reset()
         await SubscriptionService.shared.reset()
+        // Cancel any in-flight push-token Supabase write so the token
+        // doesn't get persisted onto the just-signed-out user's row.
+        PushNotificationService.shared.cancelInFlightTokenSave()
+        // The local LoginThrottle is per-device, not per-user — but a
+        // successful sign-in already resets it (line 230) and a sign-out
+        // is by definition not an attack surface, so clearing the
+        // counter on sign-out unblocks user B from inheriting user A's
+        // throttle state.
+        LoginThrottleService.shared.reset()
         // Note: .signOutCompleted is tracked by the auth listener's .signedOut
         // handler, not here — avoids double-counting in analytics.
 
