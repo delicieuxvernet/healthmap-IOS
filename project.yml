@@ -77,7 +77,12 @@ targets:
       properties:
         com.apple.developer.applesignin:
           - Default
-        aps-environment: development
+        # Production push environment — required for App Store builds. Debug
+        # builds will use the development environment via Xcode's automatic
+        # entitlement substitution when running with a development provisioning
+        # profile. If push doesn't work in local dev, swap to `development`
+        # temporarily AND re-set to `production` before archiving for ASC.
+        aps-environment: production
         com.apple.developer.associated-domains:
           - applinks:healthmap.fr
     dependencies:
@@ -91,6 +96,28 @@ targets:
         product: RevenueCatUI
       - package: Sentry
         product: Sentry
+    # Upload dSYM symbols to Sentry after archive so production crashes are
+    # readable in the Sentry dashboard. Requires `brew install getsentry/tools/sentry-cli`
+    # locally and `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT` env vars
+    # exported (or stored in `~/.sentryclirc`). The script is a no-op if
+    # sentry-cli isn't installed — it only logs a warning so unsigned local
+    # builds keep working.
+    postBuildScripts:
+      - name: Upload dSYM to Sentry
+        runOnlyWhenInstalling: true
+        basedOnDependencyAnalysis: false
+        script: |
+          if [[ "${CONFIGURATION}" != "Release" ]]; then
+            exit 0
+          fi
+          if ! which sentry-cli >/dev/null 2>&1; then
+            echo "warning: sentry-cli not installed — skipping dSYM upload. Run \`brew install getsentry/tools/sentry-cli\` to enable production crash symbolication."
+            exit 0
+          fi
+          ERROR=$(sentry-cli debug-files upload --include-sources "${DWARF_DSYM_FOLDER_PATH}" 2>&1 >/dev/null)
+          if [ -n "$ERROR" ]; then
+            echo "warning: sentry-cli dSYM upload failed: $ERROR"
+          fi
 
   HealthMapTests:
     type: bundle.unit-test

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -607,6 +608,35 @@ struct ProfileView: View {
                             }
                         }
                     }
+                }
+
+                // Notifications — App Store guideline 4.5.4 expects users to
+                // be able to find a path to manage notification permissions
+                // from inside the app. We deep-link to iOS Settings since the
+                // OS owns the authorization state.
+                Section("Notifications") {
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "bell.badge.fill")
+                                .foregroundStyle(Color.healthMapBlue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Gerer les notifications")
+                                    .foregroundStyle(Color.healthMapText)
+                                Text("Ouvre les Reglages iOS pour activer/desactiver")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.healthMapSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.up.forward")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.healthMapSecondary)
+                        }
+                    }
+                    .accessibilityHint("Ouvre les Reglages iOS pour gerer les permissions de notification HealthMap.")
                 }
 
                 // RGPD — Data Export (Article 20)
