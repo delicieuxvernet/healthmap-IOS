@@ -610,6 +610,27 @@ struct ProfileView: View {
                     }
                 }
 
+                // Sécurité — sessions actives + déconnexion distante (plan B3).
+                // Future placement pour 2FA + magic link toggles.
+                Section("Securite") {
+                    NavigationLink {
+                        SecuritySessionsView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "lock.shield.fill")
+                                .foregroundStyle(Color.healthMapBlue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Mes sessions actives")
+                                    .foregroundStyle(Color.healthMapText)
+                                Text("Voir et deconnecter les appareils connectes")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.healthMapSecondary)
+                            }
+                        }
+                    }
+                    .accessibilityHint("Liste les appareils connectes a ton compte HealthMap.")
+                }
+
                 // Notifications — App Store guideline 4.5.4 expects users to
                 // be able to find a path to manage notification permissions
                 // from inside the app. We deep-link to iOS Settings since the
