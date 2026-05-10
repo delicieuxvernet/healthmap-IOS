@@ -135,9 +135,11 @@ de fonctionner tel quel — c'est pour ça qu'on a `ClerkProfileResolver`.
 
 (Identifiés lors de l'audit du 18 avril 2026, documentés dans le vault)
 
-1. **`verify-receipt` Edge Function attendue par iOS mais inexistante côté Supabase**.
-   - Code iOS : `ReceiptValidationService.swift` invoque `client.functions.invoke("verify-receipt", ...)`.
-   - Action : soit déployer cette Edge Function, soit retirer l'appel.
+1. ~~**`verify-receipt` Edge Function attendue par iOS mais inexistante côté Supabase**~~ — **RÉSOLU 10 mai 2026**.
+   - `verify-receipt` v1 déployée côté Supabase (auth via Clerk JWT + JWKS, ignore `body.user_id`, lookup `clerk_id → profiles.id`, idempotent tier correction free → premium).
+   - Source : `Healthmap-iOS/supabase/functions/verify-receipt/index.ts` (committée dans le repo iOS pour audit).
+   - Edge Fn cible : `https://ftwfxdfkghkemnpwtzlu.supabase.co/functions/v1/verify-receipt`
+   - TODO P1 : ajouter validation JWS Apple sur `signedTransaction` côté serveur (StoreKit 2). En attendant, RevenueCat webhook reste source de vérité primaire pour le tier.
 
 2. **`analytics_events` schéma divergent**.
    - iOS écrit : `event`, `properties`, `app_version`, `environment`, `created_at`.
