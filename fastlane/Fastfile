@@ -8,10 +8,18 @@ APP_ID = "fr.healthmap.app"
 
 platform :ios do
   # ───────────────────────────────────────────────────────────────────────────
-  # bootstrap — FIRST RUN ONLY. Crée les ressources Apple qui n'existent pas
-  # encore : Bundle ID (fr.healthmap.app), app App Store Connect, puis le
-  # certificat de distribution + provisioning profile via match (EN ÉCRITURE).
-  # Idempotent : produce et match ne recréent pas ce qui existe déjà.
+  # bootstrap — FIRST RUN ONLY. Génère le certificat de distribution +
+  # provisioning profile via match (EN ÉCRITURE) et les stocke chiffrés dans
+  # MATCH_GIT_URL.
+  #
+  # PRÉREQUIS (à créer manuellement UNE fois — `produce` via API key échoue
+  # avec -20101 sur la création d'app ASC) :
+  #   - App ID `fr.healthmap.app` : developer.apple.com → Certificates, IDs &
+  #     Profiles → Identifiers → (+) → App IDs → App. Capabilities à cocher :
+  #     Sign in with Apple, Push Notifications, Associated Domains.
+  #   - App ASC : appstoreconnect.apple.com → Apps → (+) New App (iOS,
+  #     bundle fr.healthmap.app, langue Français, SKU healthmap-ios-001).
+  #
   # Après un bootstrap réussi, la lane `beta` (match readonly) suffit.
   # ───────────────────────────────────────────────────────────────────────────
   lane :bootstrap do
@@ -23,20 +31,8 @@ platform :ios do
       in_house: false
     )
 
-    # 1. Bundle ID + app record (idempotent — skip si déjà présents).
-    produce(
-      app_identifier: APP_ID,
-      app_name: "HealthMap",
-      language: "French",
-      app_version: "1.0.0",
-      sku: "healthmap-ios-001",
-      api_key: api_key,
-      skip_itc: false,
-      skip_devportal: false
-    )
-
-    # 2. Certificat Distribution + profil App Store via match EN ÉCRITURE.
-    #    Génère et stocke (chiffré) dans MATCH_GIT_URL au premier run.
+    # Certificat Distribution + profil App Store via match EN ÉCRITURE.
+    # Génère et stocke (chiffré) dans MATCH_GIT_URL au premier run.
     match(
       type: "appstore",
       app_identifier: APP_ID,
