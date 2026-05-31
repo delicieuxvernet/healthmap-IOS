@@ -1,0 +1,123 @@
+# fastlane Fastfile — no-Mac TestFlight pipeline for HealthMap iOS.
+# Signing: App Store Connect API key + fastlane match (appstore, readonly).
+# Build: MANUAL signing with the match-installed profile (automatic signing is
+# unreliable for Distribution on CI). Upload: pilot (TestFlight, no submission).
+default_platform(:ios)
+
+APP_ID = "fr.healthmap.app"
+
+platform :ios do
+  # ───────────────────────────────────────────────────────────────────────────
+  # bootstrap — FIRST RUN ONLY. Crée les ressources Apple qui n'existent pas
+  # encore : Bundle ID (fr.healthmap.app), app App Store Connect, puis le
+  # certificat de distribution + provisioning profile via match (EN ÉCRITURE).
+  # Idempotent : produce et match ne recréent pas ce qui existe déjà.
+  # Après un bootstrap réussi, la lane `beta` (match readonly) suffit.
+  # ───────────────────────────────────────────────────────────────────────────
+  lane :bootstrap do
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_API_KEY_BASE64"),
+      is_key_content_base64: true,
+      in_house: false
+    )
+
+    # 1. Bundle ID + app record (idempotent — skip si déjà présents).
+    produce(
+      app_identifier: APP_ID,
+      app_name: "HealthMap",
+      language: "French",
+      app_version: "1.0.0",
+      sku: "healthmap-ios-001",
+      api_key: api_key,
+      skip_itc: false,
+      skip_devportal: false
+    )
+
+    # 2. Certificat Distribution + profil App Store via match EN ÉCRITURE.
+    #    Génère et stocke (chiffré) dans MATCH_GIT_URL au premier run.
+    match(
+      type: "appstore",
+      app_identifier: APP_ID,
+      git_url: ENV.fetch("MATCH_GIT_URL"),
+      storage_mode: "git",
+      readonly: false,
+      api_key: api_key
+    )
+  end
+
+  desc "Resolve match, build with manual signing, upload to TestFlight"
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_API_KEY_BASE64"),
+      is_key_content_base64: true,
+      in_house: false
+    )
+
+    match(
+      type: "appstore",
+      app_identifier: APP_ID,
+      git_url: ENV.fetch("MATCH_GIT_URL"),
+      storage_mode: "git",
+      readonly: true,
+      api_key: api_key
+    )
+
+    # Resolve the installed App Store profile name defensively. match populates
+    # lane_context[:MATCH_PROVISIONING_PROFILE_MAPPING] and an env var whose
+    # exact key has varied across fastlane versions — so we try several known
+    # sources and fail LOUD with diagnostics rather than guess wrong silently.
+    mapping = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING] || {}
+    profile_name = mapping[APP_ID] ||
+                   mapping["#{APP_ID}.appstore"] ||
+                   ENV["sigh_#{APP_ID}_appstore_profile-name"] ||
+                   ENV["sigh_#{APP_ID}_appstore"]
+
+    if profile_name.nil? || profile_name.to_s.empty?
+      sh("env | grep -i 'sigh_\\|match_' || true")  # first-run diagnostics
+      UI.user_error!("Could not resolve the match App Store profile name. " \
+        "Inspect the env/lane_context dump above and set the correct key.")
+    end
+    UI.message("Using provisioning profile: #{profile_name}")
+
+    build_app(
+      project: "HealthMap.xcodeproj",
+      scheme: "HealthMap",
+      configuration: "Release",
+      clean: true,
+      destination: "generic/platform=iOS",
+      export_method: "app-store",
+      output_directory: "build",
+      output_name: "HealthMap.ipa",
+      export_options: {
+        signingStyle: "manual",
+        provisioningProfiles: { APP_ID => profile_name }
+      },
+      xcargs: [
+        "CODE_SIGN_STYLE=Manual",
+        "PROVISIONING_PROFILE_SPECIFIER=#{profile_name}"
+      ].join(" ")
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: "build/HealthMap.ipa",
+      app_identifier: APP_ID,
+      skip_submission: true,
+      skip_waiting_for_build_processing: true
+    )
+  end
+end
+
+# VERIFY ON FIRST RUN (could not be fully confirmed from docs — training data
+# on fastlane internals is unreliable):
+#  - The exact match profile-name source: the diagnostic `env | grep sigh_`
+#    above prints it on first failure so the resolver list can be corrected.
+#  - DEVELOPMENT_TEAM: build_app reads team_id from the Appfile
+#    (FASTLANE_TEAM_ID). If Xcode still complains, add
+#    "DEVELOPMENT_TEAM=#{ENV['FASTLANE_TEAM_ID']}" to xcargs.
+#  - The App Store Connect app record for fr.healthmap.app must exist before
+#    upload_to_testflight (pilot does not create it).

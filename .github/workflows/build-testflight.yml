@@ -3,58 +3,72 @@ name: Build & Deploy to TestFlight
 on:
   push:
     branches: [main]
-  workflow_dispatch: # Manual trigger
+  workflow_dispatch: # Manual trigger (recommended for the FIRST run)
 
 jobs:
   build-and-upload:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 60
+
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      FASTLANE_TEAM_ID: ${{ secrets.FASTLANE_TEAM_ID }}
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_CHANGELOG: "1"
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+      - name: Setup SSH for match (certs repo)
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_SSH_PRIVATE_KEY }}
+
+      - name: Trust github.com host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      # iOS 26 SDK / Xcode 26 is mandatory for App Store Connect uploads since
+      # 2026-04-28. Xcode 26.2 is preinstalled on the current macos-15 image.
+      - name: Select Xcode 26.2
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
 
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Install certificates and provisioning profiles
-        env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          # Create paths
-          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
-          # Decode from base64 secrets
-          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
-
-          # Create temporary keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-
-          # Import certificate to keychain
-          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
-
-          # Install provisioning profile
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+      - name: Install XcodeGen
+        run: brew install xcodegen
 
       - name: Inject Config.xcconfig
         env:
           CONFIG_XCCONFIG_BASE64: ${{ secrets.CONFIG_XCCONFIG_BASE64 }}
         run: |
+          mkdir -p HealthMap/Resources
           echo -n "$CONFIG_XCCONFIG_BASE64" | base64 --decode > HealthMap/Resources/Config.xcconfig
+
+      # .xcodeproj is NOT committed (XcodeGen-generated). Regenerate so the build
+      # always matches project.yml (the source of truth).
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', 'project.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
 
       - name: Resolve SPM dependencies
         run: |
@@ -64,62 +78,55 @@ jobs:
 
       - name: Run tests
         run: |
+          set -o pipefail
           xcodebuild test \
             -project HealthMap.xcodeproj \
             -scheme HealthMap \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            -resultBundlePath TestResults.xcresult
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
 
-      - name: Build archive
-        run: |
-          xcodebuild archive \
-            -project HealthMap.xcodeproj \
-            -scheme HealthMap \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath $RUNNER_TEMP/HealthMap.xcarchive \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            -allowProvisioningUpdates
-
-      - name: Export IPA
-        run: |
-          cat > $RUNNER_TEMP/ExportOptions.plist << 'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store-connect</string>
-            <key>uploadSymbols</key>
-            <true/>
-            <key>compileBitcode</key>
-            <false/>
-          </dict>
-          </plist>
-          PLIST
-
-          xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/HealthMap.xcarchive \
-            -exportPath $RUNNER_TEMP/export \
-            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist
-
-      - name: Upload to TestFlight
-        env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
-        run: |
-          # Decode App Store Connect API key
-          API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8
-          echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode -o $API_KEY_PATH
-
-          xcrun altool --upload-app \
-            -f "$RUNNER_TEMP/export/HealthMap.ipa" \
-            --type ios \
-            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
-
-      - name: Clean up keychain
+      - name: Upload test results
         if: always()
-        run: security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults.xcresult
+          path: ${{ runner.temp }}/TestResults.xcresult
+          if-no-files-found: warn
+
+      - name: Set up Ruby (fastlane)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Install fastlane
+        run: gem install fastlane --no-document
+
+      - name: Build & upload to TestFlight (fastlane)
+        run: fastlane ios beta
+
+      - name: Upload IPA artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HealthMap-ipa
+          path: build/HealthMap.ipa
+          if-no-files-found: warn
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PREREQUISITES (set as GitHub repo secrets BEFORE first push; first run via
+# workflow_dispatch). The old manual-signing secrets
+# (BUILD_CERTIFICATE_BASE64 / P12_PASSWORD / BUILD_PROVISION_PROFILE_BASE64 /
+# KEYCHAIN_PASSWORD) are no longer used — match replaces them.
+#   - ASC_KEY_ID / ASC_ISSUER_ID / ASC_API_KEY_BASE64  (App Store Connect API
+#       key — must be a TEAM key with ADMIN role; Individual keys and
+#       App Manager role CANNOT create/manage signing assets)
+#   - MATCH_GIT_URL        (private git repo storing match certs/profiles)
+#   - MATCH_PASSWORD       (match encryption passphrase)
+#   - FASTLANE_TEAM_ID     (10-char Apple Developer Team ID owning fr.healthmap.app)
+#   - CONFIG_XCCONFIG_BASE64  (base64 of the real Config.xcconfig)
+# The app record for fr.healthmap.app must already exist in App Store Connect
+# (pilot uploads to it, it does not create it). A fresh Apple account may need
+# 24-48h after activation before signing/Provisioning endpoints respond.
+# ─────────────────────────────────────────────────────────────────────────────
