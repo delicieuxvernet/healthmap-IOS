@@ -1,0 +1,11 @@
+# fastlane Matchfile
+# Auth is via App Store Connect API key (passed in the Fastfile), so no Apple
+# ID / 2FA is needed here. Certs/profiles live encrypted in the MATCH_GIT_URL
+# repo. CI is strictly readonly: it must NEVER mint a new cert (Apple caps
+# active Distribution certs at ~3; match reuses the single stored one).
+git_url(ENV["MATCH_GIT_URL"])
+storage_mode("git")
+
+type("appstore")
+app_identifier(["fr.healthmap.app"])
+readonly(true)

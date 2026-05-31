@@ -33,7 +33,7 @@ settings:
 packages:
   Clerk:
     url: https://github.com/clerk/clerk-ios
-    branch: main
+    exactVersion: "1.1.3"
   Supabase:
     url: https://github.com/supabase/supabase-swift
     from: "2.0.0"

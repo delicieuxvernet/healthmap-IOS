@@ -46,19 +46,15 @@ struct ScoreHistoryPayload: Codable {
 // MARK: - Analytics Event Payload
 struct AnalyticsEventPayload: Codable {
     let userId: String?
-    let event: String
+    let eventName: String
     let properties: [String: String]
-    let appVersion: String
-    let environment: String
-    let createdAt: String
+    let occurredAt: String
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
-        case event
+        case eventName = "event_name"
         case properties
-        case appVersion = "app_version"
-        case environment
-        case createdAt = "created_at"
+        case occurredAt = "occurred_at"
     }
 }
 

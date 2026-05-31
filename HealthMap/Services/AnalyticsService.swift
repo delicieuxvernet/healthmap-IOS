@@ -157,21 +157,25 @@ final class AnalyticsService: AnalyticsServiceProtocol {
 
     private func supabaseCapture(event: AnalyticsEvent, properties: [String: String]) async {
         guard SupabaseService.shared.safeClient != nil else { return }
+        // Prod schema (source of truth: web src/lib/analyticsEvents.js) — the
+        // analytics_events table only has user_id / event_name / properties /
+        // occurred_at. There are NO app_version / environment columns, so they
+        // are folded into the properties JSONB. PostgREST rejects unknown
+        // columns, which is why iOS analytics inserts failed 100% silently.
+        var enrichedProperties = properties
+        enrichedProperties["app_version"] = AppConfig.shared.versionTag
+        enrichedProperties["environment"] = AppConfig.shared.environment.rawValue
         struct Row: Encodable {
             let user_id: String?
-            let event: String
+            let event_name: String
             let properties: [String: String]
-            let app_version: String
-            let environment: String
-            let created_at: String
+            let occurred_at: String
         }
         let row = Row(
             user_id: currentUserId,
-            event: event.rawValue,
-            properties: properties,
-            app_version: AppConfig.shared.versionTag,
-            environment: AppConfig.shared.environment.rawValue,
-            created_at: ISO8601DateFormatter().string(from: Date())
+            event_name: event.rawValue,
+            properties: enrichedProperties,
+            occurred_at: ISO8601DateFormatter().string(from: Date())
         )
         do {
             try await SupabaseService.shared.client
@@ -183,11 +187,9 @@ final class AnalyticsService: AnalyticsServiceProtocol {
             AppLogger.analytics.notice("Supabase analytics insert failed, queuing: \(error.localizedDescription, privacy: .public)")
             let payload = AnalyticsEventPayload(
                 userId: row.user_id,
-                event: row.event,
+                eventName: row.event_name,
                 properties: row.properties,
-                appVersion: row.app_version,
-                environment: row.environment,
-                createdAt: row.created_at
+                occurredAt: row.occurred_at
             )
             OfflineQueueService.shared.enqueue(type: .analyticsEvent, payload: payload)
         }

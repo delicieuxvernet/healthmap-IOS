@@ -20,7 +20,7 @@ enum RedFlagDetector {
         if ["vegan", "vegetarien", "vegetarian"].contains(diet) && !hasSupplement("b12") {
             flags.append(RedFlag(
                 id: .veganNoB12, urgency: .soon,
-                message: "Régime végé sans supplément B12 — signal à prendre au sérieux à long terme. La B12 n'existe pas dans les végétaux."
+                message: "Régime végé sans supplément B12 — risque d'apport insuffisant sévère à long terme. La B12 n'existe pas dans les végétaux."
             ))
         }
 
@@ -84,7 +84,7 @@ enum RedFlagDetector {
         if medications.contains("ppi") && medications.contains("metformin") {
             flags.append(RedFlag(
                 id: .ppiMetforminB12, urgency: .soon,
-                message: "PPI + Metformine = double risque d'insuffisance en B12. Demandez un dosage sanguin de B12."
+                message: "PPI + Metformine = double risque d'apport insuffisant en B12. Demandez un dosage sanguin de B12."
             ))
         }
 
@@ -101,7 +101,7 @@ enum RedFlagDetector {
             (["vegan", "vegetarien"].contains(diet) || medications.contains("ppi") || medications.contains("metformin")) {
             flags.append(RedFlag(
                 id: .tinglingB12Risk, urgency: .soon,
-                message: "Fourmillements + facteurs de risque B12 — la neuropathie liée à un manque de B12 peut devenir irréversible. Consultez rapidement."
+                message: "Fourmillements + facteurs de risque B12 — la neuropathie par apport insuffisant en B12 peut devenir irréversible. Consultez rapidement."
             ))
         }
 

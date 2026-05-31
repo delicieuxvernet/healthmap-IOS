@@ -61,7 +61,7 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
 5. **Aucune clé API hardcodée**. Tout via `Config.xcconfig` (gitignored) lu par `AppConfig.swift`.
    Les clés critiques : `CLERK_PUBLISHABLE_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
    `REVENUECAT_API_KEY`, `SENTRY_DSN`.
-6. **SSL pinning placeholders** dans `SSLPinningService.swift` → **À remplacer par les vrais hashes SPKI SHA-256 avant prod**.
+6. **SSL pinning : hashes SPKI SHA-256 RÉELS en place** dans `SSLPinningService.swift` (Supabase + Clerk, capturés 2026-05-04 ; vérifié 2026-05-19). NE PAS désactiver le pinning. Re-capturer les hashes uniquement lors d'une rotation de certificat (sinon coupure réseau prod).
 7. **PII strippée** par Sentry `beforeSend` callback. Ne jamais logger email/UUID en clair.
 8. **Clerk = single source of truth pour l'auth**. Ne JAMAIS re-introduire `SupabaseAuth.signIn/signUp`
    — le `SupabaseClient` est configuré avec `autoRefreshToken: false` et `InMemoryLocalStorage`
