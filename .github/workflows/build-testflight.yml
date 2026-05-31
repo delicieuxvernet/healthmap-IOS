@@ -26,6 +26,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup SSH for match (certs repo)
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_SSH_PRIVATE_KEY }}
+
+      - name: Trust github.com host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+
       # iOS 26 SDK / Xcode 26 is mandatory for App Store Connect uploads since
       # 2026-04-28. Xcode 26.2 is preinstalled on the current macos-15 image.
       - name: Select Xcode 26.2

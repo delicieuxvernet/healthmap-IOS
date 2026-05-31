@@ -1,0 +1,50 @@
+name: Bootstrap (first run — create Apple resources + certs)
+
+# À lancer UNE SEULE FOIS, manuellement, avant le tout premier build TestFlight.
+# Crée : Bundle ID fr.healthmap.app, app App Store Connect, certificat Distribution
+# + provisioning profile (stockés chiffrés dans le repo certs via match).
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      FASTLANE_TEAM_ID: ${{ secrets.FASTLANE_TEAM_ID }}
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_CHANGELOG: "1"
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH for match (certs repo)
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_SSH_PRIVATE_KEY }}
+
+      - name: Trust github.com host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Set up Ruby (fastlane)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Install fastlane
+        run: gem install fastlane --no-document
+
+      - name: Bootstrap Apple resources + certs
+        run: fastlane ios bootstrap
