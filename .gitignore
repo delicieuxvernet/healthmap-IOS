@@ -18,6 +18,12 @@ Pods/
 # Secrets
 Config.xcconfig
 *.entitlements.local
+.match-password.txt
+fastlane/.env
+*.p8
+*.p12
+*.mobileprovision
+AuthKey_*.p8
 
 # OS
 .DS_Store
