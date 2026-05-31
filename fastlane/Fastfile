@@ -79,6 +79,12 @@ platform :ios do
     end
     UI.message("Using provisioning profile: #{profile_name}")
 
+    # NOTE quoting : le nom de profil match contient des espaces
+    # ("match AppStore fr.healthmap.app"). Le passer dans xcargs via
+    # PROVISIONING_PROFILE_SPECIFIER=#{profile_name} sans guillemets fait que
+    # xcodebuild lit "AppStore" comme une build action → "Unknown build action".
+    # On le passe donc UNIQUEMENT via export_options.provisioningProfiles (mapping
+    # propre, géré par gym) + on quote le specifier dans xcargs par sécurité.
     build_app(
       project: "HealthMap.xcodeproj",
       scheme: "HealthMap",
@@ -94,7 +100,7 @@ platform :ios do
       },
       xcargs: [
         "CODE_SIGN_STYLE=Manual",
-        "PROVISIONING_PROFILE_SPECIFIER=#{profile_name}"
+        "PROVISIONING_PROFILE_SPECIFIER=\"#{profile_name}\""
       ].join(" ")
     )
 
