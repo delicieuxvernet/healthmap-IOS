@@ -78,7 +78,7 @@ targets:
       properties:
         com.apple.developer.applesignin:
           - Default
-        aps-environment: development
+        aps-environment: production
         com.apple.developer.associated-domains:
           - applinks:healthmap.fr
     dependencies:
