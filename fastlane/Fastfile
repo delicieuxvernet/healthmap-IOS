@@ -100,6 +100,7 @@ platform :ios do
       },
       xcargs: [
         "CODE_SIGN_STYLE=Manual",
+        "DEVELOPMENT_TEAM=#{ENV.fetch("FASTLANE_TEAM_ID")}",
         "PROVISIONING_PROFILE_SPECIFIER=\"#{profile_name}\""
       ].join(" ")
     )
@@ -118,8 +119,10 @@ end
 # on fastlane internals is unreliable):
 #  - The exact match profile-name source: the diagnostic `env | grep sigh_`
 #    above prints it on first failure so the resolver list can be corrected.
-#  - DEVELOPMENT_TEAM: build_app reads team_id from the Appfile
-#    (FASTLANE_TEAM_ID). If Xcode still complains, add
-#    "DEVELOPMENT_TEAM=#{ENV['FASTLANE_TEAM_ID']}" to xcargs.
+#  - DEVELOPMENT_TEAM: injected explicitly via xcargs
+#    (DEVELOPMENT_TEAM=#{ENV['FASTLANE_TEAM_ID']}) AND baked into project.yml
+#    (D87R3L7B75). Manual signing on CI requires the team at ARCHIVE time, not
+#    just at export — without it xcodebuild fails: "Signing for HealthMap
+#    requires a development team" (exit 65). Fixed 2026-06-03.
 #  - The App Store Connect app record for fr.healthmap.app must exist before
 #    upload_to_testflight (pilot does not create it).
