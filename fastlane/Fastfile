@@ -96,11 +96,19 @@ platform :ios do
       output_name: "HealthMap.ipa",
       export_options: {
         signingStyle: "manual",
+        teamID: ENV.fetch("FASTLANE_TEAM_ID"),
         provisioningProfiles: { APP_ID => profile_name }
       },
+      # CODE_SIGN_IDENTITY : en signing Manual, xcodebuild retombe sinon sur
+      # "iOS Development" (absent du keychain — match n'installe que le cert de
+      # distribution) → "No iOS Development signing certificate found" (exit 65).
+      # On force l'identité de distribution. Le cert match appstore est unifié
+      # (Common Name "Apple Distribution: Arthur Vernet") ; la valeur générique
+      # "Apple Distribution" le matche. Quoté car le nom contient un espace.
       xcargs: [
         "CODE_SIGN_STYLE=Manual",
         "DEVELOPMENT_TEAM=#{ENV.fetch("FASTLANE_TEAM_ID")}",
+        "CODE_SIGN_IDENTITY=\"Apple Distribution\"",
         "PROVISIONING_PROFILE_SPECIFIER=\"#{profile_name}\""
       ].join(" ")
     )
