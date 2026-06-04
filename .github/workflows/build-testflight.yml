@@ -115,7 +115,12 @@ jobs:
           bundler-cache: false
 
       - name: Install fastlane
-        run: gem install fastlane --no-document
+        # Pin fastlane to the known-good build (2.235.0 ran the lane in PR #5) and
+        # install multi_json explicitly: fastlane's action loader `require`s it
+        # (via representable/json in google-apis-core) but no gem in the tree
+        # declares it as a hard dep on Ruby 3.4, so plain `gem install fastlane`
+        # can omit it -> "Could not find 'multi_json'" crash at startup.
+        run: gem install fastlane:2.235.0 multi_json --no-document
 
       - name: Build & upload to TestFlight (fastlane)
         run: fastlane ios beta
