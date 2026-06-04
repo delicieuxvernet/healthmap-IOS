@@ -87,6 +87,10 @@ jobs:
       # ne doit jamais bloquer le build. continue-on-error => le build continue
       # même si un test échoue/expire. (Les tests restent lançables à part.)
       - name: Run tests (best-effort)
+        # TEMPORAIRE : tests coupés pour accélérer l'itération CI vers le 1er
+        # build TestFlight (best-effort, non-bloquants — ils ne gardent pas la
+        # livraison). Réactiver en retirant cette ligne `if: false`.
+        if: false
         continue-on-error: true
         timeout-minutes: 12
         run: |
