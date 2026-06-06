@@ -1,5 +1,4 @@
 import SwiftUI
-import ClerkKit
 import RevenueCat
 import UIKit
 
@@ -29,13 +28,9 @@ struct HealthMapApp: App {
         // 2. Structured logging is now ready.
         AppLogger.app.info("HealthMap launching (env: \(AppConfig.shared.environment.rawValue, privacy: .public), version: \(AppConfig.shared.versionTag, privacy: .public))")
 
-        // 3. Configure Clerk (primary auth provider since 20 avril 2026).
-        //    Doit être configuré AVANT Supabase car SupabaseService utilise
-        //    `Clerk.shared.session?.getToken(...)` dans sa closure accessToken.
-        Clerk.configure(publishableKey: AppConfig.shared.clerkPublishableKey)
-
-        // 4. Configure Supabase (DB + Edge Functions ; JWT vient de Clerk).
-        //    Includes SSL certificate pinning via SSLPinningService.
+        // 3. Configure Supabase (auth + DB + Edge Functions + Storage).
+        //    Supabase Auth gère persistence Keychain + refresh token nativement.
+        //    Migration depuis Clerk : 2026-06-06.
         SupabaseService.shared.configure()
 
         // 5. Configure RevenueCat (reads from AppConfig).
@@ -71,7 +66,6 @@ struct HealthMapApp: App {
                 .environmentObject(subscriptionService)
                 .environmentObject(pushService)
                 .environmentObject(connectivity)
-                .environment(Clerk.shared)
                 .tint(Color.healthMapBlue)
                 // Dynamic Type: clamp to a readable range.
                 // Accessibility users can still scale up, but we cap at

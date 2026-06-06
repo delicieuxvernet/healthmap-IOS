@@ -31,9 +31,6 @@ settings:
       SWIFT_OPTIMIZATION_LEVEL: "-O"
 
 packages:
-  Clerk:
-    url: https://github.com/clerk/clerk-ios
-    branch: main
   Supabase:
     url: https://github.com/supabase/supabase-swift
     from: "2.0.0"
@@ -94,8 +91,6 @@ targets:
         com.apple.developer.associated-domains:
           - applinks:healthmap.fr
     dependencies:
-      - package: Clerk
-        product: ClerkKit
       - package: Supabase
         product: Supabase
       - package: RevenueCat

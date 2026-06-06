@@ -1,213 +1,167 @@
 import Foundation
-import ClerkKit
+import Supabase
 
-// MARK: - Auth Service (Clerk-backed)
+// MARK: - Auth Service (Supabase Auth-backed)
 //
-// Depuis le 20 avril 2026, HealthMap utilise Clerk comme unique provider d'auth
-// (domaine custom `clerk.healthmap.fr`, instance PROD `pk_live_...`). Supabase
-// Auth n'est PLUS utilisé : le `SupabaseClient` est configuré avec un
-// `accessToken` closure qui pompe le JWT template "supabase" depuis la session
-// Clerk courante — voir `SupabaseService.swift`.
+// HealthMap utilise Supabase Auth comme provider d'auth depuis 2026-06-06.
+// Avant : Clerk (migration retirée pour simplification + bugs Apple/Google OAuth).
 //
-// Cette classe expose la même surface que l'ancien `AuthService` Supabase
-// (signUp/signIn/signOut/signInWithApple/resetPassword/refreshSession/
-// currentSession/authStateChanges) pour minimiser la churn dans les ViewModels.
-// Les retours sont typés `HMSession` (voir `Core/AuthTypes.swift`) au lieu de
-// `Supabase.Session`, et le lookup `clerk_id → profiles.id (UUID)` est fait
-// via `ClerkProfileResolver` (équivalent web `AuthContext.resolveProfile`).
+// Le flow signup standard Supabase est en 1 étape (pas de email code 2-step).
+// Le profile row côté DB est créé automatiquement par le trigger Postgres
+// `handle_new_user` (voir migration DB 2026-06-06), donc le client n'a rien
+// à insérer manuellement → fin du bug RLS qui faisait planter chaque signup.
+//
+// Pour préserver la surface API existante consommée par AuthViewModel/AuthView,
+// les fonctions Clerk-specific (signUpStart, verifySignUpCode, resendSignUpEmailCode)
+// sont conservées mais leur comportement diffère :
+//   - signUpStart() devient un signup direct (session active immédiatement)
+//   - verifySignUpCode() devient no-op (la session est déjà active)
+// Cela permet à l'UI de continuer à fonctionner sans modif majeure ; l'écran
+// de saisie du code email peut être skippé en regardant `currentSession != nil`.
 @MainActor
 final class AuthService {
     static let shared = AuthService()
 
     private init() {}
 
-    // MARK: - Sign Up
-    //
-    // Flow Clerk : 2 étapes
-    //   1. create(emailAddress, password, firstName) → prepare email code
-    //   2. verifyEmailCode(code)                     → session active
-    // Le `signupFirstName` est stocké temporairement pour bootstrapper
-    // `profiles.first_name` lors du resolve.
-    private(set) var pendingSignUpFirstName: String?
-
-    /// Étape 1 : crée le compte Clerk + envoie le code email.
-    /// L'UI doit ensuite afficher un champ code → appeler `verifySignUpCode`.
-    func signUpStart(email: String, password: String, firstName: String) async throws {
-        let signUp = try await Clerk.shared.auth.signUp(
-            emailAddress: email,
-            password: password,
-            firstName: firstName
-        )
-        try await signUp.sendEmailCode()
-        pendingSignUpFirstName = firstName
+    private var client: SupabaseClient {
+        SupabaseService.shared.client
     }
 
-    /// Étape 2 : vérifie le code email. Session active si `.complete`.
-    /// Distingue 3 cas d'échec pour l'UI :
-    ///   - code mauvais (typo) → `.invalidEmailCode`
-    ///   - code expiré (>10 min) → `.emailCodeExpired` + bouton "Renvoyer"
-    ///   - autre (status != .complete sans erreur explicite) → `.signUpIncomplete`
+    private var auth: AuthClient {
+        client.auth
+    }
+
+    // MARK: - First name temp storage (UI ↔ trigger metadata bridge)
+    //
+    // Le `first_name` est passé via `data` à `signUp` → atteint le trigger
+    // `handle_new_user` via `NEW.raw_user_meta_data->>'first_name'`. On garde
+    // une copie locale pour compat avec ProfileResolver qui peut le lire si
+    // jamais la metadata n'a pas été propagée à temps (race rare).
+    private(set) var pendingSignUpFirstName: String?
+
+    // MARK: - Sign Up
+    //
+    // Crée le compte Supabase Auth + pose la session. Le trigger DB
+    // `handle_new_user` crée le profile row automatiquement (avec
+    // `auth_user_id = NEW.id` + `email` + `first_name`).
+    //
+    // Si "Confirm email" est activé dans Supabase Dashboard, la session sera
+    // inactive jusqu'au click magic link — gérer ce cas via authStateChanges.
+    func signUp(email: String, password: String, firstName: String) async throws {
+        pendingSignUpFirstName = firstName
+        _ = try await auth.signUp(
+            email: email,
+            password: password,
+            data: [
+                "first_name": .string(firstName)
+            ]
+        )
+    }
+
+    /// Wrapper compat : avant l'UI faisait signUpStart → écran code → verifySignUpCode.
+    /// Avec Supabase Auth (sans confirm email) on pose la session direct. L'UI
+    /// peut toujours appeler ces deux fonctions, le résultat sera juste qu'on
+    /// est déjà connecté à la fin de signUpStart.
+    func signUpStart(email: String, password: String, firstName: String) async throws {
+        try await signUp(email: email, password: password, firstName: firstName)
+    }
+
+    /// No-op compat — la session est déjà active après signUp.
+    /// Lève `.signUpIncomplete` si la session n'est PAS active (= "Confirm email"
+    /// activé côté Dashboard et user n'a pas encore cliqué le lien).
     func verifySignUpCode(_ code: String) async throws {
-        // B4 : on relit `currentSignUp` juste avant le verify (et pas via une
-        // reference capturée plus tôt) au cas où Clerk a refresh la session
-        // en background entre temps — sinon on opère sur un objet stale et
-        // verifyEmailCode peut retourner `.incomplete` faussement.
-        guard var signUp = Clerk.shared.auth.currentSignUp else {
-            throw HealthMapError.auth(.sessionExpired)
-        }
-        do {
-            signUp = try await signUp.verifyEmailCode(code)
-        } catch {
-            // Clerk lève une ClerkAPIError dont le `.code` distingue les cas.
-            // On lit `.localizedDescription` car la surface publique exacte
-            // varie entre versions du SDK (struct vs enum).
-            let desc = error.localizedDescription.lowercased()
-            if desc.contains("expired") || desc.contains("verification_expired") {
-                throw HealthMapError.auth(.emailCodeExpired)
-            }
-            if desc.contains("incorrect") || desc.contains("invalid")
-                || desc.contains("verification_failed")
-                || desc.contains("form_code_incorrect") {
-                throw HealthMapError.auth(.invalidEmailCode)
-            }
-            throw error
-        }
-        if signUp.status != .complete {
-            // B4 : retry une fois — un session refresh concurrent peut faire
-            // que la première tentative voie un signUp légèrement décalé.
-            // Rare mais reproductible quand le refreshTimer tape juste pendant
-            // le verify. On relit l'objet et on réessaie sans demander un
-            // nouveau code à l'user.
-            if let fresh = Clerk.shared.auth.currentSignUp, fresh.status == .complete {
-                return
-            }
+        _ = code  // unused — supabase Auth ne demande pas de code email user-side
+        guard (try? await auth.session) != nil else {
             throw HealthMapError.auth(.signUpIncomplete)
         }
     }
 
-    /// Renvoie un nouveau code email à l'utilisateur en cours de signup.
-    /// À utiliser depuis le bouton "Renvoyer le code" dans EmailCodeVerificationSheet.
-    /// Lève `.sessionExpired` si l'utilisateur n'est plus dans un signup actif.
+    /// No-op compat — pas de code email en flow Supabase Auth standard.
     func resendSignUpEmailCode() async throws {
-        guard let signUp = Clerk.shared.auth.currentSignUp else {
-            throw HealthMapError.auth(.sessionExpired)
-        }
-        try await signUp.sendEmailCode()
+        // intentional no-op
     }
 
-    /// Legacy one-shot signUp — DEPRECATED : utiliser signUpStart + verifySignUpCode.
-    /// Gardé pour compatibilité avec AuthViewModel existant ; lève une erreur
-    /// "needs verification" pour forcer l'UI à basculer sur le flow en 2 étapes.
-    func signUp(email: String, password: String, firstName: String) async throws {
-        try await signUpStart(email: email, password: password, firstName: firstName)
-        throw HealthMapError.auth(.signUpNeedsEmailCode)
-    }
-
-    // MARK: - Sign In (email + password)
+    // MARK: - Sign In
     func signIn(email: String, password: String) async throws {
-        let signIn = try await Clerk.shared.auth.signInWithPassword(
-            identifier: email,
-            password: password
-        )
-        guard signIn.status == .complete else {
-            // 2FA / OTP / verification — la session n'est pas active.
-            throw HealthMapError.auth(.signInIncomplete)
-        }
-    }
-
-    // MARK: - Sign In with Google (OAuth via ASWebAuthenticationSession managed by Clerk)
-    //
-    // Clerk iOS SDK gère entièrement l'OAuth Google : pas besoin de monter
-    // notre propre ASWebAuthenticationSession. La signature de retour reste
-    // `URL` pour compat avec AuthViewModel, mais l'URL est bidon — la vraie
-    // session est déjà posée sur Clerk.shared à ce stade. L'AuthViewModel
-    // doit appeler `signInWithGoogleClerk()` à la place pour la nouvelle API.
-    func signInWithGoogleClerk() async throws {
-        _ = try await Clerk.shared.auth.signInWithOAuth(
-            provider: .google,
-            prefersEphemeralWebBrowserSession: true
-        )
-        try await Self.waitForSessionActive(timeoutSeconds: 3)
-    }
-
-    /// Legacy signature — garde la compat avec AuthViewModel.signInWithGoogle()
-    /// existant. Lance le flow Clerk et retourne une URL placeholder.
-    func signInWithGoogle() async throws -> URL {
-        try await signInWithGoogleClerk()
-        return URL(string: "healthmap://auth/callback")!
+        _ = try await auth.signIn(email: email, password: password)
     }
 
     // MARK: - Sign In with Apple
     //
-    // On consomme directement l'idToken produit par `SignInWithAppleButton`
-    // SwiftUI (AuthView.swift). Pas besoin de relancer une 2e
-    // `ASAuthorizationController` côté Clerk — `signInWithIdToken` valide
-    // le token et pose la session. `rawNonce` est gardé dans la signature
-    // pour la compat historique mais n'est pas transmis (le provider Apple
-    // configuré dans Clerk Dashboard valide la chaîne nonce côté serveur).
+    // L'idToken est produit par `SignInWithAppleButton` SwiftUI (voir AuthView).
+    // Supabase Auth valide la signature Apple côté serveur — la chaîne `nonce`
+    // doit matcher entre la request initiale et le token, sinon rejet.
+    //
+    // PRÉREQUIS Supabase Dashboard → Authentication → Providers → Apple :
+    //   - Services ID (Apple Developer)
+    //   - Team ID
+    //   - Key ID + Private Key (.p8)
     func signInWithApple(idToken: String, rawNonce: String) async throws {
-        _ = try await Clerk.shared.auth.signInWithIdToken(idToken, provider: .apple)
-        try await Self.waitForSessionActive(timeoutSeconds: 3)
+        _ = try await auth.signInWithIdToken(
+            credentials: .init(
+                provider: .apple,
+                idToken: idToken,
+                nonce: rawNonce
+            )
+        )
     }
 
-    /// Poll `Clerk.shared.session` jusqu'à ce qu'elle soit non-nil (= session
-    /// vraiment posée), ou jette `.signInIncomplete` après le timeout.
-    /// Couvre la fenêtre courte entre le retour de signInWithOAuth/idToken
-    /// (qui résout côté serveur) et la propagation locale du `Clerk.shared.session`.
-    private static func waitForSessionActive(timeoutSeconds: TimeInterval) async throws {
-        let deadline = Date().addingTimeInterval(timeoutSeconds)
-        while Date() < deadline {
-            if Clerk.shared.session != nil { return }
-            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-        }
-        if Clerk.shared.session == nil {
-            throw HealthMapError.auth(.signInIncomplete)
-        }
+    // MARK: - Sign In with Google (OAuth)
+    //
+    // PRÉREQUIS Supabase Dashboard → Authentication → Providers → Google :
+    //   - Client ID (Google Cloud Console — type "iOS application")
+    //   - Client Secret (si type web ; pour iOS natif typiquement non requis)
+    // PRÉREQUIS app : custom URL scheme `healthmap://` dans Info.plist (déjà OK).
+    func signInWithGoogle() async throws {
+        _ = try await auth.signInWithOAuth(
+            provider: .google,
+            redirectTo: URL(string: "healthmap://auth/callback")
+        )
+    }
+
+    /// Legacy signature — garde la compat avec AuthViewModel.signInWithGoogle()
+    func signInWithGoogleClerk() async throws {
+        try await signInWithGoogle()
     }
 
     // MARK: - Sign Out
     func signOut() async throws {
-        try await Clerk.shared.auth.signOut()
+        try await auth.signOut()
+        pendingSignUpFirstName = nil
+        ProfileResolver.shared.invalidate()
     }
 
     // MARK: - Current Session (HMSession-shaped)
     //
-    // Résout `profiles.id` (UUID) depuis `clerk_id = clerk.user.id` via
-    // `ClerkProfileResolver`. Cache local pour éviter un round-trip à chaque
-    // appel. `accessToken` est fetché à la volée (Clerk cache 10s par défaut).
+    // Résout `profiles.id` (UUID) depuis `auth.users.id` via `ProfileResolver`.
+    // Cache local pour éviter un round-trip à chaque appel.
     var currentSession: HMSession? {
         get async {
-            guard Clerk.shared.session != nil, let clerkUser = Clerk.shared.user else {
-                return nil
-            }
+            guard let session = try? await auth.session else { return nil }
+            let authUserId = session.user.id
+
             let profileId: UUID
             do {
-                profileId = try await ClerkProfileResolver.shared.resolveProfileUUID(for: clerkUser)
+                profileId = try await ProfileResolver.shared.resolveProfileUUID(forAuthUserId: authUserId)
             } catch HealthMapError.auth(.profileResolutionTimeout) {
-                // Réseau lent / Supabase indispo. On le logge spécifiquement (pas
-                // un crash report) et on retourne nil. Le caller observe le
-                // changement d'état (still pas authenticated) et peut afficher
-                // un retry. Sans ce catch dédié, l'erreur tomberait dans le
-                // catch générique ci-dessous, qui report() à Sentry comme un
-                // bug applicatif au lieu d'un timeout réseau attendu.
-                AppLogger.auth.notice("Profile resolution timed out — clerk session active mais Supabase profile non chargé")
+                AppLogger.auth.notice("Profile resolution timed out — Supabase auth session active mais profile non chargé")
                 return nil
             } catch {
                 AppLogger.auth.report(error, context: "AuthService.currentSession.resolveProfile")
                 return nil
             }
-            // Clerk SDK >= 0.5: `getToken(_:)` returns `String?` directly
-            // (was `TokenResource?` with `.jwt` in pre-1.0 builds).
-            let token = try? await Clerk.shared.session?.getToken(.init(template: "supabase"))
-            let email = clerkUser.primaryEmailAddress?.emailAddress
-                ?? clerkUser.emailAddresses.first?.emailAddress
+
+            let firstName = session.user.userMetadata["first_name"]?.stringValue
+                ?? pendingSignUpFirstName
+
             let user = HMUser(
                 id: profileId,
-                email: email,
-                firstName: clerkUser.firstName,
-                clerkId: clerkUser.id
+                email: session.user.email,
+                firstName: firstName,
+                clerkId: ""  // unused; kept for API compat with legacy call-sites
             )
-            return HMSession(user: user, accessToken: token)
+            return HMSession(user: user, accessToken: session.accessToken)
         }
     }
 
@@ -215,86 +169,75 @@ final class AuthService {
         get async { await currentSession?.user }
     }
 
-    /// Accès synchrone au `profiles.id` (UUID) via le cache `ClerkProfileResolver`.
-    /// Retourne nil si le resolve async n'a jamais été invoqué pour cet utilisateur
-    /// (cold-start, sign-in juste posé mais pas encore consommé). Les call-sites
-    /// synchrones (ex: `saveDraft` dans QuestionnaireVM) doivent tolérer nil.
+    /// Accès synchrone au `profiles.id` (UUID) via le cache `ProfileResolver`.
+    /// Retourne nil si le resolve async n'a jamais été invoqué pour cet utilisateur.
     var cachedCurrentUserIdString: String? {
-        guard let clerkUser = Clerk.shared.user else { return nil }
-        return ClerkProfileResolver.shared.cachedProfileUUID(forClerkId: clerkUser.id)?.uuidString
+        guard let authUserId = client.auth.currentUser?.id else { return nil }
+        return ProfileResolver.shared.cachedProfileUUID(forAuthUserId: authUserId)?.uuidString
     }
 
     // MARK: - Refresh Session
-    //
-    // Clerk gère le refresh automatiquement côté SDK. Ce call force un
-    // nouveau fetch du JWT template "supabase" (skipCache: true) pour
-    // garantir qu'on a un token frais.
     func refreshSession() async throws {
-        guard let session = Clerk.shared.session else {
-            throw HealthMapError.auth(.sessionExpired)
-        }
-        _ = try await session.getToken(.init(template: "supabase", skipCache: true))
+        _ = try await auth.refreshSession()
     }
 
     // MARK: - Reset Password
-    //
-    // Flow Clerk :
-    //   1. signIn(email) → prepareFirstFactor(.resetPasswordEmailCode)
-    //   2. user entre code + new password → attemptFirstFactor + resetPassword
-    // Cette méthode ne fait que l'étape 1. L'UI doit basculer vers un écran
-    // "entre le code et ton nouveau mot de passe" et appeler `completeResetPassword`.
     func resetPassword(email: String) async throws {
-        let signIn = try await Clerk.shared.auth.signIn(email)
-        _ = try await signIn.sendResetPasswordEmailCode()
+        try await auth.resetPasswordForEmail(email)
     }
 
-    /// Étape 2 du reset : valide le code email + pose le nouveau mot de passe.
+    /// Étape 2 du reset compat : applique le nouveau mot de passe.
+    /// Avec Supabase Auth standard, le reset se fait via magic link → l'user
+    /// arrive sur l'app via deep link + appelle `updateUser(password:)`.
+    /// Pour rester compat avec l'API existante, on tente un update password
+    /// direct (suppose qu'une session est active via le deep link).
     func completeResetPassword(code: String, newPassword: String) async throws {
-        guard let signIn = Clerk.shared.auth.currentSignIn else {
-            throw HealthMapError.auth(.sessionExpired)
-        }
-        _ = try await signIn.verifyCode(code)
-        _ = try await signIn.resetPassword(newPassword: newPassword)
+        _ = code  // unused — Supabase reset utilise magic link, pas un code 6 chiffres
+        try await updatePassword(newPassword: newPassword)
     }
 
     // MARK: - Update Password (user connecté)
     func updatePassword(newPassword: String) async throws {
-        guard let user = Clerk.shared.user else {
+        guard (try? await auth.session) != nil else {
             throw HealthMapError.auth(.sessionExpired)
         }
-        _ = try await user.updatePassword(.init(newPassword: newPassword))
+        _ = try await auth.update(user: UserAttributes(password: newPassword))
     }
 
     // MARK: - Auth State Changes
     //
-    // Clerk expose `clerk.events.authEventEmitter` via AsyncStream, mais sa
-    // surface diffère de `Supabase.AuthStateChange`. On pond un stream dérivé
-    // qui émet des `HMAuthChangeEvent` + `HMSession?` pour coller à l'API
+    // Supabase Auth expose nativement un `AsyncStream<(AuthChangeEvent, Session?)>`.
+    // On mappe ses événements vers `HMAuthChangeEvent` pour préserver la surface
     // historique consommée par AuthViewModel.listenToAuthChanges().
     func authStateChanges() -> AsyncStream<(event: HMAuthChangeEvent, session: HMSession?)> {
         AsyncStream { continuation in
             let task = Task { [weak self] in
-                // Émet l'état initial immédiatement pour dismisser le launch screen.
-                let initial = await self?.currentSession
+                guard let self = self else {
+                    continuation.finish()
+                    return
+                }
+
+                // Émet l'état initial immédiatement.
+                let initial = await self.currentSession
                 continuation.yield((event: HMAuthChangeEvent.initialSession, session: initial))
 
-                for await event in Clerk.shared.auth.events {
+                for await (event, _) in self.client.auth.authStateChanges {
                     guard !Task.isCancelled else { break }
+
                     let mapped: HMAuthChangeEvent
                     switch event {
-                    case .signInCompleted:        mapped = .signedIn
-                    case .signUpCompleted:        mapped = .signedIn
+                    case .initialSession:         mapped = .initialSession
+                    case .signedIn:               mapped = .signedIn
                     case .signedOut:              mapped = .signedOut
-                    case .accountDeleted:         mapped = .signedOut
                     case .tokenRefreshed:         mapped = .tokenRefreshed
-                    case .sessionChanged(let old, let new):
-                        // Map session transitions to the closest legacy event.
-                        mapped = (new == nil && old != nil) ? .signedOut
-                               : (new != nil && old == nil) ? .signedIn
-                               : .userUpdated
+                    case .userUpdated:            mapped = .userUpdated
+                    case .userDeleted:            mapped = .signedOut
+                    case .mfaChallengeVerified:   mapped = .userUpdated
+                    case .passwordRecovery:       continue
                     @unknown default:             continue
                     }
-                    let session = await self?.currentSession
+
+                    let session = await self.currentSession
                     continuation.yield((event: mapped, session: session))
                 }
                 continuation.finish()

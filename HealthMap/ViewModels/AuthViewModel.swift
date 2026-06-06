@@ -309,11 +309,13 @@ final class AuthViewModel: ObservableObject {
         AnalyticsService.shared.track(.signUpStarted)
 
         do {
-            // Clerk flow : signUpStart envoie un code email, puis l'UI bascule
-            // vers un champ "entrez le code reçu" et appelle verifySignUpCode.
-            try await AuthService.shared.signUpStart(email: email, password: password, firstName: firstName)
-            pendingEmailVerification = true
-            AnalyticsService.shared.track(.signUpStarted, properties: ["method": "email"])
+            // Supabase Auth flow : 1 étape — signUp pose la session direct
+            // (sauf si "Confirm email" est activé dans Supabase Dashboard, dans
+            // ce cas la session est inactive jusqu'au click magic link). On
+            // n'affiche PLUS d'écran de saisie de code email — l'authStateChanges
+            // est l'unique source de vérité du moment où l'user devient connecté.
+            try await AuthService.shared.signUp(email: email, password: password, firstName: firstName)
+            AnalyticsService.shared.track(.signUpCompleted, properties: ["method": "email"])
         } catch {
             errorMessage = Self.mapAuthError(error)
         }

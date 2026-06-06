@@ -26,7 +26,6 @@ final class AppConfig {
 
     let supabaseURL: URL
     let supabaseAnonKey: String
-    let clerkPublishableKey: String
     let revenueCatAPIKey: String
     let sentryDSN: String?
     let posthogAPIKey: String?
@@ -57,10 +56,8 @@ final class AppConfig {
         precondition(!key.isEmpty, "[AppConfig] Missing SUPABASE_ANON_KEY — vérifier Config.xcconfig")
         self.supabaseAnonKey = key
 
-        // Clerk — REQUIRED (primary auth provider since 20 avril 2026)
-        let clerkKey = info["CLERK_PUBLISHABLE_KEY"] as? String ?? ""
-        precondition(!clerkKey.isEmpty, "[AppConfig] Missing CLERK_PUBLISHABLE_KEY — vérifier Config.xcconfig (pk_live_... pour prod)")
-        self.clerkPublishableKey = clerkKey
+        // Supabase Auth is used directly (migration retirée de Clerk le 2026-06-06).
+        // Plus de CLERK_PUBLISHABLE_KEY requise — l'auth passe par le supabaseAnonKey.
 
         // RevenueCat — REQUIRED for paywalls
         let rcKey = info["REVENUECAT_API_KEY"] as? String ?? ""

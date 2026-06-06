@@ -1,74 +1,62 @@
 import Foundation
-import ClerkKit
 
-// MARK: - Clerk → Supabase Profile Resolver
+// MARK: - Profile Resolver (Supabase Auth → profiles.id)
 //
-// Miroir exact du flow web `src/context/AuthContext.jsx` `resolveProfile()` :
+// Depuis la migration Supabase Auth (2026-06-06), le profile row est créé
+// AUTOMATIQUEMENT par le trigger Postgres `handle_new_user` sur INSERT INTO
+// auth.users. Le client n'a donc PLUS à insérer manuellement (fin du bug RLS).
 //
-//   1. SELECT profiles.id WHERE clerk_id = :clerkId
-//   2. Si trouvé → on retourne cet UUID (= profiles.id canonique)
-//   3. Si pas trouvé (signup frais Clerk) → INSERT profiles(clerk_id, email, first_name)
-//      → on retourne le nouveau UUID généré
+// Cette classe ne fait plus qu'un lookup : `profiles.id` (UUID) à partir de
+// `auth.users.id` (Supabase Auth UUID), via `auth_user_id = ?` qui est unique
+// et indexé. Cache en mémoire scopé par authUserId pour éviter un round-trip
+// à chaque `currentSession`.
 //
-// Tous les call-sites iOS (`DashboardViewModel`, `QuestionnaireViewModel`,
-// `EditProfileView`, `MealScanViewModel`…) consomment ce UUID via
-// `HMSession.user.id` pour leurs requêtes `.eq("id", value: userId)`. Il est
-// donc CRITIQUE que l'UUID retourné corresponde à `profiles.id`, pas à
-// `clerk.user.id` (qui est un "user_xxx...").
-//
-// Cache en mémoire scopé par `clerk.user.id` pour éviter un round-trip
-// Supabase à chaque `currentSession` (appelé ~15× au boot du Dashboard).
-// Invalidé au sign-out via `invalidate()`.
+// Nom de fichier conservé `ClerkProfileResolver.swift` pour éviter le bruit
+// dans le diff de migration ; la classe publique est `ProfileResolver`.
 @MainActor
-final class ClerkProfileResolver {
-    static let shared = ClerkProfileResolver()
+final class ProfileResolver {
+    static let shared = ProfileResolver()
 
-    private var cache: [String: UUID] = [:]
-    /// Flight-in-progress dédupli : évite 2× SELECT simultanés pour le même clerkId
-    /// si `currentSession` est appelé 2× en parallèle au boot.
-    private var inFlight: [String: Task<UUID, Error>] = [:]
+    private var cache: [UUID: UUID] = [:]
+    /// Flight-in-progress dédupli : évite 2× SELECT simultanés pour le même
+    /// authUserId si `currentSession` est appelé 2× en parallèle au boot.
+    private var inFlight: [UUID: Task<UUID, Error>] = [:]
 
     private init() {}
 
     /// Timeout au-delà duquel on jette `.profileResolutionTimeout` au lieu de
-    /// laisser pendre indéfiniment l'appelant (cold-start, réseau ramant, DB
-    /// surchargée). 15s = compromis entre fiabilité (le SELECT est rapide
-    /// normalement, <500ms) et patience utilisateur sur réseau dégradé.
+    /// laisser pendre indéfiniment l'appelant (cold-start, réseau ramant).
     private static let resolveTimeoutSeconds: TimeInterval = 15
 
-    /// Résout `profiles.id` (UUID) pour un utilisateur Clerk donné.
-    /// Crée la row si absente (fresh signup).
-    /// Lève `.auth(.profileResolutionTimeout)` après 15s pour éviter le pendage.
-    func resolveProfileUUID(for clerkUser: User) async throws -> UUID {
-        let clerkId = clerkUser.id
-
-        if let cached = cache[clerkId] {
+    /// Résout `profiles.id` (UUID) pour un user Supabase Auth donné.
+    /// Le trigger DB crée le row automatiquement à l'INSERT auth.users ;
+    /// si jamais on tape avant que le trigger ait fini, on retry en boucle
+    /// jusqu'au timeout.
+    func resolveProfileUUID(forAuthUserId authUserId: UUID) async throws -> UUID {
+        if let cached = cache[authUserId] {
             return cached
         }
-        if let task = inFlight[clerkId] {
+        if let task = inFlight[authUserId] {
             return try await task.value
         }
 
         let task = Task<UUID, Error> { [weak self] in
-            defer { self?.inFlight[clerkId] = nil }
-            let uuid = try await Self.fetchOrCreateProfileUUIDWithTimeout(
-                clerkUser: clerkUser,
+            defer { self?.inFlight[authUserId] = nil }
+            let uuid = try await Self.fetchProfileUUIDWithTimeout(
+                authUserId: authUserId,
                 timeout: Self.resolveTimeoutSeconds
             )
-            self?.cache[clerkId] = uuid
+            self?.cache[authUserId] = uuid
             return uuid
         }
-        inFlight[clerkId] = task
+        inFlight[authUserId] = task
         return try await task.value
     }
 
     /// Lookup synchrone dans le cache — retourne nil si le resolve async n'a
-    /// jamais tourné pour ce clerkId. Utilisé par les call-sites qui ne
-    /// peuvent pas async/await (ex: `saveDraft()` appelé depuis setters
-    /// synchrones du ViewModel). Ces call-sites doivent tolérer nil — ils
-    /// skippent alors leur logique user-scoped proprement.
-    func cachedProfileUUID(forClerkId clerkId: String) -> UUID? {
-        cache[clerkId]
+    /// jamais tourné. Utilisé par les call-sites qui ne peuvent pas async/await.
+    func cachedProfileUUID(forAuthUserId authUserId: UUID) -> UUID? {
+        cache[authUserId]
     }
 
     /// À appeler après un sign-out pour que la prochaine connexion (user
@@ -81,23 +69,18 @@ final class ClerkProfileResolver {
 
     // MARK: - Private
 
-    /// Wrap `fetchOrCreateProfileUUID` avec un timeout. Si la query Supabase
-    /// dépasse `timeout` secondes, on jette `.profileResolutionTimeout` au
-    /// lieu de bloquer l'UI — le caller (AuthService.currentSession) propage
-    /// vers le launch screen / un retry user-driven.
-    private static func fetchOrCreateProfileUUIDWithTimeout(
-        clerkUser: User,
+    private static func fetchProfileUUIDWithTimeout(
+        authUserId: UUID,
         timeout: TimeInterval
     ) async throws -> UUID {
         try await withThrowingTaskGroup(of: UUID.self) { group in
             group.addTask {
-                try await fetchOrCreateProfileUUID(clerkUser: clerkUser)
+                try await fetchProfileUUID(authUserId: authUserId)
             }
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
                 throw HealthMapError.auth(.profileResolutionTimeout)
             }
-            // Premier qui gagne — soit la query a fini, soit le timeout a expiré.
             guard let result = try await group.next() else {
                 throw HealthMapError.auth(.profileResolutionTimeout)
             }
@@ -106,48 +89,48 @@ final class ClerkProfileResolver {
         }
     }
 
-    private static func fetchOrCreateProfileUUID(clerkUser: User) async throws -> UUID {
+    private static func fetchProfileUUID(authUserId: UUID) async throws -> UUID {
         guard let client = SupabaseService.shared.safeClient else {
             throw HealthMapError.database(.notConfigured)
         }
-        let clerkId = clerkUser.id
-        let email = clerkUser.primaryEmailAddress?.emailAddress
-            ?? clerkUser.emailAddresses.first?.emailAddress
 
-        // 1. Lookup (fast path — existing user)
         struct Row: Decodable { let id: UUID }
-        let existing: [Row] = try await client
+
+        // 1. Tentative immédiate.
+        let firstShot: [Row] = try await client
             .from("profiles")
             .select("id")
-            .eq("clerk_id", value: clerkId)
+            .eq("auth_user_id", value: authUserId)
             .limit(1)
             .execute()
             .value
-        if let row = existing.first {
+        if let row = firstShot.first {
             return row.id
         }
 
-        // 2. Upsert via SECURITY DEFINER RPC (fresh signup).
-        //
-        // PRIOR BUG (parity with web): we used to do a direct INSERT here, but
-        // on fresh signup Clerk's JWT for the new user hasn't fully propagated
-        // and RLS policy `clerk_id = auth.jwt()->>'sub'` returned 403, surfacing
-        // as a generic "erreur" in AuthView. Web fixed this by routing through
-        // `upsert_my_profile`, a SECURITY DEFINER function that reads `sub`
-        // server-side (deployed in prod 2026-05-19). iOS now mirrors that.
-        struct RPCParams: Encodable {
-            let p_email: String?
-            let p_first_name: String?
+        // 2. Le trigger handle_new_user a peut-être pas encore fini. Backoff
+        //    rapide puis retry (max 3× ; au-delà → le trigger est cassé).
+        for delayMs in [200, 500, 1000] {
+            try await Task.sleep(nanoseconds: UInt64(delayMs * 1_000_000))
+            let retry: [Row] = try await client
+                .from("profiles")
+                .select("id")
+                .eq("auth_user_id", value: authUserId)
+                .limit(1)
+                .execute()
+                .value
+            if let row = retry.first {
+                AppLogger.auth.info("Profile resolved after \(delayMs)ms backoff for auth_user_id=\(authUserId.uuidString, privacy: .public)")
+                return row.id
+            }
         }
-        let params = RPCParams(
-            p_email: email,
-            p_first_name: clerkUser.firstName ?? AuthService.shared.pendingSignUpFirstName
-        )
-        let newId: UUID = try await client
-            .rpc("upsert_my_profile", params: params)
-            .execute()
-            .value
-        AppLogger.auth.info("Created profile row for new Clerk user \(clerkId, privacy: .public) → \(newId.uuidString, privacy: .public)")
-        return newId
+
+        throw HealthMapError.database(.insertFailed)
     }
 }
+
+// MARK: - Backward-compat alias
+//
+// Les anciennes call-sites utilisent `ClerkProfileResolver.shared`. On garde
+// l'alias pour éviter de toucher partout dans la codebase.
+typealias ClerkProfileResolver = ProfileResolver
