@@ -53,13 +53,34 @@ platform :ios do
       in_house: false
     )
 
+    # Dedicated unlocked keychain so codesign never hits an interactive prompt.
+    # On CI, the default `login.keychain-db` is password-protected with no UI ->
+    # codesign hangs forever waiting for an authorization popup that never comes
+    # (observed: 55 min stuck on "Signing Sentry.framework" before the 60-min
+    # job timeout killed it). With keychain_name + keychain_password specified
+    # to match, the imported P12 is also "set-key-partition-list" allowed for
+    # codesign without prompting.
+    keychain_name = "build.keychain"
+    keychain_password = "tempBuildPass"
+    create_keychain(
+      name: keychain_name,
+      password: keychain_password,
+      default_keychain: true,
+      unlock: true,
+      timeout: 0,             # 0 = never lock (whole-job duration)
+      lock_when_sleeps: false,
+      add_to_search_list: true
+    )
+
     match(
       type: "appstore",
       app_identifier: APP_ID,
       git_url: ENV.fetch("MATCH_GIT_URL"),
       storage_mode: "git",
       readonly: true,
-      api_key: api_key
+      api_key: api_key,
+      keychain_name: keychain_name,
+      keychain_password: keychain_password
     )
 
     # Resolve the installed App Store profile name defensively. match populates
