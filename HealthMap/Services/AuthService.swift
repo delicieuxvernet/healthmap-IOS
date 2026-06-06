@@ -113,16 +113,22 @@ final class AuthService {
     //   - Client ID (Google Cloud Console — type "iOS application")
     //   - Client Secret (si type web ; pour iOS natif typiquement non requis)
     // PRÉREQUIS app : custom URL scheme `healthmap://` dans Info.plist (déjà OK).
-    func signInWithGoogle() async throws {
+    //
+    // Retourne `URL` pour préserver `AuthServiceProtocol.signInWithGoogle()`,
+    // mais la vraie session est déjà posée par `signInWithOAuth` à ce stade —
+    // l'URL retournée est purement décorative (placeholder pour compat API).
+    @discardableResult
+    func signInWithGoogle() async throws -> URL {
         _ = try await auth.signInWithOAuth(
             provider: .google,
             redirectTo: URL(string: "healthmap://auth/callback")
         )
+        return URL(string: "healthmap://auth/callback")!
     }
 
-    /// Legacy signature — garde la compat avec AuthViewModel.signInWithGoogle()
+    /// Legacy alias.
     func signInWithGoogleClerk() async throws {
-        try await signInWithGoogle()
+        _ = try await signInWithGoogle()
     }
 
     // MARK: - Sign Out
