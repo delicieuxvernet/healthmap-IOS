@@ -114,7 +114,7 @@ final class ClerkProfileResolver {
         let email = clerkUser.primaryEmailAddress?.emailAddress
             ?? clerkUser.emailAddresses.first?.emailAddress
 
-        // 1. Lookup
+        // 1. Lookup (fast path — existing user)
         struct Row: Decodable { let id: UUID }
         let existing: [Row] = try await client
             .from("profiles")
@@ -127,27 +127,27 @@ final class ClerkProfileResolver {
             return row.id
         }
 
-        // 2. Insert (fresh signup)
-        struct InsertPayload: Encodable {
-            let clerk_id: String
-            let email: String?
-            let first_name: String?
+        // 2. Upsert via SECURITY DEFINER RPC (fresh signup).
+        //
+        // PRIOR BUG (parity with web): we used to do a direct INSERT here, but
+        // on fresh signup Clerk's JWT for the new user hasn't fully propagated
+        // and RLS policy `clerk_id = auth.jwt()->>'sub'` returned 403, surfacing
+        // as a generic "erreur" in AuthView. Web fixed this by routing through
+        // `upsert_my_profile`, a SECURITY DEFINER function that reads `sub`
+        // server-side (deployed in prod 2026-05-19). iOS now mirrors that.
+        struct RPCParams: Encodable {
+            let p_email: String?
+            let p_first_name: String?
         }
-        let payload = InsertPayload(
-            clerk_id: clerkId,
-            email: email,
-            first_name: clerkUser.firstName ?? AuthService.shared.pendingSignUpFirstName
+        let params = RPCParams(
+            p_email: email,
+            p_first_name: clerkUser.firstName ?? AuthService.shared.pendingSignUpFirstName
         )
-        let created: [Row] = try await client
-            .from("profiles")
-            .insert(payload)
-            .select("id")
+        let newId: UUID = try await client
+            .rpc("upsert_my_profile", params: params)
             .execute()
             .value
-        guard let newRow = created.first else {
-            throw HealthMapError.database(.insertFailed)
-        }
-        AppLogger.auth.info("Created profile row for new Clerk user \(clerkId, privacy: .public) → \(newRow.id.uuidString, privacy: .public)")
-        return newRow.id
+        AppLogger.auth.info("Created profile row for new Clerk user \(clerkId, privacy: .public) → \(newId.uuidString, privacy: .public)")
+        return newId
     }
 }
