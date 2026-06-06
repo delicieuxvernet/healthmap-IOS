@@ -60,6 +60,18 @@ jobs:
           mkdir -p HealthMap/Resources
           echo -n "$CONFIG_XCCONFIG_BASE64" | base64 --decode > HealthMap/Resources/Config.xcconfig
 
+      # Use github.run_number as the build number so every push gets a unique
+      # CURRENT_PROJECT_VERSION. Without this, the second push fails the
+      # TestFlight upload with "build 1.0.0 (1) already exists" — Apple refuses
+      # to accept the same MARKETING_VERSION + CURRENT_PROJECT_VERSION twice.
+      # github.run_number is monotonically increasing per workflow, never reused.
+      - name: Bump CURRENT_PROJECT_VERSION to github.run_number
+        run: |
+          sed -i.bak "s/^        CURRENT_PROJECT_VERSION: .*/        CURRENT_PROJECT_VERSION: ${{ github.run_number }}/" project.yml
+          rm -f project.yml.bak
+          echo "Build number set to: ${{ github.run_number }}"
+          grep "CURRENT_PROJECT_VERSION" project.yml
+
       # .xcodeproj is NOT committed (XcodeGen-generated). Regenerate so the build
       # always matches project.yml (the source of truth).
       - name: Generate Xcode project
