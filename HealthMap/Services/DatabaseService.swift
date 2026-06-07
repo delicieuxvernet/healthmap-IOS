@@ -133,23 +133,21 @@ final class DatabaseService {
 
     // MARK: - Save Profile (upsert) — with transit encryption for questionnaire data
     func saveProfile(userId: String, email: String, firstName: String, questionnaireData: UserProfile) async throws {
-        // Encrypt questionnaire data for transit
-        let questionnaireJSON = try JSONEncoder().encode(questionnaireData)
-        let encryptedQuestionnaire: Data? = SecureStorageService.shared.encryptForTransit(questionnaireJSON)
-
+        // NOTE: `questionnaire_data_encrypted` n'existe pas dans la DB (mismatch
+        // documenté CLAUDE.md §4.3) — fallback plaintext via `questionnaire_data`
+        // (jsonb). Si la colonne encrypted est ajoutée plus tard, restaurer
+        // SecureStorageService.encryptForTransit + champ dans le payload.
         struct UpsertRow: Codable {
             let id: String
             let email: String
             let firstName: String
             let questionnaireData: UserProfile
-            let questionnaireDataEncrypted: String?
             let updatedAt: String
 
             enum CodingKeys: String, CodingKey {
                 case id, email
                 case firstName = "first_name"
                 case questionnaireData = "questionnaire_data"
-                case questionnaireDataEncrypted = "questionnaire_data_encrypted"
                 case updatedAt = "updated_at"
             }
         }
@@ -159,7 +157,6 @@ final class DatabaseService {
             email: email,
             firstName: firstName,
             questionnaireData: questionnaireData,
-            questionnaireDataEncrypted: encryptedQuestionnaire?.base64EncodedString(),
             updatedAt: ISO8601DateFormatter().string(from: Date())
         )
 
@@ -173,25 +170,18 @@ final class DatabaseService {
 
     // MARK: - Save AI Analysis (cache) — with transit encryption
     func saveAIAnalysis(userId: String, analysis: AIAnalysisResponse) async throws {
-        // Encrypt AI analysis for transit
-        let analysisJSON = try JSONEncoder().encode(analysis)
-        let encryptedAnalysis: Data? = SecureStorageService.shared.encryptForTransit(analysisJSON)
-
+        // NOTE: `ai_analysis_encrypted` n'existe pas dans la DB (mismatch
+        // documenté CLAUDE.md §4.3) — fallback plaintext via `ai_analysis` jsonb.
         struct UpdateRow: Codable {
             let aiAnalysis: AIAnalysisResponse
-            let aiAnalysisEncrypted: String?
             enum CodingKeys: String, CodingKey {
                 case aiAnalysis = "ai_analysis"
-                case aiAnalysisEncrypted = "ai_analysis_encrypted"
             }
         }
 
         try await client
             .from("profiles")
-            .update(UpdateRow(
-                aiAnalysis: analysis,
-                aiAnalysisEncrypted: encryptedAnalysis?.base64EncodedString()
-            ))
+            .update(UpdateRow(aiAnalysis: analysis))
             .eq("id", value: userId)
             .execute()
     }
