@@ -288,12 +288,26 @@ struct QuestionnaireContainerView: View {
                 }
 
             case let .numericInput(placeholder, suffix):
-                NumericInputView(
-                    question: question,
-                    text: bindingForString(question.id),
-                    placeholder: placeholder,
-                    suffix: suffix
-                )
+                // Lot B : si la question a une config de slider (range borné),
+                // on utilise SliderInputView (UX au pouce). Sinon fallback sur
+                // NumericInputView avec clavier numérique.
+                if let config = sliderConfig(for: question.id) {
+                    SliderInputView(
+                        question: question,
+                        text: bindingForString(question.id),
+                        range: config.range,
+                        step: config.step,
+                        suffix: suffix ?? config.suffix,
+                        defaultValue: config.defaultValue
+                    )
+                } else {
+                    NumericInputView(
+                        question: question,
+                        text: bindingForString(question.id),
+                        placeholder: placeholder,
+                        suffix: suffix
+                    )
+                }
 
             case let .textInput(placeholder):
                 TextInputView(
@@ -394,6 +408,40 @@ struct QuestionnaireContainerView: View {
             Text("Sauvegarde en cours...")
                 .font(Theme.headlineFont)
                 .foregroundStyle(Color.healthMapText)
+        }
+    }
+
+    // MARK: - Slider configs (Lot B — UX au pouce)
+    //
+    // Pour chaque question numericInput "bornée" (la valeur a un range raisonnable),
+    // on retourne la config qui rend le SliderInputView utilisable au pouce.
+    // Les valeurs par défaut correspondent à la médiane française pour
+    // pré-positionner le slider sans biaiser la réponse.
+    //
+    // Si une question n'apparaît pas ici → fallback sur le clavier numérique
+    // standard (NumericInputView).
+    private func sliderConfig(for questionId: String) -> (range: ClosedRange<Double>, step: Double, suffix: String?, defaultValue: Double)? {
+        switch questionId {
+        // ── Personnel ──────────────────────────────────────────────────────
+        case "age":      return (14...100, 1, "ans", 30)
+        case "height":   return (140...220, 1, "cm", 170)
+        case "weight":   return (35...180, 0.5, "kg", 70)
+
+        // ── Fréquences alimentaires / semaine ──────────────────────────────
+        // Range 0-21 = jusqu'à 3 portions par jour (cas extrême honnête).
+        case "vegetableServings", "fruitServings",
+             "wholegrainPerWeek", "dairyServings":
+            return (0...21, 1, "/sem", 7)
+        case "legumesPerWeek", "nutsPerWeek", "seedsPerDay":
+            return (0...14, 1, "/sem", 3)
+        case "fattyFish":
+            return (0...7, 1, "/sem", 2)
+        case "meatPoultry":
+            return (0...14, 1, "/sem", 4)
+        case "eggsPerWeek":
+            return (0...14, 1, "/sem", 4)
+
+        default: return nil
         }
     }
 
