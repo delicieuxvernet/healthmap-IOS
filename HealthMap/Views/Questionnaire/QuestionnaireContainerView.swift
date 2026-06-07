@@ -163,51 +163,78 @@ struct QuestionnaireContainerView: View {
     }
 
     // MARK: - Questionnaire Content
+    /// ID de la question vers laquelle scroller automatiquement. Mis à jour :
+    ///   - au changement de section (→ header de la nouvelle section)
+    ///   - au tap d'une réponse single-choice (→ question suivante non répondue)
+    @State private var autoScrollTargetId: String?
+
     private var questionnaireContent: some View {
         VStack(spacing: 0) {
             // Progress bar
             progressBar
 
             // Questions scroll
-            ScrollView {
-                VStack(spacing: Theme.spacingXL) {
-                    // Section header
-                    HStack(spacing: Theme.spacingSM) {
-                        Text(viewModel.currentSection.emoji)
-                            .font(.system(size: 24))
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: Theme.spacingXL) {
+                        // Section header — ancre de scroll pour le retour-au-top.
+                        HStack(spacing: Theme.spacingSM) {
+                            Text(viewModel.currentSection.emoji)
+                                .font(.system(size: 24))
 
-                        Text(viewModel.currentSection.title)
-                            .font(Theme.headlineFont)
-                            .foregroundStyle(Color.healthMapText)
+                            Text(viewModel.currentSection.title)
+                                .font(Theme.headlineFont)
+                                .foregroundStyle(Color.healthMapText)
 
-                        Spacer()
+                            Spacer()
 
-                        Text("\(viewModel.currentSectionIndex + 1)/\(viewModel.totalSections)")
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapMuted)
+                            Text("\(viewModel.currentSectionIndex + 1)/\(viewModel.totalSections)")
+                                .font(Theme.captionFont)
+                                .foregroundStyle(Color.healthMapMuted)
+                        }
+                        .padding(.horizontal, Theme.spacingLG)
+                        .padding(.top, Theme.spacingMD)
+                        .id("section-header")
+
+                        // Questions
+                        ForEach(viewModel.visibleQuestions) { question in
+                            questionView(for: question)
+                                .padding(.horizontal, Theme.spacingLG)
+                                .opacity(questionAppeared ? 1 : 0)
+                                .offset(y: questionAppeared ? 0 : 20)
+                                .id(question.id)
+                        }
+
+                        // Error message
+                        if let error = viewModel.errorMessage {
+                            Text(error)
+                                .font(Theme.captionFont)
+                                .foregroundStyle(.red)
+                                .padding(.horizontal, Theme.spacingLG)
+                        }
                     }
-                    .padding(.horizontal, Theme.spacingLG)
-                    .padding(.top, Theme.spacingMD)
-
-                    // Questions
-                    ForEach(viewModel.visibleQuestions) { question in
-                        questionView(for: question)
-                            .padding(.horizontal, Theme.spacingLG)
-                            .opacity(questionAppeared ? 1 : 0)
-                            .offset(y: questionAppeared ? 0 : 20)
-                    }
-
-                    // Error message
-                    if let error = viewModel.errorMessage {
-                        Text(error)
-                            .font(Theme.captionFont)
-                            .foregroundStyle(.red)
-                            .padding(.horizontal, Theme.spacingLG)
+                    .padding(.bottom, 100) // Space for button
+                }
+                .scrollDismissesKeyboard(.interactively)
+                // Auto-scroll quand on change de section → revenir tout en haut.
+                // Sans ce listener, l'user atterrissait au milieu de la nouvelle
+                // section avec les premières questions hors champ (UX dégueulasse,
+                // signalé par Arthur).
+                .onChange(of: viewModel.currentSectionIndex) { _, _ in
+                    withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.4)) {
+                        proxy.scrollTo("section-header", anchor: .top)
                     }
                 }
-                .padding(.bottom, 100) // Space for button
+                // Auto-scroll vers la question ciblée après réponse single-choice.
+                // Le ViewModel positionne l'id ; le listener fait défiler en douceur
+                // pour amener la question en haut du viewport (~64pt de marge).
+                .onChange(of: autoScrollTargetId) { _, newId in
+                    guard let newId else { return }
+                    withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.45)) {
+                        proxy.scrollTo(newId, anchor: .top)
+                    }
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
 
             // Bottom action button
             bottomButton
@@ -245,6 +272,11 @@ struct QuestionnaireContainerView: View {
                     currentValue: currentStringValue(for: question.id)
                 ) { value in
                     viewModel.updateAnswer(questionId: question.id, value: value)
+                    // Auto-advance vers la question suivante : 350ms pour que
+                    // l'user voie son choix se valider visuellement, puis scroll
+                    // doux. Pas de skip de questions déjà répondues — l'user qui
+                    // revient en arrière retrouve sa progression normale.
+                    scheduleAutoAdvance(after: question.id)
                 }
 
             case .multiChoice:
@@ -363,6 +395,32 @@ struct QuestionnaireContainerView: View {
                 .font(Theme.headlineFont)
                 .foregroundStyle(Color.healthMapText)
         }
+    }
+
+    // MARK: - Auto-advance
+
+    /// Programme un scroll vers la question suivante 350ms après le tap d'une
+    /// réponse single-choice. Pourquoi 350ms : laisse le temps à l'user de voir
+    /// le checkmark/highlight de sa sélection (feedback visuel) avant qu'on
+    /// déplace la vue. Plus court = saccadé ; plus long = lent.
+    private func scheduleAutoAdvance(after questionId: String) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard let next = nextQuestion(after: questionId) else { return }
+            autoScrollTargetId = next.id
+            HapticService.shared.primary()
+        }
+    }
+
+    /// Renvoie la question juste après `questionId` dans la liste visible, ou
+    /// `nil` si c'est la dernière. On scroll juste vers la suivante littérale —
+    /// pas de skip de questions déjà répondues, l'user qui revient en arrière
+    /// retrouve son parcours intuitif.
+    private func nextQuestion(after questionId: String) -> Question? {
+        let questions = viewModel.visibleQuestions
+        guard let idx = questions.firstIndex(where: { $0.id == questionId }),
+              idx + 1 < questions.count else { return nil }
+        return questions[idx + 1]
     }
 
     // MARK: - Value Helpers
