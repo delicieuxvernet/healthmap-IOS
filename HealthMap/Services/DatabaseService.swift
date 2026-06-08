@@ -97,38 +97,59 @@ final class DatabaseService {
     /// questionnaire doesn't have their `first_name` wiped (Apple will send
     /// empty fields on subsequent sign-ins).
     func bootstrapAppleProfile(userId: String, email: String?, firstName: String?) async throws {
-        struct BootstrapRow: Codable {
-            let id: String
-            let email: String?
-            let firstName: String?
-            let updatedAt: String
+        // Apple ne fournit `firstName` / `email` que dans le ASAuthorizationAppleIDCredential
+        // (côté iOS), JAMAIS dans le idToken envoyé à Supabase. Le trigger
+        // `handle_new_user` ne peut donc pas les écrire au signup Apple
+        // (`raw_user_meta_data` ne contient ni first_name ni un email custom).
+        //
+        // BUG corrigé 2026-06-08 : la version précédente faisait un upsert avec
+        // `ignoreDuplicates: true`. Avec Supabase Auth + le trigger, le profile
+        // existe DÉJÀ à ce stade → l'upsert était un no-op → first_name restait
+        // null à jamais. Maintenant on fait un UPDATE conditionnel `IS NULL`
+        // qui ne touche QUE les colonnes vides — l'user qui a déjà renseigné
+        // son prénom dans le questionnaire n'est jamais écrasé.
 
-            enum CodingKeys: String, CodingKey {
-                case id, email
-                case firstName = "first_name"
-                case updatedAt = "updated_at"
+        if firstName?.isEmpty == false {
+            struct UpdateFirstName: Codable {
+                let firstName: String
+                let updatedAt: String
+                enum CodingKeys: String, CodingKey {
+                    case firstName = "first_name"
+                    case updatedAt = "updated_at"
+                }
             }
+            let row = UpdateFirstName(
+                firstName: firstName!,
+                updatedAt: ISO8601DateFormatter().string(from: Date())
+            )
+            try await client
+                .from("profiles")
+                .update(row)
+                .eq("id", value: userId)
+                .is("first_name", value: nil)
+                .execute()
         }
 
-        // If we have nothing useful to write, skip entirely.
-        if (email?.isEmpty ?? true) && (firstName?.isEmpty ?? true) {
-            return
+        if email?.isEmpty == false {
+            struct UpdateEmail: Codable {
+                let email: String
+                let updatedAt: String
+                enum CodingKeys: String, CodingKey {
+                    case email
+                    case updatedAt = "updated_at"
+                }
+            }
+            let row = UpdateEmail(
+                email: email!,
+                updatedAt: ISO8601DateFormatter().string(from: Date())
+            )
+            try await client
+                .from("profiles")
+                .update(row)
+                .eq("id", value: userId)
+                .is("email", value: nil)
+                .execute()
         }
-
-        let row = BootstrapRow(
-            id: userId,
-            email: (email?.isEmpty == false) ? email : nil,
-            firstName: (firstName?.isEmpty == false) ? firstName : nil,
-            updatedAt: ISO8601DateFormatter().string(from: Date())
-        )
-
-        // `ignoreDuplicates: true` makes the upsert a no-op if the row already
-        // exists. This is the correct semantics here: we only want to create
-        // the row on the **first** Apple sign-in, never overwrite later ones.
-        try await client
-            .from("profiles")
-            .upsert(row, onConflict: "id", ignoreDuplicates: true)
-            .execute()
     }
 
     // MARK: - Save Profile (upsert) — with transit encryption for questionnaire data
