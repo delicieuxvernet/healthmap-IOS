@@ -15,6 +15,11 @@ struct SectionIntroView: View {
     /// Nombre de questions visibles dans la section (déjà filtré par le
     /// parcours Express/Complet et les conditions showIf).
     let questionCount: Int
+    /// Teaser "carotte au bout du nez" (Lot E) : carte discrète affichée
+    /// quand les réponses déjà saisies laissent soupçonner un besoin
+    /// nutritionnel — incite à finir le bilan. `nil` = pas de teaser
+    /// (le choix vit dans QuestionnaireContainerView, règles anti-spam).
+    var teaser: Teaser? = nil
 
     var body: some View {
         VStack(spacing: Theme.spacingLG) {
@@ -48,6 +53,13 @@ struct SectionIntroView: View {
 
             Text(questionCount <= 1 ? "1 question" : "\(questionCount) questions")
                 .pillStyle(color: Color.healthMapBlue)
+
+            // Teaser bienveillant (Lot E) — apparaît en différé sous le
+            // pill, sans modifier le reste de l'écran d'intro existant.
+            if let teaser {
+                TeaserCardView(teaser: teaser)
+                    .padding(.top, Theme.spacingSM)
+            }
 
             Spacer(minLength: Theme.spacingMD)
         }
@@ -91,6 +103,14 @@ struct SectionIntroView: View {
 #Preview {
     ZStack {
         Color.healthMapBackground.ignoresSafeArea()
-        SectionIntroView(section: .nutrition, questionCount: 23)
+        SectionIntroView(
+            section: .nutrition,
+            questionCount: 23,
+            teaser: Teaser(
+                id: "vitD",
+                emoji: "🔍",
+                message: "Beaucoup d'interieur et peu de soleil... On soupconne un besoin en vitamine D. Continue, ton bilan le confirmera !"
+            )
+        )
     }
 }
