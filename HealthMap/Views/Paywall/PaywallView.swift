@@ -35,6 +35,11 @@ struct PaywallView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 28))
                         .foregroundStyle(Color.healthMapMuted)
+                        // Zone tactile ≥ 44 pt (HIG) — l'icône seule ne
+                        // faisait que ~28 pt, sortie du paywall trop dure
+                        // à toucher.
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Fermer")
             }

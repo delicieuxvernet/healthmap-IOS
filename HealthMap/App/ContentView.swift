@@ -444,11 +444,15 @@ struct ProfileView: View {
     // RGPD Data Export state
     @State private var isExportingData = false
 
-    /// The confirmation button unlocks only when the user has typed the exact
-    /// word "SUPPRIMER" — whitespace is trimmed so a trailing space from
-    /// iOS autocomplete doesn't leave the button stuck disabled.
+    /// Le bouton de confirmation ne s'active que lorsque l'utilisateur a tapé
+    /// le mot « SUPPRIMER ». Comparaison insensible à la casse (taper
+    /// « supprimer » suffit — pas de piège lié au clavier iOS) et espaces
+    /// parasites de l'autocomplétion retirés, pour ne jamais laisser le
+    /// bouton bloqué à tort.
     private var isDeleteConfirmed: Bool {
-        deleteConfirmationText.trimmingCharacters(in: .whitespacesAndNewlines) == "SUPPRIMER"
+        deleteConfirmationText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased() == "SUPPRIMER"
     }
 
     var body: some View {
@@ -679,11 +683,15 @@ struct ProfileView: View {
             } message: {
                 Text("Cette action est irreversible. Tu vas perdre ton bilan, ton historique, tes scans et tous tes rappels. Continue uniquement si tu es sur(e).")
             }
-            // 2nd confirmation — typed email/word to prove intent (RGPD + Apple review)
+            // 2e confirmation — mot tapé pour prouver l'intention (RGPD + Apple review).
+            // Detent .large obligatoire : le contenu (icône + bullets + champ +
+            // boutons) ne tient PAS en .medium — en build 28 les textes se
+            // superposaient (illisible) et le clavier masquait le bouton
+            // Annuler. Le swipe-down reste actif : seul `isDeletingAccount`
+            // le bloque (géré dans le sheet), jamais de blocage inconditionnel.
             .sheet(isPresented: $showDeleteSecondConfirm) {
                 deleteAccountConfirmationSheet
-                    .healthMapActionSheet()
-                    .interactiveDismissDisabled(true) // critical: empêche dismiss accidental
+                    .healthMapFullSheet()
             }
             // Export offline alert — the export needs Supabase data, so
             // block the request and explain why when offline.
@@ -776,96 +784,165 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Delete account confirmation sheet (2nd step)
+    // MARK: - Delete account confirmation sheet (2e étape)
+    /// Refonte UX (plainte fondateur, build 28) : l'ancien layout vivait dans
+    /// un detent .medium sans ScrollView — les textes `fixedSize` débordaient
+    /// et se chevauchaient (illisible), et le clavier masquait le bouton
+    /// Annuler (utilisateur piégé, obligé de fermer l'app). Désormais :
+    ///   - detent .large + contenu scrollable → plus aucune superposition,
+    ///     quel que soit le réglage Dynamic Type ;
+    ///   - boutons épinglés via `safeAreaInset` → TOUJOURS visibles
+    ///     au-dessus du clavier pendant la saisie ;
+    ///   - « Annuler » doublé dans la barre de navigation, actif en
+    ///     permanence sauf pendant l'appel réseau de suppression.
+    /// La logique métier (`performDeleteAccount`) est inchangée.
     private var deleteAccountConfirmationSheet: some View {
         NavigationStack {
-            VStack(spacing: Theme.spacingLG) {
-                Spacer().frame(height: Theme.spacingMD)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.spacingLG) {
+                    // En-tête avertissement
+                    VStack(spacing: Theme.spacingMD) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 44))
+                            .foregroundStyle(Color.urgencyImmediate)
+                            .accessibilityHidden(true)
 
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Color.urgencyImmediate)
+                        Text("Confirmation finale")
+                            .font(Theme.titleFont)
+                            .foregroundStyle(Color.healthMapText)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, Theme.spacingMD)
 
-                Text("Confirmation finale")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(Color.healthMapText)
+                    // Rappel des conséquences
+                    VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                        bulletRow("Ton profil et ton bilan seront effaces")
+                        bulletRow("Ton historique de scores sera efface")
+                        bulletRow("Tes scans et rappels seront effaces")
+                        bulletRow("Ton abonnement Premium ne sera PAS annule automatiquement (gere-le dans Reglages > Apple ID)")
+                        bulletRow("Cette action est IRREVERSIBLE")
+                    }
 
-                VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                    bulletRow("Ton profil et ton bilan seront effaces")
-                    bulletRow("Ton historique de scores sera efface")
-                    bulletRow("Tes scans et rappels seront effaces")
-                    bulletRow("Ton abonnement Premium ne sera PAS annule automatiquement (gere-le dans Reglages > Apple ID)")
-                    bulletRow("Cette action est IRREVERSIBLE")
-                }
-                .padding(.horizontal, Theme.spacingLG)
+                    // Champ de confirmation — TextField natif : le placeholder
+                    // disparaît dès la première lettre tapée, donc aucun label
+                    // ne peut se superposer au texte saisi.
+                    VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                        Text("Pour confirmer, tape le mot **SUPPRIMER** (majuscules ou minuscules) :")
+                            .font(Theme.bodyFont)
+                            .foregroundStyle(Color.healthMapText)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                    Text("Pour confirmer, tape le mot **SUPPRIMER** ci-dessous :")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.healthMapText)
+                        TextField("Tape SUPPRIMER ici", text: $deleteConfirmationText)
+                            .font(Theme.bodyFont)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .submitLabel(.done)
+                            .padding(Theme.spacingMD)
+                            .frame(minHeight: 44)
+                            .background(Color.healthMapCard)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                                    .strokeBorder(
+                                        isDeleteConfirmed ? Color.urgencyImmediate : Color.healthMapMuted.opacity(0.35),
+                                        lineWidth: 1.5
+                                    )
+                            )
+                            .accessibilityLabel("Champ de confirmation. Tape le mot SUPPRIMER pour activer la suppression.")
 
-                    TextField("SUPPRIMER", text: $deleteConfirmationText)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .padding()
-                        .background(Color.healthMapCard)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
-                }
-                .padding(.horizontal, Theme.spacingLG)
-
-                if let errorMessage = deleteErrorMessage {
-                    Text(errorMessage)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.urgencyImmediate)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Theme.spacingLG)
-                }
-
-                Spacer()
-
-                VStack(spacing: Theme.spacingSM) {
-                    Button {
-                        Task { await performDeleteAccount() }
-                    } label: {
-                        HStack {
-                            if isDeletingAccount {
-                                ProgressView().tint(.white)
-                            } else {
-                                Image(systemName: "trash")
-                                Text("Supprimer definitivement")
-                                    .font(.system(size: 15, weight: .semibold))
-                            }
+                        // Feedback immédiat : confirme que la saisie est reconnue.
+                        if isDeleteConfirmed {
+                            Label("Confirmation reconnue", systemImage: "checkmark.circle.fill")
+                                .font(Theme.captionBoldFont)
+                                .foregroundStyle(Color.urgencyImmediate)
                         }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: Theme.cornerRadius)
-                                .fill(isDeleteConfirmed ? Color.urgencyImmediate : Color.healthMapMuted)
-                        )
                     }
-                    .disabled(!isDeleteConfirmed || isDeletingAccount)
 
-                    Button("Annuler") {
-                        showDeleteSecondConfirm = false
+                    // Erreur serveur éventuelle (suppression échouée)
+                    if let errorMessage = deleteErrorMessage {
+                        Text(errorMessage)
+                            .font(Theme.captionFont)
+                            .foregroundStyle(Color.urgencyImmediate)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.healthMapBlue)
-                    .disabled(isDeletingAccount)
                 }
                 .padding(.horizontal, Theme.spacingLG)
                 .padding(.bottom, Theme.spacingLG)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Color.healthMapBackground)
+            // Boutons d'action épinglés en bas : `safeAreaInset` les maintient
+            // au-dessus du clavier — « Annuler » et « Supprimer » restent donc
+            // TOUJOURS visibles, même pendant la saisie (bug build 28 :
+            // Annuler passait sous le clavier).
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: Theme.spacingSM) {
+                    Button {
+                        HapticService.shared.warning()
+                        Task { await performDeleteAccount() }
+                    } label: {
+                        HStack(spacing: Theme.spacingSM) {
+                            if isDeletingAccount {
+                                ProgressView().tint(.white)
+                                Text("Suppression en cours...")
+                            } else {
+                                Image(systemName: "trash")
+                                Text("Supprimer definitivement")
+                            }
+                        }
+                        .font(Theme.headlineFont)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 50)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                                .fill(isDeleteConfirmed ? Color.urgencyImmediate : Color.healthMapMuted)
+                        )
+                    }
+                    .buttonStyle(.healthMapPressed)
+                    .disabled(!isDeleteConfirmed || isDeletingAccount)
+                    .accessibilityHint(isDeleteConfirmed
+                        ? "Supprime ton compte immediatement et definitivement."
+                        : "Tape d'abord le mot SUPPRIMER dans le champ de confirmation.")
+
+                    Button {
+                        showDeleteSecondConfirm = false
+                    } label: {
+                        Text("Annuler")
+                            .font(Theme.headlineFont)
+                            .foregroundStyle(Color.healthMapBlue)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.healthMapPressed)
+                    .disabled(isDeletingAccount)
+                }
+                .padding(.horizontal, Theme.spacingLG)
+                .padding(.vertical, Theme.spacingSM)
+                .background(Color.healthMapBackground)
+            }
             .navigationTitle("Supprimer mon compte")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                // Sortie évidente en permanence : « Annuler » dans la barre de
+                // navigation (même pattern que EditFieldSheet), inactif
+                // uniquement pendant l'appel réseau de suppression.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Annuler") {
+                        showDeleteSecondConfirm = false
+                    }
+                    .disabled(isDeletingAccount)
+                }
+            }
+            // Swipe-down bloqué UNIQUEMENT pendant la suppression en vol
+            // (état non-annulable côté serveur) — jamais inconditionnellement.
             .interactiveDismissDisabled(isDeletingAccount)
-            // Defensive: clear the confirmation field whenever the sheet
-            // disappears (swipe-down, Annuler tap, successful deletion).
-            // The 1st-step alert also resets it before opening the sheet,
-            // so this is belt-and-braces — prevents any future refactor
-            // from accidentally leaving "SUPPRIMER" pre-filled across
-            // sessions.
+            // Défensif : on vide le champ à chaque disparition du sheet
+            // (swipe-down, Annuler, suppression réussie). L'alerte de 1re
+            // étape le réinitialise aussi avant ouverture — ceinture et
+            // bretelles pour qu'aucun refactor futur ne laisse « SUPPRIMER »
+            // pré-rempli d'une session à l'autre.
             .onDisappear {
                 deleteConfirmationText = ""
                 deleteErrorMessage = nil
@@ -877,8 +954,10 @@ struct ProfileView: View {
         HStack(alignment: .top, spacing: 8) {
             Text("•")
                 .foregroundStyle(Color.urgencyImmediate)
+            // Text style relatif (pas de taille fixe) → suit Dynamic Type ;
+            // le ScrollView parent absorbe le débordement éventuel.
             Text(text)
-                .font(.system(size: 13))
+                .font(Theme.subheadlineFont)
                 .foregroundStyle(Color.healthMapText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -896,6 +975,9 @@ struct ProfileView: View {
 
         if success {
             AnalyticsService.shared.track(.accountDeletionCompleted)
+            // Haptique de clôture — confirme physiquement que la suppression
+            // a abouti (pattern HapticService déjà utilisé dans EditProfileView).
+            HapticService.shared.success()
             // Reset local state (gamification cache, etc.) first.
             gamification.reset()
 
@@ -911,6 +993,9 @@ struct ProfileView: View {
             authViewModel.finaliseSignOutAfterDeletion()
         } else {
             AnalyticsService.shared.track(.accountDeletionFailed)
+            // Haptique d'erreur : la suppression a échoué, le sheet reste
+            // ouvert avec le message d'erreur affiché.
+            HapticService.shared.error()
             deleteErrorMessage = authViewModel.errorMessage ?? "Erreur lors de la suppression. Reessaie ou contacte le support."
         }
     }
