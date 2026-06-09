@@ -52,6 +52,9 @@ enum Theme {
     static let shadowCard = (opacity: 0.04, radius: CGFloat(8), y: CGFloat(2))
     static let shadowElevated = (opacity: 0.08, radius: CGFloat(12), y: CGFloat(4))
     static let shadowFloating = (opacity: 0.15, radius: CGFloat(20), y: CGFloat(10))
+    // Ombre teintée bleue des CTA brand (miroir du web BRAND.shadow :
+    // `0 4px 24px rgba(0,122,255,0.35)`). À utiliser avec Color.healthMapBlue.
+    static let shadowBrandGlow = (opacity: 0.35, radius: CGFloat(12), y: CGFloat(4))
 }
 
 // MARK: - Brand Title Modifier

@@ -14,25 +14,28 @@ extension Color {
     static let healthMapBlueDark = Color(hex: "0056CC")
     static let healthMapBlueLight = Color(uiColor: UIColor { trait in
         trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x16/255, green: 0x2A/255, blue: 0x40/255, alpha: 1.0)
+            ? UIColor(red: 0x1B/255, green: 0x32/255, blue: 0x52/255, alpha: 1.0)
             : UIColor(red: 0xE8/255, green: 0xF4/255, blue: 0xFD/255, alpha: 1.0)
     })
 
     // Backgrounds (dynamic)
+    // Alignés sur l'ambiance lumineuse du site web (radial-gradients bleu/violet
+    // sur fond clair, cf. src/pages/Home.jsx) : les neutres prennent une teinte
+    // bleutée subtile au lieu du gris/noir pur — l'app paraît moins sombre.
     static let healthMapBackground = Color(uiColor: UIColor { trait in
         trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x0B/255, green: 0x0B/255, blue: 0x0E/255, alpha: 1.0)
-            : UIColor(red: 0xFA/255, green: 0xFA/255, blue: 0xFA/255, alpha: 1.0)
+            ? UIColor(red: 0x11/255, green: 0x14/255, blue: 0x1D/255, alpha: 1.0)
+            : UIColor(red: 0xF6/255, green: 0xF8/255, blue: 0xFD/255, alpha: 1.0)
     })
     static let healthMapCard = Color(uiColor: UIColor { trait in
         trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x16/255, green: 0x18/255, blue: 0x1C/255, alpha: 1.0)
+            ? UIColor(red: 0x1A/255, green: 0x1E/255, blue: 0x2A/255, alpha: 1.0)
             : UIColor.white
     })
     static let healthMapCardHover = Color(uiColor: UIColor { trait in
         trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x1E/255, green: 0x20/255, blue: 0x24/255, alpha: 1.0)
-            : UIColor(red: 0xF5/255, green: 0xF5/255, blue: 0xF5/255, alpha: 1.0)
+            ? UIColor(red: 0x23/255, green: 0x2A/255, blue: 0x3B/255, alpha: 1.0)
+            : UIColor(red: 0xEE/255, green: 0xF2/255, blue: 0xFA/255, alpha: 1.0)
     })
 
     // Text (dynamic)
@@ -85,6 +88,39 @@ extension Color {
     static let accentPowder = Color(hex: "A8C5E8")        // soft highlight
     static let accentSteel = Color(hex: "4A90E2")         // secondary blue
 
+    // Brand gradient (miroir du web : BRAND.gradient = linear-gradient(135deg, #007AFF, #5856D6)).
+    // Consommer via `LinearGradient.healthMapBrand` pour les CTA / wordmark / badges.
+    static let healthMapGradientStart = Color(hex: "007AFF")
+    static let healthMapGradientEnd = Color(hex: "5856D6")
+
+    // Aurora — teintes des blobs du fond animé (AnimatedBackground).
+    // Light : pastels lumineux (ambiance hero du site) ; dark : teintes profondes
+    // qui éclairent le fond nuit sans éblouir.
+    static let healthMapAuroraBlue = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0x1E/255, green: 0x4A/255, blue: 0x8F/255, alpha: 1.0)
+            : UIColor(red: 0xB8/255, green: 0xD9/255, blue: 0xFF/255, alpha: 1.0)
+    })
+    static let healthMapAuroraViolet = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0x3B/255, green: 0x37/255, blue: 0x80/255, alpha: 1.0)
+            : UIColor(red: 0xD8/255, green: 0xD4/255, blue: 0xFF/255, alpha: 1.0)
+    })
+    static let healthMapAuroraSky = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0x14/255, green: 0x50/255, blue: 0x6E/255, alpha: 1.0)
+            : UIColor(red: 0xC5/255, green: 0xEC/255, blue: 0xFF/255, alpha: 1.0)
+    })
+
+    // Mascotte kiwi (MascotView) — couleurs d'illustration, constantes entre modes
+    // (comme un asset : la mascotte garde son identité en light et dark).
+    static let mascotSkin = Color(hex: "9C7B52")          // peau brune du kiwi
+    static let mascotFlesh = Color(hex: "85C440")         // chair verte
+    static let mascotFleshLight = Color(hex: "C9E794")    // halo interne de la chair
+    static let mascotCore = Color(hex: "F7FBEA")          // cœur pâle (zone du visage)
+    static let mascotInk = Color(hex: "2F3B1D")           // pépins + traits du visage
+    static let mascotCheek = Color(hex: "FF9BB5")         // joues (à utiliser en faible opacité)
+
     // Hex initializer
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -107,6 +143,16 @@ extension Color {
             opacity: Double(a) / 255
         )
     }
+}
+
+// MARK: - Brand Gradient
+// Équivalent SwiftUI du `linear-gradient(135deg, #007AFF, #5856D6)` du site web.
+extension LinearGradient {
+    static let healthMapBrand = LinearGradient(
+        colors: [.healthMapGradientStart, .healthMapGradientEnd],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
 }
 
 // MARK: - Score Color Helpers
