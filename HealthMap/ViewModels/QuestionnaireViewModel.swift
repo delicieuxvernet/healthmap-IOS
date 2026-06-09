@@ -294,9 +294,9 @@ final class QuestionnaireViewModel: ObservableObject {
         // Double-tap guard: prevent concurrent submissions
         guard !isSubmitting else { return }
 
-        // Force a session refresh to prevent JWT expiry during the upsert.
-        // Clerk gère le refresh côté SDK ; `AuthService.refreshSession` force
-        // un re-fetch du JWT template "supabase" avec skipCache=true.
+        // Force a session refresh to prevent JWT expiry during the update.
+        // Supabase Auth rafraîchit normalement tout seul ; on force ici un
+        // refresh explicite juste avant l'écriture critique.
         try? await AuthService.shared.refreshSession()
 
         guard let session = await AuthService.shared.currentSession else {

@@ -152,40 +152,52 @@ final class DatabaseService {
         }
     }
 
-    // MARK: - Save Profile (upsert) — with transit encryption for questionnaire data
+    // MARK: - Save Profile (update) — the row always exists, created by the
+    // `handle_new_user` DB trigger at signup.
     func saveProfile(userId: String, email: String, firstName: String, questionnaireData: UserProfile) async throws {
         // NOTE: `questionnaire_data_encrypted` n'existe pas dans la DB (mismatch
         // documenté CLAUDE.md §4.3) — fallback plaintext via `questionnaire_data`
         // (jsonb). Si la colonne encrypted est ajoutée plus tard, restaurer
         // SecureStorageService.encryptForTransit + champ dans le payload.
-        struct UpsertRow: Codable {
-            let id: String
+        //
+        // UPDATE et non upsert : la policy RLS d'INSERT exige `auth_user_id`
+        // ou `clerk_id` dans la ligne proposée — Postgres évalue ce WITH CHECK
+        // AVANT la résolution `on conflict`, donc un upsert sans ces champs est
+        // rejeté 403 même quand la ligne existe déjà (bug "Erreur lors de la
+        // sauvegarde" à la soumission du questionnaire, 9 juin 2026).
+        struct UpdateRow: Codable {
             let email: String
             let firstName: String
             let questionnaireData: UserProfile
             let updatedAt: String
 
             enum CodingKeys: String, CodingKey {
-                case id, email
+                case email
                 case firstName = "first_name"
                 case questionnaireData = "questionnaire_data"
                 case updatedAt = "updated_at"
             }
         }
 
-        let row = UpsertRow(
-            id: userId,
+        let row = UpdateRow(
             email: email,
             firstName: firstName,
             questionnaireData: questionnaireData,
             updatedAt: ISO8601DateFormatter().string(from: Date())
         )
 
+        // `.select("id").single()` force une erreur si aucune ligne ne matche :
+        // un profil manquant doit remonter comme erreur, pas passer en silence.
+        struct UpdatedRow: Decodable { let id: String }
         try await NetworkService.shared.withRetry {
-            try await self.client
+            let _: UpdatedRow = try await self.client
                 .from("profiles")
-                .upsert(row, onConflict: "id")
+                .update(row)
+                .eq("id", value: userId)
+                .select("id")
+                .single()
                 .execute()
+                .value
         }
     }
 
