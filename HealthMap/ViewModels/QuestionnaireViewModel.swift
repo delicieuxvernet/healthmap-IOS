@@ -5,11 +5,19 @@ final class QuestionnaireViewModel: ObservableObject {
 
     // MARK: - Published State
 
-    @Published var currentSectionIndex: Int = 0
+    /// Index plat de la question courante dans `visibleQuestions` (toutes
+    /// sections confondues). Le flux UI est "une question par écran" (Lot D) :
+    /// la navigation se fait question par question, plus section par section.
+    @Published var currentQuestionIndex: Int = 0
     @Published var profile: UserProfile = .empty
     @Published var pathway: UserProfile.Pathway = .express
     @Published var isSubmitting = false
     @Published var errorMessage: String?
+
+    /// Vrai si un draft a été restauré au lancement : la vue saute alors
+    /// l'écran de choix de parcours et reprend directement le flux à la
+    /// question où l'utilisateur s'était arrêté.
+    private(set) var hasDraftInProgress = false
 
     // MARK: - Draft persistence
     /// Local UserDefaults key used to survive an app kill mid-questionnaire.
@@ -25,7 +33,14 @@ final class QuestionnaireViewModel: ObservableObject {
     private struct Draft: Codable {
         let schema: Int
         let userId: String?
+        /// Index de section historique (flux par section, pré-Lot D). Toujours
+        /// écrit pour rester lisible par d'anciennes versions de l'app ; plus
+        /// utilisé à la restauration (on se repositionne par question).
         let currentSectionIndex: Int
+        /// Id de la question courante (flux une-question-par-écran, Lot D).
+        /// Optionnel pour que les drafts v2 existants décodent sans crash —
+        /// absent, on retombe sur la première question non répondue.
+        let currentQuestionId: String?
         let profile: UserProfile
         let pathway: UserProfile.Pathway
         let savedAt: Date
@@ -44,31 +59,16 @@ final class QuestionnaireViewModel: ObservableObject {
         QuestionnaireSection.allCases
     }
 
-    var currentSection: QuestionnaireSection {
-        sections[currentSectionIndex]
-    }
-
+    /// Nombre total de sections — conservé pour l'event analytics
+    /// `questionnaire_completed` (propriété `sections_count`).
     var totalSections: Int {
         sections.count
     }
 
-    /// Progress from 0 to 1
-    var progress: Double {
-        guard totalSections > 0 else { return 0 }
-        return Double(currentSectionIndex + 1) / Double(totalSections)
-    }
-
-    var isFirstSection: Bool {
-        currentSectionIndex == 0
-    }
-
-    var isLastSection: Bool {
-        currentSectionIndex == totalSections - 1
-    }
-
-    /// Questions visible for the current section, filtered by Express/Complet pathway and showIf conditions
-    var visibleQuestions: [Question] {
-        currentSection.questions.filter { question in
+    /// Questions visibles d'une section donnée, filtrées par le parcours
+    /// Express/Complet et les conditions showIf.
+    func visibleQuestions(in section: QuestionnaireSection) -> [Question] {
+        section.questions.filter { question in
             // Express pathway: only show express keys
             if pathway == .express && !QuestionnaireSection.expressKeys.contains(question.id) {
                 return false
@@ -83,12 +83,66 @@ final class QuestionnaireViewModel: ObservableObject {
         }
     }
 
+    /// Liste APLATIE de toutes les questions visibles, toutes sections
+    /// confondues. Recalculée à chaque accès : une réponse peut révéler ou
+    /// cacher des questions suivantes (ex. caffeineIntake → caffeineTiming,
+    /// gender → periodFlow/pregnancyStatus) — le compteur s'ajuste en direct.
+    var visibleQuestions: [Question] {
+        sections.flatMap { visibleQuestions(in: $0) }
+    }
+
+    /// Nombre total de questions visibles (dénominateur du compteur).
+    var totalQuestions: Int {
+        visibleQuestions.count
+    }
+
+    /// Question affichée à l'écran. Clampée sur la dernière question si la
+    /// liste a rétréci suite à un changement de réponse (showIf).
+    var currentQuestion: Question? {
+        let questions = visibleQuestions
+        guard !questions.isEmpty else { return nil }
+        return questions[min(currentQuestionIndex, questions.count - 1)]
+    }
+
+    /// Numéro 1-based de la question courante (numérateur du compteur).
+    var currentQuestionNumber: Int {
+        guard totalQuestions > 0 else { return 0 }
+        return min(currentQuestionIndex, totalQuestions - 1) + 1
+    }
+
+    /// Section à laquelle appartient une question. Scan linéaire — les
+    /// sections sont petites (≤23 questions), le coût est négligeable.
+    func section(of question: Question) -> QuestionnaireSection {
+        sections.first(where: { section in
+            section.questions.contains(where: { $0.id == question.id })
+        }) ?? .profil
+    }
+
+    /// Section de la question courante (libellé du header).
+    var currentSection: QuestionnaireSection {
+        currentQuestion.map { section(of: $0) } ?? .profil
+    }
+
+    /// Progress from 0 to 1 — pourcentage sur l'ensemble des questions visibles.
+    var progress: Double {
+        guard totalQuestions > 0 else { return 0 }
+        return Double(currentQuestionNumber) / Double(totalQuestions)
+    }
+
+    var isFirstQuestion: Bool {
+        currentQuestionIndex == 0
+    }
+
+    var isLastQuestion: Bool {
+        currentQuestionIndex >= totalQuestions - 1
+    }
+
     // MARK: - Pathway Selection
 
     func selectPathway(_ selected: UserProfile.Pathway) {
         pathway = selected
         profile.pathway = selected
-        currentSectionIndex = 0
+        currentQuestionIndex = 0
 
         // Track pathway in gamification so the "Explorer" badge unlocks once
         // both `express` and `complet` have been tried at least once.
@@ -104,23 +158,34 @@ final class QuestionnaireViewModel: ObservableObject {
         saveDraft()
     }
 
-    // MARK: - Navigation
+    // MARK: - Navigation (une question par écran)
 
-    func nextSection() {
-        guard currentSectionIndex < totalSections - 1 else { return }
+    /// Avance d'une question dans la liste aplatie. Retourne la section
+    /// nouvellement entamée si ce pas franchit une frontière de section
+    /// (la vue affiche alors un écran d'intro), `nil` sinon.
+    @discardableResult
+    func nextQuestion() -> QuestionnaireSection? {
+        let questions = visibleQuestions
+        guard currentQuestionIndex < questions.count - 1 else { return nil }
 
-        AnalyticsService.shared.track(.questionnaireSectionCompleted, properties: [
-            "section": currentSection.title,
-            "index": currentSectionIndex,
-        ])
+        let fromSection = section(of: questions[currentQuestionIndex])
+        currentQuestionIndex += 1
+        let toSection = section(of: questions[currentQuestionIndex])
 
-        currentSectionIndex += 1
+        if toSection != fromSection {
+            AnalyticsService.shared.track(.questionnaireSectionCompleted, properties: [
+                "section": fromSection.title,
+                "index": fromSection.rawValue,
+            ])
+        }
+
         saveDraft()
+        return toSection != fromSection ? toSection : nil
     }
 
-    func previousSection() {
-        guard currentSectionIndex > 0 else { return }
-        currentSectionIndex -= 1
+    func previousQuestion() {
+        guard currentQuestionIndex > 0 else { return }
+        currentQuestionIndex -= 1
         saveDraft()
     }
 
@@ -288,6 +353,109 @@ final class QuestionnaireViewModel: ObservableObject {
         saveDraft()
     }
 
+    // MARK: - Lecture des réponses
+    // Pendants LECTURE de `updateAnswer` (écriture). Utilisés par la vue pour
+    // afficher la sélection courante, et par la restauration de draft pour
+    // retrouver la première question non répondue.
+
+    /// Valeur single-choice courante d'une question (nil si non mappée).
+    func stringValue(for questionId: String) -> String? {
+        switch questionId {
+        case "gender": return profile.gender.rawValue
+        case "weightTrend": return profile.weightTrend
+        case "indoorWork": return profile.indoorWork
+        case "sunExposure": return profile.sunExposure
+        case "skinType": return profile.skinType
+        case "strengthTraining": return profile.strengthTraining
+        case "stressLevel": return profile.stressLevel
+        case "sleepHours": return profile.sleepHours
+        case "wakeFeeling": return profile.wakeFeeling
+        case "screenBeforeBed": return profile.screenBeforeBed
+        case "caffeineIntake": return profile.caffeineIntake
+        case "caffeineTiming": return profile.caffeineTiming
+        case "waterIntake": return profile.waterIntake
+        case "smoking": return profile.isSmoker ? "yes" : "no"
+        case "alcohol": return profile.alcohol
+        case "bloating": return profile.bloating
+        case "antibiotics": return profile.antibiotics
+        case "dietType": return profile.dietType
+        case "mealsPerDay": return profile.mealsPerDay
+        case "homeCookedPct": return profile.homeCookedPct
+        case "cookingMethod": return profile.cookingMethod
+        case "breadType": return profile.breadType
+        case "fermentedFoods": return profile.fermentedFoods
+        case "ultraProcessedFrequency": return profile.ultraProcessedFrequency
+        case "snacking": return profile.snacking
+        case "saltLevel": return profile.saltLevel
+        case "iodizedSalt": return profile.iodizedSalt
+        case "eatLiver": return profile.eatLiver
+        case "lowCarbDiet": return profile.lowCarbDiet
+        case "periodFlow": return profile.periodFlow
+        case "pregnancyStatus": return profile.pregnancyStatus
+        default: return nil
+        }
+    }
+
+    /// Valeurs multi-choice courantes d'une question.
+    func arrayValue(for questionId: String) -> [String] {
+        switch questionId {
+        case "goals": return profile.goals
+        case "supplementsCurrent": return profile.supplementsCurrent
+        case "symptoms": return profile.symptoms
+        case "medications": return profile.medications
+        case "digestiveConditions": return profile.digestiveConditions
+        default: return []
+        }
+    }
+
+    /// Texte courant d'une question saisie (texte, numérique ou slider).
+    func inputText(for questionId: String) -> String {
+        switch questionId {
+        case "firstName": return profile.firstName
+        case "age": return profile.age
+        case "height": return profile.height
+        case "weight": return profile.weight
+        case "vegetableServings": return profile.vegetableServings
+        case "fruitServings": return profile.fruitServings
+        case "fattyFish": return profile.fattyFish
+        case "meatPoultry": return profile.meatPoultry
+        case "eggsPerWeek": return profile.eggsPerWeek
+        case "dairyServings": return profile.dairyServings
+        case "legumesPerWeek": return profile.legumesPerWeek
+        case "nutsPerWeek": return profile.nutsPerWeek
+        case "seedsPerDay": return profile.seedsPerDay
+        case "wholegrainPerWeek": return profile.wholegrainPerWeek
+        default: return ""
+        }
+    }
+
+    /// Une question compte comme répondue dès que son champ profil n'est plus
+    /// vide. Les champs avec valeur par défaut (gender, smoking, dietType,
+    /// periodFlow, pregnancyStatus) comptent donc comme répondus — c'est le
+    /// comportement d'affichage existant : l'option par défaut apparaît déjà
+    /// présélectionnée à l'écran.
+    func isAnswered(_ question: Question) -> Bool {
+        switch question.type {
+        case .singleChoice:
+            return !(stringValue(for: question.id) ?? "").isEmpty
+        case .multiChoice:
+            return !arrayValue(for: question.id).isEmpty
+        case .textInput, .numericInput:
+            return !inputText(for: question.id).isEmpty
+        }
+    }
+
+    /// Index de la première question non répondue — point de reprise après
+    /// restauration d'un draft. Si tout est répondu, renvoie la dernière
+    /// question (l'utilisateur n'a plus qu'à terminer).
+    func firstUnansweredQuestionIndex() -> Int {
+        let questions = visibleQuestions
+        guard let index = questions.firstIndex(where: { !isAnswered($0) }) else {
+            return max(questions.count - 1, 0)
+        }
+        return index
+    }
+
     // MARK: - Submit
 
     func submitQuestionnaire() async {
@@ -367,7 +535,7 @@ final class QuestionnaireViewModel: ObservableObject {
 
     /// Serializes the current in-progress state and writes it to UserDefaults.
     /// Called after every state-changing method (pathway selection, answer
-    /// update, precision update, section navigation). Failures are swallowed
+    /// update, precision update, question navigation). Failures are swallowed
     /// — if we can't write the draft, the user still gets the normal
     /// questionnaire flow; losing the draft is acceptable, crashing isn't.
     private func saveDraft() {
@@ -387,7 +555,8 @@ final class QuestionnaireViewModel: ObservableObject {
         let draft = Draft(
             schema: Self.draftSchemaVersion,
             userId: currentUserId,
-            currentSectionIndex: currentSectionIndex,
+            currentSectionIndex: currentSection.rawValue,
+            currentQuestionId: currentQuestion?.id,
             profile: profile,
             pathway: pathway,
             savedAt: Date()
@@ -396,7 +565,7 @@ final class QuestionnaireViewModel: ObservableObject {
         do {
             let data = try JSONEncoder().encode(draft)
             UserDefaults.standard.set(data, forKey: Self.draftKey)
-            AppLogger.ui.debug("Questionnaire draft saved (section \(self.currentSectionIndex, privacy: .public))")
+            AppLogger.ui.debug("Questionnaire draft saved (question \(self.currentQuestionIndex, privacy: .public))")
         } catch {
             AppLogger.ui.notice("Failed to save questionnaire draft: \(error.localizedDescription, privacy: .public)")
         }
@@ -454,10 +623,23 @@ final class QuestionnaireViewModel: ObservableObject {
                 return
             }
 
-            self.currentSectionIndex = draft.currentSectionIndex
             self.profile = draft.profile
             self.pathway = draft.pathway
-            AppLogger.ui.info("Questionnaire draft restored (section \(self.currentSectionIndex, privacy: .public), saved \(draft.savedAt, privacy: .public))")
+
+            // Repositionnement — l'ordre compte : profile/pathway d'abord,
+            // la liste des questions visibles en dépend (showIf + express).
+            // Id exact si présent (draft écrit par le flux une-question-par-
+            // écran), sinon première question non répondue (draft v2
+            // historique : son index de section est trop grossier pour le
+            // flux par question).
+            if let questionId = draft.currentQuestionId,
+               let index = visibleQuestions.firstIndex(where: { $0.id == questionId }) {
+                self.currentQuestionIndex = index
+            } else {
+                self.currentQuestionIndex = firstUnansweredQuestionIndex()
+            }
+            self.hasDraftInProgress = true
+            AppLogger.ui.info("Questionnaire draft restored (question \(self.currentQuestionIndex, privacy: .public), saved \(draft.savedAt, privacy: .public))")
         } catch {
             AppLogger.ui.notice("Failed to restore questionnaire draft: \(error.localizedDescription, privacy: .public) — discarding")
             Self.clearDraft()

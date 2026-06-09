@@ -26,54 +26,76 @@ final class QuestionnaireViewModelTests: XCTestCase {
 
     // MARK: - Initial State
 
-    /// Fresh ViewModel should start at section index 0.
-    func testInitialState_isFirstSection() {
-        XCTAssertEqual(vm.currentSectionIndex, 0, "Should start at section 0")
-        XCTAssertTrue(vm.isFirstSection, "Should report isFirstSection = true")
+    /// Fresh ViewModel should start at question index 0.
+    func testInitialState_isFirstQuestion() {
+        XCTAssertEqual(vm.currentQuestionIndex, 0, "Should start at question 0")
+        XCTAssertTrue(vm.isFirstQuestion, "Should report isFirstQuestion = true")
+        XCTAssertEqual(vm.currentQuestion?.id, vm.visibleQuestions.first?.id, "Current question should be the first visible one")
     }
 
-    // MARK: - Navigation
+    // MARK: - Navigation (une question par écran)
 
-    /// nextSection should increment the section index by 1.
-    func testNextSection_incrementsIndex() {
-        vm.nextSection()
-        XCTAssertEqual(vm.currentSectionIndex, 1, "Should advance to section 1")
+    /// nextQuestion should increment the flat question index by 1.
+    func testNextQuestion_incrementsIndex() {
+        vm.nextQuestion()
+        XCTAssertEqual(vm.currentQuestionIndex, 1, "Should advance to question 1")
     }
 
-    /// nextSection at the last section should NOT overflow beyond the array bounds.
-    func testNextSection_atLastSection_doesNotOverflow() {
-        // Navigate to the last section
-        for _ in 0..<(vm.totalSections - 1) {
-            vm.nextSection()
+    /// nextQuestion at the last question should NOT overflow beyond the array bounds.
+    func testNextQuestion_atLastQuestion_doesNotOverflow() {
+        // Navigate to the last question
+        for _ in 0..<(vm.totalQuestions - 1) {
+            vm.nextQuestion()
         }
-        XCTAssertTrue(vm.isLastSection, "Should be at last section")
+        XCTAssertTrue(vm.isLastQuestion, "Should be at last question")
 
-        let lastIndex = vm.currentSectionIndex
-        vm.nextSection()
-        XCTAssertEqual(vm.currentSectionIndex, lastIndex, "Should not overflow past last section")
+        let lastIndex = vm.currentQuestionIndex
+        vm.nextQuestion()
+        XCTAssertEqual(vm.currentQuestionIndex, lastIndex, "Should not overflow past last question")
     }
 
-    /// previousSection should decrement the section index by 1.
-    func testPreviousSection_decrementsIndex() {
-        vm.nextSection() // go to 1
-        vm.previousSection()
-        XCTAssertEqual(vm.currentSectionIndex, 0, "Should go back to section 0")
+    /// previousQuestion should decrement the flat question index by 1.
+    func testPreviousQuestion_decrementsIndex() {
+        vm.nextQuestion() // go to 1
+        vm.previousQuestion()
+        XCTAssertEqual(vm.currentQuestionIndex, 0, "Should go back to question 0")
     }
 
-    /// previousSection at section 0 should NOT underflow below 0.
-    func testPreviousSection_atFirstSection_doesNotUnderflow() {
-        vm.previousSection()
-        XCTAssertEqual(vm.currentSectionIndex, 0, "Should not underflow below 0")
+    /// previousQuestion at question 0 should NOT underflow below 0.
+    func testPreviousQuestion_atFirstQuestion_doesNotUnderflow() {
+        vm.previousQuestion()
+        XCTAssertEqual(vm.currentQuestionIndex, 0, "Should not underflow below 0")
+    }
+
+    /// Crossing a section boundary should return the newly entered section
+    /// (used by the view to display the section intro screen), and walking
+    /// the whole complet flow should enter every section exactly once.
+    func testNextQuestion_sectionBoundary_returnsEnteredSection() {
+        vm.pathway = .complet
+        vm.profile.pathway = .complet
+
+        var enteredSections: [QuestionnaireSection] = []
+        while !vm.isLastQuestion {
+            if let entered = vm.nextQuestion() {
+                enteredSections.append(entered)
+            }
+        }
+
+        XCTAssertEqual(
+            enteredSections,
+            [.modeDeVie, .sante, .nutrition, .symptomes, .medical],
+            "Walking the complet flow should enter each section once, in order"
+        )
     }
 
     // MARK: - Progress
 
-    /// Progress should be calculated as (currentSectionIndex + 1) / totalSections.
+    /// Progress should be calculated as (currentQuestionIndex + 1) / totalQuestions.
     func testProgress_calculatedCorrectly() {
-        let total = Double(vm.totalSections)
+        let total = Double(vm.totalQuestions)
         XCTAssertEqual(vm.progress, 1.0 / total, accuracy: 0.001, "Initial progress should be 1/total")
 
-        vm.nextSection()
+        vm.nextQuestion()
         XCTAssertEqual(vm.progress, 2.0 / total, accuracy: 0.001, "After next, progress should be 2/total")
     }
 
@@ -151,14 +173,12 @@ final class QuestionnaireViewModelTests: XCTestCase {
         vm.pathway = .complet
         vm.profile.pathway = .complet
 
-        let allQuestions = vm.currentSection.questions
-        let visibleQuestions = vm.visibleQuestions
-
-        // Complet should show at least as many questions as express
-        // (it shows ALL questions minus any showIf-filtered ones)
+        // The flattened list should contain at least every non-conditional
+        // question of every section (showIf-filtered ones may be hidden).
+        let allQuestions = QuestionnaireSection.allCases.flatMap(\.questions)
         let allWithoutShowIf = allQuestions.filter { $0.showIf == nil }
         XCTAssertGreaterThanOrEqual(
-            visibleQuestions.count, allWithoutShowIf.count,
+            vm.visibleQuestions.count, allWithoutShowIf.count,
             "Complet pathway should show all non-conditional questions"
         )
     }
@@ -166,29 +186,55 @@ final class QuestionnaireViewModelTests: XCTestCase {
     // MARK: - visibleQuestions: showIf Conditions
 
     /// Questions with showIf conditions should be filtered by the condition.
+    /// The flattened list recomputes on every access, so changing an answer
+    /// reveals/hides the dependent questions immediately.
     func testVisibleQuestions_showIfCondition_filters() {
         vm.pathway = .complet
         vm.profile.pathway = .complet
 
-        // Navigate to the Medical section (section index 5)
-        // which has periodFlow and pregnancyStatus with showIf: gender == .femme
-        while vm.currentSection != .medical && !vm.isLastSection {
-            vm.nextSection()
-        }
-
         // As homme, gender-specific questions should be hidden
         vm.profile.gender = .homme
-        let hommeQuestions = vm.visibleQuestions
-        let hommeIDs = Set(hommeQuestions.map(\.id))
+        let hommeIDs = Set(vm.visibleQuestions.map(\.id))
         XCTAssertFalse(hommeIDs.contains("periodFlow"), "periodFlow should be hidden for homme")
         XCTAssertFalse(hommeIDs.contains("pregnancyStatus"), "pregnancyStatus should be hidden for homme")
 
-        // As femme, they should appear
+        // As femme, they should appear (and the total adjusts accordingly)
         vm.profile.gender = .femme
-        let femmeQuestions = vm.visibleQuestions
-        let femmeIDs = Set(femmeQuestions.map(\.id))
+        let femmeIDs = Set(vm.visibleQuestions.map(\.id))
         XCTAssertTrue(femmeIDs.contains("periodFlow"), "periodFlow should be visible for femme")
         XCTAssertTrue(femmeIDs.contains("pregnancyStatus"), "pregnancyStatus should be visible for femme")
+        XCTAssertEqual(femmeIDs.count, hommeIDs.count + 2, "Femme flow should add exactly 2 questions")
+    }
+
+    // MARK: - section(of:) helper
+
+    /// Every visible question should be attributed to the section it belongs to.
+    func testSectionOfQuestion_mapsToOwningSection() {
+        vm.pathway = .complet
+        vm.profile.pathway = .complet
+
+        for question in vm.visibleQuestions {
+            let section = vm.section(of: question)
+            XCTAssertTrue(
+                section.questions.contains(where: { $0.id == question.id }),
+                "section(of:) should return the section containing \(question.id)"
+            )
+        }
+    }
+
+    // MARK: - firstUnansweredQuestionIndex
+
+    /// Draft restore lands on the first unanswered question. Fields with a
+    /// non-empty default (gender, smoking, dietType...) count as answered —
+    /// matching the existing display behavior (option preselected on screen).
+    func testFirstUnansweredQuestionIndex_skipsAnsweredQuestions() {
+        // Fresh profile → goals (multi-choice, empty) is the first unanswered
+        XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 0, "Fresh profile should resume at the first question")
+
+        // Answer goals + firstName → next unanswered is age (flat index 2)
+        vm.updateAnswer(questionId: "goals", value: ["energie"])
+        vm.updateAnswer(questionId: "firstName", value: "Lea")
+        XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 2, "Should resume at the first unanswered question (age)")
     }
 
     // MARK: - clearDraft
