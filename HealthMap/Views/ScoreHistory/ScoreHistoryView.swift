@@ -127,9 +127,8 @@ struct ScoreHistoryView: View {
     // MARK: - Empty State
     private var emptyState: some View {
         VStack(spacing: Theme.spacingMD) {
-            Image(systemName: "chart.xyaxis.line")
-                .font(.system(size: 40))
-                .foregroundStyle(Color.healthMapMuted)
+            // Mascotte kiwi en mode "réflexion" — humanise l'état vide
+            MascotView(mood: .thinking, size: 72)
 
             Text("Pas encore assez de donnees")
                 .font(Theme.headlineFont)
