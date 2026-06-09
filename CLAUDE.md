@@ -2,7 +2,7 @@
 
 > **Ce fichier est la mémoire long terme du projet iOS.**
 > À lire intégralement au début de CHAQUE session avant d'écrire la moindre ligne de code.
-> Dernière mise à jour : 20 avril 2026 (migration Clerk)
+> Dernière mise à jour : 9 juin 2026 (migration Supabase Auth native — Clerk retiré d'iOS)
 
 ---
 
@@ -32,11 +32,14 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
 
 **HealthMap iOS** — app native SwiftUI (iOS 17+), miroir mobile de https://www.healthmap.fr.
 
-- **Auth** : **Clerk** (`pk_live_Y2xlcmsuaGVhbHRobWFwLmZyJA`, domaine `clerk.healthmap.fr`) —
-  mêmes utilisateurs que le web depuis le 20 avril 2026. **Plus de Supabase Auth.**
+- **Auth** : **Supabase Auth natif** depuis le 7 juin 2026 (email/password + Sign in with
+  Apple + Google OAuth). **Clerk est entièrement retiré d'iOS** (le web reste sur Clerk ;
+  les Edge Functions acceptent les deux via dual-auth). Le trigger DB `handle_new_user`
+  crée la ligne `profiles` à chaque signup — le client ne fait QUE des UPDATE sur profiles.
 - Backend DB + Edge Functions : **partagé avec le web** (Supabase `eu-west-1`,
-  project `ftwfxdfkghkemnpwtzlu`). JWT Clerk (template `supabase`) injecté dans le
-  `SupabaseClient` via closure `accessToken` — RLS conservée telle quelle.
+  project `ftwfxdfkghkemnpwtzlu`). Session Supabase standard (Keychain + auto-refresh),
+  RLS dual-système : `current_user_id()` matche `auth_user_id = auth.uid()` (iOS) OU
+  `clerk_id = jwt sub` (web).
 - Subscriptions : **RevenueCat** (StoreKit 2 — pas Stripe sur iOS)
 - Architecture : **MVVM + DI** via `ServiceContainer`
 - Bundle : `fr.healthmap.app`
@@ -59,13 +62,14 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
 
 ### 2.2 — Sécurité
 5. **Aucune clé API hardcodée**. Tout via `Config.xcconfig` (gitignored) lu par `AppConfig.swift`.
-   Les clés critiques : `CLERK_PUBLISHABLE_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-   `REVENUECAT_API_KEY`, `SENTRY_DSN`.
+   Les clés critiques : `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `REVENUECAT_API_KEY`, `SENTRY_DSN`.
 6. **SSL pinning placeholders** dans `SSLPinningService.swift` → **À remplacer par les vrais hashes SPKI SHA-256 avant prod**.
 7. **PII strippée** par Sentry `beforeSend` callback. Ne jamais logger email/UUID en clair.
-8. **Clerk = single source of truth pour l'auth**. Ne JAMAIS re-introduire `SupabaseAuth.signIn/signUp`
-   — le `SupabaseClient` est configuré avec `autoRefreshToken: false` et `InMemoryLocalStorage`
-   exprès pour que son système d'auth soit désactivé. Tout passe par `AuthService` (Clerk-backed).
+8. **Supabase Auth = single source of truth pour l'auth iOS** (depuis le 7 juin 2026).
+   Ne JAMAIS réintroduire Clerk côté iOS. Tout passe par `AuthService` (supabase.auth).
+   Les écritures `profiles` côté client sont des **UPDATE uniquement** (jamais insert/upsert :
+   la policy RLS d'INSERT exige `auth_user_id`/`clerk_id` et la ligne est créée par le
+   trigger `handle_new_user` — un upsert client est rejeté 403, bug questionnaire du 9 juin).
 
 ### 2.3 — UX / branding
 8. **Palette : voir `Color+Theme.swift` comme source canonique.** Pas de règle d'absolu inventée — consommer ce qui existe dans le fichier de tokens, demander au user avant de proposer une nouvelle teinte.
@@ -90,11 +94,11 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
 
 ```
 HealthMap/
-├── App/                  → @main (Clerk.configure + SupabaseService), ContentView, AppDelegate (APNs)
+├── App/                  → @main (SupabaseService), ContentView, AppDelegate (APNs)
 ├── Core/                 → AppConfig, ServiceContainer, HealthCalculator, NutrientData,
 │                          RedFlagDetector, AuthTypes (HMSession/HMUser/HMAuthChangeEvent shims)
 ├── Models/               → UserProfile, AIAnalysis (v7), Nutrient, RedFlag, Supplements
-├── Services/ (29)        → Clerk-backed AuthService, ClerkProfileResolver, Supabase (DB only),
+├── Services/ (29)        → AuthService (Supabase Auth), ProfileResolver, Supabase,
 │                          Database, AIAnalysis, Subscription (RevenueCat),
 │                          Network, Offline, SSL pinning, Toast, Haptic, Analytics, Push
 ├── ViewModels/           → @MainActor, AuthVM, DashboardVM, QuestionnaireVM, etc.
@@ -104,28 +108,30 @@ HealthMap/
 └── Resources/            → Info.plist, Config.xcconfig.example, Assets.xcassets
 ```
 
-### 3.1 — Architecture auth (depuis 20 avril 2026)
+### 3.1 — Architecture auth (depuis 7 juin 2026)
 
 ```
 SwiftUI (AuthView, ProfileView...)
     ↓
 AuthViewModel (@MainActor, publishes HMUser?/HMSession?)
     ↓
-AuthService (Clerk-backed, singleton)
-    ├─ Clerk.shared.auth.*                    ← signup/signin/oauth
-    ├─ Clerk.shared.session?.getToken(...)    ← JWT template "supabase"
-    └─ ClerkProfileResolver
-           ├─ SELECT profiles WHERE clerk_id=? (lookup UUID)
-           └─ INSERT profiles(clerk_id, email, first_name) si fresh signup
+AuthService (Supabase Auth, singleton)
+    ├─ supabase.auth.signUp / signIn          ← email+password (meta first_name)
+    ├─ supabase.auth.signInWithIdToken        ← Sign in with Apple (idToken+nonce)
+    ├─ supabase.auth.authStateChanges         → HMAuthChangeEvent
+    └─ ProfileResolver (typealias ClerkProfileResolver)
+           └─ SELECT profiles.id WHERE auth_user_id = auth.uid()
+              (retries 200/500/1000ms — la ligne est créée par le trigger
+               `handle_new_user` côté DB au signup, jamais par le client)
 
-SupabaseClient (DB + Edge Functions uniquement)
-    └─ accessToken closure → Clerk JWT ("supabase" template)
-           └─ RLS `auth.uid() = profiles.id` continue de matcher
+SupabaseClient standard (Keychain persistence + auto refresh token)
+    └─ RLS via current_user_id() : auth_user_id = auth.uid() (iOS)
+                                   OU clerk_id = jwt sub (web, inchangé)
 ```
 
-**Règle invariante** : `HMUser.id` est un `UUID` = `profiles.id`, PAS `clerk.user.id`
-(qui serait `"user_xxx..."`). Les call-sites qui font `.eq("id", value: userId)` continuent
-de fonctionner tel quel — c'est pour ça qu'on a `ClerkProfileResolver`.
+**Règle invariante** : `HMUser.id` est un `UUID` = `profiles.id`, PAS `auth.users.id`
+(`auth_user_id`). Les call-sites qui font `.eq("id", value: userId)` fonctionnent tel
+quel — c'est pour ça qu'on a `ProfileResolver`. Écritures profiles = UPDATE only.
 
 → Détail complet dans `Obsidian/Healthmap/02 — Architecture/Frontend iOS (SwiftUI).md`.
 
@@ -135,14 +141,13 @@ de fonctionner tel quel — c'est pour ça qu'on a `ClerkProfileResolver`.
 
 (Identifiés lors de l'audit du 18 avril 2026, documentés dans le vault)
 
-1. **`verify-receipt` Edge Function attendue par iOS mais inexistante côté Supabase**.
-   - Code iOS : `ReceiptValidationService.swift` invoque `client.functions.invoke("verify-receipt", ...)`.
-   - Action : soit déployer cette Edge Function, soit retirer l'appel.
+1. ~~`verify-receipt` Edge Function inexistante~~ — **RÉSOLU** : déployée (v3, dual-auth
+   Supabase + Clerk) le 8 juin 2026.
 
-2. **`analytics_events` schéma divergent**.
-   - iOS écrit : `event`, `properties`, `app_version`, `environment`, `created_at`.
-   - DB Supabase actuelle : `event_name`, `properties`, `occurred_at`.
-   - Action : aligner — soit ajouter colonnes manquantes, soit adapter `AnalyticsService.swift`.
+2. ~~`analytics_events` schéma divergent~~ — **RÉSOLU le 9 juin 2026** : `AnalyticsService`
+   et `AnalyticsEventPayload` écrivent désormais `event_name`/`properties`/`occurred_at`
+   (app_version + environment dans `properties`). Événements anonymes (user_id nil) → PostHog
+   uniquement (la RLS `events_self_insert` exige `user_id = current_user_id()`).
 
 3. **Colonnes `questionnaire_data_encrypted` / `ai_analysis_encrypted`** attendues par `SecureStorageService.decryptFromTransit()` mais inexistantes dans le schéma actuel.
    - Pas bloquant (fallback plaintext en place).

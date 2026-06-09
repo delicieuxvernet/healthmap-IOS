@@ -179,23 +179,29 @@ final class AnalyticsService: AnalyticsServiceProtocol {
         properties: [String: String]
     ) async {
         guard SupabaseService.shared.safeClient != nil else { return }
+        // RLS `events_self_insert` exige `user_id = current_user_id()` : les
+        // événements anonymes (avant identify) seraient rejetés — ils ne
+        // partent qu'à PostHog, jamais vers Supabase.
+        guard let userId else { return }
+        // Schéma DB réel : user_id / event_name / properties / occurred_at.
+        // app_version et environment voyagent DANS `properties` (jsonb) —
+        // l'ancien payload envoyait des colonnes inexistantes → 400 en boucle.
         struct Row: Encodable, Sendable {
-            let user_id: String?
-            let event: String
+            let user_id: String
+            let event_name: String
             let properties: [String: String]
-            let app_version: String
-            let environment: String
-            let created_at: String
+            let occurred_at: String
         }
         // `AppConfig` is a plain `final class` whose values are immutable
         // after init — safe to read from any actor.
+        var props = properties
+        props["app_version"] = AppConfig.shared.versionTag
+        props["environment"] = AppConfig.shared.environment.rawValue
         let row = Row(
             user_id: userId,
-            event: event.rawValue,
-            properties: properties,
-            app_version: AppConfig.shared.versionTag,
-            environment: AppConfig.shared.environment.rawValue,
-            created_at: ISO8601DateFormatter().string(from: Date())
+            event_name: event.rawValue,
+            properties: props,
+            occurred_at: ISO8601DateFormatter().string(from: Date())
         )
         do {
             try await SupabaseService.shared.client
@@ -207,11 +213,9 @@ final class AnalyticsService: AnalyticsServiceProtocol {
             AppLogger.analytics.notice("Supabase analytics insert failed, queuing: \(error.localizedDescription, privacy: .public)")
             let payload = AnalyticsEventPayload(
                 userId: row.user_id,
-                event: row.event,
+                eventName: row.event_name,
                 properties: row.properties,
-                appVersion: row.app_version,
-                environment: row.environment,
-                createdAt: row.created_at
+                occurredAt: row.occurred_at
             )
             OfflineQueueService.shared.enqueue(type: .analyticsEvent, payload: payload)
         }

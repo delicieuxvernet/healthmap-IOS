@@ -45,21 +45,22 @@ struct ScoreHistoryPayload: Codable, Sendable {
 }
 
 // MARK: - Analytics Event Payload
+// Les CodingKeys collent au schéma DB réel de `analytics_events`
+// (user_id / event_name / properties / occurred_at) : le payload est inséré
+// tel quel au replay. Les items persistés avec l'ancien schéma échouent au
+// decode → drop automatique après `maxRetries` (perte acceptable, ils
+// étaient de toute façon rejetés 400 par la DB).
 struct AnalyticsEventPayload: Codable, Sendable {
-    let userId: String?
-    let event: String
+    let userId: String
+    let eventName: String
     let properties: [String: String]
-    let appVersion: String
-    let environment: String
-    let createdAt: String
+    let occurredAt: String
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
-        case event
+        case eventName = "event_name"
         case properties
-        case appVersion = "app_version"
-        case environment
-        case createdAt = "created_at"
+        case occurredAt = "occurred_at"
     }
 }
 
