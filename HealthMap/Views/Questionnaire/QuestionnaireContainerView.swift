@@ -37,6 +37,19 @@ struct QuestionnaireContainerView: View {
     /// rather than inline text — an alert is impossible to miss.
     @State private var showSubmitError = false
 
+    // MARK: - État des teasers (Lot E — carotte au bout du nez)
+
+    /// Teaser affiché sur l'écran d'intro courant. `nil` = intro sans teaser.
+    /// Choisi par `pickTeaserForIntro()` au moment où l'intro s'ouvre.
+    @State private var introTeaser: Teaser?
+
+    /// Ids des teasers déjà montrés dans la session — jamais deux fois le même.
+    @State private var shownTeaserIds: Set<String> = []
+
+    /// Vrai si l'intro précédente portait un teaser. Règle anti-spam :
+    /// jamais deux intros d'affilée avec teaser.
+    @State private var lastIntroShowedTeaser = false
+
     /// Libellé du bouton primaire selon l'étape : intro de section, question
     /// intermédiaire, ou dernière question (avec état d'envoi / retry).
     private var primaryButtonLabel: String {
@@ -186,7 +199,8 @@ struct QuestionnaireContainerView: View {
                 if let section = introSection {
                     SectionIntroView(
                         section: section,
-                        questionCount: viewModel.visibleQuestions(in: section).count
+                        questionCount: viewModel.visibleQuestions(in: section).count,
+                        teaser: introTeaser
                     )
                     .transition(stepTransition)
                 } else if let question = viewModel.currentQuestion {
@@ -304,6 +318,17 @@ struct QuestionnaireContainerView: View {
                 .accessibilityAddTraits(.isHeader)
 
             answerControl(for: question)
+
+            // Fun fact vivant (Lot E) — petite ligne animée sous le slider
+            // (taille, âge) qui réagit en direct à la valeur. Purement
+            // décoratif : aucun geste, aucun délai — ne retarde JAMAIS la
+            // navigation ni l'auto-advance existant.
+            if let config = sliderConfig(for: question.id), FunFactCatalog.hasFacts(for: question.id) {
+                FunFactLabel(
+                    questionId: question.id,
+                    value: currentSliderValue(for: question.id, config: config)
+                )
+            }
 
             // Precision picker (multi-select chips) — appears under sliders
             // and numeric inputs for vegetables, fruits, meat, dairy, grains.
@@ -488,9 +513,31 @@ struct QuestionnaireContainerView: View {
         isNavigatingForward = true
         withAnimation(stepAnimation) {
             if let enteredSection = viewModel.nextQuestion() {
+                // Teaser choisi AVANT d'afficher l'intro, à partir des
+                // réponses déjà saisies (règles anti-spam incluses).
+                introTeaser = pickTeaserForIntro()
                 introSection = enteredSection
             }
         }
+    }
+
+    /// Choisit le teaser de l'écran d'intro qui s'ouvre. Règles anti-spam :
+    /// max un teaser par intro (donc par section), jamais deux intros
+    /// d'affilée avec teaser, jamais deux fois le même dans la session.
+    /// Le choix est déterministe : premier candidat non encore montré,
+    /// dans l'ordre de priorité de TeaserEngine.
+    private func pickTeaserForIntro() -> Teaser? {
+        if lastIntroShowedTeaser {
+            lastIntroShowedTeaser = false
+            return nil
+        }
+        let candidates = TeaserEngine.teasers(for: viewModel.profile)
+        guard let teaser = candidates.first(where: { !shownTeaserIds.contains($0.id) }) else {
+            return nil
+        }
+        shownTeaserIds.insert(teaser.id)
+        lastIntroShowedTeaser = true
+        return teaser
     }
 
     /// Ferme l'écran d'intro de section → révèle sa première question
@@ -572,6 +619,19 @@ struct QuestionnaireContainerView: View {
 
         default: return nil
         }
+    }
+
+    /// Valeur numérique courante d'une question slider — miroir de la
+    /// logique de restauration de SliderInputView : texte saisi si présent
+    /// (clampé au range, virgule tolérée), valeur par défaut sinon. Sert au
+    /// fun fact pour refléter EXACTEMENT le grand chiffre affiché.
+    private func currentSliderValue(
+        for questionId: String,
+        config: (range: ClosedRange<Double>, step: Double, suffix: String?, defaultValue: Double)
+    ) -> Double {
+        let raw = viewModel.inputText(for: questionId).replacingOccurrences(of: ",", with: ".")
+        guard let parsed = Double(raw) else { return config.defaultValue }
+        return min(max(parsed, config.range.lowerBound), config.range.upperBound)
     }
 
     // MARK: - Value Helpers
