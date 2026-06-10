@@ -51,11 +51,9 @@ final class OfflineQueueTests: XCTestCase {
         for i in 0..<5 {
             let payload = AnalyticsEventPayload(
                 userId: "user-\(i)",
-                event: "test_event",
+                eventName: "test_event",
                 properties: ["index": "\(i)"],
-                appVersion: "1.0",
-                environment: "test",
-                createdAt: ISO8601DateFormatter().string(from: Date())
+                occurredAt: ISO8601DateFormatter().string(from: Date())
             )
             OfflineQueueService.shared.enqueue(type: .analyticsEvent, payload: payload)
         }
@@ -70,11 +68,9 @@ final class OfflineQueueTests: XCTestCase {
         for i in 0..<101 {
             let payload = AnalyticsEventPayload(
                 userId: "user",
-                event: "event_\(i)",
+                eventName: "event_\(i)",
                 properties: [:],
-                appVersion: "1.0",
-                environment: "test",
-                createdAt: ISO8601DateFormatter().string(from: Date())
+                occurredAt: ISO8601DateFormatter().string(from: Date())
             )
             OfflineQueueService.shared.enqueue(type: .analyticsEvent, payload: payload)
         }
@@ -127,21 +123,22 @@ final class OfflineQueueTests: XCTestCase {
     }
 
     func testAnalyticsEventPayloadRoundtrip() throws {
+        // Schéma aligné sur la table analytics_events réelle (10 juin 2026) :
+        // event_name / occurred_at, app_version + environment dans properties.
         let original = AnalyticsEventPayload(
             userId: "user-42",
-            event: "checkin_completed",
-            properties: ["source": "manual"],
-            appVersion: "1.2.0 (45)",
-            environment: "production",
-            createdAt: "2026-04-12T10:00:00Z"
+            eventName: "checkin_completed",
+            properties: ["source": "manual", "app_version": "1.2.0 (45)"],
+            occurredAt: "2026-04-12T10:00:00Z"
         )
 
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(AnalyticsEventPayload.self, from: data)
 
         XCTAssertEqual(decoded.userId, "user-42")
-        XCTAssertEqual(decoded.event, "checkin_completed")
+        XCTAssertEqual(decoded.eventName, "checkin_completed")
         XCTAssertEqual(decoded.properties["source"], "manual")
+        XCTAssertEqual(decoded.occurredAt, "2026-04-12T10:00:00Z")
     }
 
     func testPostHogEventPayloadRoundtrip() throws {
