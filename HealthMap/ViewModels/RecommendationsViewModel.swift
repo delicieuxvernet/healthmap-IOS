@@ -79,16 +79,18 @@ final class RecommendationsViewModel: ObservableObject {
         return hasAny
     }
 
+    // Les entrées du planning sont des objets {name, dose, ...} ou des
+    // chaînes (legacy) — displayText normalise les deux pour l'affichage.
     var morningSupplements: [String] {
-        supplementsSchedule?.morning ?? []
+        (supplementsSchedule?.morning ?? []).map(\.displayText)
     }
 
     var afternoonSupplements: [String] {
-        supplementsSchedule?.afternoon ?? []
+        (supplementsSchedule?.afternoon ?? []).map(\.displayText)
     }
 
     var eveningSupplements: [String] {
-        supplementsSchedule?.evening ?? []
+        (supplementsSchedule?.evening ?? []).map(\.displayText)
     }
 
     var supplementWarnings: [String] {

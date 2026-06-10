@@ -31,16 +31,45 @@ final class DashboardViewModel: ObservableObject {
 
     // MARK: - Computed (Analysis)
 
+    /// Nutriments affichés par le Dashboard. L'analyse IA enrichit les scores
+    /// locaux quand elle est disponible ; sinon on affiche les scores LOCAUX
+    /// seuls (HealthCalculator) — le bilan ne doit JAMAIS être vide ou à 0
+    /// quand le questionnaire est complété (incident TestFlight 28).
     var nutrients: [EnrichedNutrient] {
-        aiAnalysis?.nutrients ?? []
+        if let merged = aiAnalysis { return merged.nutrients }
+        return localNutrients
+    }
+
+    /// Nutriments construits uniquement à partir des scores locaux
+    /// (déterministes) — affichés pendant le chargement de l'analyse IA
+    /// ou quand elle échoue. Labels/emojis/couleurs : catalogue canonique.
+    private var localNutrients: [EnrichedNutrient] {
+        guard profile.completed, !nutrientScores.isEmpty else { return [] }
+        return NutrientData.all.map { def in
+            let score = nutrientScores[def.id.rawValue] ?? 50
+            return EnrichedNutrient(
+                id: def.id.rawValue,
+                label: def.label,
+                emoji: def.emoji,
+                color: def.colorHex,
+                score: score,
+                status: NutrientStatus(score: score).rawValue,
+                confidence: score < 40 ? "high" : score < 60 ? "moderate" : "low"
+            )
+        }
     }
 
     var topDeficiencies: [EnrichedNutrient] {
-        aiAnalysis?.topDeficiencies ?? []
+        Array(deficiencies.prefix(3))
     }
 
+    /// Red flags : ceux du merge IA si disponible, sinon détection LOCALE
+    /// (RedFlagDetector est un mirror déterministe de health.js — les alertes
+    /// de sécurité ne doivent pas attendre l'analyse IA).
     var redFlags: [RedFlag] {
-        aiAnalysis?.redFlags ?? []
+        if let merged = aiAnalysis { return merged.redFlags }
+        guard profile.completed else { return [] }
+        return RedFlagDetector.detect(profile: profile)
     }
 
     var summaryHeadline: String? {
@@ -194,7 +223,13 @@ final class DashboardViewModel: ObservableObject {
     /// Called from `loadProfile()` and from the questionnaire submission
     /// flow to populate the dashboard immediately without waiting for a re-fetch.
     func computeLocalScores() {
-        guard hasCompletedQuestionnaire else {
+        // Garde sur `profile.completed` (PAS sur hasCompletedQuestionnaire) :
+        // à la soumission du questionnaire, le flag publié reste false tant
+        // que la célébration est affichée (il pilote le switch d'onglet dans
+        // MainTabView) — mais les scores doivent déjà être calculables.
+        // Bug TestFlight 28 : l'ancienne garde laissait healthScore à 0 →
+        // célébration « 0/100 » avec croix.
+        guard profile.completed else {
             healthScore = 0
             nutrientScores = [:]
             return
@@ -207,7 +242,9 @@ final class DashboardViewModel: ObservableObject {
     // MARK: - Trigger AI Analysis
 
     func triggerAnalysis() async {
-        guard hasCompletedQuestionnaire else { return }
+        // Même logique que computeLocalScores : l'analyse doit pouvoir démarrer
+        // pendant la célébration post-questionnaire, avant le flip du flag UI.
+        guard profile.completed else { return }
         // Re-entrancy guard: prevent concurrent analysis calls from
         // reconnect observer + loadProfile() + manual retry.
         guard !isLoadingAnalysis else { return }
@@ -237,12 +274,21 @@ final class DashboardViewModel: ObservableObject {
             if let merged {
                 self.healthScore = merged.healthScore
                 self.nutrientScores = merged.scores
-            }
 
-            analyticsService.track(.analysisCompleted, properties: [
-                "health_score": healthScore,
-                "deficiencies_count": aiAnalysis?.topDeficiencies.count ?? 0,
-            ])
+                analyticsService.track(.analysisCompleted, properties: [
+                    "health_score": healthScore,
+                    "deficiencies_count": merged.topDeficiencies.count,
+                ])
+            } else {
+                // Réponse IA inexploitable (nil après sanitization/validation) :
+                // ce n'est PAS un succès. Les scores locaux restent affichés,
+                // mais le bandeau de retry doit apparaître — jamais d'état
+                // silencieux sans analyse ni erreur (incident TestFlight 28).
+                errorMessage = "L'analyse IA n'a pas pu etre generee. Tes scores restent disponibles, reessaie dans un instant."
+                analyticsService.track(.analysisFailed, properties: [
+                    "error": "nil_analysis_after_validation",
+                ])
+            }
         } catch {
             AppLogger.analysis.report(error, context: "Dashboard AI analysis")
             analyticsService.track(.analysisFailed, properties: [
@@ -291,7 +337,7 @@ final class DashboardViewModel: ObservableObject {
     // MARK: - Regenerate Analysis (force refresh)
 
     func regenerateAnalysis() async {
-        guard hasCompletedQuestionnaire else { return }
+        guard profile.completed else { return }
 
         guard let session = await AuthService.shared.currentSession else {
             return
@@ -312,12 +358,20 @@ final class DashboardViewModel: ObservableObject {
             if let merged {
                 self.healthScore = merged.healthScore
                 self.nutrientScores = merged.scores
-            }
 
-            analyticsService.track(.analysisCompleted, properties: [
-                "health_score": healthScore,
-                "regenerated": true,
-            ])
+                analyticsService.track(.analysisCompleted, properties: [
+                    "health_score": healthScore,
+                    "regenerated": true,
+                ])
+            } else {
+                // Même logique que triggerAnalysis : nil = échec exploitable
+                // par l'UI (bandeau retry), pas un succès silencieux.
+                errorMessage = "Impossible de regenerer l'analyse."
+                analyticsService.track(.analysisFailed, properties: [
+                    "error": "nil_analysis_after_validation",
+                    "regenerated": true,
+                ])
+            }
         } catch {
             errorMessage = "Impossible de regenerer l'analyse."
             AppLogger.analysis.report(error, context: "Dashboard regenerate")

@@ -16,11 +16,16 @@ struct DashboardView: View {
                 Color.healthMapBackground
                     .ignoresSafeArea()
 
-                if viewModel.isLoadingAnalysis && viewModel.aiAnalysis == nil {
+                // Le score LOCAL (HealthCalculator) doit TOUJOURS s'afficher
+                // dès que le questionnaire est complété — jamais 0/100+croix,
+                // jamais d'écran bloqué sur un spinner (incident TestFlight 28).
+                // Le squelette et l'écran d'erreur plein écran ne servent que
+                // quand on n'a RIEN de local à montrer (cas limite).
+                if viewModel.nutrientScores.isEmpty && viewModel.isLoadingAnalysis {
                     // Skeleton d'abord pour montrer la structure (anti-flash)
-                    // Si besoin de fallback spinner plein écran, LoadingView reste dispo
                     DashboardSkeletonView()
-                } else if viewModel.aiAnalysis == nil, let errorMessage = viewModel.errorMessage {
+                } else if viewModel.nutrientScores.isEmpty, viewModel.aiAnalysis == nil,
+                          let errorMessage = viewModel.errorMessage {
                     AnalysisErrorRetryView(
                         message: errorMessage,
                         isRetrying: viewModel.isLoadingAnalysis,
@@ -83,6 +88,25 @@ struct DashboardView: View {
                 // 2. Hero Score Card (free, always visible)
                 heroScoreCard
 
+                // 2b. Statut analyse IA — le score local reste affiché ;
+                // on superpose un bandeau pendant le chargement, ou un bandeau
+                // de retry si l'analyse a échoué (états : loading / succès /
+                // échec IA avec score local + bouton réessayer).
+                if viewModel.aiAnalysis == nil {
+                    if viewModel.isLoadingAnalysis {
+                        analysisLoadingBanner
+                    } else if let errorMessage = viewModel.errorMessage {
+                        AnalysisRetryBanner(
+                            message: errorMessage,
+                            isRetrying: viewModel.isLoadingAnalysis,
+                            onRetry: {
+                                Task { await viewModel.triggerAnalysis() }
+                            }
+                        )
+                        .padding(.horizontal, Theme.spacingLG)
+                    }
+                }
+
                 // 3. Highlight Cards 2x2 (free, always visible)
                 highlightGrid
 
@@ -119,8 +143,9 @@ struct DashboardView: View {
                     badgesPreview
                 }
 
-                // 10. Refreshing indicator
-                if viewModel.isLoadingAnalysis {
+                // 10. Refreshing indicator (refresh d'une analyse déjà affichée —
+                // le premier chargement passe par le bandeau 2b)
+                if viewModel.isLoadingAnalysis && viewModel.aiAnalysis != nil {
                     HStack(spacing: Theme.spacingSM) {
                         ProgressView()
                             .tint(Color.healthMapBlue)
@@ -185,6 +210,37 @@ struct DashboardView: View {
         .padding(.horizontal, Theme.spacingLG)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Bonjour \(viewModel.firstName). Score global de sante : \(viewModel.healthScore) sur 100, \(scoreLabel)")
+    }
+
+    // MARK: - Bandeau chargement analyse IA
+    /// Affiché pendant le premier chargement de l'analyse IA, AU-DESSUS du
+    /// contenu local — le score déterministe reste visible et utilisable.
+    private var analysisLoadingBanner: some View {
+        HStack(spacing: Theme.spacingSM) {
+            ProgressView()
+                .tint(Color.healthMapBlue)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Analyse IA en cours...")
+                    .font(Theme.captionBoldFont)
+                    .foregroundStyle(Color.healthMapText)
+
+                Text("Tes scores ci-dessous sont deja calcules. Les explications personnalisees arrivent.")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+        }
+        .padding(Theme.spacingMD)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .fill(Color.healthMapBlueLight)
+        )
+        .padding(.horizontal, Theme.spacingLG)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Analyse IA en cours. Tes scores sont deja calcules.")
     }
 
     // MARK: - Highlight Grid 2x2

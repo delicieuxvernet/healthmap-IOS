@@ -24,6 +24,23 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
     func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis? {
         guard profile.completed else { return nil }
 
+        // 1. Compute local scores (ALWAYS deterministic)
+        let localScores = HealthCalculator.analyzeNutrientScores(profile: profile)
+        let healthScore = HealthCalculator.calculateHealthScore(profile: profile)
+        let redFlags = RedFlagDetector.detect(profile: profile)
+
+        // 2. Check cache — AVANT le circuit breaker : une analyse déjà en base
+        // doit toujours pouvoir s'afficher, même circuit ouvert (le breaker ne
+        // protège que l'appel Edge Function, pas la lecture du cache DB).
+        let currentHash = Self.hashProfile(profile)
+        let cached = (try? await DatabaseService.shared.loadAIAnalysis(userId: userId))?.sanitized()
+
+        if let cached, cached.isValidV7,
+           cached.meta?.profileHash == currentHash {
+            // Cache valid — merge with fresh local scores
+            return mergeWithCanonical(aiData: cached, localScores: localScores, healthScore: healthScore, redFlags: redFlags)
+        }
+
         // Circuit breaker: if too many consecutive failures, short-circuit
         if let openUntil = circuitOpenUntil, Date() < openUntil {
             throw AIAnalysisError.circuitOpen
@@ -32,21 +49,6 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         if let openUntil = circuitOpenUntil, Date() >= openUntil {
             circuitOpenUntil = nil
             consecutiveFailures = 0
-        }
-
-        // 1. Compute local scores (ALWAYS deterministic)
-        let localScores = HealthCalculator.analyzeNutrientScores(profile: profile)
-        let healthScore = HealthCalculator.calculateHealthScore(profile: profile)
-        let redFlags = RedFlagDetector.detect(profile: profile)
-
-        // 2. Check cache
-        let currentHash = Self.hashProfile(profile)
-        let cached = try? await DatabaseService.shared.loadAIAnalysis(userId: userId)
-
-        if let cached, cached.isValidV7,
-           cached.meta?.profileHash == currentHash {
-            // Cache valid — merge with fresh local scores
-            return mergeWithCanonical(aiData: cached, localScores: localScores, healthScore: healthScore, redFlags: redFlags)
         }
 
         // 3. Validate numeric inputs
@@ -66,9 +68,9 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             forceRefresh: false
         )
 
-        let analysis: AIAnalysisResponse
+        let rawAnalysis: AIAnalysisResponse
         do {
-            analysis = try await withThrowingTaskGroup(of: AIAnalysisResponse.self) { group in
+            rawAnalysis = try await withThrowingTaskGroup(of: AIAnalysisResponse.self) { group in
                 group.addTask {
                     try await self.client.functions.invoke(
                         "generate-analysis",
@@ -115,6 +117,15 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             AppLogger.analysis.error("AI network error: \(error.localizedDescription, privacy: .public)")
             recordFailure()
             throw AIAnalysisError.networkError(error)
+        } catch let error as DecodingError {
+            // Échec de DÉCODAGE (≠ réseau) : re-tenter le même payload est du
+            // gaspillage — on log le champ exact en cause, on compte l'échec
+            // (le circuit s'ouvre si ça se répète) et on remonte une erreur
+            // NON-retryable. Le décodage tolérant (AIAnalysis.swift) rend ce
+            // cas quasi impossible, mais on reste défensif.
+            AppLogger.analysis.error("AI response undecodable: \(Self.describe(error), privacy: .public)")
+            recordFailure()
+            throw AIAnalysisError.invalidResponse
         } catch let error as AIAnalysisError {
             // Re-throw typed errors after recording the failure
             if error.isRetryable { recordFailure() }
@@ -125,8 +136,12 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         consecutiveFailures = 0
         circuitOpenUntil = nil
 
+        // Nettoyage : ids hors catalogue skippés (ex. "folate"), confidence
+        // inconnue remise à nil — on ne jette jamais toute l'analyse.
+        let analysis = rawAnalysis.sanitized()
+
         guard analysis.isValidV7 else {
-            AppLogger.analysis.error("AI response failed v7 validation")
+            AppLogger.analysis.error("AI response failed v7 validation (summary inexploitable)")
             return nil
         }
 
@@ -145,6 +160,27 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
 
         // 6. Merge with canonical
         return mergeWithCanonical(aiData: analysis, localScores: localScores, healthScore: healthScore, redFlags: redFlags)
+    }
+
+    // MARK: - Decoding Error Helper
+    /// Décrit précisément le champ fautif d'une DecodingError pour les logs
+    /// (ex. "typeMismatch(String) at 'supplements_schedule.morning[0]'").
+    private static func describe(_ error: DecodingError) -> String {
+        func path(_ context: DecodingError.Context) -> String {
+            context.codingPath.map(\.stringValue).joined(separator: ".")
+        }
+        switch error {
+        case .typeMismatch(let type, let context):
+            return "typeMismatch(\(type)) at '\(path(context))': \(context.debugDescription)"
+        case .valueNotFound(let type, let context):
+            return "valueNotFound(\(type)) at '\(path(context))'"
+        case .keyNotFound(let key, let context):
+            return "keyNotFound(\(key.stringValue)) at '\(path(context))'"
+        case .dataCorrupted(let context):
+            return "dataCorrupted at '\(path(context))': \(context.debugDescription)"
+        @unknown default:
+            return String(describing: error)
+        }
     }
 
     // MARK: - Circuit Breaker Helper

@@ -428,7 +428,7 @@ final class PDFExportService {
             ("☀️ Matin" as NSString).draw(at: CGPoint(x: margin + 8, y: currentY), withAttributes: slotAttrs)
             currentY += 16
             for item in morning {
-                ("  • \(item)" as NSString).draw(at: CGPoint(x: margin + 16, y: currentY), withAttributes: itemAttrs)
+                ("  • \(item.displayText)" as NSString).draw(at: CGPoint(x: margin + 16, y: currentY), withAttributes: itemAttrs)
                 currentY += 14
             }
             currentY += 6
@@ -438,7 +438,7 @@ final class PDFExportService {
             ("🌤️ Midi" as NSString).draw(at: CGPoint(x: margin + 8, y: currentY), withAttributes: slotAttrs)
             currentY += 16
             for item in afternoon {
-                ("  • \(item)" as NSString).draw(at: CGPoint(x: margin + 16, y: currentY), withAttributes: itemAttrs)
+                ("  • \(item.displayText)" as NSString).draw(at: CGPoint(x: margin + 16, y: currentY), withAttributes: itemAttrs)
                 currentY += 14
             }
             currentY += 6
@@ -448,7 +448,7 @@ final class PDFExportService {
             ("🌙 Soir" as NSString).draw(at: CGPoint(x: margin + 8, y: currentY), withAttributes: slotAttrs)
             currentY += 16
             for item in evening {
-                ("  • \(item)" as NSString).draw(at: CGPoint(x: margin + 16, y: currentY), withAttributes: itemAttrs)
+                ("  • \(item.displayText)" as NSString).draw(at: CGPoint(x: margin + 16, y: currentY), withAttributes: itemAttrs)
                 currentY += 14
             }
             currentY += 6

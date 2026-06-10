@@ -168,13 +168,13 @@ final class CheckinViewModel: ObservableObject {
             actions.append(DailyAction(text: "Se coucher avant 23h", category: .lifestyle))
         }
 
-        // Supplement reminders
+        // Supplement reminders (displayText : entrées objet ou chaîne)
         if let schedule = analysis?.supplementsSchedule {
             if let morning = schedule.morning, !morning.isEmpty {
-                actions.append(DailyAction(text: "Prendre supplements matin: \(morning.joined(separator: ", "))", category: .supplement))
+                actions.append(DailyAction(text: "Prendre supplements matin: \(morning.map(\.displayText).joined(separator: ", "))", category: .supplement))
             }
             if let evening = schedule.evening, !evening.isEmpty {
-                actions.append(DailyAction(text: "Prendre supplements soir: \(evening.joined(separator: ", "))", category: .supplement))
+                actions.append(DailyAction(text: "Prendre supplements soir: \(evening.map(\.displayText).joined(separator: ", "))", category: .supplement))
             }
         }
 
