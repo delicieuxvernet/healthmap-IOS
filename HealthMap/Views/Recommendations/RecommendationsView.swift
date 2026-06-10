@@ -20,6 +20,7 @@ struct RecommendationsView: View {
                     mainContent(analysis: analysis)
                 } else if dashboardVM.isLoadingAnalysis {
                     VStack(spacing: Theme.spacingMD) {
+                        MascotView(mood: .thinking, size: 72)
                         ProgressView()
                             .tint(Color.healthMapBlue)
                         Text("Chargement du plan...")
@@ -28,9 +29,9 @@ struct RecommendationsView: View {
                     }
                 } else {
                     VStack(spacing: Theme.spacingMD) {
-                        Image(systemName: "doc.text.magnifyingglass")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Color.healthMapMuted)
+                        // Mascotte en réflexion plutôt qu'une icône système
+                        // froide — l'état vide reste accueillant.
+                        MascotView(mood: .thinking, size: 72)
                         Text("Aucune analyse disponible")
                             .font(Theme.bodyFont)
                             .foregroundStyle(Color.healthMapSecondary)
