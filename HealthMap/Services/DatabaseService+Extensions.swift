@@ -48,57 +48,26 @@ extension DatabaseService {
     func deleteAllUserData(userId: String) async throws {
         AppLogger.database.notice("Deleting all data for user \(userId, privacy: .public)")
 
-        // 1. Delete score history (best-effort: empty result is fine).
-        do {
-            try await NetworkService.shared.withRetry {
-                try await SupabaseService.shared.client
-                    .from("score_history")
-                    .delete()
-                    .eq("user_id", value: userId)
-                    .execute()
-            }
-        } catch {
-            AppLogger.database.notice("score_history delete failed (may be empty): \(error.localizedDescription, privacy: .public)")
-        }
-
-        // 2. Delete analytics events (best-effort: empty result is fine).
-        do {
-            try await NetworkService.shared.withRetry {
-                try await SupabaseService.shared.client
-                    .from("analytics_events")
-                    .delete()
-                    .eq("user_id", value: userId)
-                    .execute()
-            }
-        } catch {
-            AppLogger.database.notice("analytics_events delete failed (may be empty): \(error.localizedDescription, privacy: .public)")
-        }
-
-        // 3. Delete profile row (cascades to related tables via FK).
-        // This is the RGPD-critical step — if it fails after retries we
-        // MUST surface the error so the caller can route to support.
+        // L'Edge Function `delete-user` (service_role) fait TOUTE la
+        // suppression côté serveur : audit_log, annulation Stripe, DELETE
+        // profiles (les tables user-scoped suivent par FK ON DELETE CASCADE,
+        // vérifié en DB le 10 juin 2026 ; analytics_events est anonymisée
+        // par SET NULL, audit_log conservé volontairement), puis
+        // admin.deleteUser sur auth.users.
+        //
+        // BUG corrigé 10 juin 2026 : l'ancien code envoyait {"user_id": ...}
+        // alors que la fonction exige {"confirm": "DELETE_MY_ACCOUNT"} → 400
+        // systématique, ET faisait des DELETE côté client qui étaient des
+        // no-ops silencieux (aucune policy RLS DELETE sur profiles /
+        // analytics_events → 200 avec 0 ligne). Résultat : l'app affichait
+        // « compte supprimé » sans RIEN supprimer (violation RGPD Art. 17).
+        // Désormais : un seul chemin de suppression (l'edge function), et
+        // son échec REMONTE à l'UI — jamais de faux succès.
         try await NetworkService.shared.withRetry {
-            try await SupabaseService.shared.client
-                .from("profiles")
-                .delete()
-                .eq("id", value: userId)
-                .execute()
-        }
-
-        // 4. Delete auth user via Edge Function (requires service_role).
-        // Retried because the Edge Function cold-start can 503 on the
-        // first hit after a long idle period.
-        do {
-            try await NetworkService.shared.withRetry {
-                let _: Data = try await SupabaseService.shared.client.functions.invoke(
-                    "delete-user",
-                    options: .init(body: ["user_id": userId])
-                )
-            }
-        } catch {
-            AppLogger.database.report(error, context: "delete-user edge function")
-            // Don't throw — the profile is already deleted, which is the RGPD-critical part.
-            // A scheduled cron on the server will sweep orphaned auth.users rows.
+            let _: Data = try await SupabaseService.shared.client.functions.invoke(
+                "delete-user",
+                options: .init(body: ["confirm": "DELETE_MY_ACCOUNT"])
+            )
         }
 
         AppLogger.database.info("User data deletion complete for \(userId, privacy: .public)")

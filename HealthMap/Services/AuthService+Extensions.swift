@@ -11,13 +11,11 @@ extension AuthService {
     ///
     /// Flow (depuis migration Supabase Auth du 2026-06-06) :
     /// 1. Résout le `profiles.id` (UUID) du user courant.
-    /// 2. Appelle `DatabaseService.deleteAllUserData` (qui invoque l'Edge Function
-    ///    `delete-user` côté Supabase — nettoie `profiles`, `score_history`, etc.).
-    /// 3. Supprime également l'utilisateur Supabase Auth via l'Edge Function
-    ///    `delete-user` (qui call admin.deleteUser côté serveur — le client ne peut
-    ///    pas le faire directement sans service_role).
-    /// 4. Sign out local (graceful-fail).
-    /// 5. Reset analytics + crash reporting identity.
+    /// 2. Appelle `DatabaseService.deleteAllUserData` → Edge Function
+    ///    `delete-user` (service_role) qui supprime TOUT côté serveur :
+    ///    profil + cascades FK + auth.users + Stripe. Tout échec remonte.
+    /// 3. Sign out local (graceful-fail).
+    /// 4. Reset analytics + crash reporting identity.
     func deleteAccount() async throws {
         guard let session = await currentSession else {
             throw HealthMapError.auth(.sessionExpired)
