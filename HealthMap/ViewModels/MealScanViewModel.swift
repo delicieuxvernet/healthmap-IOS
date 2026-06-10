@@ -113,29 +113,31 @@ final class MealScanViewModel: ObservableObject {
         }
     }
 
+    // Schéma RÉEL de `ciqual_foods` (vérifié en DB le 10 juin 2026) : le nom
+    // de l'aliment est `alim_nom_fr` et les valeurs nutritionnelles vivent
+    // dans la table séparée `ciqual_composition` (alim_code, nutrient_code,
+    // value_per_100g). L'ancien DTO demandait des colonnes inexistantes
+    // (name, calories...) → PostgREST 400 sur CHAQUE recherche.
     private struct CiqualFoodRow: Decodable {
-        let id: Int?
-        let name: String?
-        let calories: Double?
-        let proteins: Double?
-        let carbs: Double?
-        let fats: Double?
-        let iron: Double?
-        let vitC: Double?
+        let alimCode: Int
+        let alimNomFr: String
 
         enum CodingKeys: String, CodingKey {
-            case id, name, calories, proteins, carbs, fats, iron
-            case vitC = "vit_c"
+            case alimCode = "alim_code"
+            case alimNomFr = "alim_nom_fr"
         }
     }
 
-    private struct EdgeSearchResponse: Decodable {
-        let results: [EdgeSearchItem]?
-    }
+    private struct CiqualCompositionRow: Decodable {
+        let alimCode: Int
+        let nutrientCode: String
+        let valuePer100g: Double?
 
-    private struct EdgeSearchItem: Decodable {
-        let name: String?
-        let nutrients: [String: Double]?
+        enum CodingKeys: String, CodingKey {
+            case alimCode = "alim_code"
+            case nutrientCode = "nutrient_code"
+            case valuePer100g = "value_per_100g"
+        }
     }
 
     // MARK: - Edge Function Request DTOs (Encodable)
@@ -143,10 +145,6 @@ final class MealScanViewModel: ObservableObject {
     private struct MealAnalyzeRequest: Encodable {
         let image: String
         let deficiencies: [String]
-    }
-
-    private struct FoodSearchRequest: Encodable {
-        let query: String
     }
 
     // MARK: - Image Compression
@@ -355,19 +353,14 @@ final class MealScanViewModel: ObservableObject {
                 try await Task.sleep(nanoseconds: 300_000_000) // 300ms
                 guard !Task.isCancelled else { return }
 
-                // Try Supabase ciqual_foods table first
+                // Recherche dans le référentiel CIQUAL (table Supabase).
+                // L'ancien fallback edge `search-food` a été retiré : la
+                // fonction n'a jamais été déployée côté Supabase — l'appel
+                // échouait silencieusement à chaque fois (code mort).
                 let results = try await searchCiqualTable(query: query)
 
                 guard !Task.isCancelled else { return }
-
-                if !results.isEmpty {
-                    searchResults = results
-                } else {
-                    // Fallback to Edge Function search
-                    let fallbackResults = try await searchViaEdgeFunction(query: query)
-                    guard !Task.isCancelled else { return }
-                    searchResults = fallbackResults
-                }
+                searchResults = results
             } catch is CancellationError {
                 // Cancelled by new search, ignore
             } catch {
@@ -383,40 +376,47 @@ final class MealScanViewModel: ObservableObject {
         await searchTask?.value
     }
 
-    /// Query the ciqual_foods Supabase table
+    /// Recherche dans `ciqual_foods` (noms) puis enrichit avec
+    /// `ciqual_composition` (valeurs pour 100 g). Les codes nutriments DB
+    /// sont des slugs lisibles (kcal/prot/carbs/fat/iron/vitC...) — on les
+    /// remappe vers les clés attendues par `FoodItem`.
     private func searchCiqualTable(query: String) async throws -> [FoodItem] {
-        let rows: [CiqualFoodRow] = try await client
+        let foods: [CiqualFoodRow] = try await client
             .from("ciqual_foods")
-            .select()
-            .ilike("name", pattern: "%\(query)%")
+            .select("alim_code, alim_nom_fr")
+            .ilike("alim_nom_fr", pattern: "%\(query)%")
             .limit(20)
             .execute()
             .value
 
-        return rows.compactMap { row in
-            guard let name = row.name, !name.isEmpty else { return nil }
-            var nutrients: [String: Double] = [:]
-            if let cal = row.calories { nutrients["calories"] = cal }
-            if let prot = row.proteins { nutrients["proteins"] = prot }
-            if let carb = row.carbs { nutrients["carbs"] = carb }
-            if let fat = row.fats { nutrients["fats"] = fat }
-            if let iron = row.iron { nutrients["iron"] = iron }
-            if let vitC = row.vitC { nutrients["vitC"] = vitC }
-            return FoodItem(name: name, nutrients: nutrients)
+        guard !foods.isEmpty else { return [] }
+
+        let compositions: [CiqualCompositionRow] = try await client
+            .from("ciqual_composition")
+            .select("alim_code, nutrient_code, value_per_100g")
+            .in("alim_code", values: foods.map(\.alimCode))
+            .execute()
+            .value
+
+        // nutrient_code DB → clé FoodItem (les codes non mappés sont ignorés)
+        let keyMap: [String: String] = [
+            "kcal": "calories",
+            "prot": "proteins",
+            "carbs": "carbs",
+            "fat": "fats",
+            "iron": "iron",
+            "vitC": "vitC",
+        ]
+
+        var nutrientsByCode: [Int: [String: Double]] = [:]
+        for compo in compositions {
+            guard let key = keyMap[compo.nutrientCode], let value = compo.valuePer100g else { continue }
+            nutrientsByCode[compo.alimCode, default: [:]][key] = value
         }
-    }
 
-    /// Fallback: call the search-food Edge Function
-    private func searchViaEdgeFunction(query: String) async throws -> [FoodItem] {
-        let body = FoodSearchRequest(query: query)
-        let response: EdgeSearchResponse = try await client.functions.invoke(
-            "search-food",
-            options: .init(body: body)
-        )
-
-        return (response.results ?? []).compactMap { item in
-            guard let name = item.name, !name.isEmpty else { return nil }
-            return FoodItem(name: name, nutrients: item.nutrients ?? [:])
+        return foods.compactMap { food in
+            guard !food.alimNomFr.isEmpty else { return nil }
+            return FoodItem(name: food.alimNomFr, nutrients: nutrientsByCode[food.alimCode] ?? [:])
         }
     }
 
