@@ -149,9 +149,10 @@ quel — c'est pour ça qu'on a `ProfileResolver`. Écritures profiles = UPDATE 
    (app_version + environment dans `properties`). Événements anonymes (user_id nil) → PostHog
    uniquement (la RLS `events_self_insert` exige `user_id = current_user_id()`).
 
-3. **Colonnes `questionnaire_data_encrypted` / `ai_analysis_encrypted`** attendues par `SecureStorageService.decryptFromTransit()` mais inexistantes dans le schéma actuel.
-   - Pas bloquant (fallback plaintext en place).
-   - Action : soit ajouter ces colonnes (avec pgcrypto), soit retirer le code de décryption.
+3. ~~Colonnes `questionnaire_data_encrypted` / `ai_analysis_encrypted`~~ — **RÉSOLU le 10 juin 2026** :
+   les SELECT de ces colonnes inexistantes répondaient 400 à chaque lecture (cache bilan
+   illisible). Code de transit encryption retiré (DatabaseService + SecureStorageService) ;
+   `loadQuestionnaireData`/`loadAIAnalysis` ne lisent plus que les colonnes réelles.
 
 ---
 

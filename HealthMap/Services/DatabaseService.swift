@@ -21,65 +21,49 @@ final class DatabaseService {
         return response
     }
 
-    // MARK: - Load Questionnaire Data (with transit decryption support)
+    // MARK: - Load Questionnaire Data
+    // NOTE 10 juin 2026 : les colonnes `questionnaire_data_encrypted` /
+    // `ai_analysis_encrypted` n'ont JAMAIS existé dans le schéma — les
+    // sélectionner faisait répondre PostgREST 400 à CHAQUE lecture (vu en
+    // logs sur les builds 27-29 : le cache du bilan était illisible et
+    // forçait un appel edge inutile). Le chiffrement de transit associé
+    // (SecureStorageService) a été retiré avec.
     func loadQuestionnaireData(userId: String) async throws -> UserProfile? {
         struct QRow: Codable {
             let questionnaireData: UserProfile?
-            let questionnaireDataEncrypted: String?
             enum CodingKeys: String, CodingKey {
                 case questionnaireData = "questionnaire_data"
-                case questionnaireDataEncrypted = "questionnaire_data_encrypted"
             }
         }
 
         let row: QRow = try await client
             .from("profiles")
-            .select("questionnaire_data, questionnaire_data_encrypted")
+            .select("questionnaire_data")
             .eq("id", value: userId)
             .single()
             .execute()
             .value
 
-        // Try decrypting the encrypted field first
-        if let encryptedB64 = row.questionnaireDataEncrypted,
-           let encryptedData = Data(base64Encoded: encryptedB64),
-           let decrypted = SecureStorageService.shared.decryptFromTransit(encryptedData),
-           let profile = try? JSONDecoder().decode(UserProfile.self, from: decrypted) {
-            return profile
-        }
-
-        // Fallback to plaintext field (pre-encryption data)
         return row.questionnaireData
     }
 
-    // MARK: - Load AI Analysis (with transit decryption support)
+    // MARK: - Load AI Analysis (cache lu avant tout appel edge)
     func loadAIAnalysis(userId: String) async throws -> AIAnalysisResponse? {
         struct AnalysisRow: Codable {
             let aiAnalysis: AIAnalysisResponse?
-            let aiAnalysisEncrypted: String?
             enum CodingKeys: String, CodingKey {
                 case aiAnalysis = "ai_analysis"
-                case aiAnalysisEncrypted = "ai_analysis_encrypted"
             }
         }
 
         let row: AnalysisRow = try await client
             .from("profiles")
-            .select("ai_analysis, ai_analysis_encrypted")
+            .select("ai_analysis")
             .eq("id", value: userId)
             .single()
             .execute()
             .value
 
-        // Try decrypting the encrypted field first
-        if let encryptedB64 = row.aiAnalysisEncrypted,
-           let encryptedData = Data(base64Encoded: encryptedB64),
-           let decrypted = SecureStorageService.shared.decryptFromTransit(encryptedData),
-           let analysis = try? JSONDecoder().decode(AIAnalysisResponse.self, from: decrypted) {
-            return analysis
-        }
-
-        // Fallback to plaintext field (pre-encryption data)
         return row.aiAnalysis
     }
 
@@ -155,11 +139,6 @@ final class DatabaseService {
     // MARK: - Save Profile (update) — the row always exists, created by the
     // `handle_new_user` DB trigger at signup.
     func saveProfile(userId: String, email: String, firstName: String, questionnaireData: UserProfile) async throws {
-        // NOTE: `questionnaire_data_encrypted` n'existe pas dans la DB (mismatch
-        // documenté CLAUDE.md §4.3) — fallback plaintext via `questionnaire_data`
-        // (jsonb). Si la colonne encrypted est ajoutée plus tard, restaurer
-        // SecureStorageService.encryptForTransit + champ dans le payload.
-        //
         // UPDATE et non upsert : la policy RLS d'INSERT exige `auth_user_id`
         // ou `clerk_id` dans la ligne proposée — Postgres évalue ce WITH CHECK
         // AVANT la résolution `on conflict`, donc un upsert sans ces champs est
