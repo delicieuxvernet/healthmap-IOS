@@ -298,14 +298,15 @@ struct SupplementsView: View {
                 engineTimeSlotCard(group: group)
             }
         } else if hasAISchedule {
-            // AI fallback schedule
+            // AI fallback schedule — les entrées serveur sont des objets
+            // {name, dose, ...} ou des chaînes : displayText gère les deux.
             if let morning = aiSchedule?.morning, !morning.isEmpty {
                 timeSlotCard(
                     title: "Matin",
                     subtitle: "Au petit-dejeuner",
                     icon: "sunrise.fill",
                     color: .accentSky,
-                    supplements: morning
+                    supplements: morning.map(\.displayText)
                 )
             }
             if let afternoon = aiSchedule?.afternoon, !afternoon.isEmpty {
@@ -314,7 +315,7 @@ struct SupplementsView: View {
                     subtitle: "Au dejeuner",
                     icon: "sun.max.fill",
                     color: .healthMapBlue,
-                    supplements: afternoon
+                    supplements: afternoon.map(\.displayText)
                 )
             }
             if let evening = aiSchedule?.evening, !evening.isEmpty {
@@ -323,7 +324,7 @@ struct SupplementsView: View {
                     subtitle: "Au diner ou avant le coucher",
                     icon: "moon.fill",
                     color: .accentIndigo,
-                    supplements: evening
+                    supplements: evening.map(\.displayText)
                 )
             }
 

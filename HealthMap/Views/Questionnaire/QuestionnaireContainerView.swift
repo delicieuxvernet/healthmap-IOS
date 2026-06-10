@@ -454,6 +454,13 @@ struct QuestionnaireContainerView: View {
                 // Pass data directly to DashboardVM to avoid
                 // re-fetch timing issues (Supabase replication lag).
                 dashboardVM.profile = viewModel.profile
+                // NOTE : computeLocalScores/triggerAnalysis se basent sur
+                // profile.completed — PAS sur hasCompletedQuestionnaire, qui
+                // doit rester false ici (l'activer maintenant swaperait
+                // l'onglet Bilan sous la célébration via MainTabView).
+                // Bug TestFlight 28 : l'ancienne garde sur le flag laissait
+                // healthScore à 0 → célébration « 0/100 » avec croix, et
+                // l'analyse IA ne démarrait jamais en parallèle.
                 dashboardVM.computeLocalScores()
                 // Capture local score pour la célébration AVANT de switcher.
                 celebrationScore = dashboardVM.healthScore

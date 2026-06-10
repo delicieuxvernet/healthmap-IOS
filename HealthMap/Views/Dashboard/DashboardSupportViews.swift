@@ -74,6 +74,77 @@ struct AnalysisErrorRetryView: View {
     }
 }
 
+// MARK: - Analysis Retry Banner (compact)
+/// Bandeau compact affiché EN HAUT du dashboard quand l'analyse IA a échoué
+/// mais que les scores locaux (HealthCalculator) sont disponibles : le bilan
+/// reste entièrement utilisable, on propose simplement de relancer l'analyse.
+/// (À la différence d'AnalysisErrorRetryView, qui remplace tout l'écran et ne
+/// sert plus que lorsqu'on n'a RIEN de local à montrer.)
+struct AnalysisRetryBanner: View {
+    let message: String
+    let isRetrying: Bool
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.healthMapBlue)
+                    .accessibilityHidden(true)
+
+                Text("Analyse IA indisponible")
+                    .font(Theme.captionBoldFont)
+                    .foregroundStyle(Color.healthMapText)
+
+                Spacer()
+            }
+
+            Text(message)
+                .font(Theme.captionFont)
+                .foregroundStyle(Color.healthMapSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                onRetry()
+            } label: {
+                HStack(spacing: 6) {
+                    if isRetrying {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    Text(isRetrying ? "Nouvel essai..." : "Reessayer")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, Theme.spacingMD)
+                .frame(minHeight: 44) // touch target HIG
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
+                        .fill(Color.healthMapBlue)
+                )
+            }
+            .buttonStyle(.healthMapPressed)
+            .disabled(isRetrying)
+            .accessibilityHint("Relance le chargement de ton analyse nutritionnelle.")
+        }
+        .padding(Theme.spacingMD)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .fill(Color.healthMapBlueLight.opacity(0.5))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .stroke(Color.healthMapBlue.opacity(0.12), lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+    }
+}
+
 // MARK: - Highlight Card
 struct HighlightCard: View {
     let icon: String
