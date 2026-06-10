@@ -3,8 +3,11 @@ import CryptoKit
 import Security
 
 // MARK: - SecureStorageService
-/// Provides AES-256-GCM encryption for local data persistence (Keychain-backed key)
-/// and transit encryption helpers for E2E protection of sensitive fields sent to Supabase.
+/// Provides AES-256-GCM encryption for local data persistence (Keychain-backed key).
+///
+/// NOTE 10 juin 2026 : les helpers de « transit encryption » (E2E vers des
+/// colonnes Supabase `*_encrypted`) ont été retirés — ces colonnes n'ont
+/// jamais existé dans le schéma et leur lecture provoquait des 400 PostgREST.
 ///
 /// Key storage: The 256-bit symmetric key lives in the iOS Keychain with
 /// `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, meaning it survives reboots
@@ -20,12 +23,10 @@ final class SecureStorageService {
 
     private static let keychainServicePrefix = "fr.healthmap.securestorage"
     private static let masterKeyAccount = "fr.healthmap.securestorage.masterkey"
-    private static let transitKeyAccount = "fr.healthmap.securestorage.transitkey"
 
     // MARK: - Cached keys
 
     private var _masterKey: SymmetricKey?
-    private var _transitKey: SymmetricKey?
     private let lock = NSLock()
 
     private init() {}
@@ -48,25 +49,6 @@ final class SecureStorageService {
         let newKey = SymmetricKey(size: .bits256)
         saveKeyToKeychain(newKey, account: Self.masterKeyAccount)
         _masterKey = newKey
-        return newKey
-    }
-
-    /// Dedicated key for transit encryption so a compromised transit payload
-    /// cannot be replayed against local storage and vice-versa.
-    private func transitKey() -> SymmetricKey {
-        lock.lock()
-        defer { lock.unlock() }
-
-        if let cached = _transitKey { return cached }
-
-        if let existing = loadKeyFromKeychain(account: Self.transitKeyAccount) {
-            _transitKey = existing
-            return existing
-        }
-
-        let newKey = SymmetricKey(size: .bits256)
-        saveKeyToKeychain(newKey, account: Self.transitKeyAccount)
-        _transitKey = newKey
         return newKey
     }
 
@@ -114,26 +96,6 @@ final class SecureStorageService {
     /// Removes a stored value.
     func remove(forKey key: String) {
         UserDefaults.standard.removeObject(forKey: prefixedKey(key))
-    }
-
-    // MARK: - Public API: Transit Encryption (E2E to Supabase)
-
-    /// Encrypts data for transit to the backend. The sealed box is returned as
-    /// `nonce || ciphertext || tag` so it can be stored as a single BYTEA/Base64
-    /// column in Supabase.
-    func encryptForTransit(_ data: Data) -> Data? {
-        do {
-            let sealed = try AES.GCM.seal(data, using: transitKey())
-            return sealed.combined
-        } catch {
-            AppLogger.database.notice("SecureStorage: transit encryption failed: \(error.localizedDescription, privacy: .public)")
-            return nil
-        }
-    }
-
-    /// Decrypts data that was encrypted with `encryptForTransit`.
-    func decryptFromTransit(_ data: Data) -> Data? {
-        return decrypt(data, using: transitKey())
     }
 
     // MARK: - Private Helpers
