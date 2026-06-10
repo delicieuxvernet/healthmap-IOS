@@ -38,9 +38,9 @@ struct CelebrationView: View {
 
                 // Title
                 VStack(spacing: Theme.spacingSM) {
-                    Image(systemName: "party.popper.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Color.healthMapBlue)
+                    // Mascotte joyeuse — moment de célébration = moment
+                    // d'identité (remplace l'icône cotillons générique).
+                    MascotView(mood: .happy, size: 88)
                         .scaleEffect(appeared ? 1.0 : 0.3)
                         .opacity(appeared ? 1.0 : 0)
 
