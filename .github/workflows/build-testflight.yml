@@ -3,10 +3,88 @@ name: Build & Deploy to TestFlight
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch: # Manual trigger (recommended for the FIRST run)
 
 jobs:
+  # ── Tests (gate de PR) ──────────────────────────────────────────────────
+  # Tourne sur chaque pull request : compile l'app + la suite de tests sur
+  # simulateur (aucune signature, aucun secret Apple requis). BLOQUANT : une
+  # PR avec tests rouges ne doit pas être mergée. Le déploiement TestFlight
+  # (job ci-dessous) reste réservé aux pushes sur main — il n'est pas ralenti.
+  tests:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 40
+
+    env:
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26.2
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Inject Config.xcconfig
+        env:
+          CONFIG_XCCONFIG_BASE64: ${{ secrets.CONFIG_XCCONFIG_BASE64 }}
+        run: |
+          mkdir -p HealthMap/Resources
+          echo -n "$CONFIG_XCCONFIG_BASE64" | base64 --decode > HealthMap/Resources/Config.xcconfig
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', 'project.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Resolve SPM dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project HealthMap.xcodeproj \
+            -scheme HealthMap
+
+      # timeout strict par test : un test qui hang (ex. appel réseau réel
+      # sans timeout) fait échouer la suite au lieu de bloquer le runner.
+      - name: Run tests
+        timeout-minutes: 25
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project HealthMap.xcodeproj \
+            -scheme HealthMap \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults.xcresult
+          path: ${{ runner.temp }}/TestResults.xcresult
+          if-no-files-found: warn
+
+  # ── Build + déploiement TestFlight (pushes sur main uniquement) ─────────
   build-and-upload:
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 60
 
@@ -94,36 +172,8 @@ jobs:
             -project HealthMap.xcodeproj \
             -scheme HealthMap
 
-      # Tests = best-effort, NON bloquant pour la livraison TestFlight.
-      # timeout strict : un test qui hang (ex. appel réseau réel sans timeout)
-      # ne doit jamais bloquer le build. continue-on-error => le build continue
-      # même si un test échoue/expire. (Les tests restent lançables à part.)
-      - name: Run tests (best-effort)
-        # TEMPORAIRE : tests coupés pour accélérer l'itération CI vers le 1er
-        # build TestFlight (best-effort, non-bloquants — ils ne gardent pas la
-        # livraison). Réactiver en retirant cette ligne `if: false`.
-        if: false
-        continue-on-error: true
-        timeout-minutes: 12
-        run: |
-          set -o pipefail
-          xcodebuild test \
-            -project HealthMap.xcodeproj \
-            -scheme HealthMap \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
-            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
-            -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 120 \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: TestResults.xcresult
-          path: ${{ runner.temp }}/TestResults.xcresult
-          if-no-files-found: warn
-
+      # Les tests tournent désormais dans le job `tests` sur chaque pull
+      # request (gate bloquante) — le déploiement main reste rapide.
       - name: Set up Ruby (fastlane)
         uses: ruby/setup-ruby@v1
         with:
