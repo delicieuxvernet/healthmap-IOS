@@ -1,10 +1,18 @@
 import SwiftUI
 
 // MARK: - Single Choice Question
+//
+// Cartes d'option façon "app native premium" (retour au feel du build 28) :
+// coins continus larges, élévation par ombre douce (le hairline seul faisait
+// "site web" sur le fond teinté), padding aéré, texte primaire (contraste max
+// sur healthMapCard / healthMapBlueLight) — la sélection est portée par le
+// radio + le fond + le liseré bleu, pas par la couleur du texte.
 struct SingleChoiceView: View {
     let question: Question
     let currentValue: String?
     let onSelect: (String) -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: Theme.spacingSM) {
@@ -18,12 +26,13 @@ struct SingleChoiceView: View {
                     HStack(spacing: Theme.spacingSM) {
                         if let emoji = option.emoji {
                             Text(emoji)
-                                .font(.system(size: 20))
+                                .font(.title3)
                         }
 
                         Text(option.label)
-                            .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                            .foregroundStyle(isSelected ? Color.healthMapBlue : Color.healthMapText)
+                            .font(Theme.bodyFont.weight(isSelected ? .semibold : .regular))
+                            .foregroundStyle(Color.healthMapText)
+                            .multilineTextAlignment(.leading)
 
                         Spacer()
 
@@ -36,15 +45,30 @@ struct SingleChoiceView: View {
                             .frame(width: 22, height: 22)
                     }
                     .padding(.horizontal, Theme.spacingMD)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, Theme.spacingMD)
+                    .frame(minHeight: 44)
                     .background(
-                        RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
+                        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                             .fill(isSelected ? Color.healthMapBlueLight : Color.healthMapCard)
+                            .shadow(
+                                color: isSelected
+                                    ? Color.healthMapBlue.opacity(Theme.opacityStrong)
+                                    : Color.black.opacity(Theme.shadowCard.opacity),
+                                radius: Theme.shadowCard.radius,
+                                x: 0,
+                                y: Theme.shadowCard.y
+                            )
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                            .stroke(isSelected ? Color.healthMapBlue.opacity(0.3) : Color.healthMapMuted.opacity(0.15), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                            .stroke(
+                                isSelected
+                                    ? Color.healthMapBlue.opacity(0.3)
+                                    : Color.healthMapMuted.opacity(Theme.opacityStrong),
+                                lineWidth: 1
+                            )
                     )
+                    .animation(reduceMotion ? .none : .healthMapQuick, value: isSelected)
                 }
                 .buttonStyle(.healthMapPressed)
             }
@@ -53,10 +77,13 @@ struct SingleChoiceView: View {
 }
 
 // MARK: - Multi Choice Question
+// Même traitement carte native premium que SingleChoiceView (voir ci-dessus).
 struct MultiChoiceView: View {
     let question: Question
     let currentValues: [String]
     let onToggle: (String) -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: Theme.spacingSM) {
@@ -71,12 +98,13 @@ struct MultiChoiceView: View {
                     HStack(spacing: Theme.spacingSM) {
                         if let emoji = option.emoji {
                             Text(emoji)
-                                .font(.system(size: 20))
+                                .font(.title3)
                         }
 
                         Text(option.label)
-                            .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                            .foregroundStyle(isSelected ? Color.healthMapBlue : Color.healthMapText)
+                            .font(Theme.bodyFont.weight(isSelected ? .semibold : .regular))
+                            .foregroundStyle(Color.healthMapText)
+                            .multilineTextAlignment(.leading)
 
                         Spacer()
 
@@ -96,16 +124,31 @@ struct MultiChoiceView: View {
                             .frame(width: 22, height: 22)
                     }
                     .padding(.horizontal, Theme.spacingMD)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, Theme.spacingMD)
+                    .frame(minHeight: 44)
                     .background(
-                        RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
+                        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                             .fill(isSelected ? Color.healthMapBlueLight : Color.healthMapCard)
+                            .shadow(
+                                color: isSelected
+                                    ? Color.healthMapBlue.opacity(Theme.opacityStrong)
+                                    : Color.black.opacity(Theme.shadowCard.opacity),
+                                radius: Theme.shadowCard.radius,
+                                x: 0,
+                                y: Theme.shadowCard.y
+                            )
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                            .stroke(isSelected ? Color.healthMapBlue.opacity(0.3) : Color.healthMapMuted.opacity(0.15), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                            .stroke(
+                                isSelected
+                                    ? Color.healthMapBlue.opacity(0.3)
+                                    : Color.healthMapMuted.opacity(Theme.opacityStrong),
+                                lineWidth: 1
+                            )
                     )
                     .opacity(isNone && !currentValues.isEmpty && !isSelected ? 0.5 : 1.0)
+                    .animation(reduceMotion ? .none : .healthMapQuick, value: isSelected)
                 }
                 .buttonStyle(.healthMapPressed)
             }
@@ -143,10 +186,16 @@ struct NumericInputView: View {
         .background(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                 .fill(Color.healthMapCard)
+                .shadow(
+                    color: .black.opacity(Theme.shadowCard.opacity),
+                    radius: Theme.shadowCard.radius,
+                    x: 0,
+                    y: Theme.shadowCard.y
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(isFocused ? Color.healthMapBlue.opacity(0.4) : Color.healthMapMuted.opacity(0.15), lineWidth: 1)
+                .stroke(isFocused ? Color.healthMapBlue.opacity(0.4) : Color.healthMapMuted.opacity(Theme.opacityStrong), lineWidth: 1)
         )
         .onAppear {
             isFocused = true
@@ -202,7 +251,7 @@ struct SliderInputView: View {
             }
             .frame(maxWidth: .infinity)
 
-            // Slider + boutons d'ajustement précis
+            // Slider + boutons d'ajustement précis (44pt — touch target HIG)
             HStack(spacing: Theme.spacingSM) {
                 Button {
                     adjust(by: -step)
@@ -210,8 +259,10 @@ struct SliderInputView: View {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(Color.healthMapBlue.opacity(0.85))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.healthMapPressed)
                 .accessibilityLabel("Diminuer")
 
                 Slider(
@@ -230,8 +281,10 @@ struct SliderInputView: View {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(Color.healthMapBlue.opacity(0.85))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.healthMapPressed)
                 .accessibilityLabel("Augmenter")
             }
 
@@ -249,13 +302,19 @@ struct SliderInputView: View {
         .background(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                 .fill(Color.healthMapCard)
+                .shadow(
+                    color: .black.opacity(Theme.shadowCard.opacity),
+                    radius: Theme.shadowCard.radius,
+                    x: 0,
+                    y: Theme.shadowCard.y
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                 .stroke(
                     hasInteracted || !text.isEmpty
                         ? Color.healthMapBlue.opacity(0.4)
-                        : Color.healthMapMuted.opacity(0.15),
+                        : Color.healthMapMuted.opacity(Theme.opacityStrong),
                     lineWidth: 1
                 )
         )
@@ -308,10 +367,16 @@ struct TextInputView: View {
             .background(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                     .fill(Color.healthMapCard)
+                    .shadow(
+                        color: .black.opacity(Theme.shadowCard.opacity),
+                        radius: Theme.shadowCard.radius,
+                        x: 0,
+                        y: Theme.shadowCard.y
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .stroke(isFocused ? Color.healthMapBlue.opacity(0.4) : Color.healthMapMuted.opacity(0.15), lineWidth: 1)
+                    .stroke(isFocused ? Color.healthMapBlue.opacity(0.4) : Color.healthMapMuted.opacity(Theme.opacityStrong), lineWidth: 1)
             )
             .onAppear {
                 isFocused = true

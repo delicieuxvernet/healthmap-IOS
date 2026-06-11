@@ -178,13 +178,19 @@ struct QuestionnaireContainerView: View {
             .background(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                     .fill(Color.healthMapCard)
+                    .shadow(
+                        color: .black.opacity(Theme.shadowCard.opacity),
+                        radius: Theme.shadowCard.radius,
+                        x: 0,
+                        y: Theme.shadowCard.y
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .stroke(Color.healthMapMuted.opacity(0.15), lineWidth: 1)
+                    .stroke(Color.healthMapMuted.opacity(Theme.opacityStrong), lineWidth: 1)
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.healthMapPressed)
     }
 
     // MARK: - Flux une question par écran
@@ -273,7 +279,7 @@ struct QuestionnaireContainerView: View {
                     .fill(Color.healthMapMuted.opacity(0.12))
 
                 Capsule()
-                    .fill(Color.healthMapBlue)
+                    .fill(LinearGradient.healthMapBrand)
                     .frame(width: max(geo.size.width * viewModel.progress, 6))
                     .animation(reduceMotion ? .none : .healthMapSpring, value: viewModel.progress)
             }
@@ -421,13 +427,29 @@ struct QuestionnaireContainerView: View {
                 advance()
             }
         } label: {
+            // CTA premium : même recette que le bouton d'onboarding (gradient
+            // brand + glow doux), état envoi en gris muted sans glow.
             Text(primaryButtonLabel)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(viewModel.isSubmitting ? Color.healthMapMuted : Color.healthMapBlue)
+                .frame(height: 56)
+                .background {
+                    if viewModel.isSubmitting {
+                        Color.healthMapMuted
+                    } else {
+                        LinearGradient.healthMapBrand
+                    }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                .shadow(
+                    color: viewModel.isSubmitting
+                        ? Color.clear
+                        : Color.healthMapBlue.opacity(Theme.shadowBrandGlow.opacity),
+                    radius: Theme.shadowBrandGlow.radius,
+                    x: 0,
+                    y: Theme.shadowBrandGlow.y
+                )
         }
         .buttonStyle(.healthMapPressed)
         .disabled(viewModel.isSubmitting)
