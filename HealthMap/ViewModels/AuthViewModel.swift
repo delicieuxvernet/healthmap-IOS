@@ -117,6 +117,20 @@ final class AuthViewModel: ObservableObject {
                 switch event {
                 case .signedIn, .tokenRefreshed, .initialSession, .userUpdated:
                     startRefreshTimer()
+
+                    // Identify the analytics sink so `analytics_events` inserts
+                    // pass RLS: policy `events_self_insert` requires
+                    // `user_id = current_user_id()` (= profiles.id). Here
+                    // `session.user.id` is ALREADY the resolved profiles.id
+                    // (see AuthService.currentSession), not auth.users.id.
+                    // Without this, AnalyticsService.currentUserId stays nil and
+                    // every Supabase analytics insert is silently skipped. Covers
+                    // fresh sign-in and app-restart restore (initialSession).
+                    if (event == .signedIn || event == .initialSession),
+                       let analyticsUserId = session?.user.id.uuidString {
+                        AnalyticsService.shared.identify(userId: analyticsUserId)
+                    }
+
                     if event == .signedIn {
                         // Clear any stale data from a previous user who may not
                         // have signed out explicitly (e.g. session expired, app
