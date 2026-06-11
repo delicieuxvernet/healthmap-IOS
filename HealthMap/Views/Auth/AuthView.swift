@@ -2,14 +2,18 @@ import SwiftUI
 import AuthenticationServices
 
 // MARK: - Authentication View (Login / Signup)
+/// Formulaire d'authentification. Présenté en SHEET depuis `LandingView`
+/// (mode piloté par `initialMode`), mais reste utilisable plein écran :
+/// `AuthView()` sans argument est rétro-compatible (mode connexion).
 struct AuthView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var email = ""
     @State private var password = ""
     @State private var firstName = ""
-    @State private var isSignUp = false
+    @State private var isSignUp: Bool
     @State private var showForgotPassword = false
 
     // A4 : le nonce Apple est désormais détenu par AuthViewModel
@@ -25,6 +29,22 @@ struct AuthView: View {
 
     enum Field: Hashable {
         case firstName, email, password
+    }
+
+    /// Mode d'ouverture du formulaire. `Identifiable` pour pouvoir piloter
+    /// un `.sheet(item:)` depuis LandingView.
+    enum Mode: String, Identifiable {
+        case signIn
+        case signUp
+
+        var id: String { rawValue }
+    }
+
+    /// `initialMode` ne fixe que l'état INITIAL (l'utilisateur peut toujours
+    /// basculer via le toggle en bas). Valeur par défaut `.signIn` →
+    /// rétro-compatible avec les call-sites existants `AuthView()`.
+    init(initialMode: Mode = .signIn) {
+        _isSignUp = State(initialValue: initialMode == .signUp)
     }
 
     var body: some View {
@@ -83,8 +103,10 @@ struct AuthView: View {
                                 Button("Mot de passe oublie ?") {
                                     showForgotPassword = true
                                 }
-                                .font(Theme.captionFont)
+                                .font(Theme.captionBoldFont)
                                 .foregroundStyle(Color.healthMapBlue)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                             }
                         }
                     }
@@ -100,7 +122,7 @@ struct AuthView: View {
                             Text(error)
                                 .font(Theme.captionFont)
                         }
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.urgencyImmediate)
                         .padding(.horizontal, Theme.spacingLG)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
@@ -118,7 +140,7 @@ struct AuthView: View {
                     } label: {
                         ZStack {
                             Text(isSignUp ? "Creer mon compte" : "Se connecter")
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(Theme.headlineFont)
                                 .foregroundStyle(.white)
                                 .opacity(authViewModel.isProcessing ? 0 : 1)
 
@@ -129,9 +151,14 @@ struct AuthView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
-                        .background(Color.healthMapBlue)
+                        .background(LinearGradient.healthMapBrand)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                        .shadow(color: Color.healthMapBlue.opacity(Theme.shadowBrandGlow.opacity),
+                                radius: Theme.shadowBrandGlow.radius,
+                                x: 0,
+                                y: Theme.shadowBrandGlow.y)
                     }
+                    .buttonStyle(.healthMapPressed)
                     .disabled(authViewModel.isProcessing)
                     .padding(.horizontal, Theme.spacingLG)
 
@@ -178,7 +205,7 @@ struct AuthView: View {
                             Image(systemName: "globe")
                                 .font(.system(size: 18))
                             Text("Continuer avec Google")
-                                .font(.system(size: 16, weight: .medium))
+                                .font(Theme.headlineFont)
                         }
                         .foregroundStyle(Color.healthMapText)
                         .frame(maxWidth: .infinity)
@@ -190,21 +217,25 @@ struct AuthView: View {
                                 .stroke(Color.healthMapMuted.opacity(0.3), lineWidth: 1)
                         )
                     }
+                    .buttonStyle(.healthMapPressed)
                     .padding(.horizontal, Theme.spacingLG)
 
-                    // Toggle login/signup
-                    HStack(spacing: 4) {
+                    // Toggle login/signup — typo subheadline (lisible) +
+                    // zone de tap >= 44pt sur le bouton.
+                    HStack(spacing: Theme.spacingXS) {
                         Text(isSignUp ? "Deja un compte ?" : "Pas encore de compte ?")
-                            .font(Theme.captionFont)
+                            .font(Theme.subheadlineFont)
                             .foregroundStyle(Color.healthMapSecondary)
                         Button(isSignUp ? "Se connecter" : "Creer un compte") {
-                            withAnimation(.healthMapSpring) {
+                            withAnimation(reduceMotion ? .none : .healthMapSpring) {
                                 isSignUp.toggle()
                                 authViewModel.errorMessage = nil
                             }
                         }
-                        .font(Theme.captionBoldFont)
+                        .font(Theme.subheadlineFont.weight(.semibold))
                         .foregroundStyle(Color.healthMapBlue)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .padding(.bottom, Theme.spacingXL)
                 }
@@ -234,9 +265,9 @@ struct AuthView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
-        .animation(.healthMapSpring, value: isSignUp)
-        .animation(.healthMapSpring, value: authViewModel.errorMessage)
-        .animation(.easeInOut(duration: 0.2), value: isExchangingAppleToken)
+        .animation(reduceMotion ? .none : .healthMapSpring, value: isSignUp)
+        .animation(reduceMotion ? .none : .healthMapSpring, value: authViewModel.errorMessage)
+        .animation(reduceMotion ? .none : .easeInOut(duration: 0.2), value: isExchangingAppleToken)
         .sheet(isPresented: $showForgotPassword) {
             ForgotPasswordSheet()
                 .healthMapActionSheet()
@@ -299,27 +330,40 @@ struct AuthView: View {
     }
 
     // MARK: - Header
+    /// Typo harmonisée via ThemeConstants : titre = l'ACTION en cours (le
+    /// wordmark HealthMap vit sur la LandingView, visible derrière le sheet),
+    /// tailles Dynamic-Type-aware, tout centré. La petite mascotte fait le
+    /// lien visuel avec la page de garde.
     private var headerSection: some View {
         VStack(spacing: Theme.spacingSM) {
-            Image(systemName: "heart.text.clipboard")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.healthMapBlue)
+            MascotView(mood: .idle, size: 64)
 
-            Text("HealthMap")
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+            Text(isSignUp ? "Crée ton compte" : "Content de te revoir")
+                .font(Theme.titleFont)
+                .brandTitleKerning()
                 .foregroundStyle(Color.healthMapText)
+                .multilineTextAlignment(.center)
 
-            Text(isSignUp ? "Cree ton compte gratuit" : "Content de te revoir")
+            Text(isSignUp
+                 ? "Gratuit — ton bilan nutritionnel t'attend."
+                 : "Connecte-toi pour retrouver ton bilan.")
                 .font(Theme.subheadlineFont)
                 .foregroundStyle(Color.healthMapSecondary)
+                .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
     }
 }
 
 // MARK: - Make Field conform to Hashable through the extension
 extension AuthView.Field: Sendable {}
 
-#Preview {
+#Preview("Connexion") {
     AuthView()
+        .environmentObject(AuthViewModel())
+}
+
+#Preview("Inscription") {
+    AuthView(initialMode: .signUp)
         .environmentObject(AuthViewModel())
 }

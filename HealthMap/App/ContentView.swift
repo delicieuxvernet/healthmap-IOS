@@ -15,7 +15,11 @@ struct ContentView: View {
                 } else if !hasSeenOnboarding {
                     OnboardingView(hasSeenOnboarding: $hasSeenOnboarding)
                 } else if !authViewModel.isAuthenticated {
-                    AuthView()
+                    // Page de garde animée (mascotte + wordmark + CTA).
+                    // L'authentification s'ouvre en sheet depuis LandingView —
+                    // un utilisateur non connecté n'atterrit JAMAIS directement
+                    // sur un formulaire de connexion plein écran.
+                    LandingView()
                 } else {
                     MainTabView()
                         // Force SwiftUI to destroy and recreate MainTabView (and
