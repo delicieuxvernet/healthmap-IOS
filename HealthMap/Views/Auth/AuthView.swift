@@ -100,13 +100,19 @@ struct AuthView: View {
                         if !isSignUp {
                             HStack {
                                 Spacer()
-                                Button("Mot de passe oublie ?") {
+                                // frame+contentShape DANS le label : posés sur le
+                                // Button ils n'étendraient pas la zone tappable
+                                // (le hit-test resterait sur le texte, < 44pt HIG).
+                                Button {
                                     showForgotPassword = true
+                                } label: {
+                                    Text("Mot de passe oublie ?")
+                                        .font(Theme.captionBoldFont)
+                                        .foregroundStyle(Color.healthMapBlue)
+                                        .frame(minHeight: 44)
+                                        .contentShape(Rectangle())
                                 }
-                                .font(Theme.captionBoldFont)
-                                .foregroundStyle(Color.healthMapBlue)
-                                .frame(minHeight: 44)
-                                .contentShape(Rectangle())
+                                .buttonStyle(.healthMapPressed)
                             }
                         }
                     }
@@ -226,16 +232,21 @@ struct AuthView: View {
                         Text(isSignUp ? "Deja un compte ?" : "Pas encore de compte ?")
                             .font(Theme.subheadlineFont)
                             .foregroundStyle(Color.healthMapSecondary)
-                        Button(isSignUp ? "Se connecter" : "Creer un compte") {
+                        // frame+contentShape DANS le label (zone tappable 44pt
+                        // réelle — voir bouton « Mot de passe oublié ? »).
+                        Button {
                             withAnimation(reduceMotion ? .none : .healthMapSpring) {
                                 isSignUp.toggle()
                                 authViewModel.errorMessage = nil
                             }
+                        } label: {
+                            Text(isSignUp ? "Se connecter" : "Creer un compte")
+                                .font(Theme.subheadlineFont.weight(.semibold))
+                                .foregroundStyle(Color.healthMapBlue)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
-                        .font(Theme.subheadlineFont.weight(.semibold))
-                        .foregroundStyle(Color.healthMapBlue)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.healthMapPressed)
                     }
                     .padding(.bottom, Theme.spacingXL)
                 }

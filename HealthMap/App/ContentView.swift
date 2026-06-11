@@ -77,7 +77,7 @@ struct ContentView: View {
         // revoked or expired (10-minute background tick). Surfacing the
         // alert here on the root means it works regardless of whether the
         // user is currently in MainTabView (got bounced) or already at
-        // AuthView (cold start with a stale token). The single-shot pattern
+        // LandingView (cold start with a stale token). The single-shot pattern
         // (`isPresented:` bool flipped back to false on dismissal) ensures
         // the alert never re-fires after the user acknowledges it.
         .alert(
