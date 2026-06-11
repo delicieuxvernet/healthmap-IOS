@@ -17,7 +17,7 @@ struct PrecisionPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text(title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(Theme.subheadlineFont)
                 .foregroundStyle(Color.healthMapSecondary)
                 .tracking(-0.2)
                 .accessibilityAddTraits(.isHeader)
@@ -48,20 +48,28 @@ struct PrecisionPicker: View {
         } label: {
             HStack(spacing: 6) {
                 Text(option.emoji)
-                    .font(.system(size: 16))
+                    .font(.callout)
 
                 Text(option.label)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.system(.footnote, design: .rounded).weight(.medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                     .tracking(-0.1)
             }
             .padding(.horizontal, Theme.spacingMD)
             .padding(.vertical, Theme.spacingSM)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(isSelected ? Color.healthMapBlue : Color.healthMapCard)
+                    .shadow(
+                        color: isSelected
+                            ? Color.healthMapBlue.opacity(Theme.opacityStrong)
+                            : Color.black.opacity(Theme.shadowCard.opacity),
+                        radius: Theme.shadowCard.radius,
+                        x: 0,
+                        y: Theme.shadowCard.y
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -71,9 +79,8 @@ struct PrecisionPicker: View {
                     )
             )
             .foregroundStyle(isSelected ? Color.white : Color.healthMapText)
-            .scaleEffect(isSelected ? 1.0 : 0.98)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.healthMapPressed)
         .accessibilityLabel("\(option.label), \(isSelected ? "sélectionné" : "non sélectionné")")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityHint("Double tape pour \(isSelected ? "désélectionner" : "sélectionner")")
