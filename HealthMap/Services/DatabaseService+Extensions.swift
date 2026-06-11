@@ -40,11 +40,13 @@ extension DatabaseService {
     /// Deletes: profile row, analytics events, score history. Auth user is deleted separately
     /// via the `delete-user` Supabase Edge Function (requires service_role privileges).
     ///
-    /// Every network call is wrapped in `NetworkService.withRetry` because a
-    /// user who just tapped "Supprimer definitivement" cannot be asked to
-    /// retry on a flaky 3G connection — the operation has to either succeed
-    /// or fail loud enough that we route them to support. Transient 5xx and
-    /// connection drops are invisible thanks to the exponential backoff.
+    /// PAS de retry automatique ici : la suppression n'est pas rejouable.
+    /// Après un premier succès serveur, le même JWT ne résout plus aucun
+    /// utilisateur → toute nouvelle tentative répond 401. Un retry « pour
+    /// fiabiliser » transforme donc un succès en erreur affichée à tort
+    /// (incident du 11 juin 2026, voir le commentaire dans le corps).
+    /// En cas d'échec réseau réel, l'utilisateur retape le bouton —
+    /// relancer est sans danger tant que la suppression n'a pas eu lieu.
     func deleteAllUserData(userId: String) async throws {
         AppLogger.database.notice("Deleting all data for user \(userId, privacy: .public)")
 
@@ -63,12 +65,19 @@ extension DatabaseService {
         // « compte supprimé » sans RIEN supprimer (violation RGPD Art. 17).
         // Désormais : un seul chemin de suppression (l'edge function), et
         // son échec REMONTE à l'UI — jamais de faux succès.
-        try await NetworkService.shared.withRetry {
-            let _: Data = try await SupabaseService.shared.client.functions.invoke(
-                "delete-user",
-                options: .init(body: ["confirm": "DELETE_MY_ACCOUNT"])
-            )
-        }
+        // BUG corrigé 11 juin 2026 (« erreur » affichée après une suppression
+        // réussie) : `let _: Data = invoke(...)` sélectionnait l'overload
+        // Decodable du SDK → JSONDecoder attend du base64 pour `Data` et
+        // jetait une DecodingError alors que le serveur avait répondu 200 et
+        // TOUT supprimé ; withRetry rejouait alors l'appel avec un JWT devenu
+        // orphelin → 401 → erreur UI sur un compte pourtant bien effacé
+        // (logs edge : chaque 200 suivi d'un 401 ~5-9 s après, 4/4
+        // suppressions). D'où : overload SANS décodage de réponse (le corps
+        // de la réponse ne nous sert à rien), et aucun retry.
+        try await SupabaseService.shared.client.functions.invoke(
+            "delete-user",
+            options: .init(body: ["confirm": "DELETE_MY_ACCOUNT"])
+        )
 
         AppLogger.database.info("User data deletion complete for \(userId, privacy: .public)")
     }
