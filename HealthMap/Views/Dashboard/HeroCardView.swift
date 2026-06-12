@@ -1,93 +1,9 @@
 import SwiftUI
 
-// MARK: - Hero Card View (AI analysis summary / metaphor)
-struct HeroCardView: View {
-    let headline: String?
-    let metaphore: String?
-    let profilType: String?
-    let overallScore: Int
-
-    @State private var appeared = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            // Header
-            HStack(spacing: Theme.spacingSM) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.healthMapBlue)
-
-                Text("Analyse IA")
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapBlue)
-
-                Spacer()
-
-                if let profilType {
-                    Text(profilType)
-                        .pillStyle(color: Color.healthMapBlue)
-                }
-            }
-
-            // Headline — texte libre IA : 2 lignes max (DESIGN-PAGES loi 9)
-            if let headline {
-                Text(headline)
-                    .font(Theme.headlineFont)
-                    .foregroundStyle(Color.healthMapText)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            // Metaphor
-            if let metaphore {
-                HStack(alignment: .top, spacing: Theme.spacingSM) {
-                    Image(systemName: "quote.opening")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.healthMapBlue.opacity(0.5))
-                        .padding(.top, 2)
-
-                    // Métaphore — texte libre IA : 2 lignes max (loi 9)
-                    Text(metaphore)
-                        .font(.system(size: 14, weight: .regular, design: .serif))
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .italic()
-                        .lineLimit(2)
-                        .truncationMode(.tail)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.vertical, Theme.spacingSM)
-                .padding(.horizontal, Theme.spacingSM)
-                .background(Color.healthMapBlueLight.opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
-            }
-        }
-        .padding(Theme.spacingLG)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.healthMapCard)
-                .shadow(color: Color.healthMapBlue.opacity(0.08), radius: 12, x: 0, y: 4)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(Color.healthMapBlue.opacity(0.12), lineWidth: 1)
-        )
-        .scaleEffect(appeared ? 1.0 : 0.95)
-        .opacity(appeared ? 1.0 : 0)
-        .onAppear {
-            if reduceMotion {
-                appeared = true
-            } else {
-                withAnimation(.healthMapSpring.delay(0.3)) {
-                    appeared = true
-                }
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Analyse IA. \(headline ?? "") \(metaphore ?? "")")
-    }
-}
+// La HeroCardView séparée (headline + métaphore IA) a été FUSIONNÉE dans le
+// héro intégré de DashboardView (DESIGN-PAGES §1 bloc 1) : anneau + pill
+// d'état + headline + métaphore vivent désormais dans une seule carte.
+// Ce fichier ne contient plus que la carte des red flags.
 
 // MARK: - Red Flags Card
 struct RedFlagsCardView: View {
@@ -162,13 +78,6 @@ struct RedFlagsCardView: View {
 
 #Preview {
     VStack(spacing: 16) {
-        HeroCardView(
-            headline: "Ton profil est globalement bon, mais attention a la vitamine D",
-            metaphore: "Imagine ton corps comme une maison : les fondations sont solides, mais le toit a quelques tuiles manquantes.",
-            profilType: "Sportif equilibre",
-            overallScore: 7
-        )
-
         RedFlagsCardView(flags: [
             RedFlag(id: .veganNoB12, urgency: .soon, message: "Regime vege sans supplement B12"),
         ])

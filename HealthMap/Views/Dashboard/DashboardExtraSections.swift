@@ -1,66 +1,11 @@
 import SwiftUI
 import UIKit
 
-// MARK: - DashboardView Extra Sections
-extension DashboardView {
-
-    // MARK: - Navigation Cards
-    var navigationCards: some View {
-        VStack(spacing: 8) {
-            if viewModel.interactionsCount > 0 {
-                navCard(
-                    emoji: "\u{1F517}",
-                    label: "Interactions (\(viewModel.interactionsCount))",
-                    color: .accentIndigo,
-                    destination: .plan
-                )
-            }
-            if viewModel.pepiteDuJour != nil {
-                navCard(
-                    emoji: "\u{1F4A1}",
-                    label: "Pepites sante",
-                    color: Color(hex: "5AC8FA"),
-                    destination: .plan
-                )
-            }
-            navCard(
-                emoji: "\u{1F48A}",
-                label: "Mes complements",
-                color: .scoreGood,
-                destination: .plan
-            )
-        }
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    func navCard(emoji: String, label: String, color: Color, destination: NavCardDestination) -> some View {
-        Button {
-            HapticService.shared.selection()
-            NotificationCenter.default.post(
-                name: .healthmapNavigateToTab,
-                object: destination.rawValue
-            )
-        } label: {
-            HStack(spacing: Theme.spacingSM) {
-                RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 3, height: 32)
-                Text(emoji).font(.system(size: 18)).accessibilityHidden(true)
-                Text(label).font(.system(size: 14, weight: .medium)).foregroundStyle(Color.healthMapText)
-                Spacer()
-                Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(Color.healthMapMuted).accessibilityHidden(true)
-            }
-            .padding(.horizontal, Theme.spacingSM)
-            .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous).fill(Color.healthMapCard))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.healthMapPressed)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Appuyer pour ouvrir cette section")
-    }
-}
-
+// MARK: - Tab Navigation (mécanisme partagé Bilan → autres onglets)
+// Les navigation cards du Bilan ont été supprimées (DESIGN-PAGES §1) ; ce
+// mécanisme NotificationCenter → MainTabView.selectedTab reste le canal
+// officiel de changement d'onglet (utilisé par la carte « Ton plan est
+// prêt » du bloc 8 et par ContentView).
 enum NavCardDestination: String {
     case bilan, suivi, scanner, plan, profil
 }
@@ -70,51 +15,6 @@ extension Notification.Name {
 }
 
 extension DashboardView {
-
-    // MARK: - Badges Preview
-    var badgesPreview: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack {
-                Image(systemName: "medal.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.healthMapBlue)
-
-                Text("Mes badges")
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapText)
-
-                Spacer()
-
-                Text("\(gamification.earnedBadges.count)/\(BadgeType.allCases.count)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
-            }
-
-            // Show earned badges
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
-                ForEach(BadgeType.allCases) { badge in
-                    let earned = gamification.earnedBadges.contains(badge)
-                    VStack(spacing: 2) {
-                        Image(systemName: badge.icon)
-                            .font(.system(size: 18))
-                            .foregroundStyle(earned ? badge.color : Color.healthMapMuted.opacity(0.3))
-                            .accessibilityHidden(true)
-                        Text(badge.title)
-                            .font(.system(size: 8))
-                            .foregroundStyle(earned ? Color.healthMapText : Color.healthMapMuted)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .opacity(earned ? 1 : 0.4)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(earned ? "Badge obtenu : \(badge.title)" : "Badge verrouillé : \(badge.title)")
-                }
-            }
-        }
-        .padding(Theme.spacingMD)
-        .cardStyle()
-        .padding(.horizontal, Theme.spacingLG)
-    }
 
     // MARK: - Premium Actions
     var premiumActionsSection: some View {
@@ -209,9 +109,12 @@ extension DashboardView {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Color(hex: "5AC8FA"))
                         .tracking(0.5)
+                    // Tip — texte libre IA : 2 lignes max (DESIGN-PAGES loi 9)
                     Text(pepite.hook ?? pepite.tip ?? "")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.healthMapText)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

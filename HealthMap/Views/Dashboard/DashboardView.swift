@@ -2,13 +2,16 @@ import SwiftUI
 import UIKit
 
 // MARK: - Dashboard View (main screen after analysis)
+// Structure : DESIGN-PAGES.md §1 (blocs 0 → 9). Chaque section déclare son
+// champ source, ses lignes max et sa couleur = f(score) (loi 13).
 struct DashboardView: View {
     @EnvironmentObject var viewModel: DashboardViewModel
     @ObservedObject var gamification = GamificationService.shared
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var selectedNutrient: EnrichedNutrient?
     @State private var showNutrientDetail = false
-    @State private var showPaywall = false
+    @State private var showAllNutrients = false
+    @State private var showScoreInfo = false
 
     var body: some View {
         NavigationStack {
@@ -72,9 +75,16 @@ struct DashboardView: View {
                         .healthMapSheet(.large)
                 }
             }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .healthMapFullSheet()
+            .sheet(isPresented: $showAllNutrients) {
+                AllNutrientsSheet(
+                    nutrients: viewModel.nutrients,
+                    isPremium: subscriptionService.isPremium
+                )
+                .healthMapSheet(.large)
+            }
+            .sheet(isPresented: $showScoreInfo) {
+                scoreInfoSheet
+                    .healthMapActionSheet()
             }
             .refreshable {
                 await viewModel.triggerAnalysis()
@@ -82,37 +92,42 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - Red flags filtrés (DESIGN-PAGES §1 blocs 0 et 9)
+    // Source : viewModel.redFlags (merge IA ou détection locale).
+    // Seuls les `urgency == .immediate` passent AVANT le héro (sécurité) ;
+    // les autres descendent en bas de page, après le disclaimer.
+    private var immediateRedFlags: [RedFlag] {
+        viewModel.redFlags.filter { $0.urgency == .immediate }
+    }
+
+    private var otherRedFlags: [RedFlag] {
+        viewModel.redFlags.filter { $0.urgency != .immediate }
+    }
+
+    // MARK: - Priorité n°1 (bloc 2)
+    // Source : aiAnalysis.priorityActions trié par rank (helper d'affichage pur).
+    private var topPriorityAction: PriorityAction? {
+        viewModel.aiAnalysis?.priorityActions
+            .sorted { ($0.rank ?? Int.max) < ($1.rank ?? Int.max) }
+            .first
+    }
+
     // MARK: - Main Content
     private var mainContent: some View {
         ScrollView {
             VStack(spacing: Theme.spacingLG) {
-                // 1. Red flags (safety first, always visible)
-                if !viewModel.redFlags.isEmpty {
-                    RedFlagsCardView(flags: viewModel.redFlags)
+                // 0. Red flags URGENTS uniquement (sécurité avant tout —
+                // jamais différés par le stagger d'apparition).
+                if !immediateRedFlags.isEmpty {
+                    RedFlagsCardView(flags: immediateRedFlags)
                         .padding(.horizontal, Theme.spacingLG)
                 }
 
-                // 2. Hero Score Card (free, always visible)
-                heroScoreCard
+                // 1. Héro intégré : anneau + pill état + headline + métaphore
+                heroSection
+                    .staggeredAppear(index: 0)
 
-                // 2a. Carte résumé IA (headline + métaphore) — affichée
-                // uniquement quand le summary de l'analyse existe et porte
-                // du contenu (jamais de coquille vide, DESIGN-PAGES loi 11).
-                if let summary = viewModel.aiAnalysis?.summary,
-                   summary.headline != nil || summary.metaphore != nil {
-                    // profilType: nil — texte libre IA, jamais dans une pill
-                    // (loi 8) ; reviendra en vocabulaire contrôlé avec la
-                    // refonte du héro (P1).
-                    HeroCardView(
-                        headline: summary.headline,
-                        metaphore: summary.metaphore,
-                        profilType: nil,
-                        overallScore: viewModel.overallScore
-                    )
-                    .padding(.horizontal, Theme.spacingLG)
-                }
-
-                // 2b. Statut analyse IA — le score local reste affiché ;
+                // 1b. Statut analyse IA — le score local reste affiché ;
                 // on superpose un bandeau pendant le chargement, ou un bandeau
                 // de retry si l'analyse a échoué (états : loading / succès /
                 // échec IA avec score local + bouton réessayer).
@@ -131,44 +146,61 @@ struct DashboardView: View {
                     }
                 }
 
-                // 3. Highlight Cards 2x2 (free, always visible)
-                highlightGrid
+                // 2. « Ta priorité n°1 » — carte teintée bleue pleine largeur
+                if let action = topPriorityAction {
+                    priorityCard(action)
+                        .staggeredAppear(index: 1)
+                }
 
-                // 4. Nutriments a renforcer (free, always visible)
+                // 3. « À surveiller (N) » — top 3 en cartes jumelles
                 if !viewModel.deficiencies.isEmpty {
-                    aRenforcerSection
+                    watchSection
+                        .staggeredAppear(index: 2)
                 }
 
-                // 4b. Full nutrient grid (all 10 nutrients)
+                // 4. Bouton glass vers la grille complète (sheet séparée —
+                // la grille n'est PLUS sur l'écran principal).
                 if !viewModel.nutrients.isEmpty {
-                    allNutrientsGrid
+                    GlassPillButton(
+                        title: "Tous mes nutriments (\(viewModel.nutrients.count))",
+                        systemImage: "square.grid.3x3"
+                    ) {
+                        HapticService.shared.tap()
+                        showAllNutrients = true
+                    }
+                    .staggeredAppear(index: 3)
                 }
 
-                // 5. Action du jour (free, always visible)
-                if let action = viewModel.actionDuJour {
-                    actionDuJourCard(action)
-                }
+                // 5. Rangée symétrique : Points forts / Interaction
+                insightTilesRow
+                    .staggeredAppear(index: 4)
 
-                // 6. Navigation cards (quick links)
-                navigationCards
-
-                // 7. Pepite du jour (free preview, full premium)
+                // 6. Pépite du jour (rotation quotidienne déterministe)
                 if let pepite = viewModel.pepiteDuJour {
                     pepiteDuJourCard(pepite)
+                        .staggeredAppear(index: 5)
                 }
 
-                // 8. Export + Share (premium only)
+                // 7. Case premium floutée : le hack du nutriment prioritaire
+                if let hackSection = premiumHackSection {
+                    hackSection
+                        .staggeredAppear(index: 6)
+                }
+
+                // 7b. Export + partage (premium uniquement — conservé du
+                // Bilan existant, regroupé avec le contenu premium).
                 if subscriptionService.isPremium {
                     premiumActionsSection
+                        .staggeredAppear(index: 7)
                 }
 
-                // 9. Badges
-                if !gamification.isZenMode {
-                    badgesPreview
-                }
+                // 8. Fin positive : le plan est prêt (peak-end — ne jamais
+                // finir sur les manques).
+                planReadyCard
+                    .staggeredAppear(index: 8)
 
-                // 10. Refreshing indicator (refresh d'une analyse déjà affichée —
-                // le premier chargement passe par le bandeau 2b)
+                // 8b. Refreshing indicator (refresh d'une analyse déjà
+                // affichée — le premier chargement passe par le bandeau 1b)
                 if viewModel.isLoadingAnalysis && viewModel.aiAnalysis != nil {
                     HStack(spacing: Theme.spacingSM) {
                         ProgressView()
@@ -180,65 +212,370 @@ struct DashboardView: View {
                     .padding()
                 }
 
-                // Medical disclaimer
+                // 9. Disclaimer unique (1 ligne) + red flags non urgents
                 disclaimerCard
+
+                if !otherRedFlags.isEmpty {
+                    RedFlagsCardView(flags: otherRedFlags)
+                        .padding(.horizontal, Theme.spacingLG)
+                }
             }
             .padding(.vertical, Theme.spacingMD)
         }
     }
 
-    // MARK: - Hero Score Card
-    private var heroScoreCard: some View {
-        HStack(spacing: Theme.spacingMD) {
-            // Score ring (compact)
-            ScoreRingView(score: viewModel.healthScore, size: 80, lineWidth: 6)
+    // MARK: - Héro intégré (bloc 1)
+    // Sources : healthScore local (anneau, arc = score/100 — loi 5),
+    // HealthScale.globalLabel (pill, vocabulaire contrôlé — lois 4 & 8),
+    // summary.headline (2 lignes max) + summary.metaphore (2 lignes max, loi 9).
+    // Le reveal anime déjà le trim (~1,2 s ease-out) et le count-up dans
+    // ScoreRingView/AnimatedNumberView — gelés si reduce-motion.
+    private var heroSection: some View {
+        VStack(spacing: Theme.spacingMD) {
+            ScoreRingView(score: viewModel.healthScore, size: 140, lineWidth: 12)
 
-            VStack(alignment: .leading, spacing: 4) {
-                // Greeting
-                HStack(spacing: 6) {
-                    Text("Bonjour \(viewModel.firstName)")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .brandHeadlineKerning()
-                        .foregroundStyle(Color.healthMapText)
-
-                    // Streak badge inline
-                    if gamification.currentStreak > 0 && !gamification.isZenMode {
-                        HStack(spacing: 2) {
-                            Image(systemName: "flame.fill")
-                                .font(.system(size: 10))
-                            Text("\(gamification.currentStreak)")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundStyle(Color.accentSky)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.accentSky.opacity(0.12))
-                        .clipShape(Capsule())
-                    }
-                }
-
-                // Score label
+            // Pill état global + streak discret
+            HStack(spacing: Theme.spacingSM) {
                 Text(scoreLabel)
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.globalScoreColor(for: viewModel.healthScore))
+                    .pillStyle(color: Color.globalScoreColor(for: viewModel.healthScore))
 
-                Text("Score global de sante")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.healthMapSecondary)
+                if gamification.currentStreak > 0 && !gamification.isZenMode {
+                    HStack(spacing: Theme.spacingXS) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 10))
+                        Text("\(gamification.currentStreak)")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundStyle(Color.accentSky)
+                    .padding(.horizontal, Theme.spacingSM)
+                    .padding(.vertical, Theme.spacingXS)
+                    .background(Color.accentSky.opacity(Theme.opacityMedium))
+                    .clipShape(Capsule())
+                    .accessibilityLabel("Série de \(gamification.currentStreak) jours")
+                }
             }
+
+            // Headline IA — texte libre : 2 lignes max (loi 9)
+            if let headline = viewModel.aiAnalysis?.summary?.headline, !headline.isEmpty {
+                Text(headline)
+                    .font(Theme.headlineFont)
+                    .foregroundStyle(Color.healthMapText)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Métaphore en citation — texte libre : 2 lignes max (loi 9)
+            if let metaphore = viewModel.aiAnalysis?.summary?.metaphore, !metaphore.isEmpty {
+                HStack(alignment: .top, spacing: Theme.spacingSM) {
+                    Image(systemName: "quote.opening")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.healthMapBlue.opacity(0.5))
+                        .padding(.top, 2)
+                        .accessibilityHidden(true)
+
+                    Text(metaphore)
+                        .font(.system(size: 14, weight: .regular, design: .serif))
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .italic()
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(Theme.spacingSM)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.healthMapBlueLight.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            }
+
+            // Ligne discrète « Comment ce score est calculé » → petite sheet
+            Button {
+                HapticService.shared.selection()
+                showScoreInfo = true
+            } label: {
+                HStack(spacing: Theme.spacingXS) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                        .accessibilityHidden(true)
+                    Text("Comment ce score est calculé")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(Color.healthMapSecondary)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.healthMapPressed)
+            .accessibilityHint("Ouvre une courte explication du calcul du score.")
+        }
+        .padding(Theme.spacingLG)
+        .frame(maxWidth: .infinity)
+        .cardStyle()
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    // MARK: - Sheet « Comment ce score est calculé »
+    private var scoreInfoSheet: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingMD) {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "function")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.healthMapBlue)
+                    .accessibilityHidden(true)
+
+                Text("Comment ce score est calculé")
+                    .font(Theme.headlineFont)
+                    .foregroundStyle(Color.healthMapText)
+            }
+
+            Text("Tes scores sont calculés localement, à partir de tes réponses au questionnaire\u{202F}: alimentation, mode de vie, besoins spécifiques. Chaque nutriment reçoit un score de 0 à 100, et le score global les combine. L\u{2019}analyse IA ajoute des explications personnalisées, mais ne modifie jamais tes scores. HealthMap ne remplace pas un avis médical.")
+                .font(Theme.bodyFont)
+                .foregroundStyle(Color.healthMapSecondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer()
         }
+        .padding(Theme.spacingLG)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - « Ta priorité n°1 » (bloc 2)
+    // Source : priority_actions[0] — action (2 lignes max), expected_impact
+    // (1 ligne, ligne secondaire, PAS une pill — loi 9), pill difficulty en
+    // vocabulaire contrôlé uniquement (loi 8).
+    private func priorityCard(_ action: PriorityAction) -> some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "target")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(Color.healthMapBlue)
+                    .clipShape(Circle())
+                    .accessibilityHidden(true)
+
+                Text("TA PRIORITÉ N°1")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.healthMapBlue)
+                    .tracking(0.5)
+
+                Spacer()
+
+                if let difficulty = difficultyLabel(action.difficulty) {
+                    Text(difficulty)
+                        .pillStyle(color: Color.healthMapBlue)
+                }
+            }
+
+            if let titre = action.action {
+                Text(titre)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.healthMapText)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let impact = action.expectedImpact, !impact.isEmpty {
+                Text(impact)
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
         .padding(Theme.spacingMD)
-        .cardStyle()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .fill(Color.healthMapBlueLight)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .stroke(Color.healthMapBlue.opacity(Theme.opacityMedium), lineWidth: 1)
+        )
         .padding(.horizontal, Theme.spacingLG)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Bonjour \(viewModel.firstName). Score global de sante : \(viewModel.healthScore) sur 100, \(scoreLabel)")
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Mapping difficulty → vocabulaire contrôlé (loi 8) : une valeur hors
+    /// enum ne produit AUCUNE pill (jamais de texte libre IA dans une pill).
+    private func difficultyLabel(_ raw: String?) -> String? {
+        switch raw?.lowercased() {
+        case "easy": return "Facile"
+        case "medium": return "Modéré"
+        case "hard": return "Exigeant"
+        default: return nil
+        }
+    }
+
+    // MARK: - « À surveiller (N) » (bloc 3)
+    // Source : viewModel.deficiencies (échelle unique, score < 70), top 3 en
+    // cartes JUMELLES (même structure exacte — loi 6). « Pourquoi ? » ouvre
+    // la fiche nutriment existante (pattern universel — loi 10).
+    private var watchSection: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.healthMapBlue)
+                    .accessibilityHidden(true)
+
+                Text("À surveiller (\(viewModel.deficiencies.count))")
+                    .font(Theme.headlineFont)
+                    .foregroundStyle(Color.healthMapText)
+            }
+            .padding(.horizontal, Theme.spacingLG)
+
+            VStack(spacing: Theme.spacingSM) {
+                ForEach(Array(viewModel.deficiencies.prefix(3))) { nutrient in
+                    NutrientWatchCard(nutrient: nutrient) {
+                        HapticService.shared.tap()
+                        selectedNutrient = nutrient
+                        showNutrientDetail = true
+                    }
+                }
+            }
+            .padding(.horizontal, Theme.spacingLG)
+        }
+    }
+
+    // MARK: - Rangée symétrique Points forts / Interaction (bloc 5)
+    // Sources : positive_findings[0].finding / interactions_detectees[0].titre
+    // (2 lignes max chacun — loi 9). Tuiles strictement identiques (loi 6) ;
+    // donnée manquante → état utile, jamais de coquille vide (loi 11).
+    private var insightTilesRow: some View {
+        HStack(spacing: Theme.spacingSM) {
+            InsightTile(
+                header: "Points forts",
+                icon: "checkmark.seal.fill",
+                text: strengthText,
+                tint: Color.scoreExcellent
+            )
+
+            InsightTile(
+                header: "Interaction",
+                icon: "link",
+                text: interactionText,
+                tint: Color.accentIndigo
+            )
+        }
+        // Hauteurs STRICTEMENT égales (loi 6) : le HStack prend la hauteur
+        // de la tuile la plus haute, et chaque tuile (maxHeight: .infinity)
+        // s'étire pour la remplir.
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    private var strengthText: String {
+        if let finding = viewModel.aiAnalysis?.positiveFindings.first?.finding,
+           !finding.isEmpty {
+            return finding
+        }
+        // État utile sans analyse : compte local (pluriel dynamique, loi 15)
+        let count = viewModel.goodNutrients
+        if count == 0 {
+            return "Chaque action de ton plan va te faire progresser"
+        }
+        let noun = count == 1 ? "nutriment solide" : "nutriments solides"
+        return "\(count) \(noun) sur \(viewModel.nutrients.count)"
+    }
+
+    private var interactionText: String {
+        if let titre = viewModel.aiAnalysis?.interactions.first?.titre,
+           !titre.isEmpty {
+            return titre
+        }
+        return viewModel.aiAnalysis != nil
+            ? "Aucune interaction détectée"
+            : "Disponible après l\u{2019}analyse"
+    }
+
+    // MARK: - Case premium floutée (bloc 7)
+    // Source : hack du 1er deficiency (titre lisible qui tease, contenu réel
+    // flouté — loi 11). Pas de hack disponible → pas de case (jamais vide).
+    private var premiumHackSection: AnyView? {
+        guard let first = viewModel.deficiencies.first,
+              let hack = first.hack, !hack.isEmpty else { return nil }
+
+        return AnyView(
+            BlurredSection(isPremium: true, title: "Le hack \(first.label)") {
+                VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                    HStack(spacing: Theme.spacingSM) {
+                        Image(systemName: "lightbulb.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.accentSky)
+                            .accessibilityHidden(true)
+
+                        Text("Le hack \(first.label)")
+                            .font(Theme.captionBoldFont)
+                            .foregroundStyle(Color.healthMapText)
+                    }
+
+                    Text(hack)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.healthMapText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(Theme.spacingMD)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardStyle()
+            }
+            .padding(.horizontal, Theme.spacingLG)
+        )
+    }
+
+    // MARK: - Fin positive (bloc 8)
+    // « Ton plan est prêt → » ouvre l'onglet Plan via le mécanisme de
+    // navigation existant (NotificationCenter → MainTabView.selectedTab).
+    private var planReadyCard: some View {
+        Button {
+            HapticService.shared.tap()
+            NotificationCenter.default.post(
+                name: .healthmapNavigateToTab,
+                object: NavCardDestination.plan.rawValue
+            )
+        } label: {
+            VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                HStack(spacing: Theme.spacingSM) {
+                    Text("Ton plan est prêt")
+                        .font(Theme.headlineFont)
+                        .foregroundStyle(Color.healthMapBlue)
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.healthMapBlue)
+                        .accessibilityHidden(true)
+                }
+
+                Text("Ton score évoluera à ton prochain bilan.")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapSecondary)
+            }
+            .padding(Theme.spacingMD)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                    .fill(Color.healthMapBlueLight)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                    .stroke(Color.healthMapBlue.opacity(Theme.opacityMedium), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        }
+        .buttonStyle(.healthMapPressed)
+        .padding(.horizontal, Theme.spacingLG)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Ton plan est prêt. Ton score évoluera à ton prochain bilan.")
+        .accessibilityHint("Ouvre l\u{2019}onglet Mon Plan.")
     }
 
     // MARK: - Bandeau chargement analyse IA
-    /// Affiché pendant le premier chargement de l'analyse IA, AU-DESSUS du
-    /// contenu local — le score déterministe reste visible et utilisable.
+    /// Affiché pendant le premier chargement de l'analyse IA, sous le héro —
+    /// le score déterministe reste visible et utilisable.
     private var analysisLoadingBanner: some View {
         HStack(spacing: Theme.spacingSM) {
             // Mascotte en réflexion pendant que l'IA travaille — plus
@@ -269,244 +606,41 @@ struct DashboardView: View {
         .accessibilityLabel("Analyse IA en cours. Tes scores sont deja calcules.")
     }
 
-    // MARK: - Highlight Grid 2x2
-    private var highlightGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-            HighlightCard(
-                icon: "chart.line.uptrend.xyaxis",
-                iconColor: .scoreGood,
-                title: "Points forts",
-                value: "\(viewModel.goodNutrients) nutriments",
-                // Pas de seuil affiché : règle interne, zéro valeur pour
-                // l'utilisateur (loi 1 — test de valeur).
-                subtitle: nil
-            )
-
-            HighlightCard(
-                icon: "exclamationmark.triangle",
-                iconColor: .scoreLow,
-                title: "A surveiller",
-                value: "\(viewModel.deficiencies.count) a renforcer",
-                subtitle: nil
-            )
-
-            HighlightCard(
-                icon: "bolt.fill",
-                iconColor: .accentIndigo,
-                title: "Interactions",
-                value: "\(viewModel.interactionsCount) detectees",
-                subtitle: nil
-            )
-
-            HighlightCard(
-                icon: "target",
-                iconColor: .healthMapBlue,
-                title: "Action prioritaire",
-                // Pas de troncature par caractères : HighlightCard limite
-                // l'affichage à 2 lignes + truncationMode(.tail) (loi 9).
-                value: viewModel.actionDuJour?.titre ?? "--",
-                subtitle: nil
-            )
-        }
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    // MARK: - A Renforcer Section
-    private var aRenforcerSection: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack {
-                HStack(spacing: Theme.spacingSM) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.scoreDeficient)
-
-                    Text("Nutriments a renforcer")
-                        .font(Theme.headlineFont)
-                        .foregroundStyle(Color.healthMapText)
-                }
-
-                Spacer()
-
-                Text("\(viewModel.deficiencies.count)")
-                    .pillStyle(color: .scoreDeficient)
-            }
-            .padding(.horizontal, Theme.spacingLG)
-
-            // Show top 3
-            VStack(spacing: 6) {
-                ForEach(Array(viewModel.deficiencies.prefix(3))) { nutrient in
-                    Button {
-                        selectedNutrient = nutrient
-                        showNutrientDetail = true
-                    } label: {
-                        compactNutrientRow(nutrient)
-                    }
-                    .buttonStyle(.healthMapPressed)
-                }
-            }
-            .padding(.horizontal, Theme.spacingLG)
-
-            // "Voir les X nutriments a renforcer" link
-            if viewModel.deficiencies.count > 3 {
-                NavigationLink {
-                    RecommendationsView()
-                        .environmentObject(viewModel)
-                } label: {
-                    HStack {
-                        Text("Voir les \(viewModel.deficiencies.count) nutriments")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.healthMapBlue)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.healthMapBlue)
-                    }
-                }
-                .padding(.horizontal, Theme.spacingLG)
-            }
-        }
-    }
-
-    // MARK: - Compact Nutrient Row
-    private func compactNutrientRow(_ nutrient: EnrichedNutrient) -> some View {
-        // Échelle unique score → couleur (loi 3) : plus de seuil binaire local,
-        // la barre et le fond suivent HealthScale via Color.scoreColor(for:).
-        let needsAttention = nutrient.score < 70
-        return HStack(spacing: Theme.spacingSM) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.scoreColor(for: nutrient.score))
-                .frame(width: 4, height: 40)
-
-            Text(nutrient.emoji)
-                .font(.system(size: 20))
-                .frame(width: 32, height: 32)
-                .background(Color.nutrientColor(for: nutrient.id).opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            Text(nutrient.label)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.healthMapText)
-
-            Spacer()
-
-            Text("\(nutrient.score)%")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.scoreColor(for: nutrient.score))
-
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2.5)
-                    .fill(Color.healthMapMuted.opacity(0.15))
-                    .frame(width: 52, height: 5)
-                RoundedRectangle(cornerRadius: 2.5)
-                    .fill(Color.scoreColor(for: nutrient.score))
-                    .frame(width: CGFloat(nutrient.score) / 100.0 * 52, height: 5)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.healthMapMuted)
-        }
-        .padding(Theme.spacingSM)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                .fill(needsAttention ? Color.scoreColor(for: nutrient.score).opacity(0.04) : Color.healthMapCard)
-        )
-    }
-
-    // MARK: - All Nutrients Grid
-    private var allNutrientsGrid: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
-                Image(systemName: "square.grid.3x3")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.healthMapBlue)
-
-                Text("Tous mes nutriments")
-                    .font(Theme.headlineFont)
-                    .foregroundStyle(Color.healthMapText)
-            }
-            .padding(.horizontal, Theme.spacingLG)
-
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
-                spacing: 10
-            ) {
-                ForEach(viewModel.nutrients) { nutrient in
-                    Button {
-                        selectedNutrient = nutrient
-                        showNutrientDetail = true
-                    } label: {
-                        VStack(spacing: 6) {
-                            MiniScoreRing(
-                                score: nutrient.score,
-                                color: Color.nutrientColor(for: nutrient.id),
-                                size: 52
-                            )
-
-                            Text(nutrient.emoji)
-                                .font(.system(size: 16))
-
-                            Text(nutrient.label)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color.healthMapSecondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                                .fill(Color.healthMapCard)
-                        )
-                    }
-                    .buttonStyle(.healthMapPressed)
-                }
-            }
-            .padding(.horizontal, Theme.spacingLG)
-        }
-    }
-
-    // MARK: - Action du jour
-    private func actionDuJourCard(_ action: (titre: String, description: String?)) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(Color.healthMapBlue)
-                    .clipShape(Circle())
-
-                Text("ACTION DU JOUR")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.healthMapBlue)
-                    .tracking(0.5)
-            }
-
-            Text(action.titre)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.healthMapText)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let desc = action.description {
-                Text(desc)
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(Theme.spacingMD)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.healthMapBlueLight)
-        )
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
     // MARK: - Score Label
     // Mot d'état du score global : échelle unique HealthScale (loi 4).
     var scoreLabel: String {
         HealthScale.globalLabel(for: viewModel.healthScore)
+    }
+}
+
+// MARK: - Staggered Appear (loi 17)
+/// Apparition des sections en léger stagger : fondu + petite montée, une
+/// seule courbe (`.healthMapSpring`), délai croissant par index. Reduce
+/// Motion → affichage immédiat sans animation.
+private struct StaggeredAppear: ViewModifier {
+    let index: Int
+    @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 12)
+            .onAppear {
+                if reduceMotion {
+                    appeared = true
+                } else {
+                    withAnimation(.healthMapSpring.delay(Double(index) * 0.06)) {
+                        appeared = true
+                    }
+                }
+            }
+    }
+}
+
+private extension View {
+    func staggeredAppear(index: Int) -> some View {
+        modifier(StaggeredAppear(index: index))
     }
 }
 
