@@ -154,6 +154,9 @@ struct AnalysisRetryBanner: View {
 /// glass « Pourquoi ? » → fiche nutriment (loi 10).
 struct NutrientWatchCard: View {
     let nutrient: EnrichedNutrient
+    /// « Ton action\u{202F}: … » — uniquement sur la carte prioritaire (épure
+    /// du 12 juin : le bloc priorité séparé a disparu du Bilan).
+    var actionText: String? = nil
     let onWhy: () -> Void
 
     private var statusColor: Color {
@@ -187,6 +190,27 @@ struct NutrientWatchCard: View {
 
             // Grande jauge animée 0 → score, marqueur zone visée à 70 %
             NutrientGaugeBar(score: nutrient.score)
+
+            // « Ton action » — bandeau intégré, texte libre IA : 2 lignes max
+            if let actionText {
+                HStack(alignment: .top, spacing: Theme.spacingXS) {
+                    Image(systemName: "target")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.healthMapBlue)
+                        .accessibilityHidden(true)
+
+                    Text("Ton action\u{202F}: \(actionText)")
+                        .font(Theme.captionFont)
+                        .foregroundStyle(Color.healthMapBlue)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(Theme.spacingSM)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.healthMapBlueLight.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            }
 
             GlassPillButton(title: "Pourquoi\u{202F}?", action: onWhy)
         }

@@ -16,15 +16,11 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Fond lumineux + aurora animée à opacité réduite (DESIGN-PAGES
-                // loi 2) : la base healthMapBackground reste pleine sous
-                // l'aurora pour qu'elle ne domine jamais l'information.
-                // AnimatedBackground gère déjà reduce-motion (statique).
-                Color.healthMapBackground
-                    .ignoresSafeArea()
-
+                // Fond ruban animé (DESIGN-PAGES loi 2) : le composant gère
+                // lui-même sa transparence interne (le ruban se voit sans
+                // jamais dominer les cartes) et reduce-motion (statique).
                 AnimatedBackground()
-                    .opacity(0.5)
+                    .ignoresSafeArea()
 
                 // Le score LOCAL (HealthCalculator) doit TOUJOURS s'afficher
                 // dès que le questionnaire est complété — jamais 0/100+croix,
@@ -146,16 +142,13 @@ struct DashboardView: View {
                     }
                 }
 
-                // 2. « Ta priorité n°1 » — carte teintée bleue pleine largeur
-                if let action = topPriorityAction {
-                    priorityCard(action)
-                        .staggeredAppear(index: 1)
-                }
-
-                // 3. « À surveiller (N) » — top 3 en cartes jumelles
+                // 2. Cartes nutriments « à surveiller » — directement sous le
+                // héro, sans bloc priorité séparé ni titre de section (épure
+                // validée par Arthur le 12 juin : l'ordre fait la hiérarchie,
+                // la 1re carte intègre « Ton action »).
                 if !viewModel.deficiencies.isEmpty {
                     watchSection
-                        .staggeredAppear(index: 2)
+                        .staggeredAppear(index: 1)
                 }
 
                 // 4. Bouton glass vers la grille complète (sheet séparée —
@@ -266,28 +259,8 @@ struct DashboardView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // Métaphore en citation — texte libre : 2 lignes max (loi 9)
-            if let metaphore = viewModel.aiAnalysis?.summary?.metaphore, !metaphore.isEmpty {
-                HStack(alignment: .top, spacing: Theme.spacingSM) {
-                    Image(systemName: "quote.opening")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.healthMapBlue.opacity(0.5))
-                        .padding(.top, 2)
-                        .accessibilityHidden(true)
-
-                    Text(metaphore)
-                        .font(.system(size: 14, weight: .regular, design: .serif))
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .italic()
-                        .lineLimit(2)
-                        .truncationMode(.tail)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(Theme.spacingSM)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.healthMapBlueLight.opacity(0.5))
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
-            }
+            // (Épure du 12 juin : la métaphore IA a quitté le héro — elle vit
+            // désormais en citation d'ouverture de la sheet ci-dessous.)
 
             // Ligne discrète « Comment ce score est calculé » → petite sheet
             Button {
@@ -328,6 +301,18 @@ struct DashboardView: View {
                     .foregroundStyle(Color.healthMapText)
             }
 
+            // Métaphore IA en citation d'ouverture (déplacée du héro — épure
+            // du 12 juin). Texte libre : 3 lignes max (loi 9).
+            if let metaphore = viewModel.aiAnalysis?.summary?.metaphore, !metaphore.isEmpty {
+                Text("«\u{202F}\(metaphore)\u{202F}»")
+                    .font(.system(size: 14, weight: .regular, design: .serif))
+                    .italic()
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .lineLimit(3)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Text("Tes scores sont calculés localement, à partir de tes réponses au questionnaire\u{202F}: alimentation, mode de vie, besoins spécifiques. Chaque nutriment reçoit un score de 0 à 100, et le score global les combine. L\u{2019}analyse IA ajoute des explications personnalisées, mais ne modifie jamais tes scores. HealthMap ne remplace pas un avis médical.")
                 .font(Theme.bodyFont)
                 .foregroundStyle(Color.healthMapSecondary)
@@ -339,105 +324,41 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - « Ta priorité n°1 » (bloc 2)
-    // Source : priority_actions[0] — action (2 lignes max), expected_impact
-    // (1 ligne, ligne secondaire, PAS une pill — loi 9), pill difficulty en
-    // vocabulaire contrôlé uniquement (loi 8).
-    private func priorityCard(_ action: PriorityAction) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
-                Image(systemName: "target")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(Color.healthMapBlue)
-                    .clipShape(Circle())
-                    .accessibilityHidden(true)
-
-                Text("TA PRIORITÉ N°1")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.healthMapBlue)
-                    .tracking(0.5)
-
-                Spacer()
-
-                if let difficulty = difficultyLabel(action.difficulty) {
-                    Text(difficulty)
-                        .pillStyle(color: Color.healthMapBlue)
-                }
-            }
-
-            if let titre = action.action {
-                Text(titre)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if let impact = action.expectedImpact, !impact.isEmpty {
-                Text(impact)
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
+    // MARK: - Action intégrée à la 1re carte « à surveiller »
+    // Épure du 12 juin : le bloc « Ta priorité n°1 » a disparu — l'action vit
+    // DANS la carte du nutriment prioritaire. Choix de l'action : celle de
+    // l'IA si elle mentionne ce nutriment, sinon la solution du nutriment,
+    // sinon l'action IA générale.
+    private func integratedAction(for nutrient: EnrichedNutrient) -> String? {
+        if let top = topPriorityAction?.action, !top.isEmpty,
+           top.localizedCaseInsensitiveContains(nutrient.label) {
+            return top
         }
-        .padding(Theme.spacingMD)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.healthMapBlueLight)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(Color.healthMapBlue.opacity(Theme.opacityMedium), lineWidth: 1)
-        )
-        .padding(.horizontal, Theme.spacingLG)
-        .accessibilityElement(children: .combine)
+        if let own = nutrient.solution?.action, !own.isEmpty {
+            return own
+        }
+        return topPriorityAction?.action
     }
 
-    /// Mapping difficulty → vocabulaire contrôlé (loi 8) : une valeur hors
-    /// enum ne produit AUCUNE pill (jamais de texte libre IA dans une pill).
-    private func difficultyLabel(_ raw: String?) -> String? {
-        switch raw?.lowercased() {
-        case "easy": return "Facile"
-        case "medium": return "Modéré"
-        case "hard": return "Exigeant"
-        default: return nil
-        }
-    }
-
-    // MARK: - « À surveiller (N) » (bloc 3)
+    // MARK: - Cartes « à surveiller » (bloc 2 — épure du 12 juin)
     // Source : viewModel.deficiencies (échelle unique, score < 70), top 3 en
-    // cartes JUMELLES (même structure exacte — loi 6). « Pourquoi ? » ouvre
-    // la fiche nutriment existante (pattern universel — loi 10).
+    // cartes JUMELLES (loi 6), SANS titre de section (l'ordre fait la
+    // hiérarchie — test de valeur, loi 1). « Pourquoi ? » ouvre la fiche
+    // (pattern universel — loi 10). La 1re carte porte « Ton action ».
     private var watchSection: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.healthMapBlue)
-                    .accessibilityHidden(true)
-
-                Text("À surveiller (\(viewModel.deficiencies.count))")
-                    .font(Theme.headlineFont)
-                    .foregroundStyle(Color.healthMapText)
-            }
-            .padding(.horizontal, Theme.spacingLG)
-
-            VStack(spacing: Theme.spacingSM) {
-                ForEach(Array(viewModel.deficiencies.prefix(3))) { nutrient in
-                    NutrientWatchCard(nutrient: nutrient) {
-                        HapticService.shared.tap()
-                        selectedNutrient = nutrient
-                        showNutrientDetail = true
-                    }
+        VStack(spacing: Theme.spacingSM) {
+            ForEach(Array(viewModel.deficiencies.prefix(3).enumerated()), id: \.element.id) { index, nutrient in
+                NutrientWatchCard(
+                    nutrient: nutrient,
+                    actionText: index == 0 ? integratedAction(for: nutrient) : nil
+                ) {
+                    HapticService.shared.tap()
+                    selectedNutrient = nutrient
+                    showNutrientDetail = true
                 }
             }
-            .padding(.horizontal, Theme.spacingLG)
         }
+        .padding(.horizontal, Theme.spacingLG)
     }
 
     // MARK: - Rangée symétrique Points forts / Interaction (bloc 5)
