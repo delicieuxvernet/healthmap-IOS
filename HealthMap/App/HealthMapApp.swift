@@ -67,6 +67,9 @@ struct HealthMapApp: App {
                 .environmentObject(pushService)
                 .environmentObject(connectivity)
                 .tint(Color.healthMapBlue)
+                // Forced light theme (locked product decision, DESIGN-PAGES
+                // law 2): the app does NOT follow the iPhone dark mode.
+                .preferredColorScheme(.light)
                 // Dynamic Type: clamp to a readable range.
                 // Accessibility users can still scale up, but we cap at
                 // .accessibility3 so layouts don't break.

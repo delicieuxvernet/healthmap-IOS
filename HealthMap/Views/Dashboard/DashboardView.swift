@@ -13,8 +13,15 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // Fond lumineux + aurora animée à opacité réduite (DESIGN-PAGES
+                // loi 2) : la base healthMapBackground reste pleine sous
+                // l'aurora pour qu'elle ne domine jamais l'information.
+                // AnimatedBackground gère déjà reduce-motion (statique).
                 Color.healthMapBackground
                     .ignoresSafeArea()
+
+                AnimatedBackground()
+                    .opacity(0.5)
 
                 // Le score LOCAL (HealthCalculator) doit TOUJOURS s'afficher
                 // dès que le questionnaire est complété — jamais 0/100+croix,
@@ -87,6 +94,23 @@ struct DashboardView: View {
 
                 // 2. Hero Score Card (free, always visible)
                 heroScoreCard
+
+                // 2a. Carte résumé IA (headline + métaphore) — affichée
+                // uniquement quand le summary de l'analyse existe et porte
+                // du contenu (jamais de coquille vide, DESIGN-PAGES loi 11).
+                if let summary = viewModel.aiAnalysis?.summary,
+                   summary.headline != nil || summary.metaphore != nil {
+                    // profilType: nil — texte libre IA, jamais dans une pill
+                    // (loi 8) ; reviendra en vocabulaire contrôlé avec la
+                    // refonte du héro (P1).
+                    HeroCardView(
+                        headline: summary.headline,
+                        metaphore: summary.metaphore,
+                        profilType: nil,
+                        overallScore: viewModel.overallScore
+                    )
+                    .padding(.horizontal, Theme.spacingLG)
+                }
 
                 // 2b. Statut analyse IA — le score local reste affiché ;
                 // on superpose un bandeau pendant le chargement, ou un bandeau
@@ -253,7 +277,9 @@ struct DashboardView: View {
                 iconColor: .scoreGood,
                 title: "Points forts",
                 value: "\(viewModel.goodNutrients) nutriments",
-                subtitle: "Score >= 60"
+                // Pas de seuil affiché : règle interne, zéro valeur pour
+                // l'utilisateur (loi 1 — test de valeur).
+                subtitle: nil
             )
 
             HighlightCard(
@@ -276,7 +302,9 @@ struct DashboardView: View {
                 icon: "target",
                 iconColor: .healthMapBlue,
                 title: "Action prioritaire",
-                value: String((viewModel.actionDuJour?.titre ?? "--").prefix(30)),
+                // Pas de troncature par caractères : HighlightCard limite
+                // l'affichage à 2 lignes + truncationMode(.tail) (loi 9).
+                value: viewModel.actionDuJour?.titre ?? "--",
                 subtitle: nil
             )
         }
@@ -340,10 +368,12 @@ struct DashboardView: View {
 
     // MARK: - Compact Nutrient Row
     private func compactNutrientRow(_ nutrient: EnrichedNutrient) -> some View {
-        let needsAttention = nutrient.score < 60
+        // Échelle unique score → couleur (loi 3) : plus de seuil binaire local,
+        // la barre et le fond suivent HealthScale via Color.scoreColor(for:).
+        let needsAttention = nutrient.score < 70
         return HStack(spacing: Theme.spacingSM) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(needsAttention ? Color.scoreDeficient : Color.scoreGood)
+                .fill(Color.scoreColor(for: nutrient.score))
                 .frame(width: 4, height: 40)
 
             Text(nutrient.emoji)
@@ -378,7 +408,7 @@ struct DashboardView: View {
         .padding(Theme.spacingSM)
         .background(
             RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                .fill(needsAttention ? Color.scoreDeficient.opacity(0.04) : Color.healthMapCard)
+                .fill(needsAttention ? Color.scoreColor(for: nutrient.score).opacity(0.04) : Color.healthMapCard)
         )
     }
 
@@ -474,12 +504,9 @@ struct DashboardView: View {
     }
 
     // MARK: - Score Label
+    // Mot d'état du score global : échelle unique HealthScale (loi 4).
     var scoreLabel: String {
-        let s = viewModel.healthScore
-        if s >= 75 { return "Excellent" }
-        if s >= 60 { return "Bon" }
-        if s >= 40 { return "A ameliorer" }
-        return "Critique"
+        HealthScale.globalLabel(for: viewModel.healthScore)
     }
 }
 

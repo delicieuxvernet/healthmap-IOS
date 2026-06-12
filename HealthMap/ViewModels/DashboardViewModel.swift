@@ -81,11 +81,13 @@ final class DashboardViewModel: ObservableObject {
     }
 
     var deficiencies: [EnrichedNutrient] {
-        nutrients.filter { $0.score < 60 }.sorted { $0.score < $1.score }
+        // Seuil aligné sur l'échelle unique HealthScale (loi 3) :
+        // « Solide » commence à 70 — en dessous, le nutriment est à surveiller.
+        nutrients.filter { $0.score < 70 }.sorted { $0.score < $1.score }
     }
 
     var goodNutrients: Int {
-        nutrients.filter { $0.score >= 60 }.count
+        nutrients.filter { $0.score >= 70 }.count
     }
 
     var interactionsCount: Int {

@@ -13,13 +13,9 @@ struct NutrientRowView: View {
         Color.scoreColor(for: nutrient.score)
     }
 
+    // Mot d'état FR : mapping unique HealthScale (DESIGN-PAGES loi 4).
     private var statusLabel: String {
-        switch NutrientStatus(score: nutrient.score) {
-        case .deficient: return "A renforcer"
-        case .low: return "Insuffisant"
-        case .adequate: return "Correct"
-        case .good: return "Bon"
-        }
+        HealthScale.nutrientLabel(for: nutrient.score)
     }
 
     var body: some View {

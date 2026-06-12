@@ -264,19 +264,21 @@ final class DashboardViewModelTests: XCTestCase {
         )
         vm.aiAnalysis = merged
 
-        // deficiencies = score < 60
+        // deficiencies = score < 70 (HealthScale : « Solide » commence à 70)
         XCTAssertEqual(vm.deficiencies.count, 2, "Should have 2 deficiencies (vitD=30, iron=45)")
         // Sorted by score ascending
         XCTAssertEqual(vm.deficiencies.first?.id, "vitD", "Lowest score should be first")
     }
 
-    /// Counts nutrients with score >= 60.
+    /// Counts nutrients at or above the HealthScale "Solide" boundary (70) —
+    /// fixture straddles the boundary on purpose (69 excluded, 70 included).
     func testGoodNutrients_countsAboveThreshold() {
         let vm = makeVM(profile: makeProfileThomas())
         let nutrients = [
             EnrichedNutrient(id: "vitD", label: "D", emoji: "☀️", color: "#007AFF", score: 30, status: "deficient"),
             EnrichedNutrient(id: "vitB12", label: "B12", emoji: "🔴", color: "#0056CC", score: 80, status: "good"),
-            EnrichedNutrient(id: "iron", label: "Fer", emoji: "🩸", color: "#5856D6", score: 65, status: "adequate"),
+            EnrichedNutrient(id: "iron", label: "Fer", emoji: "🩸", color: "#5856D6", score: 69, status: "adequate"),
+            EnrichedNutrient(id: "magnesium", label: "Mg", emoji: "⚡", color: "#5856D6", score: 70, status: "good"),
         ]
         let merged = MergedAnalysis(
             healthScore: 60, scores: [:], nutrients: nutrients, redFlags: [],
@@ -286,7 +288,7 @@ final class DashboardViewModelTests: XCTestCase {
         )
         vm.aiAnalysis = merged
 
-        XCTAssertEqual(vm.goodNutrients, 2, "Should count 2 nutrients with score >= 60")
+        XCTAssertEqual(vm.goodNutrients, 2, "Should count only nutrients with score >= 70 (80 and 70; 69 and 30 excluded)")
     }
 
     // MARK: - actionDuJour

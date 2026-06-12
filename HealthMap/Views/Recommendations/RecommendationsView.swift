@@ -1,14 +1,9 @@
 import SwiftUI
+import Combine
 
 // MARK: - Recommendations View (Mon Plan)
 struct RecommendationsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
-    @State private var expandedNutrientIDs: Set<String> = []
-    @State var showPaywall = false
-
-    private var analysis: MergedAnalysis? {
-        dashboardVM.aiAnalysis
-    }
 
     var body: some View {
         NavigationStack {
@@ -16,8 +11,8 @@ struct RecommendationsView: View {
                 Color.healthMapBackground
                     .ignoresSafeArea()
 
-                if let analysis {
-                    mainContent(analysis: analysis)
+                if let analysis = dashboardVM.aiAnalysis {
+                    RecommendationsContentView(analysis: analysis)
                 } else if dashboardVM.isLoadingAnalysis {
                     VStack(spacing: Theme.spacingMD) {
                         MascotView(mood: .thinking, size: 72)
@@ -40,18 +35,28 @@ struct RecommendationsView: View {
             }
             .navigationTitle("Mon Plan")
             .navigationBarTitleDisplayMode(.large)
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .healthMapFullSheet()
-            }
         }
     }
+}
 
-    // MARK: - Main Content
-    private func mainContent(analysis: MergedAnalysis) -> some View {
-        let vm = RecommendationsViewModel(analysis: analysis)
+// MARK: - Recommendations Content (ViewModel stable)
+/// Contenu du plan une fois l'analyse disponible. Le ViewModel est un
+/// `@StateObject` : il n'est créé qu'UNE fois par cycle de vie de la vue
+/// (l'ancien code instanciait `RecommendationsViewModel(analysis:)` à chaque
+/// évaluation de `body`). Si l'analyse est régénérée pendant que l'écran est
+/// affiché, `onReceive` resynchronise le ViewModel existant sans recréation.
+struct RecommendationsContentView: View {
+    @EnvironmentObject var dashboardVM: DashboardViewModel
+    @StateObject private var vm: RecommendationsViewModel
+    @State private var expandedNutrientIDs: Set<String> = []
+    @State var showPaywall = false
 
-        return ScrollView {
+    init(analysis: MergedAnalysis) {
+        _vm = StateObject(wrappedValue: RecommendationsViewModel(analysis: analysis))
+    }
+
+    var body: some View {
+        ScrollView {
             VStack(spacing: Theme.spacingLG) {
                 if vm.hasRedFlags { redFlagsSection(vm: vm) }
                 if vm.hasInteractions { interactionsSection(vm: vm) }
@@ -73,6 +78,15 @@ struct RecommendationsView: View {
                     .padding(.horizontal, Theme.spacingLG)
             }
             .padding(.vertical, Theme.spacingMD)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
+                .healthMapFullSheet()
+        }
+        .onReceive(dashboardVM.$aiAnalysis) { newAnalysis in
+            if let newAnalysis {
+                vm.updateAnalysis(newAnalysis)
+            }
         }
     }
 
@@ -270,14 +284,21 @@ struct RecommendationsView: View {
                                 Text(text).font(Theme.bodyFont).foregroundStyle(Color.healthMapText)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            if let nutrients = finding.nutrientsCovered, !nutrients.isEmpty {
-                                HStack(spacing: 4) {
-                                    ForEach(nutrients, id: \.self) { n in
-                                        Text(n).font(.system(size: 10, weight: .medium))
-                                            .foregroundStyle(Color.scoreGood)
-                                            .padding(.horizontal, 6).padding(.vertical, 2)
-                                            .background(Color.scoreGood.opacity(0.1))
-                                            .clipShape(Capsule())
+                            // Labels canoniques via NutrientData (jamais d'ids
+                            // bruts type « vitD ») ; un id hors catalogue est
+                            // ignoré proprement (compactMap).
+                            if let ids = finding.nutrientsCovered, !ids.isEmpty {
+                                let covered = ids.compactMap { NutrientData.definition(for: $0) }
+                                if !covered.isEmpty {
+                                    HStack(spacing: 4) {
+                                        ForEach(covered) { def in
+                                            Text("\(def.emoji) \(def.label)")
+                                                .font(.system(size: 10, weight: .medium))
+                                                .foregroundStyle(Color.scoreGood)
+                                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                                .background(Color.scoreGood.opacity(0.1))
+                                                .clipShape(Capsule())
+                                        }
                                     }
                                 }
                             }

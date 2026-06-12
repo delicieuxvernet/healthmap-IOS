@@ -30,11 +30,13 @@ struct HeroCardView: View {
                 }
             }
 
-            // Headline
+            // Headline — texte libre IA : 2 lignes max (DESIGN-PAGES loi 9)
             if let headline {
                 Text(headline)
                     .font(Theme.headlineFont)
                     .foregroundStyle(Color.healthMapText)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -46,10 +48,13 @@ struct HeroCardView: View {
                         .foregroundStyle(Color.healthMapBlue.opacity(0.5))
                         .padding(.top, 2)
 
+                    // Métaphore — texte libre IA : 2 lignes max (loi 9)
                     Text(metaphore)
                         .font(.system(size: 14, weight: .regular, design: .serif))
                         .foregroundStyle(Color.healthMapSecondary)
                         .italic()
+                        .lineLimit(2)
+                        .truncationMode(.tail)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, Theme.spacingSM)
@@ -116,19 +121,8 @@ struct RedFlagsCardView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(urgencyLabel(flag.urgency)): \(flag.message)")
             }
-
-            // Medical disclaimer
-            HStack(alignment: .top, spacing: 4) {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color.healthMapMuted)
-                    .padding(.top, 1)
-
-                Text("Information indicative. Ne remplace pas un avis medical.")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundStyle(Color.healthMapMuted)
-            }
-            .padding(.top, Theme.spacingSM)
+            // Pas de mini-disclaimer ici : un seul disclaimer médical par
+            // écran, celui de fin de page (DESIGN-PAGES loi 12).
         }
         .padding(Theme.spacingMD)
         .background(

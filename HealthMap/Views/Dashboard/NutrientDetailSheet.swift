@@ -25,7 +25,9 @@ struct NutrientDetailSheet: View {
                                 .font(Theme.headlineFont)
                                 .foregroundStyle(Color.healthMapText)
 
-                            Text(NutrientStatus(score: nutrient.score).rawValue.capitalized)
+                            // Statut TOUJOURS en français — mapping unique
+                            // HealthScale (jamais le rawValue anglais).
+                            Text(HealthScale.nutrientLabel(for: nutrient.score))
                                 .font(Theme.captionBoldFont)
                                 .foregroundStyle(Color.scoreColor(for: nutrient.score))
                         }

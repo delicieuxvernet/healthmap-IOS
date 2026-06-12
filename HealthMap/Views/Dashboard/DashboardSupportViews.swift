@@ -170,6 +170,7 @@ struct HighlightCard: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.healthMapText)
                 .lineLimit(2)
+                .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let subtitle {
