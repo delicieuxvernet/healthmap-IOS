@@ -55,12 +55,13 @@ extension Color {
             : UIColor(red: 0x9C/255, green: 0xA3/255, blue: 0xAF/255, alpha: 1.0)
     })
 
-    // Score colors — 4 paliers VARIÉS (alignés sur la palette web).
-    // >= 75 vert, >= 60 bleu, >= 40 orange, < 40 rouge.
-    static let scoreExcellent = Color(hex: "34C759")   // vert (>= 75)
-    static let scoreGood = Color(hex: "007AFF")        // bleu (>= 60)
-    static let scoreLow = Color(hex: "FF9500")         // orange (>= 40)
-    static let scoreDeficient = Color(hex: "FF3B30")   // rouge (< 40)
+    // Score colors — tokens consommés par l'échelle unique HealthScale
+    // (DESIGN-PAGES loi 3 : < 45 rouge, 45-69 orange, >= 70 vert).
+    // scoreGood (bleu) reste utilisé comme accent sémantique dans les vues.
+    static let scoreExcellent = Color(hex: "34C759")   // vert
+    static let scoreGood = Color(hex: "007AFF")        // bleu (accent)
+    static let scoreLow = Color(hex: "FF9500")         // orange
+    static let scoreDeficient = Color(hex: "FF3B30")   // rouge
 
     // Nutrient-specific colors — palette variée alignée sur le web (NUTRIENTS dans health.js).
     // Chaque nutriment a SA couleur distincte pour aider la mémorisation utilisateur (façon FoodVisor).
@@ -156,22 +157,15 @@ extension LinearGradient {
 }
 
 // MARK: - Score Color Helpers
+// Échelle unique score → couleur : DÉLÉGUÉE à HealthScale (DESIGN-PAGES loi 3,
+// < 45 rouge · 45-69 orange · ≥ 70 vert). Ne pas redéfinir de paliers ici.
 extension Color {
     static func scoreColor(for score: Int) -> Color {
-        // 4 paliers variés (alignés sur le web) :
-        // >= 75 vert, >= 60 bleu, >= 40 orange, < 40 rouge.
-        if score >= 75 { return .scoreExcellent }
-        if score >= 60 { return .scoreGood }
-        if score >= 40 { return .scoreLow }
-        return .scoreDeficient
+        HealthScale.color(for: score)
     }
 
     static func globalScoreColor(for score: Int) -> Color {
-        // Anneau hero Dashboard : <40 rouge, <60 orange, <75 vert, >=75 bleu.
-        if score >= 75 { return .healthMapBlue }
-        if score >= 60 { return .scoreExcellent }   // vert
-        if score >= 40 { return .scoreLow }         // orange
-        return .scoreDeficient                       // rouge
+        HealthScale.color(for: score)
     }
 
     static func nutrientColor(for id: String) -> Color {

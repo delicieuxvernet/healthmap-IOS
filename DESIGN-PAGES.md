@@ -1,0 +1,128 @@
+# DESIGN-PAGES.md — Architecture de référence des écrans HealthMap
+
+> **À relire INTÉGRALEMENT avant tout ajustement UX/UI.** Ce fichier est la source de
+> vérité de la structure de chaque page : quel bloc, à quelle position, alimenté par
+> quelle donnée, avec quelles limites. Processus imposé par Arthur (11 juin 2026) :
+> 1. Toute évolution de structure se décide ICI d'abord (modifier ce fichier),
+> 2. puis maquette visuelle validée par Arthur,
+> 3. puis code. Jamais l'inverse.
+> Pour ajouter une information nouvelle : trouver son niveau (1 scannable / 2 détail),
+> lui faire passer le TEST DE VALEUR, et l'insérer dans le template ci-dessous.
+> Détails d'exécution et historique des décisions : `C:\Users\stana\Desktop\Claude\PLAN-BILAN-UX-2026-06-11.md`.
+
+---
+
+## 0. Lois transversales (s'appliquent à TOUTES les pages)
+
+1. **Test de valeur utilisateur (loi suprême)** : chaque élément affiché doit répondre à
+   « qu'est-ce que ça apporte à l'utilisateur ? ». Réponse faible → supprimer. Les règles
+   internes (seuils, tranches, mécanique) ne s'affichent JAMAIS.
+2. **Thème clair forcé** (`.preferredColorScheme(.light)`), fond lumineux #F7FAFF,
+   cartes blanches, **aurora animée** (AnimatedBackground) en arrière-plan à opacité
+   réduite — elle ne domine jamais l'information. Reduce-motion → statique.
+3. **Échelle de couleur unique** (une seule fonction dans le code) :
+   score < 45 → rouge · 45-69 → orange · ≥ 70 → vert. Vaut pour anneau, jauges,
+   labels d'état, pastilles. Jamais la couleur seule : toujours doublée d'un mot d'état.
+4. **Labels d'état fixes** — nutriment : < 45 « À renforcer », 45-69 « Limite »,
+   ≥ 70 « Solide ». Score global : < 45 « Priorité », 45-69 « À surveiller »,
+   70-84 « Solide », ≥ 85 « Optimal ».
+5. **Anneau de score : remplissage = score/100 exactement.** Jauges : largeur = score %,
+   marqueur « zone visée » fixe à 70 %.
+6. **Symétrie stricte** : rayon unique 16 (continuous), grille 8 pt, 3 tailles de texte
+   max par écran, tuiles d'une même rangée = dimensions identiques.
+7. **Boutons** : primaires = teinte pleine ; secondaires = **glass**
+   (`.ultraThinMaterial` + liseré fin), jamais de fond opaque. `.healthMapPressed`
+   partout, touch targets ≥ 44 pt.
+8. **Pastilles (pills) = vocabulaire contrôlé uniquement** (enums : « Impact fort »,
+   « Facile », « 2 à 3 mois », « Essentiel »). JAMAIS de texte libre IA dans une pill.
+9. **Texte libre IA : lineLimit + truncationMode(.tail) déclarés par slot**
+   (headline 2 lignes, verdict 1 ligne en carte, action 2 lignes, expected_impact
+   1 ligne, tip 2 lignes). Le serveur impose les longueurs (prompt v35+) et les rabote.
+10. **Pattern « Pourquoi ? » universel** : toute raison/explication secondaire est
+    derrière un bouton glass « Pourquoi ? » (révélation en place, chevron). Le contenu
+    révélé est CAUSAL et personnel (cite les réponses du questionnaire, cause → effet),
+    jamais circulaire.
+11. **Une case premium floutée par page** (pattern BlurredSection) : titre lisible qui
+    tease, contenu réel flouté dessous. Jamais de coquille vide. Les avertissements de
+    SÉCURITÉ ne sont jamais floutés.
+12. **Un seul disclaimer médical par écran**, en bas, 1 ligne.
+13. **Tout composant déclare en en-tête** : champ source, lignes max, couleur = f(score).
+14. Contenu IA : régi par le contrat de prompt (`supabase/functions/generate-analysis/
+    prompt.ts`, v35+) — longueurs max par champ, pas de majuscules d'emphase, pas de
+    parenthèses/molécules au niveau 1, pas de tiret long « — », fréquences naturelles.
+    Toute modification du prompt → harnais de conformité sur les 3 personas test.
+
+---
+
+## 1. BILAN (onglet 1 — l'écran le plus consulté)
+
+| # | Bloc | Source | Règles |
+|---|------|--------|--------|
+| 0 | Red flags `urgency == immediate` uniquement | `red_flags` | Sécurité : seuls les urgents passent avant le héro ; les autres en bas |
+| 1 | **Héro** : anneau (~140 pt, arc = score, reveal animé count-up au 1er affichage) + pill label global + headline + métaphore en citation + « Comment ce score est calculé » discret | `healthScore` local, `summary.headline` (2 lignes max), `summary.metaphore` (1-2 lignes) | Le reveal = pic émotionnel (peak-end). Reduce-motion : direct |
+| 2 | **« Ta priorité n°1 »** carte teintée bleue pleine largeur | `priority_actions[0]` : action (2 lignes), expected_impact (1 ligne secondaire), pills difficulty | 1 seul CTA dominant par écran (Hick / von Restorff) |
+| 3 | **« À surveiller (N) »** : top 3 cartes nutriments JUMELLES : nom + mot d'état coloré, verdict 1 ligne, grande jauge (10 pt) + marqueur 70 %, bouton glass « Pourquoi ? » → fiche | `nutrient_risks` triés par confidence, scores locaux | Nom du nutriment EN DÉBUT de titre (F-pattern) |
+| 4 | Bouton glass « Tous mes nutriments (10) » → grille complète (écran/sheet séparé) | scores locaux 10 nutriments | La grille n'est PLUS sur l'écran principal |
+| 5 | **Rangée symétrique 2 tuiles** : « Points forts » (verte) / « Interaction » | `positive_findings[0]` (labels via NutrientData, jamais d'ids bruts) / `interactions_detectees[0].titre` | Tuiles strictement identiques en dimensions |
+| 6 | « Pépite du jour » | `practical_tips` rotation quotidienne : tip (2 lignes) ; why + source au tap | |
+| 7 | Case premium floutée : « Le hack [nutriment prioritaire] de ton profil » | `hack`/`synergie` du risque n°1 | |
+| 8 | **Fin positive** : « Ton plan est prêt → » + « Ton score évoluera à ton prochain bilan » | — | Peak-end : ne JAMAIS finir sur les carences |
+| 9 | Disclaimer (1 ligne) + red flags non urgents | | |
+
+**Supprimés définitivement** : highlight grid 2×2 hétérogène, grille 10 nutriments inline,
+badges (→ Suivi), navigation cards NotificationCenter, doublons action du jour/disclaimers.
+
+## 2. FICHE NUTRIMENT (niveau 2, sheet — TERMINALE, X visible, jamais de niveau 3)
+
+| # | Bloc | Source | Règles |
+|---|------|--------|--------|
+| 1 | Header : emoji + nom + état FR + MiniScoreRing | NutrientData + score local | Statut TOUJOURS en français (helper partagé) |
+| 2 | « Détecté dans tes réponses » : chips + badge fiabilité | `signals[]`, `confidence` (vulgarisé : « fiabilité élevée ») | LA preuve de personnalisation |
+| 3 | Comparaison en citation | `comparaison` | Phrase mémorable |
+| 4 | **Solution d'abord** (carte verte) : action + dosage + quand + « Effet attendu : [delai] » | `solution.*` | Le delai est la promesse motivationnelle |
+| 5 | Repliables fermés (caret) : « Comprendre le mécanisme » / « Symptômes possibles » | `mecanisme`, `signe_manque` | |
+| 6 | Hack + synergie : premium (BlurredSection) | `hack`, `synergie` | Politique premium identique PARTOUT |
+
+## 3. MON PLAN (onglet 4)
+
+| # | Bloc | Source | Règles |
+|---|------|--------|--------|
+| 1 | Header + « N besoins identifiés dans ton bilan » | count | |
+| 2 | **Une carte par BESOIN** : nom + état coloré, SES actions cochables (cochée = barrée), footer vert « Résultat attendu : [bénéfice] — [delai] » | `nutrient_risks` + `priority_actions` rattachées + `solution.delai`/`expected_impact` | Le groupement par besoin rend chaque action signifiante |
+| 3 | Rangée symétrique 2 tuiles : « Compléments » (résumé) / « Analyses » (tests) | `supplements_schedule` counts / `blood_tests.tests` | |
+| 4 | 1 ligne interaction (si > 0) | `interactions_detectees` | |
+| 5 | Pépites (compteur) + case premium floutée « Le timing parfait de tes compléments » | `practical_tips`, `supplements_schedule` | |
+
+**Supprimés** : red flags dupliqués, points forts dupliqués, « plan 3 phases » codé en dur,
+stats grid (IMC/TDEE → Profil), CTA premium plein écran.
+
+## 4. SUIVI (onglet 2)
+
+**État A — découverte (suivi non activé)** : pill glass « Aperçu — exemple » ;
+carte « Ton score, semaine après semaine » (barres 6 semaines + ✓/✗ objectifs sous
+chaque semaine, SANS ligne d'explication) ; ligne nutriment exemple (« Fer : 38 → 64 ») ;
+rangée symétrique Série (avec joker visible) / Badges ; **gros CTA « Commencer mon
+suivi personnalisé — 3 questions · 1 minute »** → mini-questionnaire d'objectifs ;
+case premium « Ta projection de score personnalisée » (estimation CALCULÉE, jamais inventée).
+
+**État B — actif** : mêmes blocs avec données réelles (`score_history`, checkins) ;
+carte « Check-in du jour » (3 gros boutons glass Énergie/Sommeil/Stress + CTA) en
+position 2 ; delta vert « +N depuis ton dernier bilan » en tête. Jamais de faux chiffres,
+jamais de culpabilisation (pas de compteur d'inactivité).
+
+## 5. MES COMPLÉMENTS (future page, remplacera l'onglet Profil — P6)
+
+Timeline « Matin / Soir » (sections vides affichées : « Aucun complément le soir pour
+ton profil ») ; chaque complément = carte : nom + dose, pill priorité (« Essentiel »),
+ligne forme + quand, **bouton glass « Pourquoi ? »** → raison causale (`reason`) ;
+carte d'avertissement ambre TOUJOURS visible (`supplements_schedule.warnings`) ;
+sous-titre « Issus de ton bilan — à confirmer par bilan sanguin » ; case premium
+floutée « Interaction détectée avec ton [habitude] ». Le profil devient un bouton
+avatar en haut du Bilan (P6).
+
+---
+
+*Maquettes de référence : session du 11 juin 2026 (« rendu_final_4_ecrans_reference »
++ correctifs « Pourquoi ? » et règles déterministes). Contrat IA : prompt v35
+(generate-analysis v40), harnais de conformité sur audit-a/b/c obligatoire avant
+tout déploiement de prompt.*

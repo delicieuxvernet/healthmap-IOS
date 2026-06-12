@@ -72,6 +72,9 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
    trigger `handle_new_user` — un upsert client est rejeté 403, bug questionnaire du 9 juin).
 
 ### 2.3 — UX / branding
+> **Lire `DESIGN-PAGES.md` (racine du repo) AVANT tout ajustement UX/UI — c'est la
+> source de vérité de la structure de chaque écran.**
+
 8. **Palette : voir `Color+Theme.swift` comme source canonique.** Pas de règle d'absolu inventée — consommer ce qui existe dans le fichier de tokens, demander au user avant de proposer une nouvelle teinte.
 9. **Touch targets ≥ 44×44 pt** (HIG Apple).
 10. **`whileTap` scale 0.97** via `.healthMapPressed` button style. Standardisé partout.

@@ -1,7 +1,7 @@
 import SwiftUI
 
-// MARK: - RecommendationsView Extra Sections
-extension RecommendationsView {
+// MARK: - RecommendationsContentView Extra Sections
+extension RecommendationsContentView {
 
     // MARK: - Plan 3 Phases
     var planSection: some View {

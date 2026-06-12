@@ -13,8 +13,15 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // Fond lumineux + aurora animée à opacité réduite (DESIGN-PAGES
+                // loi 2) : la base healthMapBackground reste pleine sous
+                // l'aurora pour qu'elle ne domine jamais l'information.
+                // AnimatedBackground gère déjà reduce-motion (statique).
                 Color.healthMapBackground
                     .ignoresSafeArea()
+
+                AnimatedBackground()
+                    .opacity(0.5)
 
                 // Le score LOCAL (HealthCalculator) doit TOUJOURS s'afficher
                 // dès que le questionnaire est complété — jamais 0/100+croix,
@@ -87,6 +94,20 @@ struct DashboardView: View {
 
                 // 2. Hero Score Card (free, always visible)
                 heroScoreCard
+
+                // 2a. Carte résumé IA (headline + métaphore) — affichée
+                // uniquement quand le summary de l'analyse existe et porte
+                // du contenu (jamais de coquille vide, DESIGN-PAGES loi 11).
+                if let summary = viewModel.aiAnalysis?.summary,
+                   summary.headline != nil || summary.metaphore != nil {
+                    HeroCardView(
+                        headline: summary.headline,
+                        metaphore: summary.metaphore,
+                        profilType: summary.profilType,
+                        overallScore: viewModel.overallScore
+                    )
+                    .padding(.horizontal, Theme.spacingLG)
+                }
 
                 // 2b. Statut analyse IA — le score local reste affiché ;
                 // on superpose un bandeau pendant le chargement, ou un bandeau
@@ -276,7 +297,9 @@ struct DashboardView: View {
                 icon: "target",
                 iconColor: .healthMapBlue,
                 title: "Action prioritaire",
-                value: String((viewModel.actionDuJour?.titre ?? "--").prefix(30)),
+                // Pas de troncature par caractères : HighlightCard limite
+                // l'affichage à 2 lignes + truncationMode(.tail) (loi 9).
+                value: viewModel.actionDuJour?.titre ?? "--",
                 subtitle: nil
             )
         }
@@ -474,12 +497,9 @@ struct DashboardView: View {
     }
 
     // MARK: - Score Label
+    // Mot d'état du score global : échelle unique HealthScale (loi 4).
     var scoreLabel: String {
-        let s = viewModel.healthScore
-        if s >= 75 { return "Excellent" }
-        if s >= 60 { return "Bon" }
-        if s >= 40 { return "A ameliorer" }
-        return "Critique"
+        HealthScale.globalLabel(for: viewModel.healthScore)
     }
 }
 
