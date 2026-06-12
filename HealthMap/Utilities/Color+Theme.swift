@@ -94,24 +94,15 @@ extension Color {
     static let healthMapGradientStart = Color(hex: "007AFF")
     static let healthMapGradientEnd = Color(hex: "5856D6")
 
-    // Aurora — teintes des blobs du fond animé (AnimatedBackground).
-    // Light : pastels lumineux (ambiance hero du site) ; dark : teintes profondes
-    // qui éclairent le fond nuit sans éblouir.
-    static let healthMapAuroraBlue = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x1E/255, green: 0x4A/255, blue: 0x8F/255, alpha: 1.0)
-            : UIColor(red: 0xB8/255, green: 0xD9/255, blue: 0xFF/255, alpha: 1.0)
-    })
-    static let healthMapAuroraViolet = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x3B/255, green: 0x37/255, blue: 0x80/255, alpha: 1.0)
-            : UIColor(red: 0xD8/255, green: 0xD4/255, blue: 0xFF/255, alpha: 1.0)
-    })
-    static let healthMapAuroraSky = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x14/255, green: 0x50/255, blue: 0x6E/255, alpha: 1.0)
-            : UIColor(red: 0xC5/255, green: 0xEC/255, blue: 0xFF/255, alpha: 1.0)
-    })
+    // Ribbon — couleurs CANONIQUES du ruban du site web, reprises hex-pour-hex
+    // des uniforms de src/components/RibbonBackground.jsx (uColorA, uColorB,
+    // uColorC, uColorIridA). Consommées par AnimatedBackground à faible opacité.
+    // Constantes entre modes, comme la mascotte : le ruban garde son identité
+    // (le thème clair est forcé partout, DESIGN-PAGES loi 2).
+    static let healthMapRibbonLavender = Color(hex: "CAB7FF")  // uColorA
+    static let healthMapRibbonBlue = Color(hex: "B2C9FF")      // uColorB
+    static let healthMapRibbonSky = Color(hex: "9CC0FF")       // uColorC
+    static let healthMapRibbonPink = Color(hex: "FFB8EC")      // uColorIridA (iridescence)
 
     // Mascotte kiwi (MascotView) — couleurs d'illustration, constantes entre modes
     // (comme un asset : la mascotte garde son identité en light et dark).
