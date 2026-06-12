@@ -114,10 +114,10 @@ struct RecommendationsContentView: View {
                 }
 
                 // 5. Case premium floutée : contenu RÉEL borné (loi 11)
-                if let schedule = vm.analysis.supplementsSchedule, !schedule.warnings.isEmpty {
+                if let warnings = vm.analysis.supplementsSchedule?.warnings, !warnings.isEmpty {
                     BlurredSection(isPremium: true, title: "Le timing parfait de tes compléments") {
                         VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                            ForEach(Array(schedule.warnings.prefix(3).enumerated()), id: \.offset) { _, warning in
+                            ForEach(Array(warnings.prefix(3).enumerated()), id: \.offset) { _, warning in
                                 HStack(alignment: .top, spacing: Theme.spacingXS) {
                                     Image(systemName: "clock.fill")
                                         .font(.system(size: 11))
@@ -256,10 +256,13 @@ struct RecommendationsContentView: View {
 
     private var supplementsSummary: String {
         guard let schedule = vm.analysis.supplementsSchedule else { return "Aucun pour l'instant" }
+        let morning = schedule.morning ?? []
+        let afternoon = schedule.afternoon ?? []
+        let evening = schedule.evening ?? []
         var parts: [String] = []
-        if !schedule.morning.isEmpty { parts.append("\(schedule.morning.count) le matin") }
-        if !schedule.afternoon.isEmpty { parts.append("\(schedule.afternoon.count) le midi") }
-        if !schedule.evening.isEmpty { parts.append("\(schedule.evening.count) le soir") }
+        if !morning.isEmpty { parts.append("\(morning.count) le matin") }
+        if !afternoon.isEmpty { parts.append("\(afternoon.count) le midi") }
+        if !evening.isEmpty { parts.append("\(evening.count) le soir") }
         return parts.isEmpty ? "Aucun pour l'instant" : parts.joined(separator: " · ")
     }
 
@@ -358,6 +361,7 @@ private struct NeedCard: View {
 // MARK: - Plan Check Store (persistance des actions cochées)
 // Clé scopée par utilisateur (même esprit que le draft questionnaire) ;
 // ids stables (sol_<nutrient> / pa_<rank>) → l'état survit aux relances.
+@MainActor
 private enum PlanCheckStore {
     private static var key: String {
         let uid = AuthService.shared.cachedCurrentUserIdString ?? "anonymous"
