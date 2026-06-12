@@ -59,13 +59,14 @@
 | # | Bloc | Source | Règles |
 |---|------|--------|--------|
 | 0 | Red flags `urgency == immediate` uniquement | `red_flags` | Sécurité : seuls les urgents passent avant le héro ; les autres en bas |
-| 1 | **Héro** : anneau (~140 pt, arc = score, reveal animé count-up au 1er affichage) + pill label global + headline + métaphore en citation + « Comment ce score est calculé » discret | `healthScore` local, `summary.headline` (2 lignes max), `summary.metaphore` (1-2 lignes) | Le reveal = pic émotionnel (peak-end). Reduce-motion : direct |
+| 1 | **Héro** : anneau (~140 pt, arc = score, reveal animé count-up au 1er affichage) + pill label global + chip streak discrète + headline + métaphore en citation + « Comment ce score est calculé » discret | `healthScore` local, `summary.headline` (2 lignes max), `summary.metaphore` (1-2 lignes), streak gamification | Le reveal = pic émotionnel (peak-end). Reduce-motion : direct |
 | 2 | **« Ta priorité n°1 »** carte teintée bleue pleine largeur | `priority_actions[0]` : action (2 lignes), expected_impact (1 ligne secondaire), pills difficulty | 1 seul CTA dominant par écran (Hick / von Restorff) |
 | 3 | **« À surveiller (N) »** : top 3 cartes nutriments JUMELLES : nom + mot d'état coloré, verdict 1 ligne, grande jauge (10 pt) + marqueur 70 %, bouton glass « Pourquoi ? » → fiche | `nutrient_risks` triés par confidence, scores locaux | Nom du nutriment EN DÉBUT de titre (F-pattern) |
-| 4 | Bouton glass « Tous mes nutriments (10) » → grille complète (écran/sheet séparé) | scores locaux 10 nutriments | La grille n'est PLUS sur l'écran principal |
+| 4 | Bouton glass « Tous mes nutriments (10) » → grille complète (sheet séparée) | scores locaux 10 nutriments | La grille n'est PLUS sur l'écran principal. Grille héritée : anneaux encore colorés par identité, à aligner sur l'échelle score (lot polish) |
 | 5 | **Rangée symétrique 2 tuiles** : « Points forts » (verte) / « Interaction » | `positive_findings[0]` (labels via NutrientData, jamais d'ids bruts) / `interactions_detectees[0].titre` | Tuiles strictement identiques en dimensions |
-| 6 | « Pépite du jour » | `practical_tips` rotation quotidienne : tip (2 lignes) ; why + source au tap | |
-| 7 | Case premium floutée : « Le hack [nutriment prioritaire] de ton profil » | `hack`/`synergie` du risque n°1 | |
+| 6 | « Pépite du jour » | `practical_tips` rotation quotidienne : tip (2 lignes) | why + source RÉVÉLÉS au tap via bouton glass « Pourquoi ? » (loi 10), jamais inline |
+| 7 | Case premium floutée : « Le hack [nutriment prioritaire] » | `hack`/`synergie` du risque n°1 | Texte borné 3 lignes même flouté |
+| 7b | Actions premium : « Exporter mon bilan (PDF) » / « Partager mon score » | services d'export existants | 2 boutons, premium uniquement (partage = viralité) |
 | 8 | **Fin positive** : « Ton plan est prêt → » + « Ton score évoluera à ton prochain bilan » | — | Peak-end : ne JAMAIS finir sur les carences |
 | 9 | Disclaimer (1 ligne) + red flags non urgents | | |
 

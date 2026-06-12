@@ -35,7 +35,7 @@ extension ButtonStyle where Self == PressedButtonStyle {
 }
 
 // MARK: - Card Pressed Style
-/// Variante pour les cards entières tap-ables (HighlightCard, navCard).
+/// Variante pour les cards entières tap-ables (tuiles, cartes de navigation).
 /// Scale plus subtil (0.98) car la zone est plus grande.
 struct CardPressedButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

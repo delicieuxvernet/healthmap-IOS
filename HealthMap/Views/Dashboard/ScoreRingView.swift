@@ -20,10 +20,11 @@ struct ScoreRingView: View {
     /// SF Symbol overlay for color-blind users — conveys the score bracket
     /// without relying on hue alone.
     private var scoreSymbol: String {
-        if score >= 75 { return "checkmark.circle" }
-        if score >= 50 { return "arrow.up.circle" }
-        if score >= 40 { return "exclamationmark.triangle" }
-        return "xmark.circle"
+        // Aligné sur l'échelle unique HealthScale (loi 3) :
+        // ≥ 70 « Solide » · 45-69 « Limite » · < 45 « À renforcer ».
+        if score >= 70 { return "checkmark.circle" }
+        if score >= 45 { return "arrow.up.circle" }
+        return "exclamationmark.triangle"
     }
 
     var body: some View {
