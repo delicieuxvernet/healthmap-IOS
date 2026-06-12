@@ -99,13 +99,41 @@ extension DashboardView {
         ])
     }
 
-    // MARK: - Pepite du jour
-    func pepiteDuJourCard(_ pepite: PracticalTip) -> some View {
+    // MARK: - Disclaimer
+    // Bloc 9 / loi 12 : UN disclaimer par écran, UNE ligne.
+    var disclaimerCard: some View {
+        HStack(alignment: .center, spacing: Theme.spacingSM) {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(Color.healthMapMuted)
+
+            Text("Informatif\u{202F}: ne remplace pas un avis médical.")
+                .font(.system(size: 11))
+                .foregroundStyle(Color.healthMapMuted)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(Theme.spacingSM)
+        .padding(.horizontal, Theme.spacingLG)
+    }
+}
+
+// MARK: - Pépite du jour (DESIGN-PAGES §1 bloc 6)
+// Source : practical_tips (rotation quotidienne). Tip : 2 lignes max.
+// why + source : révélés au tap via le bouton glass « Pourquoi ? » (loi 10).
+// Couleur : f(identité visuelle pépite, accent sky) — pas un état de score.
+struct PepiteDuJourCard: View {
+    let pepite: PracticalTip
+
+    @State private var showWhy = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             HStack(spacing: Theme.spacingSM) {
                 Text(pepite.emoji ?? "\u{1F4A1}").font(.system(size: 20))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("PEPITE DU JOUR")
+                VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                    Text("PÉPITE DU JOUR")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Color(hex: "5AC8FA"))
                         .tracking(0.5)
@@ -118,31 +146,43 @@ extension DashboardView {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            if let detail = pepite.detail ?? pepite.why {
-                Text(detail).font(Theme.captionFont).foregroundStyle(Color.healthMapSecondary)
-                    .fixedSize(horizontal: false, vertical: true).lineLimit(3)
+
+            if pepite.detail != nil || pepite.why != nil {
+                GlassPillButton(
+                    title: "Pourquoi\u{202F}?",
+                    systemImage: showWhy ? "chevron.up" : "chevron.down"
+                ) {
+                    HapticService.shared.tap()
+                    withAnimation(reduceMotion ? .none : .healthMapSpring) {
+                        showWhy.toggle()
+                    }
+                }
+
+                if showWhy {
+                    VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                        // Why/detail — texte libre IA : 3 lignes max (loi 9)
+                        Text(pepite.detail ?? pepite.why ?? "")
+                            .font(Theme.captionFont)
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .lineLimit(3)
+                            .truncationMode(.tail)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if let source = pepite.source, !source.isEmpty {
+                            Text("Source\u{202F}: \(source)")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color.healthMapMuted)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                    }
+                }
             }
         }
         .padding(Theme.spacingMD)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).fill(Color(hex: "5AC8FA").opacity(0.06)))
         .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).stroke(Color(hex: "5AC8FA").opacity(0.12), lineWidth: 1))
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    // MARK: - Disclaimer
-    var disclaimerCard: some View {
-        HStack(alignment: .top, spacing: Theme.spacingSM) {
-            Image(systemName: "info.circle.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(Color.healthMapMuted)
-
-            Text("HealthMap ne remplace pas un avis medical. Consultez un professionnel de sante pour toute decision medicale.")
-                .font(.system(size: 11))
-                .foregroundStyle(Color.healthMapMuted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(Theme.spacingSM)
         .padding(.horizontal, Theme.spacingLG)
     }
 }

@@ -177,7 +177,7 @@ struct DashboardView: View {
 
                 // 6. Pépite du jour (rotation quotidienne déterministe)
                 if let pepite = viewModel.pepiteDuJour {
-                    pepiteDuJourCard(pepite)
+                    PepiteDuJourCard(pepite: pepite)
                         .staggeredAppear(index: 5)
                 }
 
@@ -251,7 +251,7 @@ struct DashboardView: View {
                     .padding(.vertical, Theme.spacingXS)
                     .background(Color.accentSky.opacity(Theme.opacityMedium))
                     .clipShape(Capsule())
-                    .accessibilityLabel("Série de \(gamification.currentStreak) jours")
+                    .accessibilityLabel("Série de \(gamification.currentStreak) \(gamification.currentStreak > 1 ? "jours" : "jour")")
                 }
             }
 
@@ -512,9 +512,13 @@ struct DashboardView: View {
                             .foregroundStyle(Color.healthMapText)
                     }
 
+                    // Hack — texte libre IA : 3 lignes max (loi 9), hauteur
+                    // bornée même floutée pour les non-premium.
                     Text(hack)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(Color.healthMapText)
+                        .lineLimit(3)
+                        .truncationMode(.tail)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Theme.spacingMD)
@@ -584,11 +588,11 @@ struct DashboardView: View {
             MascotView(mood: .thinking, size: 44)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Analyse IA en cours...")
+                Text("Analyse IA en cours…")
                     .font(Theme.captionBoldFont)
                     .foregroundStyle(Color.healthMapText)
 
-                Text("Tes scores ci-dessous sont deja calcules. Les explications personnalisees arrivent.")
+                Text("Tes scores ci-dessous sont déjà calculés. Les explications personnalisées arrivent.")
                     .font(Theme.captionFont)
                     .foregroundStyle(Color.healthMapSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -603,7 +607,7 @@ struct DashboardView: View {
         )
         .padding(.horizontal, Theme.spacingLG)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Analyse IA en cours. Tes scores sont deja calcules.")
+        .accessibilityLabel("Analyse IA en cours. Tes scores sont déjà calculés.")
     }
 
     // MARK: - Score Label

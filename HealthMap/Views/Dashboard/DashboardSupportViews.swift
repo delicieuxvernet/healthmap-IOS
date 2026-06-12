@@ -308,15 +308,15 @@ struct AllNutrientsSheet: View {
         NavigationStack {
             ScrollView {
                 LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
-                    spacing: 10
+                    columns: Array(repeating: GridItem(.flexible(), spacing: Theme.spacingSM), count: 3),
+                    spacing: Theme.spacingSM
                 ) {
                     ForEach(nutrients) { nutrient in
                         Button {
                             HapticService.shared.tap()
                             selectedNutrient = nutrient
                         } label: {
-                            VStack(spacing: 6) {
+                            VStack(spacing: Theme.spacingXS) {
                                 MiniScoreRing(
                                     score: nutrient.score,
                                     color: Color.nutrientColor(for: nutrient.id),
@@ -333,7 +333,7 @@ struct AllNutrientsSheet: View {
                                     .minimumScaleFactor(0.8)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, Theme.spacingSM)
                             .background(
                                 RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
                                     .fill(Color.healthMapCard)
@@ -356,7 +356,12 @@ struct AllNutrientsSheet: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 20))
                             .foregroundStyle(Color.healthMapMuted)
+                            // Zone tactile ≥ 44 pt RÉELLE (loi 20) — même fix
+                            // que PaywallView : l'icône seule fait ~20 pt.
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.healthMapPressed)
                     .accessibilityLabel("Fermer")
                 }
             }
