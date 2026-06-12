@@ -122,6 +122,41 @@ avatar en haut du Bilan (P6).
 
 ---
 
+## 6. MICRO-DÉTAILS (lois 15-22 — « pousser encore plus loin le souci du détail », Arthur)
+
+Un relecteur dédié « pixel & micro-détails » vérifie ces points sur CHAQUE PR d'interface,
+en plus des relecteurs compilation et conformité :
+
+15. **Typographie française irréprochable** : apostrophes courbes (' jamais '),
+    espace fine insécable avant ? ! : ; et dans « guillemets », accents sur les
+    capitales (É, À), pluriels dynamiques corrects (« 1 besoin identifié » /
+    « 2 besoins identifiés » — jamais « 1 besoins »), nombres au format français
+    (virgule décimale, espace insécable des milliers).
+16. **Grille au pixel** : tous les paddings/espacements sont des multiples de 8
+    (4 toléré pour les micro-gaps) ; AUCUNE valeur magique (13, 17, 22…) ;
+    espacement identique entre toutes les sections d'un même écran.
+17. **Mouvement unifié** : une seule courbe spring (`.healthMapSpring`) et une seule
+    durée courte (`.healthMapQuick`) dans toute l'app ; apparitions de sections en
+    léger stagger ; jauges et anneau s'animent de 0 → valeur à l'apparition ;
+    count-up du score ~1,2 s ease-out ; TOUT est gelé si reduce-motion.
+18. **Toucher vivant** : haptic léger sur chaque sélection, haptic de succès sur les
+    moments forts (bilan révélé, action cochée) ; `.healthMapPressed` sur tout ce qui
+    se tape ; aucune zone tappable sans feedback visuel < 100 ms.
+19. **Chaque vue déclare ses 4 états** : contenu / chargement (skeleton, jamais un
+    spinner nu) / vide (mascotte + phrase utile) / erreur (message actionnable +
+    réessayer). Un écran sans ses 4 états ne passe pas la revue.
+20. **Accessibilité de détail** : VoiceOver label sur chaque élément interactif,
+    Dynamic Type testé au clamp max sans casse de layout, contrastes AA sur tous les
+    couples texte/fond utilisés, cibles 44 pt vérifiées AU RENDU (pas au padding déclaré).
+21. **Bords d'écran** : safe areas respectées partout, testé mentalement sur iPhone SE
+    (petit) et Pro Max (grand) ; aucun texte tronqué à une taille standard ;
+    les ombres ne se font jamais couper par un clipping parent.
+22. **Cohérence des vides** : un même séparateur, une même hauteur de carte minimale,
+    une même icône de chevron partout ; si deux écrans montrent le même objet
+    (nutriment, complément), ils utilisent le MÊME composant.
+
+---
+
 *Maquettes de référence : session du 11 juin 2026 (« rendu_final_4_ecrans_reference »
 + correctifs « Pourquoi ? » et règles déterministes). Contrat IA : prompt v35
 (generate-analysis v40), harnais de conformité sur audit-a/b/c obligatoire avant

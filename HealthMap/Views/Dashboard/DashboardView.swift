@@ -100,10 +100,13 @@ struct DashboardView: View {
                 // du contenu (jamais de coquille vide, DESIGN-PAGES loi 11).
                 if let summary = viewModel.aiAnalysis?.summary,
                    summary.headline != nil || summary.metaphore != nil {
+                    // profilType: nil — texte libre IA, jamais dans une pill
+                    // (loi 8) ; reviendra en vocabulaire contrôlé avec la
+                    // refonte du héro (P1).
                     HeroCardView(
                         headline: summary.headline,
                         metaphore: summary.metaphore,
-                        profilType: summary.profilType,
+                        profilType: nil,
                         overallScore: viewModel.overallScore
                     )
                     .padding(.horizontal, Theme.spacingLG)
@@ -274,7 +277,9 @@ struct DashboardView: View {
                 iconColor: .scoreGood,
                 title: "Points forts",
                 value: "\(viewModel.goodNutrients) nutriments",
-                subtitle: "Score >= 60"
+                // Pas de seuil affiché : règle interne, zéro valeur pour
+                // l'utilisateur (loi 1 — test de valeur).
+                subtitle: nil
             )
 
             HighlightCard(
@@ -363,10 +368,12 @@ struct DashboardView: View {
 
     // MARK: - Compact Nutrient Row
     private func compactNutrientRow(_ nutrient: EnrichedNutrient) -> some View {
-        let needsAttention = nutrient.score < 60
+        // Échelle unique score → couleur (loi 3) : plus de seuil binaire local,
+        // la barre et le fond suivent HealthScale via Color.scoreColor(for:).
+        let needsAttention = nutrient.score < 70
         return HStack(spacing: Theme.spacingSM) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(needsAttention ? Color.scoreDeficient : Color.scoreGood)
+                .fill(Color.scoreColor(for: nutrient.score))
                 .frame(width: 4, height: 40)
 
             Text(nutrient.emoji)
@@ -401,7 +408,7 @@ struct DashboardView: View {
         .padding(Theme.spacingSM)
         .background(
             RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                .fill(needsAttention ? Color.scoreDeficient.opacity(0.04) : Color.healthMapCard)
+                .fill(needsAttention ? Color.scoreColor(for: nutrient.score).opacity(0.04) : Color.healthMapCard)
         )
     }
 
