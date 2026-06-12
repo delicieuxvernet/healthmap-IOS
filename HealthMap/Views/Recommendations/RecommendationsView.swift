@@ -1,14 +1,27 @@
 import SwiftUI
 import Combine
 
-// MARK: - Recommendations View (Mon Plan)
+// MARK: - Recommendations View (Mon Plan — DESIGN-PAGES §3)
+// Refonte du 12 juin (maquette validée par Arthur) :
+//   1. Header « Mon plan » + sous-titre discret « N besoin(s) identifié(s) »
+//   2. UNE CARTE PAR BESOIN (top 3) : actions cochables (persistées par
+//      utilisateur) + footer vert « [bénéfice], [délai] »
+//   3. Rangée symétrique 2 tuiles : Compléments / Analyses
+//   4. 1 ligne interaction (titre, 1 ligne max)
+//   5. Case premium floutée « Le timing parfait de tes compléments »
+//   6. Disclaimer 1 ligne (loi 12)
+// Supprimés : red flags et points forts dupliqués (vivent sur le Bilan),
+// « plan 3 phases » codé en dur (fausse personnalisation), stats IMC/TDEE
+// (→ Profil), CTA premium plein écran, listes de pépites (vivent sur le Bilan).
 struct RecommendationsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.healthMapBackground
+                // Fond ruban animé (loi 2) : le composant gère sa transparence
+                // interne et reduce-motion.
+                AnimatedBackground()
                     .ignoresSafeArea()
 
                 if let analysis = dashboardVM.aiAnalysis {
@@ -18,7 +31,7 @@ struct RecommendationsView: View {
                         MascotView(mood: .thinking, size: 72)
                         ProgressView()
                             .tint(Color.healthMapBlue)
-                        Text("Chargement du plan...")
+                        Text("Chargement du plan…")
                             .font(Theme.bodyFont)
                             .foregroundStyle(Color.healthMapSecondary)
                     }
@@ -40,16 +53,15 @@ struct RecommendationsView: View {
 }
 
 // MARK: - Recommendations Content (ViewModel stable)
-/// Contenu du plan une fois l'analyse disponible. Le ViewModel est un
-/// `@StateObject` : il n'est créé qu'UNE fois par cycle de vie de la vue
-/// (l'ancien code instanciait `RecommendationsViewModel(analysis:)` à chaque
-/// évaluation de `body`). Si l'analyse est régénérée pendant que l'écran est
-/// affiché, `onReceive` resynchronise le ViewModel existant sans recréation.
+/// Contenu du plan une fois l'analyse disponible. `@StateObject` créé une
+/// seule fois ; `onReceive` resynchronise si l'analyse est régénérée.
 struct RecommendationsContentView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @StateObject private var vm: RecommendationsViewModel
-    @State private var expandedNutrientIDs: Set<String> = []
-    @State var showPaywall = false
+
+    /// Actions cochées (ids stables), persistées par utilisateur.
+    @State private var checkedIds: Set<String> = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(analysis: MergedAnalysis) {
         _vm = StateObject(wrappedValue: RecommendationsViewModel(analysis: analysis))
@@ -58,30 +70,92 @@ struct RecommendationsContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.spacingLG) {
-                if vm.hasRedFlags { redFlagsSection(vm: vm) }
-                if vm.hasInteractions { interactionsSection(vm: vm) }
-                if vm.hasPriorityActions { priorityActionsSection(vm: vm) }
-                if vm.hasDeficiencies { deficienciesSection(vm: vm) }
-                if vm.hasPositiveFindings { positiveFindingsSection(vm: vm) }
-                if vm.hasPepites { pepitesSection(vm: vm) }
-                if vm.shouldDoBloodTest { bloodTestsSection(vm: vm) }
-                if vm.hasSuppSchedule { supplementsTeaser(vm: vm) }
-
-                planSection
-                statsSection(vm: vm)
-
-                if !SubscriptionService.shared.isPremium {
-                    premiumCTASection
+                // 1. Sous-titre d'orientation (pluriel dynamique — loi 15)
+                if !vm.topDeficiencies.isEmpty {
+                    Text(needsSubtitle)
+                        .font(Theme.captionFont)
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, Theme.spacingLG)
                 }
 
-                MedicalDisclaimerView()
+                // 2. Une carte par besoin (top 3)
+                ForEach(Array(vm.topDeficiencies.prefix(3).enumerated()), id: \.element.id) { index, nutrient in
+                    NeedCard(
+                        nutrient: nutrient,
+                        actions: actionItems(for: nutrient, isFirst: index == 0),
+                        footerText: footerText(for: nutrient),
+                        checkedIds: $checkedIds,
+                        onToggle: { id in toggle(id) }
+                    )
                     .padding(.horizontal, Theme.spacingLG)
+                }
+
+                // 3. Rangée symétrique Compléments / Analyses (loi 6)
+                planTilesRow
+                    .padding(.horizontal, Theme.spacingLG)
+
+                // 4. Interaction (1 ligne — le détail vit sur le Bilan/fiche)
+                if let interaction = vm.interactions.first, let titre = interaction.titre, !titre.isEmpty {
+                    HStack(spacing: Theme.spacingSM) {
+                        Text(interaction.emoji ?? "\u{26A1}")
+                            .font(.system(size: 16))
+                        Text(titre)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.healthMapText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer()
+                    }
+                    .padding(Theme.spacingMD)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .cardStyle()
+                    .padding(.horizontal, Theme.spacingLG)
+                }
+
+                // 5. Case premium floutée : contenu RÉEL borné (loi 11)
+                if let warnings = vm.analysis.supplementsSchedule?.warnings, !warnings.isEmpty {
+                    BlurredSection(isPremium: true, title: "Le timing parfait de tes compléments") {
+                        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                            ForEach(Array(warnings.prefix(3).enumerated()), id: \.offset) { _, warning in
+                                HStack(alignment: .top, spacing: Theme.spacingXS) {
+                                    Image(systemName: "clock.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Color.healthMapBlue)
+                                        .accessibilityHidden(true)
+                                    Text(warning)
+                                        .font(Theme.captionFont)
+                                        .foregroundStyle(Color.healthMapText)
+                                        .lineLimit(2)
+                                        .truncationMode(.tail)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                        .padding(Theme.spacingMD)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .cardStyle()
+                    }
+                    .padding(.horizontal, Theme.spacingLG)
+                }
+
+                // 6. Disclaimer unique, 1 ligne (loi 12)
+                HStack(alignment: .center, spacing: Theme.spacingSM) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.healthMapMuted)
+                    Text("Informatif\u{202F}: ne remplace pas un avis médical.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.healthMapMuted)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .padding(Theme.spacingSM)
             }
             .padding(.vertical, Theme.spacingMD)
         }
-        .sheet(isPresented: $showPaywall) {
-            PaywallView()
-                .healthMapFullSheet()
+        .onAppear {
+            checkedIds = PlanCheckStore.load()
         }
         .onReceive(dashboardVM.$aiAnalysis) { newAnalysis in
             if let newAnalysis {
@@ -90,318 +164,216 @@ struct RecommendationsContentView: View {
         }
     }
 
-    // MARK: - Sections
-
-    private func redFlagsSection(vm: RecommendationsViewModel) -> some View {
-        sectionContainer(title: "Points d'attention", icon: "exclamationmark.triangle.fill", iconColor: .urgencyImmediate) {
-            RedFlagsCardView(flags: vm.redFlags)
-        }
+    // MARK: - Sous-titre (pluriel dynamique)
+    private var needsSubtitle: String {
+        let n = min(vm.topDeficiencies.count, 3)
+        return n > 1 ? "\(n) besoins identifiés dans ton bilan" : "1 besoin identifié dans ton bilan"
     }
 
-    private func interactionsSection(vm: RecommendationsViewModel) -> some View {
-        sectionContainer(title: "Interactions detectees", icon: "arrow.triangle.merge", iconColor: .healthMapBlue) {
-            VStack(spacing: Theme.spacingSM) {
-                if let first = vm.interactions.first {
-                    InteractionCardView(interaction: first)
-                }
-                if vm.interactions.count > 1 {
-                    let remaining = Array(vm.interactions.dropFirst())
-                    BlurredSection(isPremium: true, title: "\(remaining.count) autres interactions") {
-                        VStack(spacing: Theme.spacingSM) {
-                            ForEach(remaining) { interaction in
-                                InteractionCardView(interaction: interaction)
-                            }
-                        }
-                    }
-                }
-            }
+    // MARK: - Actions par besoin
+    // Rattachement : la solution du nutriment d'abord, puis les actions IA
+    // qui mentionnent son nom ; les actions générales restantes vont au
+    // besoin n°1. Dédupliquées, 3 max par carte.
+    private func actionItems(for nutrient: EnrichedNutrient, isFirst: Bool) -> [PlanActionItem] {
+        var items: [PlanActionItem] = []
+        var seen = Set<String>()
+        func add(_ id: String, _ text: String?) {
+            guard let text, !text.isEmpty, !seen.contains(text.lowercased()) else { return }
+            seen.insert(text.lowercased())
+            items.append(PlanActionItem(id: id, text: text))
         }
-    }
 
-    private func priorityActionsSection(vm: RecommendationsViewModel) -> some View {
-        sectionContainer(title: "Actions prioritaires", icon: "target", iconColor: .healthMapBlue) {
-            VStack(spacing: Theme.spacingSM) {
-                ForEach(vm.priorityActions) { action in
-                    HStack(alignment: .top, spacing: Theme.spacingSM) {
-                        Text("\(action.rank ?? 0)")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .frame(width: 24, height: 24)
-                            .background(Color.healthMapBlue)
-                            .clipShape(Circle())
+        add("sol_\(nutrient.id)", nutrient.solution?.action)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let actionText = action.action {
-                                Text(actionText)
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(Color.healthMapText)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            HStack(spacing: Theme.spacingSM) {
-                                if let impact = action.expectedImpact {
-                                    Label(impact, systemImage: "bolt.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(Color.healthMapBlue)
-                                }
-                                if let difficulty = action.difficulty {
-                                    Label(difficulty, systemImage: "gauge.low")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(Color.healthMapSecondary)
-                                }
-                            }
-                        }
-                        Spacer()
-                    }
-                    .padding(Theme.spacingSM)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                            .fill(Color.healthMapCard)
-                    )
+        for pa in vm.analysis.priorityActions
+        where (pa.action ?? "").localizedCaseInsensitiveContains(nutrient.label) {
+            add("pa_\(pa.rank)", pa.action)
+        }
+
+        if isFirst {
+            for pa in vm.analysis.priorityActions {
+                let matchesADeficiency = vm.topDeficiencies.prefix(3).contains { deficiency in
+                    (pa.action ?? "").localizedCaseInsensitiveContains(deficiency.label)
+                }
+                if !matchesADeficiency {
+                    add("pa_\(pa.rank)", pa.action)
                 }
             }
         }
+
+        return Array(items.prefix(3))
     }
 
-    private func deficienciesSection(vm: RecommendationsViewModel) -> some View {
-        sectionContainer(title: "Nutriments a renforcer", icon: "chart.bar.doc.horizontal", iconColor: .scoreLow) {
-            VStack(spacing: Theme.spacingSM) {
-                ForEach(vm.topDeficiencies) { nutrient in
-                    let isExpanded = expandedNutrientIDs.contains(nutrient.id)
-                    VStack(spacing: 0) {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                if isExpanded { expandedNutrientIDs.remove(nutrient.id) }
-                                else { expandedNutrientIDs.insert(nutrient.id) }
-                            }
-                        } label: {
-                            deficiencyHeader(nutrient: nutrient, isExpanded: isExpanded)
-                        }
-                        .buttonStyle(.healthMapPressed)
+    /// Footer vert « [bénéfice], [délai] » — vocabulaire calibré serveur,
+    /// jamais de tiret long.
+    private func footerText(for nutrient: EnrichedNutrient) -> String? {
+        let benefit = vm.analysis.priorityActions
+            .first { ($0.action ?? "").localizedCaseInsensitiveContains(nutrient.label) }?
+            .expectedImpact
+        let delai = nutrient.solution?.delai
+        let parts = [benefit, delai].compactMap { $0?.isEmpty == false ? $0 : nil }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: ", ")
+    }
 
-                        if isExpanded {
-                            deficiencyDetail(nutrient: nutrient)
-                        }
-                    }
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                            .fill(Color.healthMapCard)
-                    )
-                }
+    private func toggle(_ id: String) {
+        HapticService.shared.primary()
+        withAnimation(reduceMotion ? .none : .healthMapSpring) {
+            if checkedIds.contains(id) {
+                checkedIds.remove(id)
+            } else {
+                checkedIds.insert(id)
             }
         }
+        PlanCheckStore.save(checkedIds)
     }
 
-    private func deficiencyHeader(nutrient: EnrichedNutrient, isExpanded: Bool) -> some View {
+    // MARK: - Tuiles Compléments / Analyses (loi 6 : strictement jumelles)
+    private var planTilesRow: some View {
         HStack(spacing: Theme.spacingSM) {
-            Text(nutrient.emoji).font(.system(size: 20))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(nutrient.label)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
-                if let verdict = nutrient.verdict {
-                    Text(verdict)
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .lineLimit(isExpanded ? nil : 2)
-                }
-            }
-            Spacer()
-            MiniScoreRing(score: nutrient.score, color: Color.nutrientColor(for: nutrient.id), size: 36)
-            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.healthMapMuted)
+            planTile(title: "Compléments", subtitle: supplementsSummary)
+            planTile(title: "Analyses", subtitle: bloodTestsSummary)
         }
-        .padding(Theme.spacingSM)
     }
 
-    private func deficiencyDetail(nutrient: EnrichedNutrient) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            Divider().padding(.horizontal, Theme.spacingSM)
-
-            if let mecanisme = nutrient.mecanisme {
-                nutrientDetailRow(icon: "gearshape.2", title: "Mecanisme", content: mecanisme, color: .healthMapBlue)
-            }
-            if let signe = nutrient.signeManque {
-                nutrientDetailRow(icon: "exclamationmark.triangle", title: "Signes de manque", content: signe, color: .scoreLow)
-            }
-            if let sol = nutrient.solution {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Solution", systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.scoreGood)
-                    if let action = sol.action { nutrientDetailInlineRow(label: "Action", value: action) }
-                    if let dosage = sol.dosage { nutrientDetailInlineRow(label: "Dosage", value: dosage) }
-                }
-                .padding(.horizontal, Theme.spacingSM)
-            }
-            if let hack = nutrient.hack {
-                nutrientDetailRow(icon: "star.fill", title: "Astuce", content: hack, color: .accentSky)
-            }
-            if let synergie = nutrient.synergie {
-                nutrientDetailRow(icon: "arrow.triangle.merge", title: "Synergie", content: synergie, color: .accentIndigo)
-            }
-        }
-        .padding(.bottom, Theme.spacingSM)
-        .transition(.opacity.combined(with: .move(edge: .top)))
-    }
-
-    private func nutrientDetailRow(icon: String, title: String, content: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: icon)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(color)
-            Text(content)
-                .font(Theme.captionFont)
+    private func planTile(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: Theme.spacingXS) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.healthMapText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, Theme.spacingSM)
-    }
-
-    private func nutrientDetailInlineRow(label: String, value: String) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            Text(label)
-                .font(.system(size: 11, weight: .bold))
+            Text(subtitle)
+                .font(.system(size: 11))
                 .foregroundStyle(Color.healthMapSecondary)
-                .frame(width: 50, alignment: .leading)
-            Text(value)
-                .font(Theme.captionFont)
-                .foregroundStyle(Color.healthMapText)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(2)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
         }
+        .padding(Theme.spacingMD)
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
+        .cardStyle()
+        .accessibilityElement(children: .combine)
     }
 
-    private func positiveFindingsSection(vm: RecommendationsViewModel) -> some View {
-        sectionContainer(title: "Points forts", icon: "hand.thumbsup.fill", iconColor: .scoreGood) {
-            VStack(spacing: Theme.spacingSM) {
-                ForEach(vm.positiveFindings) { finding in
-                    HStack(alignment: .top, spacing: Theme.spacingSM) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(Color.scoreGood)
-                        VStack(alignment: .leading, spacing: 2) {
-                            if let text = finding.finding {
-                                Text(text).font(Theme.bodyFont).foregroundStyle(Color.healthMapText)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            // Labels canoniques via NutrientData (jamais d'ids
-                            // bruts type « vitD ») ; un id hors catalogue est
-                            // ignoré proprement (compactMap).
-                            if let ids = finding.nutrientsCovered, !ids.isEmpty {
-                                let covered = ids.compactMap { NutrientData.definition(for: $0) }
-                                if !covered.isEmpty {
-                                    HStack(spacing: 4) {
-                                        ForEach(covered) { def in
-                                            Text("\(def.emoji) \(def.label)")
-                                                .font(.system(size: 10, weight: .medium))
-                                                .foregroundStyle(Color.scoreGood)
-                                                .padding(.horizontal, 6).padding(.vertical, 2)
-                                                .background(Color.scoreGood.opacity(0.1))
-                                                .clipShape(Capsule())
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(Theme.spacingSM)
-                }
-            }
-            .padding(Theme.spacingSM)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .fill(Color.scoreGood.opacity(0.04))
-            )
-        }
+    private var supplementsSummary: String {
+        guard let schedule = vm.analysis.supplementsSchedule else { return "Aucun pour l'instant" }
+        let morning = schedule.morning ?? []
+        let afternoon = schedule.afternoon ?? []
+        let evening = schedule.evening ?? []
+        var parts: [String] = []
+        if !morning.isEmpty { parts.append("\(morning.count) le matin") }
+        if !afternoon.isEmpty { parts.append("\(afternoon.count) le midi") }
+        if !evening.isEmpty { parts.append("\(evening.count) le soir") }
+        return parts.isEmpty ? "Aucun pour l'instant" : parts.joined(separator: " · ")
     }
 
-    private func pepitesSection(vm: RecommendationsViewModel) -> some View {
-        sectionContainer(title: "Pepites sante", icon: "lightbulb.fill", iconColor: .healthMapBlue) {
-            VStack(spacing: Theme.spacingSM) {
-                ForEach(Array(vm.pepites.prefix(2))) { pepite in pepiteCard(pepite) }
-                if vm.pepites.count > 2 {
-                    let remaining = Array(vm.pepites.dropFirst(2))
-                    BlurredSection(isPremium: true, title: "\(remaining.count) autres pepites") {
-                        VStack(spacing: Theme.spacingSM) {
-                            ForEach(remaining) { pepite in pepiteCard(pepite) }
-                        }
-                    }
-                }
-            }
+    private var bloodTestsSummary: String {
+        guard let tests = vm.analysis.bloodTests?.tests, !tests.isEmpty else {
+            return "Aucune analyse conseillée"
         }
+        return tests.prefix(3).joined(separator: ", ")
     }
-
-    private func pepiteCard(_ pepite: PracticalTip) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: Theme.spacingSM) {
-                Text(pepite.emoji ?? "\u{1F4A1}").font(.system(size: 18))
-                Text(pepite.hook ?? pepite.tip ?? "")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let detail = pepite.detail ?? pepite.why {
-                Text(detail).font(Theme.captionFont).foregroundStyle(Color.healthMapSecondary)
-                    .fixedSize(horizontal: false, vertical: true).padding(.leading, 34)
-            }
-        }
-        .padding(Theme.spacingSM)
-        .background(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous).fill(Color.healthMapCard))
-    }
-
-    private func bloodTestsSection(vm: RecommendationsViewModel) -> some View {
-        sectionContainer(title: "Analyses sanguines", icon: "cross.vial.fill", iconColor: .urgencySoon) {
-            VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                if let why = vm.bloodTestReason {
-                    Text(why).font(Theme.bodyFont).foregroundStyle(Color.healthMapText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if !vm.recommendedTests.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Analyses recommandees :").font(Theme.captionBoldFont).foregroundStyle(Color.healthMapSecondary)
-                        ForEach(vm.recommendedTests, id: \.self) { test in
-                            HStack(spacing: Theme.spacingSM) {
-                                Image(systemName: "drop.fill").font(.system(size: 10)).foregroundStyle(Color.urgencySoon)
-                                Text(test).font(Theme.bodyFont).foregroundStyle(Color.healthMapText)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(Theme.spacingMD)
-            .background(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).fill(Color.urgencySoon.opacity(0.06)))
-            .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).stroke(Color.urgencySoon.opacity(0.15), lineWidth: 1))
-        }
-    }
-
-    private func supplementsTeaser(vm: RecommendationsViewModel) -> some View {
-        sectionContainer(title: "Complements", icon: "pills.fill", iconColor: .healthMapBlue) {
-            HStack(spacing: Theme.spacingMD) {
-                Image(systemName: "pills.fill").font(.system(size: 28)).foregroundStyle(Color.healthMapBlue)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Planning complements").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.healthMapText)
-                    Text("Matin, midi, soir -- tout est organise.").font(Theme.captionFont).foregroundStyle(Color.healthMapSecondary)
-                }
-                Spacer()
-                Image(systemName: "arrow.right").font(.system(size: 14)).foregroundStyle(Color.healthMapBlue)
-            }
-            .padding(Theme.spacingMD)
-            .background(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).fill(Color.healthMapBlueLight))
-        }
-    }
-
 }
 
-// MARK: - Medical Disclaimer
-private struct MedicalDisclaimerView: View {
+// MARK: - Plan Action Item
+private struct PlanActionItem: Identifiable {
+    let id: String
+    let text: String
+}
+
+// MARK: - Need Card (une carte par besoin — bloc 2)
+// Source : EnrichedNutrient (état HealthScale) + actions rattachées.
+// Action cochée = cercle vert + texte barré ; haptic au tap ; footer vert
+// « bénéfice, délai ». Couleur d'état = f(score) (loi 3). Textes IA bornés.
+private struct NeedCard: View {
+    let nutrient: EnrichedNutrient
+    let actions: [PlanActionItem]
+    let footerText: String?
+    @Binding var checkedIds: Set<String>
+    let onToggle: (String) -> Void
+
     var body: some View {
-        HStack(alignment: .top, spacing: Theme.spacingSM) {
-            Image(systemName: "info.circle.fill").font(.system(size: 14)).foregroundStyle(Color.healthMapMuted)
-            Text("HealthMap fournit des informations a titre indicatif. Ces recommandations ne remplacent pas un avis medical. Consultez un professionnel de sante.")
-                .font(.system(size: 11)).foregroundStyle(Color.healthMapMuted)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack(spacing: Theme.spacingSM) {
+                Text("\(nutrient.label) \(nutrient.emoji)")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.healthMapText)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Text(HealthScale.nutrientLabel(for: nutrient.score))
+                    .font(Theme.captionBoldFont)
+                    .foregroundStyle(Color.scoreColor(for: nutrient.score))
+            }
+
+            ForEach(actions) { action in
+                Button {
+                    onToggle(action.id)
+                } label: {
+                    HStack(alignment: .top, spacing: Theme.spacingSM) {
+                        Image(systemName: checkedIds.contains(action.id) ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 20))
+                            .foregroundStyle(checkedIds.contains(action.id) ? Color.scoreExcellent : Color.healthMapMuted)
+                            .accessibilityHidden(true)
+
+                        Text(action.text)
+                            .font(Theme.captionFont)
+                            .foregroundStyle(checkedIds.contains(action.id) ? Color.healthMapMuted : Color.healthMapText)
+                            .strikethrough(checkedIds.contains(action.id))
+                            .lineLimit(2)
+                            .truncationMode(.tail)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+
+                        Spacer(minLength: 0)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.healthMapPressed)
+                .accessibilityLabel("\(checkedIds.contains(action.id) ? "Fait" : "À faire")\u{202F}: \(action.text)")
+            }
+
+            if let footerText {
+                HStack(spacing: Theme.spacingXS) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.scoreExcellent)
+                        .accessibilityHidden(true)
+                    Text("Résultat attendu\u{202F}: \(footerText)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.scoreExcellent)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                }
+                .padding(Theme.spacingSM)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.scoreExcellent.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            }
         }
-        .padding(Theme.spacingSM)
+        .padding(Theme.spacingMD)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+}
+
+// MARK: - Plan Check Store (persistance des actions cochées)
+// Clé scopée par utilisateur (même esprit que le draft questionnaire) ;
+// ids stables (sol_<nutrient> / pa_<rank>) → l'état survit aux relances.
+@MainActor
+private enum PlanCheckStore {
+    private static var key: String {
+        let uid = AuthService.shared.cachedCurrentUserIdString ?? "anonymous"
+        return "healthmap_plan_checked_\(uid)"
+    }
+
+    static func load() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+    }
+
+    static func save(_ ids: Set<String>) {
+        UserDefaults.standard.set(Array(ids).sorted(), forKey: key)
     }
 }
 
