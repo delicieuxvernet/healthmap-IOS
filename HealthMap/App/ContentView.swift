@@ -207,6 +207,7 @@ struct LaunchScreenView: View {
 // MARK: - Main Tab View
 struct MainTabView: View {
     @EnvironmentObject var pushService: PushNotificationService
+    @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var dashboardVM = DashboardViewModel()
     @StateObject private var questionnaireVM = QuestionnaireViewModel()
     @ObservedObject private var gamification = GamificationService.shared
@@ -222,6 +223,11 @@ struct MainTabView: View {
     /// so the route doesn't force a tab switch on top of the sheet.
     @State private var showPaywallFromDeepLink = false
 
+    /// Profil présenté en sheet (l'onglet Profil a été remplacé par Mes
+    /// compléments — P6) : ouvert par l'avatar du Bilan, la route deep-link
+    /// `.profile`, ou une nav-card `.profil`.
+    @State private var showProfile = false
+
     /// Tab tour — shown once after the user completes the questionnaire.
     @AppStorage("hasSeenTabTour") private var hasSeenTabTour = false
     @State private var showTabTour = false
@@ -229,7 +235,7 @@ struct MainTabView: View {
     /// Internal tab identifier. Uses a symbolic enum rather than `Int` so
     /// adding or reordering tabs doesn't silently break the deep-link mapping.
     enum Tab: Hashable {
-        case bilan, suivi, scanner, plan, profil
+        case bilan, suivi, scanner, plan, complements
     }
 
     var body: some View {
@@ -284,11 +290,18 @@ struct MainTabView: View {
             .tabItem { Label("Mon Plan", systemImage: "list.bullet.clipboard") }
             .tag(Tab.plan)
 
-            // Tab 5: Profil
-            ProfileView()
-                .environmentObject(dashboardVM)
-                .tabItem { Label("Profil", systemImage: "person.crop.circle") }
-                .tag(Tab.profil)
+            // Tab 5: Mes compléments (remplace Profil — P6). Le Profil devient
+            // un bouton avatar en haut à droite du Bilan (sheet ci-dessous).
+            Group {
+                if dashboardVM.hasCompletedQuestionnaire {
+                    SupplementsView()
+                        .environmentObject(dashboardVM)
+                } else {
+                    LockedFeatureView(title: "Mes compléments", message: "Complete ton bilan pour voir tes compléments.")
+                }
+            }
+            .tabItem { Label("Compléments", systemImage: "pills") }
+            .tag(Tab.complements)
         }
         .tint(Color.healthMapBlue)
         .onAppear {
@@ -327,6 +340,11 @@ struct MainTabView: View {
             PaywallView()
                 .healthMapFullSheet()
         }
+        .sheet(isPresented: $showProfile) {
+            ProfileView()
+                .environmentObject(dashboardVM)
+                .environmentObject(authViewModel)
+        }
         .overlay {
             if showTabTour {
                 TabTourOverlay(isShowing: $showTabTour)
@@ -361,9 +379,12 @@ struct MainTabView: View {
                 case .suivi: selectedTab = .suivi
                 case .scanner: selectedTab = .scanner
                 case .plan: selectedTab = .plan
-                case .profil: selectedTab = .profil
+                case .profil: showProfile = true
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .healthmapOpenProfile)) { _ in
+            showProfile = true
         }
     }
 
@@ -384,7 +405,7 @@ struct MainTabView: View {
         case .recommendations:
             selectedTab = .plan
         case .profile:
-            selectedTab = .profil
+            showProfile = true
         case .paywall:
             // Don't force a tab switch on top of the modal — keep the user
             // on whatever tab they were already looking at when the paywall
