@@ -248,10 +248,10 @@ struct MainTabView: View {
             .tabItem { Label("Bilan", systemImage: "heart.text.clipboard") }
             .tag(Tab.bilan)
 
-            // Tab 2: Suivi (Checkin)
+            // Tab 2: Suivi (DESIGN-PAGES §4 — découverte + actif)
             Group {
                 if dashboardVM.hasCompletedQuestionnaire {
-                    CheckinView()
+                    SuiviView()
                         .environmentObject(dashboardVM)
                 } else {
                     LockedFeatureView(title: "Suivi", message: "Complete ton bilan pour acceder au suivi quotidien.")
@@ -671,6 +671,10 @@ struct ProfileView: View {
                         .foregroundStyle(Color.healthMapSecondary)
                 }
             }
+            // Ruban de fond aussi sur le Profil (loi 2) : on masque le fond
+            // système de la List puis on glisse le ruban derrière.
+            .scrollContentBackground(.hidden)
+            .background(AnimatedBackground().ignoresSafeArea())
             .navigationTitle("Profil")
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
