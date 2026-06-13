@@ -12,6 +12,7 @@ enum NavCardDestination: String {
 
 extension Notification.Name {
     static let healthmapNavigateToTab = Notification.Name("healthmapNavigateToTab")
+    static let healthmapOpenProfile = Notification.Name("healthmapOpenProfile")
 }
 
 extension DashboardView {

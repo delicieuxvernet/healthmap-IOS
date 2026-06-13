@@ -64,6 +64,19 @@ struct DashboardView: View {
                     }
                     .disabled(viewModel.isLoadingAnalysis)
                 }
+                // Avatar Profil en haut à droite (P6 : l'onglet Profil a été
+                // remplacé par Mes compléments). Ouvre le Profil en sheet via
+                // NotificationCenter (consommé par MainTabView).
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                            .font(.system(size: 22))
+                            .foregroundStyle(Color.healthMapBlue)
+                    }
+                    .accessibilityLabel("Profil")
+                }
             }
             .sheet(isPresented: $showNutrientDetail) {
                 if let nutrient = selectedNutrient {
