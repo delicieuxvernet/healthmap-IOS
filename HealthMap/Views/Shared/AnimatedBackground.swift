@@ -5,7 +5,7 @@ import SwiftUI
 /// (`src/components/RibbonBackground.jsx`) : trois bandes-rubans diagonales
 /// dont les bords sont des sinusoïdes déphasées, remplies des couleurs
 /// canoniques du ruban (lavande → bleus ciel, reflet rose iridescent),
-/// floutées et à opacité moyenne (réglée à l'œil par Arthur, ~80/64/48 %) —
+/// floutées et à opacité moyenne (réglée à l'œil par Arthur, ~64/51/38 %) —
 /// le ruban se voit nettement, mais ne domine jamais
 /// les cartes blanches.
 ///
@@ -59,7 +59,7 @@ struct AnimatedBackground: View {
                     endPoint: .bottomTrailing
                 ))
                 .blur(radius: 10)
-                .opacity(0.80)
+                .opacity(0.64)
                 .animation(driftAnimation(duration: 26), value: drift)
 
                 // Bande iridescente — reflet rose (uColorIridA) fondu vers la
@@ -76,7 +76,7 @@ struct AnimatedBackground: View {
                     endPoint: .trailing
                 ))
                 .blur(radius: 12)
-                .opacity(0.64)
+                .opacity(0.51)
                 .animation(driftAnimation(duration: 30), value: drift)
 
                 // Voile fin — ciel, bas d'écran, presque subliminal.
@@ -92,7 +92,7 @@ struct AnimatedBackground: View {
                     endPoint: .bottomTrailing
                 ))
                 .blur(radius: 14)
-                .opacity(0.48)
+                .opacity(0.38)
                 .animation(driftAnimation(duration: 24), value: drift)
             }
             .frame(width: w, height: h)

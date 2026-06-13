@@ -17,16 +17,6 @@ struct ScoreRingView: View {
         Color.globalScoreColor(for: score)
     }
 
-    /// SF Symbol overlay for color-blind users — conveys the score bracket
-    /// without relying on hue alone.
-    private var scoreSymbol: String {
-        // Aligné sur l'échelle unique HealthScale (loi 3) :
-        // ≥ 70 « Solide » · 45-69 « Limite » · < 45 « À renforcer ».
-        if score >= 70 { return "checkmark.circle" }
-        if score >= 45 { return "arrow.up.circle" }
-        return "exclamationmark.triangle"
-    }
-
     var body: some View {
         ZStack {
             // Background ring
@@ -38,12 +28,7 @@ struct ScoreRingView: View {
             Circle()
                 .trim(from: 0, to: animatedProgress)
                 .stroke(
-                    AngularGradient(
-                        colors: [scoreColor.opacity(0.6), scoreColor],
-                        center: .center,
-                        startAngle: .degrees(-90),
-                        endAngle: .degrees(270)
-                    ),
+                    scoreColor,
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .frame(width: size, height: size)
@@ -62,18 +47,6 @@ struct ScoreRingView: View {
                     .foregroundStyle(Color.healthMapMuted)
             }
 
-            // Color-blind safe symbol overlay (bottom-right)
-            Image(systemName: scoreSymbol)
-                .font(.system(size: size * 0.1, weight: .semibold))
-                .foregroundStyle(scoreColor)
-                .padding(4)
-                .background(
-                    Circle()
-                        .fill(Color.healthMapCard)
-                        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
-                )
-                .offset(x: size * 0.32, y: size * 0.32)
-                .accessibilityHidden(true)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Score global")

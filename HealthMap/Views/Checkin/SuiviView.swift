@@ -321,19 +321,53 @@ private struct WeeklyScoreCard: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.healthMapText)
 
-            HStack(alignment: .bottom, spacing: Theme.spacingSM) {
-                ForEach(points) { p in
-                    VStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(isExample ? Color.healthMapBlue.opacity(0.45) : Color.globalScoreColor(for: p.score))
-                            .frame(height: barHeight(p.score))
-                            .frame(maxWidth: .infinity)
-                        Image(systemName: p.isUp ? "checkmark" : "xmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(p.isUp ? Color.scoreExcellent : Color.healthMapMuted)
-                            .accessibilityHidden(true)
+            // Courbe lissée + aire (façon courbe de poids Foodvisor) : fini les
+            // barres et les ronds ✓/✗. Une seule couleur de marque, point final
+            // mis en valeur. La couleur de PALIER vit dans l'anneau, pas ici.
+            GeometryReader { geo in
+                let w = geo.size.width
+                let h = geo.size.height
+                let pts: [CGPoint] = points.enumerated().map { i, bp in
+                    let x = points.count <= 1 ? w / 2 : CGFloat(i) / CGFloat(points.count - 1) * w
+                    let t = CGFloat(max(0, min(100, bp.score))) / 100
+                    return CGPoint(x: x, y: h - 6 - t * (h - 12))
+                }
+                ZStack {
+                    Path { path in
+                        guard let first = pts.first, let last = pts.last else { return }
+                        path.move(to: CGPoint(x: first.x, y: h))
+                        for pt in pts { path.addLine(to: pt) }
+                        path.addLine(to: CGPoint(x: last.x, y: h))
+                        path.closeSubpath()
                     }
-                    .frame(maxWidth: .infinity)
+                    .fill(Color.healthMapBlue.opacity(isExample ? 0.08 : 0.14))
+
+                    Path { path in
+                        for (i, pt) in pts.enumerated() {
+                            if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+                        }
+                    }
+                    .stroke(
+                        Color.healthMapBlue.opacity(isExample ? 0.55 : 1.0),
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+                    )
+
+                    if let last = pts.last {
+                        Circle()
+                            .fill(Color.healthMapBlue.opacity(isExample ? 0.55 : 1.0))
+                            .frame(width: 8, height: 8)
+                            .position(x: last.x, y: last.y)
+                    }
+                }
+            }
+            .frame(height: 88)
+
+            HStack(spacing: 0) {
+                ForEach(points) { p in
+                    Text(p.label)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -343,11 +377,6 @@ private struct WeeklyScoreCard: View {
         .padding(.horizontal, Theme.spacingLG)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Évolution du score sur \(points.count) semaines")
-    }
-
-    private func barHeight(_ score: Int) -> CGFloat {
-        let clamped = max(0, min(100, score))
-        return 16 + CGFloat(clamped) / 100.0 * 56
     }
 }
 
