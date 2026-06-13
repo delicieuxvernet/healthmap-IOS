@@ -12,7 +12,7 @@ struct ScoreHistoryView: View {
 
     var body: some View {
         ZStack {
-            Color.healthMapBackground.ignoresSafeArea()
+            AnimatedBackground().ignoresSafeArea()
 
             if isLoading {
                 VStack(spacing: Theme.spacingMD) {

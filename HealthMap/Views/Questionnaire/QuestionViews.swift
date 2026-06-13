@@ -1,5 +1,38 @@
 import SwiftUI
 
+// MARK: - Sweep Select Background (animation de sélection « balayé » — option C)
+/// Fond des cartes d'option du questionnaire : à la sélection, le bleu clair
+/// BALAIE de gauche à droite au lieu d'un simple fondu (choix d'Arthur,
+/// 13 juin). Respecte la loi 17 (`.healthMapQuick`, gelé si reduce-motion) et
+/// reste clippé à la forme arrondie ; ombre douce identique aux autres cartes
+/// (teintée bleu une fois sélectionnée).
+private struct SweepSelectBackground: View {
+    let isSelected: Bool
+    let reduceMotion: Bool
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+        return shape
+            .fill(Color.healthMapCard)
+            .overlay(alignment: .leading) {
+                GeometryReader { geo in
+                    Color.healthMapBlueLight
+                        .frame(width: isSelected ? geo.size.width : 0)
+                        .animation(reduceMotion ? .none : .healthMapQuick, value: isSelected)
+                }
+            }
+            .clipShape(shape)
+            .shadow(
+                color: isSelected
+                    ? Color.healthMapBlue.opacity(Theme.opacityStrong)
+                    : Color.black.opacity(Theme.shadowCard.opacity),
+                radius: Theme.shadowCard.radius,
+                x: 0,
+                y: Theme.shadowCard.y
+            )
+    }
+}
+
 // MARK: - Single Choice Question
 //
 // Cartes d'option façon "app native premium" (retour au feel du build 28) :
@@ -48,16 +81,7 @@ struct SingleChoiceView: View {
                     .padding(.vertical, Theme.spacingMD)
                     .frame(minHeight: 44)
                     .background(
-                        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                            .fill(isSelected ? Color.healthMapBlueLight : Color.healthMapCard)
-                            .shadow(
-                                color: isSelected
-                                    ? Color.healthMapBlue.opacity(Theme.opacityStrong)
-                                    : Color.black.opacity(Theme.shadowCard.opacity),
-                                radius: Theme.shadowCard.radius,
-                                x: 0,
-                                y: Theme.shadowCard.y
-                            )
+                        SweepSelectBackground(isSelected: isSelected, reduceMotion: reduceMotion)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
@@ -127,16 +151,7 @@ struct MultiChoiceView: View {
                     .padding(.vertical, Theme.spacingMD)
                     .frame(minHeight: 44)
                     .background(
-                        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                            .fill(isSelected ? Color.healthMapBlueLight : Color.healthMapCard)
-                            .shadow(
-                                color: isSelected
-                                    ? Color.healthMapBlue.opacity(Theme.opacityStrong)
-                                    : Color.black.opacity(Theme.shadowCard.opacity),
-                                radius: Theme.shadowCard.radius,
-                                x: 0,
-                                y: Theme.shadowCard.y
-                            )
+                        SweepSelectBackground(isSelected: isSelected, reduceMotion: reduceMotion)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
