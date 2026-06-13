@@ -12,7 +12,7 @@ struct MealScanView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.healthMapBackground.ignoresSafeArea()
+                AnimatedBackground().ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: Theme.spacingLG) {

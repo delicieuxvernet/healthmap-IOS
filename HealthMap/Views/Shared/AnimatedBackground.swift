@@ -5,7 +5,8 @@ import SwiftUI
 /// (`src/components/RibbonBackground.jsx`) : trois bandes-rubans diagonales
 /// dont les bords sont des sinusoïdes déphasées, remplies des couleurs
 /// canoniques du ruban (lavande → bleus ciel, reflet rose iridescent),
-/// floutées et à faible opacité — le ruban se voit, mais ne domine jamais
+/// floutées et à opacité moyenne (réglée à l'œil par Arthur, ~80/64/48 %) —
+/// le ruban se voit nettement, mais ne domine jamais
 /// les cartes blanches.
 ///
 /// - GPU-friendly : pas de `TimelineView`. La phase des sinusoïdes est
@@ -58,7 +59,7 @@ struct AnimatedBackground: View {
                     endPoint: .bottomTrailing
                 ))
                 .blur(radius: 10)
-                .opacity(0.40)
+                .opacity(0.80)
                 .animation(driftAnimation(duration: 26), value: drift)
 
                 // Bande iridescente — reflet rose (uColorIridA) fondu vers la
@@ -75,7 +76,7 @@ struct AnimatedBackground: View {
                     endPoint: .trailing
                 ))
                 .blur(radius: 12)
-                .opacity(0.32)
+                .opacity(0.64)
                 .animation(driftAnimation(duration: 30), value: drift)
 
                 // Voile fin — ciel, bas d'écran, presque subliminal.
@@ -91,7 +92,7 @@ struct AnimatedBackground: View {
                     endPoint: .bottomTrailing
                 ))
                 .blur(radius: 14)
-                .opacity(0.24)
+                .opacity(0.48)
                 .animation(driftAnimation(duration: 24), value: drift)
             }
             .frame(width: w, height: h)

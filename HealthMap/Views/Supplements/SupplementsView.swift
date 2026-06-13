@@ -38,7 +38,7 @@ struct SupplementsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.healthMapBackground
+                AnimatedBackground()
                     .ignoresSafeArea()
 
                 if hasContent {
