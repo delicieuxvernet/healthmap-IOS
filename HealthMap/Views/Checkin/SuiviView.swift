@@ -46,6 +46,7 @@ struct SuiviView: View {
             }
             .navigationTitle("Mon suivi")
             .navigationBarTitleDisplayMode(.large)
+            .healthMapProfileToolbar()
             .onAppear {
                 started = SuiviStore.isStarted
                 checkin = SuiviStore.todayCheckin()

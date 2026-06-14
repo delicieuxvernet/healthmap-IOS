@@ -64,6 +64,7 @@ struct SupplementsView: View {
             }
             .navigationTitle("Mes compléments")
             .navigationBarTitleDisplayMode(.large)
+            .healthMapProfileToolbar()
         }
     }
 

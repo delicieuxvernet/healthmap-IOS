@@ -37,6 +37,7 @@ struct MealScanView: View {
             }
             .navigationTitle("Scanner")
             .navigationBarTitleDisplayMode(.large)
+            .healthMapProfileToolbar()
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
                     .healthMapFullSheet()

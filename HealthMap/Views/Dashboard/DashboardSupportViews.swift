@@ -304,14 +304,12 @@ struct InsightTile: View {
         }
         .padding(Theme.spacingMD)
         .frame(maxWidth: .infinity, minHeight: 88, maxHeight: .infinity, alignment: .topLeading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(tint.opacity(Theme.opacityLight))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(tint.opacity(Theme.opacityMedium), lineWidth: 1)
-        )
+        // Opaque (carte blanche) + accent latéral coloré : la tuile ressort sur
+        // le ruban (avant : voile teinté 8 % qui se délavait).
+        .background(Color.healthMapCard)
+        .overlay(alignment: .leading) { Rectangle().fill(tint).frame(width: 3) }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .shadow(color: .black.opacity(Theme.shadowCard.opacity), radius: Theme.shadowCard.radius, x: 0, y: Theme.shadowCard.y)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(header). \(text)")
     }
