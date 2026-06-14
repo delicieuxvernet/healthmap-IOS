@@ -61,6 +61,7 @@ struct RecommendationsContentView: View {
 
     /// Actions cochées (ids stables), persistées par utilisateur.
     @State private var checkedIds: Set<String> = []
+    @ObservedObject private var gamification = GamificationService.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(analysis: MergedAnalysis) {
@@ -70,6 +71,22 @@ struct RecommendationsContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.spacingLG) {
+                // 0. Héro gamifié : anneau « objectif » qui se referme + niveau + série
+                //    (dopamine premium validée par Arthur, 14 juin). Données RÉELLES :
+                //    actions cochées / total (anneau), XP/niveau + série (GamificationService).
+                if !allActionItems.isEmpty {
+                    PlanGoalHero(
+                        done: doneCount,
+                        total: allActionItems.count,
+                        level: gamification.level,
+                        xpInLevel: gamification.xpInLevel,
+                        xpPerLevel: GamificationService.xpPerLevel,
+                        streak: gamification.currentStreak,
+                        reduceMotion: reduceMotion
+                    )
+                    .padding(.horizontal, Theme.spacingLG)
+                }
+
                 // 1. Sous-titre d'orientation (pluriel dynamique — loi 15)
                 if !vm.topDeficiencies.isEmpty {
                     Text(needsSubtitle)
@@ -164,6 +181,24 @@ struct RecommendationsContentView: View {
         }
     }
 
+    // MARK: - Anneau « objectif » : actions du plan cochées / total
+    /// Toutes les actions du plan (top 3 besoins), dédupliquées par id.
+    private var allActionItems: [PlanActionItem] {
+        var items: [PlanActionItem] = []
+        var seen = Set<String>()
+        for (index, nutrient) in vm.topDeficiencies.prefix(3).enumerated() {
+            for item in actionItems(for: nutrient, isFirst: index == 0) where !seen.contains(item.id) {
+                seen.insert(item.id)
+                items.append(item)
+            }
+        }
+        return items
+    }
+
+    private var doneCount: Int {
+        allActionItems.filter { checkedIds.contains($0.id) }.count
+    }
+
     // MARK: - Sous-titre (pluriel dynamique)
     private var needsSubtitle: String {
         let n = min(vm.topDeficiencies.count, 3)
@@ -217,6 +252,7 @@ struct RecommendationsContentView: View {
     }
 
     private func toggle(_ id: String) {
+        let willCheck = !checkedIds.contains(id)
         HapticService.shared.primary()
         withAnimation(reduceMotion ? .none : .healthMapSpring) {
             if checkedIds.contains(id) {
@@ -226,6 +262,17 @@ struct RecommendationsContentView: View {
             }
         }
         PlanCheckStore.save(checkedIds)
+
+        // Gamification (dopamine) : XP crédité une seule fois par action, et
+        // célébration quand TOUTES les actions du plan sont cochées.
+        if willCheck {
+            gamification.awardXPOnce(key: "plan_\(id)", amount: 45)
+            if !allActionItems.isEmpty && doneCount == allActionItems.count {
+                // Célébration : haptique de succès. L'anneau se referme en coche
+                // et un petit burst de confettis joue dans la carte (PlanGoalHero).
+                HapticService.shared.success()
+            }
+        }
     }
 
     // MARK: - Tuiles Compléments / Analyses (loi 6 : strictement jumelles)
@@ -355,6 +402,181 @@ private struct NeedCard: View {
         .padding(Theme.spacingMD)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
+    }
+}
+
+// MARK: - Plan Goal Hero (anneau objectif + niveau + série — gamification)
+private struct PlanGoalHero: View {
+    let done: Int
+    let total: Int
+    let level: Int
+    let xpInLevel: Int
+    let xpPerLevel: Int
+    let streak: Int
+    let reduceMotion: Bool
+
+    @State private var burst = false
+    private var complete: Bool { total > 0 && done >= total }
+
+    var body: some View {
+        HStack(spacing: Theme.spacingMD) {
+            PlanGoalRing(done: done, total: total, reduceMotion: reduceMotion)
+                .frame(width: 92, height: 92)
+
+            VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                Text(complete ? "Objectif du jour atteint, bravo\u{202F}!" : "Ton objectif du jour")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.healthMapText)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: Theme.spacingXS) {
+                    Text("Niveau \(level)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.accentIndigo)
+                    Spacer(minLength: 0)
+                    Text("\(xpInLevel) / \(xpPerLevel) XP")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.healthMapSecondary)
+                }
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.accentIndigo.opacity(0.15))
+                        Capsule().fill(Color.accentIndigo)
+                            .frame(width: geo.size.width * CGFloat(min(1, Double(xpInLevel) / Double(max(1, xpPerLevel)))))
+                    }
+                }
+                .frame(height: 7)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.accentSky)
+                        .accessibilityHidden(true)
+                    Text(streak > 0 ? "Série de \(streak) jour\(streak > 1 ? "s" : "")" : "Commence ta série aujourd'hui")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(Theme.spacingMD)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+        .overlay {
+            if burst && !reduceMotion {
+                PlanConfettiBurst().allowsHitTesting(false)
+            }
+        }
+        .onChange(of: complete) { _, now in
+            // Confetti seulement à l'objectif atteint, hors reduce-motion et hors mode zen.
+            if now && !reduceMotion && !GamificationService.shared.isZenMode {
+                burst = true
+            }
+            if !now { burst = false }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Objectif du jour : \(done) actions sur \(total) faites. Niveau \(level). Série de \(streak) jours.")
+    }
+}
+
+// MARK: - Plan Goal Ring (anneau qui se referme, dégradé premium bleu → indigo)
+private struct PlanGoalRing: View {
+    let done: Int
+    let total: Int
+    let reduceMotion: Bool
+
+    @State private var animated: CGFloat = 0
+
+    private var progress: CGFloat {
+        total > 0 ? CGFloat(done) / CGFloat(total) : 0
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.healthMapBlue.opacity(0.14), lineWidth: 9)
+            Circle()
+                .trim(from: 0, to: animated)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.healthMapBlue, Color.accentIndigo],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    style: StrokeStyle(lineWidth: 9, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            if total > 0 && done >= total {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(Color.accentIndigo)
+            } else {
+                VStack(spacing: 0) {
+                    Text("\(done)")
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.healthMapText)
+                    Text("/ \(total)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.healthMapMuted)
+                }
+            }
+        }
+        .onAppear { setProgress() }
+        .onChange(of: progress) { _, _ in setProgress() }
+    }
+
+    private func setProgress() {
+        if reduceMotion {
+            animated = progress
+        } else {
+            withAnimation(.easeOut(duration: 0.6)) { animated = progress }
+        }
+    }
+}
+
+// MARK: - Plan Confetti Burst (petite célébration in-carte à l'objectif atteint)
+// Auto-contenu (l'émetteur de CelebrationView est privé). Pièces qui partent du
+// centre vers l'extérieur puis s'effacent. Gelé si reduce-motion (côté appelant).
+private struct PlanConfettiBurst: View {
+    private let pieces = 16
+    private let colors: [Color] = [.healthMapBlue, .accentIndigo, .accentSky, .scoreExcellent, Color(hex: "FFB8EC")]
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<pieces, id: \.self) { i in
+                PlanConfettiPiece(
+                    color: colors[i % colors.count],
+                    angle: Double(i) / Double(pieces) * 2 * .pi,
+                    distance: CGFloat.random(in: 60...120),
+                    size: CGFloat.random(in: 6...10),
+                    delay: Double(i) * 0.012
+                )
+            }
+        }
+    }
+}
+
+private struct PlanConfettiPiece: View {
+    let color: Color
+    let angle: Double
+    let distance: CGFloat
+    let size: CGFloat
+    let delay: Double
+    @State private var go = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1.5)
+            .fill(color)
+            .frame(width: size, height: size * 0.6)
+            .offset(x: go ? CGFloat(cos(angle)) * distance : 0,
+                    y: go ? CGFloat(sin(angle)) * distance : 0)
+            .rotationEffect(.degrees(go ? 220 : 0))
+            .opacity(go ? 0 : 1)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.7).delay(delay)) { go = true }
+            }
     }
 }
 

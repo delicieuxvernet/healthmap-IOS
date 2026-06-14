@@ -23,6 +23,11 @@ final class GamificationService: ObservableObject {
     @Published var confettiType: ConfettiType = .badge
     @Published var totalCheckins: Int = 0
     @Published var bestStreak: Int = 0
+    /// XP cumulés (gamification Mon Plan) : montent quand l'utilisateur coche
+    /// une action de son plan, une seule fois par action, jamais déduits.
+    @Published private(set) var xp: Int = 0
+    /// Clés d'actions ayant déjà rapporté de l'XP (anti double-comptage).
+    private var awardedXPKeys: Set<String> = []
     @Published var freezesUsedThisMonth: Int = 0
     @Published var monthStart: Date = Date()
     @Published var triedPathways: Set<String> = []
@@ -37,6 +42,27 @@ final class GamificationService: ObservableObject {
     // MARK: - Computed
     var freezesRemaining: Int { maxFreezesPerMonth - freezesUsedThisMonth }
 
+    // MARK: - XP / Niveau (gamification Mon Plan)
+    /// 500 XP par niveau. Niveau 1 = 0-499 XP, niveau 2 = 500-999, etc.
+    static let xpPerLevel = 500
+    var level: Int { xp / Self.xpPerLevel + 1 }
+    var xpInLevel: Int { xp % Self.xpPerLevel }
+
+    /// Crédite `amount` XP une seule fois pour `key` (id d'action stable).
+    /// Ne déduit jamais (XP acquis = acquis). Confetti si l'XP fait monter de niveau.
+    @discardableResult
+    func awardXPOnce(key: String, amount: Int) -> Bool {
+        guard !awardedXPKeys.contains(key) else { return false }
+        awardedXPKeys.insert(key)
+        let previousLevel = level
+        xp += amount
+        if !isZenMode && level > previousLevel {
+            triggerConfetti(type: .quest)
+        }
+        saveState()
+        return true
+    }
+
     // MARK: - Keys
     private enum Keys {
         static let streak = "healthmap_streak"
@@ -48,6 +74,8 @@ final class GamificationService: ObservableObject {
         static let freezesUsedThisMonth = "healthmap_freezes_used"
         static let monthStart = "healthmap_month_start"
         static let triedPathways = "healthmap_tried_pathways"
+        static let xp = "healthmap_xp"
+        static let awardedXP = "healthmap_awarded_xp"
     }
 
     // MARK: - Init
@@ -82,6 +110,11 @@ final class GamificationService: ObservableObject {
             triedPathways = Set(pathwayStrings)
         }
 
+        xp = defaults.integer(forKey: Keys.xp)
+        if let awarded = defaults.stringArray(forKey: Keys.awardedXP) {
+            awardedXPKeys = Set(awarded)
+        }
+
         // Check if streak should reset (missed a day)
         checkStreakExpiry()
     }
@@ -98,6 +131,8 @@ final class GamificationService: ObservableObject {
         defaults.set(freezesUsedThisMonth, forKey: Keys.freezesUsedThisMonth)
         defaults.set(monthStart, forKey: Keys.monthStart)
         defaults.set(Array(triedPathways), forKey: Keys.triedPathways)
+        defaults.set(xp, forKey: Keys.xp)
+        defaults.set(Array(awardedXPKeys), forKey: Keys.awardedXP)
 
         // Cross-platform sync: write streaks to Supabase profiles table
         // so the web app at healthmap.fr can display them.
@@ -370,6 +405,8 @@ final class GamificationService: ObservableObject {
         freezesUsedThisMonth = 0
         monthStart = Date()
         triedPathways = []
+        xp = 0
+        awardedXPKeys = []
         saveState()
         isSyncing = false
     }
