@@ -174,6 +174,9 @@ struct RecommendationsContentView: View {
         }
         .onAppear {
             checkedIds = PlanCheckStore.load()
+            // Expose le total d'actions du plan au Bilan (« Mon évolution »)
+            // pour calculer l'adhésion (done/total) sans recopier la logique.
+            PlanProgressStore.saveTotal(allActionItems.count)
         }
         .onReceive(dashboardVM.$aiAnalysis) { newAnalysis in
             if let newAnalysis {

@@ -14,6 +14,9 @@ struct UserProfile: Codable, Equatable {
     var height: String = ""
     var weight: String = ""
     var weightTrend: String = ""
+    /// Morphology avatar chosen by the user, e.g. "av_m_w45_m55".
+    /// Empty until the user picks one in the avatar selection step.
+    var avatarKey: String = ""
 
     // Section 2: Mode de vie
     var indoorWork: String = ""
@@ -206,7 +209,7 @@ struct UserProfile: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case pathway, completed
-        case goals, firstName, age, gender, height, weight, weightTrend
+        case goals, firstName, age, gender, height, weight, weightTrend, avatarKey
         case indoorWork, sunExposure, skinType, strengthTraining
         case stressLevel, sleepHours, sleepDuration, wakeFeeling, screenBeforeBed
         case caffeineIntake, caffeineTiming, waterIntake, smoking, alcohol, bloating, antibiotics
@@ -234,6 +237,7 @@ struct UserProfile: Codable, Equatable {
         height = (try? c.decode(String.self, forKey: .height)) ?? ""
         weight = (try? c.decode(String.self, forKey: .weight)) ?? ""
         weightTrend = (try? c.decode(String.self, forKey: .weightTrend)) ?? ""
+        avatarKey = (try? c.decode(String.self, forKey: .avatarKey)) ?? ""
 
         indoorWork = (try? c.decode(String.self, forKey: .indoorWork)) ?? ""
         sunExposure = (try? c.decode(String.self, forKey: .sunExposure)) ?? ""
@@ -308,6 +312,7 @@ struct UserProfile: Codable, Equatable {
         try c.encode(height, forKey: .height)
         try c.encode(weight, forKey: .weight)
         try c.encode(weightTrend, forKey: .weightTrend)
+        try c.encode(avatarKey, forKey: .avatarKey)
 
         try c.encode(indoorWork, forKey: .indoorWork)
         try c.encode(sunExposure, forKey: .sunExposure)
