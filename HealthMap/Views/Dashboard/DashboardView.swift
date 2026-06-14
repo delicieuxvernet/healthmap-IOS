@@ -474,40 +474,48 @@ struct DashboardView: View {
                 object: NavCardDestination.plan.rawValue
             )
         } label: {
-            VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                HStack(spacing: Theme.spacingSM) {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.18)))
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Ton plan est prêt")
                         .font(Theme.headlineFont)
-                        .foregroundStyle(Color.healthMapBlue)
-
-                    Spacer()
-
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.healthMapBlue)
-                        .accessibilityHidden(true)
+                        .foregroundStyle(.white)
+                    Text("Tes actions t'attendent")
+                        .font(Theme.captionFont)
+                        .foregroundStyle(.white.opacity(0.85))
                 }
 
-                Text("Ton score évoluera à ton prochain bilan.")
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                Spacer()
+
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .accessibilityHidden(true)
             }
             .padding(Theme.spacingMD)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // CTA plein dégradé bleu → indigo : attire l'œil, appelle au clic.
             .background(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .fill(Color.healthMapBlueLight)
+                    .fill(LinearGradient(
+                        colors: [Color.healthMapBlue, Color.accentIndigo],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ))
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .stroke(Color.healthMapBlue.opacity(Theme.opacityMedium), lineWidth: 1)
-            )
+            .shadow(color: Color.healthMapBlue.opacity(0.3), radius: 14, x: 0, y: 6)
             .contentShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         }
         .buttonStyle(.healthMapPressed)
         .padding(.horizontal, Theme.spacingLG)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Ton plan est prêt. Ton score évoluera à ton prochain bilan.")
+        .accessibilityLabel("Ton plan est prêt. Tes actions t'attendent.")
         .accessibilityHint("Ouvre l\u{2019}onglet Mon Plan.")
     }
 

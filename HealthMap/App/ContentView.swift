@@ -287,7 +287,7 @@ struct MainTabView: View {
                     LockedFeatureView(title: "Mon Plan", message: "Complete ton bilan pour acceder a ton plan personnalise.")
                 }
             }
-            .tabItem { Label("Mon Plan", systemImage: "list.bullet.clipboard") }
+            .tabItem { Label("Plan", systemImage: "list.bullet.clipboard") }
             .tag(Tab.plan)
 
             // Tab 5: Mes compléments (remplace Profil — P6). Le Profil devient

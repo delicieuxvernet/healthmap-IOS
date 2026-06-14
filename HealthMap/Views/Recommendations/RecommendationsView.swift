@@ -48,6 +48,7 @@ struct RecommendationsView: View {
             }
             .navigationTitle("Mon Plan")
             .navigationBarTitleDisplayMode(.large)
+            .healthMapProfileToolbar()
         }
     }
 }

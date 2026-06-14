@@ -15,6 +15,30 @@ extension Notification.Name {
     static let healthmapOpenProfile = Notification.Name("healthmapOpenProfile")
 }
 
+// MARK: - Profile Toolbar (avatar Profil sur TOUS les onglets — A1)
+// Ajoute le bouton avatar en haut à droite ; ouvre le Profil en sheet via
+// NotificationCenter (consommé par MainTabView). Appliqué à chaque onglet.
+struct ProfileToolbarModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
+                } label: {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color.healthMapBlue)
+                }
+                .accessibilityLabel("Profil")
+            }
+        }
+    }
+}
+
+extension View {
+    func healthMapProfileToolbar() -> some View { modifier(ProfileToolbarModifier()) }
+}
+
 extension DashboardView {
 
     // MARK: - Premium Actions
@@ -129,52 +153,61 @@ struct PepiteDuJourCard: View {
     @State private var showWhy = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // Sky soutenu (lisible sur fond blanc) — identité « pépite », pas un score.
+    private let accent = Color(hex: "2FA8D8")
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
-                Text(pepite.emoji ?? "\u{1F4A1}").font(.system(size: 20))
-                VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                    Text("PÉPITE DU JOUR")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color(hex: "5AC8FA"))
-                        .tracking(0.5)
-                    // Tip — texte libre IA : 2 lignes max (DESIGN-PAGES loi 9)
-                    Text(pepite.hook ?? pepite.tip ?? "")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.healthMapText)
-                        .lineLimit(2)
-                        .truncationMode(.tail)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+        HStack(alignment: .top, spacing: Theme.spacingSM) {
+            // Icône en pastille (identité pépite constante)
+            Image(systemName: "lightbulb.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(accent)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(accent.opacity(0.14)))
+                .accessibilityHidden(true)
 
-            if pepite.detail != nil || pepite.why != nil {
-                GlassPillButton(
-                    title: "Pourquoi\u{202F}?",
-                    systemImage: showWhy ? "chevron.up" : "chevron.down"
-                ) {
-                    HapticService.shared.tap()
-                    withAnimation(reduceMotion ? .none : .healthMapSpring) {
-                        showWhy.toggle()
+            VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                Text("PÉPITE DU JOUR")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(accent)
+                    .tracking(0.5)
+
+                // Tip — texte libre IA : 2 lignes max (DESIGN-PAGES loi 9)
+                Text(pepite.hook ?? pepite.tip ?? "")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.healthMapText)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if pepite.detail != nil || pepite.why != nil {
+                    GlassPillButton(
+                        title: "Pourquoi\u{202F}?",
+                        systemImage: showWhy ? "chevron.up" : "chevron.down"
+                    ) {
+                        HapticService.shared.tap()
+                        withAnimation(reduceMotion ? .none : .healthMapSpring) {
+                            showWhy.toggle()
+                        }
                     }
-                }
 
-                if showWhy {
-                    VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                        // Why/detail — texte libre IA : 3 lignes max (loi 9)
-                        Text(pepite.detail ?? pepite.why ?? "")
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapSecondary)
-                            .lineLimit(3)
-                            .truncationMode(.tail)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        if let source = pepite.source, !source.isEmpty {
-                            Text("Source\u{202F}: \(source)")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color.healthMapMuted)
-                                .lineLimit(1)
+                    if showWhy {
+                        VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                            // Why/detail — texte libre IA : 3 lignes max (loi 9)
+                            Text(pepite.detail ?? pepite.why ?? "")
+                                .font(Theme.captionFont)
+                                .foregroundStyle(Color.healthMapSecondary)
+                                .lineLimit(3)
                                 .truncationMode(.tail)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            if let source = pepite.source, !source.isEmpty {
+                                Text("Source\u{202F}: \(source)")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Color.healthMapMuted)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
                         }
                     }
                 }
@@ -182,8 +215,11 @@ struct PepiteDuJourCard: View {
         }
         .padding(Theme.spacingMD)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).fill(Color(hex: "5AC8FA").opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).stroke(Color(hex: "5AC8FA").opacity(0.12), lineWidth: 1))
+        // Opaque (carte blanche) + accent latéral sky : ressort enfin sur le ruban.
+        .background(Color.healthMapCard)
+        .overlay(alignment: .leading) { Rectangle().fill(accent).frame(width: 3) }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .shadow(color: accent.opacity(0.18), radius: 12, x: 0, y: 4)
         .padding(.horizontal, Theme.spacingLG)
     }
 }
