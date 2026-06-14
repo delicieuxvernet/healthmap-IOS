@@ -12,6 +12,8 @@ struct DashboardView: View {
     @State private var showNutrientDetail = false
     @State private var showAllNutrients = false
     @State private var showScoreInfo = false
+    @State private var showAvatarPicker = false
+    @State private var didOfferAvatarPicker = false
 
     var body: some View {
         NavigationStack {
@@ -97,6 +99,18 @@ struct DashboardView: View {
             }
             .refreshable {
                 await viewModel.triggerAnalysis()
+            }
+            .sheet(isPresented: $showAvatarPicker) {
+                AvatarPickerView(profile: viewModel.profile) { key in
+                    viewModel.saveAvatarKey(key)
+                }
+                .healthMapSheet(.large)
+            }
+            .onChange(of: viewModel.isLoadingProfile, initial: true) { _, _ in
+                maybeOfferAvatarPicker()
+            }
+            .onChange(of: viewModel.profile.avatarKey) { _, _ in
+                maybeOfferAvatarPicker()
             }
         }
     }
@@ -185,6 +199,16 @@ struct DashboardView: View {
                 if let pepite = viewModel.pepiteDuJour {
                     PepiteDuJourCard(pepite: pepite)
                         .staggeredAppear(index: 5)
+                }
+
+                // 6b. Mon évolution — avatar actuel → projection à 2 mois,
+                // liée à l'adhésion au plan (dopamine). Visible dès le
+                // questionnaire complété ; l'avatar se choisit via le sélecteur.
+                if viewModel.profile.completed {
+                    MonEvolutionSection(profile: viewModel.profile) {
+                        showAvatarPicker = true
+                    }
+                    .staggeredAppear(index: 6)
                 }
 
                 // 7. Case premium floutée : le hack du nutriment prioritaire
@@ -556,6 +580,18 @@ struct DashboardView: View {
     // Mot d'état du score global : échelle unique HealthScale (loi 4).
     var scoreLabel: String {
         HealthScale.globalLabel(for: viewModel.healthScore)
+    }
+
+    /// Présente le sélecteur d'avatar une seule fois quand le profil est
+    /// chargé et complété mais qu'aucun avatar n'a encore été choisi.
+    private func maybeOfferAvatarPicker() {
+        guard !didOfferAvatarPicker,
+              !viewModel.isLoadingProfile,
+              viewModel.profile.completed,
+              !viewModel.profile.weight.isEmpty,
+              viewModel.profile.avatarKey.isEmpty else { return }
+        didOfferAvatarPicker = true
+        showAvatarPicker = true
     }
 }
 

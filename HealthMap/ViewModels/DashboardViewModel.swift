@@ -122,6 +122,9 @@ final class DashboardViewModel: ObservableObject {
 
     private var reconnectObserver: Any?
     private var initTask: Task<Void, Never>?
+    /// Email du profil chargé — réutilisé lors des UPDATE ciblés (ex. avatar)
+    /// pour ne pas écraser la colonne `email` avec une chaîne vide.
+    private var loadedEmail: String = ""
 
     // MARK: - Init
 
@@ -189,6 +192,7 @@ final class DashboardViewModel: ObservableObject {
 
         do {
             if let profileRow = try await databaseService.loadProfile(userId: userId) {
+                self.loadedEmail = profileRow.email ?? self.loadedEmail
                 if let questionnaireData = profileRow.questionnaireData {
                     self.profile = questionnaireData
                     self.hasCompletedQuestionnaire = questionnaireData.completed
@@ -384,5 +388,28 @@ final class DashboardViewModel: ObservableObject {
         }
 
         isLoadingAnalysis = false
+    }
+
+    // MARK: - Save Avatar Choice
+
+    /// Persiste l'avatar morphologique choisi dans `questionnaire_data` (JSONB)
+    /// sans toucher email/first_name. UPDATE uniquement (policy RLS).
+    func saveAvatarKey(_ key: String) {
+        profile.avatarKey = key
+        Task {
+            guard let session = await AuthService.shared.currentSession else { return }
+            let userId = session.user.id.uuidString
+            let email = session.user.email ?? loadedEmail
+            do {
+                try await databaseService.saveProfile(
+                    userId: userId,
+                    email: email,
+                    firstName: profile.firstName,
+                    questionnaireData: profile
+                )
+            } catch {
+                AppLogger.database.report(error, context: "Save avatar key")
+            }
+        }
     }
 }
