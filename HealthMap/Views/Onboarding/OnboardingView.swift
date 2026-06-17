@@ -33,8 +33,8 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            // Fond animé réutilisable (gradient statique si Reduce Motion)
-            AnimatedBackground()
+            // Fond chaud unifié, statique (WarmBackground)
+            WarmBackground()
 
             VStack(spacing: 0) {
                 // Skip button

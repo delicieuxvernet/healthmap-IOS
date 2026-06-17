@@ -19,10 +19,8 @@ struct RecommendationsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Fond ruban animé (loi 2) : le composant gère sa transparence
-                // interne et reduce-motion.
-                AnimatedBackground()
-                    .ignoresSafeArea()
+                // Fond chaud unifié, statique (WarmBackground).
+                WarmBackground()
 
                 if let analysis = dashboardVM.aiAnalysis {
                     RecommendationsContentView(analysis: analysis)

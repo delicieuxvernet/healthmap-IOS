@@ -45,8 +45,7 @@ struct SupplementsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AnimatedBackground()
-                    .ignoresSafeArea()
+                WarmBackground()
 
                 if hasContent {
                     mainContent

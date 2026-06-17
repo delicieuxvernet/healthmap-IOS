@@ -94,15 +94,18 @@ extension Color {
     static let healthMapGradientStart = Color(hex: "007AFF")
     static let healthMapGradientEnd = Color(hex: "5856D6")
 
-    // Ribbon — couleurs CANONIQUES du ruban du site web, reprises hex-pour-hex
-    // des uniforms de src/components/RibbonBackground.jsx (uColorA, uColorB,
-    // uColorC, uColorIridA). Consommées par AnimatedBackground à faible opacité.
-    // Constantes entre modes, comme la mascotte : le ruban garde son identité
-    // (le thème clair est forcé partout, DESIGN-PAGES loi 2).
-    static let healthMapRibbonLavender = Color(hex: "CAB7FF")  // uColorA
-    static let healthMapRibbonBlue = Color(hex: "B2C9FF")      // uColorB
-    static let healthMapRibbonSky = Color(hex: "9CC0FF")       // uColorC
-    static let healthMapRibbonPink = Color(hex: "FFB8EC")      // uColorIridA (iridescence)
+    // Teintes chaudes — fond unifié premium (WarmBackground), remplace le ruban
+    // animé retiré. Dynamiques light/dark comme les autres neutres.
+    static let healthMapWarm = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0x14/255, green: 0x13/255, blue: 0x0F/255, alpha: 1.0)
+            : UIColor(red: 0xFB/255, green: 0xF6/255, blue: 0xEF/255, alpha: 1.0)
+    })
+    static let healthMapWarmGlow = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0x3A/255, green: 0x2E/255, blue: 0x1C/255, alpha: 1.0)
+            : UIColor(red: 0xFF/255, green: 0xE9/255, blue: 0xCF/255, alpha: 1.0)
+    })
 
     // Mascotte kiwi (MascotView) — couleurs d'illustration, constantes entre modes
     // (comme un asset : la mascotte garde son identité en light et dark).
