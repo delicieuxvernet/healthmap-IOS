@@ -6,7 +6,6 @@ struct LoadingView: View {
 
     @State private var currentStage = 0
     @State private var currentFactIndex = 0
-    @State private var progress: CGFloat = 0
     @State private var dotCount = 0
     @State private var showSkipButton = false
 
@@ -42,8 +41,8 @@ struct LoadingView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                // Signature water-fill ball (mirrors web SVG loader)
-                WaterFillBall(size: 200, progress: Double(progress))
+                // Mascotte kiwi qui marche (loader signature, façon Foodvisor)
+                KiwiWalkerView(size: 180)
                     .frame(height: 220)
                     .padding(.bottom, Theme.spacingLG)
 
@@ -153,7 +152,6 @@ struct LoadingView: View {
             guard !Task.isCancelled else { return }
             withAnimation(.easeInOut(duration: 0.6)) {
                 currentStage = index
-                progress = CGFloat(index + 1) / CGFloat(stages.count)
             }
         }
     }
