@@ -35,8 +35,9 @@ struct LoadingView: View {
 
     var body: some View {
         ZStack {
-            Color.healthMapBackground
-                .ignoresSafeArea()
+            // Fond chaud unifié (même ambiance que le lancement et la home) —
+            // le loader IA n'est plus sur un fond neutre froid.
+            WarmBackground()
 
             VStack(spacing: 0) {
                 Spacer()
