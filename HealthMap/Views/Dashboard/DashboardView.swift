@@ -18,11 +18,9 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Fond ruban animé (DESIGN-PAGES loi 2) : le composant gère
-                // lui-même sa transparence interne (le ruban se voit sans
-                // jamais dominer les cartes) et reduce-motion (statique).
-                AnimatedBackground()
-                    .ignoresSafeArea()
+                // Fond chaud unifié, statique (WarmBackground) — remplace le
+                // ruban animé retiré (perf).
+                WarmBackground()
 
                 // Le score LOCAL (HealthCalculator) doit TOUJOURS s'afficher
                 // dès que le questionnaire est complété — jamais 0/100+croix,

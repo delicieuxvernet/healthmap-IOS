@@ -8,7 +8,7 @@ import SwiftUI
 /// via le CTA « C'est parti » (inscription) ou « J'ai déjà un compte »
 /// (connexion).
 ///
-/// - Reduce Motion → fond statique (géré par `AnimatedBackground`), mascotte
+/// - Reduce Motion → fond statique (géré par `WarmBackground`), mascotte
 ///   en pose statique (géré par `MascotView`), apparitions instantanées
 ///   (`staged()` renvoie `nil`).
 /// - Quand l'auth réussit, `AuthViewModel.isAuthenticated` bascule :
@@ -23,8 +23,8 @@ struct LandingView: View {
 
     var body: some View {
         ZStack {
-            // Fond animé réutilisable (gradient statique si Reduce Motion)
-            AnimatedBackground()
+            // Fond chaud unifié, statique (WarmBackground)
+            WarmBackground()
 
             VStack(spacing: Theme.spacingLG) {
                 Spacer()

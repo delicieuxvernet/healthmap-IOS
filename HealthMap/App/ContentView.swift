@@ -695,7 +695,7 @@ struct ProfileView: View {
             // Ruban de fond aussi sur le Profil (loi 2) : on masque le fond
             // système de la List puis on glisse le ruban derrière.
             .scrollContentBackground(.hidden)
-            .background(AnimatedBackground().ignoresSafeArea())
+            .background(WarmBackground())
             .navigationTitle("Profil")
             .sheet(isPresented: $showPaywall) {
                 PaywallView()

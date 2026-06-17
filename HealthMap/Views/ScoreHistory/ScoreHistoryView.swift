@@ -12,7 +12,7 @@ struct ScoreHistoryView: View {
 
     var body: some View {
         ZStack {
-            AnimatedBackground().ignoresSafeArea()
+            WarmBackground()
 
             if isLoading {
                 VStack(spacing: Theme.spacingMD) {
