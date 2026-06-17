@@ -27,16 +27,21 @@ struct MascotView: View {
 
     let mood: Mood
     let size: CGFloat
+    /// Si `true`, la mascotte démarre les yeux fermés puis les ouvre en douceur
+    /// (effet « réveil » à l'ouverture de l'app — cf. LaunchScreenView).
+    let wakes: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var breathe = false
-    @State private var eyesClosed = false
+    @State private var eyesClosed: Bool
 
     private let seedCount = 10
 
-    init(mood: Mood = .idle, size: CGFloat = 120) {
+    init(mood: Mood = .idle, size: CGFloat = 120, wakes: Bool = false) {
         self.mood = mood
         self.size = size
+        self.wakes = wakes
+        _eyesClosed = State(initialValue: wakes)
     }
 
     var body: some View {
@@ -193,6 +198,12 @@ struct MascotView: View {
     /// `@MainActor` : la boucle mute du `@State`, elle doit rester sur le main.
     @MainActor
     private func blinkLoop() async {
+        // Réveil : yeux fermés à l'apparition (wakes), puis ouverture douce.
+        if wakes {
+            try? await Task.sleep(nanoseconds: 550_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) { eyesClosed = false }
+        }
         guard !reduceMotion else { return }
         while !Task.isCancelled {
             let pause = UInt64.random(in: 2_200_000_000...4_200_000_000)

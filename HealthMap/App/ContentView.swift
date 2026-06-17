@@ -189,16 +189,18 @@ private struct OfflineBanner: View {
 struct LaunchScreenView: View {
     var body: some View {
         ZStack {
-            Color.healthMapBackground.ignoresSafeArea()
-            VStack(spacing: 16) {
-                Image(systemName: "heart.text.clipboard")
-                    .font(.system(size: 60))
-                    .foregroundStyle(Color.healthMapBlue)
-                Text("HealthMap")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.healthMapText)
+            WarmBackground()
+            VStack(spacing: 20) {
+                // La mascotte « se réveille » (yeux fermés → ouverts) à l'ouverture.
+                MascotView(mood: .happy, size: 132, wakes: true)
+                HStack(spacing: 0) {
+                    Text("Health").foregroundStyle(Color.healthMapText)
+                    Text("Map").foregroundStyle(LinearGradient.healthMapBrand)
+                }
+                .font(.system(size: 30, weight: .bold, design: .rounded))
                 ProgressView()
                     .tint(Color.healthMapBlue)
+                    .padding(.top, 4)
             }
         }
     }
