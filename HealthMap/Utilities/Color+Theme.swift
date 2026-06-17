@@ -17,6 +17,15 @@ extension Color {
             ? UIColor(red: 0x1B/255, green: 0x32/255, blue: 0x52/255, alpha: 1.0)
             : UIColor(red: 0xE8/255, green: 0xF4/255, blue: 0xFD/255, alpha: 1.0)
     })
+    /// Remplissage des cartes d'option SÉLECTIONNÉES du questionnaire. Plus
+    /// saturé que `healthMapBlueLight` (#E8F4FD trop pâle pour signaler l'état
+    /// sélectionné sur le fond chaud) — l'état choisi se lit au premier coup
+    /// d'œil. Dynamique light/dark.
+    static let healthMapSelectFill = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0x21/255, green: 0x40/255, blue: 0x6B/255, alpha: 1.0)
+            : UIColor(red: 0xDC/255, green: 0xEB/255, blue: 0xFB/255, alpha: 1.0)
+    })
 
     // Backgrounds (dynamic)
     // Alignés sur l'ambiance lumineuse du site web (radial-gradients bleu/violet
