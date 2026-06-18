@@ -306,6 +306,16 @@ struct MainTabView: View {
             .tag(Tab.complements)
         }
         .tint(Color.healthMapBlue)
+        .overlay {
+            // Célébrations de gamification (badge / série / niveau) — enfin
+            // visibles : le moteur (GamificationService.showConfetti) basculait
+            // sans qu'aucune vue ne l'observe. Non bloquant, coupé en mode zen.
+            if gamification.showConfetti && !gamification.isZenMode {
+                CelebrationOverlay(type: gamification.confettiType)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: gamification.showConfetti)
         .onAppear {
             // Tab bar appearance
             let appearance = UITabBarAppearance()

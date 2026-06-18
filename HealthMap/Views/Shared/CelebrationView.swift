@@ -38,11 +38,14 @@ struct CelebrationView: View {
 
                 // Title
                 VStack(spacing: Theme.spacingSM) {
-                    // Mascotte joyeuse — moment de célébration = moment
-                    // d'identité (remplace l'icône cotillons générique).
-                    MascotView(mood: .happy, size: 88)
-                        .scaleEffect(appeared ? 1.0 : 0.3)
-                        .opacity(appeared ? 1.0 : 0)
+                    // Le kiwi qui saute + étincelles — moment d'identité de la
+                    // célébration (au lieu du simple rebond .happy).
+                    ZStack {
+                        SparkleBurst(size: 200)
+                        KiwiWalkerView(size: 120, pose: .cheer)
+                    }
+                    .scaleEffect(appeared ? 1.0 : 0.3)
+                    .opacity(appeared ? 1.0 : 0)
 
                     Text("Ton bilan est pret !")
                         .font(Theme.titleFont)
