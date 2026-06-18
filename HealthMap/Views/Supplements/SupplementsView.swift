@@ -51,8 +51,9 @@ struct SupplementsView: View {
                     mainContent
                 } else if dashboardVM.isLoadingAnalysis {
                     VStack(spacing: Theme.spacingMD) {
-                        ProgressView()
-                            .tint(Color.healthMapBlue)
+                        // Loader signature : le kiwi qui marche (cohérence avec
+                        // les autres écrans de chargement).
+                        KiwiWalkerView(size: 140)
                         Text("Chargement...")
                             .font(Theme.bodyFont)
                             .foregroundStyle(Color.healthMapSecondary)
