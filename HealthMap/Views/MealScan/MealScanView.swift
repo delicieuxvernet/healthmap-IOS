@@ -52,11 +52,9 @@ struct MealScanView: View {
                 // Results view
                 resultsView(result)
             } else if viewModel.isAnalyzing {
-                // Loading
+                // Loading — loader signature : le kiwi qui marche.
                 VStack(spacing: Theme.spacingMD) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(Color.healthMapBlue)
+                    KiwiWalkerView(size: 140)
                     Text("Analyse en cours...")
                         .font(Theme.bodyFont)
                         .foregroundStyle(Color.healthMapSecondary)

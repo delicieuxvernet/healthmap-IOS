@@ -546,10 +546,9 @@ struct DashboardView: View {
     /// le score déterministe reste visible et utilisable.
     private var analysisLoadingBanner: some View {
         HStack(spacing: Theme.spacingSM) {
-            // Mascotte en réflexion pendant que l'IA travaille — plus
-            // chaleureux qu'un spinner nu (l'activité reste signalée par
-            // le texte et l'animation d'idle de la mascotte).
-            MascotView(mood: .thinking, size: 44)
+            // Le kiwi qui marche pendant que l'IA travaille — plus chaleureux
+            // qu'un spinner nu, l'activité est signalée par le mouvement.
+            KiwiWalkerView(size: 44)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Analyse IA en cours…")
