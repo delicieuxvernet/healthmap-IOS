@@ -500,9 +500,8 @@ struct QuestionnaireContainerView: View {
     // MARK: - Submitting View
     private var submittingView: some View {
         VStack(spacing: Theme.spacingLG) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(Color.healthMapBlue)
+            // Loader signature : le kiwi qui marche (remplace le spinner nu).
+            KiwiWalkerView(size: 140)
 
             Text("Sauvegarde en cours...")
                 .font(Theme.headlineFont)

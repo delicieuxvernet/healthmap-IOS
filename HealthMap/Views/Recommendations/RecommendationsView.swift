@@ -26,9 +26,9 @@ struct RecommendationsView: View {
                     RecommendationsContentView(analysis: analysis)
                 } else if dashboardVM.isLoadingAnalysis {
                     VStack(spacing: Theme.spacingMD) {
-                        MascotView(mood: .thinking, size: 72)
-                        ProgressView()
-                            .tint(Color.healthMapBlue)
+                        // Loader signature : le kiwi qui marche remplace le
+                        // spinner nu — l'attente reste non bloquante.
+                        KiwiWalkerView(size: 140)
                         Text("Chargement du plan…")
                             .font(Theme.bodyFont)
                             .foregroundStyle(Color.healthMapSecondary)
