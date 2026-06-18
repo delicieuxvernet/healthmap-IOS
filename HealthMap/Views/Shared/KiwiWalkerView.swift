@@ -17,7 +17,13 @@ import Foundation
 /// - Reduce Motion : pose statique (aucune animation).
 /// - Décorative : `accessibilityHidden(true)`.
 struct KiwiWalkerView: View {
+    /// Pose du personnage : `walk` (marche sur place — chargement) ou `cheer`
+    /// (saut sur place, bras levés — célébration). Mêmes membres, cinématique
+    /// différente. Reduce Motion = pose statique correspondante.
+    enum Pose { case walk, cheer }
+
     var size: CGFloat = 160
+    var pose: Pose = .walk
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -25,13 +31,13 @@ struct KiwiWalkerView: View {
         Group {
             if reduceMotion {
                 Canvas { context, canvasSize in
-                    Self.draw(in: context, size: canvasSize, time: 0)
+                    Self.draw(in: context, size: canvasSize, time: 0, pose: pose)
                 }
             } else {
                 TimelineView(.animation) { timeline in
                     let t = timeline.date.timeIntervalSinceReferenceDate
                     Canvas { context, canvasSize in
-                        Self.draw(in: context, size: canvasSize, time: t)
+                        Self.draw(in: context, size: canvasSize, time: t, pose: pose)
                     }
                 }
             }
@@ -48,22 +54,39 @@ struct KiwiWalkerView: View {
     private static let ink = Color.mascotInk
 
     /// Dessine la mascotte. `time` en secondes (0 = pose neutre / reduce motion).
-    private static func draw(in context: GraphicsContext, size: CGSize, time: Double) {
+    private static func draw(in context: GraphicsContext, size: CGSize, time: Double, pose: Pose) {
         let sz = min(size.width, size.height)
         let cx = size.width / 2
         let cy = size.height * 0.40
         let bodyR = sz * 0.27
 
-        // Cinématique : un cycle de marche lent (1,6 s).
-        let omega = 2 * Double.pi / 1.6
-        let swing = sin(omega * time)
-        let legL = 14.0 * swing
-        let legR = -14.0 * swing
-        let armL = 40.0 + 12.0 * swing      // bras gauche : sortant (vers la gauche) + balancement
-        let armR = -40.0 - 12.0 * swing     // bras droit : sortant (vers la droite)
-        let bob = -sz * 0.03 * CGFloat(swing * swing)  // petit rebond (2× par cycle)
-        let tilt = 1.2 * swing                         // léger tangage (degrés, Double)
-        let shadowSquish = 1.0 - 0.12 * CGFloat(swing * swing)
+        // Cinématique selon la pose.
+        let legL, legR, armL, armR, tilt: Double
+        let bob, shadowSquish: CGFloat
+        switch pose {
+        case .walk:
+            // Un cycle de marche lent (1,6 s) : jambes/bras qui balancent.
+            let swing = sin(2 * Double.pi / 1.6 * time)
+            legL = 14.0 * swing
+            legR = -14.0 * swing
+            armL = 40.0 + 12.0 * swing      // bras sortant (gauche) + balancement
+            armR = -40.0 - 12.0 * swing     // bras sortant (droite)
+            bob = -sz * 0.03 * CGFloat(swing * swing)  // petit rebond (2× par cycle)
+            tilt = 1.2 * swing                         // léger tangage (degrés)
+            shadowSquish = 1.0 - 0.12 * CGFloat(swing * swing)
+        case .cheer:
+            // Célébration : saut sur place, bras levés en V, légère oscillation.
+            let cycle = 2 * Double.pi / 0.85
+            let jump = max(0, sin(cycle * time))       // 0→1, vers le haut uniquement
+            let wob = sin(cycle * time)
+            legL = 13.0                                // jambes stables, un peu écartées
+            legR = -13.0
+            armL = 150.0 + 8.0 * wob                   // bras levés (haut-gauche)
+            armR = -150.0 - 8.0 * wob                  // bras levés (haut-droite)
+            bob = -sz * 0.12 * CGFloat(jump)           // saut
+            tilt = 0
+            shadowSquish = 1.0 - 0.22 * CGFloat(jump)  // ombre se contracte en l'air
+        }
 
         // Clignement bref ~ toutes les 3,6 s.
         let blinking = time.truncatingRemainder(dividingBy: 3.6) < 0.13
