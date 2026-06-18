@@ -7,10 +7,19 @@ struct ContentView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Durée plancher du splash : garantit que le réveil du kiwi (≈550 ms) est
+    /// toujours vu, même quand l'auth se résout instantanément (utilisateur
+    /// déconnecté / première ouverture, sans aller-retour réseau).
+    @State private var minSplashElapsed = false
+
+    /// Le splash reste affiché tant que l'auth charge OU que la durée plancher
+    /// n'est pas écoulée.
+    private var showLaunch: Bool { authViewModel.isLoading || !minSplashElapsed }
+
     var body: some View {
         ZStack(alignment: .top) {
             Group {
-                if authViewModel.isLoading {
+                if showLaunch {
                     LaunchScreenView()
                 } else if !hasSeenOnboarding {
                     OnboardingView(hasSeenOnboarding: $hasSeenOnboarding)
@@ -33,6 +42,7 @@ struct ContentView: View {
             }
             .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: authViewModel.isAuthenticated)
             .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: hasSeenOnboarding)
+            .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: showLaunch)
 
             // Global offline banner — shows above every screen when the phone
             // loses connectivity. Sits at the top because the tab bar already
@@ -51,6 +61,11 @@ struct ContentView: View {
                 .zIndex(2)
         }
         .animation(reduceMotion ? .none : .easeInOut(duration: 0.25), value: connectivity.isOnline)
+        .task {
+            // Durée plancher du splash (≈0,9 s) — le réveil du kiwi est toujours vu.
+            try? await Task.sleep(for: .seconds(0.9))
+            minSplashElapsed = true
+        }
         // Universal Links: when the user taps a `https://healthmap.fr/...`
         // link in Mail, Messages, Safari, or any other app, iOS routes the
         // activity here because the app's entitlements declare
