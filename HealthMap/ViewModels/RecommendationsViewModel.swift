@@ -23,6 +23,16 @@ final class RecommendationsViewModel: ObservableObject {
         !interactions.isEmpty
     }
 
+    // MARK: - Enquête par symptôme / par objectif (sections dédiées)
+
+    var symptomesAnalyse: [SymptomeAnalyse] {
+        analysis.symptomesAnalyse.filter { ($0.symptome?.isEmpty == false) && !($0.causesProbables ?? []).isEmpty }
+    }
+
+    var objectifsAnalyse: [ObjectifAnalyse] {
+        analysis.objectifsAnalyse.filter { $0.objectif?.isEmpty == false && (!($0.freins ?? []).isEmpty || !($0.leviers ?? []).isEmpty) }
+    }
+
     // MARK: - Top Deficiencies (nutrients with score < 60, sorted worst first)
 
     var topDeficiencies: [EnrichedNutrient] {

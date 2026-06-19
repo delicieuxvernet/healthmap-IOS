@@ -265,7 +265,8 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
                 solution: ai?.solution.map { NutrientSolutionAI(action: $0.action, dosage: $0.dosage, quand: $0.quand, pourquoi: $0.pourquoi, delai: $0.delai) },
                 hack: ai?.hack,
                 synergie: ai?.synergie,
-                pourquoiCeScore: ai?.pourquoiCeScore
+                pourquoiCeScore: ai?.pourquoiCeScore,
+                hypotheses: ai?.hypotheses
             )
         }
 
@@ -314,6 +315,8 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             positiveFindings: aiData.positiveFindings ?? [],
             supplementsSchedule: aiData.supplementsSchedule,
             bloodTests: aiData.bloodTests,
+            symptomesAnalyse: aiData.symptomesAnalyse ?? [],
+            objectifsAnalyse: aiData.objectifsAnalyse ?? [],
             meta: aiData.meta
         )
     }
@@ -333,6 +336,10 @@ struct MergedAnalysis {
     let positiveFindings: [PositiveFinding]
     let supplementsSchedule: SupplementsSchedule?
     let bloodTests: BloodTests?
+    // Défaut [] → les call-sites existants (tests) restent compatibles ;
+    // mergeWithCanonical les renseigne explicitement.
+    var symptomesAnalyse: [SymptomeAnalyse] = []
+    var objectifsAnalyse: [ObjectifAnalyse] = []
     let meta: AnalysisMeta?
 
     /// Overall score (1-10) from AI summary

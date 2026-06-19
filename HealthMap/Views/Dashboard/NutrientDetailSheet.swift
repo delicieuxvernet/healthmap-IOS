@@ -12,11 +12,15 @@ import SwiftUI
 //   6. Hack + synergie : premium via BlurredSection partagée (loi 11)
 struct NutrientDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     let nutrient: EnrichedNutrient
     /// Conservé pour les call-sites ; le gating premium est délégué à la
     /// BlurredSection partagée (SubscriptionService = source unique — loi 11,
     /// politique premium identique partout).
     let isPremium: Bool
+
+    /// État de la « Recherche approfondie » (validate-hypotheses + web).
+    @State private var deepState: DeepSearchState = .idle
 
     /// Couleur d'état : échelle unique score (lois 3 & 13) — jamais la
     /// couleur d'identité du nutriment dans cette fiche.
@@ -45,6 +49,10 @@ struct NutrientDetailSheet: View {
                     if let solution = nutrient.solution, hasSolutionContent(solution) {
                         solutionCard(solution)
                     }
+
+                    // 4b. Recherche approfondie (validate-hypotheses + web) —
+                    // présente seulement si le nutriment a des hypothèses v1.
+                    deepSearchSection
 
                     // 5. Repliables fermés (un seul composant réutilisé)
                     if hasMechanism || hasSymptoms {
@@ -372,6 +380,209 @@ struct NutrientDetailSheet: View {
             }
         }
     }
+
+    // MARK: - 4b. Recherche approfondie (validate-hypotheses + recherche web)
+    // Bouton à la demande : appelle l'Edge Function avec webSearch:true, qui
+    // arbitre les hypothèses v1 du nutriment ET ramène des sources scientifiques
+    // RÉELLES (PubMed, EFSA, Cochrane…). Résultat affiché EN PLACE (sheet
+    // terminale niveau 2, jamais de niveau 3). Absent si aucune hypothèse v1.
+    @ViewBuilder
+    private var deepSearchSection: some View {
+        if let hypotheses = nutrient.hypotheses, !hypotheses.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                switch deepState {
+                case .idle:
+                    deepSearchButton(title: "Recherche approfondie",
+                                     subtitle: "Croise tes données avec des articles scientifiques")
+                case .loading:
+                    HStack(spacing: Theme.spacingSM) {
+                        ProgressView()
+                        Text("Recherche en cours\u{2026} environ une minute")
+                            .font(Theme.captionFont)
+                            .foregroundStyle(Color.healthMapSecondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                case .loaded(let result):
+                    deepResult(result)
+                case .failed(let message):
+                    VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                        Text(message)
+                            .font(Theme.captionFont)
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        deepSearchButton(title: "Réessayer", subtitle: nil)
+                    }
+                }
+            }
+            .padding(Theme.spacingMD)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+    }
+
+    private func deepSearchButton(title: String, subtitle: String?) -> some View {
+        Button {
+            runDeepSearch()
+        } label: {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "sparkle.magnifyingglass")
+                    .font(.system(size: 16, weight: .semibold))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .semibold))
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 11))
+                            .opacity(0.9)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.white)
+            .padding(Theme.spacingMD)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
+                    .fill(Color.healthMapBlue)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.healthMapPressed)
+    }
+
+    private func deepResult(_ result: ValidateHypothesesResponse) -> some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "sparkle.magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.healthMapBlue)
+                    .accessibilityHidden(true)
+                Text("Recherche approfondie")
+                    .font(Theme.captionBoldFont)
+                    .foregroundStyle(Color.healthMapText)
+                Spacer()
+                if let n = result.meta?.webResults, n > 0 {
+                    Text("\(n) sources")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.healthMapMuted)
+                }
+            }
+
+            if let confirmed = result.confirmedHypothesis, let label = confirmed.label, !label.isEmpty {
+                HStack(alignment: .top, spacing: Theme.spacingXS) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.scoreExcellent)
+                        .padding(.top, 1)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(label)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.healthMapText)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let reason = confirmed.reason, !reason.isEmpty {
+                            Text(reason)
+                                .font(Theme.captionFont)
+                                .foregroundStyle(Color.healthMapSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+
+            if let synthesis = result.synthesis, !synthesis.isEmpty {
+                Text(synthesis)
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let evidence = result.webEvidence, !evidence.isEmpty {
+                Divider()
+                HStack(spacing: Theme.spacingXS) {
+                    Image(systemName: "link")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.healthMapBlue)
+                        .accessibilityHidden(true)
+                    Text("Sources scientifiques")
+                        .font(Theme.captionBoldFont)
+                        .foregroundStyle(Color.healthMapText)
+                }
+                ForEach(evidence.prefix(6)) { source in
+                    sourceRow(source)
+                }
+            }
+
+            Text("Informatif\u{202F}: ne remplace pas un avis médical.")
+                .font(.system(size: 10))
+                .foregroundStyle(Color.healthMapMuted)
+                .padding(.top, 2)
+        }
+    }
+
+    private func sourceRow(_ source: WebEvidenceItem) -> some View {
+        Button {
+            if let urlString = source.url, let url = URL(string: urlString) {
+                openURL(url)
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(source.title ?? source.host)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.healthMapBlue)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 4) {
+                    Text(source.host)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.healthMapMuted)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.healthMapBlue)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(Theme.spacingSM)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(Color.healthMapBlueLight)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel("Source\u{202F}: \(source.title ?? source.host). Ouvre le lien.")
+    }
+
+    private func runDeepSearch() {
+        guard let hypotheses = nutrient.hypotheses, !hypotheses.isEmpty else { return }
+        HapticService.shared.tap()
+        deepState = .loading
+        Task {
+            do {
+                let result = try await HypothesisValidationService.shared.deepSearch(
+                    nutrientId: nutrient.id,
+                    hypotheses: hypotheses,
+                    score: nutrient.score
+                )
+                deepState = .loaded(result)
+            } catch {
+                deepState = .failed("La recherche n'a pas abouti. Vérifie ta connexion et réessaie.")
+            }
+        }
+    }
+}
+
+// MARK: - État de la recherche approfondie
+private enum DeepSearchState {
+    case idle
+    case loading
+    case loaded(ValidateHypothesesResponse)
+    case failed(String)
 }
 
 // MARK: - Fiche Collapsible (bloc 5 — composant repliable UNIQUE de la fiche)
