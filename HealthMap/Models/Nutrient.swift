@@ -105,6 +105,9 @@ struct EnrichedNutrient: Identifiable, Codable {
     var hack: String?
     var synergie: String?
     var pourquoiCeScore: String?
+    /// Hypothèses v1 (pour la « Recherche approfondie »). Hors CodingKeys :
+    /// peuplé au merge depuis AIRisk, pas (dé)sérialisé avec le nutriment.
+    var hypotheses: [AIHypothesis]? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, label, emoji, color, score, status, confidence, signals, verdict

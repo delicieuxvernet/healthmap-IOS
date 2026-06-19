@@ -20,6 +20,8 @@ struct AIAnalysisResponse: Codable {
     var supplementsSchedule: SupplementsSchedule?
     var bloodTests: BloodTests?
     var interactionsDetectees: [InteractionDetected]?
+    var symptomesAnalyse: [SymptomeAnalyse]?
+    var objectifsAnalyse: [ObjectifAnalyse]?
     var meta: AnalysisMeta?
 
     // Legacy v6 compat
@@ -37,6 +39,8 @@ struct AIAnalysisResponse: Codable {
         case supplementsSchedule = "supplements_schedule"
         case bloodTests = "blood_tests"
         case interactionsDetectees = "interactions_detectees"
+        case symptomesAnalyse = "symptomes_analyse"
+        case objectifsAnalyse = "objectifs_analyse"
         case meta
         case bilan, nutriments
         case pepitesSante = "pepites_sante"
@@ -84,12 +88,31 @@ struct AIRisk: Codable, Identifiable {
     var hack: String?
     var synergie: String?
     var pourquoiCeScore: String?
+    /// Hypothèses explicatives v1 (id + label + mécanisme) — alimentent la
+    /// « Recherche approfondie » (validate-hypotheses). Décodées depuis la
+    /// même `ai_analysis` partagée avec le web ; étaient ignorées avant.
+    var hypotheses: [AIHypothesis]?
 
     enum CodingKeys: String, CodingKey {
         case id, confidence, signals, verdict, mecanisme, comparaison
         case signeManque = "signe_manque"
         case solution, hack, synergie
         case pourquoiCeScore = "pourquoi_ce_score"
+        case hypotheses
+    }
+}
+
+// MARK: - AI Hypothesis (v1 — arbitrée par validate-hypotheses)
+struct AIHypothesis: Codable, Identifiable {
+    var id: String { hypId ?? UUID().uuidString }
+    var hypId: String?
+    var label: String?
+    var mechanism: String?
+    var likelihood: String?
+
+    enum CodingKeys: String, CodingKey {
+        case hypId = "id"
+        case label, mechanism, likelihood
     }
 }
 
@@ -223,6 +246,32 @@ struct InteractionDetected: Codable, Identifiable {
     }
 }
 
+// MARK: - Symptôme analysé (enquête par symptôme déclaré)
+struct SymptomeAnalyse: Codable, Identifiable {
+    var id: String { symptome ?? UUID().uuidString }
+    var symptome: String?
+    var causesProbables: [String]?
+    var aVerifier: String?
+
+    enum CodingKeys: String, CodingKey {
+        case symptome
+        case causesProbables = "causes_probables"
+        case aVerifier = "a_verifier"
+    }
+}
+
+// MARK: - Objectif analysé (freins + leviers par objectif déclaré)
+struct ObjectifAnalyse: Codable, Identifiable {
+    var id: String { objectif ?? UUID().uuidString }
+    var objectif: String?
+    var freins: [String]?
+    var leviers: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case objectif, freins, leviers
+    }
+}
+
 // MARK: - Analysis Meta
 struct AnalysisMeta: Codable {
     var schemaVersion: Int?
@@ -337,6 +386,8 @@ extension AIAnalysisResponse {
         supplementsSchedule = c.lenient(.supplementsSchedule)
         bloodTests = c.lenient(.bloodTests)
         interactionsDetectees = c.lenientArray(.interactionsDetectees)
+        symptomesAnalyse = c.lenientArray(.symptomesAnalyse)
+        objectifsAnalyse = c.lenientArray(.objectifsAnalyse)
         meta = c.lenient(.meta)
         bilan = c.lenient(.bilan)
         nutriments = c.lenient(.nutriments)
@@ -391,6 +442,35 @@ extension AIRisk {
         hack = c.lenient(.hack)
         synergie = c.lenient(.synergie)
         pourquoiCeScore = c.lenient(.pourquoiCeScore)
+        hypotheses = c.lenientArray(.hypotheses)
+    }
+}
+
+extension AIHypothesis {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        hypId = c.lenient(.hypId)
+        label = c.lenient(.label)
+        mechanism = c.lenient(.mechanism)
+        likelihood = c.lenient(.likelihood)
+    }
+}
+
+extension SymptomeAnalyse {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        symptome = c.lenient(.symptome)
+        causesProbables = c.lenientArray(.causesProbables)
+        aVerifier = c.lenient(.aVerifier)
+    }
+}
+
+extension ObjectifAnalyse {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        objectif = c.lenient(.objectif)
+        freins = c.lenientArray(.freins)
+        leviers = c.lenientArray(.leviers)
     }
 }
 

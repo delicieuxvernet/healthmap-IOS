@@ -107,6 +107,18 @@ struct RecommendationsContentView: View {
                     .padding(.horizontal, Theme.spacingLG)
                 }
 
+                // 2b. Enquête par symptôme : causes croisées issues de TOUT le profil
+                if !vm.symptomesAnalyse.isEmpty {
+                    SymptomesAnalyseSection(symptomes: vm.symptomesAnalyse)
+                        .padding(.horizontal, Theme.spacingLG)
+                }
+
+                // 2c. Enquête par objectif : freins + leviers personnalisés
+                if !vm.objectifsAnalyse.isEmpty {
+                    ObjectifsAnalyseSection(objectifs: vm.objectifsAnalyse)
+                        .padding(.horizontal, Theme.spacingLG)
+                }
+
                 // 3. Rangée symétrique Compléments / Analyses (loi 6)
                 planTilesRow
                     .padding(.horizontal, Theme.spacingLG)
@@ -598,6 +610,150 @@ private enum PlanCheckStore {
 
     static func save(_ ids: Set<String>) {
         UserDefaults.standard.set(Array(ids).sorted(), forKey: key)
+    }
+}
+
+// MARK: - Libellé lisible pour les clés de symptôme/objectif
+/// Le profil stocke des clés (« fatigue_persistante », « cheveux_peau ») ;
+/// on les rend présentables sans table de correspondance figée.
+private func prettifyLabel(_ raw: String) -> String {
+    let cleaned = raw.replacingOccurrences(of: "_", with: " ").trimmingCharacters(in: .whitespaces)
+    guard let first = cleaned.first else { return cleaned }
+    return first.uppercased() + cleaned.dropFirst()
+}
+
+// MARK: - Section « Tes symptômes analysés » (enquête par symptôme)
+// Source : MergedAnalysis.symptomesAnalyse. Pour chaque symptôme (3 max) :
+// causes probables croisées (4 max) + une ligne « À vérifier ». Bornes loi 9.
+private struct SymptomesAnalyseSection: View {
+    let symptomes: [SymptomeAnalyse]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingMD) {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "stethoscope")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.accentSky)
+                    .accessibilityHidden(true)
+                Text("Tes symptômes analysés")
+                    .font(Theme.captionBoldFont)
+                    .foregroundStyle(Color.healthMapText)
+                Spacer()
+            }
+
+            ForEach(symptomes.prefix(3)) { item in
+                VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                    if let s = item.symptome, !s.isEmpty {
+                        Text(prettifyLabel(s))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.healthMapText)
+                    }
+
+                    ForEach(Array((item.causesProbables ?? []).prefix(4).enumerated()), id: \.offset) { _, cause in
+                        HStack(alignment: .top, spacing: Theme.spacingXS) {
+                            Circle()
+                                .fill(Color.accentSky)
+                                .frame(width: 4, height: 4)
+                                .padding(.top, 6)
+                                .accessibilityHidden(true)
+                            Text(cause)
+                                .font(Theme.captionFont)
+                                .foregroundStyle(Color.healthMapSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    if let aVerifier = item.aVerifier, !aVerifier.isEmpty {
+                        HStack(alignment: .top, spacing: Theme.spacingXS) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.healthMapBlue)
+                                .padding(.top, 1)
+                                .accessibilityHidden(true)
+                            Text("À vérifier\u{202F}: \(aVerifier)")
+                                .font(Theme.captionFont)
+                                .foregroundStyle(Color.healthMapBlue)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+                .padding(Theme.spacingSM)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.accentSky.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            }
+        }
+        .padding(Theme.spacingMD)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+}
+
+// MARK: - Section « Tes objectifs » (freins + leviers par objectif)
+// Source : MergedAnalysis.objectifsAnalyse. Pour chaque objectif (3 max) :
+// freins (3 max) puis leviers (3 max). Bornes loi 9.
+private struct ObjectifsAnalyseSection: View {
+    let objectifs: [ObjectifAnalyse]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingMD) {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "target")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.accentIndigo)
+                    .accessibilityHidden(true)
+                Text("Tes objectifs")
+                    .font(Theme.captionBoldFont)
+                    .foregroundStyle(Color.healthMapText)
+                Spacer()
+            }
+
+            ForEach(objectifs.prefix(3)) { item in
+                VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                    if let o = item.objectif, !o.isEmpty {
+                        Text(prettifyLabel(o))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.healthMapText)
+                    }
+
+                    if let freins = item.freins, !freins.isEmpty {
+                        labeledList(title: "FREINS", tint: Color.scoreDeficient, items: freins)
+                    }
+                    if let leviers = item.leviers, !leviers.isEmpty {
+                        labeledList(title: "LEVIERS", tint: Color.scoreExcellent, items: leviers)
+                    }
+                }
+                .padding(Theme.spacingSM)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.accentIndigo.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            }
+        }
+        .padding(Theme.spacingMD)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private func labeledList(title: String, tint: Color, items: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(tint)
+            ForEach(Array(items.prefix(3).enumerated()), id: \.offset) { _, text in
+                HStack(alignment: .top, spacing: Theme.spacingXS) {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 4, height: 4)
+                        .padding(.top, 6)
+                        .accessibilityHidden(true)
+                    Text(text)
+                        .font(Theme.captionFont)
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
     }
 }
 
