@@ -173,78 +173,187 @@ struct MealScanView: View {
     }
 
     // MARK: - Results View
+    // Refonte « assiette analysée » : illustration en héro (asset scan_plate) +
+    // apports RÉELS du scan (micros.pctRDA / isDeficiency) en chips « bien couvert »
+    // (vert) / « à renforcer » (orange), puis le conseil. Données 100 % réelles.
     private func resultsView(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
-        VStack(spacing: Theme.spacingLG) {
-            // Detected foods
-            HStack {
-                Text(result.detectedFoods.joined(separator: " · "))
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.healthMapText)
-                Spacer()
-            }
-            .padding(Theme.spacingSM)
-            .background(Color.healthMapCard)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .padding(.horizontal, Theme.spacingLG)
+        // Bien couvert : nutriments que CE repas apporte notablement.
+        let wellCovered = result.micros
+            .filter { $0.pctRDA >= 25 }
+            .sorted { $0.pctRDA > $1.pctRDA }
+        // À renforcer : tes points faibles (isDeficiency) que ce repas ne comble pas.
+        let toReinforce = result.micros
+            .filter { $0.isDeficiency && $0.pctRDA < 25 }
+            .sorted { $0.pctRDA < $1.pctRDA }
 
-            // Macros
+        return VStack(spacing: Theme.spacingLG) {
+            plateHeroCard(result)
+
+            if !wellCovered.isEmpty {
+                nutrientChipsSection(title: "Bien couvert par ce repas",
+                                     icon: "checkmark.seal.fill",
+                                     color: .scoreExcellent,
+                                     nutrients: wellCovered)
+            }
+
+            if toReinforce.isEmpty {
+                reinforceEmptyNote
+            } else {
+                nutrientChipsSection(title: "À renforcer",
+                                     icon: "arrow.up.circle.fill",
+                                     color: .scoreLow,
+                                     nutrients: toReinforce)
+            }
+
+            conseilCard(result.advice)
+
             macrosCard(result.macros)
 
-            // Micros
-            microsCard(result.micros)
+            if !result.warnings.isEmpty { warningsCard(result.warnings) }
 
-            // Advice cards
-            if !result.advice.coversDeficiencies.isEmpty {
-                adviceCard(title: "Couvre tes besoins", emoji: "✅", items: result.advice.coversDeficiencies, color: .scoreGood)
+            scanAgainButton
+        }
+    }
+
+    // MARK: - Hero (assiette illustrée + aliments détectés)
+    private func plateHeroCard(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
+        VStack(spacing: Theme.spacingSM) {
+            Image("scan_plate")
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .frame(height: 168)
+                .accessibilityHidden(true)
+
+            if !result.detectedFoods.isEmpty {
+                Text(result.detectedFoods.prefix(6).joined(separator: " · "))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
             }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(Theme.spacingMD)
+        .cardStyle()
+        .padding(.horizontal, Theme.spacingLG)
+    }
 
-            if !result.advice.suggestedAdditions.isEmpty {
-                adviceCard(title: "A ajouter pour mieux", emoji: "➕", items: result.advice.suggestedAdditions, color: .healthMapBlue)
+    // MARK: - Sections d'apports (chips)
+    private func nutrientChipsSection(title: String, icon: String, color: Color,
+                                      nutrients: [MealScanViewModel.MicroNutrient]) -> some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 13)).foregroundStyle(color)
+                Text(title).font(Theme.captionBoldFont).foregroundStyle(color)
             }
-
-            if !result.advice.swaps.isEmpty {
-                adviceCard(title: "Meilleures options", emoji: "🔄", items: result.advice.swaps, color: .accentIndigo)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)],
+                      alignment: .leading, spacing: 8) {
+                ForEach(nutrients) { n in nutrientChip(n, color: color) }
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.spacingMD)
+        .background(color.opacity(0.07))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .padding(.horizontal, Theme.spacingLG)
+    }
 
-            // Warnings
-            if !result.warnings.isEmpty {
-                VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Color.accentSky)
-                        Text("Attention")
-                            .font(Theme.captionBoldFont)
-                            .foregroundStyle(Color.accentSky)
-                    }
-                    ForEach(result.warnings, id: \.self) { warning in
-                        Text("• \(warning)")
+    private func nutrientChip(_ n: MealScanViewModel.MicroNutrient, color: Color) -> some View {
+        HStack(spacing: 5) {
+            Text(n.emoji).font(.system(size: 13))
+            Text(n.label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.healthMapText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.healthMapCard)
+        .overlay(Capsule().stroke(color.opacity(0.4), lineWidth: 1))
+        .clipShape(Capsule())
+        .accessibilityElement(children: .combine)
+    }
+
+    private var reinforceEmptyNote: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.seal.fill").foregroundStyle(Color.scoreExcellent)
+            Text("Ce repas couvre bien tes besoins du moment 👏")
+                .font(Theme.captionFont)
+                .foregroundStyle(Color.healthMapText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.spacingMD)
+        .background(Color.scoreExcellent.opacity(0.09))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    // MARK: - Conseil
+    @ViewBuilder
+    private func conseilCard(_ advice: MealScanViewModel.MealAdvice) -> some View {
+        let lines: [String] = !advice.suggestedAdditions.isEmpty ? advice.suggestedAdditions
+            : (!advice.coversDeficiencies.isEmpty ? advice.coversDeficiencies : advice.swaps)
+        if !lines.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                HStack(spacing: 6) {
+                    Text("💡")
+                    Text("Le conseil").font(Theme.captionBoldFont).foregroundStyle(Color.healthMapText)
+                }
+                ForEach(Array(lines.prefix(3)), id: \.self) { line in
+                    HStack(alignment: .top, spacing: 6) {
+                        Text("•").foregroundStyle(Color.healthMapBlue)
+                        Text(line)
                             .font(Theme.captionFont)
                             .foregroundStyle(Color.healthMapText)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .padding(Theme.spacingMD)
-                .background(Color.accentSky.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
-                .padding(.horizontal, Theme.spacingLG)
             }
-
-            // Scan another
-            Button {
-                viewModel.reset()
-            } label: {
-                HStack {
-                    Image(systemName: "camera.fill")
-                    Text("Scanner un autre repas")
-                        .font(.system(size: 15, weight: .semibold))
-                }
-                .foregroundStyle(Color.healthMapBlue)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.healthMapBlueLight)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Theme.spacingMD)
+            .cardStyle()
             .padding(.horizontal, Theme.spacingLG)
         }
+    }
+
+    // MARK: - Warnings
+    private func warningsCard(_ warnings: [String]) -> some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.scoreLow)
+                Text("Attention").font(Theme.captionBoldFont).foregroundStyle(Color.scoreLow)
+            }
+            ForEach(warnings, id: \.self) { warning in
+                Text("• \(warning)")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.spacingMD)
+        .background(Color.scoreLow.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    private var scanAgainButton: some View {
+        Button {
+            viewModel.reset()
+        } label: {
+            HStack {
+                Image(systemName: "camera.fill")
+                Text("Scanner un autre repas")
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            .foregroundStyle(Color.healthMapBlue)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.healthMapBlueLight)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+        }
+        .padding(.horizontal, Theme.spacingLG)
     }
 
     // MARK: - Macros Card
@@ -273,88 +382,6 @@ struct MealScanView: View {
                 .foregroundStyle(Color.healthMapSecondary)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Micros Card
-    private func microsCard(_ micros: [MealScanViewModel.MicroNutrient]) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            Text("Apport micronutriments")
-                .font(Theme.captionBoldFont)
-                .foregroundStyle(Color.healthMapSecondary)
-
-            ForEach(micros) { micro in
-                HStack(spacing: Theme.spacingSM) {
-                    Text(micro.emoji)
-                        .font(.system(size: 14))
-
-                    Text(micro.label)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.healthMapText)
-
-                    if micro.isDeficiency {
-                        Text("A renforcer")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color.scoreDeficient)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.scoreDeficient.opacity(0.1))
-                            .clipShape(Capsule())
-                    }
-
-                    Spacer()
-
-                    Text("\(micro.pctRDA)%")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(microColor(pct: micro.pctRDA))
-
-                    // Progress bar
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.healthMapMuted.opacity(0.15))
-                            .frame(width: 50, height: 5)
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(microColor(pct: micro.pctRDA))
-                            .frame(width: min(50, CGFloat(micro.pctRDA) / 100.0 * 50), height: 5)
-                    }
-                }
-            }
-        }
-        .padding(Theme.spacingMD)
-        .cardStyle()
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    private func microColor(pct: Int) -> Color {
-        if pct >= 50 { return .healthMapBlue }
-        if pct >= 25 { return .scoreLow }
-        return .healthMapMuted
-    }
-
-    // MARK: - Advice Card
-    private func adviceCard(title: String, emoji: String, items: [String], color: Color) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: 6) {
-                Text(emoji)
-                Text(title)
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(color)
-            }
-
-            ForEach(items, id: \.self) { item in
-                HStack(alignment: .top, spacing: 6) {
-                    Text("•")
-                        .foregroundStyle(color)
-                    Text(item)
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-        .padding(Theme.spacingMD)
-        .background(color.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
-        .padding(.horizontal, Theme.spacingLG)
     }
 
     // MARK: - Search Tab
