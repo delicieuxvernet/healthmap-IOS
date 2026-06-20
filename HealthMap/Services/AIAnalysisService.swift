@@ -59,7 +59,10 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             return nil
         }
 
-        // 4. Call Edge Function with 130s timeout (matches web)
+        // 4. Call Edge Function — timeout client 185s, VOLONTAIREMENT > au timeout
+        // serveur (170s) : sinon le client abandonne avant la fin de la
+        // génération (~140s), affiche une erreur, et le retry ne marche que
+        // parce que le serveur a fini + caché entre-temps (bug retour test 20 juin).
         let requestBody = EdgeFunctionRequest(
             scores: localScores,
             healthScore: healthScore,
@@ -78,7 +81,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
                     )
                 }
                 group.addTask {
-                    try await Task.sleep(for: .seconds(130))
+                    try await Task.sleep(for: .seconds(185))
                     throw AIAnalysisError.timeout
                 }
                 guard let result = try await group.next() else {

@@ -9,7 +9,6 @@ struct DashboardView: View {
     @ObservedObject var gamification = GamificationService.shared
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var selectedNutrient: EnrichedNutrient?
-    @State private var showNutrientDetail = false
     @State private var showAllNutrients = false
     @State private var showScoreInfo = false
     @State private var showAvatarPicker = false
@@ -88,11 +87,13 @@ struct DashboardView: View {
                     .accessibilityLabel("Profil")
                 }
             }
-            .sheet(isPresented: $showNutrientDetail) {
-                if let nutrient = selectedNutrient {
-                    NutrientDetailSheet(nutrient: nutrient, isPremium: subscriptionService.isPremium)
-                        .healthMapSheet(.large)
-                }
+            // .sheet(item:) garantit que NutrientDetailSheet reçoit TOUJOURS le
+            // nutriment courant — l'ancien pattern (isPresented + état séparé)
+            // présentait parfois un sheet VIDE au 1er tap (data pas encore
+            // propagée). Fix retour test du 20 juin.
+            .sheet(item: $selectedNutrient) { nutrient in
+                NutrientDetailSheet(nutrient: nutrient, isPremium: subscriptionService.isPremium)
+                    .healthMapSheet(.large)
             }
             .sheet(isPresented: $showAllNutrients) {
                 AllNutrientsSheet(
@@ -362,7 +363,6 @@ struct DashboardView: View {
                         NutrientGapChip(nutrient: nutrient) {
                             HapticService.shared.tap()
                             selectedNutrient = nutrient
-                            showNutrientDetail = true
                         }
                     }
                 }
@@ -530,9 +530,10 @@ private extension View {
 // Tant que le bilan IA n'est pas prêt, on n'affiche AUCUN résultat : juste la
 // mascotte kiwi qui marche + un message qui tourne, pour rendre l'attente
 // (~1 à 2 min) vivante. Reduce-motion : pas de rotation, 1er message figé.
-private struct FullAnalysisLoadingView: View {
+struct FullAnalysisLoadingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var messageIndex = 0
+    @State private var progress: Double = 0
 
     private let messages = [
         "On croise tes symptômes, ton alimentation et ton mode de vie.",
@@ -562,10 +563,11 @@ private struct FullAnalysisLoadingView: View {
                     .transition(.opacity)
             }
 
-            ProgressView()
+            ProgressView(value: progress)
                 .progressViewStyle(.linear)
                 .tint(Color.healthMapBlue)
                 .frame(maxWidth: 200)
+                .animation(.easeInOut(duration: 0.4), value: progress)
 
             Text("Ça prend environ une minute. On te prépare un bilan complet.")
                 .font(Theme.captionFont)
@@ -580,12 +582,20 @@ private struct FullAnalysisLoadingView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Analyse de ton profil en cours. Cela prend environ une minute.")
         .task {
-            guard !reduceMotion else { return }
+            // Progression synthétique : avance vite au début puis ralentit
+            // (asymptote ~0,95) pour signaler que ça travaille — la durée réelle
+            // est inconnue. Les messages tournent toutes les ~3,6 s (hors
+            // reduce-motion). La tâche est annulée quand le bilan arrive.
+            var ticks = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3.5))
+                try? await Task.sleep(for: .seconds(0.4))
                 if Task.isCancelled { break }
-                withAnimation(.easeInOut(duration: 0.4)) {
-                    messageIndex = (messageIndex + 1) % messages.count
+                ticks += 1
+                progress = min(0.95, progress + (0.95 - progress) * 0.03)
+                if !reduceMotion && ticks % 9 == 0 {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        messageIndex = (messageIndex + 1) % messages.count
+                    }
                 }
             }
         }

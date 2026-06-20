@@ -413,6 +413,19 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .healthmapOpenProfile)) { _ in
             showProfile = true
         }
+        // BLOCAGE pendant la 1re analyse IA (retour test 20 juin) : tant que le
+        // bilan n'est pas prêt, on couvre TOUTE l'app (barre d'onglets comprise)
+        // -> impossible de naviguer ailleurs. Se ferme automatiquement dès que le
+        // résultat arrive (aiAnalysis != nil). En cas d'échec : écran Réessayer,
+        // jamais de scores bruts. Un utilisateur revenant avec un bilan en cache
+        // ne voit pas cet écran (aiAnalysis est non-nil quasi immédiatement).
+        .fullScreenCover(isPresented: Binding(
+            get: { dashboardVM.aiAnalysis == nil && (dashboardVM.isLoadingAnalysis || dashboardVM.errorMessage != nil) },
+            set: { _ in }
+        )) {
+            AnalysisGateView()
+                .environmentObject(dashboardVM)
+        }
     }
 
     /// Routes a queued `DeepLinkRoute` to the matching tab or modal, then
@@ -442,6 +455,30 @@ struct MainTabView: View {
 
         AppLogger.push.info("Consumed deep-link route \(route.rawValue, privacy: .public)")
         pushService.pendingRoute = nil
+    }
+}
+
+// MARK: - Analysis Gate (bloque la navigation pendant la 1re analyse IA)
+// Présenté en fullScreenCover par MainTabView : couvre toute l'app (barre
+// d'onglets incluse) tant que le bilan n'est pas prêt. Affiche l'écran de
+// chargement, ou un écran « Réessayer » en cas d'échec — jamais de scores
+// bruts, et l'utilisateur ne peut pas naviguer ailleurs (retour test 20 juin).
+private struct AnalysisGateView: View {
+    @EnvironmentObject var dashboardVM: DashboardViewModel
+
+    var body: some View {
+        ZStack {
+            WarmBackground().ignoresSafeArea()
+            if !dashboardVM.isLoadingAnalysis, let errorMessage = dashboardVM.errorMessage {
+                AnalysisErrorRetryView(
+                    message: errorMessage,
+                    isRetrying: false,
+                    onRetry: { Task { await dashboardVM.triggerAnalysis() } }
+                )
+            } else {
+                FullAnalysisLoadingView()
+            }
+        }
     }
 }
 
