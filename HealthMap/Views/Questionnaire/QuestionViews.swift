@@ -219,17 +219,14 @@ struct NumericInputView: View {
     }
 }
 
-// MARK: - Slider Input (Lot B — UX au pouce)
-//
-// Remplace le NumericInputView + clavier numérique pour les questions où la
-// valeur est bornée (age, taille, poids, fréquences alimentaires). UX miroir
-// du web : grosse valeur affichée + slider tactile que l'on actionne au pouce.
-// Boutons +/- pour l'ajustement précis.
-//
-// Le binding `text` reste un String pour rester compatible avec
-// `bindingForString(question.id)` côté ViewModel — on convertit en entier
-// (ou demi-entier pour le poids) au passage.
-struct SliderInputView: View {
+// MARK: - Wheel Input Question (molette type Apple)
+// Drop-in du SliderInputView pour age / poids / taille : molette native iOS
+// (.pickerStyle(.wheel)). Mêmes paramètres et même contrat que le slider :
+// - restaure la valeur saisie si l'user revient en arrière ;
+// - n'écrit RIEN dans `text` tant que l'user n'a pas tourné la molette (évite
+//   de "remplir" la question juste en l'affichant) — la valeur par défaut est
+//   seulement centrée visuellement.
+struct WheelInputView: View {
     let question: Question
     @Binding var text: String
     let range: ClosedRange<Double>
@@ -237,84 +234,48 @@ struct SliderInputView: View {
     let suffix: String?
     let defaultValue: Double
 
-    @State private var value: Double = 0
-    @State private var hasInteracted = false
+    @State private var tick: Int
+    @State private var hasInteracted: Bool
 
-    private var displayValue: String {
-        // Step entier → afficher sans décimale. Sinon (poids, 0.5kg) → 1 décimale.
-        step >= 1 ? String(Int(value)) : String(format: "%.1f", value)
+    init(question: Question, text: Binding<String>, range: ClosedRange<Double>, step: Double, suffix: String?, defaultValue: Double) {
+        self.question = question
+        self._text = text
+        self.range = range
+        self.step = step
+        self.suffix = suffix
+        self.defaultValue = defaultValue
+        // Tick initial calculé DÈS la construction → aucun onChange parasite à
+        // l'apparition (donc `text` n'est pas écrit tant que l'user n'a pas agi).
+        let parsed = Double(text.wrappedValue.replacingOccurrences(of: ",", with: "."))
+        let v0 = parsed ?? defaultValue
+        let cnt = max(1, Int(((range.upperBound - range.lowerBound) / step).rounded()) + 1)
+        let raw = ((v0 - range.lowerBound) / step).rounded()
+        _tick = State(initialValue: Swift.min(Swift.max(Int(raw), 0), cnt - 1))
+        _hasInteracted = State(initialValue: parsed != nil)
     }
 
-    private var displayColor: Color {
-        hasInteracted || !text.isEmpty ? Color.healthMapBlue : Color.healthMapText
+    private var count: Int { max(1, Int(((range.upperBound - range.lowerBound) / step).rounded()) + 1) }
+    private func value(_ t: Int) -> Double { range.lowerBound + Double(t) * step }
+    private func format(_ v: Double) -> String { step >= 1 ? String(Int(v)) : String(format: "%.1f", v) }
+    private func label(_ t: Int) -> String {
+        let v = format(value(t))
+        return suffix.map { "\(v) \($0)" } ?? v
     }
 
     var body: some View {
-        VStack(spacing: Theme.spacingLG) {
-            // Affichage XL de la valeur courante + suffix
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(displayValue)
-                    .font(.system(size: 56, weight: .semibold, design: .rounded))
-                    .foregroundStyle(displayColor)
-                    .contentTransition(.numericText(value: value))
-                    .animation(.easeOut(duration: 0.15), value: value)
-
-                if let suffix {
-                    Text(suffix)
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
-                }
+        Picker(question.text, selection: $tick) {
+            ForEach(0..<count, id: \.self) { t in
+                Text(label(t))
+                    .font(.system(size: 22, weight: .medium, design: .rounded))
+                    .tag(t)
             }
-            .frame(maxWidth: .infinity)
-
-            // Slider + boutons d'ajustement précis (44pt — touch target HIG)
-            HStack(spacing: Theme.spacingSM) {
-                Button {
-                    adjust(by: -step)
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(Color.healthMapBlue.opacity(0.85))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.healthMapPressed)
-                .accessibilityLabel("Diminuer")
-
-                Slider(
-                    value: $value,
-                    in: range,
-                    step: step,
-                    onEditingChanged: { editing in
-                        if editing { hasInteracted = true }
-                    }
-                )
-                .tint(Color.healthMapBlue)
-
-                Button {
-                    adjust(by: step)
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(Color.healthMapBlue.opacity(0.85))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.healthMapPressed)
-                .accessibilityLabel("Augmenter")
-            }
-
-            // Bornes affichées
-            HStack {
-                Text(formatBound(range.lowerBound))
-                Spacer()
-                Text(formatBound(range.upperBound))
-            }
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(Color.healthMapMuted)
         }
+        .labelsHidden()
+        .pickerStyle(.wheel)
+        .frame(height: 180)
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, Theme.spacingLG)
-        .padding(.vertical, Theme.spacingLG)
+        .padding(.vertical, Theme.spacingSM)
         .background(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                 .fill(Color.healthMapCard)
@@ -334,32 +295,12 @@ struct SliderInputView: View {
                     lineWidth: 1
                 )
         )
-        .onAppear {
-            // Restore from stored text si l'user revient en arrière ; sinon prend
-            // la valeur par défaut (sans la pousser dans `text` tant qu'il n'a
-            // pas interagi — évite de "remplir" la question juste en l'affichant).
-            if let parsed = Double(text.replacingOccurrences(of: ",", with: ".")) {
-                value = min(max(parsed, range.lowerBound), range.upperBound)
-                hasInteracted = true
-            } else {
-                value = defaultValue
-            }
+        .onChange(of: tick) { _, newTick in
+            hasInteracted = true
+            text = format(value(newTick))
+            HapticService.shared.selection()
         }
-        .onChange(of: value) { _, new in
-            // Tronque le step pour éviter les floating-point drift.
-            let snapped = (new / step).rounded() * step
-            text = step >= 1 ? String(Int(snapped)) : String(format: "%.1f", snapped)
-        }
-    }
-
-    private func adjust(by delta: Double) {
-        hasInteracted = true
-        value = min(max(value + delta, range.lowerBound), range.upperBound)
-        HapticService.shared.primary()
-    }
-
-    private func formatBound(_ v: Double) -> String {
-        step >= 1 ? String(Int(v)) : String(format: "%.1f", v)
+        .accessibilityLabel(question.text)
     }
 }
 
