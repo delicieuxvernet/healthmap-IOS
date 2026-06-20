@@ -71,6 +71,10 @@ enum HealthCalculator {
 
     // MARK: - Health Score (0-100)
     static func calculateHealthScore(profile: UserProfile) -> Int {
+        // Caddie rempli ("Faites vos courses") -> nouveau moteur. Sinon, calcul
+        // historique ci-dessous (transition sûre, parité web préservée).
+        if !profile.groceries.isEmpty { return NutrientEngine.wellnessScore(profile: profile) }
+
         // Input validation: reject manifestly invalid profiles
         let w = profile.weightDouble
         let h = profile.heightDouble
@@ -174,6 +178,10 @@ enum HealthCalculator {
     /// Returns a dictionary of [nutrientID: score] — DETERMINISTIC
     /// Returns empty dictionary for manifestly invalid profiles.
     static func analyzeNutrientScores(profile: UserProfile) -> [String: Int] {
+        // Caddie rempli ("Faites vos courses") -> nouveau moteur de couverture.
+        // Sinon, calcul historique ci-dessous (transition sûre, parité web).
+        if !profile.groceries.isEmpty { return NutrientEngine.nutrientScores(profile: profile) }
+
         // Input validation: reject manifestly invalid profiles
         let w = profile.weightDouble
         let h = profile.heightDouble
