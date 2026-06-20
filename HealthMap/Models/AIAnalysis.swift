@@ -248,7 +248,9 @@ struct InteractionDetected: Codable, Identifiable {
 
 // MARK: - Symptôme analysé (enquête par symptôme déclaré)
 struct SymptomeAnalyse: Codable, Identifiable {
-    var id: String { symptome ?? UUID().uuidString }
+    // Chaîne vide traitée comme absente -> pas de collision d'id entre deux
+    // entrées vides dans un ForEach (revue 20 juin).
+    var id: String { (symptome?.isEmpty == false ? symptome : nil) ?? UUID().uuidString }
     var symptome: String?
     var causesProbables: [String]?
     var aVerifier: String?
@@ -262,7 +264,7 @@ struct SymptomeAnalyse: Codable, Identifiable {
 
 // MARK: - Objectif analysé (freins + leviers par objectif déclaré)
 struct ObjectifAnalyse: Codable, Identifiable {
-    var id: String { objectif ?? UUID().uuidString }
+    var id: String { (objectif?.isEmpty == false ? objectif : nil) ?? UUID().uuidString }
     var objectif: String?
     var freins: [String]?
     var leviers: [String]?
