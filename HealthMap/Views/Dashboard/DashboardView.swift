@@ -9,6 +9,7 @@ struct DashboardView: View {
     @ObservedObject var gamification = GamificationService.shared
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var selectedNutrient: EnrichedNutrient?
+    @State private var selectedSymptom: SymptomeAnalyse?
     @State private var showAllNutrients = false
     @State private var showScoreInfo = false
     @State private var showAvatarPicker = false
@@ -79,6 +80,12 @@ struct DashboardView: View {
             // propagée). Fix retour test du 20 juin.
             .sheet(item: $selectedNutrient) { nutrient in
                 NutrientDetailSheet(nutrient: nutrient, isPremium: subscriptionService.isPremium)
+                    .healthMapSheet(.large)
+            }
+            // Causes d'un symptôme : affichées UNIQUEMENT au tap "Comprendre les
+            // causes" (jamais à l'écran par défaut) — feuille validée par Arthur.
+            .sheet(item: $selectedSymptom) { symptom in
+                SymptomCausesSheet(item: symptom)
                     .healthMapSheet(.large)
             }
             .sheet(isPresented: $showAllNutrients) {
@@ -357,26 +364,65 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Symptômes détectés (refonte 20 juin) — accordéon vers les causes
-    // Source : symptomes (aiAnalysis.symptomesAnalyse). Tap sur un symptôme ->
-    // ses causes probables se déplient en place.
+    // MARK: - Symptômes détectés (refonte 20 juin v2) — compact horizontal + causes en feuille
+    // Source : symptomes (aiAnalysis.symptomesAnalyse). Cartes compactes en
+    // ScrollView horizontal (comme les apports) ; "Comprendre les causes" ouvre
+    // une FEUILLE (selectedSymptom). Suivi de 2 CTA : Suivi + Scanner.
     private var symptomesSection: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack {
-                Text("Symptômes détectés")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
-                Spacer()
-                Text("touche pour les causes")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.healthMapSecondary)
+            Text("Symptômes détectés")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.healthMapText)
+                .padding(.horizontal, Theme.spacingLG)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Theme.spacingSM) {
+                    ForEach(symptomes) { item in
+                        SymptomCompactCard(item: item) {
+                            HapticService.shared.tap()
+                            selectedSymptom = item
+                        }
+                    }
+                }
+                .padding(.horizontal, Theme.spacingLG)
             }
 
-            ForEach(symptomes) { item in
-                SymptomCard(item: item)
+            // 2 CTA sous les symptômes (validés Arthur)
+            HStack(spacing: Theme.spacingSM) {
+                navCTA(title: "Commencer mon suivi", icon: "checkmark.circle.fill",
+                       colors: [Color.scoreExcellent, Color.healthMapBlue], destination: .suivi)
+                navCTA(title: "Scanner mes plats", icon: "camera.fill",
+                       colors: [Color.healthMapBlue, Color.accentIndigo], destination: .scanner)
             }
+            .padding(.horizontal, Theme.spacingLG)
+            .padding(.top, Theme.spacingXS)
         }
-        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    // CTA dégradé vers un onglet (même mécanisme que planReadyCard).
+    private func navCTA(title: String, icon: String, colors: [Color], destination: NavCardDestination) -> some View {
+        Button {
+            HapticService.shared.tap()
+            NotificationCenter.default.post(name: .healthmapNavigateToTab, object: destination.rawValue)
+        } label: {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 66)
+            .padding(.horizontal, Theme.spacingSM)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                    .fill(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing))
+            )
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel(title)
     }
 
     // MARK: - Conseil du jour (compact) — remplace l'ancienne pépite pleine
@@ -634,72 +680,101 @@ private struct NutrientGapChip: View {
     }
 }
 
-// MARK: - Symptom card (accordéon : tap -> causes probables)
-// Source : SymptomeAnalyse (symptome + causes_probables + a_verifier).
-private struct SymptomCard: View {
+// MARK: - Symptom compact card (horizontal) — tap ouvre la feuille des causes
+// Refonte 20 juin v2 : compact, en ligne (comme les apports). Les causes ne
+// sont PAS affichées ici ; "Comprendre les causes" déclenche onTap -> feuille.
+private struct SymptomCompactCard: View {
     let item: SymptomeAnalyse
-    @State private var isExpanded = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let onTap: () -> Void
+
+    private var causeCount: Int { (item.causesProbables ?? []).count }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                HStack(spacing: 7) {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.accentSky)
+                        .frame(width: 28, height: 28)
+                        .background(Color.accentSky.opacity(0.14))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .accessibilityHidden(true)
+                    Text(prettifySymptom(item.symptome ?? ""))
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Color.healthMapText)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Text("\(causeCount) cause\(causeCount > 1 ? "s" : "") possible\(causeCount > 1 ? "s" : "")")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Color.healthMapMuted)
+
+                Spacer(minLength: 0)
+
+                Text("Comprendre les causes")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.healthMapBlue)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(Color.healthMapBlueLight)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+            .padding(11)
+            .frame(width: 158, height: 134, alignment: .topLeading)
+            .cardStyle()
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel("\(prettifySymptom(item.symptome ?? "")), \(causeCount) causes possibles. Toucher pour comprendre.")
+    }
+}
+
+// MARK: - Symptom causes sheet (ouverte au tap "Comprendre les causes")
+private struct SymptomCausesSheet: View {
+    let item: SymptomeAnalyse
+    @Environment(\.dismiss) private var dismiss
 
     private var causes: [String] { item.causesProbables ?? [] }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                HapticService.shared.tap()
-                withAnimation(reduceMotion ? .none : .healthMapSpring) { isExpanded.toggle() }
-            } label: {
-                HStack(spacing: Theme.spacingSM) {
-                    Image(systemName: "waveform.path.ecg")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color.accentSky)
-                        .frame(width: 30, height: 30)
-                        .background(Color.accentSky.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .accessibilityHidden(true)
-
-                    Text(prettifySymptom(item.symptome ?? ""))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.healthMapText)
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    if !causes.isEmpty {
-                        Text("\(causes.count) cause\(causes.count > 1 ? "s" : "")")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.healthMapMuted)
-                    }
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.healthMapMuted)
-                        .accessibilityHidden(true)
-                }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityValue(isExpanded ? "déplié" : "replié")
-
-            if isExpanded {
-                VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                    ForEach(Array(causes.prefix(4).enumerated()), id: \.offset) { _, cause in
-                        HStack(alignment: .top, spacing: Theme.spacingXS) {
-                            Circle()
-                                .fill(Color.accentSky)
-                                .frame(width: 4, height: 4)
-                                .padding(.top, 6)
-                                .accessibilityHidden(true)
-                            Text(cause)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.spacingMD) {
+                    HStack(spacing: Theme.spacingSM) {
+                        Image(systemName: "waveform.path.ecg")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color.accentSky)
+                            .frame(width: 36, height: 36)
+                            .background(Color.accentSky.opacity(0.14))
+                            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(prettifySymptom(item.symptome ?? ""))
+                                .font(Theme.headlineFont)
+                                .foregroundStyle(Color.healthMapText)
+                            Text("\(causes.count) cause\(causes.count > 1 ? "s" : "") possible\(causes.count > 1 ? "s" : "")")
                                 .font(Theme.captionFont)
                                 .foregroundStyle(Color.healthMapSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
                         }
+                        Spacer()
                     }
+
+                    ForEach(Array(causes.enumerated()), id: \.offset) { _, cause in
+                        Text(cause)
+                            .font(Theme.captionFont)
+                            .foregroundStyle(Color.healthMapText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(Theme.spacingMD)
+                            .background(Color.healthMapCard)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+                    }
+
                     if let aVerifier = item.aVerifier, !aVerifier.isEmpty {
-                        HStack(alignment: .top, spacing: Theme.spacingXS) {
+                        HStack(alignment: .top, spacing: Theme.spacingSM) {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 11))
+                                .font(.system(size: 13))
                                 .foregroundStyle(Color.healthMapBlue)
                                 .padding(.top, 1)
                                 .accessibilityHidden(true)
@@ -708,16 +783,36 @@ private struct SymptomCard: View {
                                 .foregroundStyle(Color.healthMapBlue)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        .padding(.top, 2)
+                        .padding(Theme.spacingMD)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.healthMapBlueLight)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
                     }
+
+                    Text("Informatif\u{202F}: ne remplace pas un avis médical.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.healthMapMuted)
+                        .padding(.top, Theme.spacingXS)
                 }
-                .padding(.top, Theme.spacingSM)
-                .padding(.leading, 38)
+                .padding(Theme.spacingLG)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .background(Color.healthMapBackground)
+            .navigationTitle("Causes possibles")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color.healthMapMuted)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Fermer")
+                }
+            }
         }
-        .padding(Theme.spacingMD)
-        .cardStyle()
     }
 }
 
