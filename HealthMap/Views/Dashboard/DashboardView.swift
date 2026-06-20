@@ -72,6 +72,7 @@ struct DashboardView: View {
                         .foregroundStyle(Color.healthMapBlue)
                     }
                     .disabled(viewModel.isLoadingAnalysis)
+                    .accessibilityLabel("Régénérer l'analyse")
                 }
                 // Avatar Profil en haut à droite (P6 : l'onglet Profil a été
                 // remplacé par Mes compléments). Ouvre le Profil en sheet via
@@ -138,7 +139,11 @@ struct DashboardView: View {
     // Refonte 20 juin : les symptômes déclarés + leurs causes croisées
     // (déjà générées par generate-analysis) s'affichent sur la home.
     private var symptomes: [SymptomeAnalyse] {
-        viewModel.aiAnalysis?.symptomesAnalyse ?? []
+        // Même filtre que RecommendationsViewModel : on écarte les entrées
+        // dégénérées (sans libellé ou sans cause) pour ne jamais afficher de
+        // carte inerte qui ne déplie rien (revue 20 juin).
+        (viewModel.aiAnalysis?.symptomesAnalyse ?? [])
+            .filter { ($0.symptome?.isEmpty == false) && !($0.causesProbables ?? []).isEmpty }
     }
 
     // MARK: - Main Content (refonte home 20 juin, validée Arthur)
@@ -344,7 +349,10 @@ struct DashboardView: View {
                     Text("Voir tout")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.healthMapBlue)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.healthMapPressed)
             }
             .padding(.horizontal, Theme.spacingLG)
 
