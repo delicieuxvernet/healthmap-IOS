@@ -54,25 +54,11 @@ struct DashboardView: View {
             .navigationTitle("Mon Bilan")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await viewModel.regenerateAnalysis() }
-                    } label: {
-                        Group {
-                            if #available(iOS 18.0, *) {
-                                Image(systemName: "arrow.clockwise")
-                                    .symbolEffect(.rotate.byLayer, options: .repeat(.continuous), isActive: viewModel.isLoadingAnalysis)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                                    .symbolEffect(.pulse, options: .repeating, isActive: viewModel.isLoadingAnalysis)
-                            }
-                        }
-                        .font(.system(size: 16))
-                        .foregroundStyle(Color.healthMapBlue)
-                    }
-                    .disabled(viewModel.isLoadingAnalysis)
-                    .accessibilityLabel("Régénérer l'analyse")
-                }
+                // Bouton « régénérer » RETIRÉ (20 juin) : il vidait le cache et
+                // refaisait un appel IA PAYANT à chaque tap. Le bilan est généré
+                // UNE SEULE fois puis caché ; il ne se régénère QUE si le profil
+                // change (édition). Plus aucun re-call manuel possible.
+
                 // Avatar Profil en haut à droite (P6 : l'onglet Profil a été
                 // remplacé par Mes compléments). Ouvre le Profil en sheet via
                 // NotificationCenter (consommé par MainTabView).

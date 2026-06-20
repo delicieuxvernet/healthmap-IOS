@@ -207,11 +207,15 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         var copy = profile
         copy.completed = false
         copy.firstName = ""
+        copy.avatarKey = ""   // cosmétique (choix d'avatar POST-bilan) : ne doit jamais changer le hash
         guard let data = try? JSONEncoder().encode(copy),
               let jsonObj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "0" }
 
-        // Filter out metadata fields (same as web)
-        let filtered = jsonObj.filter { $0.key != "completed" && $0.key != "firstName" }
+        // Exclut les champs qui n'affectent PAS l'analyse, sinon ré-appel IA
+        // PAYANT au prochain lancement. completed/firstName + avatarKey : ce
+        // dernier est choisi APRÈS le bilan (sélecteur d'avatar) et invalidait
+        // le cache à tort -> ré-analyse au relancement (bug coût, 20 juin).
+        let filtered = jsonObj.filter { $0.key != "completed" && $0.key != "firstName" && $0.key != "avatarKey" }
         let sortedKeys = filtered.keys.sorted()
 
         // Build deterministic string (key=value pairs, sorted)
