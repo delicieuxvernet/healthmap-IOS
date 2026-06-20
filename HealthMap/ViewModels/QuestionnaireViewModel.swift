@@ -45,8 +45,10 @@ final class QuestionnaireViewModel: ObservableObject {
         let pathway: UserProfile.Pathway
         let savedAt: Date
     }
-    /// Bumped from 1→2 to include userId. Old v1 drafts are discarded.
-    private static let draftSchemaVersion = 2
+    /// Bumped 1→2 (userId), 2→3 (refonte nutrition "Faites vos courses" :
+    /// les 10 questions de quantités sont remplacées par le caddie `groceries`).
+    /// Les drafts v2 référençant les anciennes questions sont proprement écartés.
+    private static let draftSchemaVersion = 3
 
     // MARK: - Init
     init() {
@@ -353,6 +355,15 @@ final class QuestionnaireViewModel: ObservableObject {
         saveDraft()
     }
 
+    // MARK: - Groceries ("Faites vos courses")
+
+    /// Écrit le caddie de l'utilisateur (id aliment GroceryCatalog -> portions
+    /// par semaine). Source de la partie nutrition du nouveau questionnaire.
+    func updateGroceries(_ groceries: [String: Int]) {
+        profile.groceries = groceries
+        saveDraft()
+    }
+
     // MARK: - Lecture des réponses
     // Pendants LECTURE de `updateAnswer` (écriture). Utilisés par la vue pour
     // afficher la sélection courante, et par la restauration de draft pour
@@ -442,6 +453,8 @@ final class QuestionnaireViewModel: ObservableObject {
             return !arrayValue(for: question.id).isEmpty
         case .textInput, .numericInput:
             return !inputText(for: question.id).isEmpty
+        case .groceries:
+            return !profile.groceries.isEmpty
         }
     }
 

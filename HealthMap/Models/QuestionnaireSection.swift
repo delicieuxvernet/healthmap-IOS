@@ -49,7 +49,7 @@ enum QuestionnaireSection: Int, CaseIterable, Identifiable {
         "goals", "firstName", "age", "gender", "height", "weight",
         "indoorWork", "sunExposure", "strengthTraining",
         "stressLevel", "sleepHours", "wakeFeeling", "caffeineIntake", "waterIntake", "smoking",
-        "dietType", "vegetableServings", "fruitServings", "fattyFish", "meatPoultry", "dairyServings",
+        "dietType", "groceries",
     ]
 }
 
@@ -84,6 +84,10 @@ enum QuestionType {
     case multiChoice
     case textInput(placeholder: String)
     case numericInput(placeholder: String, suffix: String?)
+    /// Flux "Faites vos courses" : ouvre le caddie (8 rayons à cocher + page
+    /// quantités). Remplace les 10 anciennes questions de quantités. La réponse
+    /// est stockée dans `profile.groceries` (voir GroceryShoppingView).
+    case groceries
 }
 
 struct QuestionOption: Identifiable {
@@ -332,16 +336,11 @@ extension QuestionnaireSection {
                 .init("mixed", "Varie"),
             ]
         ),
-        Question(id: "vegetableServings", text: "Portions de legumes par semaine ?", type: .numericInput(placeholder: "10", suffix: "/sem")),
-        Question(id: "fruitServings", text: "Portions de fruits par semaine ?", type: .numericInput(placeholder: "7", suffix: "/sem")),
-        Question(id: "fattyFish", text: "Poisson gras par semaine ?", type: .numericInput(placeholder: "2", suffix: "/sem")),
-        Question(id: "meatPoultry", text: "Viande/volaille par semaine ?", type: .numericInput(placeholder: "4", suffix: "/sem")),
-        Question(id: "eggsPerWeek", text: "Oeufs par semaine ?", type: .numericInput(placeholder: "4", suffix: "/sem")),
-        Question(id: "dairyServings", text: "Produits laitiers par semaine ?", type: .numericInput(placeholder: "7", suffix: "/sem")),
-        Question(id: "legumesPerWeek", text: "Legumineuses par semaine ?", type: .numericInput(placeholder: "2", suffix: "/sem")),
-        Question(id: "nutsPerWeek", text: "Fruits a coque par semaine ?", type: .numericInput(placeholder: "3", suffix: "/sem")),
-        Question(id: "seedsPerDay", text: "Cuilleres de graines par semaine ?", type: .numericInput(placeholder: "3", suffix: "c.a.s/sem")),
-        Question(id: "wholegrainPerWeek", text: "Cereales completes par semaine ?", type: .numericInput(placeholder: "5", suffix: "/sem")),
+        // Flux "Faites vos courses" : remplace les 10 anciennes questions de
+        // quantités (légumes, fruits, poisson, viande, œufs, laitages,
+        // légumineuses, noix, graines, complet) par un caddie d'aliments
+        // concrets à cocher rayon par rayon. Réponse -> profile.groceries.
+        Question(id: "groceries", text: "Faisons tes courses !", type: .groceries),
         Question(
             id: "breadType",
             text: "Quel type de pain ?",

@@ -123,7 +123,7 @@ struct QuestionnaireContainerView: View {
                 // Express pathway
                 pathwayButton(
                     title: "Express",
-                    subtitle: "~3 min — 21 questions essentielles",
+                    subtitle: "~3 min — l'essentiel + tes courses",
                     icon: "bolt.fill",
                     pathway: .express
                 )
@@ -131,7 +131,7 @@ struct QuestionnaireContainerView: View {
                 // Complete pathway
                 pathwayButton(
                     title: "Complet",
-                    subtitle: "~8 min — 46 questions detaillees",
+                    subtitle: "~8 min — le bilan detaille",
                     icon: "list.bullet.clipboard.fill",
                     pathway: .complet
                 )
@@ -411,6 +411,11 @@ struct QuestionnaireContainerView: View {
                 text: bindingForString(question.id),
                 placeholder: placeholder
             )
+
+        case .groceries:
+            // "Faites vos courses" : bouton qui ouvre le caddie en plein écran
+            // (8 rayons + page quantités). Écrit profile.groceries au "Valider".
+            GroceryQuestionControl()
         }
     }
 
