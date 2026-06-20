@@ -22,25 +22,34 @@ struct DashboardView: View {
                 // ruban animé retiré (perf).
                 WarmBackground()
 
-                // Le score LOCAL (HealthCalculator) doit TOUJOURS s'afficher
-                // dès que le questionnaire est complété — jamais 0/100+croix,
-                // jamais d'écran bloqué sur un spinner (incident TestFlight 28).
-                // Le squelette et l'écran d'erreur plein écran ne servent que
-                // quand on n'a RIEN de local à montrer (cas limite).
-                if viewModel.nutrientScores.isEmpty && viewModel.isLoadingAnalysis {
-                    // Skeleton d'abord pour montrer la structure (anti-flash)
-                    DashboardSkeletonView()
-                } else if viewModel.nutrientScores.isEmpty, viewModel.aiAnalysis == nil,
-                          let errorMessage = viewModel.errorMessage {
-                    AnalysisErrorRetryView(
-                        message: errorMessage,
-                        isRetrying: viewModel.isLoadingAnalysis,
-                        onRetry: {
-                            Task { await viewModel.triggerAnalysis() }
-                        }
-                    )
-                } else {
+                // NOUVEAU FLUX (20 juin, validé Arthur) : on n'affiche AUCUN
+                // résultat tant que le bilan IA n'est pas prêt — pas de scores
+                // bruts « cash ». Pendant l'analyse -> écran de chargement plein ;
+                // si l'IA échoue -> écran « Réessayer ». Seules les alertes de
+                // sécurité URGENTES (red flags immédiats, calcul local) passent
+                // au-dessus : une urgence ne doit pas attendre ni disparaître si
+                // l'IA échoue.
+                if viewModel.aiAnalysis != nil {
                     mainContent
+                } else if viewModel.profile.completed {
+                    VStack(spacing: 0) {
+                        if !immediateRedFlags.isEmpty {
+                            RedFlagsCardView(flags: immediateRedFlags)
+                                .padding(.horizontal, Theme.spacingLG)
+                                .padding(.top, Theme.spacingMD)
+                        }
+                        if !viewModel.isLoadingAnalysis, let errorMessage = viewModel.errorMessage {
+                            AnalysisErrorRetryView(
+                                message: errorMessage,
+                                isRetrying: false,
+                                onRetry: { Task { await viewModel.triggerAnalysis() } }
+                            )
+                        } else {
+                            FullAnalysisLoadingView()
+                        }
+                    }
+                } else {
+                    DashboardSkeletonView()
                 }
             }
             .navigationTitle("Mon Bilan")
@@ -148,24 +157,9 @@ struct DashboardView: View {
                 heroSection
                     .staggeredAppear(index: 0)
 
-                // 1b. Statut analyse IA — le score local reste affiché ;
-                // on superpose un bandeau pendant le chargement, ou un bandeau
-                // de retry si l'analyse a échoué (états : loading / succès /
-                // échec IA avec score local + bouton réessayer).
-                if viewModel.aiAnalysis == nil {
-                    if viewModel.isLoadingAnalysis {
-                        analysisLoadingBanner
-                    } else if let errorMessage = viewModel.errorMessage {
-                        AnalysisRetryBanner(
-                            message: errorMessage,
-                            isRetrying: viewModel.isLoadingAnalysis,
-                            onRetry: {
-                                Task { await viewModel.triggerAnalysis() }
-                            }
-                        )
-                        .padding(.horizontal, Theme.spacingLG)
-                    }
-                }
+                // (Bloc 1b « statut analyse » retiré le 20 juin : mainContent ne
+                // s'affiche plus QUE lorsque l'analyse IA est prête — le
+                // chargement/échec est géré en amont par l'écran plein.)
 
                 // 2. Cartes nutriments « à surveiller » — directement sous le
                 // héro, sans bloc priorité séparé ni titre de section (épure
@@ -541,38 +535,6 @@ struct DashboardView: View {
         .accessibilityHint("Ouvre l\u{2019}onglet Mon Plan.")
     }
 
-    // MARK: - Bandeau chargement analyse IA
-    /// Affiché pendant le premier chargement de l'analyse IA, sous le héro —
-    /// le score déterministe reste visible et utilisable.
-    private var analysisLoadingBanner: some View {
-        HStack(spacing: Theme.spacingSM) {
-            // Le kiwi qui marche pendant que l'IA travaille — plus chaleureux
-            // qu'un spinner nu, l'activité est signalée par le mouvement.
-            KiwiWalkerView(size: 44)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Analyse IA en cours…")
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapText)
-
-                Text("Tes scores ci-dessous sont déjà calculés. Les explications personnalisées arrivent.")
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer()
-        }
-        .padding(Theme.spacingMD)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.healthMapBlueLight)
-        )
-        .padding(.horizontal, Theme.spacingLG)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Analyse IA en cours. Tes scores sont déjà calculés.")
-    }
-
     // MARK: - Score Label
     // Mot d'état du score global : échelle unique HealthScale (loi 4).
     var scoreLabel: String {
@@ -620,6 +582,72 @@ private struct StaggeredAppear: ViewModifier {
 private extension View {
     func staggeredAppear(index: Int) -> some View {
         modifier(StaggeredAppear(index: index))
+    }
+}
+
+// MARK: - Écran de chargement plein (nouveau flux du 20 juin)
+// Tant que le bilan IA n'est pas prêt, on n'affiche AUCUN résultat : juste la
+// mascotte kiwi qui marche + un message qui tourne, pour rendre l'attente
+// (~1 à 2 min) vivante. Reduce-motion : pas de rotation, 1er message figé.
+private struct FullAnalysisLoadingView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var messageIndex = 0
+
+    private let messages = [
+        "On croise tes symptômes, ton alimentation et ton mode de vie.",
+        "On cherche ce qui peut expliquer tes symptômes.",
+        "On repère tes points forts et tes vraies priorités.",
+        "On prépare des conseils personnalisés, rien que pour toi.",
+    ]
+
+    var body: some View {
+        VStack(spacing: Theme.spacingLG) {
+            Spacer()
+
+            KiwiWalkerView(size: 140)
+
+            VStack(spacing: Theme.spacingSM) {
+                Text("On analyse ton profil…")
+                    .font(Theme.headlineFont)
+                    .foregroundStyle(Color.healthMapText)
+
+                Text(messages[messageIndex])
+                    .font(Theme.bodyFont)
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minHeight: 48)
+                    .id(messageIndex)
+                    .transition(.opacity)
+            }
+
+            ProgressView()
+                .progressViewStyle(.linear)
+                .tint(Color.healthMapBlue)
+                .frame(maxWidth: 200)
+
+            Text("Ça prend environ une minute. On te prépare un bilan complet.")
+                .font(Theme.captionFont)
+                .foregroundStyle(Color.healthMapMuted)
+                .multilineTextAlignment(.center)
+
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal, Theme.spacingLG)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Analyse de ton profil en cours. Cela prend environ une minute.")
+        .task {
+            guard !reduceMotion else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3.5))
+                if Task.isCancelled { break }
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    messageIndex = (messageIndex + 1) % messages.count
+                }
+            }
+        }
     }
 }
 
