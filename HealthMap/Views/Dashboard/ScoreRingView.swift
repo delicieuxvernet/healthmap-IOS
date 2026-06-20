@@ -77,6 +77,9 @@ struct MiniScoreRing: View {
     let score: Int
     let color: Color
     var size: CGFloat = 36
+    /// Épaisseur de l'anneau. Défaut 3 (mini-anneau des listes) ; montée pour
+    /// le héro de la fiche nutriment (grande jauge ~11 pt).
+    var lineWidth: CGFloat = 3
 
     @State private var animatedProgress: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -84,12 +87,12 @@ struct MiniScoreRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(color.opacity(0.15), lineWidth: 3)
+                .stroke(color.opacity(0.15), lineWidth: lineWidth)
                 .frame(width: size, height: size)
 
             Circle()
                 .trim(from: 0, to: animatedProgress)
-                .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .frame(width: size, height: size)
                 .rotationEffect(.degrees(-90))
 

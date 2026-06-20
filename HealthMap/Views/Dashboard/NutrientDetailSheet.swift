@@ -1,15 +1,16 @@
 import SwiftUI
 
-// MARK: - Nutrient Detail Sheet (fiche nutriment — DESIGN-PAGES §2)
+// MARK: - Nutrient Detail Sheet (fiche nutriment — refonte « valeur d'abord »)
 // Sheet TERMINALE (niveau 2, jamais de niveau 3) : X visible 44 pt réels.
-// Ordre des blocs imposé par le template §2 :
-//   1. Header : emoji + nom + état FR (HealthScale) + MiniScoreRing
-//      (couleur = échelle score, plus jamais la couleur d'identité)
-//   2. « Détecté dans tes réponses » : signals en chips + badge fiabilité
-//   3. Comparaison en citation discrète (barre latérale fine + italique)
-//   4. « Ta solution » d'abord (carte teintée verte douce)
+// Hiérarchie « valeur -> comprendre -> agir » :
+//   1. HERO : grande jauge centrée du score (la VALEUR domine) + emoji/nom +
+//      état FR (HealthScale) + verdict. Couleur = échelle score (lois 3 & 13).
+//   2. « Pourquoi ce score » : pourquoiCeScore + signals en chips + fiabilité
+//   3. « Ta solution » (carte teintée verte douce) — AGIR
+//   4. Le déclic : comparaison en citation discrète (après l'action)
 //   5. Repliables fermés : mécanisme / symptômes (UN composant réutilisé)
-//   6. Hack + synergie : premium via BlurredSection partagée (loi 11)
+//   6. Recherche approfondie (validate-hypotheses + web, à la demande)
+//   7. Hack + synergie : premium via BlurredSection partagée (loi 11)
 struct NutrientDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -32,34 +33,35 @@ struct NutrientDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.spacingLG) {
-                    // 1. Header
-                    headerSection
+                    // 1. HERO — la VALEUR d'abord : grande jauge centrée du score
+                    heroSection
 
-                    // 2. « Détecté dans tes réponses » — absente si signals vide
-                    if let signals = nutrient.signals, !signals.isEmpty {
-                        signalsSection(signals)
+                    // 2. Pourquoi ce score — COMPRENDRE : explication + preuve
+                    // (signals + fiabilité). Sort pourquoiCeScore du repliable.
+                    if hasPourquoi {
+                        pourquoiSection
                     }
 
-                    // 3. Comparaison en citation discrète
-                    if let comparaison = nutrient.comparaison, !comparaison.isEmpty {
-                        comparisonQuote(comparaison)
-                    }
-
-                    // 4. « Ta solution » d'abord
+                    // 3. « Ta solution » — AGIR
                     if let solution = nutrient.solution, hasSolutionContent(solution) {
                         solutionCard(solution)
                     }
 
-                    // 4b. Recherche approfondie (validate-hypotheses + web) —
-                    // présente seulement si le nutriment a des hypothèses v1.
-                    deepSearchSection
+                    // 4. Le déclic : comparaison mémorable, APRÈS l'action
+                    if let comparaison = nutrient.comparaison, !comparaison.isEmpty {
+                        comparisonQuote(comparaison)
+                    }
 
                     // 5. Repliables fermés (un seul composant réutilisé)
                     if hasMechanism || hasSymptoms {
                         collapsibleGroup
                     }
 
-                    // 6. Hack + synergie — LA case premium floutée de la fiche
+                    // 6. Recherche approfondie (validate-hypotheses + web) —
+                    // présente seulement si le nutriment a des hypothèses v1.
+                    deepSearchSection
+
+                    // 7. Hack + synergie — LA case premium floutée de la fiche
                     if let premium = premiumSection {
                         premium
                     }
@@ -89,71 +91,111 @@ struct NutrientDetailSheet: View {
         }
     }
 
-    // MARK: - 1. Header (bloc 1)
-    // Sources : NutrientData (emoji, label canonique) + score local.
-    // Statut TOUJOURS en français via HealthScale.nutrientLabel (lois 3 & 4) ;
-    // l'anneau prend la couleur d'état Color.scoreColor(for:).
-    private var headerSection: some View {
-        HStack(spacing: Theme.spacingMD) {
-            Text(nutrient.emoji)
-                .font(.system(size: 40))
-                .accessibilityHidden(true)
+    // MARK: - 1. HERO (bloc 1) — la VALEUR d'abord
+    // Refonte « valeur d'abord » : le score devient l'élément dominant (grande
+    // jauge centrée ~128 pt, vs 52 pt à droite avant). Couleur = échelle score
+    // (lois 3 & 13), jamais la couleur d'identité. Statut FR via HealthScale
+    // (lois 3 & 4). On ACTIVE enfin `verdict` (présent mais inutilisé) ; masqué
+    // si vide (jamais de coquille — loi 11).
+    private var heroSection: some View {
+        VStack(spacing: Theme.spacingSM) {
+            MiniScoreRing(score: nutrient.score, color: statusColor, size: 128, lineWidth: 11)
+                .padding(.top, Theme.spacingXS)
 
-            VStack(alignment: .leading, spacing: Theme.spacingXS) {
+            HStack(spacing: 6) {
+                Text(nutrient.emoji)
+                    .font(.system(size: 20))
+                    .accessibilityHidden(true)
                 Text(nutrient.label)
                     .font(Theme.headlineFont)
                     .foregroundStyle(Color.healthMapText)
-
-                Text(HealthScale.nutrientLabel(for: nutrient.score))
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(statusColor)
             }
 
-            Spacer()
+            Text(HealthScale.nutrientLabel(for: nutrient.score))
+                .font(Theme.captionBoldFont)
+                .foregroundStyle(statusColor)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(statusColor.opacity(Theme.opacityLight))
+                .clipShape(Capsule())
 
-            MiniScoreRing(score: nutrient.score, color: statusColor, size: 52)
+            if let verdict = heroVerdict {
+                Text(verdict)
+                    .font(Theme.bodyFont)
+                    .foregroundStyle(Color.healthMapText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+            }
         }
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(nutrient.label), \(HealthScale.nutrientLabel(for: nutrient.score)), score \(nutrient.score) sur 100")
+        .accessibilityLabel("\(nutrient.label), \(HealthScale.nutrientLabel(for: nutrient.score)), score \(nutrient.score) sur 100\(heroVerdict.map { ". \($0)" } ?? "")")
     }
 
-    // MARK: - 2. « Détecté dans tes réponses » (bloc 2)
-    // Source : nutrient.signals[] — LA preuve de personnalisation. Chips à
-    // fond doux, 1 ligne chacune, 4 max ; badge fiabilité depuis confidence
-    // (vocabulaire contrôlé — loi 8). Section absente si signals vide
-    // (vérifié au call-site).
-    private func signalsSection(_ signals: [String]) -> some View {
+    /// Phrase de verdict du héro : champ IA `verdict` s'il est présent. Sinon
+    /// rien (le héro reste complet avec jauge + état). On évite tout doublon
+    /// avec `pourquoiCeScore` (affiché en clair juste dessous).
+    private var heroVerdict: String? {
+        guard let v = nutrient.verdict, !v.isEmpty else { return nil }
+        return v
+    }
+
+    // MARK: - 2. « Pourquoi ce score » (bloc 2) — COMPRENDRE
+    // Refonte valeur-d'abord : juste sous le héro, répond à « d'où vient ce
+    // chiffre ». Affiche pourquoiCeScore (sorti du repliable mécanisme où il
+    // était noyé) + la preuve de personnalisation (signals en chips, 4 max,
+    // 1 ligne — loi 9) + badge fiabilité depuis confidence (vocabulaire
+    // contrôlé — loi 8). Absente si pourquoiCeScore ET signals vides.
+    private var hasPourquoi: Bool {
+        nutrient.pourquoiCeScore?.isEmpty == false || nutrient.signals?.isEmpty == false
+    }
+
+    private var pourquoiSection: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.healthMapBlue)
-                    .accessibilityHidden(true)
+            Text("Pourquoi ce score")
+                .font(Theme.captionBoldFont)
+                .foregroundStyle(Color.healthMapText)
 
-                Text("Détecté dans tes réponses")
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapText)
-
-                Spacer()
-
-                if let fiabilite = reliabilityBadge {
-                    Text(fiabilite)
-                        .pillStyle(color: Color.healthMapBlue)
-                }
+            if let pourquoi = nutrient.pourquoiCeScore, !pourquoi.isEmpty {
+                Text(pourquoi)
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .lineLimit(4)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                ForEach(Array(signals.prefix(4).enumerated()), id: \.offset) { _, signal in
-                    // Signal — texte libre IA : 1 ligne max (loi 9)
-                    Text(signal)
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapText)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .padding(.horizontal, Theme.pillPaddingH)
-                        .padding(.vertical, Theme.pillPaddingV)
-                        .background(Color.healthMapBlueLight)
-                        .clipShape(Capsule())
+            if let signals = nutrient.signals, !signals.isEmpty {
+                HStack(spacing: Theme.spacingXS) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.healthMapBlue)
+                        .accessibilityHidden(true)
+                    Text("Détecté dans tes réponses")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.healthMapSecondary)
+                    Spacer()
+                    if let fiabilite = reliabilityBadge {
+                        Text(fiabilite)
+                            .pillStyle(color: Color.healthMapBlue)
+                    }
+                }
+                .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                    ForEach(Array(signals.prefix(4).enumerated()), id: \.offset) { _, signal in
+                        // Signal — texte libre IA : 1 ligne max (loi 9)
+                        Text(signal)
+                            .font(Theme.captionFont)
+                            .foregroundStyle(Color.healthMapText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .padding(.horizontal, Theme.pillPaddingH)
+                            .padding(.vertical, Theme.pillPaddingV)
+                            .background(Color.healthMapBlueLight)
+                            .clipShape(Capsule())
+                    }
                 }
             }
         }
@@ -277,11 +319,11 @@ struct NutrientDetailSheet: View {
     }
 
     // MARK: - 5. Repliables fermés (bloc 5)
-    // « Comprendre le mécanisme » (mecanisme + pourquoiCeScore si dispo) /
-    // « Symptômes possibles » (signe_manque) — UN composant repliable
-    // réutilisé (loi 22), fermé par défaut.
+    // « Comprendre le mécanisme » (mecanisme — pourquoiCeScore est désormais
+    // remonté en clair dans « Pourquoi ce score ») / « Symptômes possibles »
+    // (signe_manque) — UN composant repliable réutilisé (loi 22), fermé par défaut.
     private var hasMechanism: Bool {
-        nutrient.mecanisme?.isEmpty == false || nutrient.pourquoiCeScore?.isEmpty == false
+        nutrient.mecanisme?.isEmpty == false
     }
 
     private var hasSymptoms: Bool {
@@ -290,16 +332,9 @@ struct NutrientDetailSheet: View {
 
     private var collapsibleGroup: some View {
         VStack(spacing: Theme.spacingSM) {
-            if hasMechanism {
+            if hasMechanism, let mecanisme = nutrient.mecanisme {
                 FicheCollapsible(title: "Comprendre le mécanisme", icon: "gearshape.2") {
-                    VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                        if let mecanisme = nutrient.mecanisme, !mecanisme.isEmpty {
-                            collapsibleBody(mecanisme)
-                        }
-                        if let pourquoi = nutrient.pourquoiCeScore, !pourquoi.isEmpty {
-                            collapsibleBody(pourquoi)
-                        }
-                    }
+                    collapsibleBody(mecanisme)
                 }
             }
 
@@ -647,7 +682,7 @@ private struct FicheCollapsible<Content: View>: View {
             id: "vitD", label: "Vitamine D", emoji: "☀️", color: "FF9500",
             score: 38, status: "deficient", confidence: "high",
             signals: ["Peu d\u{2019}exposition au soleil", "Pas de poisson gras", "Fatigue persistante"],
-            verdict: nil,
+            verdict: "Avec peu de soleil et un travail en int\u{00E9}rieur, ton corps fabrique trop peu de vitamine D.",
             mecanisme: "La vitamine D se synthétise surtout quand ta peau est exposée au soleil.",
             comparaison: "Comme une batterie solaire qui ne se recharge plus en hiver.",
             signeManque: "fatigue, baisse de moral, infections à répétition",
