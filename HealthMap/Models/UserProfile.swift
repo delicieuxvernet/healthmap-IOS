@@ -64,6 +64,13 @@ struct UserProfile: Codable, Equatable {
     var lowCarbDiet: String = ""
     var supplementsCurrent: [String] = []
 
+    /// "Faites vos courses" — caddie de l'utilisateur : id d'aliment (voir
+    /// `GroceryCatalog`) -> nombre de portions par semaine. Source détaillée qui
+    /// remplacera à terme les quantités chiffrées (fruitServings, fattyFish, …).
+    /// Alimente le moteur de score et le prompt IA. Vide tant que le flux caddie
+    /// n'est pas rempli.
+    var groceries: [String: Int] = [:]
+
     // Section 5: Symptomes
     var symptoms: [String] = []
 
@@ -217,7 +224,7 @@ struct UserProfile: Codable, Equatable {
         case vegetableServings, fruitServings, fattyFish, meatPoultry, eggsPerWeek
         case dairyServings, legumesPerWeek, nutsPerWeek, seedsPerDay, wholegrainPerWeek
         case breadType, fermentedFoods, ultraProcessedFrequency, snacking, saltLevel
-        case iodizedSalt, eatLiver, lowCarbDiet, supplementsCurrent
+        case iodizedSalt, eatLiver, lowCarbDiet, supplementsCurrent, groceries
         case symptoms, medications, digestiveConditions, digestiveIssues
         case periodFlow, pregnancyStatus, precisions
         // Legacy field (decoded only — never encoded)
@@ -290,6 +297,8 @@ struct UserProfile: Codable, Equatable {
             supplementsCurrent = (try? c.decode([String].self, forKey: .supplementsLegacy)) ?? []
         }
 
+        groceries = (try? c.decode([String: Int].self, forKey: .groceries)) ?? [:]
+
         symptoms = (try? c.decode([String].self, forKey: .symptoms)) ?? []
         medications = (try? c.decode([String].self, forKey: .medications)) ?? []
         digestiveConditions = (try? c.decode([String].self, forKey: .digestiveConditions)) ?? []
@@ -356,6 +365,7 @@ struct UserProfile: Codable, Equatable {
         try c.encode(eatLiver, forKey: .eatLiver)
         try c.encode(lowCarbDiet, forKey: .lowCarbDiet)
         try c.encode(supplementsCurrent, forKey: .supplementsCurrent)
+        try c.encode(groceries, forKey: .groceries)
 
         try c.encode(symptoms, forKey: .symptoms)
         try c.encode(medications, forKey: .medications)
