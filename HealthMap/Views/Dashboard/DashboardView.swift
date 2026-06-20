@@ -134,95 +134,68 @@ struct DashboardView: View {
         viewModel.redFlags.filter { $0.urgency != .immediate }
     }
 
-    // MARK: - Priorité n°1 (bloc 2)
-    // Source : aiAnalysis.priorityActions trié par rank (helper d'affichage pur).
-    private var topPriorityAction: PriorityAction? {
-        viewModel.aiAnalysis?.priorityActions
-            .sorted { ($0.rank ?? Int.max) < ($1.rank ?? Int.max) }
-            .first
+    // MARK: - Symptômes détectés (source : symptomes_analyse du bilan IA)
+    // Refonte 20 juin : les symptômes déclarés + leurs causes croisées
+    // (déjà générées par generate-analysis) s'affichent sur la home.
+    private var symptomes: [SymptomeAnalyse] {
+        viewModel.aiAnalysis?.symptomesAnalyse ?? []
     }
 
-    // MARK: - Main Content
+    // MARK: - Main Content (refonte home 20 juin, validée Arthur)
+    // Ordre : score -> apports a renforcer EN LIGNE -> symptômes cliquables
+    // (causes) -> gros CTA Mon Plan -> conseil du jour -> mon évolution.
+    // Retiré de la home : tuiles points forts/interaction, hack premium,
+    // bouton "tous mes nutriments" (remplacé par "Voir tout" sur la section).
     private var mainContent: some View {
         ScrollView {
             VStack(spacing: Theme.spacingLG) {
-                // 0. Red flags URGENTS uniquement (sécurité avant tout —
-                // jamais différés par le stagger d'apparition).
+                // 0. Red flags URGENTS (sécurité avant tout)
                 if !immediateRedFlags.isEmpty {
                     RedFlagsCardView(flags: immediateRedFlags)
                         .padding(.horizontal, Theme.spacingLG)
                 }
 
-                // 1. Héro intégré : anneau + pill état + headline + métaphore
+                // 1. Héro : score global
                 heroSection
                     .staggeredAppear(index: 0)
 
-                // (Bloc 1b « statut analyse » retiré le 20 juin : mainContent ne
-                // s'affiche plus QUE lorsque l'analyse IA est prête — le
-                // chargement/échec est géré en amont par l'écran plein.)
-
-                // 2. Cartes nutriments « à surveiller » — directement sous le
-                // héro, sans bloc priorité séparé ni titre de section (épure
-                // validée par Arthur le 12 juin : l'ordre fait la hiérarchie,
-                // la 1re carte intègre « Ton action »).
+                // 2. Apports a renforcer EN LIGNE horizontale (gain de place vertical)
                 if !viewModel.deficiencies.isEmpty {
-                    watchSection
+                    gapsSection
                         .staggeredAppear(index: 1)
                 }
 
-                // 4. Bouton glass vers la grille complète (sheet séparée —
-                // la grille n'est PLUS sur l'écran principal).
-                if !viewModel.nutrients.isEmpty {
-                    GlassPillButton(
-                        title: "Tous mes nutriments (\(viewModel.nutrients.count))",
-                        systemImage: "square.grid.3x3"
-                    ) {
-                        HapticService.shared.tap()
-                        showAllNutrients = true
-                    }
+                // 3. Symptômes détectés — accordéon vers les causes
+                if !symptomes.isEmpty {
+                    symptomesSection
+                        .staggeredAppear(index: 2)
+                }
+
+                // 4. Gros CTA -> Mon Plan
+                planReadyCard
                     .staggeredAppear(index: 3)
-                }
 
-                // 5. Rangée symétrique : Points forts / Interaction
-                insightTilesRow
-                    .staggeredAppear(index: 4)
-
-                // 6. Pépite du jour (rotation quotidienne déterministe)
+                // 5. Conseil du jour (compact)
                 if let pepite = viewModel.pepiteDuJour {
-                    PepiteDuJourCard(pepite: pepite)
-                        .staggeredAppear(index: 5)
+                    conseilDuJourCard(pepite)
+                        .staggeredAppear(index: 4)
                 }
 
-                // 6b. Mon évolution — avatar actuel → projection à 2 mois,
-                // liée à l'adhésion au plan (dopamine). Visible dès le
-                // questionnaire complété ; l'avatar se choisit via le sélecteur.
+                // 6. Mon évolution — avatar (conservé, sous le plan)
                 if viewModel.profile.completed {
                     MonEvolutionSection(profile: viewModel.profile) {
                         showAvatarPicker = true
                     }
-                    .staggeredAppear(index: 6)
+                    .staggeredAppear(index: 5)
                 }
 
-                // 7. Case premium floutée : le hack du nutriment prioritaire
-                if let hackSection = premiumHackSection {
-                    hackSection
+                // 7. Export + partage (premium uniquement)
+                if subscriptionService.isPremium {
+                    premiumActionsSection
                         .staggeredAppear(index: 6)
                 }
 
-                // 7b. Export + partage (premium uniquement — conservé du
-                // Bilan existant, regroupé avec le contenu premium).
-                if subscriptionService.isPremium {
-                    premiumActionsSection
-                        .staggeredAppear(index: 7)
-                }
-
-                // 8. Fin positive : le plan est prêt (peak-end — ne jamais
-                // finir sur les manques).
-                planReadyCard
-                    .staggeredAppear(index: 8)
-
-                // 8b. Refreshing indicator (refresh d'une analyse déjà
-                // affichée — le premier chargement passe par le bandeau 1b)
+                // Indicateur de rafraîchissement (refresh d'une analyse déjà là)
                 if viewModel.isLoadingAnalysis && viewModel.aiAnalysis != nil {
                     HStack(spacing: Theme.spacingSM) {
                         ProgressView()
@@ -234,7 +207,7 @@ struct DashboardView: View {
                     .padding()
                 }
 
-                // 9. Disclaimer unique (1 ligne) + red flags non urgents
+                // 8. Disclaimer + red flags non urgents
                 disclaimerCard
 
                 if !otherRedFlags.isEmpty {
@@ -353,130 +326,90 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Action intégrée à la 1re carte « à surveiller »
-    // Épure du 12 juin : le bloc « Ta priorité n°1 » a disparu — l'action vit
-    // DANS la carte du nutriment prioritaire. Choix de l'action : celle de
-    // l'IA si elle mentionne ce nutriment, sinon la solution du nutriment,
-    // sinon l'action IA générale.
-    private func integratedAction(for nutrient: EnrichedNutrient) -> String? {
-        if let top = topPriorityAction?.action, !top.isEmpty,
-           top.localizedCaseInsensitiveContains(nutrient.label) {
-            return top
-        }
-        if let own = nutrient.solution?.action, !own.isEmpty {
-            return own
-        }
-        return topPriorityAction?.action
-    }
-
-    // MARK: - Cartes « à surveiller » (bloc 2 — épure du 12 juin)
-    // Source : viewModel.deficiencies (échelle unique, score < 70), top 3 en
-    // cartes JUMELLES (loi 6), SANS titre de section (l'ordre fait la
-    // hiérarchie — test de valeur, loi 1). « Pourquoi ? » ouvre la fiche
-    // (pattern universel — loi 10). La 1re carte porte « Ton action ».
-    private var watchSection: some View {
-        VStack(spacing: Theme.spacingSM) {
-            ForEach(Array(viewModel.deficiencies.prefix(3).enumerated()), id: \.element.id) { index, nutrient in
-                NutrientWatchCard(
-                    nutrient: nutrient,
-                    actionText: index == 0 ? integratedAction(for: nutrient) : nil
-                ) {
+    // MARK: - Apports a renforcer en ligne horizontale (refonte 20 juin, validée Arthur)
+    // Source : viewModel.deficiencies (score < 70). Cartes compactes en
+    // ScrollView horizontal -> gain de place vertical. « Voir tout » ouvre la
+    // grille complète ; tap sur une carte -> fiche nutriment.
+    private var gapsSection: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack {
+                Text("Tes apports à renforcer")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.healthMapText)
+                Spacer()
+                Button {
                     HapticService.shared.tap()
-                    selectedNutrient = nutrient
-                    showNutrientDetail = true
+                    showAllNutrients = true
+                } label: {
+                    Text("Voir tout")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.healthMapBlue)
                 }
-            }
-        }
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    // MARK: - Rangée symétrique Points forts / Interaction (bloc 5)
-    // Sources : positive_findings[0].finding / interactions_detectees[0].titre
-    // (2 lignes max chacun — loi 9). Tuiles strictement identiques (loi 6) ;
-    // donnée manquante → état utile, jamais de coquille vide (loi 11).
-    private var insightTilesRow: some View {
-        HStack(spacing: Theme.spacingSM) {
-            InsightTile(
-                header: "Points forts",
-                icon: "checkmark.seal.fill",
-                text: strengthText,
-                tint: Color.scoreExcellent
-            )
-
-            InsightTile(
-                header: "Interaction",
-                icon: "link",
-                text: interactionText,
-                tint: Color.accentIndigo
-            )
-        }
-        // Hauteurs STRICTEMENT égales (loi 6) : le HStack prend la hauteur
-        // de la tuile la plus haute, et chaque tuile (maxHeight: .infinity)
-        // s'étire pour la remplir.
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    private var strengthText: String {
-        if let finding = viewModel.aiAnalysis?.positiveFindings.first?.finding,
-           !finding.isEmpty {
-            return finding
-        }
-        // État utile sans analyse : compte local (pluriel dynamique, loi 15)
-        let count = viewModel.goodNutrients
-        if count == 0 {
-            return "Chaque action de ton plan va te faire progresser"
-        }
-        let noun = count == 1 ? "nutriment solide" : "nutriments solides"
-        return "\(count) \(noun) sur \(viewModel.nutrients.count)"
-    }
-
-    private var interactionText: String {
-        if let titre = viewModel.aiAnalysis?.interactions.first?.titre,
-           !titre.isEmpty {
-            return titre
-        }
-        return viewModel.aiAnalysis != nil
-            ? "Aucune interaction détectée"
-            : "Disponible après l\u{2019}analyse"
-    }
-
-    // MARK: - Case premium floutée (bloc 7)
-    // Source : hack du 1er deficiency (titre lisible qui tease, contenu réel
-    // flouté — loi 11). Pas de hack disponible → pas de case (jamais vide).
-    private var premiumHackSection: AnyView? {
-        guard let first = viewModel.deficiencies.first,
-              let hack = first.hack, !hack.isEmpty else { return nil }
-
-        return AnyView(
-            BlurredSection(isPremium: true, title: "Le hack \(first.label)") {
-                VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                    HStack(spacing: Theme.spacingSM) {
-                        Image(systemName: "lightbulb.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color.accentSky)
-                            .accessibilityHidden(true)
-
-                        Text("Le hack \(first.label)")
-                            .font(Theme.captionBoldFont)
-                            .foregroundStyle(Color.healthMapText)
-                    }
-
-                    // Hack — texte libre IA : 3 lignes max (loi 9), hauteur
-                    // bornée même floutée pour les non-premium.
-                    Text(hack)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.healthMapText)
-                        .lineLimit(3)
-                        .truncationMode(.tail)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(Theme.spacingMD)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .cardStyle()
             }
             .padding(.horizontal, Theme.spacingLG)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Theme.spacingSM) {
+                    ForEach(viewModel.deficiencies) { nutrient in
+                        NutrientGapChip(nutrient: nutrient) {
+                            HapticService.shared.tap()
+                            selectedNutrient = nutrient
+                            showNutrientDetail = true
+                        }
+                    }
+                }
+                .padding(.horizontal, Theme.spacingLG)
+            }
+        }
+    }
+
+    // MARK: - Symptômes détectés (refonte 20 juin) — accordéon vers les causes
+    // Source : symptomes (aiAnalysis.symptomesAnalyse). Tap sur un symptôme ->
+    // ses causes probables se déplient en place.
+    private var symptomesSection: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack {
+                Text("Symptômes détectés")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.healthMapText)
+                Spacer()
+                Text("touche pour les causes")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.healthMapSecondary)
+            }
+
+            ForEach(symptomes) { item in
+                SymptomCard(item: item)
+            }
+        }
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    // MARK: - Conseil du jour (compact) — remplace l'ancienne pépite pleine
+    private func conseilDuJourCard(_ pepite: PracticalTip) -> some View {
+        HStack(alignment: .top, spacing: Theme.spacingSM) {
+            Image(systemName: "lightbulb.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(Color.accentIndigo)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Conseil du jour")
+                    .font(Theme.captionBoldFont)
+                    .foregroundStyle(Color.healthMapText)
+                Text(pepite.tip ?? pepite.hook ?? "")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Theme.spacingMD)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .fill(Color.accentIndigo.opacity(Theme.opacityLight))
         )
+        .padding(.horizontal, Theme.spacingLG)
     }
 
     // MARK: - Fin positive (bloc 8)
@@ -648,6 +581,139 @@ private struct FullAnalysisLoadingView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Libellé lisible pour les clés de symptôme (fatigue_persistante -> Fatigue persistante)
+private func prettifySymptom(_ raw: String) -> String {
+    let cleaned = raw.replacingOccurrences(of: "_", with: " ").trimmingCharacters(in: .whitespaces)
+    guard let first = cleaned.first else { return cleaned }
+    return first.uppercased() + cleaned.dropFirst()
+}
+
+// MARK: - Nutrient gap chip (carte compacte, ligne horizontale)
+private struct NutrientGapChip: View {
+    let nutrient: EnrichedNutrient
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 5) {
+                    Text(nutrient.emoji).font(.system(size: 14))
+                    Text(nutrient.label)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.healthMapText)
+                        .lineLimit(1)
+                }
+                Text("\(nutrient.score)%")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.scoreColor(for: nutrient.score))
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.healthMapMuted.opacity(0.15))
+                        .frame(height: 4)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.scoreColor(for: nutrient.score))
+                        .frame(width: max(6, CGFloat(nutrient.score) / 100 * 88), height: 4)
+                }
+                Text(HealthScale.nutrientLabel(for: nutrient.score))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.scoreColor(for: nutrient.score))
+            }
+            .padding(11)
+            .frame(width: 112, alignment: .leading)
+            .cardStyle()
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel("\(nutrient.label), \(nutrient.score) pour cent, \(HealthScale.nutrientLabel(for: nutrient.score))")
+    }
+}
+
+// MARK: - Symptom card (accordéon : tap -> causes probables)
+// Source : SymptomeAnalyse (symptome + causes_probables + a_verifier).
+private struct SymptomCard: View {
+    let item: SymptomeAnalyse
+    @State private var isExpanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var causes: [String] { item.causesProbables ?? [] }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                HapticService.shared.tap()
+                withAnimation(reduceMotion ? .none : .healthMapSpring) { isExpanded.toggle() }
+            } label: {
+                HStack(spacing: Theme.spacingSM) {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.accentSky)
+                        .frame(width: 30, height: 30)
+                        .background(Color.accentSky.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .accessibilityHidden(true)
+
+                    Text(prettifySymptom(item.symptome ?? ""))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.healthMapText)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    if !causes.isEmpty {
+                        Text("\(causes.count) cause\(causes.count > 1 ? "s" : "")")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.healthMapMuted)
+                    }
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.healthMapMuted)
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.healthMapPressed)
+            .accessibilityValue(isExpanded ? "déplié" : "replié")
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                    ForEach(Array(causes.prefix(4).enumerated()), id: \.offset) { _, cause in
+                        HStack(alignment: .top, spacing: Theme.spacingXS) {
+                            Circle()
+                                .fill(Color.accentSky)
+                                .frame(width: 4, height: 4)
+                                .padding(.top, 6)
+                                .accessibilityHidden(true)
+                            Text(cause)
+                                .font(Theme.captionFont)
+                                .foregroundStyle(Color.healthMapSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    if let aVerifier = item.aVerifier, !aVerifier.isEmpty {
+                        HStack(alignment: .top, spacing: Theme.spacingXS) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.healthMapBlue)
+                                .padding(.top, 1)
+                                .accessibilityHidden(true)
+                            Text("À vérifier\u{202F}: \(aVerifier)")
+                                .font(Theme.captionFont)
+                                .foregroundStyle(Color.healthMapBlue)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+                .padding(.top, Theme.spacingSM)
+                .padding(.leading, 38)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(Theme.spacingMD)
+        .cardStyle()
     }
 }
 
