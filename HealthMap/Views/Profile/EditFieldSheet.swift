@@ -46,6 +46,35 @@ struct EditFieldSheet: View {
     @State private var boolValue: Bool = false
     @FocusState private var isInputFocused: Bool
 
+    init(field: EditableField, currentValue: Any, onSave: @escaping (Any) -> Void) {
+        self.field = field
+        self.currentValue = currentValue
+        self.onSave = onSave
+        // Pré-calcule les @State DÈS le premier rendu pour qu'AUCUN contrôle ne
+        // reçoive une valeur hors plage. CRASH du 20 juin : un Stepper(value:in:)
+        // recevait intValue=0 (parse échouée — ex. sommeil "7.5" -> Int nil -> 0)
+        // sous le min (3) -> crash dur, l'app quittait. On parse les décimales
+        // et on CLAMPE impérativement dans [min, max].
+        switch field.kind {
+        case .text, .decimal, .pickerSingle:
+            _textValue = State(initialValue: (currentValue as? String) ?? "")
+        case .number(_, let lo, let hi):
+            let parsed: Int
+            if let i = currentValue as? Int {
+                parsed = i
+            } else if let s = currentValue as? String, let d = Double(s) {
+                parsed = Int(d.rounded())
+            } else {
+                parsed = lo
+            }
+            _intValue = State(initialValue: Swift.min(hi, Swift.max(lo, parsed)))
+        case .pickerMulti:
+            _arrayValue = State(initialValue: (currentValue as? [String]) ?? [])
+        case .toggle:
+            _boolValue = State(initialValue: (currentValue as? Bool) ?? false)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -96,7 +125,6 @@ struct EditFieldSheet: View {
                 }
             }
         }
-        .onAppear { initState() }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(28)
@@ -207,24 +235,6 @@ struct EditFieldSheet: View {
                     .foregroundStyle(Color.healthMapText)
             }
             .tint(Color.healthMapBlue)
-        }
-    }
-
-    // MARK: - State init
-    private func initState() {
-        switch field.kind {
-        case .text:
-            textValue = (currentValue as? String) ?? ""
-        case .number:
-            intValue = (currentValue as? Int) ?? Int((currentValue as? String) ?? "") ?? 0
-        case .decimal:
-            textValue = (currentValue as? String) ?? ""
-        case .pickerSingle:
-            textValue = (currentValue as? String) ?? ""
-        case .pickerMulti:
-            arrayValue = (currentValue as? [String]) ?? []
-        case .toggle:
-            boolValue = (currentValue as? Bool) ?? false
         }
     }
 
