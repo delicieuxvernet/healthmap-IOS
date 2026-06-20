@@ -142,10 +142,10 @@ struct DashboardView: View {
     }
 
     // MARK: - Main Content (refonte home 20 juin, validée Arthur)
-    // Ordre : score -> carences EN LIGNE horizontale -> symptômes cliquables
+    // Ordre : score -> apports a renforcer EN LIGNE -> symptômes cliquables
     // (causes) -> gros CTA Mon Plan -> conseil du jour -> mon évolution.
     // Retiré de la home : tuiles points forts/interaction, hack premium,
-    // bouton "tous mes nutriments" (remplacé par "Voir tout" sur les carences).
+    // bouton "tous mes nutriments" (remplacé par "Voir tout" sur la section).
     private var mainContent: some View {
         ScrollView {
             VStack(spacing: Theme.spacingLG) {
@@ -159,9 +159,9 @@ struct DashboardView: View {
                 heroSection
                     .staggeredAppear(index: 0)
 
-                // 2. Carences en LIGNE horizontale (gain de place vertical)
+                // 2. Apports a renforcer EN LIGNE horizontale (gain de place vertical)
                 if !viewModel.deficiencies.isEmpty {
-                    carencesSection
+                    gapsSection
                         .staggeredAppear(index: 1)
                 }
 
@@ -326,14 +326,14 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Carences en ligne horizontale (refonte 20 juin, validée Arthur)
+    // MARK: - Apports a renforcer en ligne horizontale (refonte 20 juin, validée Arthur)
     // Source : viewModel.deficiencies (score < 70). Cartes compactes en
     // ScrollView horizontal -> gain de place vertical. « Voir tout » ouvre la
     // grille complète ; tap sur une carte -> fiche nutriment.
-    private var carencesSection: some View {
+    private var gapsSection: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             HStack {
-                Text("Tes carences potentielles")
+                Text("Tes apports à renforcer")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Color.healthMapText)
                 Spacer()
@@ -351,7 +351,7 @@ struct DashboardView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Theme.spacingSM) {
                     ForEach(viewModel.deficiencies) { nutrient in
-                        CarenceChip(nutrient: nutrient) {
+                        NutrientGapChip(nutrient: nutrient) {
                             HapticService.shared.tap()
                             selectedNutrient = nutrient
                             showNutrientDetail = true
@@ -591,8 +591,8 @@ private func prettifySymptom(_ raw: String) -> String {
     return first.uppercased() + cleaned.dropFirst()
 }
 
-// MARK: - Carence chip (carte compacte, ligne horizontale)
-private struct CarenceChip: View {
+// MARK: - Nutrient gap chip (carte compacte, ligne horizontale)
+private struct NutrientGapChip: View {
     let nutrient: EnrichedNutrient
     let onTap: () -> Void
 
