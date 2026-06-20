@@ -384,11 +384,10 @@ struct QuestionnaireContainerView: View {
             }
 
         case let .numericInput(placeholder, suffix):
-            // Lot B : si la question a une config de slider (range borné),
-            // on utilise SliderInputView (UX au pouce). Sinon fallback sur
-            // NumericInputView avec clavier numérique.
+            // Si la question a une config bornée (age/poids/taille), on utilise
+            // la molette type Apple (WheelInputView). Sinon, clavier numérique.
             if let config = sliderConfig(for: question.id) {
-                SliderInputView(
+                WheelInputView(
                     question: question,
                     text: bindingForString(question.id),
                     range: config.range,
