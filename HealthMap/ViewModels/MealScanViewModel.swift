@@ -29,10 +29,16 @@ final class MealScanViewModel: ObservableObject {
     struct MealAnalysisResult: Identifiable {
         let id = UUID()
         var detectedFoods: [String]
+        /// Détail PAR aliment principal : sa contribution aux besoins de
+        /// l'utilisateur (alimente les cartes teintées + jauges de l'écran scan).
+        var foods: [DetectedFood]
         var macros: MacroNutrients
         var micros: [MicroNutrient]
         var advice: MealAdvice
         var warnings: [String]
+        /// Identifiants des nutriments où l'utilisateur est sous le seuil
+        /// (envoyés à l'IA) — sert l'en-tête « À renforcer chez toi ».
+        var userNeeds: [String]
     }
 
     struct MacroNutrients {
@@ -51,6 +57,40 @@ final class MealScanViewModel: ObservableObject {
         var isDeficiency: Bool
     }
 
+    /// Un aliment principal détecté dans le plat + ce qu'il apporte aux besoins
+    /// de l'utilisateur. La couleur de sa carte est dérivée de `status`.
+    struct DetectedFood: Identifiable {
+        let id = UUID()
+        var name: String
+        var emoji: String
+        var contributions: [FoodContribution]
+
+        /// Système couleur validé : vert = couvre un besoin (apport ≥ 40 %),
+        /// ambre = apport à renforcer (15–39 %), neutre = n'aide aucun besoin
+        /// du moment. Basé sur le meilleur apport parmi les besoins couverts.
+        var status: FoodStatus {
+            guard let best = contributions.map(\.pctRDA).max() else { return .neutral }
+            if best >= 40 { return .covers }
+            if best >= 15 { return .weak }
+            return .neutral
+        }
+    }
+
+    /// Apport d'un aliment à UN besoin de l'utilisateur (part des besoins du
+    /// jour couverte par cet aliment seul).
+    struct FoodContribution: Identifiable {
+        let id = UUID()
+        var nutrientId: String
+        var label: String
+        var pctRDA: Int
+    }
+
+    enum FoodStatus {
+        case covers   // couvre un besoin
+        case weak     // apport à renforcer
+        case neutral  // n'aide pas les besoins du moment
+    }
+
     struct MealAdvice {
         var coversDeficiencies: [String]
         var suggestedAdditions: [String]
@@ -67,6 +107,7 @@ final class MealScanViewModel: ObservableObject {
 
     private struct EdgeMealResponse: Decodable {
         let detectedFoods: [String]?
+        let foods: [EdgeFood]?
         let macros: EdgeMacros?
         let micros: [EdgeMicro]?
         let advice: EdgeAdvice?
@@ -75,7 +116,25 @@ final class MealScanViewModel: ObservableObject {
 
         enum CodingKeys: String, CodingKey {
             case detectedFoods = "detected_foods"
-            case macros, micros, advice, warnings, error
+            case foods, macros, micros, advice, warnings, error
+        }
+    }
+
+    private struct EdgeFood: Decodable {
+        let name: String?
+        let emoji: String?
+        let nutrients: [EdgeFoodNutrient]?
+    }
+
+    private struct EdgeFoodNutrient: Decodable {
+        let nutrientId: String?
+        let label: String?
+        let pctRDA: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case nutrientId = "nutrient_id"
+            case label
+            case pctRDA = "pct_rda"
         }
     }
 
@@ -285,12 +344,23 @@ final class MealScanViewModel: ObservableObject {
                 swaps: response.advice?.swaps ?? []
             )
 
+            let foods: [DetectedFood] = (response.foods ?? []).compactMap { f in
+                guard let name = f.name, !name.isEmpty else { return nil }
+                let contributions: [FoodContribution] = (f.nutrients ?? []).compactMap { n in
+                    guard let nid = n.nutrientId, !nid.isEmpty else { return nil }
+                    return FoodContribution(nutrientId: nid, label: n.label ?? "", pctRDA: n.pctRDA ?? 0)
+                }
+                return DetectedFood(name: name, emoji: f.emoji ?? "", contributions: contributions)
+            }
+
             analysisResult = MealAnalysisResult(
                 detectedFoods: response.detectedFoods ?? [],
+                foods: foods,
                 macros: macros,
                 micros: micros,
                 advice: advice,
-                warnings: response.warnings ?? []
+                warnings: response.warnings ?? [],
+                userNeeds: userDeficiencies
             )
 
             // 7. Record gamification checkin + analytics

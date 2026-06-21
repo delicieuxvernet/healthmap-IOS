@@ -2,18 +2,7 @@
   "images" : [
     {
       "idiom" : "universal",
-      "filename" : "scan_plate.png",
-      "scale" : "1x"
-    },
-    {
-      "idiom" : "universal",
-      "filename" : "scan_plate@2x.png",
-      "scale" : "2x"
-    },
-    {
-      "idiom" : "universal",
-      "filename" : "scan_plate@3x.png",
-      "scale" : "3x"
+      "filename" : "scan_plate.jpg"
     }
   ],
   "info" : {

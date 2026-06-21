@@ -58,15 +58,16 @@ struct MealScanView: View {
                     Text("Analyse en cours...")
                         .font(Theme.bodyFont)
                         .foregroundStyle(Color.healthMapSecondary)
-                    Text("Notre IA identifie les aliments et calcule les nutriments")
+                    Text("Notre IA identifie les aliments et calcule ce qu'ils t'apportent")
                         .font(Theme.captionFont)
                         .foregroundStyle(Color.healthMapMuted)
                         .multilineTextAlignment(.center)
                 }
                 .padding(Theme.spacingXL)
             } else {
-                // Capture zone
+                // Capture zone + exemple d'analyse (la maquette : plat + encadrés).
                 captureZone
+                exampleAnalysis
             }
 
             // Error
@@ -173,39 +174,32 @@ struct MealScanView: View {
     }
 
     // MARK: - Results View
-    // Refonte « assiette analysée » : illustration en héro (asset scan_plate) +
-    // apports RÉELS du scan (micros.pctRDA / isDeficiency) en chips « bien couvert »
-    // (vert) / « à renforcer » (orange), puis le conseil. Données 100 % réelles.
+    // Design VALIDÉ (21 juin 2026, ~15 itérations) : le PLAT (asset scan_plate,
+    // image réelle) au centre, des connecteurs hairline gris vers 4 encadrés —
+    // un PAR ALIMENT principal. Chaque carte est teintée selon ce que l'aliment
+    // apporte aux BESOINS de l'utilisateur (vert = couvre, ambre = à renforcer,
+    // neutre = n'aide pas), avec des jauges. En-tête « à renforcer chez toi »,
+    // bas « ce qu'il te manque ». La couleur a un sens partout. Données réelles.
     private func resultsView(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
-        // Bien couvert : nutriments que CE repas apporte notablement.
-        let wellCovered = result.micros
-            .filter { $0.pctRDA >= 25 }
-            .sorted { $0.pctRDA > $1.pctRDA }
-        // À renforcer : tes points faibles (isDeficiency) que ce repas ne comble pas.
-        let toReinforce = result.micros
-            .filter { $0.isDeficiency && $0.pctRDA < 25 }
-            .sorted { $0.pctRDA < $1.pctRDA }
+        VStack(spacing: Theme.spacingLG) {
+            needsHeader(result.userNeeds)
 
-        return VStack(spacing: Theme.spacingLG) {
-            plateHeroCard(result)
-
-            if !wellCovered.isEmpty {
-                nutrientChipsSection(title: "Bien couvert par ce repas",
-                                     icon: "checkmark.seal.fill",
-                                     color: .scoreExcellent,
-                                     nutrients: wellCovered)
-            }
-
-            if toReinforce.isEmpty {
-                reinforceEmptyNote
+            if !result.foods.isEmpty {
+                scanInfographic(foods: result.foods)
             } else {
-                nutrientChipsSection(title: "À renforcer",
-                                     icon: "arrow.up.circle.fill",
-                                     color: .scoreLow,
-                                     nutrients: toReinforce)
+                fallbackPlate
             }
 
-            conseilCard(result.advice)
+            if !result.detectedFoods.isEmpty {
+                Text(result.detectedFoods.prefix(6).joined(separator: " · "))
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, Theme.spacingLG)
+            }
+
+            missingCard(result.advice)
 
             macrosCard(result.macros)
 
@@ -215,95 +209,229 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Hero (assiette illustrée + aliments détectés)
-    private func plateHeroCard(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
-        VStack(spacing: Theme.spacingSM) {
-            Image("scan_plate")
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .frame(height: 168)
-                .accessibilityHidden(true)
-
-            if !result.detectedFoods.isEmpty {
-                Text(result.detectedFoods.prefix(6).joined(separator: " · "))
-                    .font(.system(size: 13, weight: .medium))
+    // MARK: - En-tête « À renforcer chez toi » (besoins de l'utilisateur)
+    @ViewBuilder
+    private func needsHeader(_ needs: [String]) -> some View {
+        let defs = needs.compactMap { NutrientData.definition(for: $0) }.prefix(4)
+        if !defs.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("À renforcer chez toi")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.healthMapSecondary)
-                    .multilineTextAlignment(.center)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(defs), id: \.id) { def in
+                            HStack(spacing: 4) {
+                                Text(def.emoji).font(.system(size: 11))
+                                Text(def.label)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(Color.scoreLow)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(Color.scoreLow.opacity(0.12))
+                            .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.spacingLG)
+        }
+    }
+
+    // MARK: - Infographie : plat réel au centre + connecteurs + cartes par aliment
+    func scanInfographic(foods: [MealScanViewModel.DetectedFood]) -> some View {
+        let shown = Array(foods.prefix(4))
+        return GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let cardWidth = max(118, min(150, w / 2 - 14))
+            ZStack {
+                // Connecteurs : traits hairline gris + point d'ancrage côté plat
+                // (pas de flèche « Word » — le plat n'est jamais redessiné).
+                Canvas { ctx, size in
+                    let cw = size.width, ch = size.height
+                    let plate = CGPoint(x: cw / 2, y: ch / 2)
+                    for idx in shown.indices {
+                        let card = calloutPosition(idx, w: cw, h: ch)
+                        let dir = CGVector(dx: card.x - plate.x, dy: card.y - plate.y)
+                        let len = max(1, (dir.dx * dir.dx + dir.dy * dir.dy).squareRoot())
+                        let start = CGPoint(x: plate.x + dir.dx / len * (cw * 0.15),
+                                            y: plate.y + dir.dy / len * (cw * 0.15))
+                        var line = Path()
+                        line.move(to: start)
+                        let ctrl = CGPoint(x: (start.x + card.x) / 2, y: start.y + (card.y - start.y) * 0.18)
+                        line.addQuadCurve(to: card, control: ctrl)
+                        ctx.stroke(line, with: .color(Color.healthMapMuted.opacity(0.45)),
+                                   style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+                        let dot = Path(ellipseIn: CGRect(x: start.x - 2.5, y: start.y - 2.5, width: 5, height: 5))
+                        ctx.fill(dot, with: .color(Color.healthMapMuted.opacity(0.6)))
+                    }
+                }
+
+                // Le plat — image réelle, fixe (jamais redessinée).
+                Image("scan_plate")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: min(w * 0.42, 164))
+                    .position(x: w / 2, y: h / 2)
+                    .accessibilityHidden(true)
+
+                // Encadrés par aliment aux 4 coins.
+                ForEach(Array(shown.enumerated()), id: \.element.id) { idx, food in
+                    foodCard(food, width: cardWidth)
+                        .position(calloutPosition(idx, w: w, h: h))
+                }
+            }
+        }
+        .frame(height: 440)
+        .padding(.horizontal, Theme.spacingSM)
+    }
+
+    private func calloutPosition(_ idx: Int, w: CGFloat, h: CGFloat) -> CGPoint {
+        switch idx {
+        case 0: return CGPoint(x: w * 0.27, y: h * 0.15)
+        case 1: return CGPoint(x: w * 0.73, y: h * 0.15)
+        case 2: return CGPoint(x: w * 0.27, y: h * 0.85)
+        default: return CGPoint(x: w * 0.73, y: h * 0.85)
+        }
+    }
+
+    // MARK: - Carte d'un aliment (teintée par statut)
+    private func foodCard(_ food: MealScanViewModel.DetectedFood, width: CGFloat) -> some View {
+        let color = statusColor(food.status)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text(food.emoji.isEmpty ? "🍽️" : food.emoji)
+                    .font(.system(size: 15))
+                Text(food.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.healthMapText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
+            ForEach(Array(food.contributions.prefix(2))) { c in
+                gauge(label: nutrientLabel(c.nutrientId, fallback: c.label), pct: c.pctRDA, color: color)
+            }
+
+            HStack(spacing: 3) {
+                Image(systemName: statusIcon(food.status))
+                    .font(.system(size: 9))
+                Text(statusVerdict(food))
+                    .font(.system(size: 9.5, weight: .medium))
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .foregroundStyle(food.status == .neutral ? Color.healthMapMuted : color)
         }
-        .frame(maxWidth: .infinity)
-        .padding(Theme.spacingMD)
-        .cardStyle()
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    // MARK: - Sections d'apports (chips)
-    private func nutrientChipsSection(title: String, icon: String, color: Color,
-                                      nutrients: [MealScanViewModel.MicroNutrient]) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: 6) {
-                Image(systemName: icon).font(.system(size: 13)).foregroundStyle(color)
-                Text(title).font(Theme.captionBoldFont).foregroundStyle(color)
-            }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)],
-                      alignment: .leading, spacing: 8) {
-                ForEach(nutrients) { n in nutrientChip(n, color: color) }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.spacingMD)
-        .background(color.opacity(0.07))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    private func nutrientChip(_ n: MealScanViewModel.MicroNutrient, color: Color) -> some View {
-        HStack(spacing: 5) {
-            Text(n.emoji).font(.system(size: 13))
-            Text(n.label)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.healthMapText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(Color.healthMapCard)
-        .overlay(Capsule().stroke(color.opacity(0.4), lineWidth: 1))
-        .clipShape(Capsule())
+        .padding(9)
+        .frame(width: width, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(cardTint(food.status))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .strokeBorder(color.opacity(food.status == .neutral ? 0.10 : 0.22), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
         .accessibilityElement(children: .combine)
     }
 
-    private var reinforceEmptyNote: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.seal.fill").foregroundStyle(Color.scoreExcellent)
-            Text("Ce repas couvre bien tes besoins du moment 👏")
-                .font(Theme.captionFont)
-                .foregroundStyle(Color.healthMapText)
+    private func gauge(label: String, pct: Int, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(Color.healthMapText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Spacer(minLength: 2)
+                Text("\(pct)%")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(color)
+            }
+            GeometryReader { g in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(color.opacity(0.18)).frame(height: 5)
+                    Capsule().fill(color)
+                        .frame(width: max(4, g.size.width * CGFloat(min(100, max(0, pct))) / 100), height: 5)
+                }
+            }
+            .frame(height: 5)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.spacingMD)
-        .background(Color.scoreExcellent.opacity(0.09))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-        .padding(.horizontal, Theme.spacingLG)
     }
 
-    // MARK: - Conseil
+    // MARK: - Mapping statut → sémantique couleur (tokens canoniques)
+    private func statusColor(_ status: MealScanViewModel.FoodStatus) -> Color {
+        switch status {
+        case .covers: return .scoreExcellent   // vert : couvre un besoin
+        case .weak: return .scoreLow            // ambre : apport à renforcer
+        case .neutral: return .healthMapMuted   // neutre
+        }
+    }
+
+    private func cardTint(_ status: MealScanViewModel.FoodStatus) -> Color {
+        switch status {
+        case .covers: return Color.scoreExcellent.opacity(0.10)
+        case .weak: return Color.scoreLow.opacity(0.10)
+        case .neutral: return Color.healthMapCard
+        }
+    }
+
+    private func statusIcon(_ status: MealScanViewModel.FoodStatus) -> String {
+        switch status {
+        case .covers: return "checkmark.circle.fill"
+        case .weak: return "arrow.up.circle.fill"
+        case .neutral: return "minus.circle"
+        }
+    }
+
+    private func statusVerdict(_ food: MealScanViewModel.DetectedFood) -> String {
+        switch food.status {
+        case .covers:
+            let n = food.contributions.filter { $0.pctRDA >= 40 }.count
+            return n > 1 ? "couvre \(n) besoins" : "couvre un besoin"
+        case .weak:
+            return "apport à renforcer"
+        case .neutral:
+            return food.contributions.isEmpty ? "n'apporte pas tes besoins du moment" : "apport faible"
+        }
+    }
+
+    /// Label canonique du nutriment (NutrientData = source de vérité, jamais l'IA).
+    private func nutrientLabel(_ id: String, fallback: String) -> String {
+        NutrientData.definition(for: id)?.label ?? (fallback.isEmpty ? id : fallback)
+    }
+
+    // MARK: - Repli défensif si l'IA n'a pas renvoyé le détail par aliment
+    private var fallbackPlate: some View {
+        Image("scan_plate")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 180)
+            .frame(maxWidth: .infinity)
+            .accessibilityHidden(true)
+    }
+
+    // MARK: - Ce qu'il te manque encore (conseil personnalisé)
     @ViewBuilder
-    private func conseilCard(_ advice: MealScanViewModel.MealAdvice) -> some View {
-        let lines: [String] = !advice.suggestedAdditions.isEmpty ? advice.suggestedAdditions
-            : (!advice.coversDeficiencies.isEmpty ? advice.coversDeficiencies : advice.swaps)
+    private func missingCard(_ advice: MealScanViewModel.MealAdvice) -> some View {
+        let lines: [String] = !advice.suggestedAdditions.isEmpty ? advice.suggestedAdditions : advice.swaps
         if !lines.isEmpty {
-            VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
-                    Text("💡")
-                    Text("Le conseil").font(Theme.captionBoldFont).foregroundStyle(Color.healthMapText)
+                    Image(systemName: "sparkles").font(.system(size: 12)).foregroundStyle(Color.scoreLow)
+                    Text("Ce qu'il te manque encore")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.scoreLow)
                 }
                 ForEach(Array(lines.prefix(3)), id: \.self) { line in
                     HStack(alignment: .top, spacing: 6) {
-                        Text("•").foregroundStyle(Color.healthMapBlue)
+                        Text("•").foregroundStyle(Color.scoreLow)
                         Text(line)
                             .font(Theme.captionFont)
                             .foregroundStyle(Color.healthMapText)
@@ -313,9 +441,65 @@ struct MealScanView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Theme.spacingMD)
-            .cardStyle()
+            .background(Color.scoreLow.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
             .padding(.horizontal, Theme.spacingLG)
         }
+    }
+
+    // MARK: - Exemple d'analyse (landing — statique, illustre la maquette validée)
+    private var exampleAnalysis: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingMD) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("✨ Exemple d'analyse")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color.healthMapText)
+                Text("Voici à quoi ressembleront tes résultats après le scan.")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapMuted)
+            }
+            .padding(.horizontal, Theme.spacingLG)
+
+            needsHeader(["iron", "vitD", "vitB12"])
+
+            scanInfographic(foods: exampleFoods)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles").font(.system(size: 12)).foregroundStyle(Color.scoreLow)
+                    Text("Ce qu'il te manque encore")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.scoreLow)
+                }
+                Text("Ajoute une source de fer bien absorbée — par exemple des lentilles avec un filet de citron pour booster l'absorption.")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Theme.spacingMD)
+            .background(Color.scoreLow.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+            .padding(.horizontal, Theme.spacingLG)
+        }
+        .padding(.top, Theme.spacingSM)
+    }
+
+    private var exampleFoods: [MealScanViewModel.DetectedFood] {
+        [
+            MealScanViewModel.DetectedFood(name: "Saumon", emoji: "🐟", contributions: [
+                MealScanViewModel.FoodContribution(nutrientId: "vitD", label: "Vitamine D", pctRDA: 55),
+                MealScanViewModel.FoodContribution(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 70),
+            ]),
+            MealScanViewModel.DetectedFood(name: "Brocoli", emoji: "🥦", contributions: [
+                MealScanViewModel.FoodContribution(nutrientId: "iron", label: "Fer", pctRDA: 25),
+            ]),
+            MealScanViewModel.DetectedFood(name: "Œuf", emoji: "🍳", contributions: [
+                MealScanViewModel.FoodContribution(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 50),
+                MealScanViewModel.FoodContribution(nutrientId: "vitD", label: "Vitamine D", pctRDA: 20),
+            ]),
+            MealScanViewModel.DetectedFood(name: "Tomate", emoji: "🍅", contributions: []),
+        ]
     }
 
     // MARK: - Warnings
