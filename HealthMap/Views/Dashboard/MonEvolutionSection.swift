@@ -23,10 +23,10 @@ struct MonEvolutionSection: View {
 
     private var adherence: Double { PlanProgressStore.adherence }
 
-    /// Projection : on garantit une amélioration visible (plancher 0.4) qui
-    /// s'accentue avec l'adhésion réelle au plan.
+    /// Projection à 6 mois : objectif lean-athletic, différence volontairement
+    /// marquée pour que l'utilisateur se projette. L'adhésion pilote la jauge.
     private var projected: AvatarVariant {
-        AvatarLibrary.projection(from: current, adherence: min(1.0, 0.4 + 0.6 * adherence))
+        AvatarLibrary.projection(from: current)
     }
 
     private var improves: Bool { projected != current }
@@ -118,19 +118,19 @@ struct MonEvolutionSection: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color.healthMapBlue)
                     .accessibilityHidden(true)
-                Text("2 mois")
+                Text("3 mois")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.healthMapMuted)
             }
             .frame(width: 46)
 
-            avatarColumn(title: improves ? "Dans 2 mois" : "Ton objectif",
+            avatarColumn(title: improves ? "Dans 3 mois" : "Ton objectif",
                          variant: projected, tint: Color.scoreExcellent)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(improves
-            ? "Aujourd'hui à gauche, ta projection dans deux mois à droite si tu suis ton plan."
+            ? "Aujourd'hui à gauche, ta projection dans trois mois à droite si tu suis ton plan."
             : "Tu es déjà proche de ton objectif.")
     }
 
