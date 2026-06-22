@@ -45,7 +45,18 @@ struct SuiviView: View {
             }
             .navigationTitle("Mon suivi")
             .navigationBarTitleDisplayMode(.large)
-            .healthMapProfileToolbar()
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                            .font(.system(size: 22))
+                            .foregroundStyle(Color.healthMapBlue)
+                    }
+                    .accessibilityLabel("Profil")
+                }
+            }
             .onAppear {
                 started = SuiviStore.isStarted
                 checkin = SuiviStore.todayCheckin()

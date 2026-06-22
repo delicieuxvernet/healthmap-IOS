@@ -16,28 +16,11 @@ extension Notification.Name {
 }
 
 // MARK: - Profile Toolbar (avatar Profil sur TOUS les onglets — A1)
-// Ajoute le bouton avatar en haut à droite ; ouvre le Profil en sheet via
-// NotificationCenter (consommé par MainTabView). Appliqué à chaque onglet.
-struct ProfileToolbarModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content.toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
-                } label: {
-                    Image(systemName: "person.crop.circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(Color.healthMapBlue)
-                }
-                .accessibilityLabel("Profil")
-            }
-        }
-    }
-}
-
-extension View {
-    func healthMapProfileToolbar() -> some View { modifier(ProfileToolbarModifier()) }
-}
+// Le bouton Profil est désormais posé EN INLINE (`.toolbar { ToolbarItem(...) }`)
+// directement dans chaque onglet (Bilan, Plan, Suivi, Compléments, Scanner),
+// comme le Bilan. L'ancien `ProfileToolbarModifier` / `.healthMapProfileToolbar()`
+// posait le toolbar via un ViewModifier : l'item ne s'enregistrait pas toujours
+// auprès de la NavigationStack → bouton non cliquable. Retiré (22 juin).
 
 extension DashboardView {
 
