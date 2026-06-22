@@ -8,6 +8,7 @@ struct MealScanView: View {
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var selectedItem: PhotosPickerItem?
     @State private var showPaywall = false
+    @State private var selectedFood: MealScanViewModel.DetectedFood?
 
     var body: some View {
         NavigationStack {
@@ -52,6 +53,10 @@ struct MealScanView: View {
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
                     .healthMapFullSheet()
+            }
+            .sheet(item: $selectedFood) { food in
+                FoodDetailSheet(food: food)
+                    .presentationDetents([.medium, .large])
             }
         }
     }
@@ -310,46 +315,76 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Carte d'un aliment (teintée par statut)
+    // MARK: - Carte d'un aliment (teintée par statut, cliquable → détail)
     private func foodCard(_ food: MealScanViewModel.DetectedFood, width: CGFloat) -> some View {
         let color = statusColor(food.status)
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Text(food.emoji.isEmpty ? "🍽️" : food.emoji)
-                    .font(.system(size: 15))
-                Text(food.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
+        return Button {
+            selectedFood = food
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 5) {
+                    Text(food.emoji.isEmpty ? "🍽️" : food.emoji)
+                        .font(.system(size: 15))
+                    Text(food.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.healthMapText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 2)
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(color.opacity(0.45))
+                }
 
-            ForEach(Array(food.contributions.prefix(2))) { c in
-                gauge(label: nutrientLabel(c.nutrientId, fallback: c.label), pct: c.pctRDA, color: color)
-            }
+                // Toujours du contenu : besoins couverts si présents, sinon une
+                // macro clé (fini la carte vide quand l'aliment n'est pas une
+                // source des besoins du moment).
+                if food.contributions.isEmpty {
+                    macroHeadline(food)
+                } else {
+                    ForEach(Array(food.contributions.prefix(2))) { c in
+                        gauge(label: nutrientLabel(c.nutrientId, fallback: c.label), pct: c.pctRDA, color: color)
+                    }
+                }
 
-            HStack(spacing: 3) {
-                Image(systemName: statusIcon(food.status))
-                    .font(.system(size: 9))
-                Text(statusVerdict(food))
-                    .font(.system(size: 9.5, weight: .medium))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 3) {
+                    Image(systemName: statusIcon(food.status))
+                        .font(.system(size: 9))
+                    Text(statusVerdict(food))
+                        .font(.system(size: 9.5, weight: .medium))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(food.status == .neutral ? Color.healthMapMuted : color)
             }
-            .foregroundStyle(food.status == .neutral ? Color.healthMapMuted : color)
+            .padding(9)
+            .frame(width: width, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(cardTint(food.status))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(color.opacity(food.status == .neutral ? 0.10 : 0.22), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
         }
-        .padding(9)
-        .frame(width: width, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(cardTint(food.status))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .strokeBorder(color.opacity(food.status == .neutral ? 0.10 : 0.22), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
+        .accessibilityHint("Voir le détail de l'aliment")
+    }
+
+    /// Ligne macro de repli (kcal + macro dominante) quand l'aliment n'apporte
+    /// aucun besoin du moment — garantit que la carte montre toujours du contenu.
+    private func macroHeadline(_ food: MealScanViewModel.DetectedFood) -> some View {
+        let m = food.macros
+        let macroList: [(String, Double)] = [("prot.", m.proteins), ("gluc.", m.carbs), ("lip.", m.fats)]
+        let top = macroList.max(by: { $0.1 < $1.1 }) ?? ("prot.", 0)
+        return Text("\(m.calories) kcal · \(Int(top.1.rounded())) g \(top.0)")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(Color.healthMapSecondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
     }
 
     private func gauge(label: String, pct: Int, color: Color) -> some View {
@@ -497,19 +532,32 @@ struct MealScanView: View {
     }
 
     private var exampleFoods: [MealScanViewModel.DetectedFood] {
-        [
-            MealScanViewModel.DetectedFood(name: "Saumon", emoji: "🐟", contributions: [
-                MealScanViewModel.FoodContribution(nutrientId: "vitD", label: "Vitamine D", pctRDA: 55),
-                MealScanViewModel.FoodContribution(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 70),
-            ]),
-            MealScanViewModel.DetectedFood(name: "Brocoli", emoji: "🥦", contributions: [
-                MealScanViewModel.FoodContribution(nutrientId: "iron", label: "Fer", pctRDA: 25),
-            ]),
-            MealScanViewModel.DetectedFood(name: "Œuf", emoji: "🍳", contributions: [
-                MealScanViewModel.FoodContribution(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 50),
-                MealScanViewModel.FoodContribution(nutrientId: "vitD", label: "Vitamine D", pctRDA: 20),
-            ]),
-            MealScanViewModel.DetectedFood(name: "Tomate", emoji: "🍅", contributions: []),
+        typealias F = MealScanViewModel.FoodContribution
+        return [
+            MealScanViewModel.DetectedFood(
+                name: "Saumon", emoji: "🐟",
+                contributions: [F(nutrientId: "vitD", label: "Vitamine D", pctRDA: 55),
+                                F(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 70)],
+                macros: MealScanViewModel.FoodMacros(calories: 280, proteins: 25, carbs: 0, fats: 18, fiber: 0),
+                topNutrients: [F(nutrientId: "omega3", label: "Oméga-3", pctRDA: 90),
+                               F(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 70)]),
+            MealScanViewModel.DetectedFood(
+                name: "Brocoli", emoji: "🥦",
+                contributions: [F(nutrientId: "iron", label: "Fer", pctRDA: 25)],
+                macros: MealScanViewModel.FoodMacros(calories: 35, proteins: 3, carbs: 5, fats: 0, fiber: 3),
+                topNutrients: [F(nutrientId: "vitC", label: "Vitamine C", pctRDA: 80),
+                               F(nutrientId: "fiber", label: "Fibres", pctRDA: 12)]),
+            MealScanViewModel.DetectedFood(
+                name: "Œuf", emoji: "🍳",
+                contributions: [F(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 50),
+                                F(nutrientId: "vitD", label: "Vitamine D", pctRDA: 20)],
+                macros: MealScanViewModel.FoodMacros(calories: 90, proteins: 7, carbs: 1, fats: 6, fiber: 0),
+                topNutrients: [F(nutrientId: "zinc", label: "Zinc", pctRDA: 8)]),
+            MealScanViewModel.DetectedFood(
+                name: "Tomate", emoji: "🍅",
+                contributions: [],
+                macros: MealScanViewModel.FoodMacros(calories: 20, proteins: 1, carbs: 4, fats: 0, fiber: 1),
+                topNutrients: [F(nutrientId: "vitC", label: "Vitamine C", pctRDA: 25)]),
         ]
     }
 
@@ -558,6 +606,7 @@ struct MealScanView: View {
             macroPill(label: "Proteines", value: String(format: "%.0f", macros.proteins), unit: "g")
             macroPill(label: "Glucides", value: String(format: "%.0f", macros.carbs), unit: "g")
             macroPill(label: "Lipides", value: String(format: "%.0f", macros.fats), unit: "g")
+            macroPill(label: "Fibres", value: String(format: "%.0f", macros.fiber), unit: "g")
         }
         .padding(Theme.spacingSM)
         .cardStyle()
@@ -663,6 +712,120 @@ struct MealScanView: View {
                 .padding(.vertical, 6)
                 .background(Color.healthMapBlueLight)
                 .clipShape(Capsule())
+        }
+    }
+}
+
+// MARK: - Détail d'un aliment (macros gratuit + vitamines/minéraux premium)
+private struct FoodDetailSheet: View {
+    let food: MealScanViewModel.DetectedFood
+
+    /// Vitamines/minéraux à montrer en premium = forces de l'aliment, en
+    /// retirant celles déjà affichées gratuitement dans « tes besoins ».
+    private var premiumNutrients: [MealScanViewModel.FoodContribution] {
+        food.topNutrients.filter { t in
+            !food.contributions.contains(where: { $0.nutrientId == t.nutrientId })
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.spacingLG) {
+                    HStack(spacing: 12) {
+                        Text(food.emoji.isEmpty ? "🍽️" : food.emoji)
+                            .font(.system(size: 36))
+                        Text(food.name)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(Color.healthMapText)
+                    }
+
+                    // Macros — gratuit
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionTitle("Macros", color: .healthMapBlue)
+                        HStack(spacing: 8) {
+                            macroTile("Calories", "\(food.macros.calories)", "kcal")
+                            macroTile("Prot.", gram(food.macros.proteins), "g")
+                            macroTile("Gluc.", gram(food.macros.carbs), "g")
+                            macroTile("Lip.", gram(food.macros.fats), "g")
+                            macroTile("Fibres", gram(food.macros.fiber), "g")
+                        }
+                    }
+
+                    // Ce qu'il apporte à tes besoins — gratuit
+                    if !food.contributions.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            sectionTitle("Ce qu'il apporte à tes besoins", color: .scoreExcellent)
+                            ForEach(food.contributions) { c in
+                                detailGauge(label: label(c), pct: c.pctRDA, color: .scoreExcellent)
+                            }
+                        }
+                    }
+
+                    // Vitamines & minéraux — premium
+                    if !premiumNutrients.isEmpty {
+                        BlurredSection(isPremium: true, title: "Vitamines & minéraux") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                sectionTitle("Vitamines & minéraux", color: .accentIndigo)
+                                ForEach(premiumNutrients) { c in
+                                    detailGauge(label: label(c), pct: c.pctRDA, color: .accentIndigo)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(Theme.spacingLG)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(Color.healthMapBackground)
+            .navigationTitle("Détail")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private func label(_ c: MealScanViewModel.FoodContribution) -> String {
+        NutrientData.definition(for: c.nutrientId)?.label ?? (c.label.isEmpty ? c.nutrientId : c.label)
+    }
+
+    private func gram(_ v: Double) -> String { String(format: "%.0f", v) }
+
+    private func sectionTitle(_ t: String, color: Color) -> some View {
+        Text(t).font(Theme.captionBoldFont).foregroundStyle(color)
+    }
+
+    private func macroTile(_ label: String, _ value: String, _ unit: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.healthMapText)
+            Text(unit).font(.system(size: 9)).foregroundStyle(Color.healthMapMuted)
+            Text(label)
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(Color.healthMapSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color.healthMapCard)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func detailGauge(label: String, pct: Int, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.healthMapText)
+                Spacer()
+                Text("\(pct)%").font(.system(size: 13, weight: .bold)).foregroundStyle(color)
+            }
+            GeometryReader { g in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(color.opacity(0.16)).frame(height: 7)
+                    Capsule().fill(color)
+                        .frame(width: max(6, g.size.width * CGFloat(min(100, max(0, pct))) / 100), height: 7)
+                }
+            }
+            .frame(height: 7)
         }
     }
 }

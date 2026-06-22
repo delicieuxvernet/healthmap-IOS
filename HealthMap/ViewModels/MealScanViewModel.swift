@@ -46,6 +46,7 @@ final class MealScanViewModel: ObservableObject {
         var proteins: Double
         var carbs: Double
         var fats: Double
+        var fiber: Double
     }
 
     struct MicroNutrient: Identifiable {
@@ -64,6 +65,11 @@ final class MealScanViewModel: ObservableObject {
         var name: String
         var emoji: String
         var contributions: [FoodContribution]
+        /// Macros de CET aliment (toujours affichées — gratuit).
+        var macros: FoodMacros
+        /// Forces nutritionnelles réelles de l'aliment (vitamines/minéraux où il
+        /// est riche, même hors besoins) — section premium du détail.
+        var topNutrients: [FoodContribution]
 
         /// Système couleur validé : vert = couvre un besoin (apport ≥ 40 %),
         /// ambre = apport à renforcer (15–39 %), neutre = n'aide aucun besoin
@@ -74,6 +80,15 @@ final class MealScanViewModel: ObservableObject {
             if best >= 15 { return .weak }
             return .neutral
         }
+    }
+
+    /// Macros d'un aliment pour la portion vue.
+    struct FoodMacros {
+        var calories: Int
+        var proteins: Double
+        var carbs: Double
+        var fats: Double
+        var fiber: Double
     }
 
     /// Apport d'un aliment à UN besoin de l'utilisateur (part des besoins du
@@ -123,7 +138,22 @@ final class MealScanViewModel: ObservableObject {
     private struct EdgeFood: Decodable {
         let name: String?
         let emoji: String?
+        let macros: EdgeFoodMacros?
         let nutrients: [EdgeFoodNutrient]?
+        let topNutrients: [EdgeFoodNutrient]?
+
+        enum CodingKeys: String, CodingKey {
+            case name, emoji, macros, nutrients
+            case topNutrients = "top_nutrients"
+        }
+    }
+
+    private struct EdgeFoodMacros: Decodable {
+        let calories: Int?
+        let proteins: Double?
+        let carbs: Double?
+        let fats: Double?
+        let fiber: Double?
     }
 
     private struct EdgeFoodNutrient: Decodable {
@@ -143,6 +173,7 @@ final class MealScanViewModel: ObservableObject {
         let proteins: Double?
         let carbs: Double?
         let fats: Double?
+        let fiber: Double?
     }
 
     private struct EdgeMicro: Decodable {
@@ -325,7 +356,8 @@ final class MealScanViewModel: ObservableObject {
                 calories: response.macros?.calories ?? 0,
                 proteins: response.macros?.proteins ?? 0,
                 carbs: response.macros?.carbs ?? 0,
-                fats: response.macros?.fats ?? 0
+                fats: response.macros?.fats ?? 0,
+                fiber: response.macros?.fiber ?? 0
             )
 
             let micros: [MicroNutrient] = (response.micros ?? []).map { m in
@@ -350,7 +382,18 @@ final class MealScanViewModel: ObservableObject {
                     guard let nid = n.nutrientId, !nid.isEmpty else { return nil }
                     return FoodContribution(nutrientId: nid, label: n.label ?? "", pctRDA: n.pctRDA ?? 0)
                 }
-                return DetectedFood(name: name, emoji: f.emoji ?? "", contributions: contributions)
+                let tops: [FoodContribution] = (f.topNutrients ?? []).compactMap { n in
+                    guard let nid = n.nutrientId, !nid.isEmpty else { return nil }
+                    return FoodContribution(nutrientId: nid, label: n.label ?? "", pctRDA: n.pctRDA ?? 0)
+                }
+                let fm = FoodMacros(
+                    calories: f.macros?.calories ?? 0,
+                    proteins: f.macros?.proteins ?? 0,
+                    carbs: f.macros?.carbs ?? 0,
+                    fats: f.macros?.fats ?? 0,
+                    fiber: f.macros?.fiber ?? 0
+                )
+                return DetectedFood(name: name, emoji: f.emoji ?? "", contributions: contributions, macros: fm, topNutrients: tops)
             }
 
             analysisResult = MealAnalysisResult(
