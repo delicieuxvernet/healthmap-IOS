@@ -101,20 +101,43 @@ enum AvatarLibrary {
         }
     }
 
-    /// Projection toward a lean-athletic target (w45 / m85), scaled by plan
-    /// adherence (0…1). adherence 0 → no change; 1 → reaches the fit target.
-    static func projection(from current: AvatarVariant, adherence: Double) -> AvatarVariant {
-        let a = min(max(adherence, 0), 1)
+    /// Projection RÉALISTE (3 mois par défaut) : un objectif ATTEIGNABLE en suivant le
+    /// plan, pas un fantasme. On respecte les rythmes physiologiques :
+    ///  • gras : au plus ~1 cran en moins / 3 mois (≈ -0,5 kg/sem) ;
+    ///  • muscle : au plus ~1 cran en plus / 3 mois (débutant) — ~2× plus lent chez la femme ;
+    ///  • sur un horizon court (<6 mois) on ne bouge QU'UN seul axe à la fois (celui où il y
+    ///    a le plus de marge) → jamais "obèse → sec" en 3 mois ;
+    ///  • on ne dépasse jamais la marge réellement disponible.
+    /// La jauge d'adhérence (vue Mon évolution) indique où en est l'utilisateur ; la cible
+    /// reste le potentiel réaliste à atteindre en suivant les recommandations.
+    static func projection(from current: AvatarVariant, months: Int = 3) -> AvatarVariant {
         let wi = weightLevels.firstIndex(of: current.weight) ?? 1
         let mi = muscleLevels.firstIndex(of: current.muscle) ?? 1
-        let newWi = wi + Int((Double(1 - wi) * a).rounded())   // target wIdx = 1 (w45)
-        let newMi = mi + Int((Double(2 - mi) * a).rounded())   // target mIdx = 2 (m85)
-        return variant(gender: current.gender, wIdx: newWi, mIdx: newMi)
+        let mo = Double(max(months, 1))
+
+        let fatStepsPerMonth = 0.22
+        let muscleStepsPerMonth = (current.gender == .femme) ? 0.12 : 0.20
+
+        var df = Int((fatStepsPerMonth * mo).rounded())      // crans de gras en moins
+        var dm = Int((muscleStepsPerMonth * mo).rounded())   // crans de muscle en plus
+
+        let capPerAxis = months >= 6 ? 2 : 1
+        let fatRoom = wi                                   // marge de perte de gras
+        let muscleRoom = (muscleLevels.count - 1) - mi     // marge de gain de muscle
+        df = min(df, capPerAxis, fatRoom)
+        dm = min(dm, capPerAxis, muscleRoom)
+
+        // horizon court : un seul axe à la fois, celui qui a le plus de marge (réalisme)
+        if months < 6 && df >= 1 && dm >= 1 {
+            if fatRoom >= muscleRoom { dm = 0 } else { df = 0 }
+        }
+
+        return variant(gender: current.gender, wIdx: wi - df, mIdx: mi + dm)
     }
 
-    /// Whether the projection differs from the current avatar (so we can hide the
-    /// arrow / "in 2 months" copy when there's nothing to project).
-    static func projectionChanges(from current: AvatarVariant, adherence: Double) -> Bool {
-        projection(from: current, adherence: adherence) != current
+    /// Whether the projection differs from the current avatar (so we can show an
+    /// "objectif atteint" state instead of the arrow when there's nothing to gain).
+    static func projectionChanges(from current: AvatarVariant) -> Bool {
+        projection(from: current) != current
     }
 }
