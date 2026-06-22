@@ -413,6 +413,9 @@ final class MealScanViewModel: ObservableObject {
             // Unlock meal scanned badge
             GamificationService.shared.unlockMealScanned()
 
+            // 8. Ajoute le repas au journal du jour (best-effort).
+            await persistToJournal(detectedFoods: response.detectedFoods ?? [], macros: macros)
+
         } catch is CancellationError {
             errorMessage = nil // User cancelled, no error
         } catch let error as MealScanError {
@@ -534,6 +537,29 @@ final class MealScanViewModel: ObservableObject {
     }
 
     // MARK: - Helpers
+
+    /// Ajoute le repas scanné au journal du jour (table meal_scans). Best-effort :
+    /// un échec d'écriture n'interrompt jamais l'affichage du résultat du scan.
+    private func persistToJournal(detectedFoods: [String], macros: MacroNutrients) async {
+        guard let userId = AuthService.shared.cachedCurrentUserIdString else { return }
+        let m = MealJournalService.MealMacros(
+            calories: macros.calories,
+            proteins: macros.proteins,
+            carbs: macros.carbs,
+            fats: macros.fats,
+            fiber: macros.fiber
+        )
+        do {
+            try await MealJournalService.shared.insertScan(
+                userId: userId,
+                foods: detectedFoods,
+                macros: m,
+                slot: MealJournalService.MealSlot.from(date: Date())
+            )
+        } catch {
+            AppLogger.analysis.report(error, context: "MealScan persistToJournal")
+        }
+    }
 
     /// Resolve user deficiencies by recomputing local nutrient scores from the saved profile.
     /// Returns nutrient IDs with score < 60 (matches web deficiency threshold). If unavailable,
