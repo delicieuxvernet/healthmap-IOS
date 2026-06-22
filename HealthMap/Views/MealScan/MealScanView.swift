@@ -9,6 +9,7 @@ struct MealScanView: View {
     @State private var selectedItem: PhotosPickerItem?
     @State private var showPaywall = false
     @State private var selectedFood: MealScanViewModel.DetectedFood?
+    @State private var showJournal = false
 
     var body: some View {
         NavigationStack {
@@ -39,6 +40,16 @@ struct MealScanView: View {
             .navigationTitle("Scanner")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showJournal = true
+                    } label: {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color.healthMapBlue)
+                    }
+                    .accessibilityLabel("Journal du jour")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
@@ -57,6 +68,9 @@ struct MealScanView: View {
             .sheet(item: $selectedFood) { food in
                 FoodDetailSheet(food: food)
                     .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showJournal) {
+                DailyMealJournalView()
             }
         }
     }
