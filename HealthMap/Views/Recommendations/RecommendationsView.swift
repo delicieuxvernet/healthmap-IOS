@@ -46,7 +46,18 @@ struct RecommendationsView: View {
             }
             .navigationTitle("Mon Plan")
             .navigationBarTitleDisplayMode(.large)
-            .healthMapProfileToolbar()
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                            .font(.system(size: 22))
+                            .foregroundStyle(Color.healthMapBlue)
+                    }
+                    .accessibilityLabel("Profil")
+                }
+            }
         }
     }
 }
