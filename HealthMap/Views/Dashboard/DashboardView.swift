@@ -225,66 +225,72 @@ struct DashboardView: View {
     // Le reveal anime déjà le trim (~1,2 s ease-out) et le count-up dans
     // ScoreRingView/AnimatedNumberView — gelés si reduce-motion.
     private var heroSection: some View {
-        VStack(spacing: Theme.spacingMD) {
-            ScoreRingView(score: viewModel.healthScore, size: 140, lineWidth: 12)
+        VStack(spacing: Theme.spacingSM) {
+            // Bandeau compact cliquable : mini-anneau + adjectif + streak + chevron.
+            // Le score n'occupe plus 3/4 de l'écran (retour Arthur 22 juin) ; le
+            // détail du calcul s'ouvre au tap (sheet inchangée).
+            Button {
+                HapticService.shared.selection()
+                showScoreInfo = true
+            } label: {
+                HStack(spacing: Theme.spacingMD) {
+                    MiniScoreRing(
+                        score: viewModel.healthScore,
+                        color: Color.globalScoreColor(for: viewModel.healthScore),
+                        size: 46,
+                        lineWidth: 5
+                    )
 
-            // Pill état global + streak discret
-            HStack(spacing: Theme.spacingSM) {
-                Text(scoreLabel)
-                    .pillStyle(color: Color.globalScoreColor(for: viewModel.healthScore))
-
-                if gamification.currentStreak > 0 && !gamification.isZenMode {
-                    HStack(spacing: Theme.spacingXS) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 10))
-                        Text("\(gamification.currentStreak)")
-                            .font(.system(size: 11, weight: .bold))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Ton bilan")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.healthMapSecondary)
+                        Text(scoreLabel)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.globalScoreColor(for: viewModel.healthScore))
                     }
-                    .foregroundStyle(Color.accentSky)
-                    .padding(.horizontal, Theme.spacingSM)
-                    .padding(.vertical, Theme.spacingXS)
-                    .background(Color.accentSky.opacity(Theme.opacityMedium))
-                    .clipShape(Capsule())
-                    .accessibilityLabel("Série de \(gamification.currentStreak) \(gamification.currentStreak > 1 ? "jours" : "jour")")
-                }
-            }
 
-            // Headline IA — texte libre : 2 lignes max (loi 9)
+                    Spacer(minLength: Theme.spacingSM)
+
+                    if gamification.currentStreak > 0 && !gamification.isZenMode {
+                        HStack(spacing: Theme.spacingXS) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 10))
+                            Text("\(gamification.currentStreak)")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .foregroundStyle(Color.accentSky)
+                        .padding(.horizontal, Theme.spacingSM)
+                        .padding(.vertical, Theme.spacingXS)
+                        .background(Color.accentSky.opacity(Theme.opacityMedium))
+                        .clipShape(Capsule())
+                        .accessibilityLabel("Série de \(gamification.currentStreak) \(gamification.currentStreak > 1 ? "jours" : "jour")")
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.healthMapMuted)
+                        .accessibilityHidden(true)
+                }
+                .padding(Theme.spacingMD)
+                .frame(maxWidth: .infinity)
+                .cardStyle()
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.healthMapPressed)
+            .accessibilityHint("Ouvre une courte explication du calcul de ton bilan.")
+
+            // Headline IA — petite ligne secondaire (n'est plus l'élément central).
             if let headline = viewModel.aiAnalysis?.summary?.headline, !headline.isEmpty {
                 Text(headline)
-                    .font(Theme.headlineFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.healthMapSecondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
             }
-
-            // (Épure du 12 juin : la métaphore IA a quitté le héro — elle vit
-            // désormais en citation d'ouverture de la sheet ci-dessous.)
-
-            // Ligne discrète « Comment ce score est calculé » → petite sheet
-            Button {
-                HapticService.shared.selection()
-                showScoreInfo = true
-            } label: {
-                HStack(spacing: Theme.spacingXS) {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 11))
-                        .accessibilityHidden(true)
-                    Text("Comment ce score est calculé")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundStyle(Color.healthMapSecondary)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityHint("Ouvre une courte explication du calcul du score.")
         }
-        .padding(Theme.spacingLG)
-        .frame(maxWidth: .infinity)
-        .cardStyle()
         .padding(.horizontal, Theme.spacingLG)
     }
 
