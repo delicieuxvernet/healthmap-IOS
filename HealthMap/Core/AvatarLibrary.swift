@@ -105,32 +105,32 @@ enum AvatarLibrary {
         }
     }
 
-    /// Projection RÉALISTE (3 mois par défaut) : un objectif ATTEIGNABLE en suivant le
-    /// plan, pas un fantasme. Rythmes physiologiques, calés sur la granularité fine de la grille :
-    ///  • gras : 7 crans fins (~12 pts/cran) → ~2 crans en moins / 3 mois (≈ -0,5 kg/sem) ;
-    ///  • muscle : 3 crans larges → ~1 cran en plus / 3 mois (débutant), ~2× plus lent chez la femme ;
-    ///  • recomposition légère permise (un peu de gras en moins ET un peu de muscle en plus) car
-    ///    les pas de gras sont fins — mais jamais "obèse → sec" (caps + marge réelle) ;
-    ///  • on ne dépasse jamais la marge réellement disponible.
-    /// La jauge d'adhérence (vue Mon évolution) indique où en est l'utilisateur ; la cible reste
-    /// le potentiel réaliste à atteindre en suivant les recommandations.
+    /// Projection RÉALISTE & SAINE (3 mois par défaut). On rapproche la personne d'une
+    /// ZONE SAINE à un rythme réaliste, jamais d'un extrême :
+    ///  • GRAS : on baisse vers un corps sain (~-0,5 kg/sem ≈ 2 crans fins / 3 mois), MAIS
+    ///    seulement s'il y a un excès, et JAMAIS sous "mince sain" (`floorFat` = w33) → on ne
+    ///    projette jamais quelqu'un vers la maigreur (w20), et un mince ne "maigrit" pas ;
+    ///  • MUSCLE : on tonifie vers "tonifié" (`muscleTarget` = m55 à 3 mois), JAMAIS
+    ///    "athlétique" (m85) d'office — app santé, pas muscu (m85 atteignable seulement ≥ 6 mois) ;
+    ///  • on ne descend jamais le muscle ni n'augmente le gras (pas de régression).
+    /// Résultat cohérent : obèse → surpoids tonifié ; surpoids → normal tonifié ; normal →
+    /// mince tonifié ; sec → reste mince et se tonifie ; déjà mince+athlétique → inchangé.
     static func projection(from current: AvatarVariant, months: Int = 3) -> AvatarVariant {
         let wi = weightLevels.firstIndex(of: current.weight) ?? 3
         let mi = muscleLevels.firstIndex(of: current.muscle) ?? 1
         let mo = Double(max(months, 1))
 
-        let fatStepsPerMonth = 0.5                                  // ~1,5 cran fin / 3 mois
-        let muscleStepsPerMonth = (current.gender == .femme) ? 0.12 : 0.20
+        let floorFat = 1                                  // jamais sous "mince sain" (w33)
+        let muscleTarget = months >= 6 ? 2 : 1           // tonifié (m55) ; athlétique seulement ≥6 mois
+        let fatStep = min(Int((0.5 * mo).rounded()), months >= 6 ? 4 : 2)  // ~2 crans fins / 3 mois
+        let muscleStep = months >= 6 ? 2 : 1
 
-        var df = Int((fatStepsPerMonth * mo).rounded())            // crans de gras en moins
-        var dm = Int((muscleStepsPerMonth * mo).rounded())         // crans de muscle en plus
+        // GRAS : baisse vers le plancher sain uniquement s'il y a un excès (jamais de gain, jamais sous w33)
+        let newWi = wi > floorFat ? max(wi - fatStep, floorFat) : wi
+        // MUSCLE : tonifie vers la cible, sans jamais régresser ni dépasser
+        let newMi = mi < muscleTarget ? min(mi + muscleStep, muscleTarget) : mi
 
-        let fatCap = months >= 6 ? 4 : 2
-        let muscleCap = months >= 6 ? 2 : 1
-        df = min(df, fatCap, wi)                                   // jamais sous la marge dispo
-        dm = min(dm, muscleCap, (muscleLevels.count - 1) - mi)
-
-        return variant(gender: current.gender, wIdx: wi - df, mIdx: mi + dm)
+        return variant(gender: current.gender, wIdx: newWi, mIdx: newMi)
     }
 
     /// Whether the projection differs from the current avatar (so we can show an
