@@ -15,6 +15,11 @@ final class MealScanViewModel: ObservableObject {
     @Published var searchResults: [FoodItem] = []
     @Published var isSearching = false
     @Published var selectedTab: MealScanTab = .analyze
+    /// Scans gratuits restants (iOS free) renvoyés par la fonction ; nil si
+    /// inconnu / premium. Mis en cache pour s'afficher dès l'ouverture.
+    @Published var scansRemaining: Int? = UserDefaults.standard.object(forKey: "hm_scans_remaining") as? Int
+    /// Passe à true quand le quota gratuit est épuisé → la vue ouvre le paywall.
+    @Published var quotaExhausted = false
 
     private var client: SupabaseClient { SupabaseService.shared.client }
     private var searchTask: Task<Void, Never>?
@@ -128,10 +133,12 @@ final class MealScanViewModel: ObservableObject {
         let advice: EdgeAdvice?
         let warnings: [String]?
         let error: String?
+        let scansRemaining: Int?
 
         enum CodingKeys: String, CodingKey {
             case detectedFoods = "detected_foods"
             case foods, macros, micros, advice, warnings, error
+            case scansRemaining = "scans_remaining"
         }
     }
 
@@ -235,6 +242,8 @@ final class MealScanViewModel: ObservableObject {
     private struct MealAnalyzeRequest: Encodable {
         let image: String
         let deficiencies: [String]
+        /// "ios" -> active le quota « 3 scans gratuits à vie » côté serveur.
+        let client: String
     }
 
     // MARK: - Image Compression
@@ -314,7 +323,8 @@ final class MealScanViewModel: ObservableObject {
             // 4. Call Edge Function with 130s timeout
             let requestBody = MealAnalyzeRequest(
                 image: base64String,
-                deficiencies: userDeficiencies
+                deficiencies: userDeficiencies,
+                client: "ios"
             )
 
             let response: EdgeMealResponse = try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
@@ -416,6 +426,9 @@ final class MealScanViewModel: ObservableObject {
             // 8. Ajoute le repas au journal du jour (best-effort).
             await persistToJournal(detectedFoods: response.detectedFoods ?? [], macros: macros)
 
+            // Met à jour le compteur de scans gratuits restants (iOS free).
+            updateScansRemaining(response.scansRemaining)
+
         } catch is CancellationError {
             errorMessage = nil // User cancelled, no error
         } catch let error as MealScanError {
@@ -434,8 +447,16 @@ final class MealScanViewModel: ObservableObject {
         } catch {
             // Handle HTTP / Supabase errors by inspecting the error description
             let desc = String(describing: error).lowercased()
-            if desc.contains("429") || desc.contains("rate") {
-                errorMessage = "Trop de requetes. Attends quelques secondes avant de reessayer."
+            if desc.contains("429") || desc.contains("quota") || desc.contains("rate") {
+                // Pour un compte free, un 429 = quota « 3 scans gratuits à vie »
+                // épuisé (la limite à vie (3) tombe AVANT la limite/jour (15)).
+                if SubscriptionService.shared.isPremium {
+                    errorMessage = "Trop de requetes. Attends quelques secondes avant de reessayer."
+                } else {
+                    updateScansRemaining(0)
+                    quotaExhausted = true
+                    errorMessage = nil
+                }
             } else if desc.contains("413") || desc.contains("too large") || desc.contains("payload") {
                 errorMessage = "Image trop volumineuse (> 5 Mo). Essaie avec une photo plus legere."
             } else if desc.contains("timeout") || desc.contains("timed out") {
@@ -538,6 +559,13 @@ final class MealScanViewModel: ObservableObject {
 
     // MARK: - Helpers
 
+    /// Met à jour + met en cache le compteur de scans gratuits restants.
+    private func updateScansRemaining(_ value: Int?) {
+        guard let value else { return }
+        scansRemaining = value
+        UserDefaults.standard.set(value, forKey: "hm_scans_remaining")
+    }
+
     /// Ajoute le repas scanné au journal du jour (table meal_scans). Best-effort :
     /// un échec d'écriture n'interrompt jamais l'affichage du résultat du scan.
     private func persistToJournal(detectedFoods: [String], macros: MacroNutrients) async {
@@ -589,6 +617,7 @@ final class MealScanViewModel: ObservableObject {
         selectedImage = nil
         analysisResult = nil
         errorMessage = nil
+        quotaExhausted = false
     }
 
     // MARK: - Errors

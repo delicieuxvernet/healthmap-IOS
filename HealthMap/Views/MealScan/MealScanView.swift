@@ -95,6 +95,10 @@ struct MealScanView: View {
                 }
                 .padding(Theme.spacingXL)
             } else {
+                // Compteur de scans gratuits restants (comptes free uniquement).
+                if !subscriptionService.isPremium, let remaining = viewModel.scansRemaining {
+                    freeScanCounter(remaining)
+                }
                 // Capture zone + exemple d'analyse (la maquette : plat + encadrés).
                 captureZone
                 exampleAnalysis
@@ -121,6 +125,31 @@ struct MealScanView: View {
                 .foregroundStyle(Color.healthMapBlue)
             }
         }
+        .onChange(of: viewModel.quotaExhausted) { _, exhausted in
+            if exhausted {
+                showPaywall = true
+                viewModel.quotaExhausted = false
+            }
+        }
+    }
+
+    // MARK: - Compteur de scans gratuits
+    private func freeScanCounter(_ remaining: Int) -> some View {
+        let ok = remaining > 0
+        let plural = remaining > 1 ? "s" : ""
+        return HStack(spacing: 6) {
+            Image(systemName: ok ? "bolt.fill" : "lock.fill")
+                .font(.system(size: 11))
+            Text(ok ? "\(remaining) scan\(plural) gratuit\(plural) restant\(plural)" : "Scans gratuits épuisés")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundStyle(ok ? Color.accentIndigo : Color.scoreLow)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background((ok ? Color.accentIndigo : Color.scoreLow).opacity(0.10))
+        .clipShape(Capsule())
+        .onTapGesture { if !ok { showPaywall = true } }
+        .accessibilityHint(ok ? "" : "Passer en premium pour scanner sans limite")
     }
 
     // MARK: - Capture Zone
