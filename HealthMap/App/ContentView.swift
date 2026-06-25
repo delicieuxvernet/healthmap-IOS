@@ -721,7 +721,7 @@ struct ProfileView: View {
                         }
                     }
                     .disabled(isExportingData)
-                    .accessibilityHint("Telecharge toutes tes donnees HealthMap au format JSON (RGPD Article 20).")
+                    .accessibilityHint("Telecharge toutes tes donnees Kiwio au format JSON (RGPD Article 20).")
                 }
 
                 // Sign out
