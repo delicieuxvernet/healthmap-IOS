@@ -51,8 +51,8 @@ struct LandingView: View {
                     .animation(staged(0.08), value: appeared)
 
                 // Wordmark — « Map » en gradient brand, comme le logo du site
-                (Text("Health").foregroundStyle(Color.healthMapText)
-                 + Text("Map").foregroundStyle(LinearGradient.healthMapBrand))
+                (Text("Kiwi").foregroundStyle(Color.healthMapText)
+                 + Text("o").foregroundStyle(LinearGradient.healthMapBrand))
                     .font(.system(.largeTitle, design: .rounded).weight(.black))
                     .brandTitleKerning()
                     .opacity(appeared ? 1 : 0)

@@ -280,7 +280,7 @@ struct MethodeView: View {
             VStack(alignment: .leading, spacing: Theme.spacingSM) {
                 limitationRow(
                     icon: "stethoscope",
-                    text: "HealthMap ne remplace pas un avis medical"
+                    text: "Kiwio ne remplace pas un avis medical"
                 )
                 limitationRow(
                     icon: "chart.bar.xaxis",

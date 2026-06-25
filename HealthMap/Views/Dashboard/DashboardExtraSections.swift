@@ -84,7 +84,7 @@ extension DashboardView {
     func shareScore() {
         let score = viewModel.healthScore
         let message = """
-        Mon score nutritionnel HealthMap : \(score)/100
+        Mon score nutritionnel Kiwio : \(score)/100
 
         Decouvre le tien sur https://healthmap.fr
         """

@@ -52,7 +52,7 @@ struct PaywallView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(Color.healthMapBlue)
 
-                Text("HealthMap Premium")
+                Text("Kiwio Premium")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.healthMapText)
 

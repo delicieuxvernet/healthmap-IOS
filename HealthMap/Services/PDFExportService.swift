@@ -93,7 +93,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 24, weight: .bold),
             .foregroundColor: UIColor.white,
         ]
-        let title = "HealthMap" as NSString
+        let title = "Kiwio" as NSString
         title.draw(at: CGPoint(x: margin, y: y + 15), withAttributes: titleAttrs)
 
         // Subtitle
@@ -514,7 +514,7 @@ final class PDFExportService {
 
         ("Page \(pageNumber) — \(dateStr) — www.healthmap.fr" as NSString).draw(at: CGPoint(x: margin, y: y), withAttributes: footerAttrs)
 
-        let pageStr = "HealthMap" as NSString
+        let pageStr = "Kiwio" as NSString
         let size = pageStr.size(withAttributes: footerAttrs)
         pageStr.draw(at: CGPoint(x: pageWidth - margin - size.width, y: y), withAttributes: footerAttrs)
     }
@@ -556,7 +556,7 @@ final class PDFExportService {
         formatter.dateFormat = "yyyy-MM-dd"
         let dateStr = formatter.string(from: Date())
         let firstName = profile.firstName.isEmpty ? "Utilisateur" : profile.firstName
-        let fileName = "HealthMap_Bilan_\(firstName)_\(dateStr).pdf"
+        let fileName = "Kiwio_Bilan_\(firstName)_\(dateStr).pdf"
 
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
         try? pdfData.write(to: tempURL)
