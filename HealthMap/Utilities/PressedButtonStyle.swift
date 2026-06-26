@@ -30,6 +30,6 @@ struct PressedButtonStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == PressedButtonStyle {
-    /// Style standard HealthMap pour tous les CTAs et cards interactives.
+    /// Style standard Kiwio pour tous les CTAs et cards interactives.
     static var healthMapPressed: PressedButtonStyle { PressedButtonStyle() }
 }

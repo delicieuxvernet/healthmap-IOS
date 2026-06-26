@@ -7,7 +7,7 @@
 
 ## 1. Contexte projet (résumé)
 
-**HealthMap** est une app de bilan nutritionnel par IA. URL prod web : https://www.healthmap.fr.
+**Kiwio** (ex-HealthMap — même projet) est une app de bilan nutritionnel par IA. URL prod web : https://www.healthmap.fr.
 L'app iOS est un mirror natif SwiftUI de la web app. Backend partagé Supabase + auth Clerk PROD.
 
 - **Owner** : Arthur Vernet (`audit-a@test.com` est le profil de test)

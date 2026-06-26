@@ -3,7 +3,7 @@ import Supabase
 
 // MARK: - Supabase Service (Singleton)
 //
-// HealthMap utilise désormais Supabase Auth comme provider d'auth (migration
+// Kiwio utilise désormais Supabase Auth comme provider d'auth (migration
 // du 2026-06-06, depuis Clerk). Le `SupabaseClient` standard gère TOUT :
 // l'auth (session, refresh, persistence Keychain), la DB (PostgREST), les
 // Edge Functions, le Storage.

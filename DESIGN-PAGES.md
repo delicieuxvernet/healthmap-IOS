@@ -1,4 +1,6 @@
-# DESIGN-PAGES.md — Architecture de référence des écrans HealthMap
+# DESIGN-PAGES.md — Architecture de référence des écrans Kiwio
+
+> 🥝 **Kiwio = HealthMap** (marque renommée juin 2026 ; noms internes `HealthMap`/`fr.healthmap.app`/`healthmap.fr` inchangés).
 
 > **À relire INTÉGRALEMENT avant tout ajustement UX/UI.** Ce fichier est la source de
 > vérité de la structure de chaque page : quel bloc, à quelle position, alimenté par

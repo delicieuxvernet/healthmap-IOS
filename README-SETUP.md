@@ -1,6 +1,8 @@
-# HealthMap iOS — Guide de configuration
+# Kiwio iOS — Guide de configuration
 
-App native SwiftUI (iOS 17+) pour HealthMap. Backend partagé avec healthmap.fr (Supabase).
+> 🥝 **Kiwio = HealthMap** (marque renommée, juin 2026). Les noms **internes** restent inchangés pour stabilité : target/module Swift `HealthMap`, bundle id `fr.healthmap.app`, domaine `healthmap.fr`, repo `healthmap-IOS`.
+
+App native SwiftUI (iOS 17+) pour Kiwio. Backend partagé avec healthmap.fr (Supabase).
 Cette version inclut : gestion d'erreurs typée, logging unifié, crash reporting, retry réseau,
 push notifications, et tests unitaires avec mocks.
 

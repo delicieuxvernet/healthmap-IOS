@@ -2,7 +2,7 @@ import SwiftUI
 import Foundation
 
 // MARK: - Kiwi Walker (mascotte de chargement)
-/// Le kiwi HealthMap personnifié qui marche lentement sur place, façon
+/// Le kiwi Kiwio personnifié qui marche lentement sur place, façon
 /// personnage Foodvisor. 100 % vectoriel (`Canvas` SwiftUI, aucun asset binaire).
 ///
 /// Design validé avec Arthur (17 juin 2026) :

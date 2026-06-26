@@ -3,7 +3,7 @@ import Supabase
 
 // MARK: - Auth Service (Supabase Auth-backed)
 //
-// HealthMap utilise Supabase Auth comme provider d'auth depuis 2026-06-06.
+// Kiwio utilise Supabase Auth comme provider d'auth depuis 2026-06-06.
 // Avant : Clerk (migration retirée pour simplification + bugs Apple/Google OAuth).
 //
 // Le flow signup standard Supabase est en 1 étape (pas de email code 2-step).

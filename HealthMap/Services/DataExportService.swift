@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 
 // MARK: - Data Export Service (RGPD Article 20 — Right to Data Portability)
-/// Generates a machine-readable JSON export of all user data stored by HealthMap.
+/// Generates a machine-readable JSON export of all user data stored by Kiwio.
 ///
 /// RGPD Article 20 requires that users can receive their personal data "in a
 /// structured, commonly used and machine-readable format". This service
