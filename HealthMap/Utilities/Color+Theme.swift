@@ -85,6 +85,20 @@ extension Color {
     static let nutrientIodine = Color(hex: "5856D6")      // indigo
     static let nutrientFiber = Color(hex: "A2845E")       // brown
 
+    // MARK: - Kiwio accent (vert kiwi) + macros FoodVisor
+    // Décision produit 26 juin 2026 : la zone alimentation (écran scan repas)
+    // passe en vert kiwi. Tokens additifs, consommés par MealScanView. Le reste
+    // de l'app reste sur l'accent bleu pour l'instant (migration progressive).
+    static let kiwiGreen = Color(hex: "5DA838")           // accent marque / "couvre un besoin"
+    static let kiwiTint = Color(hex: "EAF3DE")            // fond teinté kiwi
+    static let kiwiInk = Color(hex: "3B6D11")            // texte sur tint kiwi
+    // Macros (façon FoodVisor) — couleurs distinctes, hors sémantique de statut
+    // (vert/ambre/rouge portent déjà un sens : couvre / à renforcer / à combler).
+    static let macroProtein = Color(hex: "2F6FE0")        // bleu
+    static let macroCarb = Color(hex: "F2B705")           // jaune
+    static let macroFat = Color(hex: "FB8500")            // orange
+    // fibres = kiwiGreen (vert)
+
     // Urgency — red kept ONLY for genuine medical alerts (Apple HIG alert semantic).
     // "Soon" and "routine" are folded into the blue family.
     static let urgencyImmediate = Color(hex: "FF3B30")    // critical red (medical alert only)
