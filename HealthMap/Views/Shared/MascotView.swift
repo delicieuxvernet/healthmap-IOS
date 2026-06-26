@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - Mascot View (kiwi)
-/// Mascotte HealthMap : une tranche de kiwi souriante, 100 % vectorielle
+/// Mascotte Kiwio : une tranche de kiwi souriante, 100 % vectorielle
 /// (Shapes/Paths SwiftUI, aucun asset binaire). Le kiwi 🥝 est déjà l'emoji
 /// de la section Nutrition du questionnaire — identité cohérente.
 ///

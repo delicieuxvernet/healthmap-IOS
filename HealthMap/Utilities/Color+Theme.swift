@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// MARK: - HealthMap Color Palette (palette variée unifiée web ↔ iOS, façon FoodVisor)
+// MARK: - Kiwio Color Palette (palette variée unifiée web ↔ iOS, façon FoodVisor)
 //
 // Décision produit (3 mai 2026) : abandon de la règle "tout bleu" pour les
 // nutriments et les scores. Chaque nutriment a SA couleur distincte (mémorisation),

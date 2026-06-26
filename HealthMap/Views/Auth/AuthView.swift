@@ -342,7 +342,7 @@ struct AuthView: View {
 
     // MARK: - Header
     /// Typo harmonisée via ThemeConstants : titre = l'ACTION en cours (le
-    /// wordmark HealthMap vit sur la LandingView, visible derrière le sheet),
+    /// wordmark Kiwio vit sur la LandingView, visible derrière le sheet),
     /// tailles Dynamic-Type-aware, tout centré. La petite mascotte fait le
     /// lien visuel avec la page de garde.
     private var headerSection: some View {

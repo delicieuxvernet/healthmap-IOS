@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - HealthMap Session Types (Clerk-backed, Supabase-compatible shape)
+// MARK: - Kiwio Session Types (Clerk-backed, Supabase-compatible shape)
 //
 // Les call-sites iOS historiques consommaient `Supabase.Session` via
 // `client.auth.session`, et accédaient à `session.user.id.uuidString` +
