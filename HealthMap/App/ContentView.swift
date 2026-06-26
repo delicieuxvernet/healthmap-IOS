@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 
 struct ContentView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -62,6 +63,13 @@ struct ContentView: View {
         }
         .animation(reduceMotion ? .none : .easeInOut(duration: 0.25), value: connectivity.isOnline)
         .task {
+            // Premium au démarrage (cold start), non bloquant pour le splash :
+            // l'app connaît l'état d'abonnement et a les offerings en cache même
+            // si le paywall n'a pas encore été ouvert (robustesse RevenueCat).
+            Task {
+                await SubscriptionService.shared.checkPremiumStatus()
+                await SubscriptionService.shared.loadOfferings()
+            }
             // Durée plancher du splash (≈0,9 s) — le réveil du kiwi est toujours vu.
             try? await Task.sleep(for: .seconds(0.9))
             minSplashElapsed = true
@@ -513,6 +521,7 @@ struct ProfileView: View {
     @ObservedObject private var gamification = GamificationService.shared
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var showPaywall = false
+    @State private var showManageSubscriptions = false
 
     // Delete account flow state (two-step confirmation per Apple HIG).
     @State private var showDeleteFirstConfirm = false
@@ -561,6 +570,30 @@ struct ProfileView: View {
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(Color.healthMapText)
                         }
+
+                        // Date de renouvellement / expiration — lue depuis le SDK
+                        // RevenueCat (customerInfo), pas besoin d'appel serveur.
+                        if let ent = subscriptionService.customerInfo?.entitlements["premium"],
+                           let exp = ent.expirationDate {
+                            LabeledContent(
+                                ent.willRenew ? "Renouvellement" : "Expire le",
+                                value: exp.formatted(date: .abbreviated, time: .omitted)
+                            )
+                        }
+
+                        // Gerer / annuler — ouvre la feuille systeme d'abonnements
+                        // Apple (l'annulation in-app passe obligatoirement par la).
+                        Button {
+                            showManageSubscriptions = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "gearshape")
+                                    .foregroundStyle(Color.healthMapBlue)
+                                Text("Gerer mon abonnement")
+                                    .foregroundStyle(Color.healthMapBlue)
+                            }
+                        }
+                        .accessibilityHint("Ouvre la gestion de ton abonnement (modifier ou annuler) dans les reglages Apple.")
                     } else {
                         Button {
                             showPaywall = true
@@ -765,6 +798,7 @@ struct ProfileView: View {
                 PaywallView()
                     .healthMapFullSheet()
             }
+            .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
             // 1st confirmation — quick Apple-style alert
             .alert("Supprimer ton compte ?", isPresented: $showDeleteFirstConfirm) {
                 Button("Annuler", role: .cancel) { }
