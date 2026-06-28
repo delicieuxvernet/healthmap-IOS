@@ -13,8 +13,6 @@ struct QuestionnaireContainerView: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @State private var showPathwayChoice = true
-    @State private var showCelebration = false
-    @State private var celebrationScore: Int = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - État du flux par question
@@ -83,16 +81,9 @@ struct QuestionnaireContainerView: View {
         .onDisappear {
             autoAdvanceTask?.cancel()
         }
-        .fullScreenCover(isPresented: $showCelebration) {
-            CelebrationView(score: celebrationScore) {
-                // User tape "Continuer" → ferme la célébration ET active le
-                // switch vers le Dashboard. L'analyse IA tournait en parallèle,
-                // elle sera affichée dès que prête (ou loading si encore en cours).
-                showCelebration = false
-                dashboardVM.hasCompletedQuestionnaire = true
-            }
-            .interactiveDismissDisabled(true) // L'utilisateur doit tap Continuer
-        }
+        // Célébration post-questionnaire retirée le 28 juin 2026 : après la
+        // dernière question on bascule directement sur le Bilan (écran de
+        // chargement honnête) — cf. submitAndContinue().
     }
 
     // MARK: - Pathway Choice
@@ -425,7 +416,7 @@ struct QuestionnaireContainerView: View {
                 dismissIntro()
             } else if viewModel.isLastQuestion {
                 HapticService.shared.strong()
-                submitAndCelebrate()
+                submitAndContinue()
             } else {
                 HapticService.shared.primary()
                 advance()
@@ -470,9 +461,12 @@ struct QuestionnaireContainerView: View {
         }
     }
 
-    /// Flux de soumission existant, inchangé : sauvegarde serveur confirmée
-    /// → célébration + bascule Dashboard (l'analyse IA part en parallèle).
-    private func submitAndCelebrate() {
+    /// Soumission → bascule directe sur le Bilan (plus de célébration).
+    /// La sauvegarde serveur confirmée, on calcule les scores locaux PUIS on
+    /// active `hasCompletedQuestionnaire` (MainTabView affiche alors le Bilan,
+    /// càd l'écran de chargement tant que l'analyse IA n'est pas prête). L'analyse
+    /// part en parallèle.
+    private func submitAndContinue() {
         Task {
             await viewModel.submitQuestionnaire()
             if viewModel.profile.completed {
@@ -480,19 +474,12 @@ struct QuestionnaireContainerView: View {
                 // Pass data directly to DashboardVM to avoid
                 // re-fetch timing issues (Supabase replication lag).
                 dashboardVM.profile = viewModel.profile
-                // NOTE : computeLocalScores/triggerAnalysis se basent sur
-                // profile.completed — PAS sur hasCompletedQuestionnaire, qui
-                // doit rester false ici (l'activer maintenant swaperait
-                // l'onglet Bilan sous la célébration via MainTabView).
-                // Bug TestFlight 28 : l'ancienne garde sur le flag laissait
-                // healthScore à 0 → célébration « 0/100 » avec croix, et
-                // l'analyse IA ne démarrait jamais en parallèle.
+                // computeLocalScores AVANT de basculer : garantit un healthScore
+                // calculé (≠ 0) dès l'affichage du Bilan. Cf. bug TestFlight 28.
                 dashboardVM.computeLocalScores()
-                // Capture local score pour la célébration AVANT de switcher.
-                celebrationScore = dashboardVM.healthScore
-                // Afficher CelebrationView en overlay. L'analyse IA
-                // démarre en parallèle — ready quand user tape "Continuer".
-                showCelebration = true
+                // Bascule immédiate vers l'onglet Bilan : il affiche l'écran de
+                // chargement honnête (« 2-3 min ») jusqu'à ce que l'analyse arrive.
+                dashboardVM.hasCompletedQuestionnaire = true
                 Task { await dashboardVM.triggerAnalysis() }
             } else if viewModel.errorMessage != nil {
                 HapticService.shared.error()

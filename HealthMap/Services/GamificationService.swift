@@ -383,12 +383,15 @@ final class GamificationService: ObservableObject {
     }
 
     // MARK: - Typed Confetti
+    /// NEUTRALISÉ (28 juin 2026) — les célébrations « Badge débloqué / Niveau
+    /// supérieur / Série / Bravo » dégradaient la valeur perçue de l'app et ont
+    /// été retirées sur demande d'Arthur. Les badges/XP/séries continuent d'être
+    /// suivis EN SILENCE (`earnedBadges`, `xp`, `currentStreak`) ; seul le feedback
+    /// visuel disparaît. Signature conservée pour les call-sites existants + la
+    /// conformité au protocole. Point de rebranchement unique si une gamification
+    /// visuelle « premium » est un jour souhaitée.
     func triggerConfetti(type: ConfettiType) {
-        confettiType = type
-        showConfetti = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            self?.showConfetti = false
-        }
+        // no-op volontaire — voir le commentaire ci-dessus.
     }
 
     // MARK: - Reset (for sign out)

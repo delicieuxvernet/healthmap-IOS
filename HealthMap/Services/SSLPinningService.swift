@@ -22,8 +22,18 @@ final class SSLPinningService: NSObject {
     lazy var pinnedSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.tlsMinimumSupportedProtocolVersion = .TLSv12
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
+        // Le bilan IA (Edge Function `generate-analysis`, Claude Sonnet 4.6) est une
+        // requête longue qui ne renvoie AUCUNE donnée avant ~140 s (réponse en un seul
+        // bloc). Les anciennes valeurs (30 s d'inactivité / 60 s max) tuaient la requête
+        // à 30 s → fausse « erreur réseau » alors que le serveur finissait + cachait le
+        // bilan (d'où un retry qui « marchait » via le cache). Le vrai timeout métier de
+        // l'appel IA reste porté côté `AIAnalysisService` (garde à 185 s) ; on dimensionne
+        // donc la session AU-DESSUS pour ne plus jamais l'étrangler. NB : session partagée
+        // par tous les appels Supabase, mais `timeoutIntervalForRequest` est un délai
+        // d'INACTIVITÉ (reset à chaque octet reçu) → sans effet sur le chemin nominal d'une
+        // requête rapide ; il ne mord qu'en cas de serveur silencieux (rare).
+        config.timeoutIntervalForRequest = 210
+        config.timeoutIntervalForResource = 300
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
 

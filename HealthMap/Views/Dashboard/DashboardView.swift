@@ -300,10 +300,19 @@ struct FullAnalysisLoadingView: View {
                 .frame(maxWidth: 200)
                 .animation(.easeInOut(duration: 0.4), value: progress)
 
-            Text("Ça prend environ une minute. On te prépare un bilan complet.")
-                .font(Theme.captionFont)
-                .foregroundStyle(Color.healthMapMuted)
-                .multilineTextAlignment(.center)
+            VStack(spacing: Theme.spacingSM) {
+                Text("Compte 2 à 3 minutes")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.kiwiGreen)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(Color.kiwiGreen.opacity(0.12), in: Capsule())
+
+                Text("Tu peux laisser l'app ouverte, on s'occupe de tout.")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapMuted)
+                    .multilineTextAlignment(.center)
+            }
 
             Spacer()
             Spacer()
@@ -311,15 +320,19 @@ struct FullAnalysisLoadingView: View {
         .padding(.horizontal, Theme.spacingLG)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Analyse de ton profil en cours. Cela prend environ une minute.")
+        .accessibilityLabel("Analyse de ton profil en cours. Compte deux à trois minutes.")
         .task {
+            // Progression calibrée sur la durée réelle (~2-3 min) : montée douce qui
+            // plafonne vers 90 % et n'atteint JAMAIS 100 % — la barre disparaît quand
+            // le vrai bilan arrive (la vue est remplacée par le contenu). Fini le
+            // « 95 % figé en 25 s » suivi d'une fausse erreur réseau.
             var ticks = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(0.4))
+                try? await Task.sleep(for: .seconds(0.5))
                 if Task.isCancelled { break }
                 ticks += 1
-                progress = min(0.95, progress + (0.95 - progress) * 0.03)
-                if !reduceMotion && ticks % 9 == 0 {
+                progress = min(0.9, progress + (0.9 - progress) * 0.012)
+                if !reduceMotion && ticks % 8 == 0 {
                     withAnimation(.easeInOut(duration: 0.4)) {
                         messageIndex = (messageIndex + 1) % messages.count
                     }

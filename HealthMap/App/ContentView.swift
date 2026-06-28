@@ -345,16 +345,9 @@ struct MainTabView: View {
             KiwiFloatingTabBar(selected: $selectedTab)
                 .padding(.horizontal, 14)
         }
-        .overlay {
-            // Célébrations de gamification (badge / série / niveau) — enfin
-            // visibles : le moteur (GamificationService.showConfetti) basculait
-            // sans qu'aucune vue ne l'observe. Non bloquant, coupé en mode zen.
-            if gamification.showConfetti && !gamification.isZenMode {
-                CelebrationOverlay(type: gamification.confettiType)
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: gamification.showConfetti)
+        // Overlay de célébrations gamification (« Badge débloqué / Niveau
+        // supérieur ») retiré le 28 juin 2026 : feedback jugé « cheap ».
+        // Les badges/XP/séries restent suivis en silence côté GamificationService.
         .onAppear {
             // Tab bar appearance
             let appearance = UITabBarAppearance()
