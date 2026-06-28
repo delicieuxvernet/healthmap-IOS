@@ -27,7 +27,7 @@ extension DatabaseService {
                 .eq("id", value: userId)
                 .execute()
         }
-        AppLogger.database.info("Push token updated for user \(userId, privacy: .public)")
+        AppLogger.database.info("Push token updated for user \(userId, privacy: .private(mask: .hash))")
     }
 }
 
@@ -48,7 +48,7 @@ extension DatabaseService {
     /// En cas d'échec réseau réel, l'utilisateur retape le bouton —
     /// relancer est sans danger tant que la suppression n'a pas eu lieu.
     func deleteAllUserData(userId: String) async throws {
-        AppLogger.database.notice("Deleting all data for user \(userId, privacy: .public)")
+        AppLogger.database.notice("Deleting all data for user \(userId, privacy: .private(mask: .hash))")
 
         // L'Edge Function `delete-user` (service_role) fait TOUTE la
         // suppression côté serveur : audit_log, annulation Stripe, DELETE
@@ -79,6 +79,6 @@ extension DatabaseService {
             options: .init(body: ["confirm": "DELETE_MY_ACCOUNT"])
         )
 
-        AppLogger.database.info("User data deletion complete for \(userId, privacy: .public)")
+        AppLogger.database.info("User data deletion complete for \(userId, privacy: .private(mask: .hash))")
     }
 }

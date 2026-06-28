@@ -25,6 +25,11 @@ final class QuestionnaireViewModel: ObservableObject {
     /// by `AuthViewModel.clearLocalCaches()` on sign out — that way a new
     /// account can never inherit a previous user's partial answers.
     private static let draftKey = "healthmap_questionnaire_draft"
+    /// Clé du draft CHIFFRÉ (AES-256-GCM via SecureStorageService, clé en Keychain).
+    /// Le questionnaire contient des données de santé (RGPD art.9) : médicaments,
+    /// conditions, symptômes — jamais en clair au repos. `draftKey` ci-dessus n'est
+    /// conservé que pour purger d'éventuels anciens drafts en clair (migration).
+    private static let draftSecureKey = "questionnaire_draft"
 
     /// On-disk shape of the draft. Versioned (`schema`) so a future breaking
     /// change to `UserProfile` can cleanly discard old drafts instead of
@@ -575,13 +580,10 @@ final class QuestionnaireViewModel: ObservableObject {
             savedAt: Date()
         )
 
-        do {
-            let data = try JSONEncoder().encode(draft)
-            UserDefaults.standard.set(data, forKey: Self.draftKey)
-            AppLogger.ui.debug("Questionnaire draft saved (question \(self.currentQuestionIndex, privacy: .public))")
-        } catch {
-            AppLogger.ui.notice("Failed to save questionnaire draft: \(error.localizedDescription, privacy: .public)")
-        }
+        // Stockage CHIFFRÉ (AES-256-GCM + clé Keychain) — les données de santé du
+        // questionnaire ne sont jamais écrites en clair sur le disque (RGPD art.32).
+        SecureStorageService.shared.save(draft, forKey: Self.draftSecureKey)
+        AppLogger.ui.debug("Questionnaire draft saved (question \(self.currentQuestionIndex, privacy: .public))")
     }
 
     /// Reads and decodes a previously saved draft. Called once from `init()`.
@@ -591,72 +593,65 @@ final class QuestionnaireViewModel: ObservableObject {
     /// six-month-old draft to suddenly reappear — stale data is worse than
     /// no data for a health questionnaire).
     private func restoreDraftIfAvailable() {
-        guard let data = UserDefaults.standard.data(forKey: Self.draftKey) else {
+        var draft: Draft? = SecureStorageService.shared.load(forKey: Self.draftSecureKey)
+
+        // Migration : un ancien draft en clair (UserDefaults) est récupéré, re-chiffré,
+        // puis purgé — pour ne plus jamais laisser de données de santé en clair au repos.
+        if draft == nil,
+           let legacy = UserDefaults.standard.data(forKey: Self.draftKey),
+           let decoded = try? JSONDecoder().decode(Draft.self, from: legacy) {
+            draft = decoded
+            SecureStorageService.shared.save(decoded, forKey: Self.draftSecureKey)
+        }
+        UserDefaults.standard.removeObject(forKey: Self.draftKey)
+
+        guard let draft else { return }
+
+        guard draft.schema == Self.draftSchemaVersion else {
+            AppLogger.ui.notice("Discarding draft with mismatched schema \(draft.schema, privacy: .public)")
+            Self.clearDraft()
             return
         }
 
-        do {
-            let draft = try JSONDecoder().decode(Draft.self, from: data)
-
-            guard draft.schema == Self.draftSchemaVersion else {
-                AppLogger.ui.notice("Discarding draft with mismatched schema \(draft.schema, privacy: .public)")
-                Self.clearDraft()
-                return
-            }
-
-            // Cross-user safety: discard drafts that belong to a different
-            // authenticated user. This is the primary defense against the
-            // "sees someone else's cached profile" bug. The clearLocalCaches()
-            // prefix sweep on sign-out is the first line of defense, but if
-            // sign-out fails or races, this check is the safety net.
-            //
-            // Also discard drafts that have NO userId at all (legacy or saved
-            // during a brief token-refresh window) — accepting an unscoped
-            // draft would bypass the cross-user check entirely.
-            let currentUserId = AuthService.shared.cachedCurrentUserIdString
-            guard let draftUserId = draft.userId, let currentUserId else {
-                AppLogger.ui.notice("Discarding draft with missing userId (draft: \(draft.userId ?? "nil", privacy: .public), current: \(currentUserId ?? "nil", privacy: .public))")
-                Self.clearDraft()
-                return
-            }
-            if draftUserId != currentUserId {
-                AppLogger.ui.notice("Discarding draft from different user (draft: \(draftUserId, privacy: .public) vs current: \(currentUserId, privacy: .public))")
-                Self.clearDraft()
-                return
-            }
-
-            // Guard against zombie drafts: a partially completed questionnaire
-            // from months ago almost certainly no longer reflects the user's
-            // actual situation (especially for health-related answers like
-            // symptoms, weight, or medications).
-            let maxAge: TimeInterval = 30 * 24 * 60 * 60 // 30 days
-            if Date().timeIntervalSince(draft.savedAt) > maxAge {
-                AppLogger.ui.notice("Discarding draft older than 30 days")
-                Self.clearDraft()
-                return
-            }
-
-            self.profile = draft.profile
-            self.pathway = draft.pathway
-
-            // Repositionnement — l'ordre compte : profile/pathway d'abord,
-            // la liste des questions visibles en dépend (showIf + express).
-            // Id exact si présent (draft écrit par le flux une-question-par-
-            // écran), sinon première question non répondue (draft v2
-            // historique : son index de section est trop grossier pour le
-            // flux par question).
-            if let questionId = draft.currentQuestionId,
-               let index = visibleQuestions.firstIndex(where: { $0.id == questionId }) {
-                self.currentQuestionIndex = index
-            } else {
-                self.currentQuestionIndex = firstUnansweredQuestionIndex()
-            }
-            self.hasDraftInProgress = true
-            AppLogger.ui.info("Questionnaire draft restored (question \(self.currentQuestionIndex, privacy: .public), saved \(draft.savedAt, privacy: .public))")
-        } catch {
-            AppLogger.ui.notice("Failed to restore questionnaire draft: \(error.localizedDescription, privacy: .public) — discarding")
+        // Cross-user safety: discard drafts that belong to a different
+        // authenticated user. The clearLocalCaches() prefix sweep on sign-out is
+        // the first line of defense; this check is the safety net. Drafts with NO
+        // userId (legacy or saved during a token-refresh window) are also discarded.
+        let currentUserId = AuthService.shared.cachedCurrentUserIdString
+        guard let draftUserId = draft.userId, let currentUserId else {
+            AppLogger.ui.notice("Discarding draft with missing userId (draft: \(draft.userId ?? "nil", privacy: .private(mask: .hash)), current: \(currentUserId ?? "nil", privacy: .private(mask: .hash)))")
             Self.clearDraft()
+            return
         }
+        if draftUserId != currentUserId {
+            AppLogger.ui.notice("Discarding draft from different user (draft: \(draftUserId, privacy: .private(mask: .hash)) vs current: \(currentUserId, privacy: .private(mask: .hash)))")
+            Self.clearDraft()
+            return
+        }
+
+        // Guard against zombie drafts: a partially completed questionnaire from
+        // months ago almost certainly no longer reflects the user's situation
+        // (symptoms, weight, medications).
+        let maxAge: TimeInterval = 30 * 24 * 60 * 60 // 30 days
+        if Date().timeIntervalSince(draft.savedAt) > maxAge {
+            AppLogger.ui.notice("Discarding draft older than 30 days")
+            Self.clearDraft()
+            return
+        }
+
+        self.profile = draft.profile
+        self.pathway = draft.pathway
+
+        // Repositionnement — l'ordre compte : profile/pathway d'abord, la liste
+        // des questions visibles en dépend (showIf + express).
+        if let questionId = draft.currentQuestionId,
+           let index = visibleQuestions.firstIndex(where: { $0.id == questionId }) {
+            self.currentQuestionIndex = index
+        } else {
+            self.currentQuestionIndex = firstUnansweredQuestionIndex()
+        }
+        self.hasDraftInProgress = true
+        AppLogger.ui.info("Questionnaire draft restored (question \(self.currentQuestionIndex, privacy: .public), saved \(draft.savedAt, privacy: .public))")
     }
 
     /// Removes the stored draft. Called after a successful
@@ -664,7 +659,8 @@ final class QuestionnaireViewModel: ObservableObject {
     /// stale. Static so it's callable from paths that don't have a view
     /// model instance (e.g. a hypothetical "discard my answers" button).
     static func clearDraft() {
-        UserDefaults.standard.removeObject(forKey: draftKey)
+        SecureStorageService.shared.remove(forKey: draftSecureKey)
+        UserDefaults.standard.removeObject(forKey: draftKey) // purge legacy clair
         AppLogger.ui.debug("Questionnaire draft cleared")
     }
 }
