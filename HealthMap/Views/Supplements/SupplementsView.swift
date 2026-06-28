@@ -1,20 +1,25 @@
 import SwiftUI
 
-// MARK: - Supplements View (Mes compléments — langage « v4 » 3D)
+// MARK: - Supplements View (Mes compléments — design FINAL « v4 »)
 //
-// Refonte v4 (maquette « Compléments v4 - 3D ») : fond crème, cartes de
-// compléments blanches arrondies (`kiwiCard`), pastilles teintées avec pilule
-// SF Symbol (pas d'illustration 3D Fluent ici — choix de la maquette), carte
-// « cure Kiwio » (coût éco/premium), carte « À savoir » (interactions), gating
-// premium conservé, pop-up bottom-sheet « Pourquoi ce complément ».
+// Écran « Mes compléments » FINAL : titre + sous-titre, encart de transparence,
+// section « Recommandés pour toi » avec toggle Premium / Éco, une carte par
+// complément (source réelle `SupplementEngine.generateRecommendations` +
+// catalogue), panier dynamique « D'après tes choix » (somme des prix cochés),
+// et deux pop-up (détail « Pourquoi pour toi » + « Précautions »).
 //
 // Logique INCHANGÉE : `SupplementEngine` (score, whyText causal, produits, prix,
-// interactions) + repli planning IA. Aucun nouvel appel service — uniquement
-// l'habillage v4.
+// interactions) + repli planning IA. Panier (coché + total) = @State local.
+// Premium / Éco = @State toggle local. Aucun nouvel appel service.
 struct SupplementsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var selectedRec: SupplementRecommendation?
+
+    // États locaux du design final
+    @State private var premium = true
+    @State private var taken: Set<String> = []
+    @State private var whyRec: SupplementRecommendation?
+    @State private var interRec: SupplementRecommendation?
 
     // Moteur (à partir des scores + profil)
     private var engineResult: SupplementEngineResult? {
@@ -42,6 +47,17 @@ struct SupplementsView: View {
 
     private var hasContent: Bool { hasEngineResults || hasAISchedule }
 
+    // Compléments cochés (dans l'ordre de la liste recommandée)
+    private var takenRecs: [SupplementRecommendation] {
+        engineResult?.topRecommendations.filter { taken.contains($0.id) } ?? []
+    }
+
+    private var cartTotal: Double {
+        takenRecs.reduce(0) { $0 + SupplementsV4.monthlyPrice($1, premium: premium) }
+    }
+
+    private var cartTotalLabel: String { String(format: "%.0f €", cartTotal) }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -60,8 +76,7 @@ struct SupplementsView: View {
                     emptyState
                 }
             }
-            .navigationTitle("Mes compléments")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -74,8 +89,13 @@ struct SupplementsView: View {
                     .accessibilityLabel("Profil")
                 }
             }
-            .sheet(item: $selectedRec) { rec in
-                SupplementDetailSheet(rec: rec)
+            .sheet(item: $whyRec) { rec in
+                SupplementWhySheet(rec: rec) { addToCart(rec) }
+            }
+            .sheet(item: $interRec) { rec in
+                let warnings = engineResult?.warnings ?? []
+                let items = SupplementsV4.precautions(for: rec, warnings: warnings)
+                SupplementPrecautionsSheet(rec: rec, items: items, tip: SupplementsV4.tip(for: items))
             }
         }
     }
@@ -83,29 +103,52 @@ struct SupplementsView: View {
     // MARK: - Contenu principal
     private var mainContent: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                Text("Ta routine du jour, calée sur ton bilan")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 18) {
+                // Titre + sous-titre
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Mes compléments")
+                        .font(.system(size: 28, weight: .heavy))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    Text("Choisis ce que tu prends — le reste passe par l'assiette")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                SupplementTransparencyCard()
 
                 if let result = engineResult, !result.topRecommendations.isEmpty {
-                    // Recommandés pour toi → cartes v4 cliquables
-                    sectionHeader("Recommandés pour toi")
-                    ForEach(result.topRecommendations) { rec in
-                        SupplementV4Card(rec: rec) { open(rec) }
+                    // Section header + toggle Premium / Éco
+                    HStack {
+                        Text("Recommandés pour toi")
+                            .font(.system(size: 16, weight: .heavy))
+                            .foregroundStyle(Color.kiwiCharcoal)
+                        Spacer()
+                        SupplementQualityToggle(premium: $premium)
                     }
 
-                    // À savoir (interactions — sécurité, toujours visible)
-                    if !result.warnings.isEmpty {
-                        SupplementWarningsV4Card(warnings: result.warnings)
+                    VStack(spacing: 12) {
+                        ForEach(result.topRecommendations) { rec in
+                            SupplementCardV4(
+                                rec: rec,
+                                premium: premium,
+                                interCount: interactionCount(for: rec, warnings: result.warnings),
+                                isTaken: taken.contains(rec.id),
+                                onCapsule: { openWhy(rec) },
+                                onInteractions: { openInter(rec) },
+                                onTake: { toggleTake(rec) },
+                                onFood: { goToPlan() }
+                            )
+                        }
                     }
 
-                    // Interactions personnalisées (premium floutée — contenu réel)
-                    premiumInteractionCard(result.topRecommendations)
-
-                    // Ta cure Kiwio (coût éco / premium)
-                    SupplementCureV4Card(cost: result.cost)
+                    // Panier dynamique « D'après tes choix »
+                    SupplementCartCard(
+                        taken: takenRecs,
+                        premium: premium,
+                        totalLabel: cartTotalLabel,
+                        onOrder: { goToPlan() }
+                    )
                 } else {
                     aiFallbackSection
                 }
@@ -118,49 +161,42 @@ struct SupplementsView: View {
         }
     }
 
-    private func open(_ rec: SupplementRecommendation) {
+    // MARK: - Actions
+    private func openWhy(_ rec: SupplementRecommendation) {
         HapticService.shared.selection()
-        selectedRec = rec
+        whyRec = rec
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.kiwiCharcoal)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func openInter(_ rec: SupplementRecommendation) {
+        HapticService.shared.selection()
+        interRec = rec
     }
 
-    // MARK: - Interaction premium floutée (contenu RÉEL borné — loi 11)
-    @ViewBuilder
-    private func premiumInteractionCard(_ recs: [SupplementRecommendation]) -> some View {
-        let lines = recs.compactMap { rec -> String? in
-            guard let product = rec.bestProduct, !product.antiInteractions.isEmpty else { return nil }
-            return "\(rec.nutrientLabel) : à distance de \(product.antiInteractions.prefix(2).joined(separator: ", "))."
+    private func toggleTake(_ rec: SupplementRecommendation) {
+        HapticService.shared.selection()
+        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
+            if taken.contains(rec.id) { taken.remove(rec.id) }
+            else { taken.insert(rec.id) }
         }
-        if !lines.isEmpty {
-            BlurredSection(isPremium: true, title: "Interactions personnalisées") {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(lines.prefix(3).enumerated()), id: \.offset) { _, line in
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "arrow.left.arrow.right")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color.kiwiGreen)
-                                .accessibilityHidden(true)
-                            Text(line)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Color.healthMapSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .kiwiCard(radius: 20)
-            }
+    }
+
+    private func addToCart(_ rec: SupplementRecommendation) {
+        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
+            taken.insert(rec.id)
         }
+    }
+
+    private func goToPlan() {
+        HapticService.shared.selection()
+        NotificationCenter.default.post(
+            name: .healthmapNavigateToTab,
+            object: NavCardDestination.plan.rawValue
+        )
+    }
+
+    /// Nombre d'interactions du profil concernant ce complément (badge rouge).
+    private func interactionCount(for rec: SupplementRecommendation, warnings: [InteractionWarning]) -> Int {
+        SupplementsV4.precautions(for: rec, warnings: warnings).count
     }
 
     // MARK: - Repli planning IA (rare : moteur vide mais analyse présente)
@@ -242,7 +278,7 @@ struct SupplementsView: View {
                     .foregroundStyle(Color.kiwiGreen)
             }
             .accessibilityHidden(true)
-            Text("Aucun complément recommandé")
+            Text("Aucun complément à ajouter")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Color.kiwiCharcoal)
             Text("Ton bilan n'a pas identifié de complément à ajouter, ou l'analyse n'a pas encore été effectuée.")

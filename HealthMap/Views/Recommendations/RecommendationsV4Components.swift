@@ -1,525 +1,590 @@
 import SwiftUI
 
-// MARK: - Plan « v4 » (refonte 3D — direction validée juin 2026)
+// MARK: - Plan « v4 » (refonte 3D — direction validée juin 2026, maquette FINALE)
 //
-// Sous-vues de l'onglet « Mon plan » dans le langage v4 : fond crème, cartes
-// blanches arrondies (.kiwiCard), barre de progression XP en vert kiwi,
-// illustration 3D (Fluent3D.voltage = énergie / impact), pop-up bottom-sheet.
-// Source maquette : « Plan v4 - 3D » (Corrections design et interface app).
+// Sous-vues de l'onglet « Ton plan » dans le langage v4 : fond crème, cartes
+// blanches arrondies (.kiwiCard). Plus de héros gamifié (XP/niveau retirés) :
+// une carte par symptôme/objectif (la cause, le rituel du jour matin/midi/soir,
+// un bouton « Voir mes solutions » + badge), et une pop-up bottom-sheet qui
+// détaille les solutions par la nutrition / les habitudes / les compléments.
+// Source maquette : « impl_Plan.html » (vérité pixel).
 //
-// La LOGIQUE reste inchangée : ce fichier ne fait que l'habillage. Les actions
-// restent cochables et créditent de l'XP via GamificationService.awardXPOnce
-// (déclenché par l'appelant `onToggle`), exactement comme avant.
+// La LOGIQUE reste branchée au ViewModel : les données viennent de
+// dashboardVM.aiAnalysis (symptômes, objectifs, priorityActions, nutriments,
+// solutions) + des sources d'aliments du catalogue (Fluent3D.foodSources).
 
-// MARK: - Item d'action (modèle de présentation)
-struct PlanActionItem: Identifiable {
+// MARK: - Modèle de présentation d'un bloc « Ton plan »
+
+/// Une carte du plan : un symptôme déclaré OU un objectif. Tout le contenu de
+/// la carte et de sa pop-up est dérivé de l'analyse IA (jamais inventé) ; le
+/// rituel matin/midi/soir et les sources d'aliments retombent sur un exemple
+/// borné du catalogue quand l'IA ne fournit rien (signalé dans gaps).
+struct PlanTopic: Identifiable {
+    enum Kind { case symptome, objectif }
+
     let id: String
+    let kind: Kind
+    let name: String          // « Ongles cassants » / « Plus d'énergie »
+    let intro: String         // cause / explication (texte IA borné)
+    let ritual: [PlanRitualStep]
+    let nutrition: [PlanNutritionSolution]
+    let habitudes: [PlanHabitSolution]
+    let complements: [PlanSupplementSolution]
+
+    var kicker: String { kind == .symptome ? "SYMPTÔME" : "OBJECTIF" }
+    /// Accent éditorial : bleu pour un symptôme, vert kiwi pour un objectif
+    /// (exactement la maquette : #2F6FE0 / #3B6D11).
+    var accent: Color { kind == .symptome ? Color(hex: "2F6FE0") : Color.kiwiGreenInk }
+    var tint: Color { kind == .symptome ? Color(hex: "EAF0FB") : Color.kiwiGreenSoft }
+    var iconSymbol: String { kind == .symptome ? "hand.point.up.left.fill" : "bolt.fill" }
+    /// Nombre affiché dans le badge du bouton (= total des solutions).
+    var solutionsCount: Int { nutrition.count + habitudes.count + complements.count }
+}
+
+struct PlanRitualStep: Identifiable {
+    enum Slot { case matin, journee, soir }
+    let id = UUID()
+    let slot: Slot
+    let title: String         // « Matin » / « Midi » / « Soir »
+    let detail: String        // « Zinc + fer à jeun »
+}
+
+struct PlanNutritionSolution: Identifiable {
+    let id = UUID()
+    let asset: String         // imageset fluent_*
+    let label: String         // « Lentilles »
+    let note: String          // sous-titre court
+    let qty: String           // Combien
+    let moment: String        // Quand
+    let cuisson: String       // Préparation
+    let astuce: String        // Astuce
+}
+
+struct PlanHabitSolution: Identifiable {
+    let id = UUID()
+    let symbol: String        // SF Symbol
     let text: String
+    let note: String
 }
 
-// MARK: - Héro gamifié (niveau + XP + série + anneau objectif)
-/// Carte d'en-tête : anneau « actions du jour faites / total » + niveau, barre
-/// de progression XP (vert kiwi), série. Données RÉELLES (GamificationService).
-struct PlanLevelHeroV4: View {
-    let done: Int
-    let total: Int
-    let level: Int
-    let xpInLevel: Int
-    let xpPerLevel: Int
-    let streak: Int
-    let reduceMotion: Bool
-
-    @State private var burst = false
-    @State private var floaty = false
-    private var complete: Bool { total > 0 && done >= total }
-    private var xpFraction: CGFloat {
-        CGFloat(min(1, Double(xpInLevel) / Double(max(1, xpPerLevel))))
-    }
-
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 16) {
-                PlanGoalRingV4(done: done, total: total, reduceMotion: reduceMotion)
-                    .frame(width: 84, height: 84)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Fluent3DIcon(name: Fluent3D.voltage, size: 26)
-                            .offset(y: floaty ? -3 : 0)
-                        Text(complete ? "Objectif du jour atteint, bravo\u{202F}!" : "Ton objectif du jour")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color.kiwiCharcoal)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.kiwiGreen)
-                            .accessibilityHidden(true)
-                        Text(streak > 0
-                             ? "Série de \(streak) jour\(streak > 1 ? "s" : "")"
-                             : "Commence ta série aujourd'hui")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.healthMapSecondary)
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-
-            // Barre XP — vert kiwi (accent marque).
-            VStack(spacing: 7) {
-                HStack {
-                    Text("Niveau \(level)")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.kiwiGreenInk)
-                    Spacer(minLength: 0)
-                    Text("\(xpInLevel) / \(xpPerLevel) XP")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.healthMapMuted)
-                }
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.kiwiGreen.opacity(0.16))
-                        Capsule().fill(Color.kiwiGreen)
-                            .frame(width: geo.size.width * xpFraction)
-                    }
-                }
-                .frame(height: 8)
-            }
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .kiwiCard()
-        .overlay {
-            if burst && !reduceMotion {
-                PlanConfettiBurstV4().allowsHitTesting(false)
-            }
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 3.6).repeatForever(autoreverses: true)) { floaty = true }
-        }
-        .onChange(of: complete) { _, now in
-            if now && !reduceMotion && !GamificationService.shared.isZenMode {
-                burst = true
-            }
-            if !now { burst = false }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Objectif du jour : \(done) actions sur \(total) faites. Niveau \(level), \(xpInLevel) sur \(xpPerLevel) XP. \(streak > 0 ? "Série de \(streak) jours." : "")")
-    }
+struct PlanSupplementSolution: Identifiable {
+    let id = UUID()
+    let name: String
+    let note: String
+    let tag: String           // « Prioritaire » / « Si besoin »
+    let strong: Bool          // priorité haute -> teinte verte, sinon neutre
 }
 
-// MARK: - Anneau objectif (actions du plan cochées / total), vert kiwi
-private struct PlanGoalRingV4: View {
-    let done: Int
-    let total: Int
-    let reduceMotion: Bool
+// MARK: - Carte d'un topic (symptôme / objectif) — maquette FINALE
 
-    @State private var animated: CGFloat = 0
-    private var progress: CGFloat { total > 0 ? CGFloat(done) / CGFloat(total) : 0 }
+struct PlanTopicCardV4: View {
+    let topic: PlanTopic
+    let onSeeSolutions: () -> Void
 
     var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.kiwiGreen.opacity(0.16), lineWidth: 9)
-            Circle()
-                .trim(from: 0, to: animated)
-                .stroke(Color.kiwiGreen, style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-
-            if total > 0 && done >= total {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(Color.kiwiGreen)
-            } else {
-                VStack(spacing: 0) {
-                    Text("\(done)")
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.kiwiCharcoal)
-                    Text("/ \(total)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.healthMapMuted)
-                }
-            }
-        }
-        .onAppear { setProgress() }
-        .onChange(of: progress) { _, _ in setProgress() }
-    }
-
-    private func setProgress() {
-        if reduceMotion {
-            animated = progress
-        } else {
-            withAnimation(.easeOut(duration: 0.6)) { animated = progress }
-        }
-    }
-}
-
-// MARK: - Carte d'un besoin (un « apport à renforcer ») — bloc cochable
-// Source : EnrichedNutrient (état HealthScale) + actions rattachées. Reprend la
-// grammaire de la maquette (libellé de section, pastille teintée, texte IA borné,
-// actions cochables, CTA vert « résultat attendu »). Couleur = sens (loi 3).
-struct NeedCardV4: View {
-    let nutrient: EnrichedNutrient
-    let actions: [PlanActionItem]
-    let footerText: String?
-    @Binding var checkedIds: Set<String>
-    let onToggle: (String) -> Void
-
-    private var color: Color { Color.scoreColor(for: nutrient.score) }
-    private var statusLabel: String { HealthScale.nutrientLabel(for: nutrient.score) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // En-tête : pastille teintée par statut + titre + badge d'état
-            HStack(alignment: .center, spacing: 13) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .fill(color.opacity(0.14))
-                        .frame(width: 48, height: 48)
-                    Image(systemName: Fluent3D.symbol(for: nutrient.id))
-                        .font(.system(size: 24))
-                        .foregroundStyle(color)
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Apport à renforcer")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(color)
-                        .textCase(.uppercase)
+        VStack(alignment: .leading, spacing: 0) {
+            // En-tête : kicker accentué + nom + pastille icône teintée.
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(topic.kicker)
+                        .font(.system(size: 11, weight: .heavy))
                         .kerning(0.4)
-                    Text(nutrient.label)
-                        .font(.system(size: 21, weight: .bold))
+                        .foregroundStyle(topic.accent)
+                    Text(topic.name)
+                        .font(.system(size: 23, weight: .heavy))
                         .foregroundStyle(Color.kiwiCharcoal)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                HStack(spacing: 5) {
-                    Circle().fill(color).frame(width: 6, height: 6)
-                    Text(statusLabel)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(color)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .fill(topic.tint)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: topic.iconSymbol)
+                        .font(.system(size: 23))
+                        .foregroundStyle(topic.accent)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(color.opacity(0.14)))
             }
 
-            // « Pourquoi à renforcer » (texte IA borné), si présent.
-            if let why = whyText {
-                Text(why)
-                    .font(.system(size: 13.5, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            // Intro / cause (texte IA borné).
+            Text(topic.intro)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color(hex: "3a3833"))
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 14)
 
-            // Actions cochables — créditent de l'XP via l'appelant (onToggle).
-            if !actions.isEmpty {
-                Text("Ton rituel du jour")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.healthMapMuted)
-                    .textCase(.uppercase)
+            // « Ton rituel du jour » : matin / midi / soir.
+            if !topic.ritual.isEmpty {
+                Text("TON RITUEL DU JOUR")
+                    .font(.system(size: 11, weight: .heavy))
                     .kerning(0.4)
+                    .foregroundStyle(Color(hex: "B0A99B"))
+                    .padding(.top, 20)
 
-                VStack(spacing: 4) {
-                    ForEach(actions) { action in
-                        actionRow(action)
-                    }
-                }
+                PlanRitualRowV4(steps: topic.ritual)
+                    .padding(.top, 14)
             }
 
-            // CTA vert plein « résultat attendu » (footer de la maquette).
-            if let footerText {
+            // Bouton « Voir mes solutions » + badge nombre.
+            Button(action: onSeeSolutions) {
                 HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.white.opacity(0.18))
-                            .frame(width: 40, height: 40)
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 19))
-                            .foregroundStyle(.white)
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Résultat attendu")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.9))
-                        Text(footerText)
-                            .font(.system(size: 14.5, weight: .bold))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    Text("Voir mes solutions")
+                        .font(.system(size: 15.5, weight: .bold))
+                        .foregroundStyle(.white)
                     Spacer(minLength: 0)
+                    ZStack(alignment: .topTrailing) {
+                        ZStack {
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 40, height: 40)
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Color.kiwiGreen)
+                        }
+                        if topic.solutionsCount > 0 {
+                            Text("\(topic.solutionsCount)")
+                                .font(.system(size: 11, weight: .heavy))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .frame(minWidth: 20, minHeight: 20)
+                                .background(
+                                    Capsule().fill(Color(hex: "2F6FE0"))
+                                        .overlay(Capsule().stroke(Color.kiwiGreen, lineWidth: 2))
+                                )
+                                .offset(x: 6, y: -6)
+                        }
+                    }
+                    .frame(width: 40, height: 40)
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 18)
+                .padding(.trailing, 12)
+                .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(Color.kiwiGreen)
                 )
                 .shadow(color: Color.kiwiGreen.opacity(0.30), radius: 14, x: 0, y: 8)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.healthMapPressed)
+            .padding(.top, 20)
         }
-        .padding(20)
+        .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
         .kiwiCard()
-    }
-
-    private var whyText: String? {
-        if let p = nutrient.pourquoiCeScore, !p.isEmpty { return p }
-        if let v = nutrient.verdict, !v.isEmpty { return v }
-        return nil
-    }
-
-    private func actionRow(_ action: PlanActionItem) -> some View {
-        let isChecked = checkedIds.contains(action.id)
-        return Button {
-            onToggle(action.id)
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(isChecked ? Color.kiwiGreen : Color.healthMapMuted)
-                    .accessibilityHidden(true)
-
-                Text(action.text)
-                    .font(.system(size: 13.5, weight: .medium))
-                    .foregroundStyle(isChecked ? Color.healthMapMuted : Color.kiwiCharcoal)
-                    .strikethrough(isChecked, color: Color.healthMapMuted)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.leading)
-
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 11)
-            .padding(.horizontal, 13)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isChecked ? Color.kiwiGreenSoft : Color.kiwiCharcoal.opacity(0.035))
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.healthMapPressed)
-        .accessibilityLabel("\(isChecked ? "Fait" : "À faire")\u{202F}: \(action.text)")
+        .accessibilityElement(children: .contain)
     }
 }
 
-// MARK: - Tuile jumelle « Compléments » / « Analyses » (v4)
-struct PlanTileV4: View {
-    let title: String
-    let subtitle: String
-    let systemImage: String
+// MARK: - Rituel matin / midi / soir (chemin pointillé + 3 paliers)
+
+private struct PlanRitualRowV4: View {
+    let steps: [PlanRitualStep]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        ZStack {
+            // Chemin pointillé arqué reliant les paliers (≥ 2 étapes).
+            if steps.count >= 2 {
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    Path { p in
+                        p.move(to: CGPoint(x: w * 0.17, y: 22))
+                        p.addQuadCurve(
+                            to: CGPoint(x: w * 0.83, y: 22),
+                            control: CGPoint(x: w * 0.5, y: 4)
+                        )
+                    }
+                    .stroke(
+                        Color(hex: "E7E2D6"),
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [1, 6])
+                    )
+                }
+                .frame(height: 48)
+                .allowsHitTesting(false)
+            }
+
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(steps) { step in
+                    PlanRitualStepV4(step: step)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct PlanRitualStepV4: View {
+    let step: PlanRitualStep
+
+    private var tileBg: Color {
+        switch step.slot {
+        case .matin: return Color(hex: "FFF4E2")
+        case .journee: return Color(hex: "EBF4E1")
+        case .soir: return Color.kiwiCharcoal.opacity(0.05)
+        }
+    }
+    private var tileFg: Color {
+        switch step.slot {
+        case .matin: return Color.scoreLow
+        case .journee: return Color.kiwiGreenInk
+        case .soir: return Color(hex: "6B7280")
+        }
+    }
+    private var symbol: String {
+        switch step.slot {
+        case .matin: return "sunrise.fill"
+        case .journee: return "figure.walk"
+        case .soir: return "moon.stars.fill"
+        }
+    }
+    private var titleColor: Color {
+        step.slot == .soir ? Color(hex: "C0322A") : Color.kiwiCharcoal
+    }
+
+    var body: some View {
+        VStack(spacing: 7) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.kiwiGreenSoft)
-                    .frame(width: 38, height: 38)
-                Image(systemName: systemImage)
-                    .font(.system(size: 18))
-                    .foregroundStyle(Color.kiwiGreen)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(tileBg)
+                    .frame(width: 42, height: 42)
+                Image(systemName: symbol)
+                    .font(.system(size: 20))
+                    .foregroundStyle(tileFg)
+            }
+            .shadow(color: tileFg.opacity(0.18), radius: 6, x: 0, y: 5)
+
+            Text(step.title)
+                .font(.system(size: 11, weight: .heavy))
+                .foregroundStyle(titleColor)
+            Text(step.detail)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(Color(hex: "6B7280"))
+                .multilineTextAlignment(.center)
+                .lineSpacing(1)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
+// MARK: - Pop-up « Voir mes solutions » (bottom sheet)
+
+struct PlanSolutionsSheetV4: View {
+    let topic: PlanTopic
+    let onSeeSupplements: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var expanded: Set<UUID> = []
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // En-tête : pastille icône + kicker/nom + bouton fermer.
+                HStack(alignment: .center, spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .fill(topic.tint)
+                            .frame(width: 48, height: 48)
+                        Image(systemName: topic.iconSymbol)
+                            .font(.system(size: 23))
+                            .foregroundStyle(topic.accent)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(topic.kicker)
+                            .font(.system(size: 11, weight: .heavy))
+                            .kerning(0.4)
+                            .foregroundStyle(topic.accent)
+                        Text(topic.name)
+                            .font(.system(size: 20, weight: .heavy))
+                            .foregroundStyle(Color.kiwiCharcoal)
+                    }
+                    Spacer(minLength: 8)
+                    Button {
+                        dismiss()
+                    } label: {
+                        ZStack {
+                            Circle().fill(Color(hex: "EFEBE2")).frame(width: 34, height: 34)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color(hex: "6B7280"))
+                        }
+                    }
+                    .buttonStyle(.healthMapPressed)
+                    .accessibilityLabel("Fermer")
+                }
+
+                Text(topic.intro)
+                    .font(.system(size: 13.5, weight: .medium))
+                    .foregroundStyle(Color(hex: "3a3833"))
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 14)
+
+                // Par la nutrition (lignes dépliables).
+                if !topic.nutrition.isEmpty {
+                    sectionHeader(symbol: "leaf.fill", tint: Color.kiwiGreenInk,
+                                  bg: Color.kiwiGreenSoft, title: "Par la nutrition")
+                    VStack(spacing: 0) {
+                        ForEach(Array(topic.nutrition.enumerated()), id: \.element.id) { idx, n in
+                            PlanNutritionRowV4(
+                                solution: n,
+                                isExpanded: expanded.contains(n.id),
+                                showDivider: idx > 0,
+                                onToggle: { toggle(n.id) }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
+                    .kiwiCard(radius: 18)
+                }
+
+                // Par les habitudes.
+                if !topic.habitudes.isEmpty {
+                    sectionHeader(symbol: "arrow.triangle.2.circlepath", tint: Color(hex: "2F6FE0"),
+                                  bg: Color(hex: "EAF0FB"), title: "Par les habitudes")
+                    VStack(spacing: 0) {
+                        ForEach(Array(topic.habitudes.enumerated()), id: \.element.id) { idx, ha in
+                            PlanHabitRowV4(solution: ha, showDivider: idx > 0)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
+                    .kiwiCard(radius: 18)
+                }
+
+                // Par les compléments.
+                if !topic.complements.isEmpty {
+                    sectionHeader(symbol: "pills.fill", tint: topic.accent,
+                                  bg: topic.tint, title: "Par les compléments")
+                    VStack(spacing: 0) {
+                        ForEach(Array(topic.complements.enumerated()), id: \.element.id) { idx, c in
+                            PlanSupplementRowV4(solution: c, showDivider: idx > 0)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
+                    .kiwiCard(radius: 18)
+                }
+
+                // CTA « Voir mes compléments recommandés ».
+                Button {
+                    onSeeSupplements()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "pills.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.white)
+                        Text("Voir mes compléments recommandés")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.kiwiGreen)
+                    )
+                    .shadow(color: Color.kiwiGreen.opacity(0.34), radius: 14, x: 0, y: 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.healthMapPressed)
+                .padding(.top, 22)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 14)
+            .padding(.bottom, 30)
+        }
+        .scrollIndicators(.hidden)
+        .background(Color.kiwiCream.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(30)
+    }
+
+    private func toggle(_ id: UUID) {
+        if expanded.contains(id) { expanded.remove(id) } else { expanded.insert(id) }
+    }
+
+    @ViewBuilder
+    private func sectionHeader(symbol: String, tint: Color, bg: Color, title: String) -> some View {
+        HStack(spacing: 9) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(bg)
+                    .frame(width: 28, height: 28)
+                Image(systemName: symbol)
+                    .font(.system(size: 15))
+                    .foregroundStyle(tint)
             }
             Text(title)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 15, weight: .heavy))
                 .foregroundStyle(Color.kiwiCharcoal)
-            Text(subtitle)
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
-                .lineLimit(2)
-                .truncationMode(.tail)
             Spacer(minLength: 0)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading)
-        .kiwiCard(radius: 20)
-        .accessibilityElement(children: .combine)
+        .padding(.top, 22)
+        .padding(.bottom, 11)
     }
 }
 
-// MARK: - Section « Tes symptômes analysés » (v4)
-struct SymptomesAnalyseSectionV4: View {
-    let symptomes: [SymptomeAnalyse]
+// MARK: - Ligne « Par la nutrition » (dépliable : Combien / Quand / Préparation / Astuce)
+
+private struct PlanNutritionRowV4: View {
+    let solution: PlanNutritionSolution
+    let isExpanded: Bool
+    let showDivider: Bool
+    let onToggle: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader(icon: "waveform.path.ecg", tint: Color.kiwiGreen, title: "Tes symptômes analysés")
-
-            ForEach(symptomes.prefix(3)) { item in
-                VStack(alignment: .leading, spacing: 8) {
-                    if let s = item.symptome, !s.isEmpty {
-                        Text(prettifyPlanLabel(s))
-                            .font(.system(size: 15, weight: .bold))
+        VStack(spacing: 0) {
+            Button(action: onToggle) {
+                HStack(spacing: 13) {
+                    Fluent3DIcon(name: solution.asset, size: 34)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(solution.label)
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(Color.kiwiCharcoal)
+                        Text(solution.note)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(Color(hex: "6B7280"))
                     }
-                    ForEach(Array((item.causesProbables ?? []).prefix(4).enumerated()), id: \.offset) { _, cause in
-                        bullet(cause, tint: Color.kiwiGreen)
-                    }
-                    if let aVerifier = item.aVerifier, !aVerifier.isEmpty {
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.kiwiGreenInk)
-                                .padding(.top, 1)
-                                .accessibilityHidden(true)
-                            Text("À vérifier\u{202F}: \(aVerifier)")
-                                .font(.system(size: 12.5, weight: .semibold))
-                                .foregroundStyle(Color.kiwiGreenInk)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.top, 2)
+                    Spacer(minLength: 0)
+                    ZStack {
+                        Circle().fill(Color(hex: "F4F1EA")).frame(width: 26, height: 26)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color(hex: "6B7280"))
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
                     }
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.kiwiGreenSoft.opacity(0.6))
-                )
-            }
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .kiwiCard()
-    }
-}
-
-// MARK: - Section « Tes objectifs » (freins + leviers) — v4
-struct ObjectifsAnalyseSectionV4: View {
-    let objectifs: [ObjectifAnalyse]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader(icon: "target", tint: Color.kiwiGreenInk, title: "Tes objectifs")
-
-            ForEach(objectifs.prefix(3)) { item in
-                VStack(alignment: .leading, spacing: 12) {
-                    if let o = item.objectif, !o.isEmpty {
-                        Text(prettifyPlanLabel(o))
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color.kiwiCharcoal)
-                    }
-                    if let freins = item.freins, !freins.isEmpty {
-                        labeledList(title: "Freins", tint: Color.scoreLow, items: freins)
-                    }
-                    if let leviers = item.leviers, !leviers.isEmpty {
-                        labeledList(title: "Leviers", tint: Color.kiwiGreen, items: leviers)
+                .padding(.vertical, 13)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .overlay(alignment: .top) {
+                    if showDivider {
+                        Rectangle().fill(Color.kiwiCharcoal.opacity(0.06)).frame(height: 1)
                     }
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.healthMapPressed)
+
+            if isExpanded {
+                VStack(spacing: 0) {
+                    detailRow(symbol: "scalemass", tint: Color.kiwiGreenInk, label: "Combien", value: solution.qty, divider: false)
+                    detailRow(symbol: "clock", tint: Color.kiwiGreenInk, label: "Quand", value: solution.moment, divider: true)
+                    detailRow(symbol: "fork.knife", tint: Color.kiwiGreenInk, label: "Préparation", value: solution.cuisson, divider: true)
+                    detailRow(symbol: "lightbulb.fill", tint: Color(hex: "C2710A"), label: "Astuce", value: solution.astuce, divider: true)
+                }
+                .padding(.horizontal, 14)
                 .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.kiwiGreenSoft.opacity(0.6))
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.kiwiCream)
                 )
-            }
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .kiwiCard()
-    }
-
-    private func labeledList(title: String, tint: Color, items: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(tint)
-                .textCase(.uppercase)
-                .kerning(0.3)
-            ForEach(Array(items.prefix(3).enumerated()), id: \.offset) { _, text in
-                bullet(text, tint: tint)
+                .padding(.bottom, 13)
             }
         }
     }
-}
 
-// MARK: - Petites aides partagées (v4)
-@ViewBuilder
-private func sectionHeader(icon: String, tint: Color, title: String) -> some View {
-    HStack(spacing: 10) {
-        ZStack {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(tint.opacity(0.14))
-                .frame(width: 34, height: 34)
-            Image(systemName: icon)
-                .font(.system(size: 16))
+    @ViewBuilder
+    private func detailRow(symbol: String, tint: Color, label: String, value: String, divider: Bool) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 15))
                 .foregroundStyle(tint)
+                .padding(.top, 1)
+            (Text("\(label) · ").font(.system(size: 12.5, weight: .heavy))
+                + Text(value).font(.system(size: 12.5, weight: .medium)))
+                .foregroundStyle(Color(hex: "3a3833"))
+                .lineSpacing(1)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
-        Text(title)
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(Color.kiwiCharcoal)
-        Spacer(minLength: 0)
+        .padding(.vertical, 9)
+        .overlay(alignment: .top) {
+            if divider {
+                Rectangle().fill(Color.kiwiCharcoal.opacity(0.06)).frame(height: 1)
+            }
+        }
     }
 }
 
-@ViewBuilder
-private func bullet(_ text: String, tint: Color) -> some View {
-    HStack(alignment: .top, spacing: 8) {
-        Circle()
-            .fill(tint)
-            .frame(width: 5, height: 5)
-            .padding(.top, 6)
-            .accessibilityHidden(true)
-        Text(text)
-            .font(.system(size: 12.5, weight: .medium))
-            .foregroundStyle(Color.healthMapSecondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-}
+// MARK: - Ligne « Par les habitudes »
 
-/// Rend une clé brute (« fatigue_persistante ») présentable.
-private func prettifyPlanLabel(_ raw: String) -> String {
-    let cleaned = raw.replacingOccurrences(of: "_", with: " ").trimmingCharacters(in: .whitespaces)
-    guard let first = cleaned.first else { return cleaned }
-    return first.uppercased() + cleaned.dropFirst()
-}
-
-// MARK: - Confetti in-carte (célébration objectif atteint)
-// Auto-contenu (l'émetteur de CelebrationView est privé). Gelé si reduce-motion
-// (côté appelant). Couleurs alignées sur l'accent kiwi.
-struct PlanConfettiBurstV4: View {
-    private let pieces = 16
-    private let colors: [Color] = [.kiwiGreen, .kiwiGreenInk, .scoreExcellent, .scoreLow, Color(hex: "FFB8EC")]
+private struct PlanHabitRowV4: View {
+    let solution: PlanHabitSolution
+    let showDivider: Bool
 
     var body: some View {
-        ZStack {
-            ForEach(0..<pieces, id: \.self) { i in
-                PlanConfettiPieceV4(
-                    color: colors[i % colors.count],
-                    angle: Double(i) / Double(pieces) * 2 * .pi,
-                    distance: CGFloat.random(in: 60...120),
-                    size: CGFloat.random(in: 6...10),
-                    delay: Double(i) * 0.012
-                )
+        HStack(spacing: 13) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(Color(hex: "F4F1EA"))
+                    .frame(width: 34, height: 34)
+                Image(systemName: solution.symbol)
+                    .font(.system(size: 17))
+                    .foregroundStyle(Color(hex: "6B7280"))
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(solution.text)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Text(solution.note)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color(hex: "6B7280"))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .overlay(alignment: .top) {
+            if showDivider {
+                Rectangle().fill(Color.kiwiCharcoal.opacity(0.06)).frame(height: 1)
             }
         }
     }
 }
 
-private struct PlanConfettiPieceV4: View {
-    let color: Color
-    let angle: Double
-    let distance: CGFloat
-    let size: CGFloat
-    let delay: Double
-    @State private var go = false
+// MARK: - Ligne « Par les compléments »
+
+private struct PlanSupplementRowV4: View {
+    let solution: PlanSupplementSolution
+    let showDivider: Bool
+
+    private var color: Color { solution.strong ? Color.kiwiGreenInk : Color(hex: "6B7280") }
+    private var tint: Color { solution.strong ? Color.kiwiGreenSoft : Color(hex: "F4F1EA") }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 1.5)
-            .fill(color)
-            .frame(width: size, height: size * 0.6)
-            .offset(x: go ? CGFloat(cos(angle)) * distance : 0,
-                    y: go ? CGFloat(sin(angle)) * distance : 0)
-            .rotationEffect(.degrees(go ? 220 : 0))
-            .opacity(go ? 0 : 1)
-            .onAppear {
-                withAnimation(.easeOut(duration: 0.7).delay(delay)) { go = true }
+        HStack(spacing: 13) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(tint)
+                    .frame(width: 34, height: 34)
+                Image(systemName: "pills.fill")
+                    .font(.system(size: 17))
+                    .foregroundStyle(color)
             }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(solution.name)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Text(solution.note)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color(hex: "6B7280"))
+            }
+            Spacer(minLength: 0)
+            Text(solution.tag)
+                .font(.system(size: 10.5, weight: .heavy))
+                .foregroundStyle(color)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(tint))
+        }
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .overlay(alignment: .top) {
+            if showDivider {
+                Rectangle().fill(Color.kiwiCharcoal.opacity(0.06)).frame(height: 1)
+            }
+        }
     }
 }
