@@ -870,12 +870,12 @@ struct BesoinsCourbeCard: View {
             for g in stride(from: 0.0, through: 1.0, by: 0.25) {
                 let y = h * CGFloat(g)
                 var gp = Path(); gp.move(to: CGPoint(x: 0, y: y)); gp.addLine(to: CGPoint(x: w, y: y))
-                ctx.stroke(gp, with: .color(Color.kiwiCharcoal.opacity(0.05)), style: StrokeStyle(lineWidth: 1, dash: [1, 5], lineCap: .round))
+                ctx.stroke(gp, with: .color(Color.kiwiCharcoal.opacity(0.05)), style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [1, 5]))
             }
             // ligne besoin (cible)
             let ty = py(target)
             var tp = Path(); tp.move(to: CGPoint(x: 0, y: ty)); tp.addLine(to: CGPoint(x: w, y: ty))
-            ctx.stroke(tp, with: .color(Color(hex: "E0A100").opacity(0.7)), style: StrokeStyle(lineWidth: 2, dash: [7, 6], lineCap: .round))
+            ctx.stroke(tp, with: .color(Color(hex: "E0A100").opacity(0.7)), style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [7, 6]))
             // aire + ligne lissée
             let line = Self.smoothPath(pts)
             var area = line
