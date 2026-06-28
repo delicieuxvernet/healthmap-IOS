@@ -14,6 +14,34 @@
 
 ---
 
+## ⭐ Refonte « v4 — 3D » (direction validée 28 juin 2026 — déploiement onglet par onglet)
+
+> DA validée par Arthur (maquettes *« … v4 - 3D »*, dossier *Corrections design et interface app*) :
+> **fond crème** (`#FBF6EF`), **anneaux pleins**, **petites illustrations 3D** (Microsoft Fluent
+> Emoji, licence MIT — cf. `Views/Shared/Fluent3D.swift`, assets `fluent_*`), **pop-ups
+> bottom-sheet**, **accent vert kiwi** (`#5DA838`).
+>
+> ⚠️ Cette DA **supersède**, sur les écrans refondus, l'ancienne règle « zéro emoji / SF Symbols
+> uniquement » de `kiwio-design-system.md` : les icônes de **navigation / section** restent en
+> SF Symbols, mais les illustrations **aliments / récolte / score** passent en **3D**.
+>
+> Déploiement **onglet par onglet** — Arthur valide chacun sur TestFlight avant le suivant.
+>
+> **Onglet 1 — Bilan (livré, build à valider).** Ordre de l'écran :
+> ① score (anneau plein, chiffres mono, étincelle 3D, adjectif `HealthScale`) ·
+> ② *Tes apports à renforcer* (champs de points cliquables → **pop-up** : anneau « % du besoin »,
+> *Pourquoi à renforcer*, *Où le trouver* en 3D, CTA *Voir mon plan détaillé*) ·
+> ③ *Symptôme détecté* (CTA compact → causes en feuille) ·
+> ④ *Ta récolte* (coverflow 3D **adossé à la série** `GamificationService.currentStreak` —
+> aucune nouvelle mécanique de jeu introduite) ·
+> ⑤ *Tes derniers repas* (journal du jour `meal_scans`, état vide → Scanner).
+> Les **red flags urgents** restent TOUJOURS au-dessus du héros (sécurité, loi inchangée).
+> Code : `DashboardView.swift` · `BilanV4Components.swift` · `Fluent3D.swift`.
+> Retirés de la home (hors maquette v4, à réintégrer ailleurs si besoin) : carte « Ton plan est
+> prêt », conseil du jour, *Mon évolution* (avatar), export premium.
+
+---
+
 ## 0. Lois transversales (s'appliquent à TOUTES les pages)
 
 1. **Test de valeur utilisateur (loi suprême)** : chaque élément affiché doit répondre à
