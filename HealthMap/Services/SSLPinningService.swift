@@ -6,8 +6,8 @@ import Security
 /// Provides a URLSession configured with TLS certificate pinning (public key
 /// SPKI hash validation) for Supabase and PostHog endpoints.
 ///
-/// Two SHA-256 hashes are stored per domain (current + backup) to allow
-/// certificate rotation without breaking the app.
+/// We pin the STABLE chain links (issuing intermediate + root CA), not the
+/// short-lived leaf, so that routine leaf rotations don't brick the app.
 ///
 /// Usage:
 ///     let session = SSLPinningService.shared.pinnedSession
@@ -30,10 +30,14 @@ final class SSLPinningService: NSObject {
     // MARK: - Pin Database
 
     /// SHA-256 hashes of the public-key bytes returned by
-    /// `SecKeyCopyExternalRepresentation` for each pinned domain. Two
-    /// hashes per domain: primary (leaf certificate) and backup
-    /// (intermediate CA — survives a leaf rotation as long as the
-    /// issuing CA stays the same).
+    /// `SecKeyCopyExternalRepresentation` for each pinned domain. We pin the
+    /// STABLE links of the chain — the issuing intermediate (primary) and the
+    /// root CA (backup) — NOT the leaf. Supabase fronts with short-lived
+    /// (~90-day) Google Trust Services certs whose key rotates on every
+    /// renewal; pinning the leaf alone bricked every install the day the cert
+    /// rotated (incident 2026-06-28). The delegate below walks the whole chain
+    /// and accepts the connection if ANY element matches, so pinning the
+    /// intermediate covers all future leaf rotations with no app release.
     ///
     /// IMPORTANT — these are *not* the SPKI hashes you get from openssl.
     /// Apple's `SecKeyCopyExternalRepresentation` returns the raw
@@ -43,15 +47,20 @@ final class SSLPinningService: NSObject {
     /// two encodings hash differently, so an openssl-derived pin will
     /// never match a runtime-computed iOS hash.
     ///
-    /// Captured: 2026-05-04 from the booted iPhone 17 Pro simulator
-    /// runtime log (`SSLPinningService.urlSession(_:didReceive:)` prints
-    /// the chain's observed hashes on a pin miss; copy them from there).
-    /// Re-capture by booting a sim, hitting prod, and reading the
-    /// "chain hashes [...]" line in `xcrun simctl spawn booted log`.
+    /// Captured: 2026-06-28 from the prod chain
+    /// (`openssl s_client -connect <host>:443 -showcerts`, then for each cert
+    /// `… | openssl pkey -pubin -outform der | tail -c <point-len> | sha256 | base64`,
+    /// point-len = 65 for EC P-256, 97 for P-384 — matches the iOS-form bytes).
+    /// On a pin miss the delegate also logs the observed chain hashes
+    /// ("chain hashes [...]") so they can be re-captured from a device too.
     private static let pinnedHashes: [String: Set<String>] = [
         "ftwfxdfkghkemnpwtzlu.supabase.co": [
-            // Primary — leaf public key (iOS-form hash captured at runtime)
-            "JxYBCNfhi515HdL0cvKtauDKAZvS/HXZc8eHx6C/1pI=",
+            // Primary — issuing intermediate "Google Trust Services WE1"
+            // (EC P-256, stable for years; signs every supabase.co leaf).
+            "H7AMYAvicN2+UcFPBz3kJXCDmGrTItZh4ujUBK8hoWg=",
+            // Backup — root "GTS Root R4" (EC P-384, stable ~a decade;
+            // covers a future intermediate swap, e.g. WE1 → WE2).
+            "YSoUL4CBzo5aJ/ES9gSZTsavsgtHsiLLnTG+BKUdork=",
         ],
         // Clerk SDK uses its own URLSession (not our pinned one), so this
         // entry is informational only — never consulted at runtime. Kept
