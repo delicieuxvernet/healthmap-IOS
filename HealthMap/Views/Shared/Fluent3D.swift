@@ -36,6 +36,8 @@ enum Fluent3D {
     static let droplet = "fluent_droplet"      // hydratation (suivi)
     static let voltage = "fluent_voltage"      // énergie / impact (suivi, plan)
     static let sleeping = "fluent_sleeping"    // sommeil (suivi)
+    static let sun = "fluent_sun"              // matin (scan — Ta journée)
+    static let moon = "fluent_moon"            // soir (scan — Ta journée)
 
     // MARK: - Sources d'aliments par apport (fiche « Où le trouver »)
     /// 3 sources concrètes par nutriment, choisies dans le pool d'assets 3D

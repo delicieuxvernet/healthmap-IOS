@@ -1,70 +1,69 @@
 import SwiftUI
 import PhotosUI
 
-// MARK: - Meal Scan View (camera + AI meal analysis)
+// MARK: - Meal Scan View (caméra + analyse IA) — résultat « p-scanner » immersif
+//
+// Source maquette : `p-scanner.dc.html`. À l'état RÉSULTAT, l'écran devient
+// immersif : header photo plein cadre, carte couverture « N de tes besoins »
+// chevauchant le header, anneaux d'apport cliquables, tuiles aliments 3D,
+// « Ta journée » (Matin/Midi/Soir), macros FoodVisor, « Ce qui manque »,
+// courbe 7 j apports/besoins, bandeau premium, CTA. La capture et la recherche
+// gardent la barre de navigation normale. Couleur = sens ; héros = couverture
+// des besoins (jamais les kcal). UI only : toute la logique reste au ViewModel.
 struct MealScanView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @StateObject private var viewModel = MealScanViewModel()
+    @StateObject private var journal = MealJournalViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var selectedItem: PhotosPickerItem?
     @State private var showPaywall = false
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
     @State private var showJournal = false
+    /// Apports quotidiens (score) des 7 derniers jours — courbe « apports vs besoins ».
+    @State private var curve: [Int] = []
+
+    /// L'écran est en mode résultat immersif quand l'analyse est prête (onglet Analyser).
+    private var isImmersive: Bool {
+        viewModel.analysisResult != nil && viewModel.selectedTab == .analyze
+    }
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                WarmBackground()
-
-                ScrollView {
-                    VStack(spacing: Theme.spacingLG) {
-                        // Tab picker
-                        Picker("", selection: $viewModel.selectedTab) {
-                            ForEach(MealScanViewModel.MealScanTab.allCases, id: \.self) { tab in
-                                Text(tab.rawValue).tag(tab)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal, Theme.spacingLG)
-
-                        switch viewModel.selectedTab {
-                        case .analyze:
-                            analyzeTab
-                        case .search:
-                            searchTab
-                        }
-                    }
-                    .padding(.vertical, Theme.spacingMD)
+            Group {
+                if let result = viewModel.analysisResult, viewModel.selectedTab == .analyze {
+                    immersiveResult(result)
+                } else {
+                    normalScaffold
                 }
             }
             .navigationTitle("Scanner")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar(isImmersive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showJournal = true
-                    } label: {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 20))
-                            .foregroundStyle(Color.kiwiGreen)
+                if !isImmersive {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { showJournal = true } label: {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 20))
+                                .foregroundStyle(Color.kiwiGreen)
+                        }
+                        .accessibilityLabel("Journal du jour")
                     }
-                    .accessibilityLabel("Journal du jour")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
-                    } label: {
-                        Image(systemName: "person.crop.circle")
-                            .font(.system(size: 22))
-                            .foregroundStyle(Color.kiwiGreen)
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
+                        } label: {
+                            Image(systemName: "person.crop.circle")
+                                .font(.system(size: 22))
+                                .foregroundStyle(Color.kiwiGreen)
+                        }
+                        .accessibilityLabel("Profil")
                     }
-                    .accessibilityLabel("Profil")
                 }
             }
             .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .healthMapFullSheet()
+                PaywallView().healthMapFullSheet()
             }
             .sheet(item: $selectedFood) { food in
                 FoodDetailSheetV4(food: food)
@@ -78,14 +77,34 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Analyze Tab
-    private var analyzeTab: some View {
+    // MARK: - Scaffold normal (capture / recherche) — barre de nav classique
+    private var normalScaffold: some View {
+        ZStack {
+            WarmBackground()
+            ScrollView {
+                VStack(spacing: Theme.spacingLG) {
+                    Picker("", selection: $viewModel.selectedTab) {
+                        ForEach(MealScanViewModel.MealScanTab.allCases, id: \.self) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, Theme.spacingLG)
+
+                    switch viewModel.selectedTab {
+                    case .analyze: analyzeCapture
+                    case .search: searchTab
+                    }
+                }
+                .padding(.vertical, Theme.spacingMD)
+            }
+        }
+    }
+
+    // MARK: - Capture (état sans résultat)
+    private var analyzeCapture: some View {
         VStack(spacing: Theme.spacingLG) {
-            if let result = viewModel.analysisResult {
-                // Results view
-                resultsView(result)
-            } else if viewModel.isAnalyzing {
-                // Loading — loader signature : le kiwi qui marche.
+            if viewModel.isAnalyzing {
                 VStack(spacing: Theme.spacingMD) {
                     KiwiWalkerView(size: 140)
                     Text("Analyse en cours...")
@@ -98,16 +117,13 @@ struct MealScanView: View {
                 }
                 .padding(Theme.spacingXL)
             } else {
-                // Compteur de scans gratuits restants (comptes free uniquement).
                 if !subscriptionService.isPremium, let remaining = viewModel.scansRemaining {
                     freeScanCounter(remaining)
                 }
-                // Capture zone + exemple d'analyse (la maquette : plat + encadrés).
                 captureZone
                 exampleAnalysis
             }
 
-            // Error
             if let error = viewModel.errorMessage {
                 HStack(spacing: Theme.spacingSM) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -121,11 +137,9 @@ struct MealScanView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .padding(.horizontal, Theme.spacingLG)
 
-                Button("Reessayer") {
-                    viewModel.reset()
-                }
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color.kiwiGreen)
+                Button("Reessayer") { viewModel.reset() }
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.kiwiGreen)
             }
         }
         .onChange(of: viewModel.quotaExhausted) { _, exhausted in
@@ -146,7 +160,7 @@ struct MealScanView: View {
             Text(ok ? "\(remaining) scan\(plural) gratuit\(plural) restant\(plural)" : "Scans gratuits épuisés")
                 .font(.system(size: 12, weight: .medium))
         }
-        .foregroundStyle(ok ? Color.kiwiInk : Color.scoreLow)
+        .foregroundStyle(ok ? Color.kiwiGreenInk : Color.scoreLow)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background((ok ? Color.kiwiGreen : Color.scoreLow).opacity(0.10))
@@ -158,7 +172,6 @@ struct MealScanView: View {
     // MARK: - Capture Zone
     private var captureZone: some View {
         VStack(spacing: Theme.spacingMD) {
-            // Photo picker
             PhotosPicker(selection: $selectedItem, matching: .images) {
                 VStack(spacing: Theme.spacingMD) {
                     if let imageData = viewModel.selectedImage, let uiImage = UIImage(data: imageData) {
@@ -185,11 +198,9 @@ struct MealScanView: View {
                             Image(systemName: "camera.fill")
                                 .font(.system(size: 36))
                                 .foregroundStyle(Color.kiwiGreen)
-
                             Text("Cadre bien ton assiette")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(Color.healthMapText)
-
                             Text("Prends une photo du dessus, en bonne lumiere")
                                 .font(Theme.captionFont)
                                 .foregroundStyle(Color.healthMapSecondary)
@@ -214,7 +225,6 @@ struct MealScanView: View {
                 }
             }
 
-            // Analyze button
             if viewModel.selectedImage != nil {
                 Button {
                     Task { await viewModel.analyzePhoto() }
@@ -235,66 +245,122 @@ struct MealScanView: View {
         .padding(.horizontal, Theme.spacingLG)
     }
 
-    // MARK: - Results View (langage v4 — refonte 3D, direction validée juin 2026)
-    // Source maquette « Scan v3 - 3D ». Photo réelle du plat en tête (rond),
-    // carte héros « couverture des besoins » (anneau plein vert), vignettes par
-    // aliment (illustrations 3D, teintées par statut, cliquables → fiche détail),
-    // anneaux d'apport par besoin, macros façon FoodVisor, suggestions 3D,
-    // bandeau premium = quota. Le héros reste la COUVERTURE DES BESOINS.
-    private func resultsView(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
-        VStack(spacing: Theme.spacingLG) {
-            mealPhotoHeader(result)
+    // MARK: - Résultat immersif (p-scanner)
+    private func immersiveResult(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                immersiveHeader(result)
 
-            mealCoverageHero(result)
+                VStack(spacing: Theme.spacingMD) {
+                    coverageHero(result)
+                        .padding(.horizontal, Theme.spacingMD)
 
-            foodTilesSection(result.foods)
+                    needTilesSection(result.micros)
 
-            needImpactSection(result.micros)
+                    foodTilesSection(result.foods)
 
-            MacrosCardV4(macros: result.macros)
-                .padding(.horizontal, Theme.spacingLG)
+                    taJourneeSection
 
-            completeMealSection(result.advice)
+                    MacrosCardV4(macros: result.macros)
+                        .padding(.horizontal, Theme.spacingLG)
 
-            premiumScanBanner
+                    completeMealSection(result.advice)
 
-            if !result.warnings.isEmpty { warningsCard(result.warnings) }
+                    BesoinsCourbeCard(values: curve)
+                        .padding(.horizontal, Theme.spacingLG)
 
-            scanAgainButton
+                    premiumScanBanner
+
+                    if !result.warnings.isEmpty { warningsCard(result.warnings) }
+
+                    scanAgainButton
+                }
+                .padding(.top, -28)
+                .padding(.bottom, 20)
+            }
+        }
+        .ignoresSafeArea(edges: .top)
+        .background(Color.kiwiCream.ignoresSafeArea())
+        .task {
+            await journal.load()
+            if let uid = AuthService.shared.cachedCurrentUserIdString {
+                let hist = await ScoreHistoryService.shared.loadHistory(userId: uid)
+                curve = Array(hist.sorted { $0.date < $1.date }.suffix(7).map { $0.score })
+            }
         }
     }
 
-    // MARK: - En-tête photo du plat (rond) + contexte repas
-    @ViewBuilder
-    private func mealPhotoHeader(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
-        VStack(spacing: 14) {
-            if let data = viewModel.selectedImage, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 128, height: 128)
-                    .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(Color.white, lineWidth: 4))
-                    .shadow(color: Color.kiwiCharcoal.opacity(0.15), radius: 10, x: 0, y: 4)
-                    .accessibilityHidden(true)
-            } else {
-                Fluent3DIcon(name: Fluent3D.spaghetti, size: 96)
-            }
-            VStack(spacing: 4) {
-                Text(mealSlotLabel)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                if !result.detectedFoods.isEmpty {
-                    Text(result.detectedFoods.prefix(5).joined(separator: " · "))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+    // MARK: - Header photo plein cadre
+    private func immersiveHeader(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let data = viewModel.selectedImage, let uiImage = UIImage(data: data) {
+                    Image(uiImage: uiImage).resizable().scaledToFill()
+                } else {
+                    ZStack {
+                        Color.kiwiGreenSoft
+                        Fluent3DIcon(name: Fluent3D.spaghetti, size: 90)
+                    }
                 }
             }
+            .frame(height: 236)
+            .frame(maxWidth: .infinity)
+            .clipped()
+
+            LinearGradient(
+                colors: [.black.opacity(0.34), .clear, .clear, .black.opacity(0.62)],
+                startPoint: .top, endPoint: .bottom
+            )
+            .frame(height: 236)
+
+            VStack {
+                HStack {
+                    headerCircleButton(icon: "chevron.left") { viewModel.reset() }
+                        .accessibilityLabel("Retour")
+                    Spacer()
+                    headerCircleButton(icon: "calendar") { showJournal = true }
+                        .accessibilityLabel("Journal du jour")
+                    headerCircleButton(icon: "person.crop.circle") {
+                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
+                    }
+                    .accessibilityLabel("Profil")
+                }
+                .padding(.top, 54)
+                Spacer()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(mealSlotLabel)
+                        .font(.system(size: 27, weight: .bold))
+                        .foregroundStyle(.white)
+                    if !result.detectedFoods.isEmpty {
+                        Text(result.detectedFoods.prefix(4).joined(separator: " · "))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 4)
+            }
+            .padding(.horizontal, 22)
+            .frame(height: 236)
         }
+        .frame(height: 236)
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, Theme.spacingLG)
+        .clipped()
+        .accessibilityElement(children: .contain)
+    }
+
+    private func headerCircleButton(icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(Circle().fill(.black.opacity(0.28)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.healthMapPressed)
     }
 
     private var mealSlotLabel: String {
@@ -307,25 +373,25 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Carte héros « couverture des besoins »
-    /// Nombre de besoins du jour que ce repas renforce, sur le total visé.
-    private func mealCoverageHero(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
+    // MARK: - Carte couverture « N de tes besoins » (chevauche le header)
+    private func coverageHero(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
         let needs = result.micros.filter { $0.isDeficiency }
         let pool = needs.isEmpty ? result.micros : needs
         let total = pool.count
         let covered = pool.filter { $0.pctRDA >= 60 }.count
         return MealCoverageHero(coveredCount: covered, totalCount: total)
-            .padding(.horizontal, Theme.spacingLG)
     }
 
-    // MARK: - Vignettes par aliment (illustrations 3D, cliquables → détail)
+    // MARK: - « Ce que ton plat t'apporte » — anneaux 3-up cliquables
     @ViewBuilder
-    private func foodTilesSection(_ foods: [MealScanViewModel.DetectedFood]) -> some View {
-        let shown = Array(foods.prefix(6))
+    private func needTilesSection(_ micros: [MealScanViewModel.MicroNutrient]) -> some View {
+        let needs = micros.filter { $0.isDeficiency }
+        let source = needs.isEmpty ? micros : needs
+        let shown = Array(source.sorted { $0.pctRDA > $1.pctRDA }.prefix(3))
         if !shown.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("Les aliments de ce repas")
+                    Text("Ce que ton plat t'apporte")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(Color.kiwiCharcoal)
                     Spacer()
@@ -333,6 +399,26 @@ struct MealScanView: View {
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundStyle(Color.healthMapMuted)
                 }
+                HStack(spacing: 11) {
+                    ForEach(shown) { micro in
+                        ScanNeedTile(micro: micro) { impactDetail = micro }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.spacingLG)
+        }
+    }
+
+    // MARK: - Tuiles par aliment (illustrations 3D, cliquables → détail)
+    @ViewBuilder
+    private func foodTilesSection(_ foods: [MealScanViewModel.DetectedFood]) -> some View {
+        let shown = Array(foods.prefix(6))
+        if !shown.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Les aliments de ce repas")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                     ForEach(shown) { food in
                         FoodTileV4(food: food) { selectedFood = food }
@@ -344,31 +430,24 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Anneaux d'apport par besoin
-    @ViewBuilder
-    private func needImpactSection(_ micros: [MealScanViewModel.MicroNutrient]) -> some View {
-        let needs = micros.filter { $0.isDeficiency }
-        let source = needs.isEmpty ? micros : needs
-        let shown = Array(source.sorted { $0.pctRDA > $1.pctRDA }.prefix(4))
-        if !shown.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Impact sur tes besoins du jour")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                    ForEach(shown) { micro in
-                        NeedImpactCard(micro: micro) {
-                            impactDetail = micro
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    // MARK: - Ta journée (Matin / Midi / Soir)
+    private var taJourneeSection: some View {
+        TaJourneeCard(slots: journeeSlots)
             .padding(.horizontal, Theme.spacingLG)
-        }
     }
 
-    // MARK: - Suggestions « pour compléter »
+    private var journeeSlots: [JourneeSlot] {
+        let today = journal.meals
+        func done(_ slot: MealJournalService.MealSlot) -> Bool { today.contains { $0.slot == slot } }
+        let current = MealJournalService.MealSlot.from(date: Date())
+        return [
+            JourneeSlot(title: "Matin", asset: Fluent3D.sun, done: done(.breakfast), isCurrent: current == .breakfast),
+            JourneeSlot(title: "Midi", asset: Fluent3D.spaghetti, done: done(.lunch), isCurrent: current == .lunch),
+            JourneeSlot(title: "Soir", asset: Fluent3D.moon, done: done(.dinner), isCurrent: current == .dinner),
+        ]
+    }
+
+    // MARK: - « Ce qui manque à ton plat »
     @ViewBuilder
     private func completeMealSection(_ advice: MealScanViewModel.MealAdvice) -> some View {
         let lines: [String] = !advice.suggestedAdditions.isEmpty ? advice.suggestedAdditions : advice.swaps
@@ -389,7 +468,7 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Exemple d'analyse (landing — statique, illustre la maquette validée)
+    // MARK: - Exemple d'analyse (landing — statique)
     private var exampleAnalysis: some View {
         VStack(spacing: Theme.spacingLG) {
             VStack(alignment: .leading, spacing: 2) {
@@ -410,24 +489,8 @@ struct MealScanView: View {
                 .padding(.horizontal, Theme.spacingLG)
 
             foodTilesSection(exampleFoods)
-
-            needImpactSection(exampleMicros)
-
-            CompleteMealCardV4(lines: [
-                "Des légumes verts pour le fer et les fibres",
-                "Un agrume en dessert pour mieux absorber le fer",
-            ])
-            .padding(.horizontal, Theme.spacingLG)
         }
         .padding(.top, Theme.spacingSM)
-    }
-
-    private var exampleMicros: [MealScanViewModel.MicroNutrient] {
-        [
-            MealScanViewModel.MicroNutrient(nutrientId: "vitB12", label: "Vitamine B12", emoji: "", pctRDA: 70, isDeficiency: true),
-            MealScanViewModel.MicroNutrient(nutrientId: "vitD", label: "Vitamine D", emoji: "", pctRDA: 55, isDeficiency: true),
-            MealScanViewModel.MicroNutrient(nutrientId: "iron", label: "Fer", emoji: "", pctRDA: 25, isDeficiency: true),
-        ]
     }
 
     private var exampleFoods: [MealScanViewModel.DetectedFood] {
@@ -438,25 +501,12 @@ struct MealScanView: View {
                 contributions: [F(nutrientId: "vitD", label: "Vitamine D", pctRDA: 55),
                                 F(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 70)],
                 macros: MealScanViewModel.FoodMacros(calories: 280, proteins: 25, carbs: 0, fats: 18, fiber: 0),
-                topNutrients: [F(nutrientId: "omega3", label: "Oméga-3", pctRDA: 90),
-                               F(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 70)]),
+                topNutrients: [F(nutrientId: "omega3", label: "Oméga-3", pctRDA: 90)]),
             MealScanViewModel.DetectedFood(
                 name: "Brocoli", emoji: "🥦",
                 contributions: [F(nutrientId: "iron", label: "Fer", pctRDA: 25)],
                 macros: MealScanViewModel.FoodMacros(calories: 35, proteins: 3, carbs: 5, fats: 0, fiber: 3),
-                topNutrients: [F(nutrientId: "vitC", label: "Vitamine C", pctRDA: 80),
-                               F(nutrientId: "fiber", label: "Fibres", pctRDA: 12)]),
-            MealScanViewModel.DetectedFood(
-                name: "Œuf", emoji: "🍳",
-                contributions: [F(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 50),
-                                F(nutrientId: "vitD", label: "Vitamine D", pctRDA: 20)],
-                macros: MealScanViewModel.FoodMacros(calories: 90, proteins: 7, carbs: 1, fats: 6, fiber: 0),
-                topNutrients: [F(nutrientId: "zinc", label: "Zinc", pctRDA: 8)]),
-            MealScanViewModel.DetectedFood(
-                name: "Tomate", emoji: "🍅",
-                contributions: [],
-                macros: MealScanViewModel.FoodMacros(calories: 20, proteins: 1, carbs: 4, fats: 0, fiber: 1),
-                topNutrients: [F(nutrientId: "vitC", label: "Vitamine C", pctRDA: 25)]),
+                topNutrients: [F(nutrientId: "vitC", label: "Vitamine C", pctRDA: 80)]),
         ]
     }
 
@@ -501,7 +551,6 @@ struct MealScanView: View {
     // MARK: - Search Tab
     private var searchTab: some View {
         VStack(spacing: Theme.spacingMD) {
-            // Search bar
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(Color.healthMapMuted)
@@ -511,7 +560,6 @@ struct MealScanView: View {
                     .onChange(of: viewModel.searchQuery) { _, _ in
                         Task { await viewModel.searchFoods() }
                     }
-
                 if !viewModel.searchQuery.isEmpty {
                     Button {
                         viewModel.searchQuery = ""
@@ -527,13 +575,11 @@ struct MealScanView: View {
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM))
             .padding(.horizontal, Theme.spacingLG)
 
-            // Quick examples
             if viewModel.searchQuery.isEmpty {
                 VStack(alignment: .leading, spacing: Theme.spacingSM) {
                     Text("Essaie par exemple :")
                         .font(Theme.captionFont)
                         .foregroundStyle(Color.healthMapSecondary)
-
                     HStack(spacing: 8) {
                         quickSearchButton("Epinards")
                         quickSearchButton("Saumon")
@@ -543,7 +589,6 @@ struct MealScanView: View {
                 .padding(.horizontal, Theme.spacingLG)
             }
 
-            // Results
             if viewModel.isSearching {
                 ProgressView()
                     .tint(Color.kiwiGreen)
@@ -551,11 +596,9 @@ struct MealScanView: View {
             } else {
                 ForEach(viewModel.searchResults) { food in
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(food.name)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(Color.healthMapText)
-                        }
+                        Text(food.name)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.healthMapText)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12))
@@ -577,7 +620,7 @@ struct MealScanView: View {
         } label: {
             Text(text)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.kiwiInk)
+                .foregroundStyle(Color.kiwiGreenInk)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(Color.kiwiTint)
@@ -587,9 +630,9 @@ struct MealScanView: View {
 }
 
 // MARK: - Détail d'un besoin du jour (bottom sheet v4)
-/// Ouverte depuis un anneau « Impact sur tes besoins » : grand anneau de la part
-/// couverte par ce repas, ce que le repas apporte, et où trouver ce besoin
-/// (sources 3D). Couleur = statut (vert couvre / ambre partiel / rouge à combler).
+/// Ouverte depuis un anneau « Ce que ton plat t'apporte » : grand anneau de la
+/// part couverte par ce repas, ce que le repas apporte, où trouver ce besoin
+/// (sources 3D), et CTA vers le plan. Couleur = statut.
 private struct NeedImpactDetailSheet: View {
     let micro: MealScanViewModel.MicroNutrient
     @Environment(\.dismiss) private var dismiss
@@ -658,6 +701,24 @@ private struct NeedImpactDetailSheet: View {
                         }
                     }
                 }
+
+                Button {
+                    dismiss()
+                    NotificationCenter.default.post(name: .healthmapNavigateToTab, object: NavCardDestination.plan.rawValue)
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Voir mon plan")
+                            .font(.system(size: 15, weight: .bold))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 18, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiGreen))
+                    .shadow(color: Color.kiwiGreen.opacity(0.34), radius: 12, x: 0, y: 8)
+                }
+                .buttonStyle(.healthMapPressed)
+                .padding(.top, 22)
             }
             .padding(.horizontal, 22)
             .padding(.top, 8)

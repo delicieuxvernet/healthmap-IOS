@@ -276,6 +276,8 @@ struct MainTabView: View {
                         .environmentObject(dashboardVM)
                 }
             }
+            .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Bilan", systemImage: "heart.text.clipboard") }
             .tag(Tab.bilan)
 
@@ -288,6 +290,8 @@ struct MainTabView: View {
                     LockedFeatureView(title: "Suivi", message: "Complete ton bilan pour acceder au suivi quotidien.")
                 }
             }
+            .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Suivi", systemImage: "checkmark.circle") }
             .tag(Tab.suivi)
 
@@ -300,6 +304,8 @@ struct MainTabView: View {
                     LockedFeatureView(title: "Scanner", message: "Complete ton bilan pour scanner tes repas.")
                 }
             }
+            .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Scanner", systemImage: "camera") }
             .tag(Tab.scanner)
 
@@ -312,6 +318,8 @@ struct MainTabView: View {
                     LockedFeatureView(title: "Mon Plan", message: "Complete ton bilan pour acceder a ton plan personnalise.")
                 }
             }
+            .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Plan", systemImage: "list.bullet.clipboard") }
             .tag(Tab.plan)
 
@@ -325,10 +333,18 @@ struct MainTabView: View {
                     LockedFeatureView(title: "Mes compléments", message: "Complete ton bilan pour voir tes compléments.")
                 }
             }
+            .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Compléments", systemImage: "pills") }
             .tag(Tab.complements)
         }
         .tint(Color.kiwiGreen)
+        // Tab bar flottante (langage v4 — maquette p-scanner) : pill blanche
+        // posée en overlay ; la barre native est masquée par onglet.
+        .overlay(alignment: .bottom) {
+            KiwiFloatingTabBar(selected: $selectedTab)
+                .padding(.horizontal, 14)
+        }
         .overlay {
             // Célébrations de gamification (badge / série / niveau) — enfin
             // visibles : le moteur (GamificationService.showConfetti) basculait
