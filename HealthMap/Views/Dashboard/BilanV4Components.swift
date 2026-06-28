@@ -39,7 +39,7 @@ struct BilanScoreCard: View {
                         .offset(y: floaty ? -3 : 0)
                     Text(adjective)
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(Color.kiwiInk)
+                        .foregroundStyle(Color.kiwiCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let summary, !summary.isEmpty {
@@ -165,7 +165,7 @@ struct ApportsCard: View {
             HStack {
                 Text("Tes apports à renforcer")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.kiwiCharcoal)
                 Spacer()
                 Text("Touche pour le détail")
                     .font(.system(size: 11.5, weight: .semibold))
@@ -206,7 +206,7 @@ struct SymptomeCardV4: View {
                         .foregroundStyle(Color.healthMapBlue)
                     Text(label)
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.kiwiInk)
+                        .foregroundStyle(Color.kiwiCharcoal)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
@@ -260,7 +260,7 @@ struct RecolteCard: View {
             HStack {
                 Text("Ta récolte")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.kiwiCharcoal)
                 Spacer()
                 Text("\(unlockedCount) / \(ladder.count)")
                     .font(.system(size: 12, weight: .bold))
@@ -282,7 +282,7 @@ struct RecolteCard: View {
 
             Text(goal.name)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Color.kiwiInk)
+                .foregroundStyle(Color.kiwiCharcoal)
 
             if complete {
                 Text("Récolte complète. Bravo !")
@@ -300,7 +300,7 @@ struct RecolteCard: View {
             }
 
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.kiwiInk.opacity(0.10)).frame(width: 200, height: 6)
+                Capsule().fill(Color.kiwiCharcoal.opacity(0.10)).frame(width: 200, height: 6)
                 Capsule().fill(Color.kiwiGreen).frame(width: 200 * CGFloat(progress), height: 6)
             }
             .padding(.top, 8)
@@ -332,7 +332,7 @@ struct DerniersRepasCard: View {
             VStack(spacing: 0) {
                 ForEach(Array(meals.prefix(3).enumerated()), id: \.element.id) { idx, meal in
                     if idx > 0 {
-                        Divider().background(Color.kiwiInk.opacity(0.07)).padding(.leading, 16)
+                        Divider().background(Color.kiwiCharcoal.opacity(0.07)).padding(.leading, 16)
                     }
                     Button { onScan() } label: { row(meal) }
                         .buttonStyle(.healthMapPressed)
@@ -355,7 +355,7 @@ struct DerniersRepasCard: View {
                 HStack {
                     Text(title(meal))
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.kiwiInk)
+                        .foregroundStyle(Color.kiwiCharcoal)
                         .lineLimit(1)
                     Spacer()
                     Text(timeLabel(meal.consumedAt))
@@ -381,7 +381,7 @@ struct DerniersRepasCard: View {
             ZStack {
                 Circle()
                     .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [4]))
-                    .foregroundStyle(Color.kiwiInk.opacity(0.18))
+                    .foregroundStyle(Color.kiwiCharcoal.opacity(0.18))
                     .frame(width: 64, height: 64)
                 Image(systemName: "camera")
                     .font(.system(size: 28))
@@ -389,7 +389,7 @@ struct DerniersRepasCard: View {
             }
             Text("Tu n'as encore rien scanné")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color.kiwiInk)
+                .foregroundStyle(Color.kiwiCharcoal)
                 .padding(.top, 14)
             Text("Scanne ton prochain repas pour découvrir les apports qu'il couvre.")
                 .font(.system(size: 12.5, weight: .medium))
@@ -473,7 +473,7 @@ struct ApportDetailSheet: View {
 
                 Text("Pourquoi à renforcer")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.kiwiCharcoal)
                     .padding(.top, 16)
                     .padding(.bottom, 6)
                 Text(why)
@@ -484,7 +484,7 @@ struct ApportDetailSheet: View {
                 if !foods.isEmpty {
                     Text("Où le trouver")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.kiwiInk)
+                        .foregroundStyle(Color.kiwiCharcoal)
                         .padding(.top, 20)
                         .padding(.bottom, 12)
                     HStack(spacing: 10) {
@@ -493,7 +493,7 @@ struct ApportDetailSheet: View {
                                 Fluent3DIcon(name: food.asset, size: 40)
                                 Text(food.label)
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Color.kiwiInk)
+                                    .foregroundStyle(Color.kiwiCharcoal)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
                             }
@@ -501,7 +501,7 @@ struct ApportDetailSheet: View {
                             .padding(.vertical, 14)
                             .padding(.horizontal, 8)
                             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.healthMapCard))
-                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.kiwiInk.opacity(0.05), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1))
                         }
                     }
                 }
@@ -546,7 +546,7 @@ struct ApportDetailSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(nutrient.label)
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.kiwiCharcoal)
                 HStack(spacing: 5) {
                     Circle().fill(color).frame(width: 7, height: 7)
                     Text(statusLabel)
@@ -563,7 +563,7 @@ struct ApportDetailSheet: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.healthMapSecondary)
                     .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.kiwiInk.opacity(0.06)))
+                    .background(Circle().fill(Color.kiwiCharcoal.opacity(0.06)))
             }
             .buttonStyle(.healthMapPressed)
             .accessibilityLabel("Fermer")

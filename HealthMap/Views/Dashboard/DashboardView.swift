@@ -166,7 +166,7 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Tes derniers repas")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.kiwiInk)
+                        .foregroundStyle(Color.kiwiCharcoal)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     DerniersRepasCard(meals: journal.meals) {
                         HapticService.shared.tap()

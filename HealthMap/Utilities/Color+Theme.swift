@@ -225,16 +225,19 @@ extension View {
 // (= `healthMapWarm`), cartes blanches arrondies, anneaux pleins, petites
 // illustrations 3D (cf. `Fluent3D`). On designe en light.
 extension Color {
-    /// Accent vert kiwi — CTA, états actifs, anneaux « solide ».
-    static let kiwiGreen = Color(hex: "5DA838")
+    // `kiwiGreen` (#5DA838) / `kiwiTint` (#EAF3DE) / `kiwiInk` (#3B6D11, vert
+    // « texte sur tint ») vivent déjà dans la palette ci-dessus (écran Scan kiwi) :
+    // on ne les redéclare pas, on complète juste le langage v4.
+
     /// Fond teinté vert doux — cartes/pastilles « couvre un besoin ».
     static let kiwiGreenSoft = Color(hex: "EAF3DE")
-    /// Texte vert sur fond teinté.
+    /// Texte vert sur fond teinté (paliers récolte, etc.).
     static let kiwiGreenInk = Color(hex: "3B6D11")
     /// Crème chaud du langage v4 (alias lisible de `healthMapWarm`).
     static let kiwiCream = Color(hex: "FBF6EF")
-    /// Encre chaude des titres v4.
-    static let kiwiInk = Color(hex: "211F1A")
+    /// Encre charbon des titres/aplats v4 (distincte de `kiwiInk`, qui est le
+    /// vert « texte sur tint »).
+    static let kiwiCharcoal = Color(hex: "211F1A")
 }
 
 // MARK: - Kiwi Card Style (v4)
@@ -249,10 +252,10 @@ struct KiwiCardStyle: ViewModifier {
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .stroke(Color.kiwiInk.opacity(0.05), lineWidth: 1)
+                    .stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1)
             )
-            .shadow(color: Color.kiwiInk.opacity(0.05), radius: 3, x: 0, y: 1)
-            .shadow(color: Color.kiwiInk.opacity(0.08), radius: 26, x: 0, y: 14)
+            .shadow(color: Color.kiwiCharcoal.opacity(0.05), radius: 3, x: 0, y: 1)
+            .shadow(color: Color.kiwiCharcoal.opacity(0.08), radius: 26, x: 0, y: 14)
     }
 }
 
