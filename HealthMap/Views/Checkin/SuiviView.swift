@@ -38,7 +38,7 @@ struct SuiviView: View {
 
     /// Nom du symptôme suivi : premier symptôme de l'analyse IA, sinon exemple.
     private var symptomName: String {
-        if let s = dashboardVM.aiAnalysis?.symptomesAnalyse?.first?.symptome,
+        if let s = dashboardVM.aiAnalysis?.symptomesAnalyse.first?.symptome,
            !s.isEmpty {
             return s
         }
