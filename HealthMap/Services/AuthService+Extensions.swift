@@ -22,7 +22,7 @@ extension AuthService {
         }
         let userId = session.user.id.uuidString
 
-        AppLogger.auth.notice("Deleting account profileId=\(userId, privacy: .public)")
+        AppLogger.auth.notice("Deleting account profileId=\(userId, privacy: .private(mask: .hash))")
         CrashReportingService.shared.breadcrumb("account delete started", category: "auth", level: .warning)
 
         // Step 2 — RGPD-critical delete côté Supabase. L'Edge Function delete-user
@@ -43,6 +43,6 @@ extension AuthService {
         ProfileResolver.shared.invalidate()
         AnalyticsService.shared.reset()
         AnalyticsService.shared.track(.signOutCompleted, properties: ["reason": "account_deleted"])
-        AppLogger.auth.info("Account \(userId, privacy: .public) deleted")
+        AppLogger.auth.info("Account \(userId, privacy: .private(mask: .hash)) deleted")
     }
 }

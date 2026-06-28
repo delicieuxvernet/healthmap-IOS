@@ -120,7 +120,7 @@ final class ProfileResolver {
                 .execute()
                 .value
             if let row = retry.first {
-                AppLogger.auth.info("Profile resolved after \(delayMs)ms backoff for auth_user_id=\(authUserId.uuidString, privacy: .public)")
+                AppLogger.auth.info("Profile resolved after \(delayMs)ms backoff for auth_user_id=\(authUserId.uuidString, privacy: .private(mask: .hash))")
                 return row.id
             }
         }

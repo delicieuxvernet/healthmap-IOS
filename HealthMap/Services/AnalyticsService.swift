@@ -156,7 +156,7 @@ final class AnalyticsService: AnalyticsServiceProtocol {
         currentUserId = userId
         CrashReportingService.shared.identify(userId: userId)
         postHogIdentify(userId: userId, traits: Self.sanitize(traits))
-        AppLogger.analytics.info("Analytics identify userId=\(userId, privacy: .public)")
+        AppLogger.analytics.info("Analytics identify userId=\(userId, privacy: .private(mask: .hash))")
     }
 
     func reset() {
