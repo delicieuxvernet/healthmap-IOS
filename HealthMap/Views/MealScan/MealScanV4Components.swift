@@ -619,3 +619,317 @@ struct FoodDetailSheetV4: View {
         }
     }
 }
+
+// MARK: - Tuile « Ce que ton plat t'apporte » (anneau 3-up, p-scanner)
+/// Tuile verticale : anneau de la part du besoin couverte par CE repas, nom,
+/// état. Anneau plein (vert ≥60 / ambre 30-59) ou anneau fantôme pointillé
+/// rouge (< 30, « à combler »). Cliquable → fiche besoin.
+struct ScanNeedTile: View {
+    let micro: MealScanViewModel.MicroNutrient
+    let onTap: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var animated: CGFloat = 0
+
+    private var pct: Int { micro.pctRDA }
+    private var color: Color { pct >= 60 ? .kiwiGreen : (pct >= 30 ? .scoreLow : .scoreDeficient) }
+    private var label: String { NutrientData.definition(for: micro.nutrientId)?.label ?? micro.label }
+    private var status: String { pct >= 60 ? "couvert" : (pct >= 30 ? "à renforcer" : "à combler") }
+    private var combler: Bool { pct < 30 }
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 11) {
+                ring
+                VStack(spacing: 1) {
+                    Text(label)
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text(status)
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundStyle(color)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 9)
+            .kiwiCard(radius: 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.healthMapPressed)
+        .onAppear {
+            let target = CGFloat(min(100, max(0, pct))) / 100
+            if reduceMotion { animated = target }
+            else { withAnimation(.easeOut(duration: 1.0).delay(0.35)) { animated = target } }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label), \(pct) pour cent du besoin, \(status). Touche pour le détail.")
+    }
+
+    @ViewBuilder
+    private var ring: some View {
+        ZStack {
+            if combler {
+                Circle()
+                    .strokeBorder(style: StrokeStyle(lineWidth: 4, dash: [4, 4]))
+                    .foregroundStyle(color.opacity(0.5))
+                    .frame(width: 78, height: 78)
+            } else {
+                Circle().stroke(color.opacity(0.15), lineWidth: 7).frame(width: 78, height: 78)
+                Circle()
+                    .trim(from: 0, to: animated)
+                    .stroke(color, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    .frame(width: 78, height: 78)
+                    .rotationEffect(.degrees(-90))
+            }
+            VStack(spacing: 1) {
+                Image(systemName: Fluent3D.symbol(for: micro.nutrientId))
+                    .font(.system(size: 19))
+                    .foregroundStyle(color)
+                Text("\(pct)%")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(color)
+            }
+        }
+        .frame(width: 78, height: 78)
+    }
+}
+
+// MARK: - Bande « Ta journée » (Matin / Midi / Soir)
+/// Les 3 repas du jour : scanné (✓, teinté vert) ou à scanner (pointillé).
+/// Source : journal du jour (meal_scans) + créneau du repas courant.
+struct JourneeSlot: Identifiable {
+    let id = UUID()
+    let title: String
+    let asset: String
+    let done: Bool
+    let isCurrent: Bool
+}
+
+struct TaJourneeCard: View {
+    let slots: [JourneeSlot]
+
+    private var doneCount: Int { slots.filter { $0.done || $0.isCurrent }.count }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Ta journée")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Spacer()
+                HStack(spacing: 0) {
+                    Text("\(doneCount)")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    Text("/\(slots.count) repas")
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundStyle(Color.healthMapMuted)
+                }
+            }
+            HStack(spacing: 9) {
+                ForEach(slots) { slot in
+                    tile(slot)
+                }
+            }
+            .padding(.top, 14)
+            Text("Scanne tes 3 repas pour une lecture complète de ta journée")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Color.healthMapMuted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 13)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity)
+        .kiwiCard(radius: 20)
+    }
+
+    @ViewBuilder
+    private func tile(_ slot: JourneeSlot) -> some View {
+        let active = slot.done || slot.isCurrent
+        VStack(spacing: 5) {
+            Fluent3DIcon(name: slot.asset, size: 27)
+                .opacity(active ? 1 : 0.4)
+                .grayscale(active ? 0 : 0.4)
+            Text(slot.title)
+                .font(.system(size: 11.5, weight: active ? .bold : .bold))
+                .foregroundStyle(active ? Color.kiwiGreenInk : Color.healthMapMuted)
+            Text(slot.isCurrent ? "ce repas" : (slot.done ? "scanné" : "à scanner"))
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundStyle(active ? Color.kiwiGreen : Color(hex: "B5AE9F"))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(active ? Color.kiwiGreenSoft : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(
+                    active ? Color.kiwiGreen : Color.kiwiCharcoal.opacity(0.16),
+                    style: StrokeStyle(lineWidth: 1.5, dash: active ? [] : [4, 4])
+                )
+        )
+    }
+}
+
+// MARK: - Courbe « Tes apports vs tes besoins » (7 jours, reprise du Suivi)
+/// Ligne lissée des apports quotidiens (score) + ligne pointillée « besoin du
+/// jour ». Source : ScoreHistoryService. Si moins de 2 points : état d'invite.
+struct BesoinsCourbeCard: View {
+    /// Valeurs récentes (0-100+), la dernière = aujourd'hui.
+    let values: [Int]
+    /// Ligne « besoin du jour » (cible).
+    var target: Int = 100
+
+    private let maxY: Double = 112
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Tes apports vs tes besoins")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Text("cette semaine, d'après tes repas scannés")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.healthMapMuted)
+            }
+            .padding(.horizontal, 4)
+
+            if values.count >= 2 {
+                chart
+                    .frame(height: 150)
+                    .padding(.top, 10)
+                HStack(spacing: 16) {
+                    legend(color: .kiwiGreen, dashed: false, text: "Tes apports", strong: true)
+                    legend(color: Color(hex: "E0A100"), dashed: true, text: "Ton besoin du jour", strong: false)
+                }
+                .padding(.horizontal, 4)
+                .padding(.top, 2)
+            } else {
+                emptyState.padding(.top, 12)
+            }
+
+            HStack(spacing: 10) {
+                Image(systemName: "camera").font(.system(size: 17)).foregroundStyle(Color.kiwiGreen)
+                Text("Scanne chaque jour : plus tu scannes, plus ta courbe est fiable.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.kiwiCream))
+            .padding(.top, 13)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .kiwiCard(radius: 20)
+    }
+
+    private var emptyState: some View {
+        HStack(spacing: 10) {
+            Fluent3DIcon(name: Fluent3D.sparkles, size: 28)
+            Text("Scanne quelques repas de plus pour voir ta courbe se dessiner.")
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(Color.healthMapSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func legend(color: Color, dashed: Bool, text: String, strong: Bool) -> some View {
+        HStack(spacing: 6) {
+            if dashed {
+                Rectangle().fill(color).frame(width: 14, height: 3)
+                    .overlay(Rectangle().fill(Color.kiwiCream).frame(width: 3, height: 3))
+            } else {
+                Capsule().fill(color).frame(width: 14, height: 4)
+            }
+            Text(text)
+                .font(.system(size: 11.5, weight: strong ? .bold : .semibold))
+                .foregroundStyle(strong ? Color(hex: "3a3833") : Color.healthMapMuted)
+        }
+    }
+
+    private var chart: some View {
+        Canvas { ctx, size in
+            let n = values.count
+            let w = size.width, h = size.height - 18
+            func px(_ i: Int) -> CGFloat { n <= 1 ? 0 : w * CGFloat(i) / CGFloat(n - 1) }
+            func py(_ v: Int) -> CGFloat { h * (1 - CGFloat(Double(v) / maxY)) }
+            let pts = values.enumerated().map { CGPoint(x: px($0.offset), y: py($0.element)) }
+
+            // grilles horizontales
+            for g in stride(from: 0.0, through: 1.0, by: 0.25) {
+                let y = h * CGFloat(g)
+                var gp = Path(); gp.move(to: CGPoint(x: 0, y: y)); gp.addLine(to: CGPoint(x: w, y: y))
+                ctx.stroke(gp, with: .color(Color.kiwiCharcoal.opacity(0.05)), style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [1, 5]))
+            }
+            // ligne besoin (cible)
+            let ty = py(target)
+            var tp = Path(); tp.move(to: CGPoint(x: 0, y: ty)); tp.addLine(to: CGPoint(x: w, y: ty))
+            ctx.stroke(tp, with: .color(Color(hex: "E0A100").opacity(0.7)), style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [7, 6]))
+            // aire + ligne lissée
+            let line = Self.smoothPath(pts)
+            var area = line
+            area.addLine(to: CGPoint(x: pts.last!.x, y: h))
+            area.addLine(to: CGPoint(x: pts.first!.x, y: h))
+            area.closeSubpath()
+            ctx.fill(area, with: .color(Color.kiwiGreen.opacity(0.10)))
+            ctx.stroke(line, with: .color(Color.kiwiGreen), style: StrokeStyle(lineWidth: 3.4, lineCap: .round, lineJoin: .round))
+            // points
+            for (i, p) in pts.enumerated() {
+                let r: CGFloat = i == pts.count - 1 ? 4.5 : 2.3
+                let dot = Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
+                ctx.fill(dot, with: .color(i == pts.count - 1 ? Color.kiwiGreen : .white))
+                ctx.stroke(dot, with: .color(i == pts.count - 1 ? .white : Color.kiwiGreen), style: StrokeStyle(lineWidth: i == pts.count - 1 ? 2.5 : 2))
+            }
+            // jours
+            let labels = Self.dayLabels(count: n)
+            for (i, lab) in labels.enumerated() {
+                ctx.draw(Text(lab).font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundColor(Color(hex: "C2BDB0")),
+                         at: CGPoint(x: px(i), y: h + 11))
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    /// Path lissé (Catmull-Rom → Bézier cubique).
+    private static func smoothPath(_ p: [CGPoint]) -> Path {
+        var path = Path()
+        guard p.count > 1 else { return path }
+        path.move(to: p[0])
+        for i in 0..<(p.count - 1) {
+            let p0 = i > 0 ? p[i - 1] : p[i]
+            let p1 = p[i]
+            let p2 = p[i + 1]
+            let p3 = i + 2 < p.count ? p[i + 2] : p2
+            let c1 = CGPoint(x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6)
+            let c2 = CGPoint(x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6)
+            path.addCurve(to: p2, control1: c1, control2: c2)
+        }
+        return path
+    }
+
+    /// Lettres de jour (lun→dim) pour les `count` derniers jours, finissant aujourd'hui.
+    private static func dayLabels(count: Int) -> [String] {
+        let letters = ["L", "M", "M", "J", "V", "S", "D"] // lundi=1
+        let cal = Calendar(identifier: .gregorian)
+        let today = cal.startOfDay(for: Date())
+        var out: [String] = []
+        for k in stride(from: count - 1, through: 0, by: -1) {
+            let d = cal.date(byAdding: .day, value: -k, to: today) ?? today
+            let wd = cal.component(.weekday, from: d) // 1=dim..7=sam
+            let idx = (wd + 5) % 7 // -> 0=lun..6=dim
+            out.append(letters[idx])
+        }
+        return out
+    }
+}
