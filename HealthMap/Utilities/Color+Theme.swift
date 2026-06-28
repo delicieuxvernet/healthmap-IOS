@@ -203,3 +203,48 @@ extension View {
         modifier(CardStyle())
     }
 }
+
+// MARK: - Kiwio « v4 » (refonte 3D — direction validée juin 2026)
+//
+// Accent vert kiwi promu accent PRINCIPAL des écrans refondus (le bleu
+// historique reste pour les écrans pas encore migrés). Fond crème chaud
+// (= `healthMapWarm`), cartes blanches arrondies, anneaux pleins, petites
+// illustrations 3D (cf. `Fluent3D`). On designe en light.
+extension Color {
+    /// Accent vert kiwi — CTA, états actifs, anneaux « solide ».
+    static let kiwiGreen = Color(hex: "5DA838")
+    /// Fond teinté vert doux — cartes/pastilles « couvre un besoin ».
+    static let kiwiGreenSoft = Color(hex: "EAF3DE")
+    /// Texte vert sur fond teinté.
+    static let kiwiGreenInk = Color(hex: "3B6D11")
+    /// Crème chaud du langage v4 (alias lisible de `healthMapWarm`).
+    static let kiwiCream = Color(hex: "FBF6EF")
+    /// Encre chaude des titres v4.
+    static let kiwiInk = Color(hex: "211F1A")
+}
+
+// MARK: - Kiwi Card Style (v4)
+/// Carte blanche du langage v4 : rayon généreux (24 par défaut), hairline très
+/// discrète et double ombre douce (proche + portée) pour le relief premium des
+/// maquettes. Laisse `cardStyle()` (rayon 16) intact pour les écrans existants.
+struct KiwiCardStyle: ViewModifier {
+    var radius: CGFloat = 24
+    func body(content: Content) -> some View {
+        content
+            .background(Color.healthMapCard)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(Color.kiwiInk.opacity(0.05), lineWidth: 1)
+            )
+            .shadow(color: Color.kiwiInk.opacity(0.05), radius: 3, x: 0, y: 1)
+            .shadow(color: Color.kiwiInk.opacity(0.08), radius: 26, x: 0, y: 14)
+    }
+}
+
+extension View {
+    /// Carte du langage v4 (rayon 24 par défaut).
+    func kiwiCard(radius: CGFloat = 24) -> some View {
+        modifier(KiwiCardStyle(radius: radius))
+    }
+}

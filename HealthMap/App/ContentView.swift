@@ -328,7 +328,7 @@ struct MainTabView: View {
             .tabItem { Label("Compléments", systemImage: "pills") }
             .tag(Tab.complements)
         }
-        .tint(Color.healthMapBlue)
+        .tint(Color.kiwiGreen)
         .overlay {
             // Célébrations de gamification (badge / série / niveau) — enfin
             // visibles : le moteur (GamificationService.showConfetti) basculait
@@ -349,9 +349,9 @@ struct MainTabView: View {
                 .foregroundColor: UIColor.secondaryLabel,
                 .font: UIFont.systemFont(ofSize: 11, weight: .semibold)
             ]
-            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.healthMapBlue)
+            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.kiwiGreen)
             appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
-                .foregroundColor: UIColor(Color.healthMapBlue),
+                .foregroundColor: UIColor(Color.kiwiGreen),
                 .font: UIFont.systemFont(ofSize: 11, weight: .bold)
             ]
             appearance.shadowColor = UIColor.black.withAlphaComponent(0.08)
