@@ -1,20 +1,20 @@
 import SwiftUI
 
-// MARK: - Supplements View (Mes compléments — DESIGN-PAGES §5, premium « Foodvisor »)
+// MARK: - Supplements View (Mes compléments — langage « v4 » 3D)
 //
-// Refonte du 14 juin (maquette validée par Arthur) : timeline Matin/Midi/Soir +
-// FICHES DÉPLIABLES. Chaque fiche compacte (anneau de dose, priorité, bénéfice,
-// dose + moment) se déplie au clic sur le détail : pourquoi TOI (causal), niveau
-// actuel → cible, comment le prendre, durée de cure, sources alimentaires,
-// produit conseillé + prix, précaution.
+// Refonte v4 (maquette « Compléments v4 - 3D ») : fond crème, cartes de
+// compléments blanches arrondies (`kiwiCard`), pastilles teintées avec pilule
+// SF Symbol (pas d'illustration 3D Fluent ici — choix de la maquette), carte
+// « cure Kiwio » (coût éco/premium), carte « À savoir » (interactions), gating
+// premium conservé, pop-up bottom-sheet « Pourquoi ce complément ».
 //
-// Données : `SupplementEngine` (score, whyText causal, produit, prix, contre-
-// indications) + `SupplementGuide` (bénéfice, prise, cure, sources — curé, jamais
-// l'IA). Avertissement ambre toujours visible + interaction premium floutée.
+// Logique INCHANGÉE : `SupplementEngine` (score, whyText causal, produits, prix,
+// interactions) + repli planning IA. Aucun nouvel appel service — uniquement
+// l'habillage v4.
 struct SupplementsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var expanded: Set<String> = []
+    @State private var selectedRec: SupplementRecommendation?
 
     // Moteur (à partir des scores + profil)
     private var engineResult: SupplementEngineResult? {
@@ -50,12 +50,10 @@ struct SupplementsView: View {
                 if hasContent {
                     mainContent
                 } else if dashboardVM.isLoadingAnalysis {
-                    VStack(spacing: Theme.spacingMD) {
-                        // Loader signature : le kiwi qui marche (cohérence avec
-                        // les autres écrans de chargement).
+                    VStack(spacing: 16) {
                         KiwiWalkerView(size: 140)
                         Text("Chargement...")
-                            .font(Theme.bodyFont)
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(Color.healthMapSecondary)
                     }
                 } else {
@@ -71,10 +69,13 @@ struct SupplementsView: View {
                     } label: {
                         Image(systemName: "person.crop.circle")
                             .font(.system(size: 22))
-                            .foregroundStyle(Color.healthMapBlue)
+                            .foregroundStyle(Color.kiwiGreen)
                     }
                     .accessibilityLabel("Profil")
                 }
+            }
+            .sheet(item: $selectedRec) { rec in
+                SupplementDetailSheet(rec: rec)
             }
         }
     }
@@ -82,169 +83,54 @@ struct SupplementsView: View {
     // MARK: - Contenu principal
     private var mainContent: some View {
         ScrollView {
-            VStack(spacing: Theme.spacingLG) {
-                Text("Issus de ton bilan · à confirmer par une prise de sang")
-                    .font(Theme.captionFont)
+            VStack(spacing: 20) {
+                Text("Ta routine du jour, calée sur ton bilan")
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.healthMapSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Theme.spacingLG)
 
                 if let result = engineResult, !result.topRecommendations.isEmpty {
-                    timeline(result.topRecommendations)
-                    costSummaryCard(result.cost)
-                    if !result.warnings.isEmpty {
-                        interactionWarningsCard(result.warnings)
+                    // Recommandés pour toi → cartes v4 cliquables
+                    sectionHeader("Recommandés pour toi")
+                    ForEach(result.topRecommendations) { rec in
+                        SupplementV4Card(rec: rec) { open(rec) }
                     }
+
+                    // À savoir (interactions — sécurité, toujours visible)
+                    if !result.warnings.isEmpty {
+                        SupplementWarningsV4Card(warnings: result.warnings)
+                    }
+
+                    // Interactions personnalisées (premium floutée — contenu réel)
                     premiumInteractionCard(result.topRecommendations)
+
+                    // Ta cure Kiwio (coût éco / premium)
+                    SupplementCureV4Card(cost: result.cost)
                 } else {
                     aiFallbackSection
                 }
 
                 infoCard
             }
-            .padding(.vertical, Theme.spacingMD)
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
     }
 
-    // MARK: - Timeline (moteur) : Matin / Midi / Soir → fiches dépliables
-    @ViewBuilder
-    private func timeline(_ recs: [SupplementRecommendation]) -> some View {
-        ForEach(["Matin", "Midi", "Soir"], id: \.self) { group in
-            let groupRecs = recs.filter { ($0.bestProduct?.timing.displayGroup ?? "Matin") == group }
-            if !groupRecs.isEmpty {
-                sectionHeader(group: group)
-                ForEach(groupRecs) { rec in
-                    SupplementDetailCard(
-                        rec: rec,
-                        target: 70,
-                        isExpanded: expanded.contains(rec.id),
-                        onToggle: { toggle(rec.id) }
-                    )
-                    .padding(.horizontal, Theme.spacingLG)
-                }
-            }
-        }
-    }
-
-    private func toggle(_ id: String) {
+    private func open(_ rec: SupplementRecommendation) {
         HapticService.shared.selection()
-        withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.25)) {
-            if expanded.contains(id) { expanded.remove(id) } else { expanded.insert(id) }
-        }
+        selectedRec = rec
     }
 
-    private func sectionHeader(group: String) -> some View {
-        HStack(spacing: Theme.spacingSM) {
-            Image(systemName: groupIcon(group))
-                .font(.system(size: 13))
-                .foregroundStyle(groupColor(group))
-                .accessibilityHidden(true)
-            Text(group)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.healthMapSecondary)
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Color.kiwiCharcoal)
             Spacer()
         }
-        .padding(.horizontal, Theme.spacingLG)
-        .padding(.top, Theme.spacingXS)
-    }
-
-    private func groupIcon(_ g: String) -> String {
-        switch g {
-        case "Matin": return "sunrise.fill"
-        case "Midi": return "sun.max.fill"
-        default: return "moon.fill"
-        }
-    }
-
-    private func groupColor(_ g: String) -> Color {
-        switch g {
-        case "Matin": return .accentSky
-        case "Midi": return .healthMapBlue
-        default: return .accentIndigo
-        }
-    }
-
-    // MARK: - Coût mensuel
-    private func costSummaryCard(_ cost: CostSummary) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
-                Image(systemName: "eurosign.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.healthMapBlue)
-                Text("Coût mensuel estimé")
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapText)
-                Spacer()
-            }
-            HStack(spacing: Theme.spacingMD) {
-                VStack(spacing: 4) {
-                    Text("Économique")
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapSecondary)
-                    Text(String(format: "%.0f €", cost.valueTotal))
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.healthMapText)
-                    Text("/ mois")
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapMuted)
-                }
-                .frame(maxWidth: .infinity)
-
-                Rectangle()
-                    .fill(Color.healthMapMuted.opacity(0.2))
-                    .frame(width: 1, height: 50)
-
-                VStack(spacing: 4) {
-                    Text("Premium")
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapSecondary)
-                    Text(String(format: "%.0f €", cost.premiumTotal))
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.healthMapBlue)
-                    Text("/ mois")
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapMuted)
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .padding(Theme.spacingMD)
-        .cardStyle()
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    // MARK: - Avertissement ambre (toujours visible, sécurité)
-    private func interactionWarningsCard(_ warnings: [InteractionWarning]) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.scoreLow)
-                Text("À savoir")
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.scoreLow)
-            }
-            ForEach(warnings) { warning in
-                HStack(alignment: .top, spacing: Theme.spacingSM) {
-                    Text(warning.emoji)
-                        .font(.system(size: 14))
-                    Text(warning.message)
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-        .padding(Theme.spacingMD)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.scoreLow.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(Color.scoreLow.opacity(0.25), lineWidth: 1)
-        )
-        .padding(.horizontal, Theme.spacingLG)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Interaction premium floutée (contenu RÉEL borné — loi 11)
@@ -256,25 +142,24 @@ struct SupplementsView: View {
         }
         if !lines.isEmpty {
             BlurredSection(isPremium: true, title: "Interactions personnalisées") {
-                VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                VStack(alignment: .leading, spacing: 10) {
                     ForEach(Array(lines.prefix(3).enumerated()), id: \.offset) { _, line in
-                        HStack(alignment: .top, spacing: Theme.spacingXS) {
+                        HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "arrow.left.arrow.right")
                                 .font(.system(size: 11))
-                                .foregroundStyle(Color.accentIndigo)
+                                .foregroundStyle(Color.kiwiGreen)
                                 .accessibilityHidden(true)
                             Text(line)
-                                .font(Theme.captionFont)
-                                .foregroundStyle(Color.healthMapText)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color.healthMapSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
-                .padding(Theme.spacingMD)
+                .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .cardStyle()
+                .kiwiCard(radius: 20)
             }
-            .padding(.horizontal, Theme.spacingLG)
         }
     }
 
@@ -282,32 +167,48 @@ struct SupplementsView: View {
     @ViewBuilder
     private var aiFallbackSection: some View {
         if let schedule = aiSchedule {
-            let blocks: [(String, [SupplementEntry])] = [
-                ("Matin", schedule.morning ?? []),
-                ("Midi", schedule.afternoon ?? []),
-                ("Soir", schedule.evening ?? []),
+            let blocks: [(String, String, [SupplementEntry])] = [
+                ("Matin", "sunrise.fill", schedule.morning ?? []),
+                ("Midi", "sun.max.fill", schedule.afternoon ?? []),
+                ("Soir", "moon.fill", schedule.evening ?? []),
             ]
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 let label = block.0
-                let entries = block.1
+                let icon = block.1
+                let entries = block.2
                 if !entries.isEmpty {
-                    sectionHeader(group: label)
-                    VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: icon)
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.kiwiGreen)
+                                .accessibilityHidden(true)
+                            Text(label)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color.kiwiCharcoal)
+                            Spacer()
+                        }
                         ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
-                            HStack(spacing: Theme.spacingSM) {
-                                Image(systemName: "pills.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Color.healthMapBlue)
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Color.kiwiGreenSoft)
+                                        .frame(width: 40, height: 40)
+                                    Image(systemName: "pills.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(Color.kiwiGreen)
+                                }
+                                .accessibilityHidden(true)
                                 Text(entry.displayText)
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(Color.healthMapText)
+                                    .foregroundStyle(Color.kiwiCharcoal)
                                 Spacer()
                             }
                         }
                     }
-                    .padding(Theme.spacingMD)
-                    .cardStyle()
-                    .padding(.horizontal, Theme.spacingLG)
+                    .padding(16)
+                    .frame(maxWidth: .infinity)
+                    .kiwiCard(radius: 20)
                 }
             }
         }
@@ -315,160 +216,41 @@ struct SupplementsView: View {
 
     // MARK: - Disclaimer
     private var infoCard: some View {
-        HStack(alignment: .center, spacing: Theme.spacingSM) {
+        HStack(alignment: .top, spacing: 8) {
             Image(systemName: "info.circle.fill")
                 .font(.system(size: 14))
                 .foregroundStyle(Color.healthMapMuted)
             Text("Suggestions basées sur ton bilan · ne remplacent pas un avis médical.")
-                .font(.system(size: 11))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color.healthMapMuted)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(Theme.spacingSM)
-        .padding(.horizontal, Theme.spacingLG)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
     }
 
     // MARK: - État vide
     private var emptyState: some View {
-        VStack(spacing: Theme.spacingMD) {
-            Image(systemName: "pills")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.healthMapMuted)
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(Color.kiwiGreenSoft)
+                    .frame(width: 88, height: 88)
+                Image(systemName: "pills.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(Color.kiwiGreen)
+            }
+            .accessibilityHidden(true)
             Text("Aucun complément recommandé")
-                .font(Theme.headlineFont)
-                .foregroundStyle(Color.healthMapText)
-            Text("Ton analyse n'a pas identifié de complément nécessaire, ou l'analyse IA n'a pas encore été effectuée.")
-                .font(Theme.bodyFont)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.kiwiCharcoal)
+            Text("Ton bilan n'a pas identifié de complément à ajouter, ou l'analyse n'a pas encore été effectuée.")
+                .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Color.healthMapSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.spacingXL)
+                .padding(.horizontal, 32)
         }
-    }
-}
-
-// MARK: - Supplement Detail Card (fiche dépliable)
-private struct SupplementDetailCard: View {
-    let rec: SupplementRecommendation
-    let target: Int
-    let isExpanded: Bool
-    let onToggle: () -> Void
-
-    private var guide: SupplementGuideInfo? { SupplementGuide.info(for: rec.nutrientID.rawValue) }
-    private var essential: Bool { rec.score < 45 }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Button(action: onToggle) {
-                HStack(spacing: Theme.spacingSM) {
-                    NutrientDoseRing(emoji: rec.nutrientEmoji, score: rec.score, color: rec.nutrientColor)
-                        .frame(width: 44, height: 44)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: Theme.spacingSM) {
-                            Text(rec.nutrientLabel)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.healthMapText)
-                                .lineLimit(1)
-                            Text(essential ? "Essentiel" : "Utile")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(essential ? Color.healthMapBlue : Color.healthMapSecondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background((essential ? Color.healthMapBlue : Color.healthMapMuted).opacity(0.12))
-                                .clipShape(Capsule())
-                        }
-                        if let benefit = guide?.benefit {
-                            Text(benefit)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Color.scoreExcellent)
-                                .lineLimit(1)
-                        }
-                        if let product = rec.bestProduct {
-                            Text("\(product.dosage) · \(product.timing.label)")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.healthMapSecondary)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    Spacer(minLength: 0)
-
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.healthMapMuted)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        .accessibilityHidden(true)
-                }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityLabel("\(rec.nutrientLabel), \(essential ? "essentiel" : "utile")")
-            .accessibilityHint(isExpanded ? "Touche pour replier le détail" : "Touche pour voir le détail")
-
-            if isExpanded {
-                VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                    Divider().padding(.vertical, 2)
-                    detailRow(icon: "lightbulb", tint: .accentIndigo, label: "Pourquoi toi", text: rec.whyText)
-                    detailRow(icon: "target", tint: .healthMapBlue, label: "Niveau actuel", text: "\(rec.score) → cible \(target)")
-                    if let guide {
-                        detailRow(icon: "pills", tint: .healthMapBlue, label: "Comment le prendre", text: guide.howToTake)
-                        detailRow(icon: "calendar", tint: .healthMapBlue, label: "Durée de cure", text: guide.cureDuration)
-                        detailRow(icon: "leaf", tint: .scoreExcellent, label: "Aussi dans l'assiette", text: guide.foodSources)
-                    }
-                    if let product = rec.bestProduct {
-                        detailRow(icon: "bag", tint: .healthMapBlue, label: "Exemple", text: "\(product.brand) — \(String(format: "%.2f", product.dailyCost)) €/jour")
-                        let precautions = product.contraindications + product.antiInteractions
-                        if !precautions.isEmpty {
-                            detailRow(icon: "exclamationmark.triangle", tint: .scoreLow, label: "Précaution", text: precautions.prefix(3).joined(separator: " · "))
-                        }
-                    }
-                }
-                .transition(.opacity)
-            }
-        }
-        .padding(Theme.spacingMD)
-        .cardStyle()
-    }
-
-    private func detailRow(icon: String, tint: Color, label: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: Theme.spacingSM) {
-            Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundStyle(tint)
-                .frame(width: 18)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
-                Text(text)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
-// MARK: - Nutrient Dose Ring (petit anneau coloré par nutriment, emoji au centre)
-private struct NutrientDoseRing: View {
-    let emoji: String
-    let score: Int
-    let color: Color
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(color.opacity(0.18), lineWidth: 4)
-            Circle()
-                .trim(from: 0, to: CGFloat(max(0, min(100, score))) / 100)
-                .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text(emoji)
-                .font(.system(size: 16))
-        }
-        .accessibilityHidden(true)
     }
 }
 

@@ -30,6 +30,12 @@ enum Fluent3D {
     static let banana = "fluent_banana"
     static let peanuts = "fluent_peanuts"
     static let avocado = "fluent_avocado"
+    // Onglets 2-5 (Scan / Suivi / Plan)
+    static let poultry = "fluent_poultry"      // viande / protéines (scan)
+    static let spaghetti = "fluent_spaghetti"  // plat / glucides (scan)
+    static let droplet = "fluent_droplet"      // hydratation (suivi)
+    static let voltage = "fluent_voltage"      // énergie / impact (suivi, plan)
+    static let sleeping = "fluent_sleeping"    // sommeil (suivi)
 
     // MARK: - Sources d'aliments par apport (fiche « Où le trouver »)
     /// 3 sources concrètes par nutriment, choisies dans le pool d'assets 3D
