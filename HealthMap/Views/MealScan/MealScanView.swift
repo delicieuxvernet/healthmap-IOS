@@ -46,7 +46,7 @@ struct MealScanView: View {
                     } label: {
                         Image(systemName: "calendar")
                             .font(.system(size: 20))
-                            .foregroundStyle(Color.healthMapBlue)
+                            .foregroundStyle(Color.kiwiGreen)
                     }
                     .accessibilityLabel("Journal du jour")
                 }
@@ -56,7 +56,7 @@ struct MealScanView: View {
                     } label: {
                         Image(systemName: "person.crop.circle")
                             .font(.system(size: 22))
-                            .foregroundStyle(Color.healthMapBlue)
+                            .foregroundStyle(Color.kiwiGreen)
                     }
                     .accessibilityLabel("Profil")
                 }
@@ -122,7 +122,7 @@ struct MealScanView: View {
                     viewModel.reset()
                 }
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.kiwiGreen)
             }
         }
         .onChange(of: viewModel.quotaExhausted) { _, exhausted in
@@ -143,10 +143,10 @@ struct MealScanView: View {
             Text(ok ? "\(remaining) scan\(plural) gratuit\(plural) restant\(plural)" : "Scans gratuits épuisés")
                 .font(.system(size: 12, weight: .medium))
         }
-        .foregroundStyle(ok ? Color.accentIndigo : Color.scoreLow)
+        .foregroundStyle(ok ? Color.kiwiInk : Color.scoreLow)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background((ok ? Color.accentIndigo : Color.scoreLow).opacity(0.10))
+        .background((ok ? Color.kiwiGreen : Color.scoreLow).opacity(0.10))
         .clipShape(Capsule())
         .onTapGesture { if !ok { showPaywall = true } }
         .accessibilityHint(ok ? "" : "Passer en premium pour scanner sans limite")
@@ -181,7 +181,7 @@ struct MealScanView: View {
                         VStack(spacing: Theme.spacingSM) {
                             Image(systemName: "camera.fill")
                                 .font(.system(size: 36))
-                                .foregroundStyle(Color.healthMapBlue)
+                                .foregroundStyle(Color.kiwiGreen)
 
                             Text("Cadre bien ton assiette")
                                 .font(.system(size: 16, weight: .semibold))
@@ -195,8 +195,8 @@ struct MealScanView: View {
                         .frame(maxWidth: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                                .strokeBorder(Color.healthMapBlue.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [8]))
-                                .background(Color.healthMapBlueLight.opacity(0.5))
+                                .strokeBorder(Color.kiwiGreen.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [8]))
+                                .background(Color.kiwiTint.opacity(0.5))
                                 .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
                         )
                     }
@@ -224,7 +224,7 @@ struct MealScanView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.healthMapBlue)
+                    .background(Color.kiwiGreen)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
                 }
             }
@@ -233,18 +233,19 @@ struct MealScanView: View {
     }
 
     // MARK: - Results View
-    // Design VALIDÉ (21 juin 2026, ~15 itérations) : le PLAT (asset scan_plate,
-    // image réelle) au centre, des connecteurs hairline gris vers 4 encadrés —
-    // un PAR ALIMENT principal. Chaque carte est teintée selon ce que l'aliment
-    // apporte aux BESOINS de l'utilisateur (vert = couvre, ambre = à renforcer,
-    // neutre = n'aide pas), avec des jauges. En-tête « à renforcer chez toi »,
-    // bas « ce qu'il te manque ». La couleur a un sens partout. Données réelles.
+    // Design VALIDÉ (26 juin 2026) : la PHOTO RÉELLE de l'utilisateur au centre
+    // (plus l'illustration générique), des connecteurs hairline vers des encadrés
+    // par aliment cliquables → fiche détail. Section « Ce que ton déjeuner
+    // t'apporte » en anneaux (vert couvre / ambre partiel / rouge à combler),
+    // macros façon FoodVisor, bandeau premium = quota. La couleur a un sens partout.
     private func resultsView(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
         VStack(spacing: Theme.spacingLG) {
+            mealContextHeader
+
             needsHeader(result.userNeeds)
 
             if !result.foods.isEmpty {
-                scanInfographic(foods: result.foods)
+                scanInfographic(foods: result.foods, centerImage: viewModel.selectedImage)
             } else {
                 fallbackPlate
             }
@@ -258,14 +259,37 @@ struct MealScanView: View {
                     .padding(.horizontal, Theme.spacingLG)
             }
 
+            mealContributionGauges(result.micros)
+
+            foodVisorMacros(result.macros)
+
             missingCard(result.advice)
 
-            macrosCard(result.macros)
+            premiumScanBanner
 
             if !result.warnings.isEmpty { warningsCard(result.warnings) }
 
             scanAgainButton
         }
+    }
+
+    // MARK: - En-tête contexte repas (créneau déduit de l'heure)
+    private var mealContextHeader: some View {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let label: String
+        let icon: String
+        switch hour {
+        case 5..<11: label = "Petit-déjeuner"; icon = "sunrise.fill"
+        case 11..<15: label = "Déjeuner"; icon = "sun.max.fill"
+        case 15..<18: label = "Collation"; icon = "cup.and.saucer.fill"
+        default: label = "Dîner"; icon = "moon.stars.fill"
+        }
+        return HStack(spacing: 6) {
+            Image(systemName: icon).font(.system(size: 13)).foregroundStyle(Color.scoreLow)
+            Text(label).font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.healthMapText)
+            Text("· maintenant").font(.system(size: 13)).foregroundStyle(Color.healthMapMuted)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - En-tête « À renforcer chez toi » (besoins de l'utilisateur)
@@ -300,16 +324,15 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Infographie : plat réel au centre + connecteurs + cartes par aliment
-    func scanInfographic(foods: [MealScanViewModel.DetectedFood]) -> some View {
+    // MARK: - Infographie : photo réelle au centre + connecteurs + cartes par aliment
+    func scanInfographic(foods: [MealScanViewModel.DetectedFood], centerImage: Data? = nil) -> some View {
         let shown = Array(foods.prefix(4))
         return GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
             let cardWidth = max(118, min(150, w / 2 - 14))
             ZStack {
-                // Connecteurs : traits hairline gris + point d'ancrage côté plat
-                // (pas de flèche « Word » — le plat n'est jamais redessiné).
+                // Connecteurs : traits hairline + point d'ancrage côté plat.
                 Canvas { ctx, size in
                     let cw = size.width, ch = size.height
                     let plate = CGPoint(x: cw / 2, y: ch / 2)
@@ -330,13 +353,26 @@ struct MealScanView: View {
                     }
                 }
 
-                // Le plat — image réelle, fixe (jamais redessinée).
-                Image("scan_plate")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: min(w * 0.42, 164))
-                    .position(x: w / 2, y: h / 2)
-                    .accessibilityHidden(true)
+                // Le centre : la VRAIE photo de l'utilisateur si disponible,
+                // sinon l'illustration scan_plate (état exemple uniquement).
+                Group {
+                    if let data = centerImage, let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: min(w * 0.34, 128), height: min(w * 0.34, 128))
+                            .clipShape(Circle())
+                            .overlay(Circle().strokeBorder(Color.white, lineWidth: 4))
+                            .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
+                    } else {
+                        Image("scan_plate")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: min(w * 0.42, 164))
+                    }
+                }
+                .position(x: w / 2, y: h / 2)
+                .accessibilityHidden(true)
 
                 // Encadrés par aliment aux 4 coins.
                 ForEach(Array(shown.enumerated()), id: \.element.id) { idx, food in
@@ -365,9 +401,11 @@ struct MealScanView: View {
             selectedFood = food
         } label: {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 5) {
+                HStack(spacing: 6) {
                     Text(food.emoji.isEmpty ? "🍽️" : food.emoji)
-                        .font(.system(size: 15))
+                        .font(.system(size: 16))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(color.opacity(0.16)))
                     Text(food.name)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.healthMapText)
@@ -375,8 +413,8 @@ struct MealScanView: View {
                         .minimumScaleFactor(0.8)
                     Spacer(minLength: 2)
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(color.opacity(0.45))
+                        .font(.system(size: 14))
+                        .foregroundStyle(color)
                 }
 
                 // Toujours du contenu : besoins couverts si présents, sinon une
@@ -454,10 +492,155 @@ struct MealScanView: View {
         }
     }
 
+    // MARK: - « Ce que ton déjeuner t'apporte » (anneaux d'apport aux besoins)
+    @ViewBuilder
+    private func mealContributionGauges(_ micros: [MealScanViewModel.MicroNutrient]) -> some View {
+        let needs = micros.filter { $0.isDeficiency }
+        let source = needs.isEmpty ? micros : needs
+        let shown = Array(source.sorted { $0.pctRDA > $1.pctRDA }.prefix(4))
+        if !shown.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Ce que ton déjeuner t'apporte")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.healthMapText)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    ForEach(shown) { micro in
+                        contributionGaugeCard(micro)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.spacingLG)
+        }
+    }
+
+    private func contributionGaugeCard(_ micro: MealScanViewModel.MicroNutrient) -> some View {
+        let def = NutrientData.definition(for: micro.nutrientId)
+        let pct = micro.pctRDA
+        // Vert bien couvert / ambre partiel / rouge "à combler" (besoin pas assez comblé).
+        let color: Color = pct >= 60 ? .kiwiGreen : (pct >= 30 ? .scoreLow : .scoreDeficient)
+        return HStack(spacing: 10) {
+            ZStack {
+                Circle().stroke(color.opacity(0.16), lineWidth: 6).frame(width: 46, height: 46)
+                Circle().trim(from: 0, to: CGFloat(min(100, max(0, pct))) / 100)
+                    .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: 46, height: 46)
+                Text(def?.emoji ?? "•").font(.system(size: 16))
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(def?.label ?? micro.label)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.healthMapText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(pct >= 30 ? "\(pct)% du besoin" : "\(pct)% · à combler")
+                    .font(.system(size: 11))
+                    .foregroundStyle(pct >= 30 ? Color.healthMapSecondary : Color.scoreDeficient)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(11)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.healthMapCard))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.healthMapMuted.opacity(0.12), lineWidth: 0.5))
+    }
+
+    // MARK: - Macros façon FoodVisor (barre segmentée + total kcal + fibres)
+    private func foodVisorMacros(_ macros: MealScanViewModel.MacroNutrients) -> some View {
+        let p = max(0, macros.proteins)
+        let c = max(0, macros.carbs)
+        let f = max(0, macros.fats)
+        let total = max(1, p + c + f)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Macros").font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.healthMapText)
+                Spacer()
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text("\(macros.calories)").font(.system(size: 19, weight: .bold, design: .rounded)).foregroundStyle(Color.healthMapText)
+                    Text("kcal").font(.system(size: 13)).foregroundStyle(Color.healthMapSecondary)
+                }
+            }
+            GeometryReader { g in
+                HStack(spacing: 0) {
+                    Rectangle().fill(Color.macroProtein).frame(width: g.size.width * CGFloat(p / total))
+                    Rectangle().fill(Color.macroCarb).frame(width: g.size.width * CGFloat(c / total))
+                    Rectangle().fill(Color.macroFat).frame(width: g.size.width * CGFloat(f / total))
+                }
+            }
+            .frame(height: 14)
+            .clipShape(Capsule())
+            HStack(spacing: 0) {
+                macroLegend("Protéines", p, .macroProtein)
+                macroLegend("Glucides", c, .macroCarb)
+                macroLegend("Lipides", f, .macroFat)
+            }
+            if macros.fiber > 0 {
+                Divider().background(Color.healthMapMuted.opacity(0.12))
+                HStack(spacing: 7) {
+                    Circle().fill(Color.kiwiGreen).frame(width: 8, height: 8)
+                    Text("Fibres").font(.system(size: 12)).foregroundStyle(Color.healthMapSecondary)
+                    Text("\(Int(macros.fiber.rounded())) g").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.healthMapText)
+                    Spacer()
+                }
+            }
+        }
+        .padding(Theme.spacingMD)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.healthMapCard))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.healthMapMuted.opacity(0.12), lineWidth: 0.5))
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    private func macroLegend(_ label: String, _ grams: Double, _ color: Color) -> some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 4) {
+                Circle().fill(color).frame(width: 8, height: 8)
+                Text(label).font(.system(size: 11)).foregroundStyle(Color.healthMapSecondary)
+            }
+            Text("\(Int(grams.rounded())) g").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.healthMapText)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Bandeau premium (quota — aucune info masquée)
+    @ViewBuilder
+    private var premiumScanBanner: some View {
+        if !subscriptionService.isPremium {
+            let remaining = viewModel.scansRemaining ?? 0
+            let plural = remaining > 1 ? "s" : ""
+            Button {
+                showPaywall = true
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .background(Color.kiwiGreen)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Passe en illimité")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.kiwiInk)
+                        Text(remaining > 0 ? "Il te reste \(remaining) scan\(plural) gratuit\(plural) · scanne chaque jour" : "Scanne chaque jour et garde ton historique")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.kiwiInk.opacity(0.85))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.system(size: 13)).foregroundStyle(Color.kiwiGreen)
+                }
+                .padding(Theme.spacingMD)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiTint))
+            }
+            .buttonStyle(.healthMapPressed)
+            .padding(.horizontal, Theme.spacingLG)
+        }
+    }
+
     // MARK: - Mapping statut → sémantique couleur (tokens canoniques)
     private func statusColor(_ status: MealScanViewModel.FoodStatus) -> Color {
         switch status {
-        case .covers: return .scoreExcellent   // vert : couvre un besoin
+        case .covers: return .kiwiGreen        // vert kiwi : couvre un besoin
         case .weak: return .scoreLow            // ambre : apport à renforcer
         case .neutral: return .healthMapMuted   // neutre
         }
@@ -465,7 +648,7 @@ struct MealScanView: View {
 
     private func cardTint(_ status: MealScanViewModel.FoodStatus) -> Color {
         switch status {
-        case .covers: return Color.scoreExcellent.opacity(0.10)
+        case .covers: return Color.kiwiTint
         case .weak: return Color.scoreLow.opacity(0.10)
         case .neutral: return Color.healthMapCard
         }
@@ -633,42 +816,13 @@ struct MealScanView: View {
                 Text("Scanner un autre repas")
                     .font(.system(size: 15, weight: .semibold))
             }
-            .foregroundStyle(Color.healthMapBlue)
+            .foregroundStyle(Color.kiwiInk)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color.healthMapBlueLight)
+            .background(Color.kiwiTint)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
         }
         .padding(.horizontal, Theme.spacingLG)
-    }
-
-    // MARK: - Macros Card
-    private func macrosCard(_ macros: MealScanViewModel.MacroNutrients) -> some View {
-        HStack(spacing: 0) {
-            macroPill(label: "Calories", value: "\(macros.calories)", unit: "kcal")
-            macroPill(label: "Proteines", value: String(format: "%.0f", macros.proteins), unit: "g")
-            macroPill(label: "Glucides", value: String(format: "%.0f", macros.carbs), unit: "g")
-            macroPill(label: "Lipides", value: String(format: "%.0f", macros.fats), unit: "g")
-            macroPill(label: "Fibres", value: String(format: "%.0f", macros.fiber), unit: "g")
-        }
-        .padding(Theme.spacingSM)
-        .cardStyle()
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    private func macroPill(label: String, value: String, unit: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.healthMapBlue)
-            Text(unit)
-                .font(.system(size: 10))
-                .foregroundStyle(Color.healthMapMuted)
-            Text(label)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Search Tab
@@ -719,7 +873,7 @@ struct MealScanView: View {
             // Results
             if viewModel.isSearching {
                 ProgressView()
-                    .tint(Color.healthMapBlue)
+                    .tint(Color.kiwiGreen)
                     .padding()
             } else {
                 ForEach(viewModel.searchResults) { food in
@@ -750,22 +904,22 @@ struct MealScanView: View {
         } label: {
             Text(text)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.kiwiInk)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.healthMapBlueLight)
+                .background(Color.kiwiTint)
                 .clipShape(Capsule())
         }
     }
 }
 
-// MARK: - Détail d'un aliment (macros gratuit + vitamines/minéraux premium)
+// MARK: - Détail d'un aliment (tout visible — plus aucun floutage premium)
 private struct FoodDetailSheet: View {
     let food: MealScanViewModel.DetectedFood
 
-    /// Vitamines/minéraux à montrer en premium = forces de l'aliment, en
-    /// retirant celles déjà affichées gratuitement dans « tes besoins ».
-    private var premiumNutrients: [MealScanViewModel.FoodContribution] {
+    /// Vitamines/minéraux supplémentaires = forces de l'aliment, en retirant
+    /// celles déjà affichées dans « ce qu'il apporte à tes besoins ».
+    private var extraNutrients: [MealScanViewModel.FoodContribution] {
         food.topNutrients.filter { t in
             !food.contributions.contains(where: { $0.nutrientId == t.nutrientId })
         }
@@ -777,15 +931,17 @@ private struct FoodDetailSheet: View {
                 VStack(alignment: .leading, spacing: Theme.spacingLG) {
                     HStack(spacing: 12) {
                         Text(food.emoji.isEmpty ? "🍽️" : food.emoji)
-                            .font(.system(size: 36))
+                            .font(.system(size: 30))
+                            .frame(width: 52, height: 52)
+                            .background(Circle().fill(Color.kiwiTint))
                         Text(food.name)
                             .font(.system(size: 22, weight: .bold))
                             .foregroundStyle(Color.healthMapText)
                     }
 
-                    // Macros — gratuit
+                    // Macros — toujours visible
                     VStack(alignment: .leading, spacing: 8) {
-                        sectionTitle("Macros", color: .healthMapBlue)
+                        sectionTitle("Macros", color: .kiwiInk)
                         HStack(spacing: 8) {
                             macroTile("Calories", "\(food.macros.calories)", "kcal")
                             macroTile("Prot.", gram(food.macros.proteins), "g")
@@ -795,24 +951,22 @@ private struct FoodDetailSheet: View {
                         }
                     }
 
-                    // Ce qu'il apporte à tes besoins — gratuit
+                    // Ce qu'il apporte à tes besoins
                     if !food.contributions.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            sectionTitle("Ce qu'il apporte à tes besoins", color: .scoreExcellent)
+                            sectionTitle("Ce qu'il apporte à tes besoins", color: .kiwiGreen)
                             ForEach(food.contributions) { c in
-                                detailGauge(label: label(c), pct: c.pctRDA, color: .scoreExcellent)
+                                detailGauge(label: label(c), pct: c.pctRDA, color: .kiwiGreen)
                             }
                         }
                     }
 
-                    // Vitamines & minéraux — premium
-                    if !premiumNutrients.isEmpty {
-                        BlurredSection(isPremium: true, title: "Vitamines & minéraux") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                sectionTitle("Vitamines & minéraux", color: .accentIndigo)
-                                ForEach(premiumNutrients) { c in
-                                    detailGauge(label: label(c), pct: c.pctRDA, color: .accentIndigo)
-                                }
+                    // Vitamines & minéraux — tout visible (plus de floutage premium)
+                    if !extraNutrients.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            sectionTitle("Vitamines & minéraux", color: .accentIndigo)
+                            ForEach(extraNutrients) { c in
+                                detailGauge(label: label(c), pct: c.pctRDA, color: .accentIndigo)
                             }
                         }
                     }
