@@ -68,28 +68,30 @@ struct BilanScoreCard: View {
         .accessibilityLabel("\(adjective). Score \(score) sur 100.\(summary.map { " " + $0 } ?? "")")
     }
 
+    // Anneau réduit de moitié (retour Arthur build #162) : il ne doit plus
+    // dominer le héros. Ø 72 (vs 132), trait 7, chiffres mono ~24.
     private var ring: some View {
         ZStack {
             Circle()
-                .stroke(color.opacity(0.16), lineWidth: 11)
-                .frame(width: 132, height: 132)
+                .stroke(color.opacity(0.16), lineWidth: 7)
+                .frame(width: 72, height: 72)
             Circle()
                 .trim(from: 0, to: animated)
-                .stroke(color, style: StrokeStyle(lineWidth: 11, lineCap: .round))
-                .frame(width: 132, height: 132)
+                .stroke(color, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                .frame(width: 72, height: 72)
                 .rotationEffect(.degrees(-90))
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 AnimatedNumberView(
                     targetValue: score,
-                    font: .system(size: 40, weight: .bold, design: .monospaced),
+                    font: .system(size: 24, weight: .bold, design: .monospaced),
                     color: color
                 )
                 Text("/ 100")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(Color.healthMapMuted)
             }
         }
-        .frame(width: 132, height: 132)
+        .frame(width: 72, height: 72)
     }
 }
 
@@ -242,6 +244,7 @@ struct RecolteCard: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var floaty = false
+    @State private var showDetail = false
 
     private var ladder: [Fluent3D.HarvestRung] { Fluent3D.harvestLadder }
     private var unlockedCount: Int { ladder.filter { streak >= $0.threshold }.count }
@@ -305,14 +308,144 @@ struct RecolteCard: View {
             }
             .padding(.top, 8)
         }
+        // Visuel inchangé (validé Arthur build #162) — on rend juste le bloc
+        // tappable : le tap ouvre le détail de la récolte (sans rien changer à
+        // l'affichage au repos).
+        .contentShape(Rectangle())
+        .onTapGesture {
+            HapticService.shared.tap()
+            showDetail = true
+        }
         .onAppear {
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) { floaty = true }
         }
+        .sheet(isPresented: $showDetail) {
+            RecolteDetailSheet(streak: streak)
+        }
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel(complete
             ? "Ta récolte est complète."
             : "Ta récolte : \(unlockedCount) sur \(ladder.count). Plus que \(daysLeft) jours pour débloquer \(goal.name).")
+        .accessibilityHint("Touche pour voir le détail de ta récolte.")
+    }
+}
+
+// MARK: - Pop-up détail de la récolte (au tap sur le bloc récolte)
+/// Détail de la gamification « récolte » : série en cours + chaque fruit, son
+/// palier de jours d'affilée et s'il est obtenu. N'altère pas l'affichage au
+/// repos du bloc récolte (retour Arthur : « si on ne clique pas, ça reste tel quel »).
+struct RecolteDetailSheet: View {
+    let streak: Int
+    @Environment(\.dismiss) private var dismiss
+
+    private var ladder: [Fluent3D.HarvestRung] { Fluent3D.harvestLadder }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("Ta récolte")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .frame(width: 34, height: 34)
+                            .background(Circle().fill(Color.kiwiCharcoal.opacity(0.06)))
+                    }
+                    .buttonStyle(.healthMapPressed)
+                    .accessibilityLabel("Fermer")
+                }
+
+                // Série en cours (le « trophée » de jours d'affilée)
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle().fill(Color.kiwiGreenSoft).frame(width: 56, height: 56)
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 26))
+                            .foregroundStyle(Color.kiwiGreen)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(streak) jour\(streak > 1 ? "s" : "") d'affilée")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(Color.kiwiCharcoal)
+                        Text("Chaque palier de série débloque un fruit.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 18)
+
+                Text("Tes fruits")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                    .padding(.top, 22)
+                    .padding(.bottom, 10)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(ladder.enumerated()), id: \.element.id) { idx, rung in
+                        if idx > 0 {
+                            Divider().background(Color.kiwiCharcoal.opacity(0.07))
+                        }
+                        rungRow(rung)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity)
+                .kiwiCard(radius: 18)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 8)
+            .padding(.bottom, 30)
+        }
+        .background(Color.kiwiCream)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(30)
+    }
+
+    @ViewBuilder
+    private func rungRow(_ rung: Fluent3D.HarvestRung) -> some View {
+        let earned = streak >= rung.threshold
+        let left = max(0, rung.threshold - streak)
+        HStack(spacing: 13) {
+            Fluent3DIcon(name: rung.asset, size: 40)
+                .grayscale(earned ? 0 : 1)
+                .opacity(earned ? 1 : 0.35)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(rung.name)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Text("Débloqué à \(rung.threshold) jour\(rung.threshold > 1 ? "s" : "") d'affilée")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color.healthMapSecondary)
+            }
+            Spacer(minLength: 8)
+            if earned {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 12))
+                    Text("Obtenu").font(.system(size: 11, weight: .bold))
+                }
+                .foregroundStyle(Color.kiwiGreenInk)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.kiwiGreenSoft))
+            } else {
+                Text("Dans \(left) j")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.healthMapMuted)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.kiwiCharcoal.opacity(0.06)))
+            }
+        }
+        .padding(.vertical, 12)
     }
 }
 
