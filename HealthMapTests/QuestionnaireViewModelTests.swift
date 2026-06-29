@@ -168,19 +168,24 @@ final class QuestionnaireViewModelTests: XCTestCase {
 
     // MARK: - visibleQuestions: tous les blocs déverrouillés
 
-    /// Tous les blocs profonds déverrouillés (équivalent adaptatif de l'ancien
-    /// « complet ») doit révéler toutes les questions non conditionnelles.
-    func testVisibleQuestions_allDeepUnlocked_showsAll() {
+    /// Déverrouiller les 3 carrefours révèle leurs questions profondes, MAIS
+    /// les questions non-express de Profil/Mode de vie/Santé restent masquées :
+    /// elles n'ont aucun carrefour (arbitrage assumé du parcours adaptatif —
+    /// seuls alimentation/symptômes/médical sont approfondissables).
+    func testVisibleQuestions_allDeepUnlocked_revealsDeepBlocksOnly() {
         unlockAllDeepSections()
+        let visibleIDs = Set(vm.visibleQuestions.map(\.id))
 
-        // The flattened list should contain at least every non-conditional
-        // question of every section (showIf-filtered ones may be hidden).
-        let allQuestions = QuestionnaireSection.allCases.flatMap(\.questions)
-        let allWithoutShowIf = allQuestions.filter { $0.showIf == nil }
-        XCTAssertGreaterThanOrEqual(
-            vm.visibleQuestions.count, allWithoutShowIf.count,
-            "Unlocking every deep block should show all non-conditional questions"
-        )
+        // Les blocs déverrouillés exposent leurs questions profondes.
+        for id in ["mealsPerDay", "breadType", "supplementsCurrent", "symptoms", "medications", "digestiveConditions"] {
+            XCTAssertTrue(visibleIDs.contains(id), "\(id) doit être visible (bloc profond déverrouillé)")
+        }
+
+        // Les questions non-express de Profil/Mode de vie/Santé n'ont pas de
+        // carrefour → jamais atteignables, même tous blocs déverrouillés.
+        for id in ["weightTrend", "skinType", "screenBeforeBed", "alcohol", "bloating", "antibiotics"] {
+            XCTAssertFalse(visibleIDs.contains(id), "\(id) ne doit pas être visible (pas de carrefour)")
+        }
     }
 
     // MARK: - visibleQuestions: showIf Conditions
