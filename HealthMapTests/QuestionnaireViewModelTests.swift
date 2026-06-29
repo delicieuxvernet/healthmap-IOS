@@ -68,11 +68,11 @@ final class QuestionnaireViewModelTests: XCTestCase {
     }
 
     /// Crossing a section boundary should return the newly entered section
-    /// (used by the view to display the section intro screen), and walking
-    /// the whole complet flow should enter every section exactly once.
+    /// (used by the view to display the section intro screen). Parcours
+    /// adaptatif : avec tous les blocs profonds déverrouillés, marcher le flux
+    /// entre dans chaque section une fois, dans l'ordre.
     func testNextQuestion_sectionBoundary_returnsEnteredSection() {
-        vm.pathway = .complet
-        vm.profile.pathway = .complet
+        unlockAllDeepSections()
 
         var enteredSections: [QuestionnaireSection] = []
         while !vm.isLastQuestion {
@@ -84,7 +84,7 @@ final class QuestionnaireViewModelTests: XCTestCase {
         XCTAssertEqual(
             enteredSections,
             [.modeDeVie, .sante, .nutrition, .symptomes, .medical],
-            "Walking the complet flow should enter each section once, in order"
+            "Walking the fully-unlocked flow should enter each section once, in order"
         )
     }
 
@@ -166,21 +166,26 @@ final class QuestionnaireViewModelTests: XCTestCase {
         }
     }
 
-    // MARK: - visibleQuestions: Complet Pathway
+    // MARK: - visibleQuestions: tous les blocs déverrouillés
 
-    /// Complet pathway should show all questions (no express filter).
-    func testVisibleQuestions_completPathway_showsAll() {
-        vm.pathway = .complet
-        vm.profile.pathway = .complet
+    /// Déverrouiller les 3 carrefours révèle leurs questions profondes, MAIS
+    /// les questions non-express de Profil/Mode de vie/Santé restent masquées :
+    /// elles n'ont aucun carrefour (arbitrage assumé du parcours adaptatif —
+    /// seuls alimentation/symptômes/médical sont approfondissables).
+    func testVisibleQuestions_allDeepUnlocked_revealsDeepBlocksOnly() {
+        unlockAllDeepSections()
+        let visibleIDs = Set(vm.visibleQuestions.map(\.id))
 
-        // The flattened list should contain at least every non-conditional
-        // question of every section (showIf-filtered ones may be hidden).
-        let allQuestions = QuestionnaireSection.allCases.flatMap(\.questions)
-        let allWithoutShowIf = allQuestions.filter { $0.showIf == nil }
-        XCTAssertGreaterThanOrEqual(
-            vm.visibleQuestions.count, allWithoutShowIf.count,
-            "Complet pathway should show all non-conditional questions"
-        )
+        // Les blocs déverrouillés exposent leurs questions profondes.
+        for id in ["mealsPerDay", "breadType", "supplementsCurrent", "symptoms", "medications", "digestiveConditions"] {
+            XCTAssertTrue(visibleIDs.contains(id), "\(id) doit être visible (bloc profond déverrouillé)")
+        }
+
+        // Les questions non-express de Profil/Mode de vie/Santé n'ont pas de
+        // carrefour → jamais atteignables, même tous blocs déverrouillés.
+        for id in ["weightTrend", "skinType", "screenBeforeBed", "alcohol", "bloating", "antibiotics"] {
+            XCTAssertFalse(visibleIDs.contains(id), "\(id) ne doit pas être visible (pas de carrefour)")
+        }
     }
 
     // MARK: - visibleQuestions: showIf Conditions
@@ -189,8 +194,9 @@ final class QuestionnaireViewModelTests: XCTestCase {
     /// The flattened list recomputes on every access, so changing an answer
     /// reveals/hides the dependent questions immediately.
     func testVisibleQuestions_showIfCondition_filters() {
-        vm.pathway = .complet
-        vm.profile.pathway = .complet
+        // Le bloc médical doit être déverrouillé pour que periodFlow /
+        // pregnancyStatus (showIf femme) entrent dans le périmètre visible.
+        unlockAllDeepSections()
 
         // As homme, gender-specific questions should be hidden
         vm.profile.gender = .homme
@@ -253,5 +259,59 @@ final class QuestionnaireViewModelTests: XCTestCase {
 
         let afterClear = UserDefaults.standard.data(forKey: "healthmap_questionnaire_draft")
         XCTAssertNil(afterClear, "Draft should be nil after clearDraft()")
+    }
+
+    // MARK: - Parcours adaptatif (carrefours)
+
+    /// Sans aucun bloc déverrouillé, seules les questions express sont visibles
+    /// — c'est le tronc commun du parcours adaptatif (remplace l'express).
+    func testVisibleQuestions_noUnlock_showsExpressOnly() {
+        XCTAssertTrue(vm.unlockedDeepSections.isEmpty, "Fresh VM has no unlocked deep block")
+        for question in vm.visibleQuestions {
+            XCTAssertTrue(
+                QuestionnaireSection.expressKeys.contains(question.id),
+                "Tronc commun should be express-only, found: \(question.id)"
+            )
+        }
+    }
+
+    /// Le premier carrefour proposé est l'alimentation, puis les symptômes,
+    /// puis le médical ; une fois les trois déverrouillés, plus de carrefour.
+    func testNextLockedGate_progressesNutritionSymptomesMedical() {
+        XCTAssertEqual(vm.nextLockedGate, .nutrition, "Premier carrefour = alimentation")
+
+        vm.unlockDeep(.nutrition)
+        XCTAssertEqual(vm.nextLockedGate, .symptomes, "Puis symptômes")
+
+        vm.unlockDeep(.symptomes)
+        XCTAssertEqual(vm.nextLockedGate, .medical, "Puis médical")
+
+        vm.unlockDeep(.medical)
+        XCTAssertNil(vm.nextLockedGate, "Plus de carrefour une fois tout déverrouillé")
+    }
+
+    /// Déverrouiller un bloc le rend visible ET repositionne le flux sur sa
+    /// première question PROFONDE (non express).
+    func testUnlockDeep_revealsAndRepositions() throws {
+        let beforeCount = vm.visibleQuestions.count
+        vm.unlockDeep(.nutrition)
+
+        XCTAssertTrue(vm.unlockedDeepSections.contains(.nutrition), "Le bloc nutrition est déverrouillé")
+        XCTAssertGreaterThan(vm.visibleQuestions.count, beforeCount, "Le bloc révèle de nouvelles questions")
+
+        let current = try XCTUnwrap(vm.currentQuestion)
+        XCTAssertEqual(vm.section(of: current), .nutrition, "Repositionné dans le bloc nutrition")
+        XCTAssertFalse(
+            QuestionnaireSection.expressKeys.contains(current.id),
+            "Repositionné sur une question profonde (non express)"
+        )
+    }
+
+    // MARK: - Helpers
+
+    /// Déverrouille tous les blocs profonds — équivalent adaptatif de l'ancien
+    /// parcours « complet » (qui révélait toutes les questions non-express).
+    private func unlockAllDeepSections() {
+        vm.unlockedDeepSections = [.nutrition, .symptomes, .medical]
     }
 }

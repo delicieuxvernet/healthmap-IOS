@@ -12,7 +12,10 @@ import SwiftUI
 struct QuestionnaireContainerView: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
     @EnvironmentObject var dashboardVM: DashboardViewModel
-    @State private var showPathwayChoice = true
+    /// Carrefour d'approfondissement actuellement affiché (parcours adaptatif).
+    /// nil = on affiche la question / l'intro de section.
+    @State private var activeGate: QuestionnaireSection?
+    @State private var hasTrackedStart = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - État du flux par question
@@ -55,7 +58,9 @@ struct QuestionnaireContainerView: View {
         if !viewModel.isLastQuestion { return "Continuer" }
         if viewModel.isSubmitting { return "Envoi en cours..." }
         if viewModel.errorMessage != nil { return "Reessayer" }
-        return "Terminer"
+        // Dernière question visible : s'il reste un bloc à approfondir, on
+        // propose le carrefour (« Continuer ») ; sinon on termine.
+        return viewModel.nextLockedGate != nil ? "Continuer" : "Terminer"
     }
 
     var body: some View {
@@ -63,19 +68,19 @@ struct QuestionnaireContainerView: View {
             Color.healthMapBackground
                 .ignoresSafeArea()
 
-            if showPathwayChoice {
-                pathwayChoiceView
-            } else if viewModel.isSubmitting {
+            if viewModel.isSubmitting {
                 submittingView
             } else {
                 questionFlow
             }
         }
         .onAppear {
-            // Draft restauré → reprendre le flux à la question où
-            // l'utilisateur s'était arrêté, sans lui redemander le parcours.
-            if viewModel.hasDraftInProgress {
-                showPathwayChoice = false
+            // Parcours unique adaptatif : plus d'écran de choix express/complet,
+            // on démarre directement (draft restauré ou non). Trace le début une
+            // seule fois par session.
+            if !hasTrackedStart {
+                hasTrackedStart = true
+                AnalyticsService.shared.track(.questionnaireStarted, properties: nil)
             }
         }
         .onDisappear {
@@ -84,104 +89,6 @@ struct QuestionnaireContainerView: View {
         // Célébration post-questionnaire retirée le 28 juin 2026 : après la
         // dernière question on bascule directement sur le Bilan (écran de
         // chargement honnête) — cf. submitAndContinue().
-    }
-
-    // MARK: - Pathway Choice
-    private var pathwayChoiceView: some View {
-        VStack(spacing: Theme.spacingLG) {
-            Spacer()
-
-            VStack(spacing: Theme.spacingMD) {
-                Image(systemName: "clipboard.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Color.healthMapBlue)
-
-                Text("Ton bilan nutritionnel")
-                    .font(Theme.titleFont)
-                    .brandTitleKerning()
-                    .foregroundStyle(Color.healthMapText)
-
-                Text("Reponds a quelques questions pour decouvrir ton profil nutritionnel.")
-                    .font(Theme.bodyFont)
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Theme.spacingXL)
-            }
-
-            Spacer()
-
-            VStack(spacing: Theme.spacingMD) {
-                // Express pathway
-                pathwayButton(
-                    title: "Express",
-                    subtitle: "~3 min — l'essentiel + tes courses",
-                    icon: "bolt.fill",
-                    pathway: .express
-                )
-
-                // Complete pathway
-                pathwayButton(
-                    title: "Complet",
-                    subtitle: "~8 min — le bilan detaille",
-                    icon: "list.bullet.clipboard.fill",
-                    pathway: .complet
-                )
-            }
-            .padding(.horizontal, Theme.spacingLG)
-
-            Spacer()
-        }
-    }
-
-    private func pathwayButton(title: String, subtitle: String, icon: String, pathway: UserProfile.Pathway) -> some View {
-        Button {
-            HapticService.shared.primary()
-            viewModel.selectPathway(pathway)
-            introSection = nil
-            isNavigatingForward = true
-            withAnimation(stepAnimation) {
-                showPathwayChoice = false
-            }
-        } label: {
-            HStack(spacing: Theme.spacingMD) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(Color.healthMapBlue)
-                    .frame(width: 40)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.healthMapText)
-
-                    Text(subtitle)
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapSecondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.healthMapMuted)
-            }
-            .padding(Theme.spacingMD)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .fill(Color.healthMapCard)
-                    .shadow(
-                        color: .black.opacity(Theme.shadowCard.opacity),
-                        radius: Theme.shadowCard.radius,
-                        x: 0,
-                        y: Theme.shadowCard.y
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .stroke(Color.healthMapMuted.opacity(Theme.opacityStrong), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.healthMapPressed)
     }
 
     // MARK: - Flux une question par écran
@@ -193,7 +100,15 @@ struct QuestionnaireContainerView: View {
             // force SwiftUI à traiter chaque question comme une nouvelle vue,
             // ce qui déclenche la transition slide entre les écrans.
             ZStack {
-                if let section = introSection {
+                if let gate = activeGate {
+                    // Carrefour d'approfondissement (remplace l'intro de section).
+                    QuestionnaireGateView(
+                        gate: gate,
+                        onDeepen: { acceptGate(gate) },
+                        onSkip: { skipGate() }
+                    )
+                    .transition(stepTransition)
+                } else if let section = introSection {
                     SectionIntroView(
                         section: section,
                         questionCount: viewModel.visibleQuestions(in: section).count,
@@ -209,7 +124,11 @@ struct QuestionnaireContainerView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped() // les écrans qui slident ne débordent pas sur header/bouton
 
-            bottomBar
+            // Le carrefour porte ses propres CTA (Analyser / Ignorer) → on masque
+            // la barre du bas tant qu'il est affiché.
+            if activeGate == nil {
+                bottomBar
+            }
         }
     }
 
@@ -415,8 +334,12 @@ struct QuestionnaireContainerView: View {
             if introSection != nil {
                 dismissIntro()
             } else if viewModel.isLastQuestion {
-                HapticService.shared.strong()
-                submitAndContinue()
+                if viewModel.nextLockedGate != nil {
+                    presentGate()
+                } else {
+                    HapticService.shared.strong()
+                    submitAndContinue()
+                }
             } else {
                 HapticService.shared.primary()
                 advance()
@@ -576,9 +499,46 @@ struct QuestionnaireContainerView: View {
         HapticService.shared.tap()
         isNavigatingForward = false
         withAnimation(stepAnimation) {
-            introSection = nil
-            viewModel.previousQuestion()
+            if activeGate != nil {
+                // Retour depuis un carrefour → revient à la dernière question.
+                activeGate = nil
+            } else {
+                introSection = nil
+                viewModel.previousQuestion()
+            }
         }
+    }
+
+    // MARK: - Carrefours d'approfondissement (parcours adaptatif)
+
+    /// Affiche le carrefour du prochain bloc verrouillé (au tap « Continuer »
+    /// sur la dernière question visible).
+    private func presentGate() {
+        autoAdvanceTask?.cancel()
+        HapticService.shared.primary()
+        isNavigatingForward = true
+        withAnimation(stepAnimation) {
+            introSection = nil
+            activeGate = viewModel.nextLockedGate
+        }
+    }
+
+    /// « Analyser… » : déverrouille le bloc et enchaîne sur sa première question.
+    private func acceptGate(_ gate: QuestionnaireSection) {
+        HapticService.shared.primary()
+        isNavigatingForward = true
+        withAnimation(stepAnimation) {
+            viewModel.unlockDeep(gate) // déverrouille + repositionne sur la 1re question
+            activeGate = nil
+            introSection = nil          // le carrefour a déjà servi d'intro
+        }
+    }
+
+    /// « Ignorer… » : on arrête là et on file au bilan (résultat partiel).
+    private func skipGate() {
+        HapticService.shared.strong()
+        activeGate = nil
+        submitAndContinue()
     }
 
     // MARK: - Auto-advance (single-choice)
@@ -706,6 +666,126 @@ struct QuestionnaireContainerView: View {
         }
 
         viewModel.updateAnswer(questionId: questionId, value: current)
+    }
+}
+
+// MARK: - Carrefour d'approfondissement (vue)
+/// Écran de décision contextuel à chaque bloc profond : « Analyser… »
+/// (déverrouille et approfondit) ou « Ignorer… » (bilan partiel). Une icône 3D
+/// et un message DIFFÉRENTS par bloc — on incite à approfondir, le skip assume
+/// sa perte de fiabilité. Vocabulaire conforme (jamais le mot interdit).
+private struct QuestionnaireGateView: View {
+    let gate: QuestionnaireSection
+    let onDeepen: () -> Void
+    let onSkip: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
+
+    private struct Copy {
+        let asset: String
+        let kicker: String
+        let title: String
+        let sub: String
+        let cta: String
+        let skip: String
+    }
+
+    private var copy: Copy {
+        switch gate {
+        case .nutrition:
+            return Copy(asset: Fluent3D.kiwi, kicker: "On a repéré quelque chose",
+                       title: "Certains apports semblent sous tes besoins",
+                       sub: "Voyons lesquels à partir de ton alimentation.",
+                       cta: "Analyser mon alimentation", skip: "Ignorer l'analyse")
+        case .symptomes:
+            return Copy(asset: Fluent3D.loupe, kicker: "Tes signaux comptent",
+                       title: "Tes symptômes en disent long",
+                       sub: "On relie ongles, énergie, digestion à tes apports.",
+                       cta: "Analyser mes symptômes", skip: "Ignorer mes symptômes")
+        case .medical:
+            return Copy(asset: Fluent3D.pill, kicker: "Point sécurité",
+                       title: "Tes traitements changent la donne",
+                       sub: "Certains interagissent avec tes vitamines et minéraux.",
+                       cta: "Vérifier mes interactions", skip: "Ignorer les interactions")
+        default:
+            return Copy(asset: Fluent3D.kiwi, kicker: "On a repéré quelque chose",
+                       title: "Quelques questions de plus",
+                       sub: "Pour rendre ton bilan plus fiable.",
+                       cta: "Continuer", skip: "Ignorer")
+        }
+    }
+
+    var body: some View {
+        let c = copy
+        VStack {
+            Spacer()
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 9) {
+                    Fluent3DIcon(name: c.asset, size: 34)
+                    Text(c.kicker)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.kiwiGreen)
+                }
+                Text(c.title)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
+                Text(c.sub)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
+
+                Button(action: onDeepen) {
+                    HStack {
+                        Text(c.cta).font(.system(size: 16, weight: .bold))
+                        Spacer()
+                        Image(systemName: "arrow.right").font(.system(size: 18, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .frame(height: 56)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiGreen))
+                    .shadow(color: Color.kiwiGreen.opacity(0.32), radius: 12, x: 0, y: 8)
+                }
+                .buttonStyle(.healthMapPressed)
+                .padding(.top, 24)
+
+                Button(action: onSkip) {
+                    VStack(spacing: 2) {
+                        Text(c.skip)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.healthMapMuted)
+                            .underline()
+                        Text("plus rapide, mais ton bilan sera moins fiable")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(Color.healthMapMuted.opacity(0.7))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.healthMapPressed)
+                .padding(.top, 18)
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color.healthMapCard)
+                    .shadow(color: Color.kiwiCharcoal.opacity(0.08), radius: 24, x: 0, y: 12)
+            )
+            .padding(.horizontal, Theme.spacingLG)
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 14)
+            Spacer()
+        }
+        .onAppear {
+            if reduceMotion { appeared = true }
+            else { withAnimation(.easeOut(duration: 0.45)) { appeared = true } }
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 
