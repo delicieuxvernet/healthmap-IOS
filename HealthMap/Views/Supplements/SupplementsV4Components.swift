@@ -100,16 +100,21 @@ enum SupplementsV4 {
     }
 }
 
+// MARK: - Choix utilisateur pour un complément
+enum SupplementChoice { case none, complement, assiette }
+
 // MARK: - Carte d'un complément recommandé (FINAL)
 struct SupplementCardV4: View {
     let rec: SupplementRecommendation
     let premium: Bool
     let interCount: Int
-    let isTaken: Bool
-    let onCapsule: () -> Void      // ouvre le détail
-    let onInteractions: () -> Void // ouvre les précautions
-    let onTake: () -> Void         // toggle panier
-    let onFood: () -> Void         // → Plan
+    /// Choix courant : panier (complément) ou couverture par l'assiette.
+    let choice: SupplementChoice
+    let onCapsule: () -> Void       // ouvre le détail
+    let onInteractions: () -> Void  // ouvre les précautions
+    let onComplement: () -> Void    // « Je le prends » (panier)
+    let onAssiette: () -> Void      // « Par l'assiette » (mode assiette)
+    let onSeeFoodPlan: () -> Void   // CTA assiette → Plan
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var suppFill: CGFloat = 0
@@ -117,6 +122,8 @@ struct SupplementCardV4: View {
     private var color: Color { Color.scoreColor(for: rec.score) }
     private var essential: Bool { rec.score < 45 }
     private var foodPct: CGFloat { CGFloat(max(0, min(100, rec.score))) / 100 }
+    private var isComplement: Bool { choice == .complement }
+    private var isAssiette: Bool { choice == .assiette }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -235,41 +242,42 @@ struct SupplementCardV4: View {
             .buttonStyle(.healthMapPressed)
             .padding(.top, 14)
 
-            // Choix : « Je le prends » (toggle prix) + « Par l'assiette »
+            // Choix : « Je le prends » (panier) OU « Par l'assiette » (mode).
+            // Vrai toggle : un seul actif à la fois, re-tap = on désélectionne.
             HStack(spacing: 3) {
-                Button(action: onTake) {
+                Button(action: onComplement) {
                     VStack(spacing: 1) {
                         Text("Je le prends")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(isTaken ? .white : Color.kiwiCharcoal)
+                            .foregroundStyle(isComplement ? .white : Color.kiwiCharcoal)
                         Text("\(SupplementsV4.priceLabel(rec, premium: premium))/mois")
                             .font(.system(size: 10.5, weight: .bold, design: .monospaced))
-                            .foregroundStyle(isTaken ? Color.white.opacity(0.85) : Color.healthMapSecondary)
+                            .foregroundStyle(isComplement ? Color.white.opacity(0.85) : Color.healthMapSecondary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 9)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(isTaken ? Color.kiwiGreen : Color.clear)
-                            .shadow(color: isTaken ? Color.kiwiGreen.opacity(0.3) : .clear,
+                            .fill(isComplement ? Color.kiwiGreen : Color.clear)
+                            .shadow(color: isComplement ? Color.kiwiGreen.opacity(0.3) : .clear,
                                     radius: 6, x: 0, y: 3)
                     )
                 }
                 .buttonStyle(.healthMapPressed)
 
-                Button(action: onFood) {
+                Button(action: onAssiette) {
                     HStack(spacing: 5) {
                         Image(systemName: "leaf.fill")
                             .font(.system(size: 13))
                         Text("Par l'assiette")
                             .font(.system(size: 13, weight: .bold))
                     }
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(isAssiette ? .white : Color.kiwiGreenInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 9)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white)
+                            .fill(isAssiette ? Color.kiwiGreenInk : Color.white)
                             .shadow(color: Color.kiwiCharcoal.opacity(0.05), radius: 4, x: 0, y: 2)
                     )
                 }
@@ -282,9 +290,10 @@ struct SupplementCardV4: View {
             )
             .padding(.top, 14)
 
-            // Lien « Voir comment le couvrir par l'assiette » (visible si coché)
-            if isTaken {
-                Button(action: onFood) {
+            // Lien « Voir comment le couvrir par l'assiette » → Plan :
+            // visible UNIQUEMENT quand on a choisi « Par l'assiette ».
+            if isAssiette {
+                Button(action: onSeeFoodPlan) {
                     HStack(spacing: 11) {
                         Image(systemName: "leaf.fill")
                             .font(.system(size: 16))

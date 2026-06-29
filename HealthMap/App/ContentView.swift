@@ -277,7 +277,6 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Bilan", systemImage: "heart.text.clipboard") }
             .tag(Tab.bilan)
 
@@ -291,7 +290,6 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Suivi", systemImage: "checkmark.circle") }
             .tag(Tab.suivi)
 
@@ -305,7 +303,6 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Scanner", systemImage: "camera") }
             .tag(Tab.scanner)
 
@@ -319,7 +316,6 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Plan", systemImage: "list.bullet.clipboard") }
             .tag(Tab.plan)
 
@@ -334,16 +330,20 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 72) }
             .tabItem { Label("Compléments", systemImage: "pills") }
             .tag(Tab.complements)
         }
         .tint(Color.kiwiGreen)
-        // Tab bar flottante (langage v4 — maquette p-scanner) : pill blanche
-        // posée en overlay ; la barre native est masquée par onglet.
-        .overlay(alignment: .bottom) {
+        // Tab bar flottante (langage v4) : pill blanche posée en safe-area inset
+        // bas — elle RÉSERVE sa place (le contenu s'arrête au-dessus, plus rien
+        // n'est masqué) et reste au-dessus du home indicator. Fond crème pour se
+        // fondre dans les écrans. Barre native masquée par onglet.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             KiwiFloatingTabBar(selected: $selectedTab)
                 .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 2)
+                .background(Color.kiwiCream.ignoresSafeArea(edges: .bottom))
         }
         // Overlay de célébrations gamification (« Badge débloqué / Niveau
         // supérieur ») retiré le 28 juin 2026 : feedback jugé « cheap ».

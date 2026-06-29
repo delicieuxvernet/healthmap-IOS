@@ -45,10 +45,9 @@ struct SuiviView: View {
         return "Ongles cassants"
     }
 
-    /// Variante minuscule du symptôme pour les phrases (« tes ongles … »).
-    private var symptomLower: String {
-        symptomName.prefix(1).lowercased() + symptomName.dropFirst()
-    }
+    /// Sens d'évolution + libellés dérivés du symptôme suivi : un symptôme
+    /// « problème » s'améliore en DESCENDANT, l'énergie en MONTANT.
+    private var trend: SymptomTrend { SymptomTrend.make(from: symptomName) }
 
     var body: some View {
         NavigationStack {
@@ -58,9 +57,10 @@ struct SuiviView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         titleBlock
-                        SuiviSymptomCurveCard(symptomName: symptomName,
+                        SuiviSymptomCurveCard(trend: trend,
                                               reduceMotion: reduceMotion)
                         SuiviSymptomCheckinCard(
+                            trend: trend,
                             streak: gamification.currentStreak,
                             selected: checkin[symptomFeelKey],
                             reduceMotion: reduceMotion
@@ -113,27 +113,99 @@ struct SuiviView: View {
     }
 }
 
-// MARK: - 2. Carte « Évolution de tes ongles » (courbe 3 séries)
-/// Badge −38% vert, courbe à 3 séries (Avec Kiwio plein vert · Potentiel max
-/// tirets · Sans Kiwio pointillés), légende, encart explicatif.
+// MARK: - Sens d'évolution d'un symptôme (logique métier)
+// Un symptôme « problème » (ongles cassants, digestion, cheveux, humeur,
+// sommeil, fatigue…) s'améliore quand sa courbe DESCEND. Un objectif positif
+// (énergie, concentration…) s'améliore quand sa courbe MONTE.
+enum SymptomDir { case lowerBetter, higherBetter }
+
+struct SymptomTrend {
+    let dir: SymptomDir
+    let noun: String        // « tes ongles », « ton énergie »
+    let betterLabel: String // « Moins cassants », « Plus d'énergie »
+    let worseLabel: String  // « Plus cassants », « Moins d'énergie »
+
+    var evolutionTitle: String { "Évolution de \(noun)" }
+    var checkinQuestion: String {
+        let cap = noun.prefix(1).uppercased() + noun.dropFirst()
+        return "\(cap) aujourd'hui\u{00A0}?"
+    }
+    var improvingDown: Bool { dir == .lowerBetter }
+    var deltaLabel: String { improvingDown ? "−38%" : "+38%" }
+    var helperText: String {
+        improvingDown
+            ? "Plus la courbe descend, mieux c'est\u{202F}: \(noun) s'améliore. Le sans-faute t'amène au potentiel max."
+            : "Plus la courbe monte, mieux c'est\u{202F}: \(noun) progresse. Le sans-faute t'amène au potentiel max."
+    }
+
+    static func make(from symptom: String) -> SymptomTrend {
+        let s = symptom.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+        func has(_ ks: [String]) -> Bool { ks.contains { s.contains($0) } }
+        if has(["energie", "vitalit", "tonus", "entrain", "peche", "forme"]) {
+            return SymptomTrend(dir: .higherBetter, noun: "ton énergie", betterLabel: "Plus d'énergie", worseLabel: "Moins d'énergie")
+        }
+        if has(["concentr", "memoire", "focus", "clart", "vigilan"]) {
+            return SymptomTrend(dir: .higherBetter, noun: "ta concentration", betterLabel: "Plus nette", worseLabel: "Moins nette")
+        }
+        if has(["ongle"]) {
+            return SymptomTrend(dir: .lowerBetter, noun: "tes ongles", betterLabel: "Moins cassants", worseLabel: "Plus cassants")
+        }
+        if has(["cheveu", "chute", "alopec"]) {
+            return SymptomTrend(dir: .lowerBetter, noun: "tes cheveux", betterLabel: "Moins de chute", worseLabel: "Plus de chute")
+        }
+        if has(["digest", "ballonn", "transit", "intestin", "constip"]) {
+            return SymptomTrend(dir: .lowerBetter, noun: "ta digestion", betterLabel: "Plus légère", worseLabel: "Plus lourde")
+        }
+        if has(["humeur", "moral", "irritab", "nervos"]) {
+            return SymptomTrend(dir: .lowerBetter, noun: "ton humeur", betterLabel: "Plus stable", worseLabel: "Moins stable")
+        }
+        if has(["sommeil", "dormir", "insomn", "reveil"]) {
+            return SymptomTrend(dir: .lowerBetter, noun: "ton sommeil", betterLabel: "Meilleur", worseLabel: "Moins bon")
+        }
+        if has(["fatigue", "epuis", "las"]) {
+            return SymptomTrend(dir: .lowerBetter, noun: "ta fatigue", betterLabel: "Moins fatigué", worseLabel: "Plus fatigué")
+        }
+        if has(["peau", "acne", "bouton", "teint"]) {
+            return SymptomTrend(dir: .lowerBetter, noun: "ta peau", betterLabel: "Plus nette", worseLabel: "Moins nette")
+        }
+        if has(["stress", "anxi"]) {
+            return SymptomTrend(dir: .lowerBetter, noun: "ton stress", betterLabel: "Moins de stress", worseLabel: "Plus de stress")
+        }
+        let tail = (symptom.split(separator: " ").first.map(String.init) ?? symptom).lowercased()
+        return SymptomTrend(dir: .lowerBetter, noun: "tes \(tail)", betterLabel: "Mieux", worseLabel: "Moins bien")
+    }
+}
+
+// MARK: - 2. Carte « Évolution du symptôme » (courbe 3 séries)
+/// Badge ±38% vert, courbe à 3 séries (Avec Kiwio plein vert · Potentiel max
+/// tirets · Sans Kiwio pointillés). Le SENS suit la logique du symptôme.
 private struct SuiviSymptomCurveCard: View {
-    let symptomName: String
+    let trend: SymptomTrend
     let reduceMotion: Bool
 
     @State private var progress: CGFloat = 0
 
-    /// Séries représentatives (état exemple — pas d'historique réel du symptôme).
-    /// 0 = haut (symptôme très présent), 100 = bas (symptôme résorbé) ;
-    /// la courbe DESCEND quand le symptôme s'améliore.
-    private let withKiwio: [Int] = [82, 78, 70, 64, 55, 49, 44]   // plein vert
-    private let potentialMax: [Int] = [82, 74, 62, 50, 40, 33, 28] // tirets clair
-    private let withoutKiwio: [Int] = [82, 83, 81, 84, 82, 85, 83] // pointillés gris
+    // Séries représentatives (état exemple — pas d'historique réel). On stocke
+    // le NIVEAU de la métrique ; le sens visuel découle de `py` (niveau haut =
+    // en haut) : la sévérité d'un symptôme DESCEND, l'énergie MONTE.
+    private var series: (with: [Int], max: [Int], without: [Int]) {
+        switch trend.dir {
+        case .lowerBetter:
+            return (with: [82, 78, 70, 64, 55, 49, 44],
+                    max: [82, 74, 62, 50, 40, 33, 28],
+                    without: [82, 83, 81, 84, 82, 85, 83])
+        case .higherBetter:
+            return (with: [44, 49, 55, 64, 70, 78, 84],
+                    max: [44, 52, 64, 76, 86, 92, 96],
+                    without: [44, 43, 45, 42, 46, 44, 45])
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Évolution de tes \(symptomTail)")
+                    Text(trend.evolutionTitle)
                         .font(.system(size: 16.5, weight: .heavy))
                         .foregroundStyle(Color.kiwiCharcoal)
                         .lineLimit(1)
@@ -144,9 +216,9 @@ private struct SuiviSymptomCurveCard: View {
                 }
                 Spacer(minLength: 8)
                 HStack(spacing: 4) {
-                    Image(systemName: "arrow.down.right")
+                    Image(systemName: trend.improvingDown ? "arrow.down.right" : "arrow.up.right")
                         .font(.system(size: 12, weight: .heavy))
-                    Text("−38%")
+                    Text(trend.deltaLabel)
                         .font(.system(size: 12, weight: .heavy, design: .monospaced))
                 }
                 .foregroundStyle(Color.kiwiGreenInk)
@@ -160,7 +232,6 @@ private struct SuiviSymptomCurveCard: View {
                 .frame(height: 150)
                 .padding(.top, 14)
 
-            // Légende
             HStack(spacing: 13) {
                 legend(color: Color.kiwiGreen, kind: .solid, text: "Avec Kiwio", strong: true)
                 legend(color: Color(hex: "93C16B"), kind: .dashed, text: "Potentiel max", strong: false)
@@ -170,10 +241,10 @@ private struct SuiviSymptomCurveCard: View {
             .padding(.top, 4)
 
             HStack(spacing: 10) {
-                Image(systemName: "arrow.down")
+                Image(systemName: trend.improvingDown ? "arrow.down" : "arrow.up")
                     .font(.system(size: 17))
                     .foregroundStyle(Color.kiwiGreen)
-                Text("Plus la courbe descend, moins tes \(symptomTail) sont cassants. Le sans-faute t'amène au potentiel max.")
+                Text(trend.helperText)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color(hex: "3a3833"))
                     .fixedSize(horizontal: false, vertical: true)
@@ -195,25 +266,22 @@ private struct SuiviSymptomCurveCard: View {
         }
     }
 
-    /// Mot pluriel du symptôme pour les phrases (« ongles »).
-    private var symptomTail: String {
-        let words = symptomName.split(separator: " ")
-        return (words.first.map(String.init) ?? symptomName).lowercased()
-    }
-
     private var chart: some View {
         Canvas { ctx, size in
             let w = size.width, h = size.height
-            let series = [withKiwio, potentialMax, withoutKiwio]
-            let n = series[0].count
+            let s = series
+            let n = s.with.count
             func px(_ i: Int) -> CGFloat { n <= 1 ? 0 : w * CGFloat(i) / CGFloat(n - 1) }
+            // Niveau haut = en HAUT de l'écran : sévérité qui baisse → descend,
+            // énergie qui monte → monte.
             func py(_ v: Int) -> CGFloat {
-                // v: 0..100 ; on garde un padding vertical (haut 8 %, bas 8 %).
                 let t = CGFloat(v) / 100
-                return h * (0.08 + t * 0.84)
+                return h * (0.08 + (1 - t) * 0.84)
+            }
+            func points(_ vals: [Int]) -> [CGPoint] {
+                vals.enumerated().map { CGPoint(x: px($0.offset), y: py($0.element)) }
             }
 
-            // grilles horizontales discrètes
             for g in stride(from: 0.0, through: 1.0, by: 0.25) {
                 let y = h * g
                 var gp = Path(); gp.move(to: CGPoint(x: 0, y: y)); gp.addLine(to: CGPoint(x: w, y: y))
@@ -221,24 +289,14 @@ private struct SuiviSymptomCurveCard: View {
                            style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [1, 5]))
             }
 
-            func points(_ vals: [Int]) -> [CGPoint] {
-                vals.enumerated().map { CGPoint(x: px($0.offset), y: py($0.element)) }
-            }
-
-            // Sans Kiwio (pointillés gris) — tracé en premier (fond).
-            let withoutPts = points(withoutKiwio)
-            ctx.stroke(SuiviChartMath.smoothPath(withoutPts),
+            ctx.stroke(SuiviChartMath.smoothPath(points(s.without)),
                        with: .color(Color(hex: "C2BDB0")),
                        style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round, dash: [2, 5]))
-
-            // Potentiel max (tirets clair).
-            let maxPts = points(potentialMax)
-            ctx.stroke(SuiviChartMath.smoothPath(maxPts),
+            ctx.stroke(SuiviChartMath.smoothPath(points(s.max)),
                        with: .color(Color(hex: "93C16B")),
                        style: StrokeStyle(lineWidth: 2.6, lineCap: .round, lineJoin: .round, dash: [7, 5]))
 
-            // Avec Kiwio (plein vert + aire) — animé par `progress`.
-            let withPts = points(withKiwio)
+            let withPts = points(s.with)
             let visible = max(2, Int(ceil(CGFloat(n) * progress)))
             let drawn = Array(withPts.prefix(visible))
             let line = SuiviChartMath.smoothPath(drawn)
@@ -250,7 +308,6 @@ private struct SuiviSymptomCurveCard: View {
             ctx.stroke(line, with: .color(Color.kiwiGreen),
                        style: StrokeStyle(lineWidth: 3.4, lineCap: .round, lineJoin: .round))
 
-            // point de tête « Avec Kiwio »
             if let p = drawn.last {
                 let r: CGFloat = 4.5
                 let dot = Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
@@ -291,21 +348,22 @@ private struct SuiviSymptomCurveCard: View {
 
 // MARK: - 3. Carte « Tes ongles aujourd'hui ? » (réponse du jour + série)
 private struct SuiviSymptomCheckinCard: View {
+    let trend: SymptomTrend
     let streak: Int
     let selected: Int?
     let reduceMotion: Bool
     let onSelect: (Int) -> Void
 
-    private let options: [(icon: String, label: String)] = [
-        ("face.smiling", "Moins cassants"),
-        ("minus", "Pareil"),
-        ("face.dashed", "Plus cassants")
-    ]
+    private var options: [(icon: String, label: String)] {
+        [("face.smiling", trend.betterLabel),
+         ("minus", "Pareil"),
+         ("face.dashed", trend.worseLabel)]
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Tes ongles aujourd'hui\u{00A0}?")
+                Text(trend.checkinQuestion)
                     .font(.system(size: 15, weight: .heavy))
                     .foregroundStyle(Color.kiwiCharcoal)
                 Spacer()
