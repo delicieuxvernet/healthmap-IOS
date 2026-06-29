@@ -68,6 +68,10 @@
     <!-- HealthKit : lecture seule (activité, poids, sommeil) pour pré-remplir le profil. -->
     <key>NSHealthShareUsageDescription</key>
     <string>Kiwio lit ton activité, ton poids et ton sommeil depuis Apple Santé pour pré-remplir ton profil et personnaliser ton bilan. Lecture seule : Kiwio n'écrit jamais dans Santé.</string>
+    <!-- Exigée par la validation App Store dès que l'entitlement HealthKit est présent,
+         même en lecture seule. Kiwio n'écrit aucune donnée dans Santé. -->
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>Kiwio n'écrit aucune donnée dans Apple Santé. Cette autorisation, requise par Apple pour les apps liées à Santé, n'est pas utilisée.</string>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
         <string>arm64</string>
