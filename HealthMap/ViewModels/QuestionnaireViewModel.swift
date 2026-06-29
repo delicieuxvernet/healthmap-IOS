@@ -11,6 +11,11 @@ final class QuestionnaireViewModel: ObservableObject {
     @Published var currentQuestionIndex: Int = 0
     @Published var profile: UserProfile = .empty
     @Published var pathway: UserProfile.Pathway = .express
+    /// Blocs « profonds » (questions au-delà de l'express) que l'utilisateur a
+    /// choisi d'approfondir via un carrefour. Le tronc commun = questions
+    /// express ; chaque carrefour déverrouille un bloc (nutrition / symptômes /
+    /// médical). Parcours adaptatif (remplace le choix express/complet).
+    @Published var unlockedDeepSections: Set<QuestionnaireSection> = []
     @Published var isSubmitting = false
     @Published var errorMessage: String?
 
@@ -48,12 +53,15 @@ final class QuestionnaireViewModel: ObservableObject {
         let currentQuestionId: String?
         let profile: UserProfile
         let pathway: UserProfile.Pathway
+        /// Blocs profonds déverrouillés (rawValues de QuestionnaireSection) —
+        /// parcours adaptatif (schema v4). Optionnel pour le décodage robuste.
+        let unlockedDeepSections: [Int]?
         let savedAt: Date
     }
-    /// Bumped 1→2 (userId), 2→3 (refonte nutrition "Faites vos courses" :
-    /// les 10 questions de quantités sont remplacées par le caddie `groceries`).
-    /// Les drafts v2 référençant les anciennes questions sont proprement écartés.
-    private static let draftSchemaVersion = 3
+    /// Bumped 1→2 (userId), 2→3 (refonte nutrition "Faites vos courses"),
+    /// 3→4 (parcours adaptatif : le choix express/complet est remplacé par les
+    /// blocs déverrouillables `unlockedDeepSections`). Les drafts v3 sont écartés.
+    private static let draftSchemaVersion = 4
 
     // MARK: - Init
     init() {
@@ -76,8 +84,11 @@ final class QuestionnaireViewModel: ObservableObject {
     /// Express/Complet et les conditions showIf.
     func visibleQuestions(in section: QuestionnaireSection) -> [Question] {
         section.questions.filter { question in
-            // Express pathway: only show express keys
-            if pathway == .express && !QuestionnaireSection.expressKeys.contains(question.id) {
+            // Tronc commun = questions express. Les questions « profondes »
+            // (non-express) n'apparaissent que si l'utilisateur a déverrouillé
+            // ce bloc via son carrefour (parcours adaptatif).
+            let isExpress = QuestionnaireSection.expressKeys.contains(question.id)
+            if !isExpress && !unlockedDeepSections.contains(section) {
                 return false
             }
 
@@ -88,6 +99,39 @@ final class QuestionnaireViewModel: ObservableObject {
 
             return true
         }
+    }
+
+    // MARK: - Carrefours d'approfondissement (parcours adaptatif)
+
+    /// Blocs profonds proposés via carrefour, dans l'ordre du flux
+    /// (alimentation → symptômes → médical).
+    static let deepGateSections: [QuestionnaireSection] = [.nutrition, .symptomes, .medical]
+
+    /// La section a-t-elle des questions profondes (non-express) pertinentes
+    /// (showIf inclus) à proposer ?
+    func hasDeepContent(_ section: QuestionnaireSection) -> Bool {
+        section.questions.contains { q in
+            !QuestionnaireSection.expressKeys.contains(q.id) && (q.showIf?(profile) ?? true)
+        }
+    }
+
+    /// Prochain bloc profond verrouillé à proposer en carrefour — nil si plus
+    /// aucun (l'utilisateur peut alors terminer).
+    var nextLockedGate: QuestionnaireSection? {
+        Self.deepGateSections.first { !unlockedDeepSections.contains($0) && hasDeepContent($0) }
+    }
+
+    /// Déverrouille un bloc profond (« Analyser… ») et repositionne le flux sur
+    /// sa première question (le carrefour remplace l'intro de section).
+    func unlockDeep(_ gate: QuestionnaireSection) {
+        unlockedDeepSections.insert(gate)
+        let questions = visibleQuestions
+        if let idx = questions.firstIndex(where: {
+            section(of: $0) == gate && !QuestionnaireSection.expressKeys.contains($0.id)
+        }) {
+            currentQuestionIndex = idx
+        }
+        saveDraft()
     }
 
     /// Liste APLATIE de toutes les questions visibles, toutes sections
@@ -501,9 +545,13 @@ final class QuestionnaireViewModel: ObservableObject {
         // This prevents the optimistic flag from leaking to SwiftUI views
         // (which check profile.completed to switch to DashboardView) while the
         // network call is still in flight.
+        // Parcours adaptatif : `pathway` est désormais DÉRIVÉ — express si
+        // l'utilisateur n'a approfondi aucun bloc, complet sinon. Conserve la
+        // sémantique du champ DB existant (web ↔ iOS).
+        let derivedPathway: UserProfile.Pathway = unlockedDeepSections.isEmpty ? .express : .complet
         var submissionProfile = profile
         submissionProfile.completed = true
-        submissionProfile.pathway = pathway
+        submissionProfile.pathway = derivedPathway
 
         do {
             try await DatabaseService.shared.saveProfile(
@@ -515,10 +563,10 @@ final class QuestionnaireViewModel: ObservableObject {
 
             // Server confirmed — NOW commit the flag to the published state
             profile.completed = true
-            profile.pathway = pathway
+            profile.pathway = derivedPathway
 
             AnalyticsService.shared.track(.questionnaireCompleted, properties: [
-                "pathway": pathway.rawValue,
+                "pathway": derivedPathway.rawValue,
                 "sections_count": totalSections,
             ])
 
@@ -577,6 +625,7 @@ final class QuestionnaireViewModel: ObservableObject {
             currentQuestionId: currentQuestion?.id,
             profile: profile,
             pathway: pathway,
+            unlockedDeepSections: unlockedDeepSections.map { $0.rawValue },
             savedAt: Date()
         )
 
@@ -641,9 +690,10 @@ final class QuestionnaireViewModel: ObservableObject {
 
         self.profile = draft.profile
         self.pathway = draft.pathway
+        self.unlockedDeepSections = Set((draft.unlockedDeepSections ?? []).compactMap { QuestionnaireSection(rawValue: $0) })
 
-        // Repositionnement — l'ordre compte : profile/pathway d'abord, la liste
-        // des questions visibles en dépend (showIf + express).
+        // Repositionnement — l'ordre compte : profile + blocs déverrouillés
+        // d'abord, la liste des questions visibles en dépend (showIf + unlock).
         if let questionId = draft.currentQuestionId,
            let index = visibleQuestions.firstIndex(where: { $0.id == questionId }) {
             self.currentQuestionIndex = index

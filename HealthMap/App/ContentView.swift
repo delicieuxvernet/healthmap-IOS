@@ -213,16 +213,14 @@ struct LaunchScreenView: View {
     var body: some View {
         ZStack {
             WarmBackground()
-            VStack(spacing: 20) {
-                // La mascotte « se réveille » (yeux fermés → ouverts) à l'ouverture.
-                MascotView(mood: .happy, size: 132, wakes: true)
-                HStack(spacing: 0) {
-                    Text("Health").foregroundStyle(Color.healthMapText)
-                    Text("Map").foregroundStyle(LinearGradient.healthMapBrand)
-                }
-                .font(.system(size: 30, weight: .bold, design: .rounded))
+            VStack(spacing: 22) {
+                // Logo en contour épuré (le demi-kiwi réduit à ses traits, monochrome).
+                KiwiContourMark(size: 104, color: .kiwiCharcoal)
+                Text("Kiwio")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.kiwiCharcoal)
                 ProgressView()
-                    .tint(Color.healthMapBlue)
+                    .tint(Color.kiwiGreen)
                     .padding(.top, 4)
             }
         }

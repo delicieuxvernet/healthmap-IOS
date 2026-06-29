@@ -38,6 +38,8 @@ enum Fluent3D {
     static let sleeping = "fluent_sleeping"    // sommeil (suivi)
     static let sun = "fluent_sun"              // matin (scan — Ta journée)
     static let moon = "fluent_moon"            // soir (scan — Ta journée)
+    static let loupe = "fluent_loupe"          // carrefour symptômes (questionnaire)
+    static let pill = "fluent_pill"            // carrefour médical (questionnaire)
 
     // MARK: - Sources d'aliments par apport (fiche « Où le trouver »)
     /// 3 sources concrètes par nutriment, choisies dans le pool d'assets 3D
