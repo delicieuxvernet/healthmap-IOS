@@ -154,9 +154,19 @@ struct RecommendationsContentView: View {
         // partagé (corrige le doublon de solutions d'une carte à l'autre).
         var pool = vm.topDeficiencies
 
-        func focus(matching text: String) -> [EnrichedNutrient] {
+        // Apports pertinents cités dans le texte IA ET réellement insuffisants.
+        // `fallbackToDeficiencies` : pour un SYMPTÔME, à défaut de correspondance
+        // on retombe sur les apports les plus faibles (lien défendable). Pour un
+        // OBJECTIF, JAMAIS : on n'injecte pas un apport hors-sujet sous un titre
+        // comme « Mieux dormir » — la carte s'appuie alors sur ses leviers de vie.
+        func focus(matching text: String, fallbackToDeficiencies: Bool) -> [EnrichedNutrient] {
             let matched = nutrientsMentioned(in: text).filter { e in pool.contains { $0.id == e.id } }
-            let picked = matched.isEmpty ? Array(pool.prefix(2)) : Array(matched.prefix(2))
+            let picked: [EnrichedNutrient]
+            if matched.isEmpty {
+                picked = fallbackToDeficiencies ? Array(pool.prefix(2)) : []
+            } else {
+                picked = Array(matched.prefix(2))
+            }
             for n in picked { pool.removeAll { $0.id == n.id } }
             return picked
         }
@@ -169,7 +179,7 @@ struct RecommendationsContentView: View {
                 kind: .symptome,
                 name: prettify(name),
                 intro: symptomeIntro(s),
-                focus: focus(matching: (s.causesProbables ?? []).joined(separator: " "))
+                focus: focus(matching: (s.causesProbables ?? []).joined(separator: " "), fallbackToDeficiencies: true)
             ))
         }
 
@@ -184,7 +194,7 @@ struct RecommendationsContentView: View {
                 name: prettify(name),
                 intro: levierText.map { "Ton levier principal\u{202F}: \($0)." }
                     ?? "Voici comment t'en rapprocher au quotidien.",
-                focus: focus(matching: ((o.leviers ?? []) + (o.freins ?? [])).joined(separator: " "))
+                focus: focus(matching: ((o.leviers ?? []) + (o.freins ?? [])).joined(separator: " "), fallbackToDeficiencies: false)
             ))
         }
 
@@ -201,7 +211,7 @@ struct RecommendationsContentView: View {
             intro: intro,
             ritual: ritual(for: focus, kind: kind),
             nutrition: nutritionSolutions(for: focus),
-            habitudes: habitSolutions(for: focus, kind: kind),
+            habitudes: habits(for: focus, kind: kind, objectifName: name),
             complements: supplementSolutions(for: focus)
         )
     }
@@ -226,6 +236,15 @@ struct RecommendationsContentView: View {
                                detail: names.contains("fer") ? "Pas de\nthé / café" : "Repas\nléger")
             ]
         } else {
+            // Objectif sans apport ciblé : rituel d'hygiène de vie (aucun nutriment
+            // parachuté). Sinon, repère lié à l'apport principal.
+            if nutrients.isEmpty {
+                return [
+                    PlanRitualStep(slot: .matin, title: "Matin", detail: "Lumière\n+ mouvement"),
+                    PlanRitualStep(slot: .journee, title: "Journée", detail: "20 min\nde marche"),
+                    PlanRitualStep(slot: .soir, title: "Soir", detail: "Routine\nau calme")
+                ]
+            }
             return [
                 PlanRitualStep(slot: .matin, title: "Matin",
                                detail: names.contains("vitb12") || names.contains("b12") ? "B12\nsublinguale" : "\(primary)\nau réveil"),
@@ -273,6 +292,81 @@ struct RecommendationsContentView: View {
                                          note: "Loin des repas riches en fer pour mieux l'absorber"))
         }
         return Array(out.prefix(3))
+    }
+
+    // MARK: - Habitudes par objectif (leviers d'hygiène de vie)
+    /// Habitudes affichées : pour un OBJECTIF, des leviers d'hygiène de vie ciblés
+    /// par thème (sommeil, énergie, poids, stress, digestion) — jamais une reco
+    /// nutriment hors-sujet. Pour un SYMPTÔME, comportement existant inchangé.
+    private func habits(for nutrients: [EnrichedNutrient], kind: PlanTopic.Kind, objectifName: String) -> [PlanHabitSolution] {
+        guard kind == .objectif else { return habitSolutions(for: nutrients, kind: kind) }
+        return lifestyleHabits(forObjective: objectifName)
+    }
+
+    /// Leviers d'hygiène de vie par grand thème d'objectif. Conseils de bien-être
+    /// génériques (jamais de l'ordre du soin) ; un apport n'apparaît que s'il est
+    /// pertinent ET réellement insuffisant (cf. `focus`).
+    private func lifestyleHabits(forObjective name: String) -> [PlanHabitSolution] {
+        let key = name.lowercased()
+        func has(_ words: [String]) -> Bool { words.contains { key.contains($0) } }
+
+        if has(["dorm", "sommeil", "endorm", "nuit"]) {
+            return [
+                PlanHabitSolution(symbol: "sun.max.fill", text: "Lumière le matin",
+                                  note: "10 min dehors recalent ton horloge interne"),
+                PlanHabitSolution(symbol: "bed.double.fill", text: "Un sommeil régulier",
+                                  note: "Couche-toi à heure fixe pour mieux récupérer"),
+                PlanHabitSolution(symbol: "cup.and.saucer.fill", text: "Décale la caféine",
+                                  note: "Évite café et thé après 14h")
+            ]
+        }
+        if has(["énerg", "energ", "fatigue", "forme", "vitalit", "tonus"]) {
+            return [
+                PlanHabitSolution(symbol: "figure.walk", text: "Bouge chaque jour",
+                                  note: "20 min de marche relancent ton énergie"),
+                PlanHabitSolution(symbol: "sun.max.fill", text: "Lumière le matin",
+                                  note: "Elle cale ton rythme et ton réveil"),
+                PlanHabitSolution(symbol: "drop.fill", text: "Bois régulièrement",
+                                  note: "Le manque d'eau fatigue vite")
+            ]
+        }
+        if has(["poids", "maigr", "mince", "ligne", "perdre", "affin"]) {
+            return [
+                PlanHabitSolution(symbol: "fork.knife", text: "Des portions repérées",
+                                  note: "Sers-toi une fois, dans une assiette plus petite"),
+                PlanHabitSolution(symbol: "figure.walk", text: "Marche après les repas",
+                                  note: "10 min aident à rester actif au quotidien"),
+                PlanHabitSolution(symbol: "drop.fill", text: "Bois avant de grignoter",
+                                  note: "La soif se confond souvent avec la faim")
+            ]
+        }
+        if has(["stress", "anxi", "calme", "sérén", "seren", "détente", "detente", "zen"]) {
+            return [
+                PlanHabitSolution(symbol: "wind", text: "Respire en conscience",
+                                  note: "3 min de respiration lente apaisent le tempo"),
+                PlanHabitSolution(symbol: "figure.walk", text: "Bouge pour décharger",
+                                  note: "Une marche dehors aère la tête"),
+                PlanHabitSolution(symbol: "moon.stars.fill", text: "Coupe les écrans le soir",
+                                  note: "30 min sans écran avant le coucher")
+            ]
+        }
+        if has(["digest", "ventre", "transit", "ballonn", "intestin"]) {
+            return [
+                PlanHabitSolution(symbol: "fork.knife", text: "Mange posément",
+                                  note: "Mâche bien, sans précipiter le repas"),
+                PlanHabitSolution(symbol: "figure.walk", text: "Marche après manger",
+                                  note: "Quelques minutes facilitent la digestion"),
+                PlanHabitSolution(symbol: "drop.fill", text: "Hydrate-toi dans la journée",
+                                  note: "L'eau soutient un transit régulier")
+            ]
+        }
+        // Objectif générique : leviers universels.
+        return [
+            PlanHabitSolution(symbol: "figure.walk", text: "Bouge chaque jour",
+                              note: "20 min de marche, c'est déjà beaucoup"),
+            PlanHabitSolution(symbol: "bed.double.fill", text: "Un sommeil régulier",
+                              note: "Couche-toi à heure fixe pour mieux récupérer")
+        ]
     }
 
     // MARK: - Solutions « Par les compléments »
