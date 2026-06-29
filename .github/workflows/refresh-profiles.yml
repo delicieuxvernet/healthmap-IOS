@@ -1,0 +1,51 @@
+name: Refresh provisioning profiles (after a capability change)
+
+# À lancer manuellement APRÈS avoir coché une nouvelle capability sur l'App ID
+# fr.healthmap.app dans le portail Apple Developer (ex. HealthKit). Régénère le
+# provisioning profile App Store via match (force) pour qu'il intègre la
+# capability, puis le build TestFlight (match readonly) reprend le profil à jour.
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh-profiles:
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      FASTLANE_TEAM_ID: ${{ secrets.FASTLANE_TEAM_ID }}
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_CHANGELOG: "1"
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH for match (certs repo)
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_SSH_PRIVATE_KEY }}
+
+      - name: Trust github.com host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Set up Ruby (fastlane)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: false
+
+      - name: Install fastlane
+        run: gem install fastlane:2.235.0 multi_json --no-document
+
+      - name: Regenerate App Store provisioning profile (match force)
+        run: fastlane ios refresh_profiles

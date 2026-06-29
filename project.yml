@@ -90,6 +90,7 @@ targets:
         aps-environment: production
         com.apple.developer.associated-domains:
           - applinks:healthmap.fr
+        com.apple.developer.healthkit: true
     dependencies:
       - package: Supabase
         product: Supabase

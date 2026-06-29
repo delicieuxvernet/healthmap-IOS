@@ -136,6 +136,34 @@ platform :ios do
       skip_waiting_for_build_processing: true
     )
   end
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # refresh_profiles — régénère le provisioning profile App Store EN ÉCRITURE
+  # (force: true) pour qu'il intègre une capability fraîchement cochée sur
+  # l'App ID (ex. HealthKit). À lancer UNE FOIS après avoir activé la capability
+  # dans le portail Apple Developer ; ensuite la lane `beta` (match readonly)
+  # télécharge le profil à jour. `force` ne régénère QUE le profil — le
+  # certificat de distribution existant est réutilisé, jamais révoqué.
+  # ───────────────────────────────────────────────────────────────────────────
+  lane :refresh_profiles do
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_API_KEY_BASE64"),
+      is_key_content_base64: true,
+      in_house: false
+    )
+
+    match(
+      type: "appstore",
+      app_identifier: APP_ID,
+      git_url: ENV.fetch("MATCH_GIT_URL"),
+      storage_mode: "git",
+      readonly: false,
+      force: true,
+      api_key: api_key
+    )
+  end
 end
 
 # VERIFY ON FIRST RUN (could not be fully confirmed from docs — training data
