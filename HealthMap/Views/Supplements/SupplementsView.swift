@@ -17,7 +17,8 @@ struct SupplementsView: View {
 
     // États locaux du design final
     @State private var premium = true
-    @State private var taken: Set<String> = []
+    /// Choix par complément : panier (complément) ou couverture par l'assiette.
+    @State private var choices: [String: SupplementChoice] = [:]
     @State private var whyRec: SupplementRecommendation?
     @State private var interRec: SupplementRecommendation?
 
@@ -49,7 +50,7 @@ struct SupplementsView: View {
 
     // Compléments cochés (dans l'ordre de la liste recommandée)
     private var takenRecs: [SupplementRecommendation] {
-        engineResult?.topRecommendations.filter { taken.contains($0.id) } ?? []
+        engineResult?.topRecommendations.filter { choices[$0.id] == .complement } ?? []
     }
 
     private var cartTotal: Double {
@@ -133,11 +134,12 @@ struct SupplementsView: View {
                                 rec: rec,
                                 premium: premium,
                                 interCount: interactionCount(for: rec, warnings: result.warnings),
-                                isTaken: taken.contains(rec.id),
+                                choice: choices[rec.id] ?? .none,
                                 onCapsule: { openWhy(rec) },
                                 onInteractions: { openInter(rec) },
-                                onTake: { toggleTake(rec) },
-                                onFood: { goToPlan() }
+                                onComplement: { chooseComplement(rec) },
+                                onAssiette: { chooseAssiette(rec) },
+                                onSeeFoodPlan: { goToPlan() }
                             )
                         }
                     }
@@ -172,17 +174,26 @@ struct SupplementsView: View {
         interRec = rec
     }
 
-    private func toggleTake(_ rec: SupplementRecommendation) {
+    /// « Je le prends » : (dé)sélectionne le mode complément (panier).
+    private func chooseComplement(_ rec: SupplementRecommendation) {
         HapticService.shared.selection()
         withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
-            if taken.contains(rec.id) { taken.remove(rec.id) }
-            else { taken.insert(rec.id) }
+            choices[rec.id] = (choices[rec.id] == .complement) ? SupplementChoice.none : .complement
         }
     }
 
+    /// « Par l'assiette » : (dé)sélectionne le mode assiette (affiche le CTA Plan).
+    private func chooseAssiette(_ rec: SupplementRecommendation) {
+        HapticService.shared.selection()
+        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
+            choices[rec.id] = (choices[rec.id] == .assiette) ? SupplementChoice.none : .assiette
+        }
+    }
+
+    /// Depuis la fiche « Pourquoi pour toi » → ajoute au panier (mode complément).
     private func addToCart(_ rec: SupplementRecommendation) {
         withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
-            taken.insert(rec.id)
+            choices[rec.id] = .complement
         }
     }
 

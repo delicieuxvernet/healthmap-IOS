@@ -247,16 +247,30 @@ struct RecolteCard: View {
     @State private var showDetail = false
 
     private var ladder: [Fluent3D.HarvestRung] { Fluent3D.harvestLadder }
+    /// Nombre de fruits déjà obtenus (série ≥ palier).
     private var unlockedCount: Int { ladder.filter { streak >= $0.threshold }.count }
-    private var goalIndex: Int {
-        ladder.firstIndex(where: { streak < $0.threshold }) ?? (ladder.count - 1)
-    }
-    private var goal: Fluent3D.HarvestRung { ladder[goalIndex] }
+    /// Index du fruit ACTUEL (le dernier obtenu) — nil si aucun encore.
+    private var currentIndex: Int? { unlockedCount > 0 ? unlockedCount - 1 : nil }
+    /// Index du prochain fruit à débloquer — nil si récolte complète.
+    private var nextIndex: Int? { ladder.firstIndex { streak < $0.threshold } }
+    /// Fruit affiché en grand au centre : l'actuel, sinon le prochain (série 0).
+    private var centerIndex: Int { currentIndex ?? (nextIndex ?? ladder.count - 1) }
+    private var centerRung: Fluent3D.HarvestRung { ladder[centerIndex] }
+    private var nextRung: Fluent3D.HarvestRung? { nextIndex.map { ladder[$0] } }
+    private var daysLeft: Int { nextRung.map { max(0, $0.threshold - streak) } ?? 0 }
+    private var complete: Bool { nextIndex == nil }
+    /// Progression entre le palier actuel et le suivant.
     private var progress: Double {
-        goal.threshold > 0 ? min(1, Double(streak) / Double(goal.threshold)) : 1
+        guard let n = nextRung else { return 1 }
+        let base = currentIndex.map { ladder[$0].threshold } ?? 0
+        let span = max(1, n.threshold - base)
+        return min(1, max(0, Double(streak - base) / Double(span)))
     }
-    private var daysLeft: Int { max(0, goal.threshold - streak) }
-    private var complete: Bool { unlockedCount >= ladder.count }
+    private func isEarned(_ idx: Int) -> Bool { streak >= ladder[idx].threshold }
+    /// Article du fruit pour la phrase (« la myrtille » / « le citron »).
+    private func article(_ name: String) -> String {
+        ["Citron", "Kiwi"].contains(name) ? "le " : "la "
+    }
 
     var body: some View {
         VStack(spacing: 4) {
@@ -272,18 +286,22 @@ struct RecolteCard: View {
 
             HStack(spacing: 0) {
                 ForEach(Array(ladder.enumerated()), id: \.element.id) { idx, rung in
-                    let dist = abs(idx - goalIndex)
-                    let isGoal = idx == goalIndex
-                    Fluent3DIcon(name: rung.asset, size: isGoal ? 84 : (dist == 1 ? 58 : 46))
-                        .opacity(isGoal ? 1 : (dist == 1 ? 0.7 : 0.4))
-                        .offset(y: isGoal && floaty ? -4 : 0)
-                        .zIndex(isGoal ? 2 : (dist == 1 ? 1 : 0))
+                    let dist = abs(idx - centerIndex)
+                    let isCenter = idx == centerIndex
+                    let earned = isEarned(idx)
+                    Fluent3DIcon(name: rung.asset, size: isCenter ? 84 : (dist == 1 ? 58 : 46))
+                        // Obtenus = nets ; pas encore obtenus = grisés/estompés.
+                        .grayscale(earned ? 0 : 1)
+                        .opacity(earned ? (isCenter ? 1 : (dist == 1 ? 0.85 : 0.6)) : 0.32)
+                        .offset(y: isCenter && floaty ? -4 : 0)
+                        .zIndex(isCenter ? 2 : (dist == 1 ? 1 : 0))
                         .frame(maxWidth: .infinity)
                 }
             }
             .frame(height: 104)
 
-            Text(goal.name)
+            // Nom du fruit ACTUEL (celui qu'on a), pas du prochain.
+            Text(centerRung.name)
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Color.kiwiCharcoal)
 
@@ -291,13 +309,14 @@ struct RecolteCard: View {
                 Text("Récolte complète. Bravo !")
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(Color.healthMapSecondary)
-            } else {
+            } else if let n = nextRung {
                 HStack(spacing: 0) {
                     Text("Plus que ").foregroundStyle(Color.healthMapSecondary)
                     Text("\(daysLeft) jour\(daysLeft > 1 ? "s" : "")")
                         .foregroundStyle(Color.kiwiGreenInk)
                         .fontWeight(.bold)
-                    Text(" pour le débloquer").foregroundStyle(Color.healthMapSecondary)
+                    Text(" pour débloquer \(article(n.name))\(n.name.lowercased())")
+                        .foregroundStyle(Color.healthMapSecondary)
                 }
                 .font(.system(size: 11.5, weight: .medium))
             }
@@ -326,8 +345,8 @@ struct RecolteCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(complete
-            ? "Ta récolte est complète."
-            : "Ta récolte : \(unlockedCount) sur \(ladder.count). Plus que \(daysLeft) jours pour débloquer \(goal.name).")
+            ? "Ta récolte est complète, \(ladder.count) fruits obtenus."
+            : "Ta récolte : \(unlockedCount) sur \(ladder.count). Tu as débloqué \(centerRung.name). Plus que \(daysLeft) jours pour le prochain fruit.")
         .accessibilityHint("Touche pour voir le détail de ta récolte.")
     }
 }

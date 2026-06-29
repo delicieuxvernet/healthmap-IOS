@@ -149,8 +149,19 @@ struct RecommendationsContentView: View {
     /// des nutriments à renforcer associés + du catalogue de sources d'aliments.
     private var topics: [PlanTopic] {
         var result: [PlanTopic] = []
+        // Pool d'apports à DISTRIBUER de façon distincte entre les cartes :
+        // chaque carte consomme SES propres apports, plus aucun fond commun
+        // partagé (corrige le doublon de solutions d'une carte à l'autre).
+        var pool = vm.topDeficiencies
 
-        // SYMPTÔMES — un bloc par symptôme analysé.
+        func focus(matching text: String) -> [EnrichedNutrient] {
+            let matched = nutrientsMentioned(in: text).filter { e in pool.contains { $0.id == e.id } }
+            let picked = matched.isEmpty ? Array(pool.prefix(2)) : Array(matched.prefix(2))
+            for n in picked { pool.removeAll { $0.id == n.id } }
+            return picked
+        }
+
+        // SYMPTÔMES — titre = le symptôme (ex. « Ongles cassants »).
         for s in vm.symptomesAnalyse.prefix(3) {
             guard let name = s.symptome, !name.isEmpty else { continue }
             result.append(makeTopic(
@@ -158,51 +169,32 @@ struct RecommendationsContentView: View {
                 kind: .symptome,
                 name: prettify(name),
                 intro: symptomeIntro(s),
-                relatedNutrients: nutrientsMentioned(in: (s.causesProbables ?? []).joined(separator: " "))
+                focus: focus(matching: (s.causesProbables ?? []).joined(separator: " "))
             ))
         }
 
-        // OBJECTIFS — priorityActions en premier (libellé d'action = objectif
-        // concret), sinon les objectifs déclarés.
-        if !vm.priorityActions.isEmpty {
-            for pa in vm.priorityActions.prefix(3) {
-                guard let action = pa.action, !action.isEmpty else { continue }
-                result.append(makeTopic(
-                    id: "pa_\(pa.rank ?? 0)",
-                    kind: .objectif,
-                    name: prettify(action),
-                    intro: objectifIntro(impact: pa.expectedImpact),
-                    relatedNutrients: nutrientsMentioned(in: action)
-                ))
-            }
-        } else {
-            for o in vm.objectifsAnalyse.prefix(3) {
-                guard let name = o.objectif, !name.isEmpty else { continue }
-                let levierText = (o.leviers ?? []).first
-                result.append(makeTopic(
-                    id: "obj_\(name)",
-                    kind: .objectif,
-                    name: prettify(name),
-                    intro: levierText.map { "Ton levier principal\u{202F}: \($0)." }
-                        ?? "Voici comment t'en rapprocher au quotidien.",
-                    relatedNutrients: nutrientsMentioned(in: ((o.leviers ?? []) + (o.freins ?? [])).joined(separator: " "))
-                ))
-            }
+        // OBJECTIFS — titre = le NOM de l'objectif (ex. « Plus d'énergie »),
+        // jamais une phrase d'action longue. L'explication passe en intro.
+        for o in vm.objectifsAnalyse.prefix(3) {
+            guard let name = o.objectif, !name.isEmpty else { continue }
+            let levierText = (o.leviers ?? []).first
+            result.append(makeTopic(
+                id: "obj_\(name)",
+                kind: .objectif,
+                name: prettify(name),
+                intro: levierText.map { "Ton levier principal\u{202F}: \($0)." }
+                    ?? "Voici comment t'en rapprocher au quotidien.",
+                focus: focus(matching: ((o.leviers ?? []) + (o.freins ?? [])).joined(separator: " "))
+            ))
         }
 
         return result
     }
 
-    /// Assemble un PlanTopic complet à partir des nutriments à renforcer
-    /// rattachés (nutrition + compléments) et d'un rituel/d'habitudes dérivés.
-    private func makeTopic(id: String, kind: PlanTopic.Kind, name: String, intro: String, relatedNutrients: [EnrichedNutrient]) -> PlanTopic {
-        // Nutriments à mettre en avant : ceux mentionnés, sinon le top des
-        // apports à renforcer (couleur = sens).
-        let focus = relatedNutrients.isEmpty
-            ? Array(vm.topDeficiencies.prefix(2))
-            : Array(relatedNutrients.prefix(2))
-
-        return PlanTopic(
+    /// Assemble un PlanTopic à partir des apports DÉJÀ attribués à cette carte
+    /// (distincts des autres cartes — voir `topics`).
+    private func makeTopic(id: String, kind: PlanTopic.Kind, name: String, intro: String, focus: [EnrichedNutrient]) -> PlanTopic {
+        PlanTopic(
             id: id,
             kind: kind,
             name: name,
