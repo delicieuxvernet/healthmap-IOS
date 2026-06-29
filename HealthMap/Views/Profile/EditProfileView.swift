@@ -24,6 +24,16 @@ struct EditProfileView: View {
     @State private var saveError: String?
     @State private var expandedSection: EditSection?
 
+    // MARK: - Liaison Apple Santé (HealthKit, lecture seule)
+    /// L'utilisateur a-t-il lié Apple Santé ? HealthKit ne révèle pas le statut
+    /// d'autorisation de lecture, on porte donc l'intention nous-mêmes.
+    @AppStorage("healthkit_linked") private var healthLinked = false
+    @State private var healthSyncing = false
+    @State private var healthSnapshot: HealthKitService.HealthSnapshot?
+    @State private var showHealthManage = false
+    /// Message contextuel sous la carte (ex. « aucune donnée trouvée »).
+    @State private var healthNote: String?
+
     enum EditSection: String, CaseIterable, Identifiable {
         case profil = "Profil"
         case modeDeVie = "Mode de vie"
@@ -72,12 +82,21 @@ struct EditProfileView: View {
 
             ScrollView {
                 VStack(spacing: Theme.spacingSM) {
+                    if HealthKitService.shared.isAvailable {
+                        appleHealthCard
+                    }
                     ForEach(EditSection.allCases) { section in
                         sectionCard(section)
                     }
                 }
                 .padding(.vertical, Theme.spacingMD)
                 .padding(.bottom, hasUnsavedChanges ? 100 : 20)
+            }
+            .task {
+                // Si déjà lié, on rafraîchit silencieusement les valeurs à l'ouverture.
+                if healthLinked, healthSnapshot == nil {
+                    healthSnapshot = await HealthKitService.shared.importSnapshot()
+                }
             }
 
             // Sticky save button — visible uniquement si modifications
@@ -117,6 +136,185 @@ struct EditProfileView: View {
         } message: {
             Text(saveError ?? "")
         }
+    }
+
+    // MARK: - Carte Apple Santé (liaison HealthKit)
+    private var appleHealthCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: Theme.spacingSM) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(hex: "FF2D55"))
+                    .frame(width: 36, height: 36)
+                    .background(Color(hex: "FF2D55").opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Apple Santé")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.healthMapText)
+                    if healthLinked {
+                        HStack(spacing: 5) {
+                            Image(systemName: "checkmark.circle.fill").font(.system(size: 11))
+                            Text("Connecté · synchronisé")
+                        }
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.kiwiGreen)
+                    } else {
+                        Text("Importe ton activité, ton poids et ton sommeil.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                Spacer()
+
+                if healthLinked {
+                    Button("Gérer") { showHealthManage = true }
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .buttonStyle(.healthMapPressed)
+                }
+            }
+            .padding(Theme.spacingMD)
+
+            if healthLinked {
+                Divider().padding(.horizontal, Theme.spacingMD)
+                VStack(spacing: 0) {
+                    healthRow(icon: "figure.walk", label: "Activité", value: stepsDisplay(healthSnapshot))
+                    Divider().padding(.horizontal, Theme.spacingMD)
+                    healthRow(icon: "scalemass", label: "Poids", value: weightDisplay(healthSnapshot))
+                    Divider().padding(.horizontal, Theme.spacingMD)
+                    healthRow(icon: "moon.fill", label: "Sommeil", value: sleepDisplay(healthSnapshot))
+                }
+            } else {
+                Button { connectHealth() } label: {
+                    HStack(spacing: 8) {
+                        if healthSyncing {
+                            ProgressView().tint(.white).controlSize(.small)
+                        } else {
+                            Image(systemName: "link").font(.system(size: 15))
+                        }
+                        Text(healthSyncing ? "Connexion..." : "Connecter Apple Santé")
+                    }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.kiwiGreen))
+                }
+                .buttonStyle(.healthMapPressed)
+                .disabled(healthSyncing)
+                .padding(.horizontal, Theme.spacingMD)
+                .padding(.bottom, Theme.spacingMD)
+            }
+
+            if let note = healthNote {
+                Text(note)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.healthMapMuted)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, Theme.spacingMD)
+                    .padding(.bottom, Theme.spacingMD)
+            }
+        }
+        .background(Color.healthMapCard)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+        .padding(.horizontal, Theme.spacingLG)
+        .confirmationDialog("Apple Santé", isPresented: $showHealthManage, titleVisibility: .visible) {
+            Button("Délier Apple Santé", role: .destructive) { disconnectHealth() }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Pour gérer les données partagées, ouvre Réglages > Santé > Données et accès.")
+        }
+    }
+
+    private func healthRow(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: Theme.spacingSM) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(Color.healthMapBlue)
+                .frame(width: 28, height: 28)
+                .background(Color.healthMapBlue.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            Text(label)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color.healthMapText)
+            Spacer()
+            Text(value)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.healthMapText)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, Theme.spacingMD)
+        .padding(.vertical, 12)
+    }
+
+    // MARK: - Liaison Apple Santé — actions
+
+    private func connectHealth() {
+        guard !healthSyncing else { return }
+        healthSyncing = true
+        healthNote = nil
+        HapticService.shared.primary()
+        Task {
+            let granted = await HealthKitService.shared.requestAuthorization()
+            guard granted else {
+                healthSyncing = false
+                healthNote = "Autorisation refusée. Tu peux l'activer dans Réglages > Santé."
+                HapticService.shared.error()
+                return
+            }
+            let snap = await HealthKitService.shared.importSnapshot()
+            healthSnapshot = snap
+            healthLinked = true
+            applyHealthSnapshot(snap)
+            healthSyncing = false
+            if snap.isEmpty {
+                healthNote = "Connecté, mais aucune donnée partagée pour l'instant."
+                HapticService.shared.success()
+            } else {
+                HapticService.shared.success()
+                await save() // persiste le profil + recalcule les scores
+            }
+        }
+    }
+
+    private func disconnectHealth() {
+        healthLinked = false
+        healthSnapshot = nil
+        healthNote = nil
+        HapticService.shared.selection()
+    }
+
+    /// Écrit les valeurs importées dans les champs profil correspondants
+    /// (uniquement celles réellement présentes dans l'instantané).
+    private func applyHealthSnapshot(_ snap: HealthKitService.HealthSnapshot) {
+        var p = dashboardVM.profile
+        if let kg = snap.weightKg { p.weight = HealthKitService.weightString(forKilograms: kg) }
+        if let steps = snap.steps { p.strengthTraining = HealthKitService.activityLevel(forSteps: steps) }
+        if let hours = snap.sleepHours { p.sleepHours = HealthKitService.sleepBucket(forHours: hours) }
+        dashboardVM.profile = p
+    }
+
+    private func stepsDisplay(_ snap: HealthKitService.HealthSnapshot?) -> String {
+        guard let steps = snap?.steps else { return "—" }
+        return "\(steps) pas"
+    }
+
+    private func weightDisplay(_ snap: HealthKitService.HealthSnapshot?) -> String {
+        guard let kg = snap?.weightKg else { return "—" }
+        return HealthKitService.weightString(forKilograms: kg) + " kg"
+    }
+
+    private func sleepDisplay(_ snap: HealthKitService.HealthSnapshot?) -> String {
+        guard let hours = snap?.sleepHours else { return "—" }
+        let whole = Int(hours)
+        let mins = Int((hours - Double(whole)) * 60)
+        return "\(whole) h \(String(format: "%02d", mins))"
     }
 
     // MARK: - Section Card
