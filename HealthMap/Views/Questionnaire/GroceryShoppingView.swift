@@ -219,8 +219,11 @@ struct GroceryShoppingView: View {
                 Spacer()
             } else {
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: Theme.spacingSM) {
-                        ForEach(selectedItems) { item in quantityRow(item) }
+                    VStack(spacing: Theme.spacingLG) {
+                        precisionGauge
+                        ForEach(familiesWithSelection) { family in
+                            familySection(family)
+                        }
                     }
                     .padding(Theme.spacingLG)
                 }
@@ -250,49 +253,117 @@ struct GroceryShoppingView: View {
         }
     }
 
-    private func quantityRow(_ item: GroceryItem) -> some View {
-        let q = selections[item.id] ?? 1
-        return HStack(spacing: Theme.spacingSM) {
-            Text("\(item.emoji) \(item.name)")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.healthMapText)
-                .lineLimit(1)
-            Spacer(minLength: Theme.spacingSM)
-            HStack(spacing: 10) {
-                Button { HapticService.shared.tap(); selections[item.id] = max(1, q - 1) } label: {
-                    stepperGlyph("minus", filled: false)
-                }
-                .buttonStyle(.healthMapPressed)
-                .accessibilityLabel("Diminuer")
+    // MARK: Quantités — fourchettes par famille + jauge de précision
 
-                HStack(alignment: .firstTextBaseline, spacing: 1) {
-                    Text("\(q)").font(.system(size: 15, weight: .bold)).monospacedDigit().foregroundStyle(Color.healthMapText)
-                    Text("/sem").font(.system(size: 9)).foregroundStyle(Color.healthMapMuted)
-                }
-                .frame(width: 44)
-
-                Button { HapticService.shared.tap(); selections[item.id] = q + 1 } label: {
-                    stepperGlyph("plus", filled: true)
-                }
-                .buttonStyle(.healthMapPressed)
-                .accessibilityLabel("Augmenter")
-            }
+    /// Familles (sur 4) réellement représentées dans le caddie.
+    private var familiesWithSelection: [QuantityFamily] {
+        QuantityFamily.all.filter { family in
+            selectedItems.contains { QuantityFamily.family(forItemId: $0.id).id == family.id }
         }
-        .padding(.horizontal, Theme.spacingMD)
-        .padding(.vertical, 9)
-        .background(Color.healthMapCard)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityValue("\(q) par semaine")
     }
 
-    private func stepperGlyph(_ name: String, filled: Bool) -> some View {
-        Image(systemName: name)
-            .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(filled ? .white : Color.healthMapSecondary)
-            .frame(width: 28, height: 28)
-            .background(filled ? Color.healthMapBlue : Color.healthMapMuted.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    /// Aliments cochés appartenant à une famille donnée.
+    private func items(in family: QuantityFamily) -> [GroceryItem] {
+        selectedItems.filter { QuantityFamily.family(forItemId: $0.id).id == family.id }
+    }
+
+    /// Jauge « précision du bilan » : nombre de familles couvertes / 4. Plus
+    /// l'utilisateur diversifie son caddie, plus le bilan est complet — un signal
+    /// concret de la valeur qu'il en retire.
+    private var precisionGauge: some View {
+        let covered = familiesWithSelection.count
+        let total = QuantityFamily.all.count
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Précision de ton bilan")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Color.healthMapSecondary)
+                Spacer()
+                Text("\(covered)/\(total) familles")
+                    .font(Theme.captionBoldFont)
+                    .monospacedDigit()
+                    .foregroundStyle(Color.healthMapBlue)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.healthMapMuted.opacity(0.12))
+                    Capsule().fill(LinearGradient.healthMapBrand)
+                        .frame(width: max(geo.size.width * CGFloat(covered) / CGFloat(total), 6))
+                        .animation(reduceMotion ? .none : .healthMapSpring, value: covered)
+                }
+            }
+            .frame(height: 6)
+            if covered < total {
+                Text("Complète les \(total) familles pour un bilan plus précis.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.healthMapMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(Theme.spacingMD)
+        .background(Color.healthMapCard)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Précision du bilan : \(covered) familles sur \(total)")
+    }
+
+    /// Section d'une famille : en-tête + une ligne de fourchettes par aliment.
+    private func familySection(_ family: QuantityFamily) -> some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            HStack(spacing: 6) {
+                Text(family.emoji).font(.system(size: 15))
+                Text(family.label)
+                    .font(Theme.captionBoldFont)
+                    .foregroundStyle(Color.healthMapSecondary)
+            }
+            .accessibilityAddTraits(.isHeader)
+            ForEach(items(in: family)) { item in bracketRow(item) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Une ligne aliment : nom + 4 boutons-fourchettes (un seul tap, bien lisibles).
+    private func bracketRow(_ item: GroceryItem) -> some View {
+        let current = QuantityBracket.from(portions: selections[item.id] ?? 1)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("\(item.emoji) \(item.name)")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.healthMapText)
+                .lineLimit(1)
+            HStack(spacing: 8) {
+                ForEach(QuantityBracket.allCases) { bracket in
+                    bracketButton(item: item, bracket: bracket, selected: bracket == current)
+                }
+            }
+        }
+        .padding(Theme.spacingMD)
+        .background(Color.healthMapCard)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+    }
+
+    private func bracketButton(item: GroceryItem, bracket: QuantityBracket, selected: Bool) -> some View {
+        Button {
+            HapticService.shared.selection()
+            selections[item.id] = bracket.medianPortionsPerWeek
+        } label: {
+            Text(bracket.label)
+                .font(.system(size: 15, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(selected ? .white : Color.healthMapText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(selected ? Color.healthMapBlue : Color.healthMapBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(selected ? Color.clear : Color.healthMapMuted.opacity(0.35), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel("\(item.name), \(bracket.label) fois par semaine")
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: Navigation interne
