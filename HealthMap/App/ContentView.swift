@@ -795,6 +795,21 @@ struct ProfileView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Color.healthMapSecondary)
                 }
+
+                // Numero de version + build, visible en bas du profil. Permet de
+                // verifier d'un coup d'oeil QUEL build TestFlight tourne reellement
+                // sur l'appareil (le build number = github.run_number du workflow).
+                Section {
+                    HStack {
+                        Spacer()
+                        Text("Kiwio v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .textSelection(.enabled)
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                }
             }
             // Ruban de fond aussi sur le Profil (loi 2) : on masque le fond
             // système de la List puis on glisse le ruban derrière.
