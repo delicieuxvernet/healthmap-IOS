@@ -337,11 +337,23 @@ struct MainTabView: View {
         // n'est masqué) et reste au-dessus du home indicator. Fond crème pour se
         // fondre dans les écrans. Barre native masquée par onglet.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            KiwiFloatingTabBar(selected: $selectedTab)
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 2)
-                .background(Color.kiwiCream.ignoresSafeArea(edges: .bottom))
+            // La barre d'onglets flottante ne s'affiche QU'UNE FOIS le
+            // questionnaire terminé. Pendant le bilan (questionnaire en cours),
+            // elle n'a aucune cible utile — les 4 autres onglets sont verrouillés
+            // (LockedFeatureView) — et surtout elle recouvrait le bouton
+            // « Continuer / Terminer » en bas de chaque question (retour fondateur
+            // 30 juin 2026). On la masque donc tant que `hasCompletedQuestionnaire`
+            // est faux ; la place réservée tombe à zéro (spacing 0 + contenu vide),
+            // le questionnaire occupe alors tout l'écran. Une fois le bilan soumis,
+            // l'écran de résultats (AnalysisGateView) est présenté en fullScreenCover
+            // par-dessus : la barre n'apparaît donc réellement qu'avec le dashboard.
+            if dashboardVM.hasCompletedQuestionnaire {
+                KiwiFloatingTabBar(selected: $selectedTab)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 8)
+                    .padding(.bottom, 2)
+                    .background(Color.kiwiCream.ignoresSafeArea(edges: .bottom))
+            }
         }
         // Overlay de célébrations gamification (« Badge débloqué / Niveau
         // supérieur ») retiré le 28 juin 2026 : feedback jugé « cheap ».
