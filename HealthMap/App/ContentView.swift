@@ -261,6 +261,18 @@ struct MainTabView: View {
         case bilan, suivi, scanner, plan, complements
     }
 
+    /// Réserve la hauteur de la barre flottante DANS chaque onglet (8 pt de
+    /// marge haute + 64 pt de pill + 2 pt de marge basse = 74 pt). Appliqué au
+    /// contenu de chaque onglet car un inset posé sur le TabView lui-même ne
+    /// se propage pas aux pages (hébergement UIKit) — le contenu défilait sous
+    /// la barre. Rien n'est réservé pendant le questionnaire (barre masquée).
+    @ViewBuilder
+    private var tabBarInsetSpacer: some View {
+        if dashboardVM.hasCompletedQuestionnaire {
+            Color.clear.frame(height: 74)
+        }
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             // Tab 1: Bilan (Dashboard or Questionnaire)
@@ -275,6 +287,7 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarInsetSpacer }
             .tabItem { Label("Bilan", systemImage: "heart.text.clipboard") }
             .tag(Tab.bilan)
 
@@ -288,6 +301,7 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarInsetSpacer }
             .tabItem { Label("Suivi", systemImage: "checkmark.circle") }
             .tag(Tab.suivi)
 
@@ -301,6 +315,7 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarInsetSpacer }
             .tabItem { Label("Scanner", systemImage: "camera") }
             .tag(Tab.scanner)
 
@@ -314,6 +329,7 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarInsetSpacer }
             .tabItem { Label("Plan", systemImage: "list.bullet.clipboard") }
             .tag(Tab.plan)
 
@@ -328,14 +344,17 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) { tabBarInsetSpacer }
             .tabItem { Label("Compléments", systemImage: "pills") }
             .tag(Tab.complements)
         }
         .tint(Color.kiwiGreen)
-        // Tab bar flottante (langage v4) : pill blanche posée en safe-area inset
-        // bas — elle RÉSERVE sa place (le contenu s'arrête au-dessus, plus rien
-        // n'est masqué) et reste au-dessus du home indicator. Fond crème pour se
-        // fondre dans les écrans. Barre native masquée par onglet.
+        // Tab bar flottante (langage v4). ⚠️ L'inset posé sur le TabView dessine
+        // la barre mais NE se propage PAS aux écrans des onglets (TabView =
+        // conteneur UIKit : chaque onglet a sa propre safe area) — le contenu
+        // passait dessous (bug build 198). La réservation d'espace se fait donc
+        // PAR ONGLET via `tabBarInsetSpacer` ci-dessus ; ici on ne fait que
+        // dessiner la pill au-dessus du home indicator.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // La barre flottante n'apparaît qu'une fois le bilan complété.
             // Pendant le questionnaire (onglet Bilan = QuestionnaireContainerView),
