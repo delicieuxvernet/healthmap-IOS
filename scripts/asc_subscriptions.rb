@@ -9,6 +9,7 @@
 #                autres territoires égalisés par Apple), crée localisation fr-FR et
 #                disponibilité manquantes, essai gratuit 7 j — puis relit l'état.
 
+require "digest"
 require "jwt"
 require "json"
 require "net/http"
@@ -124,12 +125,45 @@ def sub_snapshot(sub_id)
   snap[:introOffers] = offers.map { |o| o["attributes"].slice("duration", "offerMode", "numberOfPeriods") }.uniq
   snap[:introOfferTerritoriesCount] = offers.size
 
-  # assetDeliveryState est le point clé : un screenshot réservé mais jamais
-  # committé (AWAITING_UPLOAD) compte comme métadonnée manquante.
+  # HTTP 200 avec data:null = pas de screenshot ; un screenshot réservé mais
+  # jamais committé (AWAITING_UPLOAD) compte aussi comme métadonnée manquante.
   code, shot = req(:get, "/v1/subscriptions/#{sub_id}/appStoreReviewScreenshot")
-  snap[:reviewScreenshot] = code == 200 ? shot["data"]["attributes"] : "absent (HTTP #{code})"
-  snap[:rawAttributes] = a
+  snap[:reviewScreenshot] =
+    if code == 200 && shot["data"]
+      { id: shot["data"]["id"] }.merge(shot["data"]["attributes"] || {})
+    else
+      "absent (HTTP #{code})"
+    end
   snap
+end
+
+def upload_review_screenshot(sub_id, png_path)
+  bytes = File.binread(png_path)
+  ok, resp = write("réservation screenshot (#{bytes.bytesize} o)", :post, "/v1/subscriptionAppStoreReviewScreenshots",
+    { data: { type: "subscriptionAppStoreReviewScreenshots",
+              attributes: { fileName: File.basename(png_path), fileSize: bytes.bytesize },
+              relationships: { subscription: { data: { type: "subscriptions", id: sub_id } } } } })
+  return false unless ok
+
+  shot_id = resp["data"]["id"]
+  (resp["data"]["attributes"]["uploadOperations"] || []).each do |op|
+    uri = URI(op["url"])
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    put = Net::HTTP::Put.new(uri)
+    (op["requestHeaders"] || []).each { |h| put[h["name"]] = h["value"] }
+    put.body = bytes[op["offset"], op["length"]]
+    res = http.request(put)
+    unless (200..299).cover?(res.code.to_i)
+      puts "  ÉCHEC upload chunk -> HTTP #{res.code} #{res.body.to_s[0, 300]}"
+      return false
+    end
+  end
+
+  ok, = write("commit screenshot", :patch, "/v1/subscriptionAppStoreReviewScreenshots/#{shot_id}",
+    { data: { type: "subscriptionAppStoreReviewScreenshots", id: shot_id,
+              attributes: { uploaded: true, sourceFileChecksum: Digest::MD5.hexdigest(bytes) } } })
+  ok
 end
 
 def find_price_point(sub_id, price)
@@ -286,6 +320,36 @@ TARGETS.each do |product_id, spec|
       puts "  essai 7 j par territoire : #{ok_n}/#{territories.size} OK"
       failures << "#{product_id}: essai 7 j" if ok_n == 0
     end
+  end
+
+  # Screenshot review : requis pour sortir de MISSING_METADATA
+  shot = snap[:reviewScreenshot]
+  needs_upload =
+    if shot.is_a?(String)
+      true # absent
+    elsif shot.dig("assetDeliveryState", "state") == "COMPLETE"
+      false
+    else
+      # réservation jamais finalisée (AWAITING_UPLOAD / FAILED) : suppression puis ré-upload
+      uri = URI(BASE + "/v1/subscriptionAppStoreReviewScreenshots/#{shot[:id]}")
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      del = Net::HTTP::Delete.new(uri)
+      del["Authorization"] = "Bearer #{token}"
+      res = http.request(del)
+      puts "  suppression screenshot non finalisé -> HTTP #{res.code}"
+      true
+    end
+  if needs_upload
+    png = ENV["REVIEW_SCREENSHOT_PATH"]
+    if png && File.exist?(png)
+      failures << "#{product_id}: screenshot review" unless upload_review_screenshot(sub_id, png)
+    else
+      puts "  screenshot review manquant et REVIEW_SCREENSHOT_PATH non fourni"
+      failures << "#{product_id}: screenshot review (aucun PNG)"
+    end
+  else
+    puts "  OK  screenshot review déjà complet"
   end
 end
 

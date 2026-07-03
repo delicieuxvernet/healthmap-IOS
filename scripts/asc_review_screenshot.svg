@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1284 2778" width="1284" height="2778">
+  <!-- Screenshot review App Store (visible uniquement par l'équipe App Review) :
+       représentation du paywall Kiwio Premium — prix et essai conformes à la config ASC. -->
+  <rect width="1284" height="2778" fill="#FAF7F0"/>
+
+  <!-- Logo -->
+  <circle cx="642" cy="420" r="130" fill="#5DA838"/>
+  <circle cx="642" cy="420" r="96" fill="#8FC23C"/>
+  <circle cx="642" cy="420" r="34" fill="#FAF7F0"/>
+  <text x="642" y="660" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="88" font-weight="700" fill="#211F1A">Kiwio Premium</text>
+  <text x="642" y="750" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="46" fill="#5DA838" font-weight="700">7 jours d'essai gratuit</text>
+
+  <!-- Avantages -->
+  <g font-family="Helvetica, Arial, sans-serif" font-size="44" fill="#211F1A">
+    <text x="240" y="960">Scans repas illimités</text>
+    <text x="240" y="1080">Vitamines et minéraux complets</text>
+    <text x="240" y="1200">Historique et tendances du journal</text>
+    <text x="240" y="1320">Timing et interactions des compléments</text>
+    <text x="240" y="1440">Export PDF de vos analyses</text>
+  </g>
+  <g fill="#5DA838" font-family="Helvetica, Arial, sans-serif" font-size="44" font-weight="700">
+    <text x="160" y="960">✓</text>
+    <text x="160" y="1080">✓</text>
+    <text x="160" y="1200">✓</text>
+    <text x="160" y="1320">✓</text>
+    <text x="160" y="1440">✓</text>
+  </g>
+
+  <!-- Carte Annuel -->
+  <rect x="120" y="1600" width="1044" height="280" rx="40" fill="#FFFFFF" stroke="#5DA838" stroke-width="6"/>
+  <rect x="820" y="1570" width="290" height="70" rx="35" fill="#5DA838"/>
+  <text x="965" y="1618" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="38" font-weight="700" fill="#FFFFFF">-30 %</text>
+  <text x="180" y="1720" font-family="Helvetica, Arial, sans-serif" font-size="50" font-weight="700" fill="#211F1A">Annuel</text>
+  <text x="180" y="1810" font-family="Helvetica, Arial, sans-serif" font-size="44" fill="#211F1A">24,99 € / an</text>
+
+  <!-- Carte Mensuel -->
+  <rect x="120" y="1960" width="1044" height="280" rx="40" fill="#FFFFFF" stroke="#E7ECE6" stroke-width="4"/>
+  <text x="180" y="2080" font-family="Helvetica, Arial, sans-serif" font-size="50" font-weight="700" fill="#211F1A">Mensuel</text>
+  <text x="180" y="2170" font-family="Helvetica, Arial, sans-serif" font-size="44" fill="#211F1A">2,99 € / mois</text>
+
+  <!-- CTA -->
+  <rect x="120" y="2360" width="1044" height="150" rx="75" fill="#5DA838"/>
+  <text x="642" y="2455" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="52" font-weight="700" fill="#FFFFFF">Commencer l'essai gratuit</text>
+
+  <text x="642" y="2610" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="32" fill="#8A8A82">Renouvellement automatique. Annulable à tout moment.</text>
+</svg>

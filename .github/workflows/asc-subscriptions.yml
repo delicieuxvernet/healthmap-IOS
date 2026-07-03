@@ -33,10 +33,20 @@ jobs:
       - name: Install jwt gem
         run: sudo gem install jwt --no-document
 
+      # Screenshot review (visible uniquement par App Review) : requis pour
+      # sortir de l'état MISSING_METADATA, rendu depuis le SVG du repo.
+      - name: Render review screenshot
+        if: inputs.mode == 'apply'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq librsvg2-bin
+          rsvg-convert -w 1284 -h 2778 scripts/asc_review_screenshot.svg -o "$RUNNER_TEMP/kiwio-paywall-review.png"
+          ls -la "$RUNNER_TEMP/kiwio-paywall-review.png"
+
       - name: Run (${{ inputs.mode }})
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_PATH: ${{ runner.temp }}/asc_key.p8
+          REVIEW_SCREENSHOT_PATH: ${{ runner.temp }}/kiwio-paywall-review.png
           MODE: ${{ inputs.mode }}
         run: ruby scripts/asc_subscriptions.rb
