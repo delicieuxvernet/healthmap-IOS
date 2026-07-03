@@ -50,13 +50,19 @@ struct SafeFluent3DIcon: View {
 }
 
 // MARK: - En-tête : « Bonjour {prénom} » + date + besoins nourris + petit anneau
+// Refonte 3 juillet 2026 (maquette « Option B » validée) : le score figé du
+// questionnaire disparaît — l'anneau affiche le SCORE DE LA SEMAINE, calculé
+// sur les repas scannés (WeekScoreEngine), avec les 7 barres des jours et une
+// phrase d'insight (vert = progression, ambre = recul, neutre = pas de donnée).
 struct BilanGreetingHeader: View {
     let firstName: String
-    let besoinsNourris: Int?
-    let score: Int
+    let week: WeekScoreEngine.WeekScore
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animated: CGFloat = 0
+
+    private static let amberInk = Color(hex: "D9820A")
+    private static let dayLetters = ["L", "M", "M", "J", "V", "S", "D"]
 
     private var dateLabel: String {
         let f = DateFormatter()
@@ -66,51 +72,162 @@ struct BilanGreetingHeader: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(firstName.isEmpty ? "Bonjour" : "Bonjour \(firstName)")
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                subtitle
-                    .lineLimit(2)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(firstName.isEmpty ? "Bonjour" : "Bonjour \(firstName)")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    subtitle
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 8)
+                ring
             }
-            Spacer(minLength: 8)
-            ring
+            dayBars
+            insightCard
         }
-        .onAppear { animateRing(to: score) }
-        .onChange(of: score) { _, newValue in animateRing(to: newValue) }
+        .onAppear { animateRing(to: week.score ?? 0) }
+        .onChange(of: week.score) { _, newValue in animateRing(to: newValue ?? 0) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
 
-    private var accessibilityText: String {
-        var parts = [firstName.isEmpty ? "Bonjour" : "Bonjour \(firstName)", dateLabel]
-        if let n = besoinsNourris, n > 0 {
-            parts.append("\(n) besoin\(n > 1 ? "s" : "") déjà nourri\(n > 1 ? "s" : "")")
-        }
-        parts.append("Score \(score) sur 100")
-        return parts.joined(separator: ". ")
+    // MARK: - Insight (une seule phrase, couleur = sens)
+
+    private enum Mood { case up, down, flat, empty }
+
+    private var mood: Mood {
+        guard week.score != nil else { return .empty }
+        guard let delta = week.delta else { return .flat }
+        if delta >= 3 { return .up }
+        if delta <= -3 { return .down }
+        return .flat
     }
+
+    private var insightText: String {
+        switch mood {
+        case .up:
+            var t = "Ton score gagne \(week.delta ?? 0) pts vs la semaine dernière."
+            if let mover = week.topMover, mover.delta > 0,
+               let def = NutrientData.definition(for: mover.id) {
+                t += " \(def.label) en tête."
+            }
+            return t
+        case .down:
+            var t = "Ton score perd \(abs(week.delta ?? 0)) pts vs la semaine dernière."
+            if let mover = week.topMover, mover.delta < 0,
+               let def = NutrientData.definition(for: mover.id) {
+                t += " \(def.label) en recul — ton plan a des idées simples."
+            }
+            return t
+        case .flat:
+            if week.delta != nil {
+                return "Score stable vs la semaine dernière. Chaque scan affine ton suivi."
+            }
+            let n = week.mealCount
+            return "\(n) repas compté\(n > 1 ? "s" : "") cette semaine — ton score suit tes apports à renforcer."
+        case .empty:
+            return "Scanne ton premier repas pour lancer ton score de la semaine."
+        }
+    }
+
+    private var insightIcon: String {
+        switch mood {
+        case .up:    return "arrow.up.right"
+        case .down:  return "arrow.down.right"
+        case .flat:  return "equal"
+        case .empty: return "camera"
+        }
+    }
+
+    private var insightInk: Color {
+        switch mood {
+        case .up:          return .kiwiGreenInk
+        case .down:        return Self.amberInk
+        case .flat, .empty: return .healthMapSecondary
+        }
+    }
+
+    private var insightBackground: Color {
+        switch mood {
+        case .up:          return .kiwiTint
+        case .down:        return Self.amberInk.opacity(0.12)
+        case .flat, .empty: return .healthMapCard
+        }
+    }
+
+    private var insightCard: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: insightIcon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(insightInk)
+            Text(insightText)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(insightInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(insightBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    // MARK: - Barres des 7 jours (lundi → dimanche)
+
+    private var dayBars: some View {
+        VStack(spacing: 4) {
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach(Array(week.days.enumerated()), id: \.offset) { _, day in
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(barColor(day))
+                        .frame(height: barHeight(day))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 36, alignment: .bottom)
+            HStack(spacing: 6) {
+                ForEach(Array(week.days.enumerated()), id: \.offset) { index, day in
+                    Text(Self.dayLetters[index % 7])
+                        .font(.system(size: 10, weight: day.isToday ? .bold : .medium))
+                        .foregroundStyle(day.isToday ? Color.kiwiGreenInk : Color.healthMapSecondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    private func barHeight(_ day: WeekScoreEngine.DayScore) -> CGFloat {
+        guard let s = day.score, s > 0 else { return 4 }
+        return max(6, CGFloat(s) * 0.32)
+    }
+
+    private func barColor(_ day: WeekScoreEngine.DayScore) -> Color {
+        guard day.score != nil else { return Color.kiwiCharcoal.opacity(0.07) }
+        return day.isToday ? .kiwiGreen : Color.kiwiGreen.opacity(0.35)
+    }
+
+    // MARK: - Sous-titre + anneau
 
     private var subtitle: Text {
         var t = Text(dateLabel)
             .font(.system(size: 12.5, weight: .medium))
             .foregroundStyle(Color.healthMapSecondary)
-        if let n = besoinsNourris, n > 0 {
+        if week.mealCount > 0 {
             t = t + Text(" · ")
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(Color.healthMapSecondary)
-            t = t + Text("\(n) besoin\(n > 1 ? "s" : "") déjà nourri\(n > 1 ? "s" : "")")
+            t = t + Text("\(week.mealCount) repas cette semaine")
                 .font(.system(size: 12.5, weight: .bold))
                 .foregroundStyle(Color.kiwiGreenInk)
         }
         return t
     }
 
-    // Petit anneau 58 pt (maquette) : progress = score/100, vert kiwi,
-    // chiffre mono. L'anneau héros v4 (72 pt) disparaît au profit de celui-ci.
+    // Anneau 64 pt : progress = score semaine / 100, vert kiwi, chiffre mono
+    // + libellé « semaine ». Sans donnée : tiret, anneau vide.
     private var ring: some View {
         ZStack {
             Circle()
@@ -119,13 +236,33 @@ struct BilanGreetingHeader: View {
                 .trim(from: 0, to: animated)
                 .stroke(Color.kiwiGreen, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            AnimatedNumberView(
-                targetValue: score,
-                font: .system(size: 17, weight: .bold, design: .monospaced),
-                color: .kiwiCharcoal
-            )
+            VStack(spacing: 0) {
+                if let score = week.score {
+                    AnimatedNumberView(
+                        targetValue: score,
+                        font: .system(size: 16, weight: .bold, design: .monospaced),
+                        color: .kiwiCharcoal
+                    )
+                } else {
+                    Text("—")
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Color.healthMapSecondary)
+                }
+                Text("semaine")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(Color.healthMapSecondary)
+            }
         }
-        .frame(width: 58, height: 58)
+        .frame(width: 64, height: 64)
+    }
+
+    private var accessibilityText: String {
+        var parts = [firstName.isEmpty ? "Bonjour" : "Bonjour \(firstName)", dateLabel]
+        if let score = week.score {
+            parts.append("Score de la semaine \(score) sur 100")
+        }
+        parts.append(insightText)
+        return parts.joined(separator: ". ")
     }
 
     private func animateRing(to value: Int) {

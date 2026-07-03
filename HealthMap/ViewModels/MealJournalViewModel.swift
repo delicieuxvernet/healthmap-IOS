@@ -6,6 +6,10 @@ import Foundation
 @MainActor
 final class MealJournalViewModel: ObservableObject {
     @Published var meals: [MealJournalService.MealRecord] = []
+    /// 14 derniers jours (semaine courante + précédente) — nourrit le score
+    /// de la semaine du Bilan (WeekScoreEngine). `meals` en reste le sous-
+    /// ensemble « aujourd'hui », dérivé de la même requête.
+    @Published var fortnight: [MealJournalService.MealRecord] = []
     @Published var isLoading = false
 
     private let service = MealJournalService.shared
@@ -15,11 +19,16 @@ final class MealJournalViewModel: ObservableObject {
     func load() async {
         guard let userId = AuthService.shared.cachedCurrentUserIdString else {
             meals = []
+            fortnight = []
             return
         }
         isLoading = true
         do {
-            meals = try await service.loadDay(userId: userId)
+            let week = WeekScoreEngine.currentWeekInterval(containing: Date())
+            let from = Calendar.current.date(byAdding: .day, value: -7, to: week.start) ?? week.start
+            let all = try await service.loadRange(userId: userId, from: from, to: week.end)
+            fortnight = all
+            meals = all.filter { Calendar.current.isDateInToday($0.consumedAt) }
         } catch {
             AppLogger.database.warning("Journal load failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -43,6 +52,7 @@ final class MealJournalViewModel: ObservableObject {
         do {
             try await service.softDelete(id: meal.id)
             meals.removeAll { $0.id == meal.id }
+            fortnight.removeAll { $0.id == meal.id }
         } catch {
             AppLogger.database.warning("Journal delete failed: \(error.localizedDescription, privacy: .public)")
         }

@@ -106,6 +106,19 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - Score de la semaine (déterministe, repas scannés)
+    /// Recalculé à chaque rendu depuis le journal 14 jours + les apports à
+    /// renforcer du profil (scores locaux < 60, même seuil que le scan).
+    private var weekScore: WeekScoreEngine.WeekScore {
+        WeekScoreEngine.compute(
+            meals: journal.fortnight,
+            weakNutrients: viewModel.nutrientScores
+                .filter { $0.value < 60 }
+                .map(\.key)
+                .sorted()
+        )
+    }
+
     // MARK: - Red flags (sécurité — inchangé)
     private var immediateRedFlags: [RedFlag] {
         viewModel.redFlags.filter { $0.urgency == .immediate }
@@ -127,11 +140,13 @@ struct DashboardView: View {
                         .padding(.horizontal, Theme.spacingLG)
                 }
 
-                // 1. Greeting + date + besoins nourris + petit anneau de score
+                // 1. Greeting + date + score de la SEMAINE (repas scannés,
+                // WeekScoreEngine) + barres des 7 jours + insight. Le score
+                // figé du questionnaire ne s'affiche plus ici (retour Arthur
+                // 3 juillet : noter le suivi réel, pas un chiffre statique).
                 BilanGreetingHeader(
                     firstName: viewModel.firstName,
-                    besoinsNourris: v2.besoinsNourris,
-                    score: v2.score ?? viewModel.healthScore
+                    week: weekScore
                 )
                 .padding(.horizontal, Theme.spacingLG)
                 .staggeredAppear(index: 0)
