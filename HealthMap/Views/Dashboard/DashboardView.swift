@@ -26,8 +26,6 @@ struct DashboardView: View {
 
     @State private var selectedApport: ApportV2?
     @State private var selectedSymptome: SymptomeV2?
-    @State private var showAvatarPicker = false
-    @State private var didOfferAvatarPicker = false
 
     var body: some View {
         NavigationStack {
@@ -70,18 +68,6 @@ struct DashboardView: View {
                     selectedSymptome = nil
                     openTab(.plan)
                 }
-            }
-            .sheet(isPresented: $showAvatarPicker) {
-                AvatarPickerView(profile: viewModel.profile) { key in
-                    viewModel.saveAvatarKey(key)
-                }
-                .healthMapSheet(.large)
-            }
-            .onChange(of: viewModel.isLoadingProfile, initial: true) { _, _ in
-                maybeOfferAvatarPicker()
-            }
-            .onChange(of: viewModel.profile.avatarKey) { _, _ in
-                maybeOfferAvatarPicker()
             }
         }
     }
@@ -249,17 +235,6 @@ struct DashboardView: View {
         )
     }
 
-    /// Présente le sélecteur d'avatar une seule fois quand le profil est
-    /// chargé et complété mais qu'aucun avatar n'a encore été choisi.
-    private func maybeOfferAvatarPicker() {
-        guard !didOfferAvatarPicker,
-              !viewModel.isLoadingProfile,
-              viewModel.profile.completed,
-              !viewModel.profile.weight.isEmpty,
-              viewModel.profile.avatarKey.isEmpty else { return }
-        didOfferAvatarPicker = true
-        showAvatarPicker = true
-    }
 }
 
 // MARK: - Staggered Appear (loi 17)
