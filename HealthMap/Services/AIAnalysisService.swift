@@ -195,12 +195,6 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         }
     }
 
-    // MARK: - Force Regenerate
-    func regenerate(userId: String, profile: UserProfile) async throws -> MergedAnalysis? {
-        try? await DatabaseService.shared.clearAIAnalysis(userId: userId)
-        return try await fetchFullAnalysis(userId: userId, profile: profile)
-    }
-
     // MARK: - Fetch Bilan v2 (contrat v2 — nourrit l'écran Bilan v6)
     /// Poste le MÊME endpoint `generate-analysis` avec `"tache": "bilan"` en
     /// plus dans le body. Réutilise l'infra existante : client Supabase

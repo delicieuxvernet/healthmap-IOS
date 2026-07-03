@@ -7,7 +7,7 @@ import UIKit
 // officiel de changement d'onglet (utilisé par la carte « Ton plan est
 // prêt » du bloc 8 et par ContentView).
 enum NavCardDestination: String {
-    case bilan, suivi, scanner, plan, profil
+    case bilan, suivi, scanner, plan, complements, profil
 }
 
 extension Notification.Name {

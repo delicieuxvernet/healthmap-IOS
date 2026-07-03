@@ -349,60 +349,6 @@ final class DashboardViewModel: ObservableObject {
         isLoadingAnalysis = false
     }
 
-    // MARK: - Regenerate Analysis (force refresh)
-
-    func regenerateAnalysis() async {
-        guard profile.completed else { return }
-
-        guard let session = await AuthService.shared.currentSession else {
-            return
-        }
-
-        let userId = session.user.id.uuidString
-        isLoadingAnalysis = true
-        errorMessage = nil
-
-        // Bilan v2 : régénéré en parallèle (forceRefresh saute le cache
-        // ai_analysis_v2 et le signale au serveur).
-        Task { await self.fetchBilanV2(userId: userId, forceRefresh: true) }
-
-        do {
-            let merged = try await aiAnalysisService.regenerate(
-                userId: userId,
-                profile: profile
-            )
-
-            self.aiAnalysis = merged
-
-            if let merged {
-                self.healthScore = merged.healthScore
-                self.nutrientScores = merged.scores
-
-                analyticsService.track(.analysisCompleted, properties: [
-                    "health_score": healthScore,
-                    "regenerated": true,
-                ])
-            } else {
-                // Même logique que triggerAnalysis : nil = échec exploitable
-                // par l'UI (bandeau retry), pas un succès silencieux.
-                errorMessage = "Impossible de regenerer l'analyse."
-                analyticsService.track(.analysisFailed, properties: [
-                    "error": "nil_analysis_after_validation",
-                    "regenerated": true,
-                ])
-            }
-        } catch {
-            errorMessage = "Impossible de regenerer l'analyse."
-            AppLogger.analysis.report(error, context: "Dashboard regenerate")
-            analyticsService.track(.analysisFailed, properties: [
-                "error": error.localizedDescription,
-                "regenerated": true,
-            ])
-        }
-
-        isLoadingAnalysis = false
-    }
-
     // MARK: - Bilan v2 (contrat v2 — nouvel écran Bilan)
 
     /// Charge le bilan v2 : cache DB d'abord (géré par le service), sinon

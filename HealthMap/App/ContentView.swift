@@ -447,6 +447,7 @@ struct MainTabView: View {
                 case .suivi: selectedTab = .suivi
                 case .scanner: selectedTab = .scanner
                 case .plan: selectedTab = .plan
+                case .complements: selectedTab = .complements
                 case .profil: showProfile = true
                 }
             }
