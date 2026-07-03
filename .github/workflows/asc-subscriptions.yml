@@ -1,0 +1,42 @@
+# Pilote les abonnements App Store (prix, localisations, disponibilité, essai)
+# via l'API App Store Connect — l'UI web n'est pas automatisable (shadow DOM)
+# et un accord en attente (ex. DSA) y bloque l'enregistrement sans message.
+# Réutilise les secrets ASC déjà en place pour TestFlight.
+name: ASC Subscriptions
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "audit = lecture seule | apply = fixe prix/localisation/disponibilité/essai"
+        required: true
+        default: audit
+        type: choice
+        options: [audit, apply]
+
+permissions:
+  contents: read
+
+jobs:
+  asc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write ASC API key
+        env:
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+        run: echo -n "$ASC_API_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/asc_key.p8"
+
+      - name: Install jwt gem
+        run: sudo gem install jwt --no-document
+
+      - name: Run (${{ inputs.mode }})
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_PATH: ${{ runner.temp }}/asc_key.p8
+          MODE: ${{ inputs.mode }}
+        run: ruby scripts/asc_subscriptions.rb
