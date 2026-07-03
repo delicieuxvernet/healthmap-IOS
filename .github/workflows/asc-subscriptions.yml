@@ -12,7 +12,7 @@ on:
         required: true
         default: audit
         type: choice
-        options: [audit, apply, app-audit]
+        options: [audit, apply, app-audit, apply-app]
 
 permissions:
   contents: read
@@ -48,5 +48,6 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_PATH: ${{ runner.temp }}/asc_key.p8
           REVIEW_SCREENSHOT_PATH: ${{ runner.temp }}/kiwio-paywall-review.png
+          DEMO_ACCOUNT_PASSWORD: ${{ secrets.DEMO_ACCOUNT_PASSWORD }}
           MODE: ${{ inputs.mode }}
         run: ruby scripts/asc_subscriptions.rb

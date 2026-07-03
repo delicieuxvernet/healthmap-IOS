@@ -218,22 +218,77 @@ if MODE == "app-audit"
     end
   end
 
-  # Questionnaire confidentialité (App Privacy) — même famille d'endpoints que
-  # fastlane upload_app_privacy_details
-  code, du = req(:get, "/v1/apps/#{app_id}/dataUsages?limit=200&include=category,grouping,purposes,dataProtection")
-  report[:privacyDataUsages] =
-    if code == 200
-      du["data"].map do |u|
-        cat = u.dig("relationships", "category", "data", "id")
-        prot = u.dig("relationships", "dataProtection", "data", "id")
-        { category: cat, dataProtection: prot }
+  # Questionnaire confidentialité (App Privacy) : le chemin exact n'est pas
+  # documenté — on sonde les candidats plausibles et on rapporte lequel répond.
+  report[:privacyProbes] = {}
+  ["/v1/apps/#{app_id}/dataUsages?limit=5",
+   "/v1/apps/#{app_id}/appDataUsages?limit=5",
+   "/v1/appDataUsages?filter[app]=#{app_id}&limit=5",
+   "/v1/apps/#{app_id}/appDataUsageCategories?limit=5",
+   "/v1/appDataUsageCategories?limit=5"].each do |path|
+    code, resp = req(:get, path)
+    report[:privacyProbes][path] =
+      if code == 200
+        { count: resp["data"].is_a?(Array) ? resp["data"].size : 1,
+          sample: resp["data"].is_a?(Array) ? resp["data"].first(2) : resp["data"] }
+      else
+        "HTTP #{code} #{resp.is_a?(Hash) ? resp.dig("errors", 0, "detail") : resp.to_s[0, 120]}"
       end
-    else
-      { error: code, body: du }
-    end
+  end
 
   puts "\n===== APP AUDIT ====="
   puts JSON.pretty_generate(report)
+  exit 0
+end
+
+# ── MODE apply-app : infos review + rattache le dernier build à la v1.0 ─────
+if MODE == "apply-app"
+  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=1&filter[appStoreState]=PREPARE_FOR_SUBMISSION")
+  abort_with("appStoreVersions", code, v) unless code == 200 && v["data"]&.any?
+  version_id = v["data"][0]["id"]
+  puts "Version éditable : #{v["data"][0].dig("attributes", "versionString")} (#{version_id})"
+
+  # Infos App Review : contact + compte démo (compte de test partagé du repo,
+  # celui que les reviewers utiliseront). Le téléphone reste à compléter.
+  code, rd = req(:get, "/v1/appStoreVersions/#{version_id}/appStoreReviewDetail")
+  review_attrs = {
+    contactFirstName: "Arthur",
+    contactLastName: "Vernet",
+    contactEmail: "contact@healthmap.fr",
+    demoAccountName: "audit-a@test.com",
+    demoAccountPassword: ENV["DEMO_ACCOUNT_PASSWORD"].to_s,
+    demoAccountRequired: true,
+    notes: "Application en francais. Compte demo fourni (profil complet avec bilan). " \
+           "L'abonnement Kiwio Premium (mensuel/annuel) se teste depuis l'onglet Profil " \
+           "ou une section Premium du bilan.",
+  }
+  review_attrs.delete(:demoAccountPassword) if review_attrs[:demoAccountPassword].empty?
+
+  if code == 200 && rd["data"]
+    detail_id = rd["data"]["id"]
+    write("mise à jour des infos review", :patch, "/v1/appStoreReviewDetails/#{detail_id}",
+      { data: { type: "appStoreReviewDetails", id: detail_id, attributes: review_attrs } })
+  else
+    write("création des infos review", :post, "/v1/appStoreReviewDetails",
+      { data: { type: "appStoreReviewDetails", attributes: review_attrs,
+                relationships: { appStoreVersion: { data: { type: "appStoreVersions", id: version_id } } } } })
+  end
+
+  # Rattache le dernier build traité (VALID) à la version
+  code, b = req(:get, "/v1/builds?filter[app]=#{app_id}&filter[processingState]=VALID&sort=-uploadedDate&limit=1")
+  if code == 200 && b["data"]&.any?
+    build = b["data"][0]
+    puts "Dernier build VALID : ##{build.dig("attributes", "version")}"
+    write("rattachement du build ##{build.dig("attributes", "version")}", :patch,
+      "/v1/appStoreVersions/#{version_id}/relationships/build",
+      { data: { type: "builds", id: build["id"] } })
+  else
+    puts "Aucun build VALID trouvé (HTTP #{code})"
+  end
+
+  code, rd = req(:get, "/v1/appStoreVersions/#{version_id}/appStoreReviewDetail")
+  puts "\n===== ÉTAT FINAL REVIEW DETAIL ====="
+  puts JSON.pretty_generate(code == 200 ? rd["data"] : rd)
   exit 0
 end
 
