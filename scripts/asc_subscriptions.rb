@@ -262,15 +262,30 @@ TARGETS.each do |product_id, spec|
       failures << "#{product_id}: prix base" unless ok
     end
 
-    if snap[:pricesAllTerritoriesCount] < 100
-      eqs = get_all("/v1/subscriptionPricePoints/#{pp_id}/equalizations?limit=200&fields[subscriptionPricePoints]=customerPrice")
+    # Aligne toute la grille sur le prix base validé : on pose les points de prix
+    # égalisés absents de la grille courante (idempotent — un changement de prix
+    # base laisse sinon les autres territoires sur l'ancien prix).
+    target_ids = get_all("/v1/subscriptionPricePoints/#{pp_id}/equalizations?limit=200&fields[subscriptionPricePoints]=customerPrice")
+      .map { |e| e["id"] }
+    current_pp_ids = []
+    url = "/v1/subscriptions/#{sub_id}/prices?limit=200&fields[subscriptionPrices]=subscriptionPricePoint&include=subscriptionPricePoint&fields[subscriptionPricePoints]=customerPrice"
+    while url
+      code, body = req(:get, url)
+      abort_with("prices (grille)", code, body) unless code == 200
+      body["data"].each { |p| current_pp_ids << p.dig("relationships", "subscriptionPricePoint", "data", "id") }
+      url = body.dig("links", "next")
+    end
+    missing = target_ids - current_pp_ids
+    if missing.empty?
+      puts "  OK  grille alignée sur #{spec[:price]} € (#{current_pp_ids.uniq.size} points de prix)"
+    else
       ok_n = ko_n = 0
       first_error = nil
-      eqs.each do |eq|
+      missing.each do |eq_id|
         code, resp = req(:post, "/v1/subscriptionPrices",
           { data: { type: "subscriptionPrices",
                     relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
-                                     subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: eq["id"] } } } } })
+                                     subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: eq_id } } } } })
         if (200..299).cover?(code)
           ok_n += 1
         else
@@ -278,14 +293,12 @@ TARGETS.each do |product_id, spec|
           first_error ||= [code, resp]
         end
       end
-      puts "  égalisation : #{ok_n} territoires OK, #{ko_n} en échec (sur #{eqs.size})"
+      puts "  alignement grille : #{ok_n} OK, #{ko_n} en échec (sur #{missing.size})"
       if first_error
-        puts "  première erreur d'égalisation -> HTTP #{first_error[0]}"
-        puts JSON.pretty_generate(first_error[1]) rescue puts(first_error[1].inspect)
+        puts "  première erreur d'alignement -> HTTP #{first_error[0]}"
+        puts(first_error[1].is_a?(String) ? first_error[1] : JSON.pretty_generate(first_error[1]))
       end
-      failures << "#{product_id}: égalisation (#{ko_n} échecs)" if ko_n > 0 && ok_n == 0
-    else
-      puts "  OK  grille de prix déjà complète (#{snap[:pricesAllTerritoriesCount]} territoires)"
+      failures << "#{product_id}: alignement grille (#{ko_n} échecs)" if ko_n > 0
     end
   end
 
