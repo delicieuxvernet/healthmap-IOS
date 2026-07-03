@@ -113,6 +113,10 @@ def sub_snapshot(sub_id)
       { error: code, body: pr }
     end
 
+  # Nombre de prix tous territoires confondus : ~175 attendus quand la grille est
+  # complète ; 1 = prix base seul, jamais égalisé (cause plausible de MISSING_METADATA).
+  snap[:pricesAllTerritoriesCount] = get_all("/v1/subscriptions/#{sub_id}/prices?limit=200").size
+
   code, av = req(:get, "/v1/subscriptions/#{sub_id}/subscriptionAvailability")
   snap[:availability] = code == 200 ? { availableInNewTerritories: av.dig("data", "attributes", "availableInNewTerritories") } : "aucune (HTTP #{code})"
 
@@ -203,21 +207,48 @@ TARGETS.each do |product_id, spec|
     failures << "#{product_id}: localisation" unless ok
   end
 
-  # Prix (base France ; Apple égalise les autres territoires)
-  current = snap[:prices_fra].is_a?(Array) ? snap[:prices_fra].map { |p| p[:customerPrice] } : []
-  if current.include?(spec[:price])
-    puts "  OK  prix FRA déjà à #{spec[:price]} €"
+  # Prix : base France, puis égalisation explicite sur tous les territoires —
+  # un prix base seul laisse l'abonnement en MISSING_METADATA.
+  pp_id = find_price_point(sub_id, spec[:price])
+  if pp_id.nil?
+    puts "  ÉCHEC aucun price point FRA à #{spec[:price]}"
+    failures << "#{product_id}: price point introuvable"
   else
-    pp_id = find_price_point(sub_id, spec[:price])
-    if pp_id.nil?
-      puts "  ÉCHEC aucun price point FRA à #{spec[:price]}"
-      failures << "#{product_id}: price point introuvable"
+    current = snap[:prices_fra].is_a?(Array) ? snap[:prices_fra].map { |p| p[:customerPrice] } : []
+    if current.include?(spec[:price])
+      puts "  OK  prix FRA déjà à #{spec[:price]} €"
     else
       ok, = write("prix FRA #{spec[:price]} €", :post, "/v1/subscriptionPrices",
         { data: { type: "subscriptionPrices",
                   relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
                                    subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: pp_id } } } } })
-      failures << "#{product_id}: prix" unless ok
+      failures << "#{product_id}: prix base" unless ok
+    end
+
+    if snap[:pricesAllTerritoriesCount] < 100
+      eqs = get_all("/v1/subscriptionPricePoints/#{pp_id}/equalizations?limit=200&fields[subscriptionPricePoints]=customerPrice")
+      ok_n = ko_n = 0
+      first_error = nil
+      eqs.each do |eq|
+        code, resp = req(:post, "/v1/subscriptionPrices",
+          { data: { type: "subscriptionPrices",
+                    relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
+                                     subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: eq["id"] } } } } })
+        if (200..299).cover?(code)
+          ok_n += 1
+        else
+          ko_n += 1
+          first_error ||= [code, resp]
+        end
+      end
+      puts "  égalisation : #{ok_n} territoires OK, #{ko_n} en échec (sur #{eqs.size})"
+      if first_error
+        puts "  première erreur d'égalisation -> HTTP #{first_error[0]}"
+        puts JSON.pretty_generate(first_error[1]) rescue puts(first_error[1].inspect)
+      end
+      failures << "#{product_id}: égalisation (#{ko_n} échecs)" if ko_n > 0 && ok_n == 0
+    else
+      puts "  OK  grille de prix déjà complète (#{snap[:pricesAllTerritoriesCount]} territoires)"
     end
   end
 
@@ -232,13 +263,26 @@ TARGETS.each do |product_id, spec|
     failures << "#{product_id}: disponibilité" unless ok
   end
 
-  # Essai gratuit 7 j (best effort)
+  # Essai gratuit 7 j (best effort) : tentative globale, sinon par territoire
   if snap[:introOffers].empty?
-    ok, = write("essai gratuit 7 j", :post, "/v1/subscriptionIntroductoryOffers",
+    ok, = write("essai gratuit 7 j (tous territoires)", :post, "/v1/subscriptionIntroductoryOffers",
       { data: { type: "subscriptionIntroductoryOffers",
                 attributes: { duration: "ONE_WEEK", offerMode: "FREE_TRIAL", numberOfPeriods: 1 },
                 relationships: { subscription: { data: { type: "subscriptions", id: sub_id } } } } })
-    failures << "#{product_id}: essai 7 j (best effort)" unless ok
+    unless ok
+      territories = get_all("/v1/territories?limit=200").map { |t| t["id"] }
+      ok_n = 0
+      territories.each do |t|
+        code, = req(:post, "/v1/subscriptionIntroductoryOffers",
+          { data: { type: "subscriptionIntroductoryOffers",
+                    attributes: { duration: "ONE_WEEK", offerMode: "FREE_TRIAL", numberOfPeriods: 1 },
+                    relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
+                                     territory: { data: { type: "territories", id: t } } } } })
+        ok_n += 1 if (200..299).cover?(code)
+      end
+      puts "  essai 7 j par territoire : #{ok_n}/#{territories.size} OK"
+      failures << "#{product_id}: essai 7 j" if ok_n == 0
+    end
   end
 end
 
@@ -247,8 +291,7 @@ puts "\n===== ÉTAT FINAL ====="
 final = {}
 TARGETS.each_key do |product_id|
   entry = all_subs[product_id]
-  next final[product_id] = "ABSENT" unless entry || (entry = all_subs[product_id])
-  final[product_id] = sub_snapshot(entry[:id])
+  final[product_id] = entry ? sub_snapshot(entry[:id]) : "ABSENT"
 end
 # Recharge la liste au cas où un abonnement vient d'être créé
 if final.value?("ABSENT")
