@@ -98,15 +98,15 @@ struct DashboardView: View {
                         .padding(.horizontal, Theme.spacingLG)
                         .padding(.top, Theme.spacingMD)
                 }
-                if viewModel.isLoadingAnalysis || viewModel.isLoadingAnalysisV2 {
+                if viewModel.isLoadingAnalysisV2 {
                     FullAnalysisLoadingView()
-                } else if viewModel.errorMessage != nil || viewModel.aiAnalysis != nil {
-                    // Erreur explicite, OU pipeline terminé sans bilan v2
-                    // (échec silencieux du fetch v2) : on propose de relancer
-                    // plutôt que de laisser un chargement infini.
+                } else if let errorMessageV2 = viewModel.errorMessageV2 {
+                    // Le bilan RÉELLEMENT affiché (v2) a échoué sans repli en
+                    // cache. Gardé sur errorMessageV2 (pas aiAnalysis/errorMessage,
+                    // v7) depuis l'incident du 4 juillet : un échec v7 seul ne
+                    // doit jamais bloquer l'affichage du vrai bilan v2.
                     AnalysisErrorRetryView(
-                        message: viewModel.errorMessage
-                            ?? "Ton bilan n'a pas pu être chargé. Vérifie ta connexion puis réessaie.",
+                        message: errorMessageV2,
                         isRetrying: false,
                         onRetry: { Task { await viewModel.triggerAnalysis() } }
                     )

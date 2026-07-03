@@ -17,6 +17,13 @@ final class DashboardViewModel: ObservableObject {
     @Published var nutrientScores: [String: Int] = [:]
     @Published var hasCompletedQuestionnaire = false
     @Published var errorMessage: String?
+    /// Erreur dédiée au bilan v2 (écran de chargement/gate onboarding).
+    /// Distincte de `errorMessage` (v7, autre bandeau) pour ne pas faire
+    /// courir de risque de course entre les deux tâches parallèles — un raté
+    /// v7 ne doit jamais afficher/masquer une erreur qui concerne le v2 et
+    /// inversement (incident bilan indisponible, 4 juillet : la gate bloquait
+    /// sur `aiAnalysis`/v7 alors que le bilan RÉELLEMENT affiché est v2).
+    @Published var errorMessageV2: String?
 
     // MARK: - Injected Services
 
@@ -163,15 +170,18 @@ final class DashboardViewModel: ObservableObject {
     // MARK: - Reconnect Observer
 
     /// Re-triggers AI analysis when the network comes back after an offline period.
-    /// Only fires if the previous analysis failed (aiAnalysis is nil and questionnaire
-    /// is completed), so a successful cached state is never disrupted.
+    /// Only fires if the bilan (v2, réellement affiché) n'a pas encore de résultat
+    /// et que le questionnaire est complet, so a successful cached state is never
+    /// disrupted. Gardé sur `analysisV2` (pas `aiAnalysis`/v7) depuis l'incident du
+    /// 4 juillet — sinon un raté v7 seul peut redéclencher un appel inutile alors
+    /// que le vrai bilan (v2) est déjà là.
     private func observeReconnect() {
         reconnectObserver = NotificationCenter.default.addObserver(
             forName: .healthmapDidReconnect,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            guard let self, self.hasCompletedQuestionnaire, self.aiAnalysis == nil else { return }
+            guard let self, self.hasCompletedQuestionnaire, self.analysisV2 == nil else { return }
             Task { @MainActor in
                 AppLogger.analysis.info("Reconnect: retrying AI analysis")
                 await self.triggerAnalysis()
@@ -353,8 +363,6 @@ final class DashboardViewModel: ObservableObject {
 
     /// Charge le bilan v2 : cache DB d'abord (géré par le service), sinon
     /// Edge Function (tache "bilan"). Tourne en parallèle du flux v7.
-    /// Erreur → log seulement : l'écran Bilan v6 (étape UI) décidera de son
-    /// propre affichage d'erreur ; le flux v7 garde son bandeau existant.
     private func fetchBilanV2(userId: String, forceRefresh: Bool) async {
         // Mêmes gardes que triggerAnalysis : l'analyse doit pouvoir démarrer
         // pendant la célébration post-questionnaire.
@@ -362,6 +370,7 @@ final class DashboardViewModel: ObservableObject {
         // Re-entrancy guard (reconnect + loadProfile + regenerate).
         guard !isLoadingAnalysisV2 else { return }
         isLoadingAnalysisV2 = true
+        errorMessageV2 = nil
         defer { isLoadingAnalysisV2 = false }
 
         // Entrées déterministes — mêmes sources locales que le flux v7
@@ -382,6 +391,13 @@ final class DashboardViewModel: ObservableObject {
             )
         } catch {
             AppLogger.analysis.report(error, context: "Dashboard bilan v2")
+            // Surface une erreur exploitable par la gate onboarding UNIQUEMENT
+            // si on n'a rien à montrer (pas de cache valide) — sinon le bilan
+            // déjà affiché ne doit pas être remplacé par un bandeau d'erreur.
+            if analysisV2 == nil {
+                errorMessageV2 = (error as? AIAnalysisError)?.errorDescription
+                    ?? "Impossible de charger ton bilan pour le moment. Reessaie dans un instant."
+            }
         }
     }
 
