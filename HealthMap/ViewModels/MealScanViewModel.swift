@@ -424,7 +424,7 @@ final class MealScanViewModel: ObservableObject {
             GamificationService.shared.unlockMealScanned()
 
             // 8. Ajoute le repas au journal du jour (best-effort).
-            await persistToJournal(detectedFoods: response.detectedFoods ?? [], macros: macros)
+            await persistToJournal(detectedFoods: response.detectedFoods ?? [], macros: macros, micros: micros)
 
             // Met à jour le compteur de scans gratuits restants (iOS free).
             updateScansRemaining(response.scansRemaining)
@@ -568,7 +568,7 @@ final class MealScanViewModel: ObservableObject {
 
     /// Ajoute le repas scanné au journal du jour (table meal_scans). Best-effort :
     /// un échec d'écriture n'interrompt jamais l'affichage du résultat du scan.
-    private func persistToJournal(detectedFoods: [String], macros: MacroNutrients) async {
+    private func persistToJournal(detectedFoods: [String], macros: MacroNutrients, micros: [MicroNutrient]) async {
         guard let userId = AuthService.shared.cachedCurrentUserIdString else { return }
         let m = MealJournalService.MealMacros(
             calories: macros.calories,
@@ -577,12 +577,17 @@ final class MealScanViewModel: ObservableObject {
             fats: macros.fats,
             fiber: macros.fiber
         )
+        // Les micros persistés nourrissent le score de la semaine du Bilan.
+        let pcts = micros
+            .filter { !$0.nutrientId.isEmpty }
+            .map { MealJournalService.MicroPct(id: $0.nutrientId, pctRDA: $0.pctRDA) }
         do {
             try await MealJournalService.shared.insertScan(
                 userId: userId,
                 foods: detectedFoods,
                 macros: m,
-                slot: MealJournalService.MealSlot.from(date: Date())
+                slot: MealJournalService.MealSlot.from(date: Date()),
+                micros: pcts
             )
         } catch {
             AppLogger.analysis.report(error, context: "MealScan persistToJournal")

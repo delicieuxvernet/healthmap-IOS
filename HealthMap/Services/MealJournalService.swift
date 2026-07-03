@@ -53,6 +53,30 @@ final class MealJournalService {
         }
     }
 
+    /// Apport d'un repas à UN nutriment, persisté dans la colonne jsonb
+    /// `micros` (format partagé avec le web : `[{id, unit, amount, pctRDA}]` —
+    /// iOS n'écrit et ne lit que `id` + `pctRDA`, les clés en trop sont ignorées).
+    struct MicroPct: Codable, Equatable {
+        let id: String
+        let pctRDA: Int
+
+        init(id: String, pctRDA: Int) {
+            self.id = id
+            self.pctRDA = pctRDA
+        }
+
+        // `pctRDA` peut arriver en décimal selon la source (web) — on arrondit.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            if let i = try? c.decode(Int.self, forKey: .pctRDA) {
+                pctRDA = i
+            } else {
+                pctRDA = Int(((try? c.decode(Double.self, forKey: .pctRDA)) ?? 0).rounded())
+            }
+        }
+    }
+
     /// Un repas du journal, prêt pour l'UI.
     struct MealRecord: Identifiable, Equatable {
         let id: String
@@ -60,6 +84,9 @@ final class MealJournalService {
         let slot: MealSlot
         let foods: [String]
         let macros: MealMacros
+        /// Vide pour les repas antérieurs à la persistance des micros
+        /// (scans d'avant juillet 2026, ajouts manuels, lignes web).
+        var micros: [MicroPct] = []
     }
 
     // MARK: - Insert (un scan ou un ajout manuel rejoint la journée)
@@ -68,6 +95,7 @@ final class MealJournalService {
                     foods: [String],
                     macros: MealMacros,
                     slot: MealSlot,
+                    micros: [MicroPct] = [],
                     consumedAt: Date = Date()) async throws {
         struct InsertRow: Encodable {
             let userId: String
@@ -75,12 +103,13 @@ final class MealJournalService {
             let mealType: String
             let detectedFoods: [String]
             let macros: MealMacros
+            let micros: [MicroPct]
             enum CodingKeys: String, CodingKey {
                 case userId = "user_id"
                 case consumedAt = "consumed_at"
                 case mealType = "meal_type"
                 case detectedFoods = "detected_foods"
-                case macros
+                case macros, micros
             }
         }
         let row = InsertRow(
@@ -88,7 +117,8 @@ final class MealJournalService {
             consumedAt: Self.iso.string(from: consumedAt),
             mealType: slot.rawValue,
             detectedFoods: foods,
-            macros: macros
+            macros: macros,
+            micros: micros
         )
         try await client.from("meal_scans").insert(row).execute()
     }
@@ -105,45 +135,55 @@ final class MealJournalService {
                              consumedAt: consumedAt)
     }
 
-    // MARK: - Lecture des repas d'un jour
+    // MARK: - Lecture des repas (jour ou plage)
 
     func loadDay(userId: String, day: Date = Date(), calendar: Calendar = .current) async throws -> [MealRecord] {
         let start = calendar.startOfDay(for: day)
         let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
+        return try await loadRange(userId: userId, from: start, to: end, calendar: calendar)
+    }
 
+    /// Repas d'une plage `[from, to)` — nourrit le score de la semaine (14
+    /// derniers jours : semaine courante + précédente pour la comparaison).
+    func loadRange(userId: String, from: Date, to: Date, calendar: Calendar = .current) async throws -> [MealRecord] {
         struct RemoteRow: Decodable {
             let id: String
             let consumedAt: String
             let mealType: String?
             let detectedFoods: [String]?
             let macros: MealMacros?
+            let micros: [MicroPct]?
             enum CodingKeys: String, CodingKey {
                 case id
                 case consumedAt = "consumed_at"
                 case mealType = "meal_type"
                 case detectedFoods = "detected_foods"
-                case macros
+                case macros, micros
             }
         }
 
+        // `deleted_at IS NULL` : sans ce filtre les repas supprimés (soft
+        // delete) réapparaissaient au rechargement suivant du journal.
         let rows: [RemoteRow] = try await client
             .from("meal_scans")
-            .select("id, consumed_at, meal_type, detected_foods, macros")
+            .select("id, consumed_at, meal_type, detected_foods, macros, micros")
             .eq("user_id", value: userId)
-            .gte("consumed_at", value: Self.iso.string(from: start))
-            .lt("consumed_at", value: Self.iso.string(from: end))
+            .is("deleted_at", value: nil)
+            .gte("consumed_at", value: Self.iso.string(from: from))
+            .lt("consumed_at", value: Self.iso.string(from: to))
             .order("consumed_at", ascending: true)
             .execute()
             .value
 
         return rows.map { r in
-            let date = Self.parseTimestamp(r.consumedAt) ?? start
+            let date = Self.parseTimestamp(r.consumedAt) ?? from
             let slot = MealSlot(rawValue: r.mealType ?? "") ?? MealSlot.from(date: date, calendar: calendar)
             return MealRecord(id: r.id,
                               consumedAt: date,
                               slot: slot,
                               foods: r.detectedFoods ?? [],
-                              macros: r.macros ?? MealMacros())
+                              macros: r.macros ?? MealMacros(),
+                              micros: r.micros ?? [])
         }
     }
 
