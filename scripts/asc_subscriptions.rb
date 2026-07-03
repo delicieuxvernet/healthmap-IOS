@@ -184,6 +184,59 @@ abort_with("apps", code, body) unless code == 200 && body["data"]&.any?
 app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
+# ── MODE app-audit : état de préparation à la soumission App Store ──────────
+if MODE == "app-audit"
+  report = { appId: app_id }
+
+  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=5&fields[appStoreVersions]=versionString,appStoreState,platform,createdDate")
+  report[:versions] = code == 200 ? v["data"].map { |x| x["attributes"].merge("id" => x["id"]) } : { error: code, body: v }
+
+  code, b = req(:get, "/v1/builds?filter[app]=#{app_id}&sort=-uploadedDate&limit=5&fields[builds]=version,processingState,expired,uploadedDate")
+  report[:builds] = code == 200 ? b["data"].map { |x| x["attributes"] } : { error: code, body: b }
+
+  if report[:versions].is_a?(Array)
+    report[:versions].each do |ver|
+      vid = ver["id"]
+      code, rd = req(:get, "/v1/appStoreVersions/#{vid}/appStoreReviewDetail")
+      ver["reviewDetail"] = code == 200 && rd["data"] ? rd["data"]["attributes"] : "absent (HTTP #{code})"
+
+      code, bld = req(:get, "/v1/appStoreVersions/#{vid}/build?fields[builds]=version,processingState")
+      ver["buildAttached"] = code == 200 && bld["data"] ? bld["data"]["attributes"] : "aucun (HTTP #{code})"
+
+      locs = get_all("/v1/appStoreVersions/#{vid}/appStoreVersionLocalizations?limit=10")
+      ver["localizations"] = locs.map do |l|
+        entry = { locale: l.dig("attributes", "locale"),
+                  hasDescription: !l.dig("attributes", "description").to_s.empty?,
+                  hasKeywords: !l.dig("attributes", "keywords").to_s.empty? }
+        sets = get_all("/v1/appStoreVersionLocalizations/#{l["id"]}/appScreenshotSets?limit=20")
+        entry[:screenshotSets] = sets.map do |s|
+          shots = get_all("/v1/appScreenshotSets/#{s["id"]}/appScreenshots?limit=20")
+          { displayType: s.dig("attributes", "screenshotDisplayType"), count: shots.size }
+        end
+        entry
+      end
+    end
+  end
+
+  # Questionnaire confidentialité (App Privacy) — même famille d'endpoints que
+  # fastlane upload_app_privacy_details
+  code, du = req(:get, "/v1/apps/#{app_id}/dataUsages?limit=200&include=category,grouping,purposes,dataProtection")
+  report[:privacyDataUsages] =
+    if code == 200
+      du["data"].map do |u|
+        cat = u.dig("relationships", "category", "data", "id")
+        prot = u.dig("relationships", "dataProtection", "data", "id")
+        { category: cat, dataProtection: prot }
+      end
+    else
+      { error: code, body: du }
+    end
+
+  puts "\n===== APP AUDIT ====="
+  puts JSON.pretty_generate(report)
+  exit 0
+end
+
 groups = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
 abort_with("subscriptionGroups", 0, "aucun groupe d'abonnement") if groups.empty?
 

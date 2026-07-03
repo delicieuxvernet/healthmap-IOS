@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "audit = lecture seule | apply = fixe prix/localisation/disponibilité/essai"
+        description: "audit/app-audit = lecture seule | apply = fixe prix/localisation/disponibilité/essai"
         required: true
         default: audit
         type: choice
-        options: [audit, apply]
+        options: [audit, apply, app-audit]
 
 permissions:
   contents: read
