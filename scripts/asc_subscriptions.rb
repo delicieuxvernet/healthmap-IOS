@@ -124,8 +124,11 @@ def sub_snapshot(sub_id)
   snap[:introOffers] = offers.map { |o| o["attributes"].slice("duration", "offerMode", "numberOfPeriods") }.uniq
   snap[:introOfferTerritoriesCount] = offers.size
 
-  code, _shot = req(:get, "/v1/subscriptions/#{sub_id}/appStoreReviewScreenshot")
-  snap[:reviewScreenshot] = code == 200 ? "présent" : "absent (HTTP #{code})"
+  # assetDeliveryState est le point clé : un screenshot réservé mais jamais
+  # committé (AWAITING_UPLOAD) compte comme métadonnée manquante.
+  code, shot = req(:get, "/v1/subscriptions/#{sub_id}/appStoreReviewScreenshot")
+  snap[:reviewScreenshot] = code == 200 ? shot["data"]["attributes"] : "absent (HTTP #{code})"
+  snap[:rawAttributes] = a
   snap
 end
 
