@@ -67,6 +67,27 @@ final class DatabaseService {
         return row.aiAnalysis
     }
 
+    // MARK: - Load AI Analysis v2 (cache du Bilan v6 — lecture symétrique de
+    // loadAIAnalysis, colonne distincte `ai_analysis_v2`)
+    func loadAIAnalysisV2(userId: String) async throws -> AIAnalysisV2? {
+        struct AnalysisRow: Codable {
+            let aiAnalysisV2: AIAnalysisV2?
+            enum CodingKeys: String, CodingKey {
+                case aiAnalysisV2 = "ai_analysis_v2"
+            }
+        }
+
+        let row: AnalysisRow = try await client
+            .from("profiles")
+            .select("ai_analysis_v2")
+            .eq("id", value: userId)
+            .single()
+            .execute()
+            .value
+
+        return row.aiAnalysisV2
+    }
+
     // MARK: - Bootstrap Apple profile (first SIWA sign-in only)
     /// Upserts a minimal `profiles` row with `id`, `email`, `first_name` but
     /// **never overwrites** an existing row's fields.
@@ -194,6 +215,23 @@ final class DatabaseService {
         try await client
             .from("profiles")
             .update(UpdateRow(aiAnalysis: analysis))
+            .eq("id", value: userId)
+            .execute()
+    }
+
+    // MARK: - Save AI Analysis v2 (cache du Bilan v6 — écriture symétrique de
+    // saveAIAnalysis, colonne distincte `ai_analysis_v2`)
+    func saveAIAnalysisV2(userId: String, analysis: AIAnalysisV2) async throws {
+        struct UpdateRow: Codable {
+            let aiAnalysisV2: AIAnalysisV2
+            enum CodingKeys: String, CodingKey {
+                case aiAnalysisV2 = "ai_analysis_v2"
+            }
+        }
+
+        try await client
+            .from("profiles")
+            .update(UpdateRow(aiAnalysisV2: analysis))
             .eq("id", value: userId)
             .execute()
     }

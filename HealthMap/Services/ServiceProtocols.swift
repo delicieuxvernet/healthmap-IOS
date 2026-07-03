@@ -34,8 +34,10 @@ protocol DatabaseServiceProtocol: AnyObject {
     func loadProfile(userId: String) async throws -> ProfileRow?
     func loadQuestionnaireData(userId: String) async throws -> UserProfile?
     func loadAIAnalysis(userId: String) async throws -> AIAnalysisResponse?
+    func loadAIAnalysisV2(userId: String) async throws -> AIAnalysisV2?
     func saveProfile(userId: String, email: String, firstName: String, questionnaireData: UserProfile) async throws
     func saveAIAnalysis(userId: String, analysis: AIAnalysisResponse) async throws
+    func saveAIAnalysisV2(userId: String, analysis: AIAnalysisV2) async throws
     func clearAIAnalysis(userId: String) async throws
     func updatePushToken(_ token: String) async throws
     func deleteAllUserData(userId: String) async throws
@@ -67,6 +69,9 @@ protocol AnalyticsServiceProtocol: AnyObject {
 protocol AIAnalysisServiceProtocol: AnyObject {
     func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis?
     func regenerate(userId: String, profile: UserProfile) async throws -> MergedAnalysis?
+    /// Bilan v2 (contrat v2) — même endpoint `generate-analysis` avec
+    /// `"tache": "bilan"` en plus. Nourrit le nouvel écran Bilan (v6).
+    func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2
 }
 
 // MARK: - Gamification

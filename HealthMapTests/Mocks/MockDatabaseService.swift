@@ -9,6 +9,7 @@ final class MockDatabaseService: DatabaseServiceProtocol {
     var profilesByUserId: [String: ProfileRow] = [:]
     var questionnaireByUserId: [String: UserProfile] = [:]
     var analysisByUserId: [String: AIAnalysisResponse] = [:]
+    var analysisV2ByUserId: [String: AIAnalysisV2] = [:]
     var pushTokensByUserId: [String: String] = [:]
     var deletedUserIds: [String] = []
 
@@ -16,8 +17,10 @@ final class MockDatabaseService: DatabaseServiceProtocol {
     var loadProfileError: Error?
     var loadQuestionnaireError: Error?
     var loadAnalysisError: Error?
+    var loadAnalysisV2Error: Error?
     var saveProfileError: Error?
     var saveAnalysisError: Error?
+    var saveAnalysisV2Error: Error?
     var clearAnalysisError: Error?
     var updatePushTokenError: Error?
     var deleteError: Error?
@@ -46,6 +49,11 @@ final class MockDatabaseService: DatabaseServiceProtocol {
         return analysisByUserId[userId]
     }
 
+    func loadAIAnalysisV2(userId: String) async throws -> AIAnalysisV2? {
+        if let loadAnalysisV2Error { throw loadAnalysisV2Error }
+        return analysisV2ByUserId[userId]
+    }
+
     func saveProfile(userId: String, email: String, firstName: String, questionnaireData: UserProfile) async throws {
         saveProfileCount += 1
         if let saveProfileError { throw saveProfileError }
@@ -56,6 +64,11 @@ final class MockDatabaseService: DatabaseServiceProtocol {
         saveAnalysisCount += 1
         if let saveAnalysisError { throw saveAnalysisError }
         analysisByUserId[userId] = analysis
+    }
+
+    func saveAIAnalysisV2(userId: String, analysis: AIAnalysisV2) async throws {
+        if let saveAnalysisV2Error { throw saveAnalysisV2Error }
+        analysisV2ByUserId[userId] = analysis
     }
 
     func clearAIAnalysis(userId: String) async throws {
