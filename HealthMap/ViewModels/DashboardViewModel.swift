@@ -7,8 +7,12 @@ final class DashboardViewModel: ObservableObject {
 
     @Published var profile: UserProfile = .empty
     @Published var aiAnalysis: MergedAnalysis?
+    /// Bilan v2 (contrat v2) — nourrit le NOUVEL écran Bilan (v6). Le flux v7
+    /// (`aiAnalysis`) continue de nourrir Plan/Compléments jusqu'à la vague V4.
+    @Published var analysisV2: AIAnalysisV2?
     @Published var isLoadingProfile = false
     @Published var isLoadingAnalysis = false
+    @Published var isLoadingAnalysisV2 = false
     @Published var healthScore: Int = 0
     @Published var nutrientScores: [String: Int] = [:]
     @Published var hasCompletedQuestionnaire = false
@@ -268,6 +272,11 @@ final class DashboardViewModel: ObservableObject {
 
         analyticsService.track(.analysisStarted, properties: nil)
 
+        // Bilan v2 : part EN PARALLÈLE de l'appel v7 (deux tâches distinctes
+        // sur le même endpoint). v2 nourrit le nouvel écran Bilan et n'est pas
+        // bloqué par le v7 ; il gère son propre état (isLoadingAnalysisV2).
+        Task { await self.fetchBilanV2(userId: userId, forceRefresh: false) }
+
         do {
             let merged = try await aiAnalysisService.fetchFullAnalysis(
                 userId: userId,
@@ -353,6 +362,10 @@ final class DashboardViewModel: ObservableObject {
         isLoadingAnalysis = true
         errorMessage = nil
 
+        // Bilan v2 : régénéré en parallèle (forceRefresh saute le cache
+        // ai_analysis_v2 et le signale au serveur).
+        Task { await self.fetchBilanV2(userId: userId, forceRefresh: true) }
+
         do {
             let merged = try await aiAnalysisService.regenerate(
                 userId: userId,
@@ -388,6 +401,42 @@ final class DashboardViewModel: ObservableObject {
         }
 
         isLoadingAnalysis = false
+    }
+
+    // MARK: - Bilan v2 (contrat v2 — nouvel écran Bilan)
+
+    /// Charge le bilan v2 : cache DB d'abord (géré par le service), sinon
+    /// Edge Function (tache "bilan"). Tourne en parallèle du flux v7.
+    /// Erreur → log seulement : l'écran Bilan v6 (étape UI) décidera de son
+    /// propre affichage d'erreur ; le flux v7 garde son bandeau existant.
+    private func fetchBilanV2(userId: String, forceRefresh: Bool) async {
+        // Mêmes gardes que triggerAnalysis : l'analyse doit pouvoir démarrer
+        // pendant la célébration post-questionnaire.
+        guard profile.completed else { return }
+        // Re-entrancy guard (reconnect + loadProfile + regenerate).
+        guard !isLoadingAnalysisV2 else { return }
+        isLoadingAnalysisV2 = true
+        defer { isLoadingAnalysisV2 = false }
+
+        // Entrées déterministes — mêmes sources locales que le flux v7
+        // (HealthCalculator / RedFlagDetector, mirrors de health.js).
+        let localScores = HealthCalculator.analyzeNutrientScores(profile: profile)
+        let localHealthScore = HealthCalculator.calculateHealthScore(profile: profile)
+        let localFlags = RedFlagDetector.detect(profile: profile)
+        let profileHash = AIAnalysisService.hashProfile(profile)
+
+        do {
+            analysisV2 = try await aiAnalysisService.fetchBilanV2(
+                userId: userId,
+                profileHash: profileHash,
+                scores: localScores,
+                healthScore: localHealthScore,
+                redFlags: localFlags,
+                forceRefresh: forceRefresh
+            )
+        } catch {
+            AppLogger.analysis.report(error, context: "Dashboard bilan v2")
+        }
     }
 
     // MARK: - Save Avatar Choice

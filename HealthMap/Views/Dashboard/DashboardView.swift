@@ -1,26 +1,31 @@
 import SwiftUI
 
-// MARK: - Dashboard View (onglet Bilan — refonte « v4 3D », direction validée juin 2026)
+// MARK: - Dashboard View (onglet Bilan — refonte « v6 vivant », juillet 2026)
 //
-// Langage v4 : fond crème, anneau plein du score, apports en champs de points
-// cliquables (pop-up bottom-sheet), symptôme en CTA compact, récolte 3D
-// (gamification adossée à la série), derniers repas du journal.
-// Source maquette : « Bilan v4 - 3D ». Structure de référence : DESIGN-PAGES.md.
+// Langage v6 : greeting « Bonjour {prénom} » + petit anneau de score (58 pt),
+// carte « Ta journée » (repas du jour, meal_scans), carte « Apports à
+// renforcer » (insight + 3 jauges du CONTRAT v2, pop-up bottom-sheet), tuiles
+// Symptôme / Ta récolte côte à côte, « Interactions détectées », derniers
+// repas du journal. Source maquette : « Bilan v6 - vivant ».
 //
-// Inchangé côté sécurité : les red flags URGENTS passent TOUJOURS au-dessus du
-// héros (une alerte ne doit pas attendre l'IA) ; le flux de chargement / d'échec
-// (FullAnalysisLoadingView / AnalysisErrorRetryView) reste identique.
+// Source de données : `DashboardViewModel.analysisV2` (contrat API v2,
+// tache "bilan"). Tant que le bilan v2 n'est pas là, le flux de chargement
+// existant reste inchangé (FullAnalysisLoadingView « 2-3 min » /
+// AnalysisErrorRetryView).
+//
+// Inchangé côté sécurité : les red flags URGENTS passent TOUJOURS au-dessus
+// du contenu (une alerte ne doit pas attendre l'IA).
 struct DashboardView: View {
     @EnvironmentObject var viewModel: DashboardViewModel
     @ObservedObject var gamification = GamificationService.shared
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
-    /// Journal du jour (table `meal_scans`) — chargé localement pour le bloc
+    /// Journal du jour (table `meal_scans`) — nourrit « Ta journée » et
     /// « Tes derniers repas ». Lecture seule, aucun calcul touché.
     @StateObject private var journal = MealJournalViewModel()
 
-    @State private var selectedNutrient: EnrichedNutrient?
-    @State private var selectedSymptom: SymptomeAnalyse?
+    @State private var selectedApport: ApportV2?
+    @State private var selectedSymptome: SymptomeV2?
     @State private var showAvatarPicker = false
     @State private var didOfferAvatarPicker = false
 
@@ -28,32 +33,12 @@ struct DashboardView: View {
         NavigationStack {
             ZStack {
                 WarmBackground()
-
-                if viewModel.aiAnalysis != nil {
-                    mainContent
-                } else if viewModel.profile.completed {
-                    VStack(spacing: 0) {
-                        if !immediateRedFlags.isEmpty {
-                            RedFlagsCardView(flags: immediateRedFlags)
-                                .padding(.horizontal, Theme.spacingLG)
-                                .padding(.top, Theme.spacingMD)
-                        }
-                        if !viewModel.isLoadingAnalysis, let errorMessage = viewModel.errorMessage {
-                            AnalysisErrorRetryView(
-                                message: errorMessage,
-                                isRetrying: false,
-                                onRetry: { Task { await viewModel.triggerAnalysis() } }
-                            )
-                        } else {
-                            FullAnalysisLoadingView()
-                        }
-                    }
-                } else {
-                    DashboardSkeletonView()
-                }
+                content
             }
-            .navigationTitle("Mon bilan")
-            .navigationBarTitleDisplayMode(.large)
+            // v6 : le greeting fait office de titre — la barre reste inline et
+            // vide, seul l'avatar Profil y demeure.
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 // Avatar Profil en haut à droite (ouvre le Profil en sheet via
                 // NotificationCenter, consommé par MainTabView). Accent vert kiwi.
@@ -68,21 +53,23 @@ struct DashboardView: View {
                     .accessibilityLabel("Profil")
                 }
             }
-            // Pop-up détail d'un apport (langage v4). .sheet(item:) garantit que
-            // la feuille reçoit toujours le nutriment courant.
-            .sheet(item: $selectedNutrient) { nutrient in
-                ApportDetailSheet(nutrient: nutrient) {
-                    selectedNutrient = nil
-                    NotificationCenter.default.post(
-                        name: .healthmapNavigateToTab,
-                        object: NavCardDestination.plan.rawValue
-                    )
+            // Pop-up détail d'un apport (contrat v2). .sheet(item:) garantit que
+            // la feuille reçoit toujours l'apport courant.
+            .sheet(item: $selectedApport) { apport in
+                ApportV2DetailSheet(apport: apport) {
+                    selectedApport = nil
+                    openTab(.plan)
                 }
             }
-            // Causes d'un symptôme — uniquement au tap "Voir pourquoi".
-            .sheet(item: $selectedSymptom) { symptom in
-                SymptomCausesSheet(item: symptom)
-                    .healthMapSheet(.large)
+            // « Voir pourquoi » d'un symptôme — causes mappées sur les apports v2.
+            .sheet(item: $selectedSymptome) { symptome in
+                SymptomeV6Sheet(
+                    symptome: symptome,
+                    apports: viewModel.analysisV2?.bilan?.apports ?? []
+                ) {
+                    selectedSymptome = nil
+                    openTab(.plan)
+                }
             }
             .sheet(isPresented: $showAvatarPicker) {
                 AvatarPickerView(profile: viewModel.profile) { key in
@@ -99,6 +86,40 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - Contenu (v6 si bilan v2 dispo, sinon flux chargement existant)
+    @ViewBuilder
+    private var content: some View {
+        if let v2 = viewModel.analysisV2, v2.isValidV2 {
+            mainContent(v2)
+        } else if viewModel.profile.completed {
+            VStack(spacing: 0) {
+                if !immediateRedFlags.isEmpty {
+                    RedFlagsCardView(flags: immediateRedFlags)
+                        .padding(.horizontal, Theme.spacingLG)
+                        .padding(.top, Theme.spacingMD)
+                }
+                if viewModel.isLoadingAnalysis || viewModel.isLoadingAnalysisV2 {
+                    FullAnalysisLoadingView()
+                } else if viewModel.errorMessage != nil || viewModel.aiAnalysis != nil {
+                    // Erreur explicite, OU pipeline terminé sans bilan v2
+                    // (échec silencieux du fetch v2) : on propose de relancer
+                    // plutôt que de laisser un chargement infini.
+                    AnalysisErrorRetryView(
+                        message: viewModel.errorMessage
+                            ?? "Ton bilan n'a pas pu être chargé. Vérifie ta connexion puis réessaie.",
+                        isRetrying: false,
+                        onRetry: { Task { await viewModel.triggerAnalysis() } }
+                    )
+                } else {
+                    // Analyse pas encore déclenchée (transition post-questionnaire).
+                    FullAnalysisLoadingView()
+                }
+            }
+        } else {
+            DashboardSkeletonView()
+        }
+    }
+
     // MARK: - Red flags (sécurité — inchangé)
     private var immediateRedFlags: [RedFlag] {
         viewModel.redFlags.filter { $0.urgency == .immediate }
@@ -108,80 +129,73 @@ struct DashboardView: View {
         viewModel.redFlags.filter { $0.urgency != .immediate }
     }
 
-    // MARK: - Symptômes détectés (source : symptomes_analyse du bilan IA)
-    private var symptomes: [SymptomeAnalyse] {
-        (viewModel.aiAnalysis?.symptomesAnalyse ?? [])
-            .filter { ($0.symptome?.isEmpty == false) && !($0.causesProbables ?? []).isEmpty }
-    }
-
-    // MARK: - Main Content (langage v4)
-    // Ordre maquette : score → apports → symptôme → récolte → derniers repas.
-    // (Red flags urgents au-dessus pour la sécurité ; disclaimer + red flags non
-    // urgents en bas.)
-    private var mainContent: some View {
+    // MARK: - Main Content (langage v6)
+    // Ordre maquette : greeting+score → ta journée → apports → tuiles
+    // symptôme/récolte → interactions → derniers repas. (Red flags urgents
+    // au-dessus pour la sécurité ; disclaimer + red flags non urgents en bas.)
+    private func mainContent(_ v2: AIAnalysisV2) -> some View {
         ScrollView {
-            VStack(spacing: 14) {
+            VStack(spacing: 13) {
                 if !immediateRedFlags.isEmpty {
                     RedFlagsCardView(flags: immediateRedFlags)
                         .padding(.horizontal, Theme.spacingLG)
                 }
 
-                // 1. Héros : score global (anneau plein)
-                BilanScoreCard(
-                    score: viewModel.healthScore,
-                    summary: viewModel.aiAnalysis?.summary?.headline
+                // 1. Greeting + date + besoins nourris + petit anneau de score
+                BilanGreetingHeader(
+                    firstName: viewModel.firstName,
+                    besoinsNourris: v2.besoinsNourris,
+                    score: v2.score ?? viewModel.healthScore
                 )
                 .padding(.horizontal, Theme.spacingLG)
                 .staggeredAppear(index: 0)
 
-                // 2. Apports à renforcer (champs de points cliquables)
-                if !topDeficiencies.isEmpty {
-                    ApportsCard(deficiencies: topDeficiencies) { nutrient in
-                        HapticService.shared.tap()
-                        selectedNutrient = nutrient
-                    }
-                    .padding(.horizontal, Theme.spacingLG)
-                    .staggeredAppear(index: 1)
+                // 2. Ta journée (repas scannés du jour — tap → onglet Scanner)
+                TaJourneeV6Card(meals: journal.meals) {
+                    HapticService.shared.tap()
+                    openTab(.scanner)
                 }
+                .padding(.horizontal, Theme.spacingLG)
+                .staggeredAppear(index: 1)
 
-                // 3. Symptôme détecté (CTA compact → causes en feuille)
-                if let symptom = symptomes.first {
-                    SymptomeCardV4(label: prettifySymptom(symptom.symptome ?? "")) {
+                // 3. Apports à renforcer (insight + jauges cliquables)
+                if let apports = v2.bilan?.apports, !apports.isEmpty {
+                    ApportsV6Card(
+                        insight: v2.bilan?.apportsInsight,
+                        apports: Array(apports.prefix(3))
+                    ) { apport in
                         HapticService.shared.tap()
-                        selectedSymptom = symptom
+                        selectedApport = apport
                     }
                     .padding(.horizontal, Theme.spacingLG)
                     .staggeredAppear(index: 2)
                 }
 
-                // 4. Ta récolte (gamification — masquée en mode zen)
-                if !gamification.isZenMode {
-                    RecolteCard(streak: gamification.currentStreak)
+                // 4. Tuiles Symptôme + Ta récolte (récolte masquée en mode zen)
+                tilesRow(v2)
+                    .padding(.horizontal, Theme.spacingLG)
+                    .staggeredAppear(index: 3)
+
+                // 5. Interactions détectées (≤2, contrat v2)
+                if let interactions = v2.bilan?.interactions,
+                   interactions.contains(where: { ($0.tipBold?.isEmpty == false) || ($0.tipRest?.isEmpty == false) }) {
+                    InteractionsV6Card(interactions: Array(interactions.prefix(2)))
                         .padding(.horizontal, Theme.spacingLG)
-                        .padding(.top, 8)
-                        .staggeredAppear(index: 3)
+                        .staggeredAppear(index: 4)
                 }
 
-                // 5. Tes derniers repas (journal du jour)
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Tes derniers repas")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.kiwiCharcoal)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    DerniersRepasCard(meals: journal.meals) {
+                // 6. Tes derniers repas (journal réel — masquée si vide)
+                if !journal.meals.isEmpty {
+                    DerniersRepasV6Card(meals: journal.meals) {
                         HapticService.shared.tap()
-                        NotificationCenter.default.post(
-                            name: .healthmapNavigateToTab,
-                            object: NavCardDestination.scanner.rawValue
-                        )
+                        openTab(.scanner)
                     }
+                    .padding(.horizontal, Theme.spacingLG)
+                    .staggeredAppear(index: 5)
                 }
-                .padding(.horizontal, Theme.spacingLG)
-                .padding(.top, 8)
-                .staggeredAppear(index: 4)
 
-                // Indicateur de rafraîchissement (analyse déjà présente)
-                if viewModel.isLoadingAnalysis && viewModel.aiAnalysis != nil {
+                // Indicateur de rafraîchissement (bilan déjà présent)
+                if viewModel.isLoadingAnalysis || viewModel.isLoadingAnalysisV2 {
                     HStack(spacing: Theme.spacingSM) {
                         ProgressView().tint(Color.kiwiGreen)
                         Text("Mise à jour de l'analyse…")
@@ -191,7 +205,7 @@ struct DashboardView: View {
                     .padding()
                 }
 
-                // 6. Disclaimer + red flags non urgents
+                // 7. Disclaimer + red flags non urgents
                 disclaimerCard
 
                 if !otherRedFlags.isEmpty {
@@ -208,9 +222,31 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Top deficiencies (3 apports les plus bas)
-    private var topDeficiencies: [EnrichedNutrient] {
-        Array(viewModel.deficiencies.prefix(3))
+    // MARK: - Rangée de tuiles (symptôme du contrat + récolte)
+    @ViewBuilder
+    private func tilesRow(_ v2: AIAnalysisV2) -> some View {
+        let symptome = v2.bilan?.symptomes?.first(where: { $0.nom?.isEmpty == false })
+        if symptome != nil || !gamification.isZenMode {
+            HStack(alignment: .top, spacing: 12) {
+                if let symptome {
+                    SymptomeV6Tile(nom: symptome.nom ?? "") {
+                        HapticService.shared.tap()
+                        selectedSymptome = symptome
+                    }
+                }
+                if !gamification.isZenMode {
+                    RecolteV6Tile(streak: gamification.currentStreak)
+                }
+            }
+        }
+    }
+
+    // MARK: - Navigation onglets (mécanisme existant)
+    private func openTab(_ destination: NavCardDestination) {
+        NotificationCenter.default.post(
+            name: .healthmapNavigateToTab,
+            object: destination.rawValue
+        )
     }
 
     /// Présente le sélecteur d'avatar une seule fois quand le profil est
@@ -336,99 +372,6 @@ struct FullAnalysisLoadingView: View {
                     withAnimation(.easeInOut(duration: 0.4)) {
                         messageIndex = (messageIndex + 1) % messages.count
                     }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Libellé lisible pour les clés de symptôme (fatigue_persistante → Fatigue persistante)
-private func prettifySymptom(_ raw: String) -> String {
-    let cleaned = raw.replacingOccurrences(of: "_", with: " ").trimmingCharacters(in: .whitespaces)
-    guard let first = cleaned.first else { return cleaned }
-    return first.uppercased() + cleaned.dropFirst()
-}
-
-// MARK: - Symptom causes sheet (ouverte au tap "Voir pourquoi")
-private struct SymptomCausesSheet: View {
-    let item: SymptomeAnalyse
-    @Environment(\.dismiss) private var dismiss
-
-    private var causes: [String] { item.causesProbables ?? [] }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.spacingMD) {
-                    HStack(spacing: Theme.spacingSM) {
-                        Image(systemName: "waveform.path.ecg")
-                            .font(.system(size: 18))
-                            .foregroundStyle(Color.healthMapBlue)
-                            .frame(width: 36, height: 36)
-                            .background(Color.healthMapBlueLight)
-                            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(prettifySymptom(item.symptome ?? ""))
-                                .font(Theme.headlineFont)
-                                .foregroundStyle(Color.healthMapText)
-                            Text("\(causes.count) cause\(causes.count > 1 ? "s" : "") possible\(causes.count > 1 ? "s" : "")")
-                                .font(Theme.captionFont)
-                                .foregroundStyle(Color.healthMapSecondary)
-                        }
-                        Spacer()
-                    }
-
-                    ForEach(Array(causes.enumerated()), id: \.offset) { _, cause in
-                        Text(cause)
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapText)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(Theme.spacingMD)
-                            .background(Color.healthMapCard)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
-                    }
-
-                    if let aVerifier = item.aVerifier, !aVerifier.isEmpty {
-                        HStack(alignment: .top, spacing: Theme.spacingSM) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color.healthMapBlue)
-                                .padding(.top, 1)
-                                .accessibilityHidden(true)
-                            Text("À vérifier\u{202F}: \(aVerifier)")
-                                .font(Theme.captionFont)
-                                .foregroundStyle(Color.healthMapBlue)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(Theme.spacingMD)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.healthMapBlueLight)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
-                    }
-
-                    Text("Informatif\u{202F}: ne remplace pas un avis médical.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.healthMapMuted)
-                        .padding(.top, Theme.spacingXS)
-                }
-                .padding(Theme.spacingLG)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .background(Color.healthMapBackground)
-            .navigationTitle("Causes possibles")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(Color.healthMapMuted)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("Fermer")
                 }
             }
         }

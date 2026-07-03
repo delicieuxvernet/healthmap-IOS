@@ -201,6 +201,139 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         return try await fetchFullAnalysis(userId: userId, profile: profile)
     }
 
+    // MARK: - Fetch Bilan v2 (contrat v2 — nourrit l'écran Bilan v6)
+    /// Poste le MÊME endpoint `generate-analysis` avec `"tache": "bilan"` en
+    /// plus dans le body. Réutilise l'infra existante : client Supabase
+    /// (session/token), timeouts longs de la session réseau (210/300 s —
+    /// NE PAS rebaisser, cf. incident bilan du 28 juin) + garde client 185 s
+    /// identique au flux v7, circuit breaker PARTAGÉ avec le v7 (même
+    /// fonction serveur derrière), décodage tolérant (AIAnalysisV2.swift).
+    ///
+    /// Contrairement au v7 (qui retourne nil sur réponse inexploitable), une
+    /// réponse sans apports jette `.invalidResponse` : le retour est
+    /// non-optionnel pour que l'UI n'ait qu'un seul chemin d'erreur.
+    func fetchBilanV2(
+        userId: String,
+        profileHash: String,
+        scores: [String: Int],
+        healthScore: Int,
+        redFlags: [RedFlag],
+        forceRefresh: Bool = false
+    ) async throws -> AIAnalysisV2 {
+        // 1. Cache DB (profiles.ai_analysis_v2) — lu AVANT le circuit breaker,
+        // même logique que le v7 : un bilan déjà en base doit toujours pouvoir
+        // s'afficher. Colonne absente / cache illisible → appel edge normal.
+        if !forceRefresh,
+           let cached = ((try? await DatabaseService.shared.loadAIAnalysisV2(userId: userId)) ?? nil),
+           cached.isValidV2,
+           cached.meta?.profileHash == profileHash {
+            return cached
+        }
+
+        // Circuit breaker partagé avec le flux v7 (même Edge Function).
+        if let openUntil = circuitOpenUntil, Date() < openUntil {
+            throw AIAnalysisError.circuitOpen
+        }
+        if let openUntil = circuitOpenUntil, Date() >= openUntil {
+            circuitOpenUntil = nil
+            consecutiveFailures = 0
+        }
+
+        // 2. Appel Edge Function — même garde client 185 s que le v7
+        // (VOLONTAIREMENT > au timeout serveur, cf. commentaire du v7).
+        let requestBody = BilanV2Request(
+            tache: "bilan",
+            scores: scores,
+            healthScore: healthScore,
+            redFlags: redFlags.map { EdgeFlagDTO(id: $0.id.rawValue, urgency: $0.urgency.rawValue, message: $0.message) },
+            profileHash: profileHash,
+            forceRefresh: forceRefresh
+        )
+
+        let analysis: AIAnalysisV2
+        do {
+            analysis = try await withThrowingTaskGroup(of: AIAnalysisV2.self) { group in
+                group.addTask {
+                    try await self.client.functions.invoke(
+                        "generate-analysis",
+                        options: .init(body: requestBody)
+                    )
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(185))
+                    throw AIAnalysisError.timeout
+                }
+                guard let result = try await group.next() else {
+                    group.cancelAll()
+                    throw AIAnalysisError.timeout
+                }
+                group.cancelAll()
+                return result
+            }
+        } catch let error as FunctionsError {
+            // Même mapping HTTP → AIAnalysisError que le flux v7.
+            switch error {
+            case .httpError(let code, _):
+                AppLogger.analysis.error("Bilan v2 : Edge Function HTTP \(code, privacy: .public)")
+                switch code {
+                case 429:
+                    throw AIAnalysisError.rateLimited
+                case 400...499:
+                    throw AIAnalysisError.clientError(code)
+                case 500...599:
+                    throw AIAnalysisError.serverError(code)
+                default:
+                    throw AIAnalysisError.invalidResponse
+                }
+            case .relayError:
+                AppLogger.analysis.error("Bilan v2 : Edge Function relay error")
+                throw AIAnalysisError.serverError(0)
+            @unknown default:
+                throw AIAnalysisError.invalidResponse
+            }
+        } catch let error as URLError where error.code == .timedOut {
+            recordFailure()
+            throw AIAnalysisError.timeout
+        } catch let error as URLError {
+            AppLogger.analysis.error("Bilan v2 network error: \(error.localizedDescription, privacy: .public)")
+            recordFailure()
+            throw AIAnalysisError.networkError(error)
+        } catch let error as DecodingError {
+            // Échec de DÉCODAGE (≠ réseau) : non-retryable, comme le v7.
+            AppLogger.analysis.error("Bilan v2 undecodable: \(Self.describe(error), privacy: .public)")
+            recordFailure()
+            throw AIAnalysisError.invalidResponse
+        } catch let error as AIAnalysisError {
+            if error.isRetryable { recordFailure() }
+            throw error
+        }
+
+        // Succès : reset du circuit breaker.
+        consecutiveFailures = 0
+        circuitOpenUntil = nil
+
+        guard analysis.isValidV2 else {
+            AppLogger.analysis.error("Bilan v2 : réponse sans apports exploitables")
+            throw AIAnalysisError.invalidResponse
+        }
+
+        // 3. Cache DB non bloquant — clé distincte du v7 (ai_analysis_v2).
+        // Si la colonne n'existe pas encore côté DB, l'échec est loggé en
+        // notice et n'affecte pas le retour.
+        var toCache = analysis
+        if toCache.meta == nil { toCache.meta = MetaV2() }
+        toCache.meta?.profileHash = profileHash
+        Task {
+            do {
+                try await DatabaseService.shared.saveAIAnalysisV2(userId: userId, analysis: toCache)
+            } catch {
+                AppLogger.database.notice("Bilan v2 cache save failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+
+        return toCache
+    }
+
     // MARK: - Hash Profile (same djb2 as web — excludes completed + firstName)
     static func hashProfile(_ profile: UserProfile) -> String {
         // Web: excludes "completed" and "firstName", sorts remaining keys
@@ -385,6 +518,16 @@ private struct EdgeFlagDTO: Encodable {
     let id: String
     let urgency: String
     let message: String
+}
+
+// MARK: - Bilan v2 Request DTO (même body que le v7 + "tache": "bilan")
+private struct BilanV2Request: Encodable {
+    let tache: String
+    let scores: [String: Int]
+    let healthScore: Int
+    let redFlags: [EdgeFlagDTO]
+    let profileHash: String
+    let forceRefresh: Bool
 }
 
 // MARK: - Errors
