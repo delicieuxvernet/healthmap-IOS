@@ -91,6 +91,7 @@ struct SuiviView: View {
                     .padding(.bottom, 24)
                 }
             }
+            .kiwiTabBarBottomInset()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

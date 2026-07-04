@@ -33,6 +33,7 @@ struct DashboardView: View {
                 WarmBackground()
                 content
             }
+            .kiwiTabBarBottomInset()
             // v6 : le greeting fait office de titre — la barre reste inline et
             // vide, seul l'avatar Profil y demeure.
             .navigationTitle("")

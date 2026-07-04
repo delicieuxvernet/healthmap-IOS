@@ -77,6 +77,7 @@ struct SupplementsView: View {
                     emptyState
                 }
             }
+            .kiwiTabBarBottomInset()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

@@ -60,3 +60,18 @@ struct KiwiFloatingTabBar: View {
         .accessibilityElement(children: .contain)
     }
 }
+
+// MARK: - Réservation d'espace pour la barre flottante
+/// Réserve la hauteur de la pill (8 pt de marge haute + 64 pt + 2 pt basse
+/// = 74 pt) pour que le contenu défilant s'arrête AU-DESSUS de la barre.
+/// ⚠️ À appliquer au CONTENU RACINE, À L'INTÉRIEUR du NavigationStack de
+/// chaque onglet : un inset posé sur le TabView ou autour du NavigationStack
+/// ne se propage pas à la safe area du scroll (hébergement UIKit) — c'était
+/// la cause du contenu masqué sous la barre (builds 179→202).
+extension View {
+    func kiwiTabBarBottomInset() -> some View {
+        safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear.frame(height: 74)
+        }
+    }
+}
