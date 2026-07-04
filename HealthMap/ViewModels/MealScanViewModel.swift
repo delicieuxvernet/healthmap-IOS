@@ -447,11 +447,7 @@ final class MealScanViewModel: ObservableObject {
             GamificationService.shared.unlockMealScanned()
 
             // 8. Ajoute le repas au journal du jour (best-effort).
-<<<<<<< Updated upstream
-            await persistToJournal(detectedFoods: response.detectedFoods ?? [], macros: macros, micros: micros)
-=======
-            await persistToJournal(detectedFoods: detectedNames, macros: macros)
->>>>>>> Stashed changes
+            await persistToJournal(detectedFoods: detectedNames, macros: macros, micros: micros)
 
             // Compteur de scans restants — la fonction renvoie rate_limit.remaining.
             updateScansRemaining(response.rateLimit?.remaining)
