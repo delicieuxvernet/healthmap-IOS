@@ -44,6 +44,11 @@ final class MealScanViewModel: ObservableObject {
         /// Identifiants des nutriments où l'utilisateur est sous le seuil
         /// (envoyés à l'IA) — sert l'en-tête « À renforcer chez toi ».
         var userNeeds: [String]
+        /// Bloc contrat v2 (`scan_v2`, opt-in `contract: "v2"`) : plat nommé,
+        /// couverture des besoins, apports ciblés rédigés par le serveur.
+        /// nil si le serveur ne l'a pas renvoyé — l'écran scan validé reste
+        /// entièrement fonctionnel sans lui.
+        var scanV2: ScanV2? = nil
     }
 
     struct MacroNutrients {
@@ -134,11 +139,16 @@ final class MealScanViewModel: ObservableObject {
         let warnings: [String]?
         let error: String?
         let scansRemaining: Int?
+        /// Bloc contrat v2 (optionnel) — décodage tolérant : `ScanV2.init(from:)`
+        /// ne jette jamais, un bloc malformé devient un bloc vide au lieu de
+        /// faire échouer toute la réponse.
+        let scanV2: ScanV2?
 
         enum CodingKeys: String, CodingKey {
             case detectedFoods = "detected_foods"
             case foods, macros, micros, advice, warnings, error
             case scansRemaining = "scans_remaining"
+            case scanV2 = "scan_v2"
         }
     }
 
@@ -244,6 +254,9 @@ final class MealScanViewModel: ObservableObject {
         let deficiencies: [String]
         /// "ios" -> active le quota « 3 scans gratuits à vie » côté serveur.
         let client: String
+        /// "v2" -> opt-in contrat v2 : la fonction (version 10+) ajoute le
+        /// bloc `scan_v2` à sa réponse (les anciennes versions l'ignorent).
+        let contract: String
     }
 
     // MARK: - Image Compression
@@ -324,7 +337,8 @@ final class MealScanViewModel: ObservableObject {
             let requestBody = MealAnalyzeRequest(
                 image: base64String,
                 deficiencies: userDeficiencies,
-                client: "ios"
+                client: "ios",
+                contract: "v2"
             )
 
             let response: EdgeMealResponse = try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
@@ -413,7 +427,8 @@ final class MealScanViewModel: ObservableObject {
                 micros: micros,
                 advice: advice,
                 warnings: response.warnings ?? [],
-                userNeeds: userDeficiencies
+                userNeeds: userDeficiencies,
+                scanV2: response.scanV2
             )
 
             // 7. Record gamification checkin + analytics

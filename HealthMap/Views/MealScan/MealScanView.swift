@@ -264,9 +264,9 @@ struct MealScanView: View {
                     MacrosCardV4(macros: result.macros)
                         .padding(.horizontal, Theme.spacingLG)
 
-                    completeMealSection(result.advice)
+                    completeMealSection(result)
 
-                    BesoinsCourbeCard(values: curve)
+                    BesoinsCourbeCard(values: curve, insight: result.scanV2?.courbeInsight)
                         .padding(.horizontal, Theme.spacingLG)
 
                     premiumScanBanner
@@ -328,11 +328,13 @@ struct MealScanView: View {
                 .padding(.top, 54)
                 Spacer()
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(mealSlotLabel)
+                    Text(headerTitle(result))
                         .font(.system(size: 27, weight: .bold))
                         .foregroundStyle(.white)
-                    if !result.detectedFoods.isEmpty {
-                        Text(result.detectedFoods.prefix(4).joined(separator: " · "))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                    if let subtitle = headerSubtitle(result) {
+                        Text(subtitle)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.9))
                             .lineLimit(2)
@@ -373,13 +375,44 @@ struct MealScanView: View {
         }
     }
 
+    /// Titre du header : nom du plat rédigé par le serveur (contrat v2,
+    /// `scan_v2.plat.nom`) quand présent — remplace le créneau générique
+    /// (Déjeuner, Dîner…), comme le prévoit la maquette. Sinon inchangé.
+    private func headerTitle(_ result: MealScanViewModel.MealAnalysisResult) -> String {
+        if let nom = result.scanV2?.plat?.nom?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !nom.isEmpty {
+            return nom
+        }
+        return mealSlotLabel
+    }
+
+    /// Sous-titre du header : description du plat (contrat v2,
+    /// `scan_v2.plat.description`) quand présente, sinon la liste des
+    /// aliments détectés (rendu historique). nil → pas de sous-titre.
+    private func headerSubtitle(_ result: MealScanViewModel.MealAnalysisResult) -> String? {
+        if let description = result.scanV2?.plat?.description?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !description.isEmpty {
+            return description
+        }
+        guard !result.detectedFoods.isEmpty else { return nil }
+        return result.detectedFoods.prefix(4).joined(separator: " · ")
+    }
+
     // MARK: - Carte couverture « N de tes besoins » (chevauche le header)
     private func coverageHero(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
         let needs = result.micros.filter { $0.isDeficiency }
         let pool = needs.isEmpty ? result.micros : needs
         let total = pool.count
         let covered = pool.filter { $0.pctRDA >= 60 }.count
-        return MealCoverageHero(coveredCount: covered, totalCount: total)
+        // Contrat v2 : comptes + phrase rédigés par le serveur quand présents
+        // (`scan_v2.couverture`) — repli champ par champ sur le calcul local.
+        let couverture = result.scanV2?.couverture
+        return MealCoverageHero(
+            coveredCount: couverture?.nbRenforces ?? covered,
+            totalCount: couverture?.totalBesoins ?? total,
+            insight: couverture?.insight
+        )
     }
 
     // MARK: - « Ce que ton plat t'apporte » — anneaux 3-up cliquables
@@ -448,11 +481,17 @@ struct MealScanView: View {
     }
 
     // MARK: - « Ce qui manque à ton plat »
+    /// Contrat v2 : les `scan_v2.manques` (≤2, suggestion + icône serveur)
+    /// priment sur les conseils historiques ; sans eux, rendu inchangé.
     @ViewBuilder
-    private func completeMealSection(_ advice: MealScanViewModel.MealAdvice) -> some View {
+    private func completeMealSection(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
+        let advice = result.advice
         let lines: [String] = !advice.suggestedAdditions.isEmpty ? advice.suggestedAdditions : advice.swaps
-        if !lines.isEmpty {
-            CompleteMealCardV4(lines: lines)
+        let manques = (result.scanV2?.manques ?? []).filter {
+            !($0.suggestion ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        if !lines.isEmpty || !manques.isEmpty {
+            CompleteMealCardV4(lines: lines, manques: manques)
                 .padding(.horizontal, Theme.spacingLG)
         }
     }
