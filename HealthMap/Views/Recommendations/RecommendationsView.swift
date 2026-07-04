@@ -69,6 +69,10 @@ struct RecommendationsView: View {
 struct RecommendationsContentView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @StateObject private var vm: RecommendationsViewModel
+    /// Journal alimentaire (repas scannés de la quinzaine) — nourrit la carte
+    /// « Focus de la semaine » en tête du Plan. Chargé une fois via `.task`.
+    @StateObject private var journalVM = MealJournalViewModel()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Topic dont la pop-up « Voir mes solutions » est ouverte.
     @State private var activeTopic: PlanTopic?
@@ -93,6 +97,15 @@ struct RecommendationsContentView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 24)
                 .padding(.top, 4)
+
+                // 1 bis. « Focus de la semaine » : une mission unique dérivée des
+                // scans (moteur déterministe). Affichée seulement si on peut la
+                // calculer honnêtement (des repas scannés existent) — sinon rien,
+                // jamais de chiffre inventé.
+                if let focus = planFocus {
+                    PlanFocusCardV6(focus: focus, reduceMotion: reduceMotion)
+                        .padding(.horizontal, 24)
+                }
 
                 // 2. Une carte par symptôme / objectif.
                 ForEach(topics) { topic in
@@ -142,6 +155,30 @@ struct RecommendationsContentView: View {
                 vm.updateAnalysis(newAnalysis)
             }
         }
+        .task {
+            // Repas scannés de la quinzaine (lecture seule) pour la carte Focus.
+            // Aucun LLM : la mission est ensuite calculée localement (SuiviEngineV4).
+            await journalVM.load()
+        }
+    }
+
+    // MARK: - Focus de la semaine (carte en tête, 100 % déterministe)
+    /// Mission unique de la semaine, dérivée des repas réellement scannés :
+    /// couverture 7 jours des apports à renforcer → apport le plus à combler →
+    /// mission « 3 repas riches en X » + progrès compté sur les scans de la
+    /// semaine. `nil` s'il n'y a rien à calculer honnêtement (aucun scan) →
+    /// la carte n'est pas affichée (jamais de chiffre inventé).
+    private var planFocus: SuiviEngineV4.PlanFocus? {
+        // Apports à renforcer = ids des nutriments faibles (< 70, cf. deficiencies).
+        let focusIds = dashboardVM.deficiencies.map(\.id)
+        let coverage = SuiviEngineV4.nutrientCoverage(
+            fortnight: journalVM.fortnight,
+            focusIds: focusIds
+        )
+        // Repas de la SEMAINE courante (sous-ensemble de la quinzaine).
+        let week = WeekScoreEngine.currentWeekInterval(containing: Date())
+        let weekMeals = journalVM.fortnight.filter { week.contains($0.consumedAt) }
+        return SuiviEngineV4.planFocus(coverage: coverage, weekMeals: weekMeals)
     }
 
     // MARK: - Construction des topics (symptômes + objectifs)

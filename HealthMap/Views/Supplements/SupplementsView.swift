@@ -22,6 +22,25 @@ struct SupplementsView: View {
     @State private var whyRec: SupplementRecommendation?
     @State private var interRec: SupplementRecommendation?
 
+    /// Rituel du jour (tête de l'onglet) — dérivé du bilan v2 caché de façon
+    /// déterministe, coche persistée localement. Recalculé à l'apparition et à
+    /// chaque bascule (le moteur relit UserDefaults). Aucun appel réseau/IA.
+    @State private var rituel: SuiviEngineV4.ComplementsRituel?
+
+    /// Compléments du bilan v2 caché (source du rituel du jour). nil si le bilan
+    /// n'est pas encore disponible → carte en état vide propre, jamais de crash.
+    private var complementsV2: ComplementsV2? {
+        dashboardVM.analysisV2?.complements
+    }
+
+    /// Signature légère (Equatable) des compléments du bilan, pour ré-armer le
+    /// rituel quand le bilan v2 arrive/change sans exiger `AIAnalysisV2: Equatable`.
+    private var complementsSignature: String {
+        (complementsV2?.complements ?? [])
+            .compactMap { $0.id }
+            .joined(separator: "|")
+    }
+
     // Moteur (à partir des scores + profil)
     private var engineResult: SupplementEngineResult? {
         let scores = dashboardVM.nutrientScores
@@ -78,6 +97,8 @@ struct SupplementsView: View {
                 }
             }
             .kiwiTabBarBottomInset()
+            .onAppear { refreshRituel() }
+            .onChange(of: complementsSignature) { _, _ in refreshRituel() }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -116,6 +137,13 @@ struct SupplementsView: View {
                         .foregroundStyle(Color.healthMapSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                // « Ton rituel du jour » EN TÊTE (cochable, persistant local).
+                if let rituel {
+                    ComplementsRituelCard(rituel: rituel) { id in
+                        toggleRituel(id)
+                    }
+                }
 
                 SupplementTransparencyCard()
 
@@ -165,6 +193,20 @@ struct SupplementsView: View {
     }
 
     // MARK: - Actions
+
+    /// (Re)construit le rituel du jour à partir du bilan v2 caché (déterministe).
+    private func refreshRituel() {
+        rituel = SuiviEngineV4.complementsRituel(complements: complementsV2)
+    }
+
+    /// Coche/décoche un item du rituel pour aujourd'hui (persisté localement).
+    private func toggleRituel(_ id: String) {
+        HapticService.shared.selection()
+        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
+            rituel = SuiviEngineV4.toggleRituel(id: id, complements: complementsV2)
+        }
+    }
+
     private func openWhy(_ rec: SupplementRecommendation) {
         HapticService.shared.selection()
         whyRec = rec
