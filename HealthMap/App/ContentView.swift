@@ -447,6 +447,7 @@ struct MainTabView: View {
                 case .suivi: selectedTab = .suivi
                 case .scanner: selectedTab = .scanner
                 case .plan: selectedTab = .plan
+                case .complements: selectedTab = .complements
                 case .profil: showProfile = true
                 }
             }
@@ -457,11 +458,18 @@ struct MainTabView: View {
         // BLOCAGE pendant la 1re analyse IA (retour test 20 juin) : tant que le
         // bilan n'est pas prêt, on couvre TOUTE l'app (barre d'onglets comprise)
         // -> impossible de naviguer ailleurs. Se ferme automatiquement dès que le
-        // résultat arrive (aiAnalysis != nil). En cas d'échec : écran Réessayer,
+        // résultat arrive (analysisV2 != nil). En cas d'échec : écran Réessayer,
         // jamais de scores bruts. Un utilisateur revenant avec un bilan en cache
-        // ne voit pas cet écran (aiAnalysis est non-nil quasi immédiatement).
+        // ne voit pas cet écran (analysisV2 est non-nil quasi immédiatement).
+        //
+        // ⚠️ Gardé sur analysisV2 (bilan v2, réellement affiché par DashboardView
+        // v6), PAS sur aiAnalysis (v7, legacy) — incident du 4 juillet : la gate
+        // bloquait sur un raté du flux v7 pendant que le VRAI bilan (v2) avait
+        // déjà réussi en arrière-plan, forçant des "Réessayer" inutiles qui
+        // épuisaient le quota gratuit partagé (v7+v2 comptent sur le même
+        // endpoint côté serveur) sur le tout premier bilan d'un compte neuf.
         .fullScreenCover(isPresented: Binding(
-            get: { dashboardVM.aiAnalysis == nil && (dashboardVM.isLoadingAnalysis || dashboardVM.errorMessage != nil) },
+            get: { dashboardVM.analysisV2 == nil && (dashboardVM.isLoadingAnalysisV2 || dashboardVM.errorMessageV2 != nil) },
             set: { _ in }
         )) {
             AnalysisGateView()
@@ -510,7 +518,7 @@ private struct AnalysisGateView: View {
     var body: some View {
         ZStack {
             WarmBackground().ignoresSafeArea()
-            if !dashboardVM.isLoadingAnalysis, let errorMessage = dashboardVM.errorMessage {
+            if !dashboardVM.isLoadingAnalysisV2, let errorMessage = dashboardVM.errorMessageV2 {
                 AnalysisErrorRetryView(
                     message: errorMessage,
                     isRetrying: false,

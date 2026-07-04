@@ -16,10 +16,11 @@ import Foundation
 //   6. CTA vert clair « Continue 2 semaines · 5/7 de tes besoins du jour ».
 //
 // Données réelles branchées : le symptôme vient de
-// `dashboardVM.aiAnalysis?.symptomesAnalyse` (1er), la couverture par nutriment
-// vient de `dashboardVM.nutrients` (label + score → HealthScale). Le check-in
-// du jour persiste en local (SuiviStore, scopé par utilisateur), la série
-// vient de GamificationService.
+// `dashboardVM.analysisV2?.bilan?.symptomes` (1er, contrat v2 — plus jamais de
+// nom inventé si aucun symptôme n'est déclaré, cf. SuiviNoSymptomCard), la
+// couverture par nutriment vient de `dashboardVM.nutrients` (label + score →
+// HealthScale). Le check-in du jour persiste en local (SuiviStore, scopé par
+// utilisateur), la série vient de GamificationService.
 //
 // GAPS (état exemple, faute d'historique réel) : la courbe d'évolution du
 // symptôme et la courbe apports/besoins sont des séries représentatives ;
@@ -36,18 +37,23 @@ struct SuiviView: View {
     /// Clé locale du choix du jour pour le ressenti du symptôme (0/1/2).
     private let symptomFeelKey = "symptome_today"
 
-    /// Nom du symptôme suivi : premier symptôme de l'analyse IA, sinon exemple.
-    private var symptomName: String {
-        if let s = dashboardVM.aiAnalysis?.symptomesAnalyse.first?.symptome,
-           !s.isEmpty {
-            return s
-        }
-        return "Ongles cassants"
+    /// Nom du premier symptôme déclaré, depuis le bilan IA (contrat v2).
+    /// nil si aucun symptôme déclaré ou bilan pas encore chargé — JAMAIS de
+    /// nom inventé (l'ancien repli "Ongles cassants" affichait un symptôme
+    /// fictif comme s'il venait de l'utilisateur).
+    private var symptomName: String? {
+        guard let s = dashboardVM.analysisV2?.bilan?.symptomes?.first?.nom,
+              !s.isEmpty else { return nil }
+        return s
     }
 
     /// Sens d'évolution + libellés dérivés du symptôme suivi : un symptôme
-    /// « problème » s'améliore en DESCENDANT, l'énergie en MONTANT.
-    private var trend: SymptomTrend { SymptomTrend.make(from: symptomName) }
+    /// « problème » s'améliore en DESCENDANT, l'énergie en MONTANT. nil tant
+    /// qu'il n'y a pas de symptôme réel à suivre.
+    private var trend: SymptomTrend? {
+        guard let symptomName else { return nil }
+        return SymptomTrend.make(from: symptomName)
+    }
 
     var body: some View {
         NavigationStack {
@@ -57,17 +63,23 @@ struct SuiviView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         titleBlock
-                        SuiviSymptomCurveCard(trend: trend,
-                                              reduceMotion: reduceMotion)
-                        SuiviSymptomCheckinCard(
-                            trend: trend,
-                            streak: gamification.currentStreak,
-                            selected: checkin[symptomFeelKey],
-                            reduceMotion: reduceMotion
-                        ) { choice in
-                            checkin[symptomFeelKey] = choice
-                            SuiviStore.saveCheckin(checkin)
-                            HapticService.shared.selection()
+                        if let trend {
+                            SuiviSymptomCurveCard(trend: trend,
+                                                  reduceMotion: reduceMotion)
+                            SuiviSymptomCheckinCard(
+                                trend: trend,
+                                streak: gamification.currentStreak,
+                                selected: checkin[symptomFeelKey],
+                                reduceMotion: reduceMotion
+                            ) { choice in
+                                checkin[symptomFeelKey] = choice
+                                SuiviStore.saveCheckin(checkin)
+                                HapticService.shared.selection()
+                            }
+                        } else if dashboardVM.isLoadingAnalysisV2 {
+                            SuiviSymptomLoadingCard()
+                        } else {
+                            SuiviNoSymptomCard()
                         }
                         SuiviNeedsCurveCard(reduceMotion: reduceMotion)
                         SuiviCoverageCard(nutrients: dashboardVM.nutrients,
@@ -173,6 +185,42 @@ struct SymptomTrend {
         }
         let tail = (symptom.split(separator: " ").first.map(String.init) ?? symptom).lowercased()
         return SymptomTrend(dir: .lowerBetter, noun: "tes \(tail)", betterLabel: "Mieux", worseLabel: "Moins bien")
+    }
+}
+
+// MARK: - Bilan pas encore chargé — état de chargement honnête (pas de flash vide)
+private struct SuiviSymptomLoadingCard: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            ProgressView()
+                .tint(Color.kiwiGreen)
+            Text("On regarde tes symptômes déclarés...")
+                .font(.system(size: 13.5, weight: .medium))
+                .foregroundStyle(Color.healthMapSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 22)
+        .kiwiCard()
+    }
+}
+
+// MARK: - Aucun symptôme déclaré — état vide honnête (jamais de nom inventé)
+private struct SuiviNoSymptomCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Aucun symptôme à suivre")
+                .font(.system(size: 16.5, weight: .heavy))
+                .foregroundStyle(Color.kiwiCharcoal)
+            Text("Tu n'as déclaré aucun symptôme dans ton questionnaire, il n'y a donc rien à suivre ici pour le moment.")
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(Color.healthMapSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 20)
+        .kiwiCard()
     }
 }
 

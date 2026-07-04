@@ -68,7 +68,6 @@ protocol AnalyticsServiceProtocol: AnyObject {
 
 protocol AIAnalysisServiceProtocol: AnyObject {
     func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis?
-    func regenerate(userId: String, profile: UserProfile) async throws -> MergedAnalysis?
     /// Bilan v2 (contrat v2) — même endpoint `generate-analysis` avec
     /// `"tache": "bilan"` en plus. Nourrit le nouvel écran Bilan (v6).
     func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2
