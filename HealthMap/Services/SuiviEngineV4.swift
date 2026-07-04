@@ -387,14 +387,14 @@ enum SuiviEngineV4 {
 
         // Un scan « aide » le nutriment s'il porte du pctRDA > 0 pour cet id.
         let helping = weekMeals.filter { meal in
-            meal.micros.contains { $0.id == target.nutrientId && $0.pctRDA > 0 }
+            meal.micros.contains { $0.id == target.id && $0.pctRDA > 0 }
         }
         let done = min(3, helping.count)
         // Exemple = 1er aliment détecté du 1er repas aidant.
         let example = helping.first?.foods.first
 
         let mission = "3 repas riches en \(target.nom.lowercased()) avant dimanche"
-        return PlanFocus(nutrientId: target.nutrientId,
+        return PlanFocus(nutrientId: target.id,
                          nutrientNom: target.nom,
                          mission: mission,
                          done: done,
