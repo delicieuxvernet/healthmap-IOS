@@ -130,58 +130,61 @@ final class MealScanViewModel: ObservableObject {
 
     // MARK: - Edge Function Response DTOs (Decodable)
 
+    // Forme RÉELLE de la réponse (vérifiée en prod le 4 juillet 2026) :
+    // { scan: <ligne meal_scans>, scan_v2, from_cache, rate_limit } — les champs
+    // legacy (detected_foods/macros/micros) vivent SOUS `scan`, pas en racine.
+    // L'ancien DTO les lisait en racine → cartes d'aliments et macros vides.
     private struct EdgeMealResponse: Decodable {
-        let detectedFoods: [String]?
-        let foods: [EdgeFood]?
+        let scan: EdgeScan?
+        let scanV2: ScanV2?
+        let fromCache: Bool?
+        let rateLimit: EdgeRateLimit?
+        let error: String?
+
+        enum CodingKeys: String, CodingKey {
+            case scan, error
+            case scanV2 = "scan_v2"
+            case fromCache = "from_cache"
+            case rateLimit = "rate_limit"
+        }
+    }
+
+    private struct EdgeRateLimit: Decodable {
+        let remaining: Int?
+        let dailyLimit: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case remaining
+            case dailyLimit = "daily_limit"
+        }
+    }
+
+    /// Ligne `meal_scans` renvoyée sous la clé `scan`. Valeurs par aliment dans
+    /// `detected_foods[].micros`, totaux dans `macros`/`micros`.
+    private struct EdgeScan: Decodable {
+        let detectedFoods: [EdgeDetectedFood]?
         let macros: EdgeMacros?
         let micros: [EdgeMicro]?
-        let advice: EdgeAdvice?
-        let warnings: [String]?
-        let error: String?
-        let scansRemaining: Int?
-        /// Bloc contrat v2 (optionnel) — décodage tolérant : `ScanV2.init(from:)`
-        /// ne jette jamais, un bloc malformé devient un bloc vide au lieu de
-        /// faire échouer toute la réponse.
-        let scanV2: ScanV2?
+        let mealScore: Int?
+        let perfectMix: EdgePerfectMix?
 
         enum CodingKeys: String, CodingKey {
             case detectedFoods = "detected_foods"
-            case foods, macros, micros, advice, warnings, error
-            case scansRemaining = "scans_remaining"
-            case scanV2 = "scan_v2"
+            case macros, micros
+            case mealScore = "meal_score"
+            case perfectMix = "perfect_mix"
         }
     }
 
-    private struct EdgeFood: Decodable {
-        let name: String?
-        let emoji: String?
-        let macros: EdgeFoodMacros?
-        let nutrients: [EdgeFoodNutrient]?
-        let topNutrients: [EdgeFoodNutrient]?
+    private struct EdgeDetectedFood: Decodable {
+        let nameFr: String?
+        let portionG: Double?
+        let micros: [EdgeMicro]?
 
         enum CodingKeys: String, CodingKey {
-            case name, emoji, macros, nutrients
-            case topNutrients = "top_nutrients"
-        }
-    }
-
-    private struct EdgeFoodMacros: Decodable {
-        let calories: Int?
-        let proteins: Double?
-        let carbs: Double?
-        let fats: Double?
-        let fiber: Double?
-    }
-
-    private struct EdgeFoodNutrient: Decodable {
-        let nutrientId: String?
-        let label: String?
-        let pctRDA: Int?
-
-        enum CodingKeys: String, CodingKey {
-            case nutrientId = "nutrient_id"
-            case label
-            case pctRDA = "pct_rda"
+            case nameFr = "name_fr"
+            case portionG = "portion_g"
+            case micros
         }
     }
 
@@ -193,31 +196,28 @@ final class MealScanViewModel: ObservableObject {
         let fiber: Double?
     }
 
+    /// Micro-nutriment (agrégé ou par aliment). La fonction émet
+    /// `{ id, unit, amount, pctRDA }` — ids = catalogue NutrientData.
     private struct EdgeMicro: Decodable {
-        let nutrientId: String?
-        let label: String?
-        let emoji: String?
+        let id: String?
+        let unit: String?
+        let amount: Double?
         let pctRDA: Int?
-        let isDeficiency: Bool?
+    }
+
+    private struct EdgePerfectMix: Decodable {
+        let suggestions: [EdgeSuggestion]?
+        let remainingDeficits: [String]?
 
         enum CodingKeys: String, CodingKey {
-            case nutrientId = "nutrient_id"
-            case label, emoji
-            case pctRDA = "pct_rda"
-            case isDeficiency = "is_deficiency"
+            case suggestions
+            case remainingDeficits = "remaining_deficits"
         }
     }
 
-    private struct EdgeAdvice: Decodable {
-        let coversDeficiencies: [String]?
-        let suggestedAdditions: [String]?
-        let swaps: [String]?
-
-        enum CodingKeys: String, CodingKey {
-            case coversDeficiencies = "covers_deficiencies"
-            case suggestedAdditions = "suggested_additions"
-            case swaps
-        }
+    private struct EdgeSuggestion: Decodable {
+        let name: String?
+        let fills: [String]?
     }
 
     // Schéma RÉEL de `ciqual_foods` (vérifié en DB le 10 juin 2026) : le nom
@@ -376,57 +376,65 @@ final class MealScanViewModel: ObservableObject {
             }
 
             // 6. Parse response into MealAnalysisResult
+            // Les champs legacy vivent sous `scan`. Labels/emojis TOUJOURS depuis
+            // NutrientData (règle canonique — jamais l'IA).
+            let scan = response.scan
             let macros = MacroNutrients(
-                calories: response.macros?.calories ?? 0,
-                proteins: response.macros?.proteins ?? 0,
-                carbs: response.macros?.carbs ?? 0,
-                fats: response.macros?.fats ?? 0,
-                fiber: response.macros?.fiber ?? 0
+                calories: scan?.macros?.calories ?? 0,
+                proteins: scan?.macros?.proteins ?? 0,
+                carbs: scan?.macros?.carbs ?? 0,
+                fats: scan?.macros?.fats ?? 0,
+                fiber: scan?.macros?.fiber ?? 0
             )
 
-            let micros: [MicroNutrient] = (response.micros ?? []).map { m in
-                MicroNutrient(
-                    nutrientId: m.nutrientId ?? "",
-                    label: m.label ?? "",
-                    emoji: m.emoji ?? "",
+            // Micros du repas (totaux) → jauges, ciblées sur les besoins de l'user.
+            let micros: [MicroNutrient] = (scan?.micros ?? []).compactMap { m in
+                guard let nid = m.id, !nid.isEmpty, let def = NutrientData.definition(for: nid) else { return nil }
+                return MicroNutrient(
+                    nutrientId: nid,
+                    label: def.label,
+                    emoji: def.emoji,
                     pctRDA: m.pctRDA ?? 0,
-                    isDeficiency: m.isDeficiency ?? false
+                    isDeficiency: userDeficiencies.contains(nid)
                 )
             }
 
+            // Conseils dérivés du perfect mix serveur (l'ancien champ `advice`
+            // n'existe plus dans la fonction).
             let advice = MealAdvice(
-                coversDeficiencies: response.advice?.coversDeficiencies ?? [],
-                suggestedAdditions: response.advice?.suggestedAdditions ?? [],
-                swaps: response.advice?.swaps ?? []
+                coversDeficiencies: userDeficiencies.filter { d in
+                    ((scan?.micros ?? []).first { $0.id == d }?.pctRDA ?? 0) >= 25
+                },
+                suggestedAdditions: (scan?.perfectMix?.suggestions ?? []).compactMap { $0.name }.filter { !$0.isEmpty },
+                swaps: []
             )
 
-            let foods: [DetectedFood] = (response.foods ?? []).compactMap { f in
-                guard let name = f.name, !name.isEmpty else { return nil }
-                let contributions: [FoodContribution] = (f.nutrients ?? []).compactMap { n in
-                    guard let nid = n.nutrientId, !nid.isEmpty else { return nil }
-                    return FoodContribution(nutrientId: nid, label: n.label ?? "", pctRDA: n.pctRDA ?? 0)
+            // Cartes par aliment : contributions AUX BESOINS de l'user (teinte +
+            // jauges) ; forces générales hors besoins dans topNutrients.
+            let foods: [DetectedFood] = (scan?.detectedFoods ?? []).compactMap { f in
+                guard let name = f.nameFr, !name.isEmpty else { return nil }
+                let perFood: [FoodContribution] = (f.micros ?? []).compactMap { n in
+                    guard let nid = n.id, !nid.isEmpty, let def = NutrientData.definition(for: nid), (n.pctRDA ?? 0) > 0 else { return nil }
+                    return FoodContribution(nutrientId: nid, label: def.label, pctRDA: n.pctRDA ?? 0)
                 }
-                let tops: [FoodContribution] = (f.topNutrients ?? []).compactMap { n in
-                    guard let nid = n.nutrientId, !nid.isEmpty else { return nil }
-                    return FoodContribution(nutrientId: nid, label: n.label ?? "", pctRDA: n.pctRDA ?? 0)
-                }
-                let fm = FoodMacros(
-                    calories: f.macros?.calories ?? 0,
-                    proteins: f.macros?.proteins ?? 0,
-                    carbs: f.macros?.carbs ?? 0,
-                    fats: f.macros?.fats ?? 0,
-                    fiber: f.macros?.fiber ?? 0
-                )
-                return DetectedFood(name: name, emoji: f.emoji ?? "", contributions: contributions, macros: fm, topNutrients: tops)
+                let contributions = perFood.filter { userDeficiencies.contains($0.nutrientId) }.sorted { $0.pctRDA > $1.pctRDA }
+                let tops = perFood.filter { !userDeficiencies.contains($0.nutrientId) }.sorted { $0.pctRDA > $1.pctRDA }
+                let fm = FoodMacros(calories: 0, proteins: 0, carbs: 0, fats: 0, fiber: 0)
+                return DetectedFood(name: name, emoji: "", contributions: contributions, macros: fm, topNutrients: tops)
+            }
+
+            let detectedNames: [String] = (scan?.detectedFoods ?? []).compactMap { f in
+                guard let n = f.nameFr, !n.isEmpty else { return nil }
+                return n
             }
 
             analysisResult = MealAnalysisResult(
-                detectedFoods: response.detectedFoods ?? [],
+                detectedFoods: detectedNames,
                 foods: foods,
                 macros: macros,
                 micros: micros,
                 advice: advice,
-                warnings: response.warnings ?? [],
+                warnings: [],
                 userNeeds: userDeficiencies,
                 scanV2: response.scanV2
             )
@@ -439,10 +447,10 @@ final class MealScanViewModel: ObservableObject {
             GamificationService.shared.unlockMealScanned()
 
             // 8. Ajoute le repas au journal du jour (best-effort).
-            await persistToJournal(detectedFoods: response.detectedFoods ?? [], macros: macros, micros: micros)
+            await persistToJournal(detectedFoods: detectedNames, macros: macros, micros: micros)
 
-            // Met à jour le compteur de scans gratuits restants (iOS free).
-            updateScansRemaining(response.scansRemaining)
+            // Compteur de scans restants — la fonction renvoie rate_limit.remaining.
+            updateScansRemaining(response.rateLimit?.remaining)
 
         } catch is CancellationError {
             errorMessage = nil // User cancelled, no error
