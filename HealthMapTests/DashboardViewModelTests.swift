@@ -369,7 +369,6 @@ private final class MockSubscriptionService: SubscriptionServiceProtocol {
 /// Minimal mock for AIAnalysisServiceProtocol used by DashboardViewModel.
 private final class MockAIAnalysisService: AIAnalysisServiceProtocol {
     func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis? { nil }
-    func regenerate(userId: String, profile: UserProfile) async throws -> MergedAnalysis? { nil }
     func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2 {
         AIAnalysisV2(contract: "v2")
     }
