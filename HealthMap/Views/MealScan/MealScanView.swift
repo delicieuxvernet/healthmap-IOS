@@ -37,6 +37,7 @@ struct MealScanView: View {
                     normalScaffold
                 }
             }
+            .kiwiTabBarBottomInset()
             .navigationTitle("Scanner")
             .navigationBarTitleDisplayMode(.large)
             .toolbar(isImmersive ? .hidden : .automatic, for: .navigationBar)

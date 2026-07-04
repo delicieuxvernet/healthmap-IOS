@@ -44,6 +44,7 @@ struct RecommendationsView: View {
                     }
                 }
             }
+            .kiwiTabBarBottomInset()
             .navigationTitle("Ton plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
