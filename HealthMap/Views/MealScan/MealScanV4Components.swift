@@ -58,16 +58,26 @@ enum MealScanFluent {
 struct MealCoverageHero: View {
     let coveredCount: Int
     let totalCount: Int
+    /// Phrase de couverture rédigée par le serveur (contrat v2,
+    /// `scan_v2.couverture.insight`, ≤90 caractères) — la zone prévue par la
+    /// maquette est cette headline, à droite de l'anneau. Présente → elle
+    /// remplace la phrase locale ; nil/vide → rendu historique inchangé.
+    var insight: String? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animated: CGFloat = 0
     @State private var floaty = false
 
     private var fraction: CGFloat {
-        totalCount > 0 ? CGFloat(coveredCount) / CGFloat(totalCount) : 0
+        guard totalCount > 0 else { return 0 }
+        // Clampé : les comptes peuvent désormais venir du serveur.
+        return min(1, max(0, CGFloat(coveredCount) / CGFloat(totalCount)))
     }
 
     private var headline: String {
+        if let insight = insight?.trimmingCharacters(in: .whitespacesAndNewlines), !insight.isEmpty {
+            return insight
+        }
         if totalCount == 0 {
             return "Voici ce que ce repas t'apporte"
         }
@@ -389,12 +399,73 @@ struct MacrosCardV4: View {
     }
 }
 
-// MARK: - Carte « Pour compléter ce repas » (suggestions 3D)
+// MARK: - Carte « Pour compléter ce repas » / « Ce qui manque à ton plat »
+/// Deux modes, même carte :
+/// - `manques` (contrat v2, `scan_v2.manques`, ≤2) non vides → mode maquette
+///   « Ce qui manque à ton plat » : suggestion rédigée par le serveur + icône
+///   de la liste fermée (id nu → asset `fluent_<id>`, via `SafeFluent3DIcon`).
+/// - sinon → rendu historique inchangé (lines + icônes heuristiques).
 struct CompleteMealCardV4: View {
     let lines: [String]
+    var manques: [ManqueV2] = []
+
+    /// Manques exploitables (suggestion non vide), plafonnés à 2 (contrat).
+    private var v2Manques: [ManqueV2] {
+        Array(manques.filter {
+            !($0.suggestion ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }.prefix(2))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            header
+            if v2Manques.isEmpty {
+                ForEach(Array(lines.prefix(3).enumerated()), id: \.offset) { idx, line in
+                    if idx > 0 {
+                        Divider().background(Color.kiwiCharcoal.opacity(0.07))
+                    }
+                    HStack(spacing: 12) {
+                        Fluent3DIcon(name: asset(for: idx), size: 34)
+                        Text(line)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 12)
+                }
+            } else {
+                Text("Selon tes besoins du jour, tu aurais pu y ajouter :")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.healthMapMuted)
+                    .padding(.top, 2)
+                    .padding(.bottom, 2)
+                ForEach(Array(v2Manques.enumerated()), id: \.offset) { idx, manque in
+                    if idx > 0 {
+                        Divider().background(Color.kiwiCharcoal.opacity(0.07))
+                    }
+                    HStack(spacing: 12) {
+                        SafeFluent3DIcon(name: manque.icone, size: 34)
+                        Text(manque.suggestion ?? "")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 12)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .kiwiCard(radius: 20)
+    }
+
+    /// En-tête : maquette « Ce qui manque à ton plat » (pastille + rouge) en
+    /// mode v2, en-tête historique (étincelle) sinon.
+    @ViewBuilder
+    private var header: some View {
+        if v2Manques.isEmpty {
             HStack(spacing: 8) {
                 Fluent3DIcon(name: Fluent3D.sparkles, size: 20)
                 Text("Pour compléter ce repas")
@@ -402,24 +473,22 @@ struct CompleteMealCardV4: View {
                     .foregroundStyle(Color.kiwiCharcoal)
             }
             .padding(.bottom, 4)
-            ForEach(Array(lines.prefix(3).enumerated()), id: \.offset) { idx, line in
-                if idx > 0 {
-                    Divider().background(Color.kiwiCharcoal.opacity(0.07))
+        } else {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.scoreDeficient.opacity(0.12))
+                        .frame(width: 25, height: 25)
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.scoreDeficient)
                 }
-                HStack(spacing: 12) {
-                    Fluent3DIcon(name: asset(for: idx), size: 34)
-                    Text(line)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 12)
+                Text("Ce qui manque à ton plat")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
             }
+            .padding(.bottom, 4)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .kiwiCard(radius: 20)
     }
 
     /// Illustration 3D décorative pour une suggestion : on cherche un aliment
@@ -787,6 +856,11 @@ struct BesoinsCourbeCard: View {
     let values: [Int]
     /// Ligne « besoin du jour » (cible).
     var target: Int = 100
+    /// Phrase rédigée par le serveur (contrat v2, `scan_v2.courbeInsight`,
+    /// ≤90 caractères) — headline sous le titre, zone prévue par la maquette
+    /// (« Ce repas rapproche ta journée de ton besoin. »). nil/vide → rendu
+    /// historique inchangé.
+    var insight: String? = nil
 
     private let maxY: Double = 112
 
@@ -799,6 +873,14 @@ struct BesoinsCourbeCard: View {
                 Text("cette semaine, d'après tes repas scannés")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.healthMapMuted)
+                if let insight = insight?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !insight.isEmpty {
+                    Text(insight)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 7)
+                }
             }
             .padding(.horizontal, 4)
 
