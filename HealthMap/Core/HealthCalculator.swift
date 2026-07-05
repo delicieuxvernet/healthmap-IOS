@@ -344,7 +344,10 @@ enum HealthCalculator {
         if p.bloating == "yes" { scores["zinc", default: 70] -= 3 }
 
         // ═══════ IODINE ═══════
-        if p.iodizedSalt == "no" || p.iodizedSalt.isEmpty {
+        // mirror health.js:473 — undefined/non renseigné = neutre, pas de penalite
+        // (isEmpty traite auparavant a tort comme "no", trouve par le test de
+        // parite cross-repo du 2026-07-05)
+        if p.iodizedSalt == "no" {
             scores["iodine", default: 70] -= 12
         } else if p.iodizedSalt == "yes" && p.saltLevel == "none" {
             scores["iodine", default: 70] -= 8

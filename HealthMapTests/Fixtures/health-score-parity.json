@@ -53,7 +53,7 @@
       "vitD": 75,
       "vitB12": 80,
       "iron": 75,
-      "magnesium": 80,
+      "magnesium": 85,
       "omega3": 97,
       "vitC": 100,
       "calcium": 88,
@@ -235,13 +235,13 @@
       "vitD": 70,
       "vitB12": 25,
       "iron": 45,
-      "magnesium": 57,
+      "magnesium": 62,
       "omega3": 45,
       "vitC": 87,
       "calcium": 50,
       "zinc": 45,
       "iodine": 70,
-      "fiber": 82
+      "fiber": 87
     }
   }
 }
