@@ -83,8 +83,8 @@ final class QuestionnaireViewModelTests: XCTestCase {
 
         XCTAssertEqual(
             enteredSections,
-            [.modeDeVie, .sante, .nutrition, .symptomes, .medical],
-            "Walking the fully-unlocked flow should enter each section once, in order"
+            [.modeDeVie, .sante, .nutrition, .medical],
+            "Walking the flow enters chaque section NON VIDE une fois (symptômes désormais en Q1 dans le profil → section symptômes vide)"
         )
     }
 
@@ -234,13 +234,14 @@ final class QuestionnaireViewModelTests: XCTestCase {
     /// non-empty default (gender, smoking, dietType...) count as answered —
     /// matching the existing display behavior (option preselected on screen).
     func testFirstUnansweredQuestionIndex_skipsAnsweredQuestions() {
-        // Fresh profile → goals (multi-choice, empty) is the first unanswered
+        // Fresh profile → symptoms (Q1, multi-choice, empty) is the first unanswered
         XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 0, "Fresh profile should resume at the first question")
 
-        // Answer goals + firstName → next unanswered is age (flat index 2)
+        // Answer symptoms + goals + firstName → next unanswered is age (flat index 3)
+        vm.updateAnswer(questionId: "symptoms", value: ["fatigue_chronic"])
         vm.updateAnswer(questionId: "goals", value: ["energie"])
         vm.updateAnswer(questionId: "firstName", value: "Lea")
-        XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 2, "Should resume at the first unanswered question (age)")
+        XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 3, "Should resume at the first unanswered question (age)")
     }
 
     // MARK: - clearDraft
@@ -281,9 +282,8 @@ final class QuestionnaireViewModelTests: XCTestCase {
         XCTAssertEqual(vm.nextLockedGate, .nutrition, "Premier carrefour = alimentation")
 
         vm.unlockDeep(.nutrition)
-        XCTAssertEqual(vm.nextLockedGate, .symptomes, "Puis symptômes")
-
-        vm.unlockDeep(.symptomes)
+        // Les symptômes sont désormais en Q1 (section symptômes vide → plus de
+        // carrefour symptômes) : après l'alimentation vient directement le médical.
         XCTAssertEqual(vm.nextLockedGate, .medical, "Puis médical")
 
         vm.unlockDeep(.medical)

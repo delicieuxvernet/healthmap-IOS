@@ -46,7 +46,7 @@ enum QuestionnaireSection: Int, CaseIterable, Identifiable {
 
     /// Express pathway keys (21 questions)
     static let expressKeys: Set<String> = [
-        "goals", "firstName", "age", "gender", "height", "weight",
+        "symptoms", "goals", "firstName", "age", "gender", "height", "weight",
         "indoorWork", "sunExposure", "strengthTraining",
         "stressLevel", "sleepHours", "wakeFeeling", "caffeineIntake", "waterIntake", "smoking",
         "dietType", "groceries",
@@ -105,9 +105,35 @@ struct QuestionOption: Identifiable {
 // MARK: - Section 1: Profil
 extension QuestionnaireSection {
     static let profilQuestions: [Question] = [
+        // Q1 : les SYMPTÔMES d'abord (« qu'est-ce qui t'amène »), Q2 : les objectifs,
+        // AVANT le prénom — c'est le motif de venue qui compte en premier.
+        Question(
+            id: "symptoms",
+            text: "Qu'est-ce qui t'amene ?",
+            type: .multiChoice,
+            options: [
+                .init("none", "Aucun"),
+                .init("fatigue_chronic", "Fatigue chronique", emoji: "😴"),
+                .init("hair_loss", "Perte de cheveux", emoji: "💇"),
+                .init("brittle_nails", "Ongles cassants", emoji: "💅"),
+                .init("muscle_cramps", "Crampes musculaires", emoji: "🦵"),
+                .init("tingling", "Fourmillements", emoji: "⚡"),
+                .init("brain_fog", "Brouillard mental", emoji: "🌫️"),
+                .init("bleeding_gums", "Saignement des gencives", emoji: "🩸"),
+                .init("feeling_cold", "Toujours froid", emoji: "🥶"),
+                .init("mouth_ulcers", "Aphtes frequents", emoji: "😣"),
+                .init("dry_skin", "Peau seche", emoji: "🏜️"),
+                .init("bloating_frequent", "Ballonnements frequents", emoji: "🎈"),
+                .init("slow_digestion", "Digestion lente", emoji: "🐌"),
+                .init("acid_reflux_feeling", "Remontees acides", emoji: "🔥"),
+                .init("low_mood", "Baisse de moral", emoji: "😔"),
+                .init("low_motivation", "Manque de motivation", emoji: "🪫"),
+                .init("skin_breakouts", "Poussees d'acne", emoji: "😬"),
+            ]
+        ),
         Question(
             id: "goals",
-            text: "Qu'est-ce qui t'amene ?",
+            text: "Quels sont tes objectifs ?",
             type: .multiChoice,
             options: [
                 .init("sleep", "Mieux dormir", emoji: "😴"),
@@ -422,30 +448,9 @@ extension QuestionnaireSection {
 // MARK: - Section 5: Symptomes
 extension QuestionnaireSection {
     static let symptomesQuestions: [Question] = [
-        Question(
-            id: "symptoms",
-            text: "As-tu certains de ces symptomes ?",
-            type: .multiChoice,
-            options: [
-                .init("none", "Aucun"),
-                .init("fatigue_chronic", "Fatigue chronique", emoji: "😴"),
-                .init("hair_loss", "Perte de cheveux", emoji: "💇"),
-                .init("brittle_nails", "Ongles cassants", emoji: "💅"),
-                .init("muscle_cramps", "Crampes musculaires", emoji: "🦵"),
-                .init("tingling", "Fourmillements", emoji: "⚡"),
-                .init("brain_fog", "Brouillard mental", emoji: "🌫️"),
-                .init("bleeding_gums", "Saignement des gencives", emoji: "🩸"),
-                .init("feeling_cold", "Toujours froid", emoji: "🥶"),
-                .init("mouth_ulcers", "Aphtes frequents", emoji: "😣"),
-                .init("dry_skin", "Peau seche", emoji: "🏜️"),
-                .init("bloating_frequent", "Ballonnements frequents", emoji: "🎈"),
-                .init("slow_digestion", "Digestion lente", emoji: "🐌"),
-                .init("acid_reflux_feeling", "Remontees acides", emoji: "🔥"),
-                .init("low_mood", "Baisse de moral", emoji: "😔"),
-                .init("low_motivation", "Manque de motivation", emoji: "🪫"),
-                .init("skin_breakouts", "Poussees d'acne", emoji: "😬"),
-            ]
-        ),
+        // Les symptômes sont désormais posés en Q1 (section profil, « qu'est-ce
+        // qui t'amène ? »). Cette section est donc vide — plus de carrefour
+        // symptômes ; le questionnaire s'ouvre directement sur les symptômes.
     ]
 }
 
