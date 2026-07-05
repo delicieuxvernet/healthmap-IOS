@@ -264,6 +264,21 @@ struct PaywallView: View {
 
     private var footerLinks: some View {
         VStack(spacing: Theme.spacingSM) {
+            // Feuille système Apple de saisie d'un code promo (offer code).
+            // Permet d'utiliser un code comme « NAIA » ou « LANCEMENT50 ».
+            Button {
+                Purchases.shared.presentCodeRedemptionSheet()
+            } label: {
+                Text("J'ai un code promo")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.kiwiInk)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Capsule().fill(Color.kiwiTint))
+            }
+            .padding(.horizontal, Theme.spacingMD)
+            .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
+
             Button {
                 Task { await restore() }
             } label: {
