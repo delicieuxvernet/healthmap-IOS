@@ -366,7 +366,7 @@ if MODE == "apply-app"
   exit 0
 end
 
-# ── MODE offers : codes promo (NAIA = 3 mois offerts, LANCEMENT50 = -50% 3 mois) ──
+# ── MODE offers : codes promo (NAIA = 3 mois offerts / mensuel, LANCEMENT50 = -50% 1re année / annuel) ──
 if MODE == "offers"
   groups = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
   subs = {}
@@ -376,42 +376,56 @@ if MODE == "offers"
     end
   end
   monthly = subs["healthmap_monthly"]
-  abort_with("offers", 0, "abonnement mensuel introuvable") unless monthly
-  puts "Abonnement mensuel : #{monthly}"
+  annual  = subs["healthmap_annual"]
+  abort_with("offers", 0, "abonnements introuvables") unless monthly && annual
+  puts "Mensuel : #{monthly} | Annuel : #{annual}"
 
   # Expiration des codes ~18 mois (Time.now = vrai Ruby CI, pas le sandbox Workflow).
   expiration = (Time.now + 550 * 24 * 3600).strftime("%Y-%m-%d")
 
-  existing = {}
-  get_all("/v1/subscriptions/#{monthly}/offerCodes?limit=200").each { |o| existing[o.dig("attributes", "name")] = o["id"] }
-  puts "Offer codes existants : #{existing.keys.inspect}"
+  # Nettoyage : LANCEMENT50 était sur le mensuel ; le code passe sur l'annuel
+  # (aucun code redeemable minté → suppression sûre, best-effort).
+  legacy = {}
+  get_all("/v1/subscriptions/#{monthly}/offerCodes?limit=200").each { |o| legacy[o.dig("attributes", "name")] = o["id"] }
+  if (old_id = legacy["LANCEMENT50 - -50% 3 mois"])
+    uri = URI(BASE + "/v1/subscriptionOfferCodes/#{old_id}")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    del = Net::HTTP::Delete.new(uri)
+    del["Authorization"] = "Bearer #{token}"
+    puts "Nettoyage ancienne LANCEMENT50 (mensuel) -> HTTP #{http.request(del).code}"
+  end
 
   offers = [
-    { name: "NAIA - 3 mois offerts", code: "NAIA", redemptions: 20, target: nil,
+    { sub: monthly, name: "NAIA - 3 mois offerts", code: "NAIA", redemptions: 20, target: nil,
       attrs: { offerMode: "FREE_TRIAL", duration: "THREE_MONTHS", numberOfPeriods: 1,
                customerEligibilities: %w[NEW EXISTING EXPIRED], offerEligibility: "STACK_WITH_INTRO_OFFERS" } },
-    { name: "LANCEMENT50 - -50% 3 mois", code: "LANCEMENT50", redemptions: 100, target: "2.49",
-      attrs: { offerMode: "PAY_AS_YOU_GO", duration: "ONE_MONTH", numberOfPeriods: 3,
+    # -50% sur l'annuel : 1re année à ~25 € (au lieu de 50 €), puis 50 €/an.
+    { sub: annual, name: "LANCEMENT50 annuel - -50% 1re annee", code: "LANCEMENT50", redemptions: 100, target: "25.00",
+      attrs: { offerMode: "PAY_AS_YOU_GO", duration: "ONE_YEAR", numberOfPeriods: 1,
                customerEligibilities: %w[NEW EXPIRED], offerEligibility: "STACK_WITH_INTRO_OFFERS" } },
   ]
 
   failures = []
   pending = []
   offers.each do |o|
-    puts "\n--- #{o[:code]} ---"
+    label = o[:sub] == annual ? "annuel" : "mensuel"
+    puts "\n--- #{o[:code]} (#{label}) ---"
+    existing = {}
+    get_all("/v1/subscriptions/#{o[:sub]}/offerCodes?limit=200").each { |x| existing[x.dig("attributes", "name")] = x["id"] }
     oc_id = existing[o[:name]]
     if oc_id
       puts "  offer code déjà présent (#{oc_id})"
     else
       # Grille de prix : prix réduit pour un -50%, prix de base sinon (essai gratuit).
-      grid, real = offer_price_grid(monthly, o[:target] || TARGETS["healthmap_monthly"][:price])
+      grid, real = offer_price_grid(o[:sub], o[:target] || TARGETS["healthmap_monthly"][:price])
       if grid.empty?
         puts "  ÉCHEC aucun point de prix pour la cible"
         failures << "#{o[:code]}: prix"
         next
       end
       puts "  prix par période retenu (FRA) : #{real} €" if o[:target]
-      ok, resp = create_offer_code(monthly, o[:name], o[:attrs], grid)
+      ok, resp = create_offer_code(o[:sub], o[:name], o[:attrs], grid)
       (failures << "#{o[:code]}: offer code"; next) unless ok
       oc_id = resp["data"]["id"]
     end
@@ -435,10 +449,11 @@ if MODE == "offers"
     end
   end
 
-  # Relit les codes custom créés
-  code, body = req(:get, "/v1/subscriptions/#{monthly}/offerCodes?include=customCodes&limit=200")
+  # Relit les codes custom sur les 2 abonnements
   puts "\n===== ÉTAT FINAL OFFER CODES ====="
-  if code == 200
+  [monthly, annual].uniq.each do |sub_id|
+    code, body = req(:get, "/v1/subscriptions/#{sub_id}/offerCodes?include=customCodes&limit=200")
+    next unless code == 200
     (body["included"] || []).select { |i| i["type"] == "subscriptionOfferCodeCustomCodes" }.each do |c|
       a = c["attributes"]
       puts "  code=#{a["customCode"]} usages=#{a["numberOfCodes"]} expire=#{a["expirationDate"]} actif=#{a["active"]}"
