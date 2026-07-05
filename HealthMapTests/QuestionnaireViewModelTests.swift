@@ -181,10 +181,9 @@ final class QuestionnaireViewModelTests: XCTestCase {
             XCTAssertTrue(visibleIDs.contains(id), "\(id) doit être visible (bloc profond déverrouillé)")
         }
 
-        // Les questions non-express de Profil/Mode de vie/Santé n'ont pas de
-        // carrefour → jamais atteignables, même tous blocs déverrouillés.
+        // Ex-orphelines : désormais dans le tronc express → posées à tout le monde.
         for id in ["weightTrend", "skinType", "screenBeforeBed", "alcohol", "bloating", "antibiotics"] {
-            XCTAssertFalse(visibleIDs.contains(id), "\(id) ne doit pas être visible (pas de carrefour)")
+            XCTAssertTrue(visibleIDs.contains(id), "\(id) doit être visible (ajoutée au tronc express)")
         }
     }
 
