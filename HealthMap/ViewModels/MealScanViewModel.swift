@@ -463,8 +463,13 @@ final class MealScanViewModel: ObservableObject {
             // Unlock meal scanned badge
             GamificationService.shared.unlockMealScanned()
 
-            // 8. Ajoute le repas au journal du jour (best-effort).
-            await persistToJournal(detectedFoods: detectedNames, macros: macros, micros: micros)
+            // 8. Le repas est DÉJÀ persisté dans meal_scans par la fonction Edge
+            // (source d'autorité, avec macros + micros + créneau). On ne réécrit
+            // donc PAS côté client (évite les doublons / le score gonflé) — on
+            // notifie les écrans en aval pour qu'ils rechargent leur journal,
+            // sinon le score hebdo du Bilan et « Ta journée » restent figés sur
+            // un instantané antérieur au scan.
+            NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
 
             // Compteur de scans restants — la fonction renvoie rate_limit.remaining.
             updateScansRemaining(response.rateLimit?.remaining)
@@ -604,34 +609,6 @@ final class MealScanViewModel: ObservableObject {
         guard let value else { return }
         scansRemaining = value
         UserDefaults.standard.set(value, forKey: "hm_scans_remaining")
-    }
-
-    /// Ajoute le repas scanné au journal du jour (table meal_scans). Best-effort :
-    /// un échec d'écriture n'interrompt jamais l'affichage du résultat du scan.
-    private func persistToJournal(detectedFoods: [String], macros: MacroNutrients, micros: [MicroNutrient]) async {
-        guard let userId = AuthService.shared.cachedCurrentUserIdString else { return }
-        let m = MealJournalService.MealMacros(
-            calories: macros.calories,
-            proteins: macros.proteins,
-            carbs: macros.carbs,
-            fats: macros.fats,
-            fiber: macros.fiber
-        )
-        // Les micros persistés nourrissent le score de la semaine du Bilan.
-        let pcts = micros
-            .filter { !$0.nutrientId.isEmpty }
-            .map { MealJournalService.MicroPct(id: $0.nutrientId, pctRDA: $0.pctRDA) }
-        do {
-            try await MealJournalService.shared.insertScan(
-                userId: userId,
-                foods: detectedFoods,
-                macros: m,
-                slot: MealJournalService.MealSlot.from(date: Date()),
-                micros: pcts
-            )
-        } catch {
-            AppLogger.analysis.report(error, context: "MealScan persistToJournal")
-        }
     }
 
     /// Resolve user deficiencies by recomputing local nutrient scores from the saved profile.
