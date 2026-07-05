@@ -691,6 +691,10 @@ private struct QuestionnaireGateView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
+    /// Faux temps d'analyse : le carrefour reste caché derrière un court écran
+    /// « analyse en cours » (~2 s) avant de s'afficher — pour donner l'impression
+    /// qu'on calcule à partir des réponses. Levier d'engagement, aucun calcul réel.
+    @State private var analyzing = true
 
     private struct Copy {
         let asset: String
@@ -727,6 +731,46 @@ private struct QuestionnaireGateView: View {
     }
 
     var body: some View {
+        Group {
+            if analyzing {
+                analyzingView
+            } else {
+                gateCard
+            }
+        }
+        .onAppear {
+            // ~2 s de faux « analyse » avant d'afficher le carrefour : donne
+            // l'impression qu'on calcule à partir des réponses de l'utilisateur.
+            // AUCUN calcul réel — c'est un levier d'engagement pour l'inciter à
+            // terminer le questionnaire. Le message affiché ensuite est toujours
+            // le même (indépendant du contenu des réponses).
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                withAnimation(reduceMotion ? .none : .easeOut(duration: 0.35)) {
+                    analyzing = false
+                }
+            }
+        }
+    }
+
+    /// Écran d'attente « analyse en cours » (théâtral, ~2 s).
+    private var analyzingView: some View {
+        VStack(spacing: Theme.spacingLG) {
+            Spacer()
+            Fluent3DIcon(name: Fluent3D.kiwi, size: 56)
+            ProgressView().tint(Color.kiwiGreen)
+            Text("Analyse de tes réponses…")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.healthMapSecondary)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .transition(.opacity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Analyse en cours")
+    }
+
+    private var gateCard: some View {
         let c = copy
         VStack {
             Spacer()
