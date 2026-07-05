@@ -282,4 +282,47 @@ final class HealthCalculatorTests: XCTestCase {
 
         XCTAssertGreaterThan(suppScores["vitB12"]!, baseScores["vitB12"]!, "B12 supplement should boost score")
     }
+
+    // MARK: - Anti Double-Scoring (mirror health.js: v6 keys scored only if the
+    // legacy v5 key is absent — health.js:148-154 / :160-164). Regression test
+    // for the confirmed drift found in the 2026-07-05 architecture audit: iOS
+    // was scoring sleepHours+sleepDuration and mealsPerDay+mealFrequency
+    // unconditionally, double-counting sleep/meal quality vs. the web mirror.
+    private func baseValidProfile() -> UserProfile {
+        var p = UserProfile.empty
+        p.completed = true
+        p.age = "30"
+        p.gender = .homme
+        p.height = "175"
+        p.weight = "70"
+        return p
+    }
+
+    func testSleepScore_notDoubleCountedWhenBothKeysSet() {
+        var v5Only = baseValidProfile()
+        v5Only.sleepHours = "7.5"
+
+        var v5AndV6 = baseValidProfile()
+        v5AndV6.sleepHours = "7.5"
+        v5AndV6.sleepDuration = "7.5"
+
+        let scoreV5Only = HealthCalculator.calculateHealthScore(profile: v5Only)
+        let scoreBoth = HealthCalculator.calculateHealthScore(profile: v5AndV6)
+
+        XCTAssertEqual(scoreBoth, scoreV5Only, "sleepDuration (v6 key) must not add extra score on top of sleepHours (v5 key)")
+    }
+
+    func testMealFrequencyScore_notDoubleCountedWhenBothKeysSet() {
+        var v5Only = baseValidProfile()
+        v5Only.mealsPerDay = "3"
+
+        var v5AndV6 = baseValidProfile()
+        v5AndV6.mealsPerDay = "3"
+        v5AndV6.mealFrequency = "three"
+
+        let scoreV5Only = HealthCalculator.calculateHealthScore(profile: v5Only)
+        let scoreBoth = HealthCalculator.calculateHealthScore(profile: v5AndV6)
+
+        XCTAssertEqual(scoreBoth, scoreV5Only, "mealFrequency (v6 key) must not add extra score on top of mealsPerDay (v5 key)")
+    }
 }
