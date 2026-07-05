@@ -113,6 +113,9 @@ struct MealScanView: View {
                     }
                 }
                 .padding(.vertical, Theme.spacingMD)
+                // Épingle la largeur du contenu à celle du conteneur : empêche
+                // toute dérive/scroll horizontal (le scroll reste vertical only).
+                .containerRelativeFrame(.horizontal)
             }
         }
     }
@@ -302,6 +305,9 @@ struct MealScanView: View {
                 .padding(.top, -28)
                 .padding(.bottom, 20)
             }
+            // Épingle la largeur du contenu au conteneur → scroll vertical only,
+            // aucune dérive horizontale ni marge vide latérale.
+            .containerRelativeFrame(.horizontal)
         }
         .ignoresSafeArea(edges: .top)
         .background(Color.kiwiCream.ignoresSafeArea())
