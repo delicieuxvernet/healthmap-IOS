@@ -380,11 +380,6 @@ private struct SuiviSymptomCard: View {
         }
     }
 
-    private var variationLabel: String {
-        let v = evolution.variationPct
-        return v > 0 ? "+\(v)%" : "\(v)%"
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center) {
@@ -411,18 +406,16 @@ private struct SuiviSymptomCard: View {
                 .background(Capsule().fill(pillBg))
             }
 
-            HStack(alignment: .center, spacing: 12) {
-                Text(insightSentence)
-                    .font(.system(size: 17, weight: .heavy))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 4)
-                Text(variationLabel)
-                    .font(.system(size: 22, weight: .heavy, design: .monospaced))
-                    .foregroundStyle(Color.kiwiGreenInk)
-                    .fixedSize()
-            }
-            .padding(.top, 9)
+            // Pas de pourcentage chiffré ici : la base de comparaison ("sans Kiwio")
+            // est une trajectoire de référence illustrative, pas une mesure precise
+            // du symptôme — un chiffre à deux décimales de confiance ("-38%")
+            // laisserait croire à une precision qui n'existe pas (audit du
+            // 2026-07-05). Le verdict (pastille) + la phrase d'insight suffisent.
+            Text(insightSentence)
+                .font(.system(size: 17, weight: .heavy))
+                .foregroundStyle(Color.kiwiCharcoal)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 9)
 
             SuiviPosedChart(evolution: evolution, progress: progress)
                 .frame(height: 132)
@@ -543,7 +536,7 @@ private struct SuiviPosedChart: View {
                 .padding(.leading, 2)
         }
         .accessibilityElement()
-        .accessibilityLabel("\(evolution.nom) : \(evolution.verdict), \(evolution.variationPct) pour cent")
+        .accessibilityLabel("\(evolution.nom) : \(evolution.verdict)")
     }
 }
 
