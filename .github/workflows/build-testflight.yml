@@ -8,13 +8,17 @@ on:
   workflow_dispatch: # Manual trigger (recommended for the FIRST run)
 
 jobs:
-  # ── Tests (gate de PR) ──────────────────────────────────────────────────
-  # Tourne sur chaque pull request : compile l'app + la suite de tests sur
-  # simulateur (aucune signature, aucun secret Apple requis). BLOQUANT : une
-  # PR avec tests rouges ne doit pas être mergée. Le déploiement TestFlight
-  # (job ci-dessous) reste réservé aux pushes sur main — il n'est pas ralenti.
+  # ── Tests (gate de PR + gate de déploiement) ─────────────────────────────
+  # Tourne sur CHAQUE trigger (pull_request, push sur main, workflow_dispatch) :
+  # compile l'app + la suite de tests sur simulateur (aucune signature, aucun
+  # secret Apple requis). BLOQUANT : une PR avec tests rouges ne doit pas être
+  # mergée. Tourne aussi sur push main pour que le job de déploiement
+  # (build-and-upload, ci-dessous) puisse en dépendre via `needs:` — sans ça,
+  # le caractère bloquant reposait UNIQUEMENT sur la branch protection GitHub
+  # (réglage externe, invisible dans ce fichier, contournable par un push
+  # direct ou un merge forcé). Coût : ~10-15 min ajoutées à chaque déploiement
+  # main, assumé pour ce garde-fou (audit d'architecture du 2026-07-05).
   tests:
-    if: github.event_name == 'pull_request'
     runs-on: macos-15
     timeout-minutes: 40
 
@@ -83,8 +87,14 @@ jobs:
           if-no-files-found: warn
 
   # ── Build + déploiement TestFlight (pushes sur main uniquement) ─────────
+  # needs: tests -> ne démarre QUE si le job tests ci-dessus a réussi (pas
+  # juste "pas échoué" : un job needs par défaut n'attend un succès explicite,
+  # skip ou failure bloquent le déploiement). C'est le garde-fou : même un
+  # push direct sur main sans passer par une PR ne peut plus livrer en
+  # TestFlight sans tests verts.
   build-and-upload:
     if: github.event_name != 'pull_request'
+    needs: tests
     runs-on: macos-15
     timeout-minutes: 60
 
@@ -172,8 +182,8 @@ jobs:
             -project HealthMap.xcodeproj \
             -scheme HealthMap
 
-      # Les tests tournent désormais dans le job `tests` sur chaque pull
-      # request (gate bloquante) — le déploiement main reste rapide.
+      # Les tests tournent dans le job `tests` (PR + main via `needs:` ci-dessus,
+      # gate bloquante des deux côtés).
       - name: Set up Ruby (fastlane)
         uses: ruby/setup-ruby@v1
         with:
