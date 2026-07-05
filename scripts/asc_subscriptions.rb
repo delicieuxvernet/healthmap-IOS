@@ -396,6 +396,7 @@ if MODE == "offers"
   ]
 
   failures = []
+  pending = []
   offers.each do |o|
     puts "\n--- #{o[:code]} ---"
     oc_id = existing[o[:name]]
@@ -419,8 +420,18 @@ if MODE == "offers"
     if custom_codes_of(oc_id).include?(o[:code])
       puts "  custom code « #{o[:code]} » déjà présent"
     else
-      okc, = create_custom_code(oc_id, o[:code], o[:redemptions], expiration)
-      failures << "#{o[:code]}: custom code" unless okc
+      okc, resp = create_custom_code(oc_id, o[:code], o[:redemptions], expiration)
+      unless okc
+        codes = resp.is_a?(Hash) ? (resp["errors"] || []).map { |e| e["code"] } : []
+        if codes.any? { |c| c.to_s.include?("APP_STATE_INVALID") || c.to_s.include?("SALABLE_STATE_INVALID") }
+          # Apple refuse de générer un code redeemable tant que l'app/abonnement
+          # n'est pas approuvé. Campagne prête ; code à générer post-approbation.
+          puts "  ⏳ code « #{o[:code]} » en attente d'approbation de l'app (re-lancer ce mode après)"
+          pending << o[:code]
+        else
+          failures << "#{o[:code]}: custom code"
+        end
+      end
     end
   end
 
@@ -434,7 +445,10 @@ if MODE == "offers"
     end
   end
   puts "\n===== RÉSUMÉ ====="
-  puts failures.empty? ? "Codes promo créés." : "Échecs : #{failures.join(" | ")}"
+  puts "Campagnes offer codes : #{offers.map { |o| o[:name] }.join(" | ")}"
+  puts "En attente d'approbation app (codes à générer après) : #{pending.join(", ")}" unless pending.empty?
+  puts "Échecs : #{failures.join(" | ")}" unless failures.empty?
+  puts "Tout est prêt." if failures.empty? && pending.empty?
   exit 0
 end
 
