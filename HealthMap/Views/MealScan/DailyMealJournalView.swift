@@ -34,6 +34,10 @@ struct DailyMealJournalView: View {
             }
             .task { await vm.load() }
             .refreshable { await vm.load() }
+            // Recharge dès qu'un scan est persisté ailleurs (onglet Scanner).
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
+                Task { await vm.load() }
+            }
             .sheet(isPresented: $showAdd) {
                 AddMealSheet(slot: addSlot) { name, kcal in
                     Task { await vm.addManual(name: name, calories: kcal, slot: addSlot) }
