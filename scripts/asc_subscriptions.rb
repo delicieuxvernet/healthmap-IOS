@@ -216,19 +216,20 @@ end
 # subscriptionOfferCodePrices (territory + price point) placé dans `included`
 # et référencé par un id de corrélation client (ici "p-<territoire>").
 # Apple exige un id de corrélation local au format ${...} pour la création inline.
-def build_offer_prices(grid)
+# FREE_TRIAL : subscriptionPricePoint DOIT être absent (offre gratuite, aucun prix) ;
+# PAY_AS_YOU_GO / PAY_UP_FRONT : on fournit le point de prix réduit par territoire.
+def build_offer_prices(grid, with_price_point)
   data = grid.map { |terr, _| { type: "subscriptionOfferCodePrices", id: "${#{terr}}" } }
   included = grid.map do |terr, pp_id|
-    { type: "subscriptionOfferCodePrices", id: "${#{terr}}",
-      relationships: {
-        territory: { data: { type: "territories", id: terr } },
-        subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: pp_id } } } }
+    rel = { territory: { data: { type: "territories", id: terr } } }
+    rel[:subscriptionPricePoint] = { data: { type: "subscriptionPricePoints", id: pp_id } } if with_price_point
+    { type: "subscriptionOfferCodePrices", id: "${#{terr}}", relationships: rel }
   end
   [data, included]
 end
 
 def create_offer_code(sub_id, name, attrs, grid)
-  prices_data, included = build_offer_prices(grid)
+  prices_data, included = build_offer_prices(grid, attrs[:offerMode] != "FREE_TRIAL")
   write("offer code « #{name} » (#{grid.size} territoires)", :post, "/v1/subscriptionOfferCodes",
     { data: { type: "subscriptionOfferCodes",
               attributes: attrs.merge(name: name),
