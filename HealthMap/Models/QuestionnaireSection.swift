@@ -435,6 +435,12 @@ extension QuestionnaireSection {
                 .init("feeling_cold", "Toujours froid", emoji: "🥶"),
                 .init("mouth_ulcers", "Aphtes frequents", emoji: "😣"),
                 .init("dry_skin", "Peau seche", emoji: "🏜️"),
+                .init("bloating_frequent", "Ballonnements frequents", emoji: "🎈"),
+                .init("slow_digestion", "Digestion lente", emoji: "🐌"),
+                .init("acid_reflux_feeling", "Remontees acides", emoji: "🔥"),
+                .init("low_mood", "Baisse de moral", emoji: "😔"),
+                .init("low_motivation", "Manque de motivation", emoji: "🪫"),
+                .init("skin_breakouts", "Poussees d'acne", emoji: "😬"),
             ]
         ),
     ]
@@ -456,6 +462,9 @@ extension QuestionnaireSection {
                 .init("statins", "Statines", emoji: "❤️"),
                 .init("anticoagulant", "Anticoagulant", emoji: "🩸"),
                 .init("thyroid_med", "Thyroide", emoji: "🦋"),
+                .init("laxatives", "Laxatifs", emoji: "💊"),
+                .init("antispasmodics", "Antispasmodiques", emoji: "💊"),
+                .init("antidiarrheal", "Anti-diarrheiques", emoji: "💊"),
             ]
         ),
         Question(
