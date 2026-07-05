@@ -7,6 +7,7 @@ import XCTest
 // NutrientEngine consumes it for scoring — a changed grocery cart never
 // invalidated the cached bilan. Fixed 2026-07-05 (architecture audit) via a
 // sorted-key serialization of the groceries dictionary.
+@MainActor
 final class AIAnalysisServiceHashTests: XCTestCase {
 
     func testHashIsDeterministicAcrossRepeatedCalls() {
