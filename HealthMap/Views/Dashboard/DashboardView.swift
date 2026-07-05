@@ -34,6 +34,13 @@ struct DashboardView: View {
                 content
             }
             .kiwiTabBarBottomInset()
+            // Recharge le journal dès qu'un scan est persisté ailleurs (onglet
+            // Scanner) — posé ICI (pas dans mainContent) pour rester vivant même
+            // si le bilan v2 n'est pas encore chargé/valide (mainContent n'est
+            // alors pas monté). journal/viewModel sont au niveau de la struct.
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
+                Task { await journal.load() }
+            }
             // v6 : le greeting fait office de titre — la barre reste inline et
             // vide, seul l'avatar Profil y demeure.
             .navigationTitle("")
@@ -218,12 +225,6 @@ struct DashboardView: View {
             .padding(.vertical, Theme.spacingMD)
         }
         .task { await journal.load() }
-        // Un scan fait dans l'onglet Scanner ne relance pas le .task du Bilan
-        // (l'onglet reste vivant) : on recharge le journal à réception de la notif
-        // pour que le score hebdo + les barres lun→dim intègrent le repas scanné.
-        .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
-            Task { await journal.load() }
-        }
         .refreshable {
             await viewModel.triggerAnalysis()
             await journal.load()

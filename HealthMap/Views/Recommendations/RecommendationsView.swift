@@ -160,6 +160,11 @@ struct RecommendationsContentView: View {
             // Aucun LLM : la mission est ensuite calculée localement (SuiviEngineV4).
             await journalVM.load()
         }
+        // Un scan fait dans l'onglet Scanner ne relance pas ce .task : on recharge
+        // pour que la carte Focus (repas qui comptent) intègre le nouveau scan.
+        .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
+            Task { await journalVM.load() }
+        }
     }
 
     // MARK: - Focus de la semaine (carte en tête, 100 % déterministe)

@@ -113,6 +113,11 @@ struct SuiviView: View {
                 stepsToday = await Self.loadSteps()
                 checkinHistory = SuiviCheckinHistory.recentFeelings()
             }
+            // Un scan fait dans l'onglet Scanner ne relance pas ce .task (le Suivi
+            // reste vivant) : on recharge pour que couverture/paliers intègrent le scan.
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
+                Task { await journal.load() }
+            }
             .onAppear {
                 // Présenté UNE fois par jour, jamais si déjà répondu / snoozé.
                 if SuiviCheckinStore.shouldPromptToday() {
