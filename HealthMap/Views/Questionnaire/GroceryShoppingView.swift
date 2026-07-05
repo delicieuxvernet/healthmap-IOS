@@ -13,6 +13,8 @@ struct GroceryShoppingView: View {
     @State private var aisleIndex = 0
     @State private var selections: [String: Int]
     @State private var showQuantities = false
+    /// Famille de quantités affichée (pagination : un écran par famille).
+    @State private var familyIndex = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(initial: [String: Int], onDone: @escaping ([String: Int]) -> Void, onCancel: @escaping () -> Void) {
@@ -169,16 +171,26 @@ struct GroceryShoppingView: View {
     // MARK: Écran quantités
 
     private var quantitiesScreen: some View {
-        VStack(spacing: 0) {
+        let families = familiesWithSelection
+        let idx = min(familyIndex, max(families.count - 1, 0))
+        let isLast = idx >= families.count - 1
+        return VStack(spacing: 0) {
             HStack {
-                Button { HapticService.shared.tap(); goBackToShopping(lastAisle: true) } label: {
+                Button {
+                    HapticService.shared.tap()
+                    if familyIndex > 0 {
+                        withAnimation(reduceMotion ? .none : .healthMapSpring) { familyIndex -= 1 }
+                    } else {
+                        goBackToShopping(lastAisle: true)
+                    }
+                } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.healthMapBlue)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Retour aux rayons")
+                .accessibilityLabel("Retour")
                 Spacer()
                 Button { HapticService.shared.tap(); onCancel() } label: {
                     Image(systemName: "xmark")
@@ -192,12 +204,12 @@ struct GroceryShoppingView: View {
             .padding(.horizontal, Theme.spacingSM)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("📋 Dernière étape")
+                Text("📋 Tes quantités")
                     .font(Theme.titleFont)
                     .brandTitleKerning()
                     .foregroundStyle(Color.healthMapText)
                     .accessibilityAddTraits(.isHeader)
-                Text("Combien de fois par semaine, pour chaque aliment de ton caddie ?")
+                Text("Combien de fois par semaine, en moyenne ?")
                     .font(Theme.captionFont)
                     .foregroundStyle(Color.healthMapSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -206,7 +218,7 @@ struct GroceryShoppingView: View {
             .padding(.horizontal, Theme.spacingLG)
             .padding(.top, Theme.spacingXS)
 
-            if selectedItems.isEmpty {
+            if families.isEmpty {
                 Spacer()
                 VStack(spacing: Theme.spacingSM) {
                     Text("🛒").font(.system(size: 34))
@@ -218,29 +230,37 @@ struct GroceryShoppingView: View {
                 .padding(.horizontal, Theme.spacingXL)
                 Spacer()
             } else {
+                // Un écran par famille : progression + la famille courante seule.
+                familyProgressBar(count: families.count, current: idx)
+                    .padding(.horizontal, Theme.spacingLG)
+                    .padding(.top, Theme.spacingSM)
+
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: Theme.spacingLG) {
-                        precisionGauge
-                        ForEach(familiesWithSelection) { family in
-                            familySection(family)
-                        }
-                    }
-                    .padding(Theme.spacingLG)
+                    familySection(families[idx])
+                        .padding(Theme.spacingLG)
                 }
+                .id(idx)
             }
 
             VStack(spacing: Theme.spacingSM) {
-                Button { HapticService.shared.strong(); onDone(selections) } label: {
-                    Text("Valider mon caddie")
+                Button {
+                    if isLast {
+                        HapticService.shared.strong(); onDone(selections)
+                    } else {
+                        HapticService.shared.primary()
+                        withAnimation(reduceMotion ? .none : .healthMapSpring) { familyIndex += 1 }
+                    }
+                } label: {
+                    Text(isLast ? "Valider mon caddie" : "Suivant")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
-                        .background(selectedItems.isEmpty ? AnyShapeStyle(Color.healthMapMuted) : AnyShapeStyle(LinearGradient.healthMapBrand))
+                        .background(families.isEmpty ? AnyShapeStyle(Color.healthMapMuted) : AnyShapeStyle(LinearGradient.healthMapBrand))
                         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                 }
                 .buttonStyle(.healthMapPressed)
-                .disabled(selectedItems.isEmpty)
+                .disabled(families.isEmpty)
 
                 Button { HapticService.shared.tap(); goBackToShopping(lastAisle: false) } label: {
                     Text("‹ Modifier mes courses")
@@ -251,6 +271,20 @@ struct GroceryShoppingView: View {
             .padding(.horizontal, Theme.spacingLG)
             .padding(.bottom, Theme.spacingMD)
         }
+    }
+
+    /// Barre de progression des quantités : un segment par famille, rempli
+    /// jusqu'à la famille courante.
+    private func familyProgressBar(count: Int, current: Int) -> some View {
+        HStack(spacing: 5) {
+            ForEach(0..<count, id: \.self) { i in
+                Capsule()
+                    .fill(i <= current ? Color.healthMapBlue : Color.healthMapMuted.opacity(0.18))
+                    .frame(height: 6)
+            }
+        }
+        .animation(reduceMotion ? .none : .healthMapSpring, value: current)
+        .accessibilityLabel("Famille \(current + 1) sur \(count)")
     }
 
     // MARK: Quantités — fourchettes par famille + jauge de précision
@@ -371,7 +405,7 @@ struct GroceryShoppingView: View {
     private func next() {
         HapticService.shared.primary()
         if aisleIndex == aisles.count - 1 {
-            withAnimation(reduceMotion ? .none : .healthMapSpring) { showQuantities = true }
+            withAnimation(reduceMotion ? .none : .healthMapSpring) { familyIndex = 0; showQuantities = true }
         } else {
             withAnimation(reduceMotion ? .none : .healthMapSpring) { aisleIndex += 1 }
         }
@@ -386,6 +420,7 @@ struct GroceryShoppingView: View {
     private func goBackToShopping(lastAisle: Bool) {
         withAnimation(reduceMotion ? .none : .healthMapSpring) {
             showQuantities = false
+            familyIndex = 0
             aisleIndex = lastAisle ? aisles.count - 1 : 0
         }
     }
@@ -407,29 +442,42 @@ struct GroceryQuestionControl: View {
                 .foregroundStyle(Color.healthMapSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button { HapticService.shared.primary(); showCaddie = true } label: {
+            if count > 0 {
+                // Caddie validé : on ne le redemande plus et il n'est plus
+                // modifiable (fini le « on me redemande mes courses »).
                 HStack(spacing: Theme.spacingSM) {
-                    Image(systemName: "cart.fill").font(.system(size: 18)).foregroundStyle(.white)
-                    Text(count > 0 ? "Modifier mon caddie" : "Commencer mes courses")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
+                    Image(systemName: "checkmark.seal.fill").font(.system(size: 22)).foregroundStyle(Color.scoreExcellent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Courses validées")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.healthMapText)
+                        Text("\(count) aliment\(count > 1 ? "s" : "") dans ton caddie")
+                            .font(Theme.captionFont)
+                            .foregroundStyle(Color.healthMapSecondary)
+                    }
                     Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
                 }
                 .padding(Theme.spacingMD)
                 .frame(maxWidth: .infinity)
-                .background(LinearGradient.healthMapBrand)
+                .background(Color.healthMapCard)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            }
-            .buttonStyle(.healthMapPressed)
-
-            if count > 0 {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 14)).foregroundStyle(Color.scoreExcellent)
-                    Text("\(count) aliment\(count > 1 ? "s" : "") dans ton caddie")
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapSecondary)
+                .accessibilityElement(children: .combine)
+            } else {
+                Button { HapticService.shared.primary(); showCaddie = true } label: {
+                    HStack(spacing: Theme.spacingSM) {
+                        Image(systemName: "cart.fill").font(.system(size: 18)).foregroundStyle(.white)
+                        Text("Commencer mes courses")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+                    }
+                    .padding(Theme.spacingMD)
+                    .frame(maxWidth: .infinity)
+                    .background(LinearGradient.healthMapBrand)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                 }
+                .buttonStyle(.healthMapPressed)
             }
         }
         .fullScreenCover(isPresented: $showCaddie) {
