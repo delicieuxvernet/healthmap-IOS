@@ -146,11 +146,31 @@ final class MealJournalService {
     /// Repas d'une plage `[from, to)` — nourrit le score de la semaine (14
     /// derniers jours : semaine courante + précédente pour la comparaison).
     func loadRange(userId: String, from: Date, to: Date, calendar: Calendar = .current) async throws -> [MealRecord] {
+        // `detected_foods` a DEUX formes en base :
+        //   • tableau de chaînes         → ajouts manuels + lignes web/legacy
+        //   • tableau d'objets {name_fr…}→ scans photo (fonction Edge, depuis v5)
+        // On extrait le nom dans les deux cas. AVANT ce fix, le type `[String]`
+        // faisait ÉCHOUER le décodage de TOUTE la page dès qu'un scan photo
+        // (objet) était présent → `loadRange` levait, `journal.load()` avalait
+        // l'erreur, et le journal apparaissait VIDE partout (score hebdo, « Ta
+        // journée », Suivi, Plan tous à 0). C'était la vraie cause racine.
+        struct FlexibleFoodName: Decodable {
+            let name: String
+            init(from decoder: Decoder) throws {
+                let c = try decoder.singleValueContainer()
+                if let s = try? c.decode(String.self) {
+                    name = s
+                } else {
+                    struct Obj: Decodable { let name_fr: String? }
+                    name = ((try? c.decode(Obj.self))?.name_fr) ?? ""
+                }
+            }
+        }
         struct RemoteRow: Decodable {
             let id: String
             let consumedAt: String
             let mealType: String?
-            let detectedFoods: [String]?
+            let detectedFoods: [FlexibleFoodName]?
             let macros: MealMacros?
             let micros: [MicroPct]?
             enum CodingKeys: String, CodingKey {
@@ -178,10 +198,11 @@ final class MealJournalService {
         return rows.map { r in
             let date = Self.parseTimestamp(r.consumedAt) ?? from
             let slot = MealSlot(rawValue: r.mealType ?? "") ?? MealSlot.from(date: date, calendar: calendar)
+            let names = (r.detectedFoods ?? []).map(\.name).filter { !$0.isEmpty }
             return MealRecord(id: r.id,
                               consumedAt: date,
                               slot: slot,
-                              foods: r.detectedFoods ?? [],
+                              foods: names,
                               macros: r.macros ?? MealMacros(),
                               micros: r.micros ?? [])
         }
