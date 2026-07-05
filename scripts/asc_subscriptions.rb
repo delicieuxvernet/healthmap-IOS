@@ -10,6 +10,7 @@
 #                disponibilité manquantes, essai gratuit 7 j — puis relit l'état.
 #   MODE=offers : crée les codes promo (NAIA = 3 mois offerts / LANCEMENT50 = -50%).
 
+require "base64"
 require "digest"
 require "jwt"
 require "json"
@@ -190,14 +191,22 @@ end
 # ── Helpers codes promo (offer codes) ───────────────────────────────────────
 # Grille [ [territoire, pricePointId], ... ] pour un prix cible, depuis les
 # égalisations du point FRA le plus proche. Renvoie [grid, prix_FRA_retenu].
+# Le territoire d'un price point est encodé dans son id (base64 de
+# {"s":sub,"t":TERRITOIRE,"p":num}) — plus fiable que de demander la relation.
+def territory_of(price_point_id)
+  JSON.parse(Base64.decode64(price_point_id))["t"]
+rescue StandardError
+  nil
+end
+
 def offer_price_grid(sub_id, target_price)
   found = find_price_point(sub_id, target_price)
   return [[], nil] if found.nil?
   fra_id, real = found
-  grid = { "FRA" => fra_id }
-  eqs = get_all("/v1/subscriptionPricePoints/#{fra_id}/equalizations?limit=200&fields[subscriptionPricePoints]=customerPrice,territory")
+  grid = { (territory_of(fra_id) || "FRA") => fra_id }
+  eqs = get_all("/v1/subscriptionPricePoints/#{fra_id}/equalizations?limit=200&fields[subscriptionPricePoints]=customerPrice")
   eqs.each do |p|
-    terr = p.dig("relationships", "territory", "data", "id")
+    terr = territory_of(p["id"])
     grid[terr] ||= p["id"] if terr
   end
   [grid.to_a, real]
@@ -206,10 +215,11 @@ end
 # Un offer code exige une relation prices avec, PAR territoire, un
 # subscriptionOfferCodePrices (territory + price point) placé dans `included`
 # et référencé par un id de corrélation client (ici "p-<territoire>").
+# Apple exige un id de corrélation local au format ${...} pour la création inline.
 def build_offer_prices(grid)
-  data = grid.map { |terr, _| { type: "subscriptionOfferCodePrices", id: "p-#{terr}" } }
+  data = grid.map { |terr, _| { type: "subscriptionOfferCodePrices", id: "${#{terr}}" } }
   included = grid.map do |terr, pp_id|
-    { type: "subscriptionOfferCodePrices", id: "p-#{terr}",
+    { type: "subscriptionOfferCodePrices", id: "${#{terr}}",
       relationships: {
         territory: { data: { type: "territories", id: terr } },
         subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: pp_id } } } }
