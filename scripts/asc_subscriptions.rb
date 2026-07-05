@@ -239,11 +239,17 @@ def create_offer_code(sub_id, name, attrs, grid)
       included: included })
 end
 
+# `active` est interdit à la création (il devient contrôlable en PATCH ensuite).
 def create_custom_code(offer_code_id, code, n, expiration)
   write("custom code « #{code} » x#{n}", :post, "/v1/subscriptionOfferCodeCustomCodes",
     { data: { type: "subscriptionOfferCodeCustomCodes",
-              attributes: { customCode: code, numberOfCodes: n, expirationDate: expiration, active: true },
+              attributes: { customCode: code, numberOfCodes: n, expirationDate: expiration },
               relationships: { offerCode: { data: { type: "subscriptionOfferCodes", id: offer_code_id } } } } })
+end
+
+def custom_codes_of(offer_code_id)
+  code, body = req(:get, "/v1/subscriptionOfferCodes/#{offer_code_id}/customCodes?limit=200")
+  code == 200 ? body["data"].map { |c| c.dig("attributes", "customCode") } : []
 end
 
 # ── 1. App + groupes ─────────────────────────────────────────────────────────
@@ -376,9 +382,9 @@ if MODE == "offers"
   # Expiration des codes ~18 mois (Time.now = vrai Ruby CI, pas le sandbox Workflow).
   expiration = (Time.now + 550 * 24 * 3600).strftime("%Y-%m-%d")
 
-  code, body = req(:get, "/v1/subscriptions/#{monthly}/offerCodes?limit=200")
-  existing = code == 200 ? body["data"].map { |o| o.dig("attributes", "name") } : []
-  puts "Offer codes existants (HTTP #{code}) : #{existing.inspect}"
+  existing = {}
+  get_all("/v1/subscriptions/#{monthly}/offerCodes?limit=200").each { |o| existing[o.dig("attributes", "name")] = o["id"] }
+  puts "Offer codes existants : #{existing.keys.inspect}"
 
   offers = [
     { name: "NAIA - 3 mois offerts", code: "NAIA", redemptions: 20, target: nil,
@@ -392,25 +398,30 @@ if MODE == "offers"
   failures = []
   offers.each do |o|
     puts "\n--- #{o[:code]} ---"
-    if existing.include?(o[:name])
-      puts "  (déjà créé) #{o[:name]}"
-      next
+    oc_id = existing[o[:name]]
+    if oc_id
+      puts "  offer code déjà présent (#{oc_id})"
+    else
+      # Grille de prix : prix réduit pour un -50%, prix de base sinon (essai gratuit).
+      grid, real = offer_price_grid(monthly, o[:target] || TARGETS["healthmap_monthly"][:price])
+      if grid.empty?
+        puts "  ÉCHEC aucun point de prix pour la cible"
+        failures << "#{o[:code]}: prix"
+        next
+      end
+      puts "  prix par période retenu (FRA) : #{real} €" if o[:target]
+      ok, resp = create_offer_code(monthly, o[:name], o[:attrs], grid)
+      (failures << "#{o[:code]}: offer code"; next) unless ok
+      oc_id = resp["data"]["id"]
     end
-    # Grille de prix : prix réduit pour un -50%, prix de base sinon (essai gratuit).
-    grid, real = offer_price_grid(monthly, o[:target] || TARGETS["healthmap_monthly"][:price])
-    if grid.empty?
-      puts "  ÉCHEC aucun point de prix pour la cible"
-      failures << "#{o[:code]}: prix"
-      next
+
+    # Custom code (idempotent) : ne créer que s'il manque encore.
+    if custom_codes_of(oc_id).include?(o[:code])
+      puts "  custom code « #{o[:code]} » déjà présent"
+    else
+      okc, = create_custom_code(oc_id, o[:code], o[:redemptions], expiration)
+      failures << "#{o[:code]}: custom code" unless okc
     end
-    puts "  prix par période retenu (FRA) : #{real} €" if o[:target]
-    ok, resp = create_offer_code(monthly, o[:name], o[:attrs], grid)
-    unless ok
-      failures << "#{o[:code]}: offer code"
-      next
-    end
-    okc, = create_custom_code(resp["data"]["id"], o[:code], o[:redemptions], expiration)
-    failures << "#{o[:code]}: custom code" unless okc
   end
 
   # Relit les codes custom créés
