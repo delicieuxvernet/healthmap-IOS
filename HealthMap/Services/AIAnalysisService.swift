@@ -342,12 +342,13 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         // PAYANT au prochain lancement. completed/firstName + avatarKey : ce
         // dernier est choisi APRÈS le bilan (sélecteur d'avatar) et invalidait
         // le cache à tort -> ré-analyse au relancement (bug coût, 20 juin).
-        // groceries : exclu TANT qu'il ne pilote pas l'analyse (PR 1 fondations).
-        // 1) l'ajouter maintenant changerait le hash de tous les profils existants
-        //    (caddie vide) -> ré-analyse payante ; 2) un dict s'interpole dans un
-        //    ordre non déterministe -> hash instable à chaque lancement. Il sera
-        //    réintégré de façon déterministe (clés triées) avec le moteur de score
-        //    et le prompt qui le consomment.
+        // groceries : exclu du filtrage générique (un dict s'interpole dans un
+        // ordre non déterministe) puis réintégré ci-dessous via une sérialisation
+        // triée par clé — le prompt IA le traite en source prioritaire (## CADDIE)
+        // et NutrientEngine le consomme pour scorer, donc un caddie modifié DOIT
+        // invalider le cache. Réintégré le 2026-07-05 (audit archi) : tous les
+        // profils avec un caddie non vide déclencheront une ré-analyse au prochain
+        // lancement — attendu, une seule fois.
         let filtered = jsonObj.filter {
             $0.key != "completed" && $0.key != "firstName"
                 && $0.key != "avatarKey" && $0.key != "groceries"
@@ -361,6 +362,14 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
                 parts.append("\(key):\(val)")
             }
         }
+
+        // groceries : sérialisation déterministe séparée (clés d'aliment triées)
+        let groceriesStr = profile.groceries
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: ",")
+        parts.append("groceries:\(groceriesStr)")
+
         let str = parts.joined(separator: "|")
 
         // djb2 hash (same as web)

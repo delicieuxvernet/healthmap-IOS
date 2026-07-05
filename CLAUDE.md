@@ -50,6 +50,14 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
 >
 > Toute évolution d'une formule côté web doit être répercutée immédiatement dans `Core/HealthCalculator.swift`, `Core/RedFlagDetector.swift`, `Core/NutrientData.swift`. Sinon, divergence iOS/web → bugs invisibles.
 
+> **Exception assumée (2026-07-05)** : dès que `profile.groceries` (caddie "Faites vos
+> courses") n'est pas vide, `HealthCalculator.calculateHealthScore`/`analyzeNutrientScores`
+> bifurquent entièrement vers `NutrientEngine` (moteur de score iOS-only, sans équivalent
+> dans `health.js`). Pour ce sous-ensemble de profils, iOS N'EST PAS un mirror du web —
+> décision produit : le web est déprioritisé (MVP abandonné), pas de portage prévu.
+> Ne pas essayer de faire converger `NutrientEngine` vers `health.js` sans un nouvel
+> arbitrage explicite.
+
 ---
 
 ## 2. ⚠️ Règles absolues immuables

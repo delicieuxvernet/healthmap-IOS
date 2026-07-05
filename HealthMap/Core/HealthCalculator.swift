@@ -145,19 +145,23 @@ enum HealthCalculator {
         let screenScores = ["none": 3, "short": 1, "moderate": -1, "long": -3, "very_long": -5]
         score += screenScores[profile.screenBeforeBed] ?? 0
 
-        // Sleep duration
-        let sd = profile.sleepHoursDouble
-        if sd >= 7 && sd <= 9 { score += 5 }
-        else if sd >= 6 { score += 2 }
-        else if sd > 0 && sd < 6 { score -= 5 }
+        // Sleep duration (v6 key, scored only if sleepHours was not set — avoids double-scoring, mirror health.js:148-154)
+        if profile.sleepHours.isEmpty {
+            let sd = Double(profile.sleepDuration) ?? 0
+            if sd >= 7 && sd <= 9 { score += 5 }
+            else if sd >= 6 { score += 2 }
+            else if sd > 0 && sd < 6 { score -= 5 }
+        }
 
         // Ultra-processed
         let upfScores = ["never": 5, "rarely": 2, "sometimes": 0, "often": -5, "daily": -8]
         score += upfScores[profile.ultraProcessedFrequency] ?? 0
 
-        // Meal frequency
-        let mealNewScores = ["one": -5, "two": -2, "three": 3, "four_plus": 2, "irregular": -4]
-        score += mealNewScores[profile.mealFrequency] ?? 0
+        // Meal frequency (v6 key, scored only if mealsPerDay was not set — avoids double-scoring, mirror health.js:160-164)
+        if profile.mealsPerDay.isEmpty {
+            let mealNewScores = ["one": -5, "two": -2, "three": 3, "four_plus": 2, "irregular": -4]
+            score += mealNewScores[profile.mealFrequency] ?? 0
+        }
 
         // Diet diversity
         let diversityItems: [Bool] = [
@@ -340,7 +344,10 @@ enum HealthCalculator {
         if p.bloating == "yes" { scores["zinc", default: 70] -= 3 }
 
         // ═══════ IODINE ═══════
-        if p.iodizedSalt == "no" || p.iodizedSalt.isEmpty {
+        // mirror health.js:473 — undefined/non renseigné = neutre, pas de penalite
+        // (isEmpty traite auparavant a tort comme "no", trouve par le test de
+        // parite cross-repo du 2026-07-05)
+        if p.iodizedSalt == "no" {
             scores["iodine", default: 70] -= 12
         } else if p.iodizedSalt == "yes" && p.saltLevel == "none" {
             scores["iodine", default: 70] -= 8
