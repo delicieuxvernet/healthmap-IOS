@@ -51,6 +51,16 @@ struct QuestionnaireContainerView: View {
     /// jamais deux intros d'affilée avec teaser.
     @State private var lastIntroShowedTeaser = false
 
+    /// Vrai si l'utilisateur est sur une question à choix unique qu'il n'a pas
+    /// encore renseignée : « Continuer / Terminer » reste bloqué tant qu'il n'a
+    /// pas choisi (fini le défaut silencieux type « Homme » validé sans geste).
+    private var isBlockedOnSingleChoice: Bool {
+        guard introSection == nil, activeGate == nil,
+              let q = viewModel.currentQuestion,
+              case .singleChoice = q.type else { return false }
+        return !viewModel.interactedQuestionIds.contains(q.id)
+    }
+
     /// Libellé du bouton primaire selon l'étape : intro de section, question
     /// intermédiaire, ou dernière question (avec état d'envoi / retry).
     private var primaryButtonLabel: String {
@@ -275,7 +285,7 @@ struct QuestionnaireContainerView: View {
         case .singleChoice:
             SingleChoiceView(
                 question: question,
-                currentValue: viewModel.stringValue(for: question.id)
+                currentValue: viewModel.displaySingleChoiceValue(for: question.id)
             ) { value in
                 viewModel.updateAnswer(questionId: question.id, value: value)
                 // Auto-advance : 350ms pour que l'utilisateur voie son choix
@@ -353,7 +363,7 @@ struct QuestionnaireContainerView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
                 .background {
-                    if viewModel.isSubmitting {
+                    if viewModel.isSubmitting || isBlockedOnSingleChoice {
                         Color.healthMapMuted
                     } else {
                         LinearGradient.healthMapBrand
@@ -361,7 +371,7 @@ struct QuestionnaireContainerView: View {
                 }
                 .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                 .shadow(
-                    color: viewModel.isSubmitting
+                    color: (viewModel.isSubmitting || isBlockedOnSingleChoice)
                         ? Color.clear
                         : Color.healthMapBlue.opacity(Theme.shadowBrandGlow.opacity),
                     radius: Theme.shadowBrandGlow.radius,
@@ -370,7 +380,7 @@ struct QuestionnaireContainerView: View {
                 )
         }
         .buttonStyle(.healthMapPressed)
-        .disabled(viewModel.isSubmitting)
+        .disabled(viewModel.isSubmitting || isBlockedOnSingleChoice)
         .padding(.horizontal, Theme.spacingLG)
         .padding(.top, Theme.spacingSM)
         .padding(.bottom, Theme.spacingSM)

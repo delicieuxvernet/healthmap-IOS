@@ -16,6 +16,12 @@ final class QuestionnaireViewModel: ObservableObject {
     /// express ; chaque carrefour déverrouille un bloc (nutrition / symptômes /
     /// médical). Parcours adaptatif (remplace le choix express/complet).
     @Published var unlockedDeepSections: Set<QuestionnaireSection> = []
+    /// Ids des questions que l'utilisateur a RÉELLEMENT renseignées d'un geste.
+    /// Distinct de `isAnswered`, qui compte un champ à valeur par défaut (gender,
+    /// smoking, dietType) comme répondu : c'est ce suivi qui permet de n'afficher
+    /// AUCUNE présélection sur une question à choix unique tant que l'utilisateur
+    /// n'a pas choisi (fini le « Homme » déjà coché).
+    @Published private(set) var interactedQuestionIds: Set<String> = []
     @Published var isSubmitting = false
     @Published var errorMessage: String?
 
@@ -56,6 +62,9 @@ final class QuestionnaireViewModel: ObservableObject {
         /// Blocs profonds déverrouillés (rawValues de QuestionnaireSection) —
         /// parcours adaptatif (schema v4). Optionnel pour le décodage robuste.
         let unlockedDeepSections: [Int]?
+        /// Ids des questions réellement renseignées par l'utilisateur. Optionnel :
+        /// un ancien draft sans ce champ décode et on dérive à la reprise.
+        let interactedQuestionIds: [String]?
         let savedAt: Date
     }
     /// Bumped 1→2 (userId), 2→3 (refonte nutrition "Faites vos courses"),
@@ -381,6 +390,9 @@ final class QuestionnaireViewModel: ObservableObject {
             AppLogger.ui.warning("Unknown question ID: \(questionId, privacy: .public)")
         }
 
+        // La réponse vient d'un geste explicite → on la marque comme renseignée
+        // (les retours anticipés ci-dessus, ex. taille/poids invalides, l'évitent).
+        interactedQuestionIds.insert(questionId)
         saveDraft()
     }
 
@@ -417,6 +429,14 @@ final class QuestionnaireViewModel: ObservableObject {
     // Pendants LECTURE de `updateAnswer` (écriture). Utilisés par la vue pour
     // afficher la sélection courante, et par la restauration de draft pour
     // retrouver la première question non répondue.
+
+    /// Valeur à AFFICHER comme sélectionnée sur une question à choix unique :
+    /// `nil` tant que l'utilisateur n'a pas fait un vrai choix, même si le champ
+    /// profil porte une valeur par défaut. C'est ce qui supprime la présélection.
+    func displaySingleChoiceValue(for questionId: String) -> String? {
+        guard interactedQuestionIds.contains(questionId) else { return nil }
+        return stringValue(for: questionId)
+    }
 
     /// Valeur single-choice courante d'une question (nil si non mappée).
     func stringValue(for questionId: String) -> String? {
@@ -626,6 +646,7 @@ final class QuestionnaireViewModel: ObservableObject {
             profile: profile,
             pathway: pathway,
             unlockedDeepSections: unlockedDeepSections.map { $0.rawValue },
+            interactedQuestionIds: Array(interactedQuestionIds),
             savedAt: Date()
         )
 
@@ -699,6 +720,20 @@ final class QuestionnaireViewModel: ObservableObject {
             self.currentQuestionIndex = index
         } else {
             self.currentQuestionIndex = firstUnansweredQuestionIndex()
+        }
+        // Suivi d'interaction : soit on relit ce qui a été explicitement
+        // renseigné (draft récent), soit — vieux draft sans ce champ — on le
+        // dérive des réponses non vides pour qu'un utilisateur qui reprend son
+        // questionnaire retrouve ses sélections déjà faites.
+        if let saved = draft.interactedQuestionIds {
+            self.interactedQuestionIds = Set(saved)
+        } else {
+            self.interactedQuestionIds = Set(
+                QuestionnaireSection.allCases
+                    .flatMap { $0.questions }
+                    .filter { isAnswered($0) }
+                    .map { $0.id }
+            )
         }
         self.hasDraftInProgress = true
         AppLogger.ui.info("Questionnaire draft restored (question \(self.currentQuestionIndex, privacy: .public), saved \(draft.savedAt, privacy: .public))")
