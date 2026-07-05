@@ -13,6 +13,10 @@ enum NavCardDestination: String {
 extension Notification.Name {
     static let healthmapNavigateToTab = Notification.Name("healthmapNavigateToTab")
     static let healthmapOpenProfile = Notification.Name("healthmapOpenProfile")
+    /// Émise après un scan de repas réussi (repas persisté dans meal_scans par la
+    /// fonction Edge). Les écrans en aval (Bilan → score hebdo, journal du jour
+    /// « Ta journée ») rechargent leur journal à réception.
+    static let healthmapMealScanned = Notification.Name("healthmapMealScanned")
 }
 
 // MARK: - Profile Toolbar (avatar Profil sur TOUS les onglets — A1)

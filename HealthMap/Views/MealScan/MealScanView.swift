@@ -15,6 +15,7 @@ struct MealScanView: View {
     @StateObject private var viewModel = MealScanViewModel()
     @StateObject private var journal = MealJournalViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var gamification = GamificationService.shared
     @State private var selectedItem: PhotosPickerItem?
     @State private var showPaywall = false
     @State private var selectedFood: MealScanViewModel.DetectedFood?
@@ -28,6 +29,13 @@ struct MealScanView: View {
         viewModel.analysisResult != nil && viewModel.selectedTab == .analyze
     }
 
+    /// Vrai dès qu'au moins un vrai scan a réussi (badge `mealScanned` persistant en
+    /// UserDefaults, posé une fois au 1er scan). Sert à masquer DÉFINITIVEMENT le bloc
+    /// d'exemple pédagogique une fois que l'utilisateur a scanné pour de vrai.
+    private var hasEverScanned: Bool {
+        gamification.earnedBadges.contains(.mealScanned)
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -38,6 +46,10 @@ struct MealScanView: View {
                 }
             }
             .kiwiTabBarBottomInset()
+            // Recharge le journal du jour (« Ta journée ») dès qu'un scan est persisté.
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
+                Task { await journal.load() }
+            }
             .navigationTitle("Scanner")
             .navigationBarTitleDisplayMode(.large)
             .toolbar(isImmersive ? .hidden : .automatic, for: .navigationBar)
@@ -122,7 +134,9 @@ struct MealScanView: View {
                     freeScanCounter(remaining)
                 }
                 captureZone
-                exampleAnalysis
+                // L'exemple pédagogique ne s'affiche que tant qu'aucun vrai scan
+                // n'a été fait : dès le 1er scan réussi, il disparaît à vie.
+                if !hasEverScanned { exampleAnalysis }
             }
 
             if let error = viewModel.errorMessage {
