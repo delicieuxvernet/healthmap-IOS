@@ -31,7 +31,7 @@
   <rect x="760" y="1570" width="350" height="70" rx="35" fill="#5DA838"/>
   <text x="935" y="1618" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#FFFFFF">7 jours offerts</text>
   <text x="180" y="1720" font-family="Helvetica, Arial, sans-serif" font-size="50" font-weight="700" fill="#211F1A">Annuel</text>
-  <text x="180" y="1810" font-family="Helvetica, Arial, sans-serif" font-size="44" fill="#211F1A">30 € / an</text>
+  <text x="180" y="1810" font-family="Helvetica, Arial, sans-serif" font-size="44" fill="#211F1A">50 € / an</text>
 
   <!-- Carte Mensuel -->
   <rect x="120" y="1960" width="1044" height="280" rx="40" fill="#FFFFFF" stroke="#E7ECE6" stroke-width="4"/>

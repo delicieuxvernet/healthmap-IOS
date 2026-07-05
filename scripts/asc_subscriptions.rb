@@ -20,7 +20,7 @@ require "openssl"
 BUNDLE_ID = "fr.healthmap.app"
 TARGETS = {
   "healthmap_monthly" => { price: "4.99",  name: "Kiwio Mensuel", period: "ONE_MONTH" },
-  "healthmap_annual"  => { price: "30.00", name: "Kiwio Annuel",  period: "ONE_YEAR"  },
+  "healthmap_annual"  => { price: "50.00", name: "Kiwio Annuel",  period: "ONE_YEAR"  },
 }.freeze
 MODE = (ENV["MODE"] || "audit").downcase
 BASE = "https://api.appstoreconnect.apple.com"
