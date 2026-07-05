@@ -5,9 +5,10 @@
 # si un accord (ex. vérification DSA) bloque l'écriture.
 #
 #   MODE=audit : lit et rapporte l'état complet des abonnements (aucune écriture)
-#   MODE=apply : fixe les prix validés (2,99 € mensuel / 24,99 € annuel, base FRA,
+#   MODE=apply : fixe les prix validés (4,99 € mensuel / 30 € annuel, base FRA,
 #                autres territoires égalisés par Apple), crée localisation fr-FR et
 #                disponibilité manquantes, essai gratuit 7 j — puis relit l'état.
+#   MODE=offers : crée les codes promo (NAIA = 3 mois offerts / LANCEMENT50 = -50%).
 
 require "digest"
 require "jwt"
@@ -17,8 +18,8 @@ require "openssl"
 
 BUNDLE_ID = "fr.healthmap.app"
 TARGETS = {
-  "healthmap_monthly" => { price: "2.99",  name: "Kiwio Mensuel", period: "ONE_MONTH" },
-  "healthmap_annual"  => { price: "24.99", name: "Kiwio Annuel",  period: "ONE_YEAR"  },
+  "healthmap_monthly" => { price: "4.99",  name: "Kiwio Mensuel", period: "ONE_MONTH" },
+  "healthmap_annual"  => { price: "30.00", name: "Kiwio Annuel",  period: "ONE_YEAR"  },
 }.freeze
 MODE = (ENV["MODE"] || "audit").downcase
 BASE = "https://api.appstoreconnect.apple.com"
@@ -166,16 +167,24 @@ def upload_review_screenshot(sub_id, png_path)
   ok
 end
 
+# Renvoie [id, prix_réel] du point de prix FRA le plus proche de `price`
+# (Apple n'a pas toujours un point exact, ex. 30,00 € → 29,99 €). Nil si aucun.
 def find_price_point(sub_id, price)
+  target = price.to_f
+  best = nil
   url = "/v1/subscriptions/#{sub_id}/pricePoints?filter[territory]=FRA&limit=200&fields[subscriptionPricePoints]=customerPrice"
   while url
     code, body = req(:get, url)
     abort_with("pricePoints", code, body) unless code == 200
-    hit = body["data"].find { |p| p.dig("attributes", "customerPrice") == price }
-    return hit["id"] if hit
+    body["data"].each do |p|
+      cp = p.dig("attributes", "customerPrice")
+      next unless cp
+      dist = (cp.to_f - target).abs
+      best = { id: p["id"], price: cp, dist: dist } if best.nil? || dist < best[:dist]
+    end
     url = body.dig("links", "next")
   end
-  nil
+  best ? [best[:id], best[:price]] : nil
 end
 
 # ── 1. App + groupes ─────────────────────────────────────────────────────────
@@ -354,16 +363,18 @@ TARGETS.each do |product_id, spec|
 
   # Prix : base France, puis égalisation explicite sur tous les territoires —
   # un prix base seul laisse l'abonnement en MISSING_METADATA.
-  pp_id = find_price_point(sub_id, spec[:price])
-  if pp_id.nil?
-    puts "  ÉCHEC aucun price point FRA à #{spec[:price]}"
+  found = find_price_point(sub_id, spec[:price])
+  if found.nil?
+    puts "  ÉCHEC aucun price point FRA proche de #{spec[:price]}"
     failures << "#{product_id}: price point introuvable"
   else
+    pp_id, real_price = found
+    puts "  cible #{spec[:price]} € → point de prix FRA retenu #{real_price} €"
     current = snap[:prices_fra].is_a?(Array) ? snap[:prices_fra].map { |p| p[:customerPrice] } : []
-    if current.include?(spec[:price])
-      puts "  OK  prix FRA déjà à #{spec[:price]} €"
+    if current.include?(real_price)
+      puts "  OK  prix FRA déjà à #{real_price} €"
     else
-      ok, = write("prix FRA #{spec[:price]} €", :post, "/v1/subscriptionPrices",
+      ok, = write("prix FRA #{real_price} €", :post, "/v1/subscriptionPrices",
         { data: { type: "subscriptionPrices",
                   relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
                                    subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: pp_id } } } } })
