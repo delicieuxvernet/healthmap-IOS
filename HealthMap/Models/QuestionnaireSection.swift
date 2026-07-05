@@ -46,10 +46,10 @@ enum QuestionnaireSection: Int, CaseIterable, Identifiable {
 
     /// Express pathway keys (21 questions)
     static let expressKeys: Set<String> = [
-        "symptoms", "goals", "firstName", "age", "gender", "height", "weight",
-        "indoorWork", "sunExposure", "strengthTraining",
-        "stressLevel", "sleepHours", "wakeFeeling", "caffeineIntake", "waterIntake", "smoking",
-        "dietType", "groceries",
+        "symptoms", "goals", "firstName", "age", "gender", "height", "weight", "weightTrend",
+        "indoorWork", "sunExposure", "strengthTraining", "skinType",
+        "stressLevel", "sleepHours", "wakeFeeling", "screenBeforeBed", "caffeineIntake", "waterIntake", "smoking", "alcohol", "bloating",
+        "dietType", "groceries", "antibiotics",
     ]
 }
 
