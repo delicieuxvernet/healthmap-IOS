@@ -772,7 +772,7 @@ private struct QuestionnaireGateView: View {
 
     private var gateCard: some View {
         let c = copy
-        VStack {
+        return VStack {
             Spacer()
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 9) {
