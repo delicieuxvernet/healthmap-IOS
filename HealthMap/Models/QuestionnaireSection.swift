@@ -340,7 +340,6 @@ extension QuestionnaireSection {
         // quantités (légumes, fruits, poisson, viande, œufs, laitages,
         // légumineuses, noix, graines, complet) par un caddie d'aliments
         // concrets à cocher rayon par rayon. Réponse -> profile.groceries.
-        Question(id: "groceries", text: "Faisons tes courses !", type: .groceries),
         Question(
             id: "breadType",
             text: "Quel type de pain ?",
@@ -413,6 +412,10 @@ extension QuestionnaireSection {
                 .init("probiotics", "Probiotiques", emoji: "🦠"), .init("multivitamin", "Multivitamine", emoji: "💊"),
             ]
         ),
+        // Le caddie ("Faites vos courses") est la DERNIÈRE question de la
+        // nutrition : on pose d'abord TOUTES les questions alimentaires, puis on
+        // coche les aliments concrets rayon par rayon. Réponse -> profile.groceries.
+        Question(id: "groceries", text: "Faisons tes courses !", type: .groceries),
     ]
 }
 
