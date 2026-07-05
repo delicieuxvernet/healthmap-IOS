@@ -187,6 +187,54 @@ def find_price_point(sub_id, price)
   best ? [best[:id], best[:price]] : nil
 end
 
+# ── Helpers codes promo (offer codes) ───────────────────────────────────────
+# Grille [ [territoire, pricePointId], ... ] pour un prix cible, depuis les
+# égalisations du point FRA le plus proche. Renvoie [grid, prix_FRA_retenu].
+def offer_price_grid(sub_id, target_price)
+  found = find_price_point(sub_id, target_price)
+  return [[], nil] if found.nil?
+  fra_id, real = found
+  grid = { "FRA" => fra_id }
+  eqs = get_all("/v1/subscriptionPricePoints/#{fra_id}/equalizations?limit=200&fields[subscriptionPricePoints]=customerPrice,territory")
+  eqs.each do |p|
+    terr = p.dig("relationships", "territory", "data", "id")
+    grid[terr] ||= p["id"] if terr
+  end
+  [grid.to_a, real]
+end
+
+# Un offer code exige une relation prices avec, PAR territoire, un
+# subscriptionOfferCodePrices (territory + price point) placé dans `included`
+# et référencé par un id de corrélation client (ici "p-<territoire>").
+def build_offer_prices(grid)
+  data = grid.map { |terr, _| { type: "subscriptionOfferCodePrices", id: "p-#{terr}" } }
+  included = grid.map do |terr, pp_id|
+    { type: "subscriptionOfferCodePrices", id: "p-#{terr}",
+      relationships: {
+        territory: { data: { type: "territories", id: terr } },
+        subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: pp_id } } } }
+  end
+  [data, included]
+end
+
+def create_offer_code(sub_id, name, attrs, grid)
+  prices_data, included = build_offer_prices(grid)
+  write("offer code « #{name} » (#{grid.size} territoires)", :post, "/v1/subscriptionOfferCodes",
+    { data: { type: "subscriptionOfferCodes",
+              attributes: attrs.merge(name: name),
+              relationships: {
+                subscription: { data: { type: "subscriptions", id: sub_id } },
+                prices: { data: prices_data } } },
+      included: included })
+end
+
+def create_custom_code(offer_code_id, code, n, expiration)
+  write("custom code « #{code} » x#{n}", :post, "/v1/subscriptionOfferCodeCustomCodes",
+    { data: { type: "subscriptionOfferCodeCustomCodes",
+              attributes: { customCode: code, numberOfCodes: n, expirationDate: expiration, active: true },
+              relationships: { offerCode: { data: { type: "subscriptionOfferCodes", id: offer_code_id } } } } })
+end
+
 # ── 1. App + groupes ─────────────────────────────────────────────────────────
 code, body = req(:get, "/v1/apps?filter[bundleId]=#{BUNDLE_ID}")
 abort_with("apps", code, body) unless code == 200 && body["data"]&.any?
@@ -298,6 +346,73 @@ if MODE == "apply-app"
   code, rd = req(:get, "/v1/appStoreVersions/#{version_id}/appStoreReviewDetail")
   puts "\n===== ÉTAT FINAL REVIEW DETAIL ====="
   puts JSON.pretty_generate(code == 200 ? rd["data"] : rd)
+  exit 0
+end
+
+# ── MODE offers : codes promo (NAIA = 3 mois offerts, LANCEMENT50 = -50% 3 mois) ──
+if MODE == "offers"
+  groups = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
+  subs = {}
+  groups.each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      subs[s.dig("attributes", "productId")] = s["id"]
+    end
+  end
+  monthly = subs["healthmap_monthly"]
+  abort_with("offers", 0, "abonnement mensuel introuvable") unless monthly
+  puts "Abonnement mensuel : #{monthly}"
+
+  # Expiration des codes ~18 mois (Time.now = vrai Ruby CI, pas le sandbox Workflow).
+  expiration = (Time.now + 550 * 24 * 3600).strftime("%Y-%m-%d")
+
+  code, body = req(:get, "/v1/subscriptions/#{monthly}/offerCodes?limit=200")
+  existing = code == 200 ? body["data"].map { |o| o.dig("attributes", "name") } : []
+  puts "Offer codes existants (HTTP #{code}) : #{existing.inspect}"
+
+  offers = [
+    { name: "NAIA - 3 mois offerts", code: "NAIA", redemptions: 20, target: nil,
+      attrs: { offerMode: "FREE_TRIAL", duration: "THREE_MONTHS", numberOfPeriods: 1,
+               customerEligibilities: %w[NEW EXISTING EXPIRED], offerEligibility: "STACK_WITH_INTRO_OFFERS" } },
+    { name: "LANCEMENT50 - -50% 3 mois", code: "LANCEMENT50", redemptions: 100, target: "2.49",
+      attrs: { offerMode: "PAY_AS_YOU_GO", duration: "ONE_MONTH", numberOfPeriods: 3,
+               customerEligibilities: %w[NEW EXPIRED], offerEligibility: "STACK_WITH_INTRO_OFFERS" } },
+  ]
+
+  failures = []
+  offers.each do |o|
+    puts "\n--- #{o[:code]} ---"
+    if existing.include?(o[:name])
+      puts "  (déjà créé) #{o[:name]}"
+      next
+    end
+    # Grille de prix : prix réduit pour un -50%, prix de base sinon (essai gratuit).
+    grid, real = offer_price_grid(monthly, o[:target] || TARGETS["healthmap_monthly"][:price])
+    if grid.empty?
+      puts "  ÉCHEC aucun point de prix pour la cible"
+      failures << "#{o[:code]}: prix"
+      next
+    end
+    puts "  prix par période retenu (FRA) : #{real} €" if o[:target]
+    ok, resp = create_offer_code(monthly, o[:name], o[:attrs], grid)
+    unless ok
+      failures << "#{o[:code]}: offer code"
+      next
+    end
+    okc, = create_custom_code(resp["data"]["id"], o[:code], o[:redemptions], expiration)
+    failures << "#{o[:code]}: custom code" unless okc
+  end
+
+  # Relit les codes custom créés
+  code, body = req(:get, "/v1/subscriptions/#{monthly}/offerCodes?include=customCodes&limit=200")
+  puts "\n===== ÉTAT FINAL OFFER CODES ====="
+  if code == 200
+    (body["included"] || []).select { |i| i["type"] == "subscriptionOfferCodeCustomCodes" }.each do |c|
+      a = c["attributes"]
+      puts "  code=#{a["customCode"]} usages=#{a["numberOfCodes"]} expire=#{a["expirationDate"]} actif=#{a["active"]}"
+    end
+  end
+  puts "\n===== RÉSUMÉ ====="
+  puts failures.empty? ? "Codes promo créés." : "Échecs : #{failures.join(" | ")}"
   exit 0
 end
 
