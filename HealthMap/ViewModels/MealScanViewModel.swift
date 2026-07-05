@@ -180,12 +180,23 @@ final class MealScanViewModel: ObservableObject {
         let nameFr: String?
         let portionG: Double?
         let micros: [EdgeMicro]?
+        let macros: EdgeFoodMacros?   // macros de CET aliment (kcal + prot/carbs/fat/fiber)
 
         enum CodingKeys: String, CodingKey {
             case nameFr = "name_fr"
             case portionG = "portion_g"
             case micros
+            case macros
         }
+    }
+
+    /// Macros par aliment renvoyées par le backend (déterministes, CIQUAL × portion).
+    private struct EdgeFoodMacros: Decodable {
+        let calories: Int?
+        let proteins: Double?
+        let carbs: Double?
+        let fats: Double?
+        let fiber: Double?
     }
 
     private struct EdgeMacros: Decodable {
@@ -419,7 +430,13 @@ final class MealScanViewModel: ObservableObject {
                 }
                 let contributions = perFood.filter { userDeficiencies.contains($0.nutrientId) }.sorted { $0.pctRDA > $1.pctRDA }
                 let tops = perFood.filter { !userDeficiencies.contains($0.nutrientId) }.sorted { $0.pctRDA > $1.pctRDA }
-                let fm = FoodMacros(calories: 0, proteins: 0, carbs: 0, fats: 0, fiber: 0)
+                let fm = FoodMacros(
+                    calories: f.macros?.calories ?? 0,
+                    proteins: f.macros?.proteins ?? 0,
+                    carbs: f.macros?.carbs ?? 0,
+                    fats: f.macros?.fats ?? 0,
+                    fiber: f.macros?.fiber ?? 0
+                )
                 return DetectedFood(name: name, emoji: "", contributions: contributions, macros: fm, topNutrients: tops)
             }
 
