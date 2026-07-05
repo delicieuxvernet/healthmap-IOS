@@ -436,6 +436,10 @@ extension QuestionnaireSection {
                 .init("iron", "Fer", emoji: "🩸"), .init("b12", "Vitamine B12", emoji: "🔴"),
                 .init("zinc", "Zinc", emoji: "🛡️"), .init("folate", "Folate", emoji: "🧬"),
                 .init("probiotics", "Probiotiques", emoji: "🦠"), .init("multivitamin", "Multivitamine", emoji: "💊"),
+                .init("vitC", "Vitamine C", emoji: "🍊"), .init("calcium", "Calcium", emoji: "🦴"),
+                .init("collagene", "Collagène", emoji: "✨"), .init("creatine", "Créatine", emoji: "💪"),
+                .init("proteine", "Protéine en poudre", emoji: "🥛"), .init("spiruline", "Spiruline", emoji: "🌿"),
+                .init("curcuma", "Curcuma", emoji: "🟡"), .init("melatonine", "Mélatonine", emoji: "🌙"),
             ]
         ),
         // Le caddie ("Faites vos courses") est la DERNIÈRE question de la
