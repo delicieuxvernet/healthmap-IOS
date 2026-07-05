@@ -329,6 +329,7 @@ if MODE == "apply-app"
     contactFirstName: "Arthur",
     contactLastName: "Vernet",
     contactEmail: "contact@healthmap.fr",
+    contactPhone: ENV["REVIEW_CONTACT_PHONE"].to_s,
     demoAccountName: "audit-a@test.com",
     demoAccountPassword: ENV["DEMO_ACCOUNT_PASSWORD"].to_s,
     demoAccountRequired: true,
@@ -336,6 +337,7 @@ if MODE == "apply-app"
            "L'abonnement Kiwio Premium (mensuel/annuel) se teste depuis l'onglet Profil " \
            "ou une section Premium du bilan.",
   }
+  review_attrs.delete(:contactPhone) if review_attrs[:contactPhone].empty?
   review_attrs.delete(:demoAccountPassword) if review_attrs[:demoAccountPassword].empty?
 
   if code == 200 && rd["data"]
