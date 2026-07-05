@@ -17,6 +17,9 @@ struct MealScanView: View {
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @ObservedObject private var gamification = GamificationService.shared
     @State private var selectedItem: PhotosPickerItem?
+    @State private var selectedSearchFood: MealScanViewModel.FoodItem?
+    @State private var isAddingFood = false
+    @State private var addFoodConfirmation: String?
     @State private var showPaywall = false
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
@@ -134,9 +137,15 @@ struct MealScanView: View {
                     freeScanCounter(remaining)
                 }
                 captureZone
-                // L'exemple pédagogique ne s'affiche que tant qu'aucun vrai scan
-                // n'a été fait : dès le 1er scan réussi, il disparaît à vie.
-                if !hasEverScanned { exampleAnalysis }
+                // Dès qu'un vrai repas existe (scan photo ou ajout manuel), on
+                // remplace l'exemple pédagogique par un recap du dernier repas —
+                // jamais un écran vide. L'exemple ne revient qu'en l'absence
+                // totale d'historique (nouveau compte).
+                if let last = journal.fortnight.max(by: { $0.consumedAt < $1.consumedAt }) {
+                    lastScanRecapCard(last)
+                } else if !hasEverScanned {
+                    exampleAnalysis
+                }
             }
 
             if let error = viewModel.errorMessage {
@@ -564,6 +573,29 @@ struct MealScanView: View {
         ]
     }
 
+    // MARK: - Recap dernier repas (remplace l'exemple une fois un vrai historique)
+    private func lastScanRecapCard(_ meal: MealJournalService.MealRecord) -> some View {
+        HStack(spacing: Theme.spacingSM) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(Color.kiwiGreen)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Dernier repas : \(meal.foods.joined(separator: ", "))")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                    .lineLimit(1)
+                Text(DateFormatters.relative.localizedString(for: meal.consumedAt, relativeTo: Date()))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.healthMapSecondary)
+            }
+            Spacer()
+        }
+        .padding(Theme.spacingMD)
+        .background(Color.healthMapCard)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
     // MARK: - Warnings
     private func warningsCard(_ warnings: [String]) -> some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
@@ -643,27 +675,69 @@ struct MealScanView: View {
                 .padding(.horizontal, Theme.spacingLG)
             }
 
+            if let confirmation = addFoodConfirmation {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.kiwiGreen)
+                    Text(confirmation)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.kiwiGreenInk)
+                    Spacer()
+                }
+                .padding(Theme.spacingSM)
+                .background(Color.kiwiGreenSoft)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, Theme.spacingLG)
+                .transition(.opacity)
+            }
+
             if viewModel.isSearching {
                 ProgressView()
                     .tint(Color.kiwiGreen)
                     .padding()
             } else {
                 ForEach(viewModel.searchResults) { food in
-                    HStack {
-                        Text(food.name)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color.healthMapText)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.healthMapMuted)
+                    Button {
+                        HapticService.shared.selection()
+                        selectedSearchFood = food
+                    } label: {
+                        HStack {
+                            Text(food.name)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Color.healthMapText)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.healthMapMuted)
+                        }
+                        .padding(Theme.spacingSM)
+                        .background(Color.healthMapCard)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .padding(Theme.spacingSM)
-                    .background(Color.healthMapCard)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .buttonStyle(.healthMapPressed)
                     .padding(.horizontal, Theme.spacingLG)
                 }
             }
+        }
+        .sheet(item: $selectedSearchFood) { food in
+            FoodPortionSheet(food: food, isAdding: isAddingFood) { portion in
+                Task {
+                    isAddingFood = true
+                    do {
+                        try await viewModel.addManualFood(food, portion: portion)
+                        HapticService.shared.success()
+                        selectedSearchFood = nil
+                        withAnimation { addFoodConfirmation = "\(food.name) ajouté (\(portion.rawValue.lowercased()))" }
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        withAnimation { addFoodConfirmation = nil }
+                    } catch {
+                        AppLogger.analysis.report(error, context: "MealScan addManualFood")
+                        selectedSearchFood = nil
+                    }
+                    isAddingFood = false
+                }
+            }
+            .presentationDetents([.height(280)])
         }
     }
 
@@ -680,6 +754,67 @@ struct MealScanView: View {
                 .background(Color.kiwiTint)
                 .clipShape(Capsule())
         }
+    }
+}
+
+// MARK: - Portion d'un aliment cherché (façon Foodvisor)
+/// 3 gabarits de portion (Petite/Moyenne/Grande) ; kcal calculées instantanément
+/// (déjà en mémoire depuis la recherche, aucun aller-retour réseau). Tap →
+/// ajoute directement au journal (pas d'étape de confirmation supplémentaire).
+private struct FoodPortionSheet: View {
+    let food: MealScanViewModel.FoodItem
+    let isAdding: Bool
+    let onSelect: (MealScanViewModel.PortionSize) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: Theme.spacingLG) {
+            VStack(spacing: 4) {
+                Text(food.name)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Text("Choisis la portion")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.healthMapSecondary)
+            }
+            .padding(.top, Theme.spacingLG)
+
+            if isAdding {
+                ProgressView().tint(Color.kiwiGreen)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.spacingLG)
+            } else {
+                HStack(spacing: Theme.spacingSM) {
+                    ForEach(MealScanViewModel.PortionSize.allCases) { portion in
+                        Button {
+                            onSelect(portion)
+                        } label: {
+                            VStack(spacing: 6) {
+                                Text(portion.rawValue)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.kiwiGreenInk)
+                                Text("\(portion.grams) g")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.healthMapSecondary)
+                                Text("\(MealScanViewModel.previewCalories(for: food, portion: portion)) kcal")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color.kiwiGreen)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.spacingMD)
+                            .background(Color.kiwiGreenSoft)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .buttonStyle(.healthMapPressed)
+                    }
+                }
+                .padding(.horizontal, Theme.spacingLG)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.kiwiCream.ignoresSafeArea())
     }
 }
 

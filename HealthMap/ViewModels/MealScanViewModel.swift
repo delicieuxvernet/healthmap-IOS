@@ -123,9 +123,14 @@ final class MealScanViewModel: ObservableObject {
     }
 
     struct FoodItem: Identifiable {
-        let id = UUID()
+        let id: Int          // = alim_code CIQUAL — stable (pas un UUID aléatoire),
+                              // sert aussi à recalculer la composition à la portion.
         var name: String
+        /// Valeurs pour 100 g : macros (calories/proteins/carbs/fats/fiber) +
+        /// les 10 nutriments canoniques (mêmes clés que NutrientData.all).
         var nutrients: [String: Double]
+
+        var alimCode: Int { id }
     }
 
     // MARK: - Edge Function Response DTOs (Decodable)
@@ -580,14 +585,24 @@ final class MealScanViewModel: ObservableObject {
             .execute()
             .value
 
-        // nutrient_code DB → clé FoodItem (les codes non mappés sont ignorés)
+        // nutrient_code DB → clé FoodItem. Macros + les 10 nutriments canoniques
+        // (mêmes codes que NUTRIENTS_RDA côté backend analyze-meal-photo/ciqual.ts
+        // — mirror exact, ne pas diverger). Codes non mappés ignorés.
         let keyMap: [String: String] = [
             "kcal": "calories",
             "prot": "proteins",
             "carbs": "carbs",
             "fat": "fats",
+            "fiber": "fiber",
+            "vitD": "vitD",
+            "vitB12": "vitB12",
             "iron": "iron",
+            "magnesium": "magnesium",
+            "omega3": "omega3",
             "vitC": "vitC",
+            "calcium": "calcium",
+            "zinc": "zinc",
+            "iodine": "iodine",
         ]
 
         var nutrientsByCode: [Int: [String: Double]] = [:]
@@ -598,8 +613,71 @@ final class MealScanViewModel: ObservableObject {
 
         return foods.compactMap { food in
             guard !food.alimNomFr.isEmpty else { return nil }
-            return FoodItem(name: food.alimNomFr, nutrients: nutrientsByCode[food.alimCode] ?? [:])
+            return FoodItem(id: food.alimCode, name: food.alimNomFr, nutrients: nutrientsByCode[food.alimCode] ?? [:])
         }
+    }
+
+    // MARK: - Ajout manuel d'un aliment (recherche → portion → journal)
+
+    /// Portion prédéfinie (façon Foodvisor) — grammage médian par gabarit.
+    enum PortionSize: String, CaseIterable, Identifiable {
+        case small = "Petite", medium = "Moyenne", large = "Grande"
+        var id: String { rawValue }
+        var grams: Int {
+            switch self {
+            case .small: return 80
+            case .medium: return 150
+            case .large: return 250
+            }
+        }
+    }
+
+    /// kcal pour la portion choisie — calcul instantané, aucun appel réseau
+    /// (les valeurs pour 100 g sont déjà en mémoire depuis la recherche). Pure
+    /// (aucun état d'instance) : appelable depuis une vue sans le ViewModel.
+    static func previewCalories(for food: FoodItem, portion: PortionSize) -> Int {
+        Int(((food.nutrients["calories"] ?? 0) * Double(portion.grams) / 100.0).rounded())
+    }
+
+    /// Ajoute un aliment cherché manuellement au journal du jour. Déterministe
+    /// (composition CIQUAL × portion, même formule que le backend du scan photo) —
+    /// aucun appel IA. `meal_scans` est la source unique (cf. fix cohérence scan) :
+    /// on écrit UNE fois ici, puis on notifie pour que Bilan/Suivi/Journal/Plan
+    /// rechargent (même mécanisme que le scan photo).
+    func addManualFood(_ food: FoodItem, portion: PortionSize) async throws {
+        guard let userId = AuthService.shared.cachedCurrentUserIdString else { return }
+        let factor = Double(portion.grams) / 100.0
+
+        let macros = MealJournalService.MealMacros(
+            calories: Int(((food.nutrients["calories"] ?? 0) * factor).rounded()),
+            proteins: ((food.nutrients["proteins"] ?? 0) * factor * 10).rounded() / 10,
+            carbs: ((food.nutrients["carbs"] ?? 0) * factor * 10).rounded() / 10,
+            fats: ((food.nutrients["fats"] ?? 0) * factor * 10).rounded() / 10,
+            fiber: ((food.nutrients["fiber"] ?? 0) * factor * 10).rounded() / 10
+        )
+
+        let micros: [MealJournalService.MicroPct] = NutrientData.all.compactMap { def in
+            let nid = def.id.rawValue
+            guard let per100 = food.nutrients[nid], per100 > 0 else { return nil }
+            let amount = per100 * factor
+            let pct = def.rda > 0 ? Int((min(100, max(0, amount / def.rda * 100))).rounded()) : 0
+            return MealJournalService.MicroPct(id: nid, pctRDA: pct)
+        }
+
+        try await MealJournalService.shared.insertScan(
+            userId: userId,
+            foods: [food.name],
+            macros: macros,
+            slot: MealJournalService.MealSlot.from(date: Date()),
+            micros: micros
+        )
+
+        // Réinitialise la recherche (retour à l'état "Essaie par exemple...").
+        searchQuery = ""
+        searchResults = []
+
+        // Même mécanisme que le scan photo : Bilan/Suivi/Journal/Plan rechargent.
+        NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
     }
 
     // MARK: - Helpers
