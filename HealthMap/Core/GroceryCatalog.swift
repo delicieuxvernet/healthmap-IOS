@@ -123,9 +123,12 @@ enum GroceryCatalog {
             gi("comte", "Comté", "🧀", [.calcium, .vitB12, .zinc]),
             gi("mozzarella", "Mozzarella", "🧀", [.calcium, .vitB12]),
             gi("buche_chevre", "Bûche de chèvre", "🐐", [.calcium, .vitB12]),
+            gi("feta", "Feta", "🧀", [.calcium, .vitB12]),
             gi("beurre", "Beurre", "🧈", []),
             gi("creme_fraiche", "Crème fraîche", "🥛", []),
             gi("boisson_soja", "Boisson au soja", "🌱", [.calcium]),
+            gi("yaourt_soja", "Yaourt de soja", "🌱", [.calcium]),
+            gi("boisson_avoine", "Boisson à l'avoine", "🌾", []),
         ]),
 
         GroceryAisle(id: "feculents", label: "Féculents & légumes secs", emoji: "🍚", items: [
@@ -133,6 +136,7 @@ enum GroceryCatalog {
             gi("riz_blanc", "Riz blanc", "🍚", []),
             gi("baguette", "Baguette", "🥖", []),
             gi("pain_complet", "Pain complet", "🍞", [.fiber, .magnesium]),
+            gi("pain_levain", "Pain au levain", "🍞", []),
             gi("lentilles", "Lentilles", "🫘", [.iron, .magnesium, .fiber]),
             gi("pois_chiches", "Pois chiches", "🫛", [.iron, .magnesium, .fiber]),
             gi("haricots_rouges", "Haricots rouges", "🫘", [.iron, .magnesium, .fiber]),
@@ -162,6 +166,8 @@ enum GroceryCatalog {
             gi("figues_sechees", "Figues séchées", "🟤", [.calcium, .magnesium, .iron, .fiber]),
             gi("dattes", "Dattes", "🌴", [.fiber, .magnesium]),
             gi("graines_chia", "Graines de chia", "⚫", [.omega3, .fiber]),
+            gi("graines_lin", "Graines de lin", "🌱", [.omega3, .fiber]),
+            gi("graines_sesame", "Graines de sésame", "⚪", [.calcium, .magnesium, .iron]),
         ]),
 
         GroceryAisle(id: "gras", label: "Matières grasses & placard", emoji: "🫒", items: [
