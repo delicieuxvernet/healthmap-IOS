@@ -29,4 +29,12 @@ enum DateFormatters {
         f.locale = Locale(identifier: "en_US_POSIX")
         return f
     }()
+
+    /// « il y a 12 min » / « hier » — recap dernier scan (écran Scan).
+    static let relative: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.locale = Locale(identifier: "fr_FR")
+        f.unitsStyle = .full
+        return f
+    }()
 }
