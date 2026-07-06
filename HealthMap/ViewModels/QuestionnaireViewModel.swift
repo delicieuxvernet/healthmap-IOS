@@ -184,6 +184,29 @@ final class QuestionnaireViewModel: ObservableObject {
         return Double(currentQuestionNumber) / Double(totalQuestions)
     }
 
+    /// Nombre de questions visibles dans la SECTION courante.
+    var totalQuestionsInSection: Int {
+        visibleQuestions(in: currentSection).count
+    }
+
+    /// Position 1-based de la question courante DANS sa section.
+    var currentQuestionNumberInSection: Int {
+        guard let q = currentQuestion else { return 0 }
+        let inSection = visibleQuestions(in: currentSection)
+        guard let idx = inSection.firstIndex(where: { $0.id == q.id }) else { return 0 }
+        return idx + 1
+    }
+
+    /// Progression 0→1 DANS la section courante (la barre du header n'est plus
+    /// globale). Repart de 0 à chaque nouvelle section. Basée sur (position-1)/N :
+    /// la 1re question vaut 0 ; le dernier segment est rempli par l'animation de
+    /// fin de section au moment de valider (SectionCompletionOverlay).
+    var sectionProgress: Double {
+        let total = totalQuestionsInSection
+        guard total > 0 else { return 0 }
+        return Double(currentQuestionNumberInSection - 1) / Double(total)
+    }
+
     var isFirstQuestion: Bool {
         currentQuestionIndex == 0
     }

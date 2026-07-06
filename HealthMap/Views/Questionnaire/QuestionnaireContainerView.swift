@@ -44,6 +44,9 @@ struct QuestionnaireContainerView: View {
     @State private var pendingIntroSection: QuestionnaireSection?
     /// Teaser associé à l'intro en attente.
     @State private var pendingTeaser: Teaser?
+    /// Remplissage de départ de la barre de l'animation (là où en était la
+    /// barre de section au moment de valider).
+    @State private var completionStartFill: CGFloat = 0
 
     /// Tracks whether we should show the submission error as an alert
     /// rather than inline text — an alert is impossible to miss.
@@ -102,7 +105,8 @@ struct QuestionnaireContainerView: View {
             if let finished = completingSection {
                 SectionCompletionOverlay(
                     sectionTitle: finished.title,
-                    reduceMotion: reduceMotion
+                    reduceMotion: reduceMotion,
+                    startFill: completionStartFill
                 ) {
                     // Fin de l'animation : on révèle l'intro de la nouvelle
                     // section (mise de côté au franchissement), sans animation
@@ -211,7 +215,7 @@ struct QuestionnaireContainerView: View {
 
                 Spacer()
 
-                Text("Question \(viewModel.currentQuestionNumber)/\(viewModel.totalQuestions)")
+                Text("Question \(viewModel.currentQuestionNumberInSection)/\(viewModel.totalQuestionsInSection)")
                     .font(Theme.captionFont)
                     .monospacedDigit()
                     .foregroundStyle(Color.healthMapMuted)
@@ -223,9 +227,10 @@ struct QuestionnaireContainerView: View {
     }
 
     // MARK: - Progress Bar
-    /// Barre fine de progression GLOBALE : pourcentage sur l'ensemble des
-    /// questions visibles (le total s'ajuste si une réponse révèle ou cache
-    /// des questions conditionnelles).
+    /// Barre fine de progression PAR SECTION : elle repart de 0 à chaque
+    /// nouvelle section (le total s'ajuste si une réponse révèle ou cache des
+    /// questions conditionnelles de la section). Le dernier segment est rempli
+    /// par l'animation de fin de section.
     private var progressBar: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
@@ -234,14 +239,14 @@ struct QuestionnaireContainerView: View {
 
                 Capsule()
                     .fill(Color.kiwiGreen)
-                    .frame(width: max(geo.size.width * viewModel.progress, 6))
-                    .animation(reduceMotion ? .none : .healthMapSpring, value: viewModel.progress)
+                    .frame(width: max(geo.size.width * viewModel.sectionProgress, 6))
+                    .animation(reduceMotion ? .none : .healthMapSpring, value: viewModel.sectionProgress)
             }
         }
         .frame(height: 4)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Progression du bilan")
-        .accessibilityValue("\(Int((viewModel.progress * 100).rounded())) pour cent")
+        .accessibilityLabel("Progression de la section")
+        .accessibilityValue("\(Int((viewModel.sectionProgress * 100).rounded())) pour cent")
     }
 
     // MARK: - Écran question
@@ -511,8 +516,10 @@ struct QuestionnaireContainerView: View {
         autoAdvanceTask?.cancel()
         isNavigatingForward = true
 
-        // Section que l'on quitte — sert de libellé à l'animation de complétion.
+        // Section que l'on quitte + où en était SA barre — pour que l'animation
+        // de complétion démarre pile là où la barre de section en était.
         let finishedSection = viewModel.currentSection
+        let startFill = viewModel.sectionProgress
 
         var enteredSection: QuestionnaireSection?
         withAnimation(stepAnimation) {
@@ -525,6 +532,7 @@ struct QuestionnaireContainerView: View {
             // l'animation (pas sous l'écran blanc) — « chaque chose en son temps ».
             pendingIntroSection = entered
             pendingTeaser = pickTeaserForIntro()
+            completionStartFill = CGFloat(startFill)
             withAnimation(.easeInOut(duration: 0.18)) {
                 completingSection = finishedSection
             }
@@ -906,12 +914,12 @@ private extension QuestionnaireSection {
     /// Teinte douce du haut de l'écran, propre à chaque section du questionnaire.
     var flowTint: Color {
         switch self {
-        case .profil:    return .sectionTintSand
-        case .modeDeVie: return .sectionTintPeach
+        case .profil:    return .sectionTintGold
+        case .modeDeVie: return .sectionTintBlue
         case .sante:     return .sectionTintRose
         case .nutrition: return .sectionTintGreen
-        case .symptomes: return .sectionTintSky
-        case .medical:   return .sectionTintMint
+        case .symptomes: return .sectionTintCoral
+        case .medical:   return .sectionTintTeal
         }
     }
 }
@@ -930,8 +938,17 @@ private struct SectionCompletionOverlay: View {
 
     @State private var atCenter = false
     @State private var thick = false
-    @State private var fill: CGFloat = 0.72
+    @State private var fill: CGFloat
     @State private var validated = false
+
+    init(sectionTitle: String, reduceMotion: Bool, startFill: CGFloat, onFinished: @escaping () -> Void) {
+        self.sectionTitle = sectionTitle
+        self.reduceMotion = reduceMotion
+        self.onFinished = onFinished
+        // La barre démarre là où en était la section (≈ dernier segment restant),
+        // puis se remplit jusqu'à 100 % pendant la validation.
+        _fill = State(initialValue: max(startFill, 0.5))
+    }
 
     var body: some View {
         ZStack {
