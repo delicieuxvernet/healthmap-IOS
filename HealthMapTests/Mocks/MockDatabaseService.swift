@@ -10,6 +10,7 @@ final class MockDatabaseService: DatabaseServiceProtocol {
     var questionnaireByUserId: [String: UserProfile] = [:]
     var analysisByUserId: [String: AIAnalysisResponse] = [:]
     var analysisV2ByUserId: [String: AIAnalysisV2] = [:]
+    var baselineScoresByUserId: [String: [String: Int]] = [:]
     var pushTokensByUserId: [String: String] = [:]
     var deletedUserIds: [String] = []
 
@@ -21,6 +22,7 @@ final class MockDatabaseService: DatabaseServiceProtocol {
     var saveProfileError: Error?
     var saveAnalysisError: Error?
     var saveAnalysisV2Error: Error?
+    var saveBaselineError: Error?
     var clearAnalysisError: Error?
     var updatePushTokenError: Error?
     var deleteError: Error?
@@ -69,6 +71,11 @@ final class MockDatabaseService: DatabaseServiceProtocol {
     func saveAIAnalysisV2(userId: String, analysis: AIAnalysisV2) async throws {
         if let saveAnalysisV2Error { throw saveAnalysisV2Error }
         analysisV2ByUserId[userId] = analysis
+    }
+
+    func saveBaselineNutrientScores(userId: String, scores: [String: Int]) async throws {
+        if let saveBaselineError { throw saveBaselineError }
+        baselineScoresByUserId[userId] = scores
     }
 
     func clearAIAnalysis(userId: String) async throws {

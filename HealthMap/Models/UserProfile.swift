@@ -71,6 +71,12 @@ struct UserProfile: Codable, Equatable {
     /// n'est pas rempli.
     var groceries: [String: Int] = [:]
 
+    /// Photo « départ » des 10 scores nutriments (0-100) figée au tout premier
+    /// bilan. Décodée de la colonne jsonb `baseline_nutrient_scores`. `nil` tant
+    /// qu'aucune baseline n'a encore été capturée (capture one-time côté
+    /// DashboardViewModel). Sert de socle « départ » à la barre de couverture.
+    var baselineNutrientScores: [String: Int]? = nil
+
     // Section 5: Symptomes
     var symptoms: [String] = []
 
@@ -384,6 +390,10 @@ struct ProfileRow: Codable {
     var firstName: String?
     var questionnaireData: UserProfile?
     var aiAnalysis: AIAnalysisResponse?
+    /// Colonne jsonb `baseline_nutrient_scores` (sœur de `questionnaire_data`,
+    /// pas imbriquée dedans). Photo « départ » des scores nutriments figée au
+    /// 1er bilan. Fusionnée dans `UserProfile.baselineNutrientScores` au chargement.
+    var baselineNutrientScores: [String: Int]?
     var tier: String?
     var subscriptionStatus: String?
     var cancelAtPeriodEnd: Bool?
@@ -396,6 +406,7 @@ struct ProfileRow: Codable {
         case firstName = "first_name"
         case questionnaireData = "questionnaire_data"
         case aiAnalysis = "ai_analysis"
+        case baselineNutrientScores = "baseline_nutrient_scores"
         case tier
         case subscriptionStatus = "subscription_status"
         case cancelAtPeriodEnd = "cancel_at_period_end"

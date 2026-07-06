@@ -24,7 +24,7 @@ import Foundation
 //      labels POSÉS (toi / sans Kiwio) — plus d'onglets ni de légende.
 //   4. « Besoins vs apports » : bandeau « besoins augmentés » (activité Santé) +
 //      « Pour faire mieux la semaine prochaine » (2 conseils tirés des manques).
-//   5. « Couverture par nutriment · 7 j » : barres PLEINES + pastille de tendance.
+//   5. « Ta progression par nutriment » : socle bilan + gain depuis le départ.
 //   6. « Tes prochains paliers » : prochain fruit + projection besoins couverts.
 //
 // État vide propre partout : bilan / journal indisponibles → carte d'attente ou
@@ -184,7 +184,13 @@ struct SuiviView: View {
     }
 
     private var coverage: [SuiviEngineV4.NutrientCoverage7d] {
-        SuiviEngineV4.nutrientCoverage(fortnight: journal.fortnight, focusIds: weakNutrientIds)
+        // Socle « départ » = baseline persistée (scores figés au 1er bilan).
+        // Tant qu'elle n'est pas capturée, on passe [:] : la barre affiche alors
+        // juste le niveau courant sans progrès (évite un socle transitoire faux).
+        let baseline = dashboardVM.profile.baselineNutrientScores ?? [:]
+        return SuiviEngineV4.nutrientCoverage(fortnight: journal.fortnight,
+                                              focusIds: weakNutrientIds,
+                                              baseline: baseline)
     }
 
     private var weeklyTips: [SuiviEngineV4.WeeklyTip] {
@@ -689,9 +695,23 @@ private enum SuiviTipIcon {
     }
 }
 
-// MARK: - 5. Carte « Couverture par nutriment · 7 j » (barres pleines + tendance)
+// MARK: - 5. Carte « Ta progression par nutriment » (socle bilan + gain depuis le départ)
 private struct SuiviCoverageCard: View {
     let coverage: [SuiviEngineV4.NutrientCoverage7d]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Moyenne arrondie des gains (aujourd'hui - départ) sur les lignes où le
+    /// gain est positif. 0 s'il n'y a aucun progrès à afficher.
+    private var averageGain: Int {
+        let gains = coverage.map { n -> Int in
+            let base = max(0, min(100, n.baselinePct))
+            let cur = max(base, max(0, min(100, n.pct)))
+            return cur - base
+        }
+        let positifs = gains.filter { $0 > 0 }
+        guard !positifs.isEmpty else { return 0 }
+        return Int((Double(positifs.reduce(0, +)) / Double(positifs.count)).rounded())
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -699,13 +719,17 @@ private struct SuiviCoverageCard: View {
                 Image(systemName: "list.bullet")
                     .font(.system(size: 13))
                     .foregroundStyle(Color(hex: "D9820A"))
-                Text("Couverture par nutriment")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color(hex: "D9820A"))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ta progression par nutriment")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color(hex: "D9820A"))
+                    if averageGain > 0 {
+                        Text("Depuis ton bilan · +\(averageGain) pts en moyenne")
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(Color.healthMapSecondary)
+                    }
+                }
                 Spacer()
-                Text("7 j")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.healthMapMuted)
             }
             .padding(.horizontal, 2)
 
@@ -732,60 +756,67 @@ private struct SuiviCoverageCard: View {
     }
 
     private func row(_ n: SuiviEngineV4.NutrientCoverage7d) -> some View {
-        let color = Color.scoreColor(for: n.pct)
-        let pct = max(0, min(100, n.pct))
-        return VStack(spacing: 0) {
+        let base = max(0, min(100, n.baselinePct))
+        let cur = max(base, max(0, min(100, n.pct)))
+        let gain = cur - base
+        let color = Color.scoreColor(for: cur)
+        return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 Text(n.nom)
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Color.kiwiCharcoal)
-                trendPill(n.trendPct)
                 Spacer()
-                Text("\(pct)%")
+                Text("\(cur)%")
                     .font(.system(size: 15, weight: .heavy, design: .monospaced))
                     .foregroundStyle(color)
             }
-            // Barre PLEINE (fini les pointillés)
+            // Barre continue : track + socle (départ) + gain dégradé + repère.
             GeometryReader { g in
+                let width = g.size.width
                 ZStack(alignment: .leading) {
-                    Capsule().fill(color.opacity(0.14)).frame(height: 8)
+                    Capsule().fill(color.opacity(0.13))
+                        .frame(height: 12)
+                    // Socle = score de départ.
                     Capsule().fill(color)
-                        .frame(width: max(8, g.size.width * CGFloat(pct) / 100), height: 8)
+                        .frame(width: max(0, width * CGFloat(base) / 100), height: 12)
+                    // Gain = progrès depuis le départ, teinte claire dégradée.
+                    if gain > 0 {
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [color.opacity(0.55), color.opacity(0.30)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: max(0, width * CGFloat(cur - base) / 100), height: 12)
+                            .offset(x: width * CGFloat(base) / 100)
+                        // Repère vertical à la position « départ ».
+                        Capsule()
+                            .fill(color.opacity(0.85))
+                            .frame(width: 2, height: 18)
+                            .offset(x: width * CGFloat(base) / 100)
+                    }
                 }
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: cur)
             }
-            .frame(height: 8)
+            .frame(height: 18)
             .padding(.top, 11)
 
-            HStack {
-                marker("0"); Spacer(); marker("50"); Spacer(); marker("100")
+            // Ligne micro « départ / aujourd'hui (+gain) ».
+            HStack(spacing: 0) {
+                Text("Départ \(base)% · aujourd'hui \(cur)%")
+                    .foregroundStyle(Color.healthMapMuted)
+                if gain > 0 {
+                    Text(" · +\(gain) pts")
+                        .foregroundStyle(Color.kiwiGreenInk)
+                }
             }
+            .font(.system(size: 12))
             .padding(.top, 7)
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 2)
-    }
-
-    @ViewBuilder
-    private func trendPill(_ trend: Int) -> some View {
-        if trend != 0 {
-            let up = trend > 0
-            HStack(spacing: 3) {
-                Image(systemName: up ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 9, weight: .heavy))
-                Text("\(up ? "+" : "")\(trend)%")
-                    .font(.system(size: 10.5, weight: .heavy, design: .monospaced))
-            }
-            .foregroundStyle(up ? Color.kiwiGreenInk : Color(hex: "D9820A"))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(up ? Color.kiwiGreenSoft : Color(hex: "FDECD6")))
-        }
-    }
-
-    private func marker(_ t: String) -> some View {
-        Text(t)
-            .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-            .foregroundStyle(Color(hex: "C2BDB0"))
     }
 
     private var emptyState: some View {
@@ -793,7 +824,7 @@ private struct SuiviCoverageCard: View {
             Image(systemName: "chart.bar")
                 .font(.system(size: 17))
                 .foregroundStyle(Color.kiwiGreen)
-            Text("Scanne tes repas pour voir ta couverture par nutriment se remplir sur 7 jours.")
+            Text("Scanne tes repas : ta barre part de ton bilan et grimpe avec tes progrès.")
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(Color.healthMapSecondary)
                 .fixedSize(horizontal: false, vertical: true)
