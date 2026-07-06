@@ -289,10 +289,12 @@ extension Color {
         })
     }
 
-    static let sectionTintSand  = sectionTint(light: (0xF1, 0xEA, 0xD9), dark: (0x23, 0x20, 0x1A)) // Profil
-    static let sectionTintPeach = sectionTint(light: (0xFD, 0xE7, 0xCE), dark: (0x2A, 0x21, 0x15)) // Mode de vie
-    static let sectionTintRose  = sectionTint(light: (0xFB, 0xE0, 0xE3), dark: (0x2A, 0x1B, 0x1E)) // Sante
-    static let sectionTintGreen = sectionTint(light: (0xE1, 0xEF, 0xCF), dark: (0x1E, 0x27, 0x16)) // Nutrition
-    static let sectionTintSky   = sectionTint(light: (0xE1, 0xEA, 0xF6), dark: (0x18, 0x21, 0x30)) // Symptomes
-    static let sectionTintMint  = sectionTint(light: (0xDA, 0xED, 0xE7), dark: (0x16, 0x25, 0x1F)) // Medical
+    // Teintes recalees + saturees (6 juil. 2026) pour etre nettement visibles
+    // sur le creme : or / bleu / rose / vert / orange / teal.
+    static let sectionTintGold  = sectionTint(light: (0xF7, 0xDF, 0xA8), dark: (0x2E, 0x26, 0x12)) // Profil (or ambre)
+    static let sectionTintBlue  = sectionTint(light: (0xC6, 0xDD, 0xF4), dark: (0x17, 0x26, 0x3A)) // Mode de vie (bleu)
+    static let sectionTintRose  = sectionTint(light: (0xF7, 0xCB, 0xD2), dark: (0x30, 0x1B, 0x20)) // Sante (rose)
+    static let sectionTintGreen = sectionTint(light: (0xD3, 0xEA, 0xB2), dark: (0x1F, 0x2A, 0x14)) // Nutrition (vert)
+    static let sectionTintCoral = sectionTint(light: (0xFB, 0xCD, 0xB4), dark: (0x33, 0x1E, 0x13)) // Symptomes (orange)
+    static let sectionTintTeal  = sectionTint(light: (0xBF, 0xE6, 0xD9), dark: (0x14, 0x27, 0x1F)) // Medical (teal)
 }
