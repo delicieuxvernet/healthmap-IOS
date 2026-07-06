@@ -446,9 +446,9 @@ private struct SuiviSymptomCard: View {
 }
 
 // MARK: - Mini-graphe à labels posés (toi / sans Kiwio + pôles d'axe)
-/// 3 séries : « toi » (plein vert, animée), « potentiel max » (tirets clairs),
-/// « sans Kiwio » (pointillés gris). Les libellés sont écrits DIRECTEMENT sur le
-/// tracé — plus de légende séparée. Échelle 0-100, niveau haut = tracé haut.
+/// 2 séries : « toi » (plein vert, animée) et « sans Kiwio » (pointillés gris).
+/// Les libellés sont écrits DIRECTEMENT sur le tracé — plus de légende séparée.
+/// Échelle 0-100, niveau haut = tracé haut.
 private struct SuiviPosedChart: View {
     let evolution: SuiviEngineV4.SymptomEvolution
     let progress: CGFloat
@@ -457,7 +457,6 @@ private struct SuiviPosedChart: View {
         Canvas { ctx, size in
             let w = size.width, h = size.height
             let reel = evolution.reel
-            let maxS = evolution.potentielMax
             let sans = evolution.sansKiwio
             let n = reel.count
             guard n > 1 else { return }
@@ -484,10 +483,6 @@ private struct SuiviPosedChart: View {
             ctx.stroke(SuiviCurveMath.smoothPath(sansPts),
                        with: .color(Color(hex: "C2BDB0")),
                        style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round, dash: [2, 5]))
-            // « potentiel max » — tirets vert clair
-            ctx.stroke(SuiviCurveMath.smoothPath(points(maxS)),
-                       with: .color(Color(hex: "93C16B")),
-                       style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round, dash: [7, 5]))
 
             // « toi » — plein vert + aire, animée par `progress`
             let reelPts = points(reel)
