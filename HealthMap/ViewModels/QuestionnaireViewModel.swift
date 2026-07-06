@@ -25,11 +25,6 @@ final class QuestionnaireViewModel: ObservableObject {
     @Published var isSubmitting = false
     @Published var errorMessage: String?
 
-    /// Vrai si un draft a été restauré au lancement : la vue saute alors
-    /// l'écran de choix de parcours et reprend directement le flux à la
-    /// question où l'utilisateur s'était arrêté.
-    private(set) var hasDraftInProgress = false
-
     // MARK: - Draft persistence
     /// Local UserDefaults key used to survive an app kill mid-questionnaire.
     /// Follows the `healthmap_*` prefix convention so it's wiped automatically
@@ -713,14 +708,15 @@ final class QuestionnaireViewModel: ObservableObject {
         self.pathway = draft.pathway
         self.unlockedDeepSections = Set((draft.unlockedDeepSections ?? []).compactMap { QuestionnaireSection(rawValue: $0) })
 
-        // Repositionnement — l'ordre compte : profile + blocs déverrouillés
-        // d'abord, la liste des questions visibles en dépend (showIf + unlock).
-        if let questionId = draft.currentQuestionId,
-           let index = visibleQuestions.firstIndex(where: { $0.id == questionId }) {
-            self.currentQuestionIndex = index
-        } else {
-            self.currentQuestionIndex = firstUnansweredQuestionIndex()
-        }
+        // Reprise volontairement AU DÉBUT du questionnaire (décision produit,
+        // 6 juil. 2026). Rouvrir l'app en plein flux ne doit plus rejeter
+        // l'utilisateur au milieu (déroutant : il a oublié où il en était, ou
+        // veut simplement recommencer / revenir en arrière). On restaure ses
+        // réponses — rien n'est perdu, les sélections déjà faites restent
+        // visibles — mais on repositionne le flux sur la première question :
+        // il repart de la « home » du questionnaire et re-parcourt à son rythme.
+        // `currentQuestionId` du draft est donc ignoré à dessein.
+        self.currentQuestionIndex = 0
         // Suivi d'interaction : soit on relit ce qui a été explicitement
         // renseigné (draft récent), soit — vieux draft sans ce champ — on le
         // dérive des réponses non vides pour qu'un utilisateur qui reprend son
@@ -735,8 +731,7 @@ final class QuestionnaireViewModel: ObservableObject {
                     .map { $0.id }
             )
         }
-        self.hasDraftInProgress = true
-        AppLogger.ui.info("Questionnaire draft restored (question \(self.currentQuestionIndex, privacy: .public), saved \(draft.savedAt, privacy: .public))")
+        AppLogger.ui.info("Questionnaire draft restored (answers kept, flow reset to start, saved \(draft.savedAt, privacy: .public))")
     }
 
     /// Removes the stored draft. Called after a successful

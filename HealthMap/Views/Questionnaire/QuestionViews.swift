@@ -16,7 +16,7 @@ private struct SweepSelectBackground: View {
             .fill(Color.healthMapCard)
             .overlay(alignment: .leading) {
                 GeometryReader { geo in
-                    Color.healthMapSelectFill
+                    Color.kiwiTint
                         .frame(width: isSelected ? geo.size.width : 0)
                         .animation(reduceMotion ? .none : .healthMapQuick, value: isSelected)
                 }
@@ -24,7 +24,7 @@ private struct SweepSelectBackground: View {
             .clipShape(shape)
             .shadow(
                 color: isSelected
-                    ? Color.healthMapBlue.opacity(Theme.opacityStrong)
+                    ? Color.kiwiGreen.opacity(0.22)
                     : Color.black.opacity(Theme.shadowCard.opacity),
                 radius: Theme.shadowCard.radius,
                 x: 0,
@@ -70,10 +70,10 @@ struct SingleChoiceView: View {
                         Spacer()
 
                         Circle()
-                            .strokeBorder(isSelected ? Color.healthMapBlue : Color.healthMapMuted.opacity(0.4), lineWidth: 2)
+                            .strokeBorder(isSelected ? Color.kiwiGreen : Color.healthMapMuted.opacity(0.4), lineWidth: 2)
                             .background(
                                 Circle()
-                                    .fill(isSelected ? AnyShapeStyle(LinearGradient.healthMapBrand) : AnyShapeStyle(Color.clear))
+                                    .fill(isSelected ? AnyShapeStyle(Color.kiwiGreen) : AnyShapeStyle(Color.clear))
                                     .padding(4)
                             )
                             .frame(width: 22, height: 22)
@@ -88,7 +88,7 @@ struct SingleChoiceView: View {
                         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                             .stroke(
                                 isSelected
-                                    ? Color.healthMapBlue.opacity(0.45)
+                                    ? Color.kiwiGreen.opacity(0.5)
                                     : Color.healthMapMuted.opacity(Theme.opacityStrong),
                                 lineWidth: isSelected ? 1.5 : 1
                             )
@@ -134,10 +134,10 @@ struct MultiChoiceView: View {
                         Spacer()
 
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .strokeBorder(isSelected ? Color.healthMapBlue : Color.healthMapMuted.opacity(0.4), lineWidth: 2)
+                            .strokeBorder(isSelected ? Color.kiwiGreen : Color.healthMapMuted.opacity(0.4), lineWidth: 2)
                             .background(
                                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(isSelected ? AnyShapeStyle(LinearGradient.healthMapBrand) : AnyShapeStyle(Color.clear))
+                                    .fill(isSelected ? AnyShapeStyle(Color.kiwiGreen) : AnyShapeStyle(Color.clear))
                                     .padding(3)
                             )
                             .overlay(
@@ -158,7 +158,7 @@ struct MultiChoiceView: View {
                         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                             .stroke(
                                 isSelected
-                                    ? Color.healthMapBlue.opacity(0.45)
+                                    ? Color.kiwiGreen.opacity(0.5)
                                     : Color.healthMapMuted.opacity(Theme.opacityStrong),
                                 lineWidth: isSelected ? 1.5 : 1
                             )

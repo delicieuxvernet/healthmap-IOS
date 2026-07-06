@@ -34,6 +34,17 @@ struct QuestionnaireContainerView: View {
     /// Continuer) avant l'échéance des 350ms.
     @State private var autoAdvanceTask: Task<Void, Never>?
 
+    // MARK: - État de l'animation de fin de section
+
+    /// Section dont on joue l'animation de complétion (« écran blanc + barre »).
+    /// nil = aucune animation en cours.
+    @State private var completingSection: QuestionnaireSection?
+    /// Intro de la nouvelle section, mise de côté pendant l'animation et
+    /// révélée seulement à la fin (« chaque chose en son temps »).
+    @State private var pendingIntroSection: QuestionnaireSection?
+    /// Teaser associé à l'intro en attente.
+    @State private var pendingTeaser: Teaser?
+
     /// Tracks whether we should show the submission error as an alert
     /// rather than inline text — an alert is impossible to miss.
     @State private var showSubmitError = false
@@ -75,13 +86,36 @@ struct QuestionnaireContainerView: View {
 
     var body: some View {
         ZStack {
-            Color.healthMapBackground
+            sectionBackground
                 .ignoresSafeArea()
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.5), value: viewModel.currentSection)
 
             if viewModel.isSubmitting {
                 submittingView
             } else {
                 questionFlow
+            }
+
+            // Transition premium de fin de section : l'écran se vide, seule la
+            // barre glisse au centre, s'épaissit/s'arrondit, se valide, puis
+            // remonte — la nouvelle section n'apparaît qu'ensuite.
+            if let finished = completingSection {
+                SectionCompletionOverlay(
+                    sectionTitle: finished.title,
+                    reduceMotion: reduceMotion
+                ) {
+                    // Fin de l'animation : on révèle l'intro de la nouvelle
+                    // section (mise de côté au franchissement), sans animation
+                    // (le fondu de l'overlay qui se retire suffit).
+                    introTeaser = pendingTeaser
+                    introSection = pendingIntroSection
+                    pendingIntroSection = nil
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        completingSection = nil
+                    }
+                }
+                .transition(.opacity)
+                .zIndex(10)
             }
         }
         .onAppear {
@@ -199,7 +233,7 @@ struct QuestionnaireContainerView: View {
                     .fill(Color.healthMapMuted.opacity(0.12))
 
                 Capsule()
-                    .fill(LinearGradient.healthMapBrand)
+                    .fill(Color.kiwiGreen)
                     .frame(width: max(geo.size.width * viewModel.progress, 6))
                     .animation(reduceMotion ? .none : .healthMapSpring, value: viewModel.progress)
             }
@@ -355,29 +389,29 @@ struct QuestionnaireContainerView: View {
                 advance()
             }
         } label: {
-            // CTA premium : même recette que le bouton d'onboarding (gradient
-            // brand + glow doux), état envoi en gris muted sans glow.
-            Text(primaryButtonLabel)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background {
-                    if viewModel.isSubmitting || isBlockedOnSingleChoice {
-                        Color.healthMapMuted
-                    } else {
-                        LinearGradient.healthMapBrand
-                    }
+            // CTA façon iOS : aplat vert kiwi, coins continus, ombre discrète
+            // (fini le dégradé + halo). Chevron SF Symbol sur « Continuer ».
+            // État envoi / choix non renseigné → gris muted, sans ombre.
+            let inactive = viewModel.isSubmitting || isBlockedOnSingleChoice
+            HStack(spacing: 6) {
+                Text(primaryButtonLabel)
+                if primaryButtonLabel == "Continuer" {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 15, weight: .semibold))
                 }
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                .shadow(
-                    color: (viewModel.isSubmitting || isBlockedOnSingleChoice)
-                        ? Color.clear
-                        : Color.healthMapBlue.opacity(Theme.shadowBrandGlow.opacity),
-                    radius: Theme.shadowBrandGlow.radius,
-                    x: 0,
-                    y: Theme.shadowBrandGlow.y
-                )
+            }
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(inactive ? Color.healthMapMuted : Color.kiwiGreen)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(
+                color: inactive ? .clear : Color.kiwiGreen.opacity(0.28),
+                radius: 12,
+                x: 0,
+                y: 6
+            )
         }
         .buttonStyle(.healthMapPressed)
         .disabled(viewModel.isSubmitting || isBlockedOnSingleChoice)
@@ -433,6 +467,19 @@ struct QuestionnaireContainerView: View {
         }
     }
 
+    // MARK: - Fond dégradé par section
+    /// Léger lavis de la teinte de la section courante en haut de l'écran,
+    /// fondu vers le crème de base. L'accent vert kiwi reste la seule couleur
+    /// « active » (barre + CTA) — la teinte n'est qu'une ambiance douce.
+    private var sectionBackground: some View {
+        LinearGradient(
+            colors: [viewModel.currentSection.flowTint, Color.healthMapWarm],
+            startPoint: .top,
+            endPoint: .center
+        )
+        .background(Color.healthMapWarm)
+    }
+
     // MARK: - Navigation entre écrans
 
     /// Animation des transitions d'écran. Reduce motion → crossfade simple
@@ -463,12 +510,23 @@ struct QuestionnaireContainerView: View {
         guard !viewModel.isLastQuestion else { return }
         autoAdvanceTask?.cancel()
         isNavigatingForward = true
+
+        // Section que l'on quitte — sert de libellé à l'animation de complétion.
+        let finishedSection = viewModel.currentSection
+
+        var enteredSection: QuestionnaireSection?
         withAnimation(stepAnimation) {
-            if let enteredSection = viewModel.nextQuestion() {
-                // Teaser choisi AVANT d'afficher l'intro, à partir des
-                // réponses déjà saisies (règles anti-spam incluses).
-                introTeaser = pickTeaserForIntro()
-                introSection = enteredSection
+            enteredSection = viewModel.nextQuestion()
+        }
+
+        if let entered = enteredSection {
+            // Frontière de section franchie → moment de complétion premium.
+            // L'intro est mise de côté : elle n'est révélée qu'à la FIN de
+            // l'animation (pas sous l'écran blanc) — « chaque chose en son temps ».
+            pendingIntroSection = entered
+            pendingTeaser = pickTeaserForIntro()
+            withAnimation(.easeInOut(duration: 0.18)) {
+                completingSection = finishedSection
             }
         }
     }
@@ -840,6 +898,119 @@ private struct QuestionnaireGateView: View {
             else { withAnimation(.easeOut(duration: 0.45)) { appeared = true } }
         }
         .accessibilityElement(children: .contain)
+    }
+}
+
+// MARK: - Teinte de fond par section
+private extension QuestionnaireSection {
+    /// Teinte douce du haut de l'écran, propre à chaque section du questionnaire.
+    var flowTint: Color {
+        switch self {
+        case .profil:    return .sectionTintSand
+        case .modeDeVie: return .sectionTintPeach
+        case .sante:     return .sectionTintRose
+        case .nutrition: return .sectionTintGreen
+        case .symptomes: return .sectionTintSky
+        case .medical:   return .sectionTintMint
+        }
+    }
+}
+
+// MARK: - Section Completion Overlay (animation de fin de section)
+/// Transition « premium » de fin de section : l'écran se vide (fond crème
+/// uni), il ne reste que la barre de progression qui glisse au centre,
+/// s'épaissit et s'arrondit, se remplit à 100 % avec une coche, puis remonte —
+/// après quoi seulement la nouvelle section est révélée. Une chose à la fois,
+/// rien d'autre à l'écran (pas de surcharge). Reduce Motion → simple fondu +
+/// coche, sans déplacement de la barre.
+private struct SectionCompletionOverlay: View {
+    let sectionTitle: String
+    let reduceMotion: Bool
+    let onFinished: () -> Void
+
+    @State private var atCenter = false
+    @State private var thick = false
+    @State private var fill: CGFloat = 0.72
+    @State private var validated = false
+
+    var body: some View {
+        ZStack {
+            // Écran « blanc » : crème de base (adaptatif dark).
+            Color.healthMapWarm.ignoresSafeArea()
+
+            GeometryReader { geo in
+                VStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.kiwiTint)
+                            .frame(width: 48, height: 48)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(Color.kiwiInk)
+                    }
+                    .scaleEffect(validated ? 1 : 0.3)
+                    .opacity(validated ? 1 : 0)
+
+                    progressCapsule
+                        .frame(height: thick ? 14 : 6)
+                        .padding(.horizontal, 18)
+
+                    Text("Section \(sectionTitle) terminee")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .opacity(validated ? 1 : 0)
+                }
+                .frame(width: geo.size.width)
+                .position(
+                    x: geo.size.width / 2,
+                    y: atCenter ? geo.size.height / 2 : min(96, geo.size.height / 2)
+                )
+            }
+        }
+        .task { await run() }
+    }
+
+    /// La barre elle-même : piste crème + remplissage vert kiwi. La hauteur
+    /// (fine → épaisse) est animée par le parent via `.frame(height:)`.
+    private var progressCapsule: some View {
+        GeometryReader { g in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.kiwiGreen.opacity(0.14))
+                Capsule()
+                    .fill(Color.kiwiGreen)
+                    .frame(width: max(g.size.width * fill, 8))
+            }
+        }
+    }
+
+    /// Chorégraphie : (1) l'écran est blanc, la barre en haut ; (2) elle glisse
+    /// au centre en s'épaississant/arrondissant ; (3) elle se remplit à 100 %
+    /// avec une coche (validation éclair) ; (4) elle remonte ; (5) fin → la
+    /// nouvelle section est révélée par le parent.
+    private func run() async {
+        if reduceMotion {
+            withAnimation(.easeOut(duration: 0.25)) {
+                thick = true; fill = 1; validated = true
+            }
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            onFinished()
+            return
+        }
+        try? await Task.sleep(nanoseconds: 260_000_000)
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+            atCenter = true; thick = true
+        }
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        withAnimation(.easeOut(duration: 0.32)) { fill = 1 }
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.6)) { validated = true }
+        try? await Task.sleep(nanoseconds: 720_000_000)
+        withAnimation(.easeIn(duration: 0.2)) { validated = false }
+        try? await Task.sleep(nanoseconds: 120_000_000)
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.9)) {
+            atCenter = false; thick = false
+        }
+        try? await Task.sleep(nanoseconds: 420_000_000)
+        onFinished()
     }
 }
 

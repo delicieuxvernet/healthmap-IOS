@@ -265,3 +265,34 @@ extension View {
         modifier(KiwiCardStyle(radius: radius))
     }
 }
+
+// MARK: - Teintes de fond par section du questionnaire (6 juil. 2026)
+//
+// Chaque section du questionnaire porte un lavis de fond TRÈS doux (haut de
+// l'écran, fondu vers le crème) pour rendre le parcours plus vivant sans
+// surcharger. Désaturées ; dynamiques light/dark (en dark : un simple soupçon
+// de teinte sur le fond sombre). L'accent vert kiwi reste la SEULE couleur
+// « active » (barre de progression + CTA) — la teinte n'est qu'une ambiance.
+extension Color {
+    private static func sectionTint(
+        light: (UInt8, UInt8, UInt8),
+        dark: (UInt8, UInt8, UInt8)
+    ) -> Color {
+        Color(uiColor: UIColor { trait in
+            let c = trait.userInterfaceStyle == .dark ? dark : light
+            return UIColor(
+                red: CGFloat(c.0) / 255,
+                green: CGFloat(c.1) / 255,
+                blue: CGFloat(c.2) / 255,
+                alpha: 1
+            )
+        })
+    }
+
+    static let sectionTintSand  = sectionTint(light: (0xF1, 0xEA, 0xD9), dark: (0x23, 0x20, 0x1A)) // Profil
+    static let sectionTintPeach = sectionTint(light: (0xFD, 0xE7, 0xCE), dark: (0x2A, 0x21, 0x15)) // Mode de vie
+    static let sectionTintRose  = sectionTint(light: (0xFB, 0xE0, 0xE3), dark: (0x2A, 0x1B, 0x1E)) // Sante
+    static let sectionTintGreen = sectionTint(light: (0xE1, 0xEF, 0xCF), dark: (0x1E, 0x27, 0x16)) // Nutrition
+    static let sectionTintSky   = sectionTint(light: (0xE1, 0xEA, 0xF6), dark: (0x18, 0x21, 0x30)) // Symptomes
+    static let sectionTintMint  = sectionTint(light: (0xDA, 0xED, 0xE7), dark: (0x16, 0x25, 0x1F)) // Medical
+}
