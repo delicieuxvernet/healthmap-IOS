@@ -233,6 +233,7 @@ enum SuiviEngineV4 {
         let nom: String       // label canonique (NutrientData)
         let pct: Int          // 0-100 — couverture moyenne des 7 derniers jours
         let trendPct: Int     // signé, vs semaine précédente (0 si pas comparable)
+        let baselinePct: Int  // 0-100 — score « départ » figé au 1er bilan
     }
 
     /// - Parameters:
@@ -240,9 +241,14 @@ enum SuiviEngineV4 {
     ///     C'est exactement `MealJournalViewModel.fortnight`.
     ///   - focusIds: nutriments à afficher en priorité (apports à renforcer).
     ///     Si vide, on prend tous les nutriments présents dans les micros.
+    ///   - baseline: scores nutriments « départ » figés au 1er bilan
+    ///     (id -> 0-100). Sert de socle à la barre de progression. Si un id n'a
+    ///     pas encore de baseline, le socle vaut le niveau courant (aucun progrès
+    ///     affiché tant que la baseline n'est pas capturée).
     ///   - now: injectable pour les tests.
     static func nutrientCoverage(fortnight: [MealJournalService.MealRecord],
                                  focusIds: [String],
+                                 baseline: [String: Int] = [:],
                                  now: Date = Date(),
                                  calendar: Calendar = WeekScoreEngine.mondayFirst) -> [NutrientCoverage7d] {
         let week = WeekScoreEngine.currentWeekInterval(containing: now, calendar: calendar)
@@ -268,7 +274,9 @@ enum SuiviEngineV4 {
             let prev = averageDailyCoverage(of: id, in: previous, calendar: calendar)
             let trend = prev.map { cur - $0 } ?? 0
             let nom = NutrientData.definition(for: id)?.label ?? id
-            return NutrientCoverage7d(id: id, nom: nom, pct: max(0, min(100, cur)), trendPct: trend)
+            // Pas de baseline pour cet id => socle = niveau courant (gain 0).
+            let basePct = baseline[id].map { max(0, min(100, $0)) } ?? max(0, min(100, cur))
+            return NutrientCoverage7d(id: id, nom: nom, pct: max(0, min(100, cur)), trendPct: trend, baselinePct: basePct)
         }
     }
 

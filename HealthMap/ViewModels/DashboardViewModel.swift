@@ -214,6 +214,10 @@ final class DashboardViewModel: ObservableObject {
                     self.profile = .empty
                     self.hasCompletedQuestionnaire = false
                 }
+                // `baseline_nutrient_scores` est une colonne sœur de
+                // `questionnaire_data` (pas imbriquée dedans) : on la fusionne
+                // manuellement dans le profil en mémoire.
+                self.profile.baselineNutrientScores = profileRow.baselineNutrientScores
             }
         } catch {
             errorMessage = "Impossible de charger votre profil."
@@ -257,6 +261,34 @@ final class DashboardViewModel: ObservableObject {
 
         healthScore = HealthCalculator.calculateHealthScore(profile: profile)
         nutrientScores = HealthCalculator.analyzeNutrientScores(profile: profile)
+
+        captureBaselineIfNeeded()
+    }
+
+    // MARK: - Capture one-time de la baseline nutriments
+
+    /// Fige la photo « départ » des scores nutriments au tout premier bilan.
+    /// Le check `baselineNutrientScores == nil` garantit une exécution unique :
+    /// une fois écrite, la colonne n'est jamais réécrite. Met aussi à jour la
+    /// copie en mémoire du profil pour que la barre de couverture utilise la
+    /// baseline dès le premier affichage. Non bloquant : un échec d'écriture
+    /// n'est que loggué (l'utilisateur retentera au prochain chargement).
+    private func captureBaselineIfNeeded() {
+        guard profile.baselineNutrientScores == nil, !nutrientScores.isEmpty else { return }
+
+        let baseline = nutrientScores
+        // Copie en mémoire immédiate (la barre l'utilise tout de suite).
+        profile.baselineNutrientScores = baseline
+
+        Task { [databaseService] in
+            guard let session = await AuthService.shared.currentSession else { return }
+            let userId = session.user.id.uuidString
+            do {
+                try await databaseService.saveBaselineNutrientScores(userId: userId, scores: baseline)
+            } catch {
+                AppLogger.database.report(error, context: "Capture baseline nutrient scores")
+            }
+        }
     }
 
     // MARK: - Trigger AI Analysis

@@ -236,6 +236,25 @@ final class DatabaseService {
             .execute()
     }
 
+    // MARK: - Save Baseline Nutrient Scores (capture one-time du 1er bilan)
+    // UPDATE de la seule colonne `baseline_nutrient_scores` (jsonb) — jamais
+    // upsert/insert (la ligne existe déjà, créée par le trigger handle_new_user ;
+    // règle absolue profiles = UPDATE only). Symétrique de saveAIAnalysis.
+    func saveBaselineNutrientScores(userId: String, scores: [String: Int]) async throws {
+        struct UpdateRow: Codable {
+            let baselineNutrientScores: [String: Int]
+            enum CodingKeys: String, CodingKey {
+                case baselineNutrientScores = "baseline_nutrient_scores"
+            }
+        }
+
+        try await client
+            .from("profiles")
+            .update(UpdateRow(baselineNutrientScores: scores))
+            .eq("id", value: userId)
+            .execute()
+    }
+
     // MARK: - Clear AI Analysis (force refresh)
     func clearAIAnalysis(userId: String) async throws {
         struct ClearRow: Codable {
