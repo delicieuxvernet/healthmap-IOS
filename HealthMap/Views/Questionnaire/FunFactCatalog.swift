@@ -3,27 +3,27 @@ import SwiftUI
 // MARK: - Fun Fact Catalog (Lot E — questionnaire premium & engageant)
 //
 // Petites lignes "fun facts" affichées sous les sliders taille et âge.
-// La ligne réagit EN DIRECT à la valeur du slider : chaque plage de valeurs
-// a son repère (célébrités, humour aux extrêmes). Logique PURE et
-// déterministe — aucune dépendance UI, testable unitairement.
+// La ligne réagit à la valeur du slider mais UNIQUEMENT après un court temps
+// d'arrêt (debounce côté FunFactLabel) — on ne fait pas défiler tous les
+// messages pendant qu'on scrolle. Logique PURE et déterministe.
 //
 // Règles d'écriture :
 // - Chaînes utilisateur sans accents (convention des libellés questionnaire).
-// - POIDS : volontairement AUCUN fun fact — sujet sensible, aucune
-//   comparaison à des personnes, aucun jugement.
+// - JAMAIS d'information fausse : pour la taille, la phrase est vraie pour CHAQUE
+//   cm (écart honnête vs la célébrité la plus proche ; jamais une taille de
+//   célébrité attribuée à une valeur qui n'est pas la sienne).
+// - POIDS : volontairement AUCUN fun fact — sujet sensible, aucune comparaison.
 // - Ton bienveillant, zéro vocabulaire médical alarmant.
 enum FunFactCatalog {
 
-    /// Vrai si la question possède un catalogue de fun facts. Permet à la
-    /// vue de ne rien afficher (ni réserver d'espace) pour les autres
-    /// questions slider — le poids n'a délibérément PAS de catalogue.
+    /// Vrai si la question possède un catalogue de fun facts. Le poids n'en a
+    /// délibérément PAS.
     static func hasFacts(for questionId: String) -> Bool {
         questionId == "height" || questionId == "age"
     }
 
-    /// Fun fact pour la valeur courante du slider. `nil` si la question
-    /// n'a pas de catalogue. Fonction totale sur les ranges des sliders
-    /// (height 140-220, age 14-100) : toujours une phrase à afficher.
+    /// Fun fact pour la valeur courante. `nil` si la question n'a pas de
+    /// catalogue. Fonction totale sur les ranges (height 140-220, age 14-100).
     static func fact(for questionId: String, value: Double) -> String? {
         switch questionId {
         case "height": return heightFact(Int(value.rounded()))
@@ -34,28 +34,35 @@ enum FunFactCatalog {
 
     // MARK: - Taille (140-220 cm)
 
-    /// Repères célébrités par plage de centimètres + humour tour Eiffel
-    /// aux extrêmes. Les plages encadrent la taille réelle de chaque repère.
+    /// Célébrités à leur taille réelle (largement documentée), triées. Sert de
+    /// repère : pour un cm donné on prend la plus proche et on formule un écart
+    /// EXACT — donc jamais une taille attribuée à tort.
+    private static let heightRefs: [(cm: Int, who: String)] = [
+        (147, "Edith Piaf"), (155, "Lady Gaga"), (157, "Kevin Hart"),
+        (165, "Daniel Radcliffe"), (168, "Napoleon"), (170, "Lionel Messi"),
+        (173, "Rihanna"), (178, "Kylian Mbappe"), (185, "Zinedine Zidane"),
+        (187, "Cristiano Ronaldo"), (190, "Omar Sy"), (196, "Charles de Gaulle"),
+        (204, "Teddy Riner"), (216, "Shaquille O'Neal"),
+    ]
+
     private static func heightFact(_ cm: Int) -> String {
-        switch cm {
-        case ..<151: return "Comme Edith Piaf (147 cm) — la grandeur ne se mesure pas !"
-        case 151..<159: return "Comme Lady Gaga (155 cm) — la presence avant tout !"
-        case 159..<167: return "Comme Daniel Radcliffe (165 cm) — magique !"
-        case 167..<170: return "Comme Napoleon (168 cm) — plus grand que sa legende !"
-        case 170..<173: return "Comme Lionel Messi (170 cm) — la preuve que tout est possible !"
-        case 173..<176: return "Comme Rihanna (173 cm) — allure de star !"
-        case 176..<181: return "Comme Kylian Mbappe (178 cm) — vitesse eclair !"
-        case 181..<188: return "Comme Zinedine Zidane (185 cm) — classe mondiale !"
-        case 188..<193: return "Comme Omar Sy (190 cm) — du charisme en hauteur !"
-        case 193..<200: return "Comme Charles de Gaulle (196 cm) — une stature historique !"
-        case 200..<208: return "Comme Teddy Riner (204 cm) — gabarit de champion olympique !"
-        default: return "La tour Eiffel (330 m) garde de l'avance... pour l'instant !"
+        // Célébrité dont la taille est la plus proche de la valeur choisie.
+        let ref = heightRefs.min { abs($0.cm - cm) < abs($1.cm - cm) } ?? heightRefs[0]
+        let delta = cm - ref.cm
+        if delta == 0 {
+            return "Pile la taille de \(ref.who) (\(ref.cm) cm) !"
         }
+        if abs(delta) == 1 {
+            return "A un cheveu de \(ref.who) (\(ref.cm) cm) !"
+        }
+        let sens = delta > 0 ? "de plus que" : "de moins que"
+        return "\(cm) cm — soit \(abs(delta)) cm \(sens) \(ref.who) (\(ref.cm) cm)."
     }
 
     // MARK: - Age (14-100 ans)
 
-    /// Repères neutres et positifs par tranche d'âge — jamais de jugement.
+    /// Repères neutres et positifs par tranche d'âge — jamais de jugement, et
+    /// pas de célébrité (leur âge change avec le temps -> deviendrait faux).
     private static func ageFact(_ years: Int) -> String {
         switch years {
         case ..<18: return "En pleine croissance — ton corps a de grands besoins !"
@@ -73,25 +80,34 @@ enum FunFactCatalog {
 
 // MARK: - Fun Fact Label
 //
-// Ligne animée affichée sous le slider. Le texte change quand la valeur
-// franchit une plage du catalogue : l'ancien fait sort en fondu, le nouveau
-// entre avec un léger scale (fondu simple si reduce-motion). Purement
-// décoratif : aucun geste, aucun délai — ne retarde JAMAIS la navigation.
+// Ligne animée affichée sous le slider. Elle ne se met à jour qu'après un court
+// TEMPS D'ARRÊT (~0,6 s) sur une valeur : pendant qu'on fait défiler la molette,
+// le message reste figé (on n'affiche pas tous les repères à la suite) ; dès
+// qu'on s'arrête, il se met à jour avec une transition douce.
 struct FunFactLabel: View {
     let questionId: String
     let value: Double
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Valeur "stabilisée" : ne suit `value` qu'après le debounce. Le fait
+    /// affiché en dérive, donc il ne change pas pendant le défilement.
+    @State private var settledValue: Double
+    @State private var debounce: Task<Void, Never>?
+
+    init(questionId: String, value: Double) {
+        self.questionId = questionId
+        self.value = value
+        _settledValue = State(initialValue: value)
+    }
+
     private var fact: String? {
-        FunFactCatalog.fact(for: questionId, value: value)
+        FunFactCatalog.fact(for: questionId, value: settledValue)
     }
 
     var body: some View {
         ZStack(alignment: .leading) {
             if let fact {
                 chip(for: fact)
-                    // `.id(fact)` force un remove+insert quand le texte change
-                    // → la transition joue à chaque changement de plage.
                     .id(fact)
                     .transition(
                         reduceMotion
@@ -101,6 +117,17 @@ struct FunFactLabel: View {
             }
         }
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : .healthMapQuick, value: fact)
+        .onChange(of: value) { _, newValue in
+            // Reporte la mise à jour tant que l'utilisateur fait défiler : on
+            // n'affiche le repère que lorsqu'il s'arrête ~0,6 s sur une valeur.
+            debounce?.cancel()
+            debounce = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                guard !Task.isCancelled else { return }
+                settledValue = newValue
+            }
+        }
+        .onDisappear { debounce?.cancel() }
     }
 
     private func chip(for fact: String) -> some View {
