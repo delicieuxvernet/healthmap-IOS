@@ -46,6 +46,12 @@ enum FunFactCatalog {
     ]
 
     private static func heightFact(_ cm: Int) -> String {
+        // Au-dela du plus grand repere reel (Shaquille O'Neal, 216 cm) : humour
+        // assume, hors echelle humaine courante. Ce n'est pas une info fausse,
+        // c'est une blague explicite pour l'extreme haut du slider.
+        if cm > 216 {
+            return "La tour Eiffel (330 m) garde de l'avance... pour l'instant !"
+        }
         // Célébrité dont la taille est la plus proche de la valeur choisie.
         let ref = heightRefs.min { abs($0.cm - cm) < abs($1.cm - cm) } ?? heightRefs[0]
         let delta = cm - ref.cm
