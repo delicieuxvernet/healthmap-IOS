@@ -70,6 +70,10 @@ struct SuiviView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 24)
+                    // Verrou anti-dérive horizontale : la largeur du contenu est
+                    // épinglée à celle du ScrollView → plus de slide latéral vers
+                    // une marge vide (l'écran ne bouge plus qu'en vertical).
+                    .containerRelativeFrame(.horizontal)
                 }
             }
             .kiwiTabBarBottomInset()
