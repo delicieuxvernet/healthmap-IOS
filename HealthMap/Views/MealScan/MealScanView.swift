@@ -25,6 +25,10 @@ struct MealScanView: View {
     @State private var showJournal = false
     /// Apports quotidiens (score) des 7 derniers jours — courbe « apports vs besoins ».
     @State private var curve: [Int] = []
+    /// Énergie active du jour (Apple Santé) → colonne « dépensées » de la jauge kcal.
+    /// nil = Santé non lié / rien partagé → colonne masquée (jamais un « 0 » trompeur).
+    /// Lu au chargement de la page (présente la feuille d'autorisation la 1re fois).
+    @State private var activeEnergyToday: Int?
 
     /// L'écran est en mode résultat immersif quand l'analyse est prête (onglet Analyser).
     private var isImmersive: Bool {
@@ -137,7 +141,7 @@ struct MealScanView: View {
             ScanKcalGauge(
                 consommees: journal.dayCalories,
                 objectif: dashboardVM.physicalMetrics.macros?.calories,
-                depensees: nil,            // Apple Santé = V2 : colonne masquée tant que non branchée
+                depensees: isTodaySelected ? activeEnergyToday : nil,   // dépense active du jour (Apple Santé) ; nil si non lié ou jour passé (non backfillé) → colonne masquée
                 isToday: isTodaySelected
             )
             .padding(.horizontal, Theme.spacingLG)
@@ -171,7 +175,12 @@ struct MealScanView: View {
                 .padding(.horizontal, Theme.spacingLG)
         }
         .padding(.vertical, Theme.spacingMD)
-        .task { await journal.load() }
+        .task {
+            await journal.load()
+            // Énergie active du jour (Apple Santé) pour la « dépense » de la jauge —
+            // présente la feuille d'autorisation la 1re fois, sinon lecture directe.
+            activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal()
+        }
         .onChange(of: viewModel.quotaExhausted) { _, exhausted in
             if exhausted {
                 showPaywall = true
