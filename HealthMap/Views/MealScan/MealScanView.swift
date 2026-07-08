@@ -385,25 +385,8 @@ struct MealScanView: View {
                                 alignment: .topTrailing
                             )
                     } else {
-                        VStack(spacing: Theme.spacingSM) {
-                            Image(systemName: "camera.fill")
-                                .font(.system(size: 36))
-                                .foregroundStyle(Color.kiwiGreen)
-                            Text("Cadre bien ton assiette")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(Color.healthMapText)
-                            Text("Prends une photo du dessus, en bonne lumiere")
-                                .font(Theme.captionFont)
-                                .foregroundStyle(Color.healthMapSecondary)
-                        }
-                        .frame(height: 200)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                                .strokeBorder(Color.kiwiGreen.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [8]))
-                                .background(Color.kiwiTint.opacity(0.5))
-                                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
-                        )
+                        // Viseur animé (ligne de scan + coins) — polish V3.
+                        ScanViewfinderPrompt()
                     }
                 }
             }
