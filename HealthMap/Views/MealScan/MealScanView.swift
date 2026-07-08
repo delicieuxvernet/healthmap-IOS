@@ -15,7 +15,6 @@ struct MealScanView: View {
     @StateObject private var viewModel = MealScanViewModel()
     @StateObject private var journal = MealJournalViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
-    @ObservedObject private var gamification = GamificationService.shared
     @State private var selectedItem: PhotosPickerItem?
     @State private var selectedSearchFood: MealScanViewModel.FoodItem?
     @State private var isAddingFood = false
@@ -32,13 +31,6 @@ struct MealScanView: View {
         viewModel.analysisResult != nil && viewModel.selectedTab == .analyze
     }
 
-    /// Vrai dès qu'au moins un vrai scan a réussi (badge `mealScanned` persistant en
-    /// UserDefaults, posé une fois au 1er scan). Sert à masquer DÉFINITIVEMENT le bloc
-    /// d'exemple pédagogique une fois que l'utilisateur a scanné pour de vrai.
-    private var hasEverScanned: Bool {
-        gamification.earnedBadges.contains(.mealScanned)
-    }
-
     var body: some View {
         NavigationStack {
             Group {
@@ -53,8 +45,10 @@ struct MealScanView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
                 Task { await journal.load() }
             }
-            .navigationTitle("Scanner")
-            .navigationBarTitleDisplayMode(.large)
+            // Titre porté dans le contenu (grand « Scan » en tête de scroll) —
+            // barre de navigation réduite à ses boutons (journal + profil).
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar(isImmersive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 if !isImmersive {
@@ -93,26 +87,17 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Scaffold normal (capture / recherche) — barre de nav classique
+    // MARK: - Scaffold normal (journal du jour / recherche)
     private var normalScaffold: some View {
         ZStack {
-            WarmBackground()
+            Color.kiwiCream.ignoresSafeArea()
             ScrollView {
-                VStack(spacing: Theme.spacingLG) {
-                    Picker("", selection: $viewModel.selectedTab) {
-                        ForEach(MealScanViewModel.MealScanTab.allCases, id: \.self) { tab in
-                            Text(tab.rawValue).tag(tab)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, Theme.spacingLG)
-
+                Group {
                     switch viewModel.selectedTab {
-                    case .analyze: analyzeCapture
-                    case .search: searchTab
+                    case .analyze: scanHome
+                    case .search: searchScaffold
                     }
                 }
-                .padding(.vertical, Theme.spacingMD)
                 // Épingle la largeur du contenu à celle du conteneur : empêche
                 // toute dérive/scroll horizontal (le scroll reste vertical only).
                 .containerRelativeFrame(.horizontal)
@@ -120,9 +105,107 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Capture (état sans résultat)
-    private var analyzeCapture: some View {
+    // MARK: - Page d'accueil Scan = journal calories du jour
+    // Ordre (maquette validée) : titre · nav jour · capture · recherche · jauge
+    // kcal · apports micros du jour · macros du jour · dernier plat · récents.
+    private var scanHome: some View {
         VStack(spacing: Theme.spacingLG) {
+            HStack {
+                Text("Scan")
+                    .font(.system(size: 28, weight: .heavy))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Spacer()
+            }
+            .padding(.horizontal, Theme.spacingLG)
+
+            ScanDayNav(
+                label: journal.dayLabel,
+                sub: journal.daySub,
+                canNext: journal.canGoNext,
+                onPrev: { journal.goPrevDay() },
+                onNext: { journal.goNextDay() }
+            )
+            .padding(.horizontal, Theme.spacingLG)
+
+            captureBlock
+
+            searchEntry
+
+            ScanCardHeader(icon: "flame.fill", title: "Ta journée")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Theme.spacingLG)
+            ScanKcalGauge(
+                consommees: journal.dayCalories,
+                objectif: dashboardVM.physicalMetrics.macros?.calories,
+                depensees: nil,            // Apple Santé = V2 : colonne masquée tant que non branchée
+                isToday: isTodaySelected
+            )
+            .padding(.horizontal, Theme.spacingLG)
+
+            ScanMicrosJourCard(
+                items: microItems,
+                headline: MealJournalViewModel.dayMicroHeadline(microItems, isToday: isTodaySelected)
+            )
+            .padding(.horizontal, Theme.spacingLG)
+
+            ScanMacrosJourCard(
+                prot: (g: journal.dayProteins, target: dashboardVM.physicalMetrics.macros?.protein),
+                carb: (g: journal.dayCarbs, target: dashboardVM.physicalMetrics.macros?.carbs),
+                fat: (g: journal.dayFats, target: dashboardVM.physicalMetrics.macros?.fat),
+                fiber: (g: journal.dayFiber, target: 30),
+                headline: MealJournalViewModel.dayMacroHeadline(
+                    prot: (g: journal.dayProteins, target: dashboardVM.physicalMetrics.macros?.protein),
+                    carb: (g: journal.dayCarbs, target: dashboardVM.physicalMetrics.macros?.carbs),
+                    fat: (g: journal.dayFats, target: dashboardVM.physicalMetrics.macros?.fat),
+                    fiber: (g: journal.dayFiber, target: 30),
+                    isToday: isTodaySelected
+                )
+            )
+            .padding(.horizontal, Theme.spacingLG)
+
+            if let last = journal.dayMeals.last {
+                lastScanRecapCard(last)
+            }
+
+            ScanRecentScansList(meals: journal.dayMeals, onOpen: { showJournal = true })
+                .padding(.horizontal, Theme.spacingLG)
+        }
+        .padding(.vertical, Theme.spacingMD)
+        .task { await journal.load() }
+        .onChange(of: viewModel.quotaExhausted) { _, exhausted in
+            if exhausted {
+                showPaywall = true
+                viewModel.quotaExhausted = false
+            }
+        }
+    }
+
+    /// Vrai si le jour affiché par le journal est aujourd'hui (formulations
+    /// « aujourd'hui / restantes » vs jour passé, et périmètre des apports listés).
+    private var isTodaySelected: Bool {
+        Calendar.current.isDateInToday(journal.selectedDay)
+    }
+
+    /// Micronutriments listés dans la carte « apports du jour ». AUJOURD'HUI :
+    /// union des nutriments scannés du jour et des apports du user à renforcer
+    /// (scores < 60, source dashboardVM). JOUR PASSÉ : uniquement les nutriments
+    /// réellement présents ce jour-là (on ne projette pas le contexte d'aujourd'hui
+    /// sur une date antérieure). Ordre canonique, plafonné à 6. pct = couverture
+    /// réelle du jour sélectionné (0 si non couvert).
+    private var microItems: [(id: String, pct: Int)] {
+        let deficient = isTodaySelected
+            ? dashboardVM.nutrientScores.filter { $0.value < 60 }.map(\.key)
+            : []
+        let union = Set(journal.dayNutrientIds).union(deficient)
+        let canonical = NutrientData.all.map(\.id.rawValue).filter { union.contains($0) }
+        let rest = union.subtracting(canonical).sorted()
+        return (canonical + rest).prefix(6).map { (id: $0, pct: journal.dayMicroPct($0)) }
+    }
+
+    // MARK: - Bloc capture (déclenche le scan — inchangé, agit sur aujourd'hui)
+    @ViewBuilder
+    private var captureBlock: some View {
+        VStack(spacing: Theme.spacingMD) {
             if viewModel.isAnalyzing {
                 VStack(spacing: Theme.spacingMD) {
                     KiwiWalkerView(size: 140)
@@ -140,15 +223,6 @@ struct MealScanView: View {
                     freeScanCounter(remaining)
                 }
                 captureZone
-                // Dès qu'un vrai repas existe (scan photo ou ajout manuel), on
-                // remplace l'exemple pédagogique par un recap du dernier repas —
-                // jamais un écran vide. L'exemple ne revient qu'en l'absence
-                // totale d'historique (nouveau compte).
-                if let last = journal.fortnight.max(by: { $0.consumedAt < $1.consumedAt }) {
-                    lastScanRecapCard(last)
-                } else if !hasEverScanned {
-                    exampleAnalysis
-                }
             }
 
             if let error = viewModel.errorMessage {
@@ -169,12 +243,82 @@ struct MealScanView: View {
                     .foregroundStyle(Color.kiwiGreen)
             }
         }
-        .onChange(of: viewModel.quotaExhausted) { _, exhausted in
-            if exhausted {
-                showPaywall = true
-                viewModel.quotaExhausted = false
+    }
+
+    // MARK: - Entrée recherche (surface l'onglet recherche existant)
+    private var searchEntry: some View {
+        VStack(spacing: Theme.spacingMD) {
+            HStack(spacing: 12) {
+                line
+                Text("ou")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.healthMapMuted)
+                line
             }
+            Button {
+                viewModel.selectedTab = .search
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.healthMapMuted)
+                    Text("Rechercher un produit ou une marque")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.healthMapMuted)
+                }
+                .padding(.horizontal, Theme.spacingMD)
+                .frame(minHeight: 48)
+                .background(Color.healthMapCard)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.healthMapPressed)
+            .accessibilityLabel("Rechercher un produit ou une marque")
         }
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    private var line: some View {
+        Rectangle()
+            .fill(Color.kiwiCharcoal.opacity(0.08))
+            .frame(height: 1)
+    }
+
+    // MARK: - Scaffold recherche (onglet recherche existant + retour)
+    private var searchScaffold: some View {
+        VStack(spacing: Theme.spacingMD) {
+            HStack(spacing: 10) {
+                Button {
+                    viewModel.selectedTab = .analyze
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.kiwiInk)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.healthMapCard))
+                        .overlay(Circle().stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.healthMapPressed)
+                .accessibilityLabel("Retour au scan")
+                Text("Rechercher un aliment")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Spacer()
+            }
+            .padding(.horizontal, Theme.spacingLG)
+
+            searchTab
+        }
+        .padding(.vertical, Theme.spacingMD)
     }
 
     // MARK: - Compteur de scans gratuits
@@ -537,49 +681,7 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Exemple d'analyse (landing — statique)
-    private var exampleAnalysis: some View {
-        VStack(spacing: Theme.spacingLG) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    Fluent3DIcon(name: Fluent3D.sparkles, size: 22)
-                    Text("Exemple d'analyse")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.kiwiCharcoal)
-                }
-                Text("Voici à quoi ressembleront tes résultats après le scan.")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Color.healthMapMuted)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.spacingLG)
-
-            MealCoverageHero(coveredCount: 2, totalCount: 3)
-                .padding(.horizontal, Theme.spacingLG)
-
-            foodTilesSection(exampleFoods)
-        }
-        .padding(.top, Theme.spacingSM)
-    }
-
-    private var exampleFoods: [MealScanViewModel.DetectedFood] {
-        typealias F = MealScanViewModel.FoodContribution
-        return [
-            MealScanViewModel.DetectedFood(
-                name: "Saumon", emoji: "🐟",
-                contributions: [F(nutrientId: "vitD", label: "Vitamine D", pctRDA: 55),
-                                F(nutrientId: "vitB12", label: "Vitamine B12", pctRDA: 70)],
-                macros: MealScanViewModel.FoodMacros(calories: 280, proteins: 25, carbs: 0, fats: 18, fiber: 0),
-                topNutrients: [F(nutrientId: "omega3", label: "Oméga-3", pctRDA: 90)]),
-            MealScanViewModel.DetectedFood(
-                name: "Brocoli", emoji: "🥦",
-                contributions: [F(nutrientId: "iron", label: "Fer", pctRDA: 25)],
-                macros: MealScanViewModel.FoodMacros(calories: 35, proteins: 3, carbs: 5, fats: 0, fiber: 3),
-                topNutrients: [F(nutrientId: "vitC", label: "Vitamine C", pctRDA: 80)]),
-        ]
-    }
-
-    // MARK: - Recap dernier repas (remplace l'exemple une fois un vrai historique)
+    // MARK: - Recap dernier repas (dernier plat du jour sélectionné)
     private func lastScanRecapCard(_ meal: MealJournalService.MealRecord) -> some View {
         HStack(spacing: Theme.spacingSM) {
             Image(systemName: "checkmark.circle.fill")
