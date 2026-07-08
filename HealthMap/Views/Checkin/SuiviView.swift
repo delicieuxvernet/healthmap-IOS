@@ -51,6 +51,11 @@ struct SuiviView: View {
     /// Pop-up check-in du jour : présenté une fois par jour si pas déjà répondu.
     @State private var showCheckin = false
 
+    /// Le vrai suivi est-il démarré ? Faux → les courbes sont des EXEMPLES badgés
+    /// avec un bandeau « Commencer mon suivi ». Vrai → courbes nourries UNIQUEMENT
+    /// par les check-ins réels. Initialisé depuis SuiviTrackingStore à l'affichage.
+    @State private var isTracking = false
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -113,6 +118,7 @@ struct SuiviView: View {
                 }
             }
             .task {
+                isTracking = SuiviTrackingStore.isStarted()
                 await journal.load()
                 stepsToday = await Self.loadSteps()
                 checkinHistory = SuiviCheckinHistory.recentFeelings()
@@ -154,11 +160,21 @@ struct SuiviView: View {
     // MARK: - 3. Section symptômes (1 carte auto-explicite par symptôme)
     @ViewBuilder
     private var symptomSection: some View {
+        // Mode réel dès que le suivi est démarré : la courbe « toi » ne réagit
+        // qu'aux check-ins réels enregistrés depuis la date de début. Sinon, on
+        // montre l'EXEMPLE (badgé, avec un bandeau « Commencer mon suivi »).
+        let tracking: SuiviEngineV4.SuiviTracking = isTracking
+            ? .real(feelings: SuiviCheckinHistory.feelingsSince(SuiviTrackingStore.startDate() ?? Date()))
+            : .example
         let evolutions = SuiviEngineV4.symptomEvolutions(
             symptomes: dashboardVM.analysisV2?.bilan?.symptomes,
-            checkinHistory: checkinHistory
+            tracking: tracking
         )
         if !evolutions.isEmpty {
+            // Bandeau UNIQUE en tête de section, uniquement en mode exemple.
+            if !isTracking {
+                SuiviStartBanner(action: startTracking)
+            }
             ForEach(evolutions) { evo in
                 SuiviSymptomCard(evolution: evo, reduceMotion: reduceMotion)
             }
@@ -167,6 +183,15 @@ struct SuiviView: View {
         } else {
             SuiviNoSymptomCard()
         }
+    }
+
+    /// Bascule vers le VRAI suivi : fige la date de début et recharge la série
+    /// réelle. À partir de là, les courbes ne reflètent que les check-ins réels.
+    private func startTracking() {
+        SuiviTrackingStore.start()
+        isTracking = true
+        checkinHistory = SuiviCheckinHistory.recentFeelings()
+        HapticService.shared.success()
     }
 
     // MARK: - Dérivés déterministes (aucun appel réseau)
@@ -357,6 +382,49 @@ private struct SuiviNoSymptomCard: View {
     }
 }
 
+// MARK: - Bandeau « Commencer mon suivi » (uniquement en mode exemple)
+/// Bandeau UNIQUE posé en tête de la section symptômes tant que le vrai suivi
+/// n'est pas démarré : explique que les courbes sont un exemple et propose un
+/// seul bouton pour basculer vers un suivi nourri par les vrais check-ins.
+private struct SuiviStartBanner: View {
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 11) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.kiwiGreenInk)
+                    .padding(.top, 1)
+                Text("Ces courbes sont un exemple. Démarre ton suivi pour les remplir avec tes vraies données.")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+
+            Button(action: action) {
+                Text("Commencer mon suivi")
+                    .font(.system(size: 15, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 48)
+                    .background(
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .fill(Color.kiwiGreen)
+                    )
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.healthMapPressed)
+            .accessibilityHint("Bascule tes courbes vers un vrai suivi nourri par tes check-ins")
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.kiwiGreenSoft))
+    }
+}
+
 // MARK: - 3. Carte « Évolution du symptôme » (verdict écrit + graphe posé)
 /// Verdict d'abord (pastille), phrase d'insight en gros, variation signée, puis
 /// mini-graphe à 3 séries avec labels POSÉS directement sur les courbes (« toi »
@@ -367,9 +435,31 @@ private struct SuiviSymptomCard: View {
 
     @State private var progress: CGFloat = 0
 
-    private var pillColor: Color { evolution.improving ? Color.kiwiGreenInk : Color(hex: "D9820A") }
-    private var pillBg: Color { evolution.improving ? Color.kiwiGreenSoft : Color(hex: "FDECD6") }
-    private var pillIcon: String {
+    /// Nb de points réels de la courbe « toi » (baseline + 1 par check-in).
+    private var realPointCount: Int { evolution.reel.count }
+    /// Mode réel mais aucun check-in encore : la courbe « démarre » (jour 0).
+    private var isDayZero: Bool { !evolution.isExample && realPointCount < 2 }
+
+    // La pastille change selon l'état : Exemple / Jour 0 / verdict réel.
+    private var pillText: String {
+        if evolution.isExample { return "Exemple" }
+        if isDayZero { return "Jour 0" }
+        return evolution.verdict
+    }
+    private var pillColor: Color {
+        if evolution.isExample { return Color(hex: "5F5E5A") }
+        if isDayZero { return Color.kiwiGreenInk }
+        return evolution.improving ? Color.kiwiGreenInk : Color(hex: "D9820A")
+    }
+    private var pillBg: Color {
+        if evolution.isExample { return Color(hex: "F1EFE8") }
+        if isDayZero { return Color.kiwiGreenSoft }
+        return evolution.improving ? Color.kiwiGreenSoft : Color(hex: "FDECD6")
+    }
+    /// Icône de pastille : neutre en exemple / jour 0, flèche de sens en réel.
+    private var pillIcon: String? {
+        if evolution.isExample { return "sparkles" }
+        if isDayZero { return "circle.dashed" }
         guard evolution.verdict != "Stable" else { return "equal" }
         // La flèche suit le SENS RÉEL de la courbe (baisse d'un problème = flèche
         // vers le bas), indépendamment du fait que ce soit une bonne nouvelle.
@@ -377,12 +467,16 @@ private struct SuiviSymptomCard: View {
     }
 
     private var insightSentence: String {
-        // Phrase d'insight ANCRÉE sur le nom du symptôme + le verdict — jamais
-        // sur un pôle d'axe (dont le « bon côté » dépend du sens : un problème
-        // s'améliore en descendant, un objectif en montant — s'appuyer sur un
-        // libellé de pôle inverserait le sens un jour sur deux). Le nom + verdict
-        // est toujours juste, quel que soit le sens.
+        // Phrase d'insight ANCRÉE sur le nom du symptôme + l'état — jamais sur un
+        // pôle d'axe (dont le « bon côté » dépend du sens). Le nom + verdict est
+        // toujours juste, quel que soit le sens.
         let nom = evolution.nom.lowercased()
+        if evolution.isExample {
+            return "Voici à quoi ressemblera ton suivi de \(nom)."
+        }
+        if isDayZero {
+            return "Ton suivi de \(nom) démarre, tes check-ins vont le dessiner."
+        }
         switch evolution.verdict {
         case "En amélioration": return "Ton suivi de \(nom) s'améliore depuis ton arrivée."
         case "À surveiller":    return "Ton suivi de \(nom) est à surveiller ces jours-ci."
@@ -405,9 +499,11 @@ private struct SuiviSymptomCard: View {
                 }
                 Spacer(minLength: 8)
                 HStack(spacing: 5) {
-                    Image(systemName: pillIcon)
-                        .font(.system(size: 11, weight: .heavy))
-                    Text(evolution.verdict)
+                    if let icon = pillIcon {
+                        Image(systemName: icon)
+                            .font(.system(size: 11, weight: .heavy))
+                    }
+                    Text(pillText)
                         .font(.system(size: 11.5, weight: .heavy))
                 }
                 .foregroundStyle(pillColor)
@@ -463,15 +559,30 @@ private struct SuiviPosedChart: View {
             let reel = evolution.reel
             let sans = evolution.sansKiwio
             let n = reel.count
-            guard n > 1 else { return }
+            // Rien à tracer sans point « toi » ; « sans Kiwio » garantit ≥ 2 points.
+            guard n >= 1 else { return }
+            let padL: CGFloat = 6
 
-            func px(_ i: Int) -> CGFloat { w * CGFloat(i) / CGFloat(n - 1) }
+            // Position horizontale d'un point « toi » : si un seul point, calé à
+            // gauche (jour 0) ; sinon réparti sur toute la largeur utile.
+            func px(_ i: Int) -> CGFloat {
+                guard n > 1 else { return padL }
+                return padL + (w - padL) * CGFloat(i) / CGFloat(n - 1)
+            }
+            // « sans Kiwio » a sa propre longueur (≥ 2) et occupe toute la largeur.
+            func pxSans(_ i: Int, count: Int) -> CGFloat {
+                guard count > 1 else { return padL }
+                return w * CGFloat(i) / CGFloat(count - 1)
+            }
             func py(_ v: Double) -> CGFloat {
                 let t = CGFloat(v) / 100
                 return h * (0.12 + (1 - t) * 0.72)
             }
-            func points(_ vals: [Double]) -> [CGPoint] {
+            func reelPoints(_ vals: [Double]) -> [CGPoint] {
                 vals.enumerated().map { CGPoint(x: px($0.offset), y: py($0.element)) }
+            }
+            func sansPoints(_ vals: [Double]) -> [CGPoint] {
+                vals.enumerated().map { CGPoint(x: pxSans($0.offset, count: vals.count), y: py($0.element)) }
             }
 
             // Grille horizontale discrète
@@ -482,41 +593,71 @@ private struct SuiviPosedChart: View {
                            style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [1, 5]))
             }
 
-            // « sans Kiwio » — pointillés gris
-            let sansPts = points(sans)
-            ctx.stroke(SuiviCurveMath.smoothPath(sansPts),
-                       with: .color(Color(hex: "C2BDB0")),
-                       style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round, dash: [2, 5]))
+            // « sans Kiwio » — pointillés gris (toujours ≥ 2 points → ligne visible)
+            let sansPts = sansPoints(sans)
+            if sansPts.count > 1 {
+                ctx.stroke(SuiviCurveMath.smoothPath(sansPts),
+                           with: .color(Color(hex: "C2BDB0")),
+                           style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round, dash: [2, 5]))
+            }
 
-            // « toi » — plein vert + aire, animée par `progress`
-            let reelPts = points(reel)
-            let visible = max(2, Int(ceil(CGFloat(n) * progress)))
-            let drawn = Array(reelPts.prefix(visible))
-            let line = SuiviCurveMath.smoothPath(drawn)
-            var area = line
-            area.addLine(to: CGPoint(x: drawn.last!.x, y: h))
-            area.addLine(to: CGPoint(x: drawn.first!.x, y: h))
-            area.closeSubpath()
-            ctx.fill(area, with: .color(Color.kiwiGreen.opacity(0.10)))
-            ctx.stroke(line, with: .color(Color.kiwiGreen),
-                       style: StrokeStyle(lineWidth: 3.4, lineCap: .round, lineJoin: .round))
+            // « toi » — plein vert + aire, animée par `progress`. En EXEMPLE, tracé
+            // fondu + tirets ; sinon plein. Avec un seul point (jour 0), on ne
+            // trace pas de ligne, juste le point.
+            let reelPts = reelPoints(reel)
+            let toiColor = Color.kiwiGreen
+            let toiOpacity: Double = evolution.isExample ? 0.42 : 1.0
+            let toiDash: [CGFloat] = evolution.isExample ? [7, 5] : []
 
-            if let p = drawn.last {
+            if reelPts.count > 1 {
+                let visible = max(2, Int(ceil(CGFloat(n) * progress)))
+                let drawn = Array(reelPts.prefix(visible))
+                let line = SuiviCurveMath.smoothPath(drawn)
+                if !evolution.isExample {
+                    // Aire de remplissage réservée au vrai suivi (l'exemple reste léger).
+                    var area = line
+                    area.addLine(to: CGPoint(x: drawn.last!.x, y: h))
+                    area.addLine(to: CGPoint(x: drawn.first!.x, y: h))
+                    area.closeSubpath()
+                    ctx.fill(area, with: .color(toiColor.opacity(0.10)))
+                }
+                ctx.stroke(line, with: .color(toiColor.opacity(toiOpacity)),
+                           style: StrokeStyle(lineWidth: 3.4, lineCap: .round, lineJoin: .round, dash: toiDash))
+
+                if let p = drawn.last {
+                    let r: CGFloat = 4.5
+                    let dot = Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
+                    ctx.fill(dot, with: .color(toiColor.opacity(toiOpacity)))
+                    ctx.stroke(dot, with: .color(.white), style: StrokeStyle(lineWidth: 2.5))
+                }
+            } else if let p = reelPts.first {
+                // Un seul point (jour 0) : pas de ligne, juste le repère « toi ».
                 let r: CGFloat = 4.5
                 let dot = Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
-                ctx.fill(dot, with: .color(Color.kiwiGreen))
+                ctx.fill(dot, with: .color(toiColor))
                 ctx.stroke(dot, with: .color(.white), style: StrokeStyle(lineWidth: 2.5))
             }
 
-            // Labels POSÉS sur les courbes (fin de tracé)
+            // Labels POSÉS sur les courbes (fin de tracé). Point unique (jour 0) :
+            // le label part À DROITE du point pour ne pas déborder à gauche.
             if let tip = reelPts.last {
-                ctx.draw(
-                    Text(evolution.labelToi)
-                        .font(.system(size: 11, weight: .heavy))
-                        .foregroundColor(Color.kiwiGreenInk),
-                    at: CGPoint(x: tip.x - 4, y: max(12, tip.y - 14)),
-                    anchor: .trailing
-                )
+                if reelPts.count > 1 {
+                    ctx.draw(
+                        Text(evolution.labelToi)
+                            .font(.system(size: 11, weight: .heavy))
+                            .foregroundColor(Color.kiwiGreenInk),
+                        at: CGPoint(x: tip.x - 4, y: max(12, tip.y - 14)),
+                        anchor: .trailing
+                    )
+                } else {
+                    ctx.draw(
+                        Text(evolution.labelToi)
+                            .font(.system(size: 11, weight: .heavy))
+                            .foregroundColor(Color.kiwiGreenInk),
+                        at: CGPoint(x: tip.x + 10, y: max(12, tip.y - 14)),
+                        anchor: .leading
+                    )
+                }
             }
             if let tip = sansPts.last {
                 ctx.draw(
@@ -541,7 +682,14 @@ private struct SuiviPosedChart: View {
                 .padding(.leading, 2)
         }
         .accessibilityElement()
-        .accessibilityLabel("\(evolution.nom) : \(evolution.verdict)")
+        .accessibilityLabel("\(evolution.nom) : \(chartA11yStatus)")
+    }
+
+    /// Statut lu par VoiceOver — cohérent avec la pastille de la carte.
+    private var chartA11yStatus: String {
+        if evolution.isExample { return "exemple" }
+        if evolution.reel.count < 2 { return "jour 0, suivi qui démarre" }
+        return evolution.verdict
     }
 }
 
