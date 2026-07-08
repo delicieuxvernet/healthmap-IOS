@@ -69,17 +69,30 @@ enum SuiviEngineV4 {
 
     // MARK: - 2. Évolution par symptôme (1 carte auto-explicite / symptôme)
 
-    /// Une série de 7 points pour un symptôme, prête pour le tracé.
-    /// `reel` = ressenti réel dérivé des check-ins ; `potentielMax` = trajectoire
-    /// idéale (sans-faute) ; `sansKiwio` = référence quasi-plate.
+    /// État du suivi d'un symptôme :
+    /// - `.example` : trajectoire ILLUSTRATIVE affichée tant que l'utilisateur
+    ///   n'a pas démarré son vrai suivi (badgée « Exemple » côté carte).
+    /// - `.real(feelings)` : suivi RÉEL, la courbe « toi » ne réagit qu'aux
+    ///   check-ins réels (série `feelings`, du plus ancien au plus récent).
+    enum SuiviTracking: Equatable {
+        case example
+        case real(feelings: [Int])
+    }
+
+    /// Une série de points pour un symptôme, prête pour le tracé.
+    /// `reel` = niveau « toi » (illustratif en mode exemple, dérivé UNIQUEMENT
+    /// des check-ins réels en mode réel) ; `sansKiwio` = référence quasi-plate.
     struct SymptomEvolution: Identifiable, Equatable {
         let id: String              // id du symptôme (ou nom si pas d'id)
         let nom: String             // nom affichable du symptôme
         let verdict: String         // « En amélioration » / « Stable » / « À surveiller »
         let variationPct: Int       // signé, dans le SENS de l'amélioration (ex. -38)
         let improving: Bool         // vrai si la tendance va dans le bon sens
-        /// Les trois séries, échelle 0-100 (100 = niveau haut de la métrique).
+        /// Vrai tant que la courbe est un EXEMPLE (suivi pas encore démarré).
+        let isExample: Bool
+        /// Les séries, échelle 0-100 (100 = niveau haut de la métrique).
         let reel: [Double]
+        /// Conservé pour la stabilité de la struct — plus rendu (toujours []).
         let potentielMax: [Double]
         let sansKiwio: [Double]
         /// Libellés à POSER sur les courbes (« toi », « sans Kiwio ») et les
@@ -93,23 +106,24 @@ enum SuiviEngineV4 {
         static func == (lhs: SymptomEvolution, rhs: SymptomEvolution) -> Bool {
             lhs.id == rhs.id && lhs.verdict == rhs.verdict
                 && lhs.variationPct == rhs.variationPct && lhs.improving == rhs.improving
-                && lhs.reel == rhs.reel && lhs.potentielMax == rhs.potentielMax
-                && lhs.sansKiwio == rhs.sansKiwio
+                && lhs.isExample == rhs.isExample
+                && lhs.reel == rhs.reel && lhs.sansKiwio == rhs.sansKiwio
         }
     }
 
     /// Construit une carte d'évolution par symptôme déclaré.
     /// - Parameters:
     ///   - symptomes: `AIAnalysisV2.bilan?.symptomes` (nom + id) — vide → [].
-    ///   - checkinHistory: historique local des ressentis (0=mieux,1=pareil,
-    ///     2=moins bien selon le SENS du symptôme), le plus récent en dernier.
+    ///   - tracking: `.example` (illustratif) ou `.real(feelings:)` (vrai suivi,
+    ///     série de ressentis 0=mieux,1=pareil,2=moins bien, du plus ancien au
+    ///     plus récent).
     static func symptomEvolutions(symptomes: [SymptomeV2]?,
-                                  checkinHistory: [Int]) -> [SymptomEvolution] {
+                                  tracking: SuiviTracking) -> [SymptomEvolution] {
         guard let symptomes, !symptomes.isEmpty else { return [] }
         return symptomes.compactMap { s in
             guard let nom = s.nom, !nom.isEmpty else { return nil }
             let trend = SymptomTrend.make(from: nom)
-            return evolution(id: s.id ?? nom, nom: nom, trend: trend, checkinHistory: checkinHistory)
+            return evolution(id: s.id ?? nom, nom: nom, trend: trend, tracking: tracking)
         }
     }
 
@@ -117,32 +131,40 @@ enum SuiviEngineV4 {
     static func evolution(id: String,
                           nom: String,
                           trend: SymptomTrend,
-                          checkinHistory: [Int]) -> SymptomEvolution {
-        // Trois trajectoires de NIVEAU (échelle 0-100). On stocke toujours le
-        // « niveau de la métrique » : niveau haut = tracé haut. Un problème qui
-        // s'améliore DESCEND, un objectif qui progresse MONTE — exactement le
-        // contrat des séries de SuiviSymptomCurveCard.
-        let reelInt: [Int]
-        let maxInt: [Int]
-        let sansInt: [Int]
-        switch trend.dir {
-        case .lowerBetter:
-            reelInt = [82, 78, 70, 64, 55, 49, 44]
-            maxInt  = [82, 74, 62, 50, 40, 33, 28]
-            sansInt = [82, 83, 81, 84, 82, 85, 83]
-        case .higherBetter:
-            reelInt = [44, 49, 55, 64, 70, 78, 84]
-            maxInt  = [44, 52, 64, 76, 86, 92, 96]
-            sansInt = [44, 43, 45, 42, 46, 44, 45]
+                          tracking: SuiviTracking) -> SymptomEvolution {
+        // La courbe « toi » et son verdict dépendent du MODE :
+        //  • example → trajectoire illustrative (rien de réel, badgée « Exemple »).
+        //  • real    → série construite UNIQUEMENT à partir des check-ins réels.
+        let reel: [Double]
+        let sansKiwio: [Double]
+        let isExample: Bool
+        let variation: Int
+
+        switch tracking {
+        case .example:
+            isExample = true
+            let base: [Int]
+            switch trend.dir {
+            case .lowerBetter:
+                base = [82, 78, 70, 64, 55, 49, 44]
+            case .higherBetter:
+                base = [44, 49, 55, 64, 70, 78, 84]
+            }
+            reel = base.map(Double.init)
+            // Référence « sans Kiwio » quasi-plate, alignée sur le point de départ.
+            sansKiwio = flatSansKiwio(baseline: base.first ?? 50, count: base.count)
+            // Un exemple ne PRÉTEND à aucune progression réelle → verdict neutre.
+            variation = 0
+
+        case .real(let feelings):
+            isExample = false
+            let series = buildRealSeries(baseline: 50, dir: trend.dir, feelings: feelings)
+            reel = series.map(Double.init)
+            sansKiwio = flatSansKiwio(baseline: 50, count: max(2, series.count))
+            // Variation réelle : significative seulement avec ≥ 2 points (≥ 1 check-in).
+            variation = series.count >= 2 ? variationPct(series: series, dir: trend.dir) : 0
         }
 
-        // Le ressenti réel des check-ins module le DERNIER point de la courbe
-        // « toi » : plus l'utilisateur déclare « mieux », plus la courbe va dans
-        // le bon sens. On n'invente rien — sans check-in, on garde la trajectoire
-        // représentative telle quelle (variation nominale ±38).
-        let reel = adjustedReel(base: reelInt, dir: trend.dir, checkinHistory: checkinHistory)
-
-        let variation = variationPct(series: reel, dir: trend.dir)
         let verdict = self.verdict(forVariation: variation, dir: trend.dir)
         let improving = isImproving(variation: variation, dir: trend.dir)
 
@@ -165,9 +187,10 @@ enum SuiviEngineV4 {
             verdict: verdict,
             variationPct: variation,
             improving: improving,
-            reel: reel.map(Double.init),
-            potentielMax: maxInt.map(Double.init),
-            sansKiwio: sansInt.map(Double.init),
+            isExample: isExample,
+            reel: reel,
+            potentielMax: [],
+            sansKiwio: sansKiwio,
             labelToi: "toi",
             labelSansKiwio: "sans Kiwio",
             labelHaut: labelHaut,
@@ -175,31 +198,42 @@ enum SuiviEngineV4 {
         )
     }
 
-    /// Ajuste la courbe « toi » selon le ressenti déclaré. Chaque check-in
-    /// « mieux » pousse la fin de courbe vers l'amélioration, « moins bien » la
-    /// tire dans l'autre sens ; « pareil » ne change rien. Borné 0-100.
-    private static func adjustedReel(base: [Int], dir: SymptomDir, checkinHistory: [Int]) -> [Int] {
-        guard !checkinHistory.isEmpty else { return base }
-        // Solde net des ressentis récents (au plus les 7 derniers).
-        let recent = checkinHistory.suffix(7)
-        // 0 = mieux, 1 = pareil, 2 = moins bien (ordre des options de SuiviView).
-        let net = recent.reduce(0) { acc, v -> Int in
-            switch v {
-            case 0: return acc + 1
-            case 2: return acc - 1
-            default: return acc
+    /// Référence « sans Kiwio » PLATE au niveau `baseline`, sur `count` points
+    /// (au moins 2 pour toujours pouvoir tracer la ligne, même au jour 0).
+    private static func flatSansKiwio(baseline: Int, count: Int) -> [Double] {
+        let n = max(2, count)
+        let v = Double(max(0, min(100, baseline)))
+        return Array(repeating: v, count: n)
+    }
+
+    /// Construit la série « toi » RÉELLE à partir des seuls check-ins.
+    /// - Premier point = `baseline` (niveau de départ, 50 par défaut).
+    /// - Un point ajouté PAR check-in : chaque ressenti déplace le niveau d'un
+    ///   `step` dans le sens du ressenti.
+    ///   * f == 0 (« mieux ») → va vers le mieux : DESCEND si `.lowerBetter`,
+    ///     MONTE si `.higherBetter`.
+    ///   * f == 2 (« moins bien ») → l'inverse.
+    ///   * f == 1 (« pareil ») → plat.
+    /// - Chaque niveau est clampé 0-100. Statique et pure → testable.
+    static func buildRealSeries(baseline: Int = 50,
+                                dir: SymptomDir,
+                                feelings: [Int],
+                                step: Int = 6) -> [Int] {
+        var level = max(0, min(100, baseline))
+        var out = [level]
+        for f in feelings {
+            let towardBetter: Int
+            switch f {
+            case 0: towardBetter = 1   // mieux
+            case 2: towardBetter = -1  // moins bien
+            default: towardBetter = 0  // pareil
             }
+            // « mieux » = baisser si lowerBetter, monter si higherBetter.
+            let signed = (dir == .lowerBetter ? -towardBetter : towardBetter) * step
+            level = max(0, min(100, level + signed))
+            out.append(level)
         }
-        guard net != 0 else { return base }
-        // « mieux » = aller vers le bon sens : baisser si lowerBetter, monter si
-        // higherBetter. On applique un petit décalage progressif sur la 2e moitié.
-        let step = 3 // points par ressenti net, doux
-        let signedShift = (dir == .lowerBetter ? -net : net) * step
-        return base.enumerated().map { i, v in
-            let weight = Double(i) / Double(max(1, base.count - 1)) // 0 → 1
-            let delta = Int((Double(signedShift) * weight).rounded())
-            return min(100, max(0, v + delta))
-        }
+        return out
     }
 
     /// Variation exprimée dans le SENS de l'amélioration : négative si un
@@ -508,6 +542,61 @@ enum SuiviCheckinHistory {
             if let v = dict?[feelKey] { out.append(v) }
         }
         return out
+    }
+
+    /// Ressentis de CHAQUE jour ayant un check-in, du début du suivi (`start`,
+    /// ramené à son début de journée) jusqu'à aujourd'hui — du plus ANCIEN au
+    /// plus récent. Un jour sans check-in est simplement absent : la série ne
+    /// contient QUE des données réelles. Sert de matière au vrai suivi.
+    static func feelingsSince(_ start: Date, now: Date = Date(), calendar: Calendar = .current) -> [Int] {
+        let from = calendar.startOfDay(for: start)
+        let to = calendar.startOfDay(for: now)
+        // Nombre de jours (inclusif) entre le début du suivi et aujourd'hui.
+        let dayCount = (calendar.dateComponents([.day], from: from, to: to).day ?? 0)
+        guard dayCount >= 0 else { return [] }
+        var out: [Int] = []
+        for k in 0...dayCount {
+            guard let d = calendar.date(byAdding: .day, value: k, to: from) else { continue }
+            let dict = UserDefaults.standard.dictionary(forKey: dayKey(dayString(d))) as? [String: Int]
+            if let v = dict?[feelKey] { out.append(v) }
+        }
+        return out
+    }
+}
+
+// MARK: - Démarrage du suivi (persistance locale scopée utilisateur)
+//
+// Tant que le suivi n'est pas démarré, l'onglet Suivi montre des courbes
+// d'EXEMPLE. Le bouton « Commencer mon suivi » appelle `start()` : on fige la
+// date de début (début de journée). Ensuite, la courbe « toi » ne réagit QU'aux
+// check-ins réels enregistrés à partir de cette date. Scope = même uid que
+// SuiviCheckinStore (le suivi appartient à l'utilisateur, pas au jour).
+@MainActor
+enum SuiviTrackingStore {
+    private static var uid: String {
+        AuthService.shared.cachedCurrentUserIdString ?? "anonymous"
+    }
+    private static var key: String {
+        "healthmap_suivi_started_\(uid)"
+    }
+
+    /// Date de début du suivi (début de journée) ou nil si pas encore démarré.
+    static func startDate() -> Date? {
+        let t = UserDefaults.standard.double(forKey: key)
+        guard t > 0 else { return nil }
+        return Date(timeIntervalSince1970: t)
+    }
+
+    /// Le suivi réel est-il démarré ?
+    static func isStarted() -> Bool {
+        UserDefaults.standard.double(forKey: key) > 0
+    }
+
+    /// Démarre le suivi (idempotent) : fige le début de la journée courante.
+    static func start(now: Date = Date(), calendar: Calendar = .current) {
+        guard !isStarted() else { return }
+        let startOfDay = calendar.startOfDay(for: now)
+        UserDefaults.standard.set(startOfDay.timeIntervalSince1970, forKey: key)
     }
 }
 
