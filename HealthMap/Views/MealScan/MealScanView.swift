@@ -23,6 +23,9 @@ struct MealScanView: View {
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
     @State private var showJournal = false
+    /// Recherche d'aliment présentée en bottom-sheet depuis la barre d'accueil
+    /// (remplace l'ancien plein écran piloté par `selectedTab`).
+    @State private var showSearch = false
     /// Apports quotidiens (score) des 7 derniers jours — courbe « apports vs besoins ».
     @State private var curve: [Int] = []
     /// Énergie active du jour (Apple Santé) → colonne « dépensées » de la jauge kcal.
@@ -30,32 +33,29 @@ struct MealScanView: View {
     /// Lu au chargement de la page (présente la feuille d'autorisation la 1re fois).
     @State private var activeEnergyToday: Int?
 
-    /// L'écran est en mode résultat immersif quand l'analyse est prête (onglet Analyser).
-    private var isImmersive: Bool {
-        viewModel.analysisResult != nil && viewModel.selectedTab == .analyze
+    /// Le résultat du scan est présenté en bottom-sheet : ouvert dès qu'une
+    /// analyse est prête, fermé → `reset()` (efface l'analyse et revient à
+    /// l'accueil pour un nouveau scan).
+    private var resultBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.analysisResult != nil },
+            set: { if !$0 { viewModel.reset() } }
+        )
     }
 
     var body: some View {
         NavigationStack {
-            Group {
-                if let result = viewModel.analysisResult, viewModel.selectedTab == .analyze {
-                    immersiveResult(result)
-                } else {
-                    normalScaffold
+            normalScaffold
+                .kiwiTabBarBottomInset()
+                // Recharge le journal du jour (« Ta journée ») dès qu'un scan est persisté.
+                .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
+                    Task { await journal.load() }
                 }
-            }
-            .kiwiTabBarBottomInset()
-            // Recharge le journal du jour (« Ta journée ») dès qu'un scan est persisté.
-            .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
-                Task { await journal.load() }
-            }
-            // Titre porté dans le contenu (grand « Scan » en tête de scroll) —
-            // barre de navigation réduite à ses boutons (journal + profil).
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(isImmersive ? .hidden : .automatic, for: .navigationBar)
-            .toolbar {
-                if !isImmersive {
+                // Titre porté dans le contenu (grand « Scan » en tête de scroll) —
+                // barre de navigation réduite à ses boutons (journal + profil).
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button { showJournal = true } label: {
                             Image(systemName: "calendar")
@@ -75,36 +75,76 @@ struct MealScanView: View {
                         .accessibilityLabel("Profil")
                     }
                 }
-            }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView().healthMapFullSheet()
-            }
-            .sheet(item: $selectedFood) { food in
-                FoodDetailSheetV4(food: food)
-            }
-            .sheet(item: $impactDetail) { micro in
-                NeedImpactDetailSheet(micro: micro)
-            }
-            .sheet(isPresented: $showJournal) {
-                DailyMealJournalView()
-            }
+                .sheet(isPresented: $showPaywall) {
+                    PaywallView().healthMapFullSheet()
+                }
+                .sheet(isPresented: $showJournal) {
+                    DailyMealJournalView()
+                }
+                // Résultat du scan en bottom-sheet (contenu immersif inchangé).
+                .sheet(isPresented: resultBinding) {
+                    resultSheet
+                }
+                // Recherche d'aliment en bottom-sheet depuis la barre d'accueil.
+                .sheet(isPresented: $showSearch) {
+                    searchSheet
+                }
         }
     }
 
-    // MARK: - Scaffold normal (journal du jour / recherche)
+    // MARK: - Sheet résultat du scan (contenu immersif préservé à l'identique)
+    // Les sous-sheets (détail aliment / impact besoin) sont attachés ICI pour
+    // se présenter AU-DESSUS du sheet résultat (sheet-sur-sheet, iOS 17).
+    @ViewBuilder
+    private var resultSheet: some View {
+        if let result = viewModel.analysisResult {
+            // Pas de NavigationStack : immersiveResult n'a aucune navigation et son
+            // header photo est full-bleed (.ignoresSafeArea top) — une barre de nav
+            // vide au-dessus casserait la DA du résultat. Le drag indicator du sheet
+            // suffit à signaler qu'on peut le refermer.
+            immersiveResult(result)
+                .sheet(item: $selectedFood) { food in
+                    FoodDetailSheetV4(food: food)
+                }
+                .sheet(item: $impactDetail) { micro in
+                    NeedImpactDetailSheet(micro: micro)
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    // MARK: - Sheet recherche d'aliment (logique de recherche inchangée)
+    private var searchSheet: some View {
+        NavigationStack {
+            ScrollView {
+                searchTab
+                    .padding(.vertical, Theme.spacingMD)
+            }
+            .background(Color.kiwiCream.ignoresSafeArea())
+            .navigationTitle("Rechercher un aliment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Fermer") { showSearch = false }
+                        .foregroundStyle(Color.kiwiGreen)
+                        .accessibilityLabel("Fermer")
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    // MARK: - Scaffold normal (journal du jour — accueil Scan)
     private var normalScaffold: some View {
         ZStack {
             Color.kiwiCream.ignoresSafeArea()
             ScrollView {
-                Group {
-                    switch viewModel.selectedTab {
-                    case .analyze: scanHome
-                    case .search: searchScaffold
-                    }
-                }
-                // Épingle la largeur du contenu à celle du conteneur : empêche
-                // toute dérive/scroll horizontal (le scroll reste vertical only).
-                .containerRelativeFrame(.horizontal)
+                scanHome
+                    // Épingle la largeur du contenu à celle du conteneur : empêche
+                    // toute dérive/scroll horizontal (le scroll reste vertical only).
+                    .containerRelativeFrame(.horizontal)
             }
         }
     }
@@ -265,7 +305,7 @@ struct MealScanView: View {
                 line
             }
             Button {
-                viewModel.selectedTab = .search
+                showSearch = true
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
@@ -299,35 +339,6 @@ struct MealScanView: View {
         Rectangle()
             .fill(Color.kiwiCharcoal.opacity(0.08))
             .frame(height: 1)
-    }
-
-    // MARK: - Scaffold recherche (onglet recherche existant + retour)
-    private var searchScaffold: some View {
-        VStack(spacing: Theme.spacingMD) {
-            HStack(spacing: 10) {
-                Button {
-                    viewModel.selectedTab = .analyze
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.kiwiInk)
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(Color.healthMapCard))
-                        .overlay(Circle().stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1))
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.healthMapPressed)
-                .accessibilityLabel("Retour au scan")
-                Text("Rechercher un aliment")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                Spacer()
-            }
-            .padding(.horizontal, Theme.spacingLG)
-
-            searchTab
-        }
-        .padding(.vertical, Theme.spacingMD)
     }
 
     // MARK: - Compteur de scans gratuits
@@ -498,15 +509,12 @@ struct MealScanView: View {
 
             VStack {
                 HStack {
-                    headerCircleButton(icon: "chevron.left") { viewModel.reset() }
-                        .accessibilityLabel("Retour")
+                    // Résultat présenté en sheet : fermer suffit (reset → retour
+                    // à l'accueil). Boutons calendrier/profil retirés (ils vivent
+                    // sur l'accueil), par sobriété.
+                    headerCircleButton(icon: "xmark") { viewModel.reset() }
+                        .accessibilityLabel("Fermer")
                     Spacer()
-                    headerCircleButton(icon: "calendar") { showJournal = true }
-                        .accessibilityLabel("Journal du jour")
-                    headerCircleButton(icon: "person.crop.circle") {
-                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
-                    }
-                    .accessibilityLabel("Profil")
                 }
                 .padding(.top, 54)
                 Spacer()
@@ -541,7 +549,7 @@ struct MealScanView: View {
             Image(systemName: icon)
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 38, height: 38)
+                .frame(width: 44, height: 44)
                 .background(Circle().fill(.black.opacity(0.28)))
                 .contentShape(Circle())
         }
