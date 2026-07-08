@@ -119,6 +119,12 @@ struct SuiviView: View {
             }
             .task {
                 isTracking = SuiviTrackingStore.isStarted()
+                // Suivi déjà démarré → on (re)planifie les rappels en silence
+                // (idempotent, sans redemander la permission). Couvre ceux qui
+                // suivaient déjà avant l'arrivée des rappels quotidiens.
+                if isTracking {
+                    await LocalNotificationService.scheduleDailyReminders()
+                }
                 await journal.load()
                 stepsToday = await Self.loadSteps()
                 checkinHistory = SuiviCheckinHistory.recentFeelings()
@@ -192,6 +198,11 @@ struct SuiviView: View {
         isTracking = true
         checkinHistory = SuiviCheckinHistory.recentFeelings()
         HapticService.shared.success()
+        // Active les 2 rappels quotidiens (12 h 30 « photographie ton repas » +
+        // 19 h 30 « suis l'évolution de tes symptômes »). La permission
+        // notifications est demandée ICI, au moment de valeur — jamais au
+        // lancement (règle App Store). Refus → le suivi marche quand même, sans rappel.
+        Task { await LocalNotificationService.enableReminders() }
     }
 
     // MARK: - Dérivés déterministes (aucun appel réseau)
