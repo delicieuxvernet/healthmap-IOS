@@ -26,10 +26,12 @@ final class HealthKitService {
     private let bodyMassType = HKQuantityType(.bodyMass)
     private let stepCountType = HKQuantityType(.stepCount)
     private let sleepType = HKCategoryType(.sleepAnalysis)
+    /// Énergie active brûlée du jour → colonne « dépensées » de la jauge kcal du Scan.
+    private let activeEnergyType = HKQuantityType(.activeEnergyBurned)
 
     /// Types lus (jamais partagés en écriture).
     private var readTypes: Set<HKObjectType> {
-        [bodyMassType, stepCountType, sleepType]
+        [bodyMassType, stepCountType, sleepType, activeEnergyType]
     }
 
     /// Le matériel supporte-t-il HealthKit (faux sur iPad/simulateur sans Santé).
@@ -71,6 +73,18 @@ final class HealthKitService {
             steps: steps.map { Int($0.rounded()) },
             sleepHours: sleep
         )
+    }
+
+    /// Énergie active brûlée aujourd'hui (kcal) → « dépenses » du jour de la jauge
+    /// Scan. Présente la feuille d'autorisation (lecture seule, jeu de types étendu
+    /// à l'énergie active) puis somme depuis minuit. `nil` si Santé non lié /
+    /// indisponible / rien partagé → la jauge masque alors la colonne dépensées
+    /// (jamais un « 0 » trompeur).
+    func todayActiveEnergyKcal() async -> Int? {
+        guard isAvailable else { return nil }
+        _ = await requestAuthorization()
+        let kcal = await sumToday(activeEnergyType, unit: .kilocalorie())
+        return kcal.map { Int($0.rounded()) }
     }
 
     // MARK: - Requêtes bas niveau
