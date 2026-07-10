@@ -49,19 +49,47 @@ final class MealJournalViewModel: ObservableObject {
         do {
             try await service.insertManual(userId: userId, name: trimmed, calories: max(0, calories), slot: slot)
             await load()
+            Self.postJournalChanged()
         } catch {
             AppLogger.database.warning("Journal add failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    func delete(_ meal: MealJournalService.MealRecord) async {
+    /// Une seule suppression à la fois : deux suppressions rapprochées sur
+    /// des données périmées écriraient des états incohérents (revue P1).
+    private var deletionInFlight = false
+
+    /// Supprime une LIGNE du journal : l'aliment seul quand le repas porte le
+    /// détail par aliment (la ligne `meal_scans` est relue puis réécrite,
+    /// agrégats recomposés), le repas entier sinon (soft delete).
+    func delete(_ row: MealJournalRow) async {
+        guard !deletionInFlight else { return }
+        deletionInFlight = true
+        defer { deletionInFlight = false }
         do {
-            try await service.softDelete(id: meal.id)
-            meals.removeAll { $0.id == meal.id }
-            fortnight.removeAll { $0.id == meal.id }
+            if row.deletesWholeRecord {
+                try await service.softDelete(id: row.record.id)
+                meals.removeAll { $0.id == row.record.id }
+                fortnight.removeAll { $0.id == row.record.id }
+            } else if let idx = row.itemIndex, row.record.items.indices.contains(idx) {
+                let removed = try await service.deleteItem(recordId: row.record.id,
+                                                           item: row.record.items[idx])
+                if !removed {
+                    AppLogger.database.info("Journal deleteItem: item introuvable (état périmé), rien écrit")
+                }
+                await load()
+            }
+            Self.postJournalChanged()
         } catch {
             AppLogger.database.warning("Journal delete failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Le journal a changé (ajout/suppression) → mêmes écouteurs que la fin
+    /// d'un scan (accueil Scan, Bilan, Suivi, Plan rechargent leurs données).
+    /// Nom hérité : `.healthmapMealScanned` signifie « journal modifié ».
+    private static func postJournalChanged() {
+        NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
     }
 
     // MARK: - Totaux du jour
@@ -80,6 +108,18 @@ final class MealJournalViewModel: ObservableObject {
 
     func calories(in slot: MealJournalService.MealSlot) -> Int {
         meals(in: slot).reduce(0) { $0 + $1.macros.calories }
+    }
+
+    /// Lignes affichables du créneau : une par ALIMENT quand le repas porte
+    /// le détail (scans photo récents), une par repas entier sinon
+    /// (legacy / ajout manuel) — voir `MealJournalRow`.
+    func rows(in slot: MealJournalService.MealSlot) -> [MealJournalRow] {
+        meals(in: slot).flatMap { record -> [MealJournalRow] in
+            guard record.hasItemDetail else {
+                return [MealJournalRow(record: record, itemIndex: nil)]
+            }
+            return record.items.indices.map { MealJournalRow(record: record, itemIndex: $0) }
+        }
     }
 
     // MARK: - Jour sélectionné (page d'accueil Scan)
@@ -237,4 +277,66 @@ final class MealJournalViewModel: ObservableObject {
             ? "Vise \(g) g de \(worst.name) de plus aujourd'hui."
             : "Il manquait \(g) g de \(worst.name) ce jour-là."
     }
+}
+
+// MARK: - Ligne du journal (une par aliment quand le détail existe)
+
+/// Une ligne affichable du journal : UN aliment d'un repas riche, ou le repas
+/// entier quand le détail par aliment n'existe pas (legacy / ajout manuel).
+/// Hors de `MealJournalViewModel` (donc hors @MainActor) — pure et testable.
+struct MealJournalRow: Identifiable, Equatable {
+    let record: MealJournalService.MealRecord
+    /// Index dans `record.items` — nil = ligne « repas entier ».
+    let itemIndex: Int?
+
+    var id: String { itemIndex.map { "\(record.id)#\($0)" } ?? record.id }
+
+    var name: String {
+        if let i = itemIndex, record.items.indices.contains(i) {
+            return record.items[i].name
+        }
+        let joined = record.foods.prefix(3).joined(separator: ", ")
+        return joined.isEmpty ? "Repas" : joined
+    }
+
+    /// Portion en grammes — nil = inconnue (jamais inventée, pas affichée).
+    var grams: Double? {
+        guard let i = itemIndex, record.items.indices.contains(i) else { return nil }
+        return record.items[i].portionG
+    }
+
+    var calories: Int {
+        if let i = itemIndex, record.items.indices.contains(i) {
+            return record.items[i].macros?.calories ?? 0
+        }
+        return record.macros.calories
+    }
+
+    /// Macros affichées : celles de l'aliment pour une ligne item, celles du
+    /// repas entier pour une ligne agrégée.
+    var macros: MealJournalService.MealMacros {
+        if let i = itemIndex, record.items.indices.contains(i),
+           let m = record.items[i].macros {
+            return m
+        }
+        return record.macros
+    }
+
+    /// Id du 1er micro apporté — sert d'icône à la ligne (fourchette sinon).
+    var iconMicroId: String? {
+        if let i = itemIndex, record.items.indices.contains(i),
+           let first = record.items[i].micros?.first {
+            return first.id
+        }
+        return record.micros.first?.id
+    }
+
+    /// La suppression retire-t-elle le repas entier ? (ligne agrégée, ou
+    /// dernier aliment du repas)
+    var deletesWholeRecord: Bool {
+        itemIndex == nil || record.items.count == 1
+    }
+
+    /// Ligne « repas entier » sans détail par aliment.
+    var isAggregate: Bool { itemIndex == nil }
 }
