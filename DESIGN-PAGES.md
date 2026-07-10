@@ -187,6 +187,35 @@ en plus des relecteurs compilation et conformité :
 
 ---
 
+## 7. JOURNAL DU JOUR (sheet de l'onglet Scan — refonte « façon Foodvisor », 10 juil. 2026)
+
+Maquette validée par Arthur (session du 10 juil.). Livraison en 3 phases : P1
+lignes par aliment + suppression + total honnête · P2 quantité libre + ajout via
+recherche · P3 favoris/récents/suggestions. Code : `DailyMealJournalView.swift`.
+
+Ordre de l'écran :
+① **En-tête** (carte kiwiCard) : « Aujourd'hui · date » · gros chiffre = **kcal
+restantes** (vert ; rouge + « au-dessus » si dépassé) vs objectif RÉEL du profil ·
+barre de progression · 3 mini-barres macros (P/G/L) vs cibles réelles.
+**Jamais de cible inventée** : sans objectif calculable → consommé seul, pas de barre.
+② **4 sections repas** (Matin/Midi/Soir/Encas) : emoji + libellé + kcal du créneau
++ bouton « + » (ajout). État vide → « Rien pour l'instant ».
+③ **Lignes aliment** (une carte par ALIMENT quand le repas porte le détail
+par aliment — scans photo Edge ≥ v5 ; une carte par repas entier sinon) :
+vignette teintée (symbole du 1er micro apporté, sinon fourchette) · nom ·
+grammes si connus (jamais inventés) · kcal à droite.
+④ **Fiche ligne** (tap → sheet ~340 pt) : nom · kcal/g/créneau · 3 pastilles
+macros · note explicative si entrée sans détail (« ancien scan ou ajout
+manuel ») · CTA rouge « Retirer cet aliment » (item) / « Supprimer du journal »
+(repas entier ou dernier aliment). Suppression aussi en contextMenu sur la ligne.
+
+Lois spécifiques : la suppression d'un ITEM réécrit `detected_foods` + agrégats
+`macros`/`micros` recomposés (miroir Edge — le Bilan hebdo et `day_summary`
+lisent ces colonnes) ; les clés annexes de l'Edge (`ciqual_code`, `confidence`,
+`nova_class`, `micros[].amount`…) sont préservées telles quelles (passthrough).
+
+---
+
 *Maquettes de référence : session du 11 juin 2026 (« rendu_final_4_ecrans_reference »
 + correctifs « Pourquoi ? » et règles déterministes). Contrat IA : prompt v35
 (generate-analysis v40), harnais de conformité sur audit-a/b/c obligatoire avant

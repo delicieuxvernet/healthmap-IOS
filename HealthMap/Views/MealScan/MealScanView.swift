@@ -79,7 +79,14 @@ struct MealScanView: View {
                     PaywallView().healthMapFullSheet()
                 }
                 .sheet(isPresented: $showJournal) {
-                    DailyMealJournalView()
+                    // Cibles réelles du profil — le journal ne doit JAMAIS
+                    // afficher d'objectif inventé (nil = dégradation honnête).
+                    DailyMealJournalView(
+                        kcalTarget: dashboardVM.physicalMetrics.macros?.calories,
+                        protTarget: dashboardVM.physicalMetrics.macros?.protein,
+                        carbTarget: dashboardVM.physicalMetrics.macros?.carbs,
+                        fatTarget: dashboardVM.physicalMetrics.macros?.fat
+                    )
                 }
                 // Résultat du scan en bottom-sheet (contenu immersif inchangé).
                 .sheet(isPresented: resultBinding) {
