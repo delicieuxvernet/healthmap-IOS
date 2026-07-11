@@ -16,7 +16,8 @@ struct MealScanView: View {
     @StateObject private var journal = MealJournalViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var selectedItem: PhotosPickerItem?
-    @State private var selectedSearchFood: MealScanViewModel.FoodItem?
+    /// Fiche 100 g de l'aliment tapé dans la recherche (fetch `get_food`).
+    @State private var selectedSearchDetail: MealJournalService.FoodDetail?
     @State private var isAddingFood = false
     @State private var addFoodConfirmation: String?
     @State private var showPaywall = false
@@ -811,48 +812,86 @@ struct MealScanView: View {
                     .tint(Color.kiwiGreen)
                     .padding()
             } else {
-                ForEach(viewModel.searchResults) { food in
+                ForEach(viewModel.searchResults) { hit in
                     Button {
-                        HapticService.shared.selection()
-                        selectedSearchFood = food
+                        openSearchDetail(hit)
                     } label: {
-                        HStack {
-                            Text(food.name)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(Color.healthMapText)
+                        HStack(spacing: 10) {
+                            Image(systemName: hit.source == "off" ? "barcode" : "fork.knife")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.kiwiGreen)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(hit.name)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(Color.healthMapText)
+                                    .lineLimit(1)
+                                Text(searchHitSub(hit))
+                                    .font(.system(size: 12, design: .rounded))
+                                    .foregroundStyle(Color.healthMapMuted)
+                                    .lineLimit(1)
+                            }
                             Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.healthMapMuted)
+                            if isAddingFood {
+                                ProgressView().tint(Color.kiwiGreen).scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.healthMapMuted)
+                            }
                         }
                         .padding(Theme.spacingSM)
                         .background(Color.healthMapCard)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.healthMapPressed)
+                    .disabled(isAddingFood)
                     .padding(.horizontal, Theme.spacingLG)
                 }
             }
         }
-        .sheet(item: $selectedSearchFood) { food in
-            FoodPortionSheet(food: food, isAdding: isAddingFood) { portion in
-                Task {
-                    isAddingFood = true
-                    do {
-                        try await viewModel.addManualFood(food, portion: portion)
-                        HapticService.shared.success()
-                        selectedSearchFood = nil
-                        withAnimation { addFoodConfirmation = "\(food.name) ajouté (\(portion.rawValue.lowercased()))" }
-                        try? await Task.sleep(nanoseconds: 2_500_000_000)
-                        withAnimation { addFoodConfirmation = nil }
-                    } catch {
-                        AppLogger.analysis.report(error, context: "MealScan addManualFood")
-                        selectedSearchFood = nil
-                    }
-                    isAddingFood = false
-                }
+        // Fiche portion unifiée (quantité libre) — l'ajout passe par le VM
+        // journal (ligne riche éditable), créneau déduit de l'heure.
+        .sheet(item: $selectedSearchDetail) { detail in
+            PortionSheet(mode: .add(detail: detail,
+                                    slot: MealJournalService.MealSlot.from(date: Date())),
+                         onAdd: { grams in
+                             let ok = await journal.addFood(detail: detail,
+                                                            grams: grams,
+                                                            slot: MealJournalService.MealSlot.from(date: Date()))
+                             if ok {
+                                 let kcal = Int(((detail.kcal100g ?? 0) * grams / 100).rounded())
+                                 withAnimation { addFoodConfirmation = "\(detail.name) ajouté · \(kcal) kcal" }
+                                 Task {
+                                     try? await Task.sleep(nanoseconds: 2_500_000_000)
+                                     withAnimation { addFoodConfirmation = nil }
+                                 }
+                             }
+                             return ok
+                         })
+            .presentationDetents([.height(420)])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func searchHitSub(_ hit: MealJournalService.FoodHit) -> String {
+        var parts = [hit.brand ?? "Générique"]
+        if let kcal = hit.kcal100g {
+            parts.append("\(Int(kcal.rounded())) kcal / 100 g")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func openSearchDetail(_ hit: MealJournalService.FoodHit) {
+        guard !isAddingFood else { return }
+        HapticService.shared.selection()
+        isAddingFood = true
+        Task {
+            defer { isAddingFood = false }
+            do {
+                selectedSearchDetail = try await MealJournalService.shared.foodDetail(id: hit.id)
+            } catch {
+                AppLogger.analysis.report(error, context: "MealScan get_food")
             }
-            .presentationDetents([.height(280)])
         }
     }
 
@@ -869,67 +908,6 @@ struct MealScanView: View {
                 .background(Color.kiwiTint)
                 .clipShape(Capsule())
         }
-    }
-}
-
-// MARK: - Portion d'un aliment cherché (façon Foodvisor)
-/// 3 gabarits de portion (Petite/Moyenne/Grande) ; kcal calculées instantanément
-/// (déjà en mémoire depuis la recherche, aucun aller-retour réseau). Tap →
-/// ajoute directement au journal (pas d'étape de confirmation supplémentaire).
-private struct FoodPortionSheet: View {
-    let food: MealScanViewModel.FoodItem
-    let isAdding: Bool
-    let onSelect: (MealScanViewModel.PortionSize) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: Theme.spacingLG) {
-            VStack(spacing: 4) {
-                Text(food.name)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                Text("Choisis la portion")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
-            }
-            .padding(.top, Theme.spacingLG)
-
-            if isAdding {
-                ProgressView().tint(Color.kiwiGreen)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.spacingLG)
-            } else {
-                HStack(spacing: Theme.spacingSM) {
-                    ForEach(MealScanViewModel.PortionSize.allCases) { portion in
-                        Button {
-                            onSelect(portion)
-                        } label: {
-                            VStack(spacing: 6) {
-                                Text(portion.rawValue)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color.kiwiGreenInk)
-                                Text("\(portion.grams) g")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(Color.healthMapSecondary)
-                                Text("\(MealScanViewModel.previewCalories(for: food, portion: portion)) kcal")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Color.kiwiGreen)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Theme.spacingMD)
-                            .background(Color.kiwiGreenSoft)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                        .buttonStyle(.healthMapPressed)
-                    }
-                }
-                .padding(.horizontal, Theme.spacingLG)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
-        .background(Color.kiwiCream.ignoresSafeArea())
     }
 }
 

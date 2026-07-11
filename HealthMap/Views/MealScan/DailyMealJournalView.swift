@@ -16,8 +16,8 @@ struct DailyMealJournalView: View {
 
     @StateObject private var vm = MealJournalViewModel()
     @Environment(\.dismiss) private var dismiss
-    @State private var showAdd = false
-    @State private var addSlot: MealJournalService.MealSlot = .lunch
+    /// Créneau dont le « + » a été touché → page de recherche.
+    @State private var searchSlot: MealJournalService.MealSlot?
     @State private var selectedRow: MealJournalRow?
 
     var body: some View {
@@ -50,17 +50,24 @@ struct DailyMealJournalView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
                 Task { await vm.load() }
             }
-            .sheet(isPresented: $showAdd) {
-                AddMealSheet(slot: addSlot) { name, kcal in
-                    Task { await vm.addManual(name: name, calories: kcal, slot: addSlot) }
+            .sheet(item: $searchSlot) { slot in
+                FoodSearchSheet(slot: slot) { detail, grams in
+                    await vm.addFood(detail: detail, grams: grams, slot: slot)
                 }
-                .presentationDetents([.height(300)])
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
             .sheet(item: $selectedRow) { row in
-                RowDetailSheet(row: row) {
-                    Task { await vm.delete(row) }
-                }
-                .presentationDetents([.height(340)])
+                PortionSheet(
+                    mode: row.isQuantityEditable ? .edit(row: row) : .info(row: row),
+                    onSave: { grams in
+                        Task { await vm.updateQuantity(row, grams: grams) }
+                    },
+                    onDelete: {
+                        Task { await vm.delete(row) }
+                    }
+                )
+                .presentationDetents([.height(row.isQuantityEditable ? 440 : 320)])
                 .presentationDragIndicator(.visible)
             }
         }
@@ -167,8 +174,7 @@ struct DailyMealJournalView: View {
                 }
                 Spacer()
                 Button {
-                    addSlot = slot
-                    showAdd = true
+                    searchSlot = slot
                 } label: {
                     ZStack {
                         Circle().fill(Color.kiwiGreenSoft).frame(width: 28, height: 28)
@@ -263,129 +269,6 @@ struct DailyMealJournalView: View {
         f.setLocalizedDateFormatFromTemplate("EEE d MMM")
         return f
     }()
-}
-
-// MARK: - Fiche d'une ligne (détail + suppression)
-
-private struct RowDetailSheet: View {
-    let row: MealJournalRow
-    let onDelete: () -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingLG) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(row.name)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
-                    .lineLimit(2)
-                HStack(spacing: 4) {
-                    Text("\(row.calories) kcal")
-                    if let g = row.grams {
-                        Text("· \(Int(g.rounded())) g")
-                    }
-                    Text("· \(row.record.slot.label)")
-                }
-                .font(.system(size: 13, design: .rounded))
-                .foregroundStyle(Color.healthMapSecondary)
-            }
-
-            HStack(spacing: Theme.spacingMD) {
-                macroChip("P", row.macros.proteins, color: .macroProtein)
-                macroChip("G", row.macros.carbs, color: .macroCarb)
-                macroChip("L", row.macros.fats, color: .macroFat)
-            }
-
-            if row.isAggregate {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.healthMapSecondary)
-                    Text("Le détail par aliment n'est pas disponible pour cette entrée (ancien scan ou ajout manuel). La suppression retire l'entrée entière.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(Theme.spacingMD)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.kiwiCharcoal.opacity(0.04))
-                )
-            }
-
-            Spacer(minLength: 0)
-
-            Button {
-                onDelete()
-                dismiss()
-            } label: {
-                Text(row.deletesWholeRecord ? "Supprimer du journal" : "Retirer cet aliment")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.scoreDeficient)
-                    )
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityLabel(row.deletesWholeRecord ? "Supprimer du journal" : "Retirer cet aliment")
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func macroChip(_ label: String, _ grams: Double, color: Color) -> some View {
-        HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text("\(label) \(Int(grams.rounded())) g")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.healthMapText)
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 32)
-        .background(Capsule().fill(color.opacity(0.10)))
-    }
-}
-
-// MARK: - Ajout manuel d'un repas (remplacé par la recherche en P2)
-
-private struct AddMealSheet: View {
-    let slot: MealJournalService.MealSlot
-    let onAdd: (String, Int) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var caloriesText = ""
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Nom du repas", text: $name)
-                    TextField("Calories (kcal)", text: $caloriesText)
-                        .keyboardType(.numberPad)
-                } header: {
-                    Text("Ajouter à \(slot.label)")
-                }
-            }
-            .navigationTitle("Repas manuel")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuler") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Ajouter") {
-                        onAdd(name, Int(caloriesText) ?? 0)
-                        dismiss()
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-            }
-        }
-    }
 }
 
 #Preview {

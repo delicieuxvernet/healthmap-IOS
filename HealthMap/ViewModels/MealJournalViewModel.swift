@@ -55,17 +55,18 @@ final class MealJournalViewModel: ObservableObject {
         }
     }
 
-    /// Une seule suppression à la fois : deux suppressions rapprochées sur
-    /// des données périmées écriraient des états incohérents (revue P1).
-    private var deletionInFlight = false
+    /// Une seule ÉCRITURE journal à la fois (suppression, quantité, ajout) :
+    /// deux mutations rapprochées sur des données périmées écriraient des
+    /// états incohérents (revue P1).
+    private var writeInFlight = false
 
     /// Supprime une LIGNE du journal : l'aliment seul quand le repas porte le
     /// détail par aliment (la ligne `meal_scans` est relue puis réécrite,
     /// agrégats recomposés), le repas entier sinon (soft delete).
     func delete(_ row: MealJournalRow) async {
-        guard !deletionInFlight else { return }
-        deletionInFlight = true
-        defer { deletionInFlight = false }
+        guard !writeInFlight else { return }
+        writeInFlight = true
+        defer { writeInFlight = false }
         do {
             if row.deletesWholeRecord {
                 try await service.softDelete(id: row.record.id)
@@ -82,6 +83,51 @@ final class MealJournalViewModel: ObservableObject {
             Self.postJournalChanged()
         } catch {
             AppLogger.database.warning("Journal delete failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Change la quantité (grammes) d'une ligne aliment — re-scaling linéaire
+    /// persisté, agrégats recomposés. Ne fait rien si la ligne n'est pas
+    /// éditable (pas de portion de base) ou si l'état a changé entre-temps.
+    func updateQuantity(_ row: MealJournalRow, grams: Double) async {
+        guard !writeInFlight, grams > 0,
+              let idx = row.itemIndex, row.record.items.indices.contains(idx) else { return }
+        writeInFlight = true
+        defer { writeInFlight = false }
+        do {
+            let updated = try await service.updateItemQuantity(recordId: row.record.id,
+                                                               item: row.record.items[idx],
+                                                               newGrams: grams)
+            if !updated {
+                AppLogger.database.info("Journal updateQuantity: item introuvable/inéditable, rien écrit")
+            }
+            await load()
+            Self.postJournalChanged()
+        } catch {
+            AppLogger.database.warning("Journal updateQuantity failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Ajoute un aliment de la recherche au créneau donné (ligne mono-aliment
+    /// riche → éditable ensuite). `false` si la fiche est incomptable (OFF
+    /// sans kcal) — l'UI désactive le CTA en amont, ceinture et bretelles.
+    @discardableResult
+    func addFood(detail: MealJournalService.FoodDetail,
+                 grams: Double,
+                 slot: MealJournalService.MealSlot) async -> Bool {
+        guard !writeInFlight,
+              let userId = AuthService.shared.cachedCurrentUserIdString,
+              let entry = MealJournalService.entry(for: detail, grams: grams) else { return false }
+        writeInFlight = true
+        defer { writeInFlight = false }
+        do {
+            try await service.insertFood(userId: userId, entry: entry, slot: slot)
+            await load()
+            Self.postJournalChanged()
+            return true
+        } catch {
+            AppLogger.database.warning("Journal addFood failed: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 
@@ -339,4 +385,12 @@ struct MealJournalRow: Identifiable, Equatable {
 
     /// Ligne « repas entier » sans détail par aliment.
     var isAggregate: Bool { itemIndex == nil }
+
+    /// La quantité est-elle modifiable ? (item avec une portion de base
+    /// exploitable pour le re-scaling — jamais de base inventée)
+    var isQuantityEditable: Bool {
+        guard let i = itemIndex, record.items.indices.contains(i),
+              let g = record.items[i].portionG else { return false }
+        return g > 0 && record.items[i].macros != nil
+    }
 }
