@@ -24,6 +24,8 @@ struct MealScanView: View {
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
     @State private var showJournal = false
+    /// Ligne du journal en cours d'édition (« Tes ajouts récents » → éditeur de portion).
+    @State private var selectedRow: MealJournalRow?
     /// Recherche d'aliment présentée en bottom-sheet depuis la barre d'accueil
     /// (remplace l'ancien plein écran piloté par `selectedTab`).
     @State private var showSearch = false
@@ -96,6 +98,17 @@ struct MealScanView: View {
                 // Recherche d'aliment en bottom-sheet depuis la barre d'accueil.
                 .sheet(isPresented: $showSearch) {
                     searchSheet
+                }
+                // Édition d'une ligne depuis « Tes ajouts récents » (réutilise
+                // l'éditeur de portion du journal).
+                .sheet(item: $selectedRow) { row in
+                    PortionSheet(
+                        mode: row.isQuantityEditable ? .edit(row: row) : .info(row: row),
+                        onSave: { grams in Task { await journal.updateQuantity(row, grams: grams) } },
+                        onDelete: { Task { await journal.delete(row) } }
+                    )
+                    .presentationDetents([.height(row.isQuantityEditable ? 460 : 320)])
+                    .presentationDragIndicator(.visible)
                 }
         }
     }
@@ -219,8 +232,16 @@ struct MealScanView: View {
                 lastScanRecapCard(last)
             }
 
-            ScanRecentScansList(meals: journal.dayMeals, onOpen: { showJournal = true })
-                .padding(.horizontal, Theme.spacingLG)
+            ScanRecentEditableList(
+                rows: recentRows,
+                onEdit: { selectedRow = $0 },
+                onDelete: { row in
+                    HapticService.shared.warning()
+                    Task { await journal.delete(row) }
+                },
+                onOpenJournal: { showJournal = true }
+            )
+            .padding(.horizontal, Theme.spacingLG)
         }
         .padding(.vertical, Theme.spacingMD)
         .task {
@@ -257,6 +278,20 @@ struct MealScanView: View {
         let canonical = NutrientData.all.map(\.id.rawValue).filter { union.contains($0) }
         let rest = union.subtracting(canonical).sorted()
         return (canonical + rest).prefix(6).map { (id: $0, pct: journal.dayMicroPct($0)) }
+    }
+
+    /// Lignes éditables « Tes ajouts récents » : entrées du jour sélectionné (une
+    /// par aliment quand le détail existe), de la plus récente à la plus ancienne,
+    /// plafonnées à 6. Même construction que `MealJournalViewModel.rows`, mais
+    /// scopée au jour affiché (`dayMeals`) pour suivre la navigation par jour.
+    private var recentRows: [MealJournalRow] {
+        let rows = journal.dayMeals
+            .sorted { $0.consumedAt > $1.consumedAt }
+            .flatMap { record -> [MealJournalRow] in
+                guard record.hasItemDetail else { return [MealJournalRow(record: record, itemIndex: nil)] }
+                return record.items.indices.map { MealJournalRow(record: record, itemIndex: $0) }
+            }
+        return Array(rows.prefix(6))
     }
 
     // MARK: - Bloc capture (déclenche le scan — inchangé, agit sur aujourd'hui)

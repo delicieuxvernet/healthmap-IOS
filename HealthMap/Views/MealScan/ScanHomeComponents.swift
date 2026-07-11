@@ -70,15 +70,14 @@ struct ScanDayNav: View {
     }
 
     private func chevron(_ icon: String, enabled: Bool, hint: String, action: @escaping () -> Void) -> some View {
+        // Chevron nu vert, façon app Santé (plus de rond blanc).
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.kiwiInk)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.kiwiGreen)
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.healthMapCard))
-                .overlay(Circle().stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1))
                 .opacity(enabled ? 1 : 0.35)
-                .contentShape(Circle())
+                .contentShape(Rectangle())
         }
         .buttonStyle(.healthMapPressed)
         .disabled(!enabled)
@@ -363,77 +362,183 @@ private struct MacroRing: View {
     }
 }
 
-// MARK: - Scans récents
-/// En-tête + jusqu'à 5 derniers repas (triés du plus récent). Chaque ligne :
-/// icône (SF Symbol du 1er micro sinon fourchette), aliments, créneau + kcal,
-/// heure relative. La carte entière ouvre le journal complet. Vide → masquée.
-struct ScanRecentScansList: View {
-    let meals: [MealJournalService.MealRecord]
-    let onOpen: () -> Void
-
-    private var recent: [MealJournalService.MealRecord] {
-        Array(meals.sorted { $0.consumedAt > $1.consumedAt }.prefix(5))
-    }
+// MARK: - Tes ajouts récents (journal éditable — tap = modifier · balayer = supprimer)
+/// Lignes du jour sélectionné, une PAR ALIMENT : icône + nom + grammes + kcal +
+/// crayon. Tap → éditeur de portion (PortionSheet). Balayer à gauche → Supprimer
+/// (repli animé ; la jauge kcal se recalcule car elle lit le même VM). Vide →
+/// invite à scanner. En-tête → ouvre le journal complet.
+struct ScanRecentEditableList: View {
+    let rows: [MealJournalRow]
+    let onEdit: (MealJournalRow) -> Void
+    let onDelete: (MealJournalRow) -> Void
+    let onOpenJournal: () -> Void
 
     var body: some View {
-        if !recent.isEmpty {
-            Button(action: onOpen) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        ScanCardHeader(icon: "clock.arrow.circlepath", title: "Scans récents")
-                        Spacer()
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: onOpenJournal) {
+                HStack {
+                    ScanCardHeader(icon: "clock.arrow.circlepath", title: "Tes ajouts récents")
+                    Spacer()
+                    if rows.isEmpty {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(Color.healthMapMuted)
-                    }
-                    VStack(spacing: 10) {
-                        ForEach(recent) { meal in
-                            row(meal)
-                        }
+                    } else {
+                        Text("balaye pour supprimer")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(Color.healthMapMuted)
                     }
                 }
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .kiwiCard(radius: 20)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.healthMapPressed)
             .accessibilityHint("Ouvre le journal du jour")
+
+            if rows.isEmpty {
+                emptyState
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(rows) { row in
+                        SwipeToDeleteRow(
+                            onTap: { onEdit(row) },
+                            onDelete: { onDelete(row) }
+                        ) {
+                            recentRow(row)
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.25), value: rows.count)
+            }
         }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .kiwiCard(radius: 20)
     }
 
-    private func row(_ meal: MealJournalService.MealRecord) -> some View {
-        let icon = meal.micros.first.map { Fluent3D.symbol(for: $0.id) } ?? "fork.knife"
-        let title = meal.foods.isEmpty ? "Repas" : meal.foods.joined(separator: ", ")
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.kiwiGreenSoft)
+                    .frame(width: 48, height: 48)
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 22))
+                    .foregroundStyle(Color.kiwiGreen)
+            }
+            Text("Rien pour l'instant")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color.kiwiCharcoal)
+            Text("Scanne ton premier plat pour voir tes apports ici.")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.healthMapMuted)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 220)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
+    }
+
+    private func recentRow(_ row: MealJournalRow) -> some View {
+        let icon = row.iconMicroId.map { Fluent3D.symbol(for: $0) } ?? "fork.knife"
         return HStack(spacing: 11) {
             ZStack {
-                Circle().fill(Color.kiwiGreenSoft).frame(width: 34, height: 34)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.kiwiGreenSoft)
+                    .frame(width: 40, height: 40)
                 Image(systemName: icon)
-                    .font(.system(size: 15))
+                    .font(.system(size: 17))
                     .foregroundStyle(Color.kiwiGreen)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(row.name)
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Color.kiwiCharcoal)
                     .lineLimit(1)
                 HStack(spacing: 6) {
-                    Text(meal.slot.label)
+                    if let g = row.grams {
+                        Text("\(Int(g.rounded())) g")
+                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                            .foregroundStyle(Color.kiwiGreenInk)
+                        Text("·")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.healthMapMuted)
+                    }
+                    Text(row.record.slot.label)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color.healthMapMuted)
-                    Text("·")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.healthMapMuted)
-                    Text("\(meal.macros.calories) kcal")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Color.healthMapSecondary)
                 }
             }
             Spacer(minLength: 6)
-            Text(DateFormatters.relative.localizedString(for: meal.consumedAt, relativeTo: Date()))
-                .font(.system(size: 10.5, weight: .medium))
+            Text("\(row.calories)")
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.healthMapSecondary)
+            Image(systemName: "pencil")
+                .font(.system(size: 15))
                 .foregroundStyle(Color.healthMapMuted)
-                .lineLimit(1)
+        }
+        .padding(.vertical, 13)
+        .padding(.horizontal, 2)
+        .background(Color.healthMapCard)
+    }
+}
+
+// MARK: - Ligne « balayer pour supprimer » (geste custom, hors List)
+/// Contenu blanc glissable au-dessus d'un bouton Supprimer rouge. Balayage à
+/// gauche → révèle Supprimer ; tap fermé → édition ; tap ouvert → referme.
+/// Réservé aux petites listes (accueil Scan) ; le journal complet garde le menu.
+struct SwipeToDeleteRow<Content: View>: View {
+    let onTap: () -> Void
+    let onDelete: () -> Void
+    @ViewBuilder var content: () -> Content
+
+    @State private var offset: CGFloat = 0
+    @State private var revealed = false
+    private let revealW: CGFloat = 78
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Button {
+                HapticService.shared.tap()
+                onDelete()
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "trash").font(.system(size: 18, weight: .semibold))
+                    Text("Supprimer").font(.system(size: 9, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .frame(width: revealW)
+                .frame(maxHeight: .infinity)
+                .background(Color.scoreDeficient)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Supprimer")
+
+            content()
+                .offset(x: offset)
+                .highPriorityGesture(
+                    DragGesture(minimumDistance: 14)
+                        .onChanged { v in
+                            let base: CGFloat = revealed ? -revealW : 0
+                            offset = min(0, max(-revealW, base + v.translation.width))
+                        }
+                        .onEnded { _ in
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                                if offset < -revealW * 0.5 { offset = -revealW; revealed = true }
+                                else { offset = 0; revealed = false }
+                            }
+                        }
+                )
+                .onTapGesture {
+                    if revealed {
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                            offset = 0; revealed = false
+                        }
+                    } else {
+                        onTap()
+                    }
+                }
         }
     }
 }
