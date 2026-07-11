@@ -262,7 +262,7 @@ puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 if MODE == "app-audit"
   report = { appId: app_id }
 
-  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=5&fields[appStoreVersions]=versionString,appStoreState,platform,createdDate")
+  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=5&fields[appStoreVersions]=versionString,appStoreState,platform,createdDate,releaseType")
   report[:versions] = code == 200 ? v["data"].map { |x| x["attributes"].merge("id" => x["id"]) } : { error: code, body: v }
 
   code, b = req(:get, "/v1/builds?filter[app]=#{app_id}&sort=-uploadedDate&limit=5&fields[builds]=version,processingState,expired,uploadedDate")
@@ -321,6 +321,11 @@ if MODE == "apply-app"
   abort_with("appStoreVersions", code, v) unless code == 200 && v["data"]&.any?
   version_id = v["data"][0]["id"]
   puts "Version éditable : #{v["data"][0].dig("attributes", "versionString")} (#{version_id})"
+
+  # Sortie MANUELLE (choix Arthur) : l'app ne devient PAS publique automatiquement
+  # à l'approbation ; Arthur déclenche la mise en ligne. releaseType = MANUAL.
+  write("sortie manuelle (releaseType=MANUAL)", :patch, "/v1/appStoreVersions/#{version_id}",
+    { data: { type: "appStoreVersions", id: version_id, attributes: { releaseType: "MANUAL" } } })
 
   # Infos App Review : contact + compte démo (compte de test partagé du repo,
   # celui que les reviewers utiliseront). Le téléphone reste à compléter.
