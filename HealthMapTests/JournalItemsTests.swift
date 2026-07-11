@@ -197,6 +197,111 @@ final class JournalItemsTests: XCTestCase {
         XCTAssertEqual(m.calories, 100)
     }
 
+    // MARK: - rescaled(to:) : re-scaling linéaire d'un item (P2)
+
+    func testRescaled_scalesLinearlyAndClampsPct() {
+        let item = S.FoodEntry(
+            name: "Poulet", portionG: 100,
+            macros: .init(calories: 165, proteins: 31, carbs: 0, fats: 3.6, fiber: 0),
+            micros: [.init(id: "vitB12", pctRDA: 60, amount: 1.44, unit: "µg")]
+        )
+        let double = item.rescaled(to: 200)
+        XCTAssertEqual(double?.portionG, 200)
+        XCTAssertEqual(double?.macros?.calories, 330)
+        XCTAssertEqual(double?.macros?.proteins ?? 0, 62, accuracy: 0.001)
+        // pct ×2 = 120 → borné à 100 ; amount ×2 SANS borne (valeur vraie).
+        XCTAssertEqual(double?.micros?.first,
+                       S.MicroPct(id: "vitB12", pctRDA: 100, amount: 2.88, unit: "µg"))
+
+        let half = item.rescaled(to: 50)
+        XCTAssertEqual(half?.macros?.calories, 83)          // 82,5 → arrondi
+        XCTAssertEqual(half?.micros?.first?.pctRDA, 30)
+        XCTAssertEqual(half?.micros?.first?.amount ?? 0, 0.72, accuracy: 0.001)
+    }
+
+    func testRescaled_refusesWithoutBase() {
+        XCTAssertNil(S.FoodEntry(name: "sans portion", macros: .init(calories: 10)).rescaled(to: 100))
+        XCTAssertNil(S.FoodEntry(name: "sans macros", portionG: 100).rescaled(to: 100))
+        XCTAssertNil(S.FoodEntry(name: "ok", portionG: 100, macros: .init()).rescaled(to: 0))
+    }
+
+    func testRescaled_thenEncode_updatesKnownKeys_keepsAnnexKeys() throws {
+        let json = #"""
+        [{"name_fr":"Poulet","portion_g":150,"confidence":0.9,"nova_class":1,
+          "macros":{"calories":248,"proteins":46.5,"carbs":0,"fats":5.4,"fiber":0},
+          "micros":[{"id":"vitB12","amount":1.08,"unit":"","pctRDA":45}]}]
+        """#
+        let item = try decodeEntries(json)[0]
+        let rescaled = try XCTUnwrap(item.rescaled(to: 300))
+        let out = String(decoding: try JSONEncoder().encode([rescaled]), as: UTF8.self)
+        XCTAssertTrue(out.contains(#""portion_g":300"#))    // écrasé par le typé
+        XCTAssertTrue(out.contains(#""calories":496"#))     // 248 × 2
+        XCTAssertTrue(out.contains(#""amount":2.16"#))      // 1,08 × 2
+        XCTAssertTrue(out.contains(#""confidence":0.9"#))   // clé annexe intacte
+        XCTAssertTrue(out.contains(#""nova_class":1"#))
+    }
+
+    // MARK: - entry(for:grams:) : fiche 100 g → item persistable (P2)
+
+    private func detail(kcal: Double? = 59,
+                        micros: [S.MicroPct] = [],
+                        brand: String? = nil,
+                        incomplets: Bool = false) -> S.FoodDetail {
+        S.FoodDetail(id: "ciqual:1", source: "ciqual", name: "Yaourt nature",
+                     brand: brand, kcal100g: kcal, proteins100g: 3.9,
+                     carbs100g: 4.7, fats100g: 3, fiber100g: 0,
+                     micros100g: micros, microsIncomplets: incomplets)
+    }
+
+    func testEntryForDetail_scalesFromServerValues() {
+        let d = detail(micros: [
+            S.MicroPct(id: "calcium", pctRDA: 12, amount: 120, unit: "mg"),
+            S.MicroPct(id: "vitD", pctRDA: 0, amount: 0, unit: "UI"),   // 0 → écarté
+        ])
+        let e = S.entry(for: d, grams: 250)
+        XCTAssertEqual(e?.name, "Yaourt nature")
+        XCTAssertEqual(e?.portionG, 250)
+        XCTAssertEqual(e?.macros?.calories, 148)            // 59 × 2,5 = 147,5 → 148
+        XCTAssertEqual(e?.macros?.proteins ?? 0, 9.8, accuracy: 0.001)
+        // pct/amount/unit de la fiche = vérité server-side, re-scalés ×2,5.
+        XCTAssertEqual(e?.micros, [S.MicroPct(id: "calcium", pctRDA: 30, amount: 300, unit: "mg")])
+    }
+
+    func testEntryForDetail_brandGoesIntoName_nilKcalRefused() {
+        let branded = S.entry(for: detail(brand: "Danone"), grams: 100)
+        XCTAssertEqual(branded?.name, "Yaourt nature · Danone")
+        XCTAssertNil(S.entry(for: detail(kcal: nil), grams: 100))
+        XCTAssertNil(S.entry(for: detail(), grams: 0))
+    }
+
+    // MARK: - FoodDetail : décodage des fiches get_food (jsonb)
+
+    func testFoodDetail_decodesCiqualAndOffShapes() throws {
+        let ciqual = #"""
+        {"id":"ciqual:20904","source":"ciqual","nom":"Yaourt nature","marque":null,
+         "kcal_100g":59,"proteines":3.9,"glucides":4.7,"lipides":3,"fibres":0,
+         "micros":[{"id":"vitD","amount":26.8,"unit":"UI","pctRDA":3}],
+         "portions":[{"label":"100 g","grammes":100}]}
+        """#
+        let c = try JSONDecoder().decode(S.FoodDetail.self, from: Data(ciqual.utf8))
+        XCTAssertEqual(c.name, "Yaourt nature")
+        XCTAssertNil(c.brand)
+        XCTAssertFalse(c.microsIncomplets)
+        // vitD arrive en UI (RDA server-side) : consommée TELLE QUELLE.
+        XCTAssertEqual(c.micros100g.first, S.MicroPct(id: "vitD", pctRDA: 3, amount: 26.8, unit: "UI"))
+
+        let off = #"""
+        {"id":"off:3033490004521","source":"off","nom":"Skyr nature","marque":"Danone",
+         "kcal_100g":57,"proteines":10,"glucides":4,"lipides":0.2,"fibres":null,
+         "micros":[],"micros_incomplets":true,"nutriscore":"a"}
+        """#
+        let o = try JSONDecoder().decode(S.FoodDetail.self, from: Data(off.utf8))
+        XCTAssertEqual(o.brand, "Danone")
+        XCTAssertTrue(o.microsIncomplets)
+        XCTAssertNil(o.fiber100g)
+        XCTAssertTrue(o.micros100g.isEmpty)
+    }
+
     // MARK: - MealJournalRow (lignes affichables)
 
     func testRow_itemLevel_exposesItemValues() {

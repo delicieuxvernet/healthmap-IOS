@@ -204,10 +204,19 @@ barre de progression · 3 mini-barres macros (P/G/L) vs cibles réelles.
 par aliment — scans photo Edge ≥ v5 ; une carte par repas entier sinon) :
 vignette teintée (symbole du 1er micro apporté, sinon fourchette) · nom ·
 grammes si connus (jamais inventés) · kcal à droite.
-④ **Fiche ligne** (tap → sheet ~340 pt) : nom · kcal/g/créneau · 3 pastilles
-macros · note explicative si entrée sans détail (« ancien scan ou ajout
-manuel ») · CTA rouge « Retirer cet aliment » (item) / « Supprimer du journal »
-(repas entier ou dernier aliment). Suppression aussi en contextMenu sur la ligne.
+④ **Fiche portion** (tap → `PortionSheet`, composant UNIQUE journal + accueil
+Scan) : presets Petite/Moyenne/Grande (80/150/250 g) · stepper ±10 · **champ
+grammes libre** (clavier) · aperçu live kcal + P/G/L (re-scaling linéaire,
+identique à la persistance) · CTA « Enregistrer » + « Retirer cet aliment »
+(ligne éditable) / note + suppression seule (entrée sans détail). Suppression
+aussi en contextMenu sur la ligne.
+⑤ **Recherche** (« + » d'un créneau → `FoodSearchSheet`) : barre de recherche
+→ RPC unifiée `search_foods` (CIQUAL ∪ Open Food Facts, marques) · lignes
+vignette / nom / « Marque · kcal / 100 g » · **⊕ ajout rapide 100 g** avec
+bandeau de confirmation, ou tap → fiche portion « Ajouter au [repas] »
+(`get_food`, valeurs 100 g server-side re-scalées ×g/100 — jamais de recalcul
+RDA client). Produit OFF sans kcal → fiche non ajoutable (note explicite).
+L'ancien AddMealSheet (nom + kcal à la main) est SUPPRIMÉ.
 
 Lois spécifiques : la suppression d'un ITEM réécrit `detected_foods` + agrégats
 `macros`/`micros` recomposés (miroir Edge — le Bilan hebdo et `day_summary`

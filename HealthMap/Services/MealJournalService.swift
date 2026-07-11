@@ -180,9 +180,16 @@ final class MealJournalService {
         }
 
         func encode(to encoder: Encoder) throws {
-            // Passthrough : l'item d'origine repart tel quel (nom garanti).
+            // Passthrough + fusion : les clés annexes de l'item d'origine
+            // (ciqual_code, confidence, nova_class…) repartent telles quelles,
+            // et les champs TYPÉS (nom, portion, macros, micros) écrasent les
+            // leurs — c'est ce qui rend le re-scaling de quantité trivial :
+            // `rescaled(to:)` ne touche que les champs typés.
             if var dict = raw {
                 dict["name_fr"] = .string(name)
+                if let p = portionG { dict["portion_g"] = .double(p) }
+                if let m = macros, let j = Self.anyJSON(m) { dict["macros"] = j }
+                if let mi = micros, let j = Self.anyJSON(mi) { dict["micros"] = j }
                 var c = encoder.singleValueContainer()
                 try c.encode(dict)
                 return
@@ -192,6 +199,40 @@ final class MealJournalService {
             try c.encodeIfPresent(portionG, forKey: .portionG)
             try c.encodeIfPresent(macros, forKey: .macros)
             try c.encodeIfPresent(micros, forKey: .micros)
+        }
+
+        private static func anyJSON<T: Encodable>(_ value: T) -> AnyJSON? {
+            guard let data = try? JSONEncoder().encode(value) else { return nil }
+            return try? JSONDecoder().decode(AnyJSON.self, from: data)
+        }
+
+        /// Ce même aliment ramené à `newGrams` : re-scaling LINÉAIRE des
+        /// macros, des `pctRDA` (borné 0-100) et des `amount` (valeur vraie,
+        /// × facteur — pas re-dérivée d'un pct plafonné). nil si l'item n'a
+        /// pas de base exploitable (pas de portion ou pas de macros) ou si
+        /// `newGrams` est invalide. Les clés annexes du JSON brut restent
+        /// intactes (voir `encode`). Pure — testable sans I/O.
+        func rescaled(to newGrams: Double) -> FoodEntry? {
+            guard let oldGrams = portionG, oldGrams > 0,
+                  let om = macros, newGrams > 0 else { return nil }
+            let k = newGrams / oldGrams
+            func r1(_ x: Double) -> Double { (x * 10).rounded() / 10 }
+            func r2(_ x: Double) -> Double { (x * 100).rounded() / 100 }
+            let nm = MealMacros(
+                calories: Int((Double(om.calories) * k).rounded()),
+                proteins: r1(om.proteins * k),
+                carbs: r1(om.carbs * k),
+                fats: r1(om.fats * k),
+                fiber: r1(om.fiber * k)
+            )
+            let nmi = (micros ?? []).map { mp in
+                MicroPct(id: mp.id,
+                         pctRDA: max(0, min(100, Int((Double(mp.pctRDA) * k).rounded()))),
+                         amount: mp.amount.map { r2($0 * k) },
+                         unit: mp.unit)
+            }
+            return FoodEntry(name: name, portionG: newGrams,
+                             macros: nm, micros: micros == nil ? nil : nmi, raw: raw)
         }
     }
 
@@ -281,6 +322,40 @@ final class MealJournalService {
                              macros: MealMacros(calories: calories),
                              slot: slot,
                              consumedAt: consumedAt)
+    }
+
+    /// Insère UN aliment (recherche) comme ligne mono-aliment, en forme
+    /// RICHE (`detected_foods` = objet avec portion/macros/micros) : la ligne
+    /// est ensuite éditable en quantité et ses `amount` comptent pour le
+    /// backend `day_summary`. Agrégats de la ligne = l'item (mono-aliment).
+    func insertFood(userId: String,
+                    entry: FoodEntry,
+                    slot: MealSlot,
+                    consumedAt: Date = Date()) async throws {
+        struct InsertRow: Encodable {
+            let userId: String
+            let consumedAt: String
+            let mealType: String
+            let detectedFoods: [FoodEntry]
+            let macros: MealMacros
+            let micros: [MicroPct]
+            enum CodingKeys: String, CodingKey {
+                case userId = "user_id"
+                case consumedAt = "consumed_at"
+                case mealType = "meal_type"
+                case detectedFoods = "detected_foods"
+                case macros, micros
+            }
+        }
+        let row = InsertRow(
+            userId: userId,
+            consumedAt: Self.iso.string(from: consumedAt),
+            mealType: slot.rawValue,
+            detectedFoods: [entry],
+            macros: entry.macros ?? MealMacros(),
+            micros: entry.micros ?? []
+        )
+        try await client.from("meal_scans").insert(row).execute()
     }
 
     // MARK: - Lecture des repas (jour ou plage)
@@ -447,6 +522,193 @@ final class MealJournalService {
             .eq("id", value: recordId)
             .execute()
         return true
+    }
+
+    /// Change la QUANTITÉ d'un aliment d'un repas. Même patron sûr que la
+    /// suppression : ligne relue fraîche, item retrouvé par VALEUR, re-scaling
+    /// linéaire (`FoodEntry.rescaled`), agrégats recomposés depuis les items.
+    /// `false` = item introuvable dans la ligne fraîche ou base inexploitable
+    /// → l'appelant recharge sans écrire.
+    func updateItemQuantity(recordId: String, item: FoodEntry, newGrams: Double) async throws -> Bool {
+        struct FreshRow: Decodable {
+            let detectedFoods: [FoodEntry]?
+            enum CodingKeys: String, CodingKey {
+                case detectedFoods = "detected_foods"
+            }
+        }
+        let fresh: [FreshRow] = try await client
+            .from("meal_scans")
+            .select("detected_foods")
+            .eq("id", value: recordId)
+            .is("deleted_at", value: nil)
+            .execute()
+            .value
+        guard let row = fresh.first else { return false }
+        var items = (row.detectedFoods ?? []).filter { !$0.name.isEmpty }
+        guard let idx = items.firstIndex(of: item),
+              let updated = items[idx].rescaled(to: newGrams),
+              items.allSatisfy({ $0.macros != nil }) else { return false }
+        items[idx] = updated
+
+        let (m, mm) = Self.aggregatesFromItems(items)
+        struct UpdateRow: Encodable {
+            let detectedFoods: [FoodEntry]
+            let macros: MealMacros
+            let micros: [MicroPct]
+            enum CodingKeys: String, CodingKey {
+                case detectedFoods = "detected_foods"
+                case macros, micros
+            }
+        }
+        try await client
+            .from("meal_scans")
+            .update(UpdateRow(detectedFoods: items, macros: m, micros: mm))
+            .eq("id", value: recordId)
+            .execute()
+        return true
+    }
+
+    // MARK: - Recherche d'aliments (RPC unifiée CIQUAL ∪ Open Food Facts)
+
+    /// Un résultat de recherche (léger). `id` = "ciqual:<code>" ou
+    /// "off:<code-barres>" — clé de `foodDetail(id:)`.
+    struct FoodHit: Identifiable, Decodable, Equatable {
+        let id: String
+        let source: String
+        let name: String
+        let brand: String?
+        let kcal100g: Double?
+        enum CodingKeys: String, CodingKey {
+            case id, source
+            case name = "nom"
+            case brand = "marque"
+            case kcal100g = "kcal_100g"
+        }
+    }
+
+    /// Fiche complète d'un aliment, valeurs POUR 100 g. Les `micros` arrivent
+    /// avec `amount`/`unit`/`pctRDA` DÉJÀ calculés côté SQL (RDA server-side,
+    /// vitD en UI) — on les consomme tels quels et on re-scale ×(g/100),
+    /// JAMAIS de recalcul de pct côté client. OFF : `microsIncomplets` = seule
+    /// la fibre est connue (étiquette produit).
+    struct FoodDetail: Decodable, Equatable {
+        let id: String
+        let source: String
+        let name: String
+        let brand: String?
+        let kcal100g: Double?
+        let proteins100g: Double?
+        let carbs100g: Double?
+        let fats100g: Double?
+        let fiber100g: Double?
+        let micros100g: [MicroPct]
+        let microsIncomplets: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case id, source, micros
+            case name = "nom"
+            case brand = "marque"
+            case kcal100g = "kcal_100g"
+            case proteins100g = "proteines"
+            case carbs100g = "glucides"
+            case fats100g = "lipides"
+            case fiber100g = "fibres"
+            case microsIncomplets = "micros_incomplets"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            source = (try? c.decode(String.self, forKey: .source)) ?? ""
+            name = (try? c.decode(String.self, forKey: .name)) ?? ""
+            brand = try? c.decode(String.self, forKey: .brand)
+            kcal100g = try? c.decode(Double.self, forKey: .kcal100g)
+            proteins100g = try? c.decode(Double.self, forKey: .proteins100g)
+            carbs100g = try? c.decode(Double.self, forKey: .carbs100g)
+            fats100g = try? c.decode(Double.self, forKey: .fats100g)
+            fiber100g = try? c.decode(Double.self, forKey: .fiber100g)
+            micros100g = (try? c.decode([MicroPct].self, forKey: .micros)) ?? []
+            microsIncomplets = (try? c.decode(Bool.self, forKey: .microsIncomplets)) ?? false
+        }
+
+        init(id: String, source: String, name: String, brand: String? = nil,
+             kcal100g: Double?, proteins100g: Double? = nil, carbs100g: Double? = nil,
+             fats100g: Double? = nil, fiber100g: Double? = nil,
+             micros100g: [MicroPct] = [], microsIncomplets: Bool = false) {
+            self.id = id
+            self.source = source
+            self.name = name
+            self.brand = brand
+            self.kcal100g = kcal100g
+            self.proteins100g = proteins100g
+            self.carbs100g = carbs100g
+            self.fats100g = fats100g
+            self.fiber100g = fiber100g
+            self.micros100g = micros100g
+            self.microsIncomplets = microsIncomplets
+        }
+    }
+
+    /// Recherche unifiée `search_foods` (CIQUAL ∪ OFF, 103k produits, scoring
+    /// FTS+trigrammes+popularité server-side). Remplace l'ancien ilike sur
+    /// `ciqual_foods` seul — les produits de marque arrivent d'OFF.
+    func searchFoods(query: String, limit: Int = 20) async throws -> [FoodHit] {
+        struct Params: Encodable {
+            let q: String
+            let maxResults: Int
+            enum CodingKeys: String, CodingKey {
+                case q
+                case maxResults = "max_results"
+            }
+        }
+        return try await client
+            .rpc("search_foods", params: Params(q: query, maxResults: limit))
+            .execute()
+            .value
+    }
+
+    /// Fiche 100 g d'un aliment (`get_food`), pour la fiche portion.
+    func foodDetail(id: String) async throws -> FoodDetail {
+        struct Params: Encodable {
+            let pFoodId: String
+            enum CodingKeys: String, CodingKey {
+                case pFoodId = "p_food_id"
+            }
+        }
+        return try await client
+            .rpc("get_food", params: Params(pFoodId: id))
+            .execute()
+            .value
+    }
+
+    /// Construit l'item à insérer pour `grams` grammes d'un aliment de la
+    /// fiche : macros ×(g/100) arrondies comme l'Edge, micros re-scalés
+    /// (amount ×f arrondi 0,01 ; pct ×f borné 0-100) — les pct/amount/unit
+    /// de la fiche sont la vérité server-side, PAS de recalcul RDA client.
+    /// Les micros à 0 sont écartés (même règle que l'ajout manuel legacy).
+    /// nil si la fiche n'a pas de kcal exploitables (produit OFF incomplet —
+    /// on n'enregistre JAMAIS un aliment qu'on ne sait pas compter).
+    /// Pure — testable sans I/O.
+    static func entry(for detail: FoodDetail, grams: Double) -> FoodEntry? {
+        guard grams > 0, let kcal100 = detail.kcal100g else { return nil }
+        let f = grams / 100.0
+        func r1(_ x: Double) -> Double { (x * 10).rounded() / 10 }
+        func r2(_ x: Double) -> Double { (x * 100).rounded() / 100 }
+        let macros = MealMacros(
+            calories: Int((kcal100 * f).rounded()),
+            proteins: r1((detail.proteins100g ?? 0) * f),
+            carbs: r1((detail.carbs100g ?? 0) * f),
+            fats: r1((detail.fats100g ?? 0) * f),
+            fiber: r1((detail.fiber100g ?? 0) * f)
+        )
+        let micros: [MicroPct] = detail.micros100g.compactMap { mp in
+            let pct = max(0, min(100, Int((Double(mp.pctRDA) * f).rounded())))
+            let amount = mp.amount.map { r2($0 * f) }
+            guard pct > 0 || (amount ?? 0) > 0 else { return nil }
+            return MicroPct(id: mp.id, pctRDA: pct, amount: amount, unit: mp.unit)
+        }
+        let name = detail.brand.map { "\(detail.name) · \($0)" } ?? detail.name
+        return FoodEntry(name: name, portionG: grams, macros: macros, micros: micros)
     }
 
     // MARK: - Suppression douce (deleted_at)

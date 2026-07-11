@@ -12,7 +12,7 @@ final class MealScanViewModel: ObservableObject {
     @Published var analysisResult: MealAnalysisResult?
     @Published var errorMessage: String?
     @Published var searchQuery = ""
-    @Published var searchResults: [FoodItem] = []
+    @Published var searchResults: [MealJournalService.FoodHit] = []
     @Published var isSearching = false
     @Published var selectedTab: MealScanTab = .analyze
     /// Scans gratuits restants (iOS free) renvoyés par la fonction ; nil si
@@ -122,17 +122,6 @@ final class MealScanViewModel: ObservableObject {
         var swaps: [String]
     }
 
-    struct FoodItem: Identifiable {
-        let id: Int          // = alim_code CIQUAL — stable (pas un UUID aléatoire),
-                              // sert aussi à recalculer la composition à la portion.
-        var name: String
-        /// Valeurs pour 100 g : macros (calories/proteins/carbs/fats/fiber) +
-        /// les 10 nutriments canoniques (mêmes clés que NutrientData.all).
-        var nutrients: [String: Double]
-
-        var alimCode: Int { id }
-    }
-
     // MARK: - Edge Function Response DTOs (Decodable)
 
     // Forme RÉELLE de la réponse (vérifiée en prod le 4 juillet 2026) :
@@ -234,33 +223,6 @@ final class MealScanViewModel: ObservableObject {
     private struct EdgeSuggestion: Decodable {
         let name: String?
         let fills: [String]?
-    }
-
-    // Schéma RÉEL de `ciqual_foods` (vérifié en DB le 10 juin 2026) : le nom
-    // de l'aliment est `alim_nom_fr` et les valeurs nutritionnelles vivent
-    // dans la table séparée `ciqual_composition` (alim_code, nutrient_code,
-    // value_per_100g). L'ancien DTO demandait des colonnes inexistantes
-    // (name, calories...) → PostgREST 400 sur CHAQUE recherche.
-    private struct CiqualFoodRow: Decodable {
-        let alimCode: Int
-        let alimNomFr: String
-
-        enum CodingKeys: String, CodingKey {
-            case alimCode = "alim_code"
-            case alimNomFr = "alim_nom_fr"
-        }
-    }
-
-    private struct CiqualCompositionRow: Decodable {
-        let alimCode: Int
-        let nutrientCode: String
-        let valuePer100g: Double?
-
-        enum CodingKeys: String, CodingKey {
-            case alimCode = "alim_code"
-            case nutrientCode = "nutrient_code"
-            case valuePer100g = "value_per_100g"
-        }
     }
 
     // MARK: - Edge Function Request DTOs (Encodable)
@@ -540,11 +502,10 @@ final class MealScanViewModel: ObservableObject {
                 try await Task.sleep(nanoseconds: 300_000_000) // 300ms
                 guard !Task.isCancelled else { return }
 
-                // Recherche dans le référentiel CIQUAL (table Supabase).
-                // L'ancien fallback edge `search-food` a été retiré : la
-                // fonction n'a jamais été déployée côté Supabase — l'appel
-                // échouait silencieusement à chaque fois (code mort).
-                let results = try await searchCiqualTable(query: query)
+                // RPC unifiée `search_foods` (CIQUAL ∪ Open Food Facts,
+                // scoring server-side) — remplace l'ancien ilike sur
+                // `ciqual_foods` seul : les produits de marque arrivent d'OFF.
+                let results = try await MealJournalService.shared.searchFoods(query: query)
 
                 guard !Task.isCancelled else { return }
                 searchResults = results
@@ -563,122 +524,13 @@ final class MealScanViewModel: ObservableObject {
         await searchTask?.value
     }
 
-    /// Recherche dans `ciqual_foods` (noms) puis enrichit avec
-    /// `ciqual_composition` (valeurs pour 100 g). Les codes nutriments DB
-    /// sont des slugs lisibles (kcal/prot/carbs/fat/iron/vitC...) — on les
-    /// remappe vers les clés attendues par `FoodItem`.
-    private func searchCiqualTable(query: String) async throws -> [FoodItem] {
-        let foods: [CiqualFoodRow] = try await client
-            .from("ciqual_foods")
-            .select("alim_code, alim_nom_fr")
-            .ilike("alim_nom_fr", pattern: "%\(query)%")
-            .limit(20)
-            .execute()
-            .value
-
-        guard !foods.isEmpty else { return [] }
-
-        let compositions: [CiqualCompositionRow] = try await client
-            .from("ciqual_composition")
-            .select("alim_code, nutrient_code, value_per_100g")
-            .in("alim_code", values: foods.map(\.alimCode))
-            .execute()
-            .value
-
-        // nutrient_code DB → clé FoodItem. Macros + les 10 nutriments canoniques
-        // (mêmes codes que NUTRIENTS_RDA côté backend analyze-meal-photo/ciqual.ts
-        // — mirror exact, ne pas diverger). Codes non mappés ignorés.
-        let keyMap: [String: String] = [
-            "kcal": "calories",
-            "prot": "proteins",
-            "carbs": "carbs",
-            "fat": "fats",
-            "fiber": "fiber",
-            "vitD": "vitD",
-            "vitB12": "vitB12",
-            "iron": "iron",
-            "magnesium": "magnesium",
-            "omega3": "omega3",
-            "vitC": "vitC",
-            "calcium": "calcium",
-            "zinc": "zinc",
-            "iodine": "iodine",
-        ]
-
-        var nutrientsByCode: [Int: [String: Double]] = [:]
-        for compo in compositions {
-            guard let key = keyMap[compo.nutrientCode], let value = compo.valuePer100g else { continue }
-            nutrientsByCode[compo.alimCode, default: [:]][key] = value
-        }
-
-        return foods.compactMap { food in
-            guard !food.alimNomFr.isEmpty else { return nil }
-            return FoodItem(id: food.alimCode, name: food.alimNomFr, nutrients: nutrientsByCode[food.alimCode] ?? [:])
-        }
-    }
-
-    // MARK: - Ajout manuel d'un aliment (recherche → portion → journal)
-
-    /// Portion prédéfinie (façon Foodvisor) — grammage médian par gabarit.
-    enum PortionSize: String, CaseIterable, Identifiable {
-        case small = "Petite", medium = "Moyenne", large = "Grande"
-        var id: String { rawValue }
-        var grams: Int {
-            switch self {
-            case .small: return 80
-            case .medium: return 150
-            case .large: return 250
-            }
-        }
-    }
-
-    /// kcal pour la portion choisie — calcul instantané, aucun appel réseau
-    /// (les valeurs pour 100 g sont déjà en mémoire depuis la recherche). Pure
-    /// (aucun état d'instance) : appelable depuis une vue sans le ViewModel.
-    static func previewCalories(for food: FoodItem, portion: PortionSize) -> Int {
-        Int(((food.nutrients["calories"] ?? 0) * Double(portion.grams) / 100.0).rounded())
-    }
-
-    /// Ajoute un aliment cherché manuellement au journal du jour. Déterministe
-    /// (composition CIQUAL × portion, même formule que le backend du scan photo) —
-    /// aucun appel IA. `meal_scans` est la source unique (cf. fix cohérence scan) :
-    /// on écrit UNE fois ici, puis on notifie pour que Bilan/Suivi/Journal/Plan
-    /// rechargent (même mécanisme que le scan photo).
-    func addManualFood(_ food: FoodItem, portion: PortionSize) async throws {
-        guard let userId = AuthService.shared.cachedCurrentUserIdString else { return }
-        let factor = Double(portion.grams) / 100.0
-
-        let macros = MealJournalService.MealMacros(
-            calories: Int(((food.nutrients["calories"] ?? 0) * factor).rounded()),
-            proteins: ((food.nutrients["proteins"] ?? 0) * factor * 10).rounded() / 10,
-            carbs: ((food.nutrients["carbs"] ?? 0) * factor * 10).rounded() / 10,
-            fats: ((food.nutrients["fats"] ?? 0) * factor * 10).rounded() / 10,
-            fiber: ((food.nutrients["fiber"] ?? 0) * factor * 10).rounded() / 10
-        )
-
-        let micros: [MealJournalService.MicroPct] = NutrientData.all.compactMap { def in
-            let nid = def.id.rawValue
-            guard let per100 = food.nutrients[nid], per100 > 0 else { return nil }
-            let amount = per100 * factor
-            let pct = def.rda > 0 ? Int((min(100, max(0, amount / def.rda * 100))).rounded()) : 0
-            return MealJournalService.MicroPct(id: nid, pctRDA: pct)
-        }
-
-        try await MealJournalService.shared.insertScan(
-            userId: userId,
-            foods: [food.name],
-            macros: macros,
-            slot: MealJournalService.MealSlot.from(date: Date()),
-            micros: micros
-        )
-
-        // Réinitialise la recherche (retour à l'état "Essaie par exemple...").
-        searchQuery = ""
-        searchResults = []
-
-        // Même mécanisme que le scan photo : Bilan/Suivi/Journal/Plan rechargent.
-        NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
-    }
+    // L'ancien chemin d'ajout manuel (searchCiqualTable + FoodItem +
+    // PortionSize + addManualFood) est REMPLACÉ par la pile journal :
+    // `MealJournalService.searchFoods`/`foodDetail` (RPC unifiées) +
+    // `MealJournalViewModel.addFood` (ligne riche éditable) + `PortionSheet`
+    // (quantité libre). Ne pas le réintroduire : il écrivait des lignes
+    // nom-seul (non éditables) et des micros sans `amount` (invisibles pour
+    // le compteur `day_summary`).
 
     // MARK: - Helpers
 
