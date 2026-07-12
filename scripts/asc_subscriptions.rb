@@ -168,6 +168,37 @@ def upload_review_screenshot(sub_id, png_path)
   ok
 end
 
+# Upload d'une capture d'écran de fiche App Store (appScreenshots) :
+# réservation -> PUT des chunks -> commit MD5. Renvoie l'id ou nil.
+def upload_app_screenshot(set_id, png_path)
+  bytes = File.binread(png_path)
+  ok, resp = write("réservation #{File.basename(png_path)} (#{bytes.bytesize} o)", :post, "/v1/appScreenshots",
+    { data: { type: "appScreenshots",
+              attributes: { fileName: File.basename(png_path), fileSize: bytes.bytesize },
+              relationships: { appScreenshotSet: { data: { type: "appScreenshotSets", id: set_id } } } } })
+  return nil unless ok
+
+  sid = resp["data"]["id"]
+  (resp["data"]["attributes"]["uploadOperations"] || []).each do |op|
+    uri = URI(op["url"])
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = (uri.scheme == "https")
+    put = Net::HTTP::Put.new(uri)
+    (op["requestHeaders"] || []).each { |h| put[h["name"]] = h["value"] }
+    put.body = bytes[op["offset"], op["length"]]
+    res = http.request(put)
+    unless (200..299).cover?(res.code.to_i)
+      puts "  ÉCHEC chunk -> HTTP #{res.code} #{res.body.to_s[0, 200]}"
+      return nil
+    end
+  end
+
+  ok2, = write("commit #{File.basename(png_path)}", :patch, "/v1/appScreenshots/#{sid}",
+    { data: { type: "appScreenshots", id: sid,
+              attributes: { uploaded: true, sourceFileChecksum: Digest::MD5.hexdigest(bytes) } } })
+  ok2 ? sid : nil
+end
+
 # Renvoie [id, prix_réel] du point de prix FRA le plus proche de `price`
 # (Apple n'a pas toujours un point exact, ex. 30,00 € → 29,99 €). Nil si aucun.
 def find_price_point(sub_id, price)
@@ -471,6 +502,62 @@ if MODE == "offers"
   puts "En attente d'approbation app (codes à générer après) : #{pending.join(", ")}" unless pending.empty?
   puts "Échecs : #{failures.join(" | ")}" unless failures.empty?
   puts "Tout est prêt." if failures.empty? && pending.empty?
+  exit 0
+end
+
+# ── MODE screenshots : upload des captures de la fiche App Store (ordre inclus) ──
+if MODE == "screenshots"
+  display_type = ENV["DISPLAY_TYPE"] || "APP_IPHONE_67"
+  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=1&filter[appStoreState]=PREPARE_FOR_SUBMISSION")
+  abort_with("appStoreVersions", code, v) unless code == 200 && v["data"]&.any?
+  version_id = v["data"][0]["id"]
+  locs = get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20")
+  loc = locs.find { |l| l.dig("attributes", "locale").to_s.start_with?("fr") } || locs[0]
+  loc_id = loc["id"]
+  puts "Version #{version_id} | Localisation #{loc.dig("attributes", "locale")} (#{loc_id}) | displayType #{display_type}"
+
+  sets = get_all("/v1/appStoreVersionLocalizations/#{loc_id}/appScreenshotSets?limit=50")
+  set = sets.find { |s| s.dig("attributes", "screenshotDisplayType") == display_type }
+  if set
+    set_id = set["id"]
+    purge = get_all("/v1/appScreenshotSets/#{set_id}/appScreenshots?limit=50")
+    puts "Set existant #{display_type} (#{set_id}) — purge de #{purge.size} captures pour re-upload propre"
+    purge.each do |sc|
+      uri = URI(BASE + "/v1/appScreenshots/#{sc["id"]}")
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      del = Net::HTTP::Delete.new(uri)
+      del["Authorization"] = "Bearer #{token}"
+      http.request(del)
+    end
+  else
+    ok, resp = write("création set #{display_type}", :post, "/v1/appScreenshotSets",
+      { data: { type: "appScreenshotSets",
+                attributes: { screenshotDisplayType: display_type },
+                relationships: { appStoreVersionLocalization: { data: { type: "appStoreVersionLocalizations", id: loc_id } } } } })
+    exit 1 unless ok
+    set_id = resp["data"]["id"]
+  end
+
+  files = Dir.glob(File.join(__dir__, "appstore_screens", "final_*.png")).sort
+  puts "#{files.size} captures à uploader :"
+  ids = []
+  files.each do |png|
+    id = upload_app_screenshot(set_id, png)
+    ids << id if id
+  end
+
+  # Ordre d'affichage sur la fiche = ordre des fichiers (final_01..09).
+  if ids.size > 1
+    write("ordre des #{ids.size} captures", :patch, "/v1/appScreenshotSets/#{set_id}/relationships/appScreenshots",
+      { data: ids.map { |i| { type: "appScreenshots", id: i } } })
+  end
+
+  puts "\n===== ÉTAT FINAL CAPTURES ====="
+  get_all("/v1/appScreenshotSets/#{set_id}/appScreenshots?limit=50&fields[appScreenshots]=fileName,assetDeliveryState").each do |s|
+    puts "  #{s.dig("attributes", "fileName")} -> #{s.dig("attributes", "assetDeliveryState", "state")}"
+  end
+  puts "#{ids.size}/#{files.size} uploadées"
   exit 0
 end
 
