@@ -124,7 +124,15 @@ def sub_snapshot(sub_id)
   snap[:pricesAllTerritoriesCount] = get_all("/v1/subscriptions/#{sub_id}/prices?limit=200").size
 
   code, av = req(:get, "/v1/subscriptions/#{sub_id}/subscriptionAvailability")
-  snap[:availability] = code == 200 ? { availableInNewTerritories: av.dig("data", "attributes", "availableInNewTerritories") } : "aucune (HTTP #{code})"
+  if code == 200 && av["data"]
+    avail_id = av.dig("data", "id")
+    terr_count = get_all("/v1/subscriptionAvailabilities/#{avail_id}/availableTerritories?limit=200&fields[territories]=currency").size
+    snap[:availability] = { id: avail_id,
+                            availableInNewTerritories: av.dig("data", "attributes", "availableInNewTerritories"),
+                            territoriesCount: terr_count }
+  else
+    snap[:availability] = "aucune (HTTP #{code})"
+  end
 
   offers = get_all("/v1/subscriptions/#{sub_id}/introductoryOffers?limit=200")
   snap[:introOffers] = offers.map { |o| o["attributes"].slice("duration", "offerMode", "numberOfPeriods") }.uniq
@@ -753,8 +761,11 @@ TARGETS.each do |product_id, spec|
     end
   end
 
-  # Disponibilité : tous les territoires
-  unless snap[:availability].is_a?(Hash)
+  # Disponibilité : tous les territoires. Un sub fraîchement créé a une coquille
+  # de dispo VIDE (territoriesCount=0) → il faut y ajouter les territoires, sinon
+  # MISSING_METADATA. On crée si absente, sinon on complète les territoires.
+  avail = snap[:availability]
+  if !avail.is_a?(Hash)
     territories = get_all("/v1/territories?limit=200").map { |t| t["id"] }
     ok, = write("disponibilité (#{territories.size} territoires)", :post, "/v1/subscriptionAvailabilities",
       { data: { type: "subscriptionAvailabilities",
@@ -762,6 +773,14 @@ TARGETS.each do |product_id, spec|
                 relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
                                  availableTerritories: { data: territories.map { |t| { type: "territories", id: t } } } } } })
     failures << "#{product_id}: disponibilité" unless ok
+  elsif avail[:territoriesCount].to_i < 100
+    territories = get_all("/v1/territories?limit=200").map { |t| t["id"] }
+    ok, = write("disponibilité : ajout de #{territories.size} territoires", :post,
+      "/v1/subscriptionAvailabilities/#{avail[:id]}/relationships/availableTerritories",
+      { data: territories.map { |t| { type: "territories", id: t } } })
+    failures << "#{product_id}: disponibilité (ajout)" unless ok
+  else
+    puts "  OK  disponibilité déjà sur #{avail[:territoriesCount]} territoires"
   end
 
   # Essai gratuit 7 j (best effort) : tentative globale, sinon par territoire
