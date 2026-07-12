@@ -580,9 +580,15 @@ if MODE == "submit"
     if code == 200 && ed["data"]
       puts "Conformité export : déjà présente (#{ed.dig("data", "attributes", "appEncryptionDeclarationState")})"
     else
+      # App exempte : uniquement du chiffrement standard OS (HTTPS/TLS), aucun
+      # algorithme propriétaire ni tiers → containsProprietary/ThirdParty = false.
       ok, resp = write("déclaration de chiffrement (exempte)", :post, "/v1/appEncryptionDeclarations",
         { data: { type: "appEncryptionDeclarations",
-                  attributes: { usesEncryption: false },
+                  attributes: { appDescription: "Kiwio — application de nutrition. HTTPS/TLS standard uniquement.",
+                                availableOnFrenchStore: true,
+                                containsProprietaryCryptography: false,
+                                containsThirdPartyCryptography: false,
+                                platform: "IOS" },
                   relationships: { app: { data: { type: "apps", id: app_id } } } } })
       if ok
         decl_id = resp["data"]["id"]
@@ -592,17 +598,18 @@ if MODE == "submit"
     end
   end
 
-  # 1) Créer la review submission
-  ok, resp = write("création de la soumission", :post, "/v1/reviewSubmissions",
-    { data: { type: "reviewSubmissions",
-              attributes: { platform: "IOS" },
-              relationships: { app: { data: { type: "apps", id: app_id } } } } })
-  # Une soumission ouverte peut déjà exister : on la réutilise.
-  sub_id = ok ? resp["data"]["id"] : nil
-  if sub_id.nil?
-    code, existing = req(:get, "/v1/apps/#{app_id}/reviewSubmissions?filter[state]=READY_FOR_REVIEW,COMPLETING,UNRESOLVED_ISSUES,WAITING_FOR_REVIEW&limit=1")
-    sub_id = existing.dig("data", 0, "id") if code == 200
-    puts "Réutilisation d'une soumission existante : #{sub_id}" if sub_id
+  # 1) Soumission : réutiliser une soumission ouverte, sinon en créer une.
+  sub_id = nil
+  code, existing = req(:get, "/v1/apps/#{app_id}/reviewSubmissions?filter[state]=READY_FOR_REVIEW&limit=10")
+  if code == 200 && existing["data"]&.any?
+    sub_id = existing["data"][0]["id"]
+    puts "Soumission ouverte réutilisée : #{sub_id}"
+  else
+    ok, resp = write("création de la soumission", :post, "/v1/reviewSubmissions",
+      { data: { type: "reviewSubmissions",
+                attributes: { platform: "IOS" },
+                relationships: { app: { data: { type: "apps", id: app_id } } } } })
+    sub_id = resp["data"]["id"] if ok
   end
   abort_with("reviewSubmissions", 0, "impossible de créer/trouver une soumission") unless sub_id
 
