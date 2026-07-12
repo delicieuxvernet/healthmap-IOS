@@ -571,6 +571,42 @@ if MODE == "submit"
   version_id = v["data"][0]["id"]
   puts "Version : #{v["data"][0].dig("attributes", "versionString")} (#{version_id}) état=#{v["data"][0].dig("attributes", "appStoreState")}"
 
+  # Prix de l'app = GRATUIT (requis même pour un freemium avec achats intégrés).
+  code, sched = req(:get, "/v1/apps/#{app_id}/appPriceSchedule")
+  if code == 200 && sched["data"]
+    puts "Prix de l'app : déjà défini"
+  else
+    free_id = nil
+    url = "/v1/apps/#{app_id}/appPricePoints?filter[territory]=USA&limit=200&fields[appPricePoints]=customerPrice"
+    while url
+      code, body = req(:get, url)
+      abort_with("appPricePoints", code, body) unless code == 200
+      hit = body["data"].find { |p| p.dig("attributes", "customerPrice").to_f == 0.0 }
+      (free_id = hit["id"]; break) if hit
+      url = body.dig("links", "next")
+    end
+    if free_id
+      write("prix de l'app = Gratuit", :post, "/v1/appPriceSchedules",
+        { data: { type: "appPriceSchedules",
+                  relationships: {
+                    app: { data: { type: "apps", id: app_id } },
+                    baseTerritory: { data: { type: "territories", id: "USA" } },
+                    manualPrices: { data: [{ type: "appPrices", id: "${p0}" }] } } },
+          included: [{ type: "appPrices", id: "${p0}",
+                      relationships: { appPricePoint: { data: { type: "appPricePoints", id: free_id } } } }] })
+    else
+      puts "  ÉCHEC point de prix gratuit introuvable"
+    end
+  end
+
+  # Diagnostic DAC7 (déclaration « service personnel ») : on inspecte l'appInfo.
+  code, infos = req(:get, "/v1/apps/#{app_id}/appInfos?limit=5")
+  if code == 200
+    (infos["data"] || []).each do |ai|
+      puts "appInfo #{ai["id"]} attrs=#{ai["attributes"].inspect}"
+    end
+  end
+
   # Conformité export : si le build attaché n'a pas de déclaration de chiffrement,
   # on en crée une EXEMPTE (l'app n'utilise que du HTTPS/TLS standard).
   code, b = req(:get, "/v1/appStoreVersions/#{version_id}/build")
@@ -587,8 +623,7 @@ if MODE == "submit"
                   attributes: { appDescription: "Kiwio — application de nutrition. HTTPS/TLS standard uniquement.",
                                 availableOnFrenchStore: true,
                                 containsProprietaryCryptography: false,
-                                containsThirdPartyCryptography: false,
-                                platform: "IOS" },
+                                containsThirdPartyCryptography: false },
                   relationships: { app: { data: { type: "apps", id: app_id } } } } })
       if ok
         decl_id = resp["data"]["id"]
