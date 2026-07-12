@@ -19,9 +19,12 @@ require "openssl"
 
 BUNDLE_ID = "fr.healthmap.app"
 TARGETS = {
-  "healthmap_monthly" => { price: "4.99",  name: "Kiwio Mensuel", period: "ONE_MONTH" },
-  "healthmap_annual"  => { price: "50.00", name: "Kiwio Annuel",  period: "ONE_YEAR"  },
+  "healthmap_weekly"  => { price: "0.99",  name: "Kiwio Hebdo",   period: "ONE_WEEK",  level: 3 },
+  "healthmap_monthly" => { price: "4.99",  name: "Kiwio Mensuel", period: "ONE_MONTH", level: 1 },
+  "healthmap_annual"  => { price: "50.00", name: "Kiwio Annuel",  period: "ONE_YEAR",  level: 2 },
 }.freeze
+# ONLY_PRODUCT : si défini, apply ne configure QUE ce produit (les autres intacts).
+ONLY_PRODUCT = ENV["ONLY_PRODUCT"].to_s.strip
 MODE = (ENV["MODE"] || "audit").downcase
 BASE = "https://api.appstoreconnect.apple.com"
 
@@ -665,6 +668,7 @@ if report[:groups][0][:localizations].empty?
 end
 
 TARGETS.each do |product_id, spec|
+  next unless ONLY_PRODUCT.empty? || ONLY_PRODUCT == product_id
   puts "\n--- #{product_id} ---"
   entry = all_subs[product_id]
 
@@ -672,7 +676,7 @@ TARGETS.each do |product_id, spec|
     ok, resp = write("création de l'abonnement", :post, "/v1/subscriptions",
       { data: { type: "subscriptions",
                 attributes: { name: spec[:name], productId: product_id,
-                              subscriptionPeriod: spec[:period], familySharable: false, groupLevel: 1 },
+                              subscriptionPeriod: spec[:period], familySharable: false, groupLevel: spec[:level] || 1 },
                 relationships: { group: { data: { type: "subscriptionGroups", id: group_id } } } } })
     (failures << "#{product_id}: création" ; next) unless ok
     entry = { id: resp["data"]["id"] }

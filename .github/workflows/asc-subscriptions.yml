@@ -18,6 +18,11 @@ on:
         required: false
         default: APP_IPHONE_67
         type: string
+      only_product:
+        description: "apply : ne configurer QUE ce productId (ex. healthmap_weekly ; vide = tous)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -55,5 +60,7 @@ jobs:
           REVIEW_SCREENSHOT_PATH: ${{ runner.temp }}/kiwio-paywall-review.png
           DEMO_ACCOUNT_PASSWORD: ${{ secrets.DEMO_ACCOUNT_PASSWORD }}
           REVIEW_CONTACT_PHONE: ${{ secrets.REVIEW_CONTACT_PHONE }}
+          DISPLAY_TYPE: ${{ inputs.display_type }}
+          ONLY_PRODUCT: ${{ inputs.only_product }}
           MODE: ${{ inputs.mode }}
         run: ruby scripts/asc_subscriptions.rb
