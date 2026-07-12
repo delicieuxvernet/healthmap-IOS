@@ -561,6 +561,67 @@ if MODE == "screenshots"
   exit 0
 end
 
+# ── MODE submit : conformité export + soumission de la version à App Review ──
+if MODE == "submit"
+  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=1&filter[appStoreState]=PREPARE_FOR_SUBMISSION")
+  unless code == 200 && v["data"]&.any?
+    code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=1&sort=-createdDate")
+  end
+  abort_with("appStoreVersions", code, v) unless code == 200 && v["data"]&.any?
+  version_id = v["data"][0]["id"]
+  puts "Version : #{v["data"][0].dig("attributes", "versionString")} (#{version_id}) état=#{v["data"][0].dig("attributes", "appStoreState")}"
+
+  # Conformité export : si le build attaché n'a pas de déclaration de chiffrement,
+  # on en crée une EXEMPTE (l'app n'utilise que du HTTPS/TLS standard).
+  code, b = req(:get, "/v1/appStoreVersions/#{version_id}/build")
+  build_id = b.dig("data", "id")
+  if build_id
+    code, ed = req(:get, "/v1/builds/#{build_id}/appEncryptionDeclaration")
+    if code == 200 && ed["data"]
+      puts "Conformité export : déjà présente (#{ed.dig("data", "attributes", "appEncryptionDeclarationState")})"
+    else
+      ok, resp = write("déclaration de chiffrement (exempte)", :post, "/v1/appEncryptionDeclarations",
+        { data: { type: "appEncryptionDeclarations",
+                  attributes: { usesEncryption: false },
+                  relationships: { app: { data: { type: "apps", id: app_id } } } } })
+      if ok
+        decl_id = resp["data"]["id"]
+        write("rattachement build↔déclaration", :post, "/v1/appEncryptionDeclarations/#{decl_id}/relationships/builds",
+          { data: [{ type: "builds", id: build_id }] })
+      end
+    end
+  end
+
+  # 1) Créer la review submission
+  ok, resp = write("création de la soumission", :post, "/v1/reviewSubmissions",
+    { data: { type: "reviewSubmissions",
+              attributes: { platform: "IOS" },
+              relationships: { app: { data: { type: "apps", id: app_id } } } } })
+  # Une soumission ouverte peut déjà exister : on la réutilise.
+  sub_id = ok ? resp["data"]["id"] : nil
+  if sub_id.nil?
+    code, existing = req(:get, "/v1/apps/#{app_id}/reviewSubmissions?filter[state]=READY_FOR_REVIEW,COMPLETING,UNRESOLVED_ISSUES,WAITING_FOR_REVIEW&limit=1")
+    sub_id = existing.dig("data", 0, "id") if code == 200
+    puts "Réutilisation d'une soumission existante : #{sub_id}" if sub_id
+  end
+  abort_with("reviewSubmissions", 0, "impossible de créer/trouver une soumission") unless sub_id
+
+  # 2) Ajouter la version comme item
+  ok, = write("ajout de la version à la soumission", :post, "/v1/reviewSubmissionItems",
+    { data: { type: "reviewSubmissionItems",
+              relationships: { reviewSubmission: { data: { type: "reviewSubmissions", id: sub_id } },
+                               appStoreVersion: { data: { type: "appStoreVersions", id: version_id } } } } })
+
+  # 3) Soumettre
+  write("SOUMISSION à Apple (submitted=true)", :patch, "/v1/reviewSubmissions/#{sub_id}",
+    { data: { type: "reviewSubmissions", id: sub_id, attributes: { submitted: true } } })
+
+  code, s = req(:get, "/v1/reviewSubmissions/#{sub_id}")
+  puts "\n===== ÉTAT SOUMISSION ====="
+  puts JSON.pretty_generate(code == 200 ? s["data"]["attributes"] : s)
+  exit 0
+end
+
 groups = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
 abort_with("subscriptionGroups", 0, "aucun groupe d'abonnement") if groups.empty?
 
