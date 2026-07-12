@@ -571,67 +571,32 @@ if MODE == "submit"
   version_id = v["data"][0]["id"]
   puts "Version : #{v["data"][0].dig("attributes", "versionString")} (#{version_id}) état=#{v["data"][0].dig("attributes", "appStoreState")}"
 
-  # Prix de l'app = GRATUIT (requis même pour un freemium avec achats intégrés).
-  code, sched = req(:get, "/v1/apps/#{app_id}/appPriceSchedule")
-  if code == 200 && sched["data"]
-    puts "Prix de l'app : déjà défini"
+  # Prix de l'app = GRATUIT (le schedule existe toujours mais peut être vide ;
+  # requis même pour un freemium avec achats intégrés). On (re)pose le prix gratuit.
+  free_id = nil
+  url = "/v1/apps/#{app_id}/appPricePoints?filter[territory]=USA&limit=200&fields[appPricePoints]=customerPrice"
+  while url
+    code, body = req(:get, url)
+    abort_with("appPricePoints", code, body) unless code == 200
+    hit = body["data"].find { |p| p.dig("attributes", "customerPrice").to_f == 0.0 }
+    (free_id = hit["id"]; break) if hit
+    url = body.dig("links", "next")
+  end
+  if free_id
+    write("prix de l'app = Gratuit", :post, "/v1/appPriceSchedules",
+      { data: { type: "appPriceSchedules",
+                relationships: {
+                  app: { data: { type: "apps", id: app_id } },
+                  baseTerritory: { data: { type: "territories", id: "USA" } },
+                  manualPrices: { data: [{ type: "appPrices", id: "${p0}" }] } } },
+        included: [{ type: "appPrices", id: "${p0}",
+                    relationships: { appPricePoint: { data: { type: "appPricePoints", id: free_id } } } }] })
   else
-    free_id = nil
-    url = "/v1/apps/#{app_id}/appPricePoints?filter[territory]=USA&limit=200&fields[appPricePoints]=customerPrice"
-    while url
-      code, body = req(:get, url)
-      abort_with("appPricePoints", code, body) unless code == 200
-      hit = body["data"].find { |p| p.dig("attributes", "customerPrice").to_f == 0.0 }
-      (free_id = hit["id"]; break) if hit
-      url = body.dig("links", "next")
-    end
-    if free_id
-      write("prix de l'app = Gratuit", :post, "/v1/appPriceSchedules",
-        { data: { type: "appPriceSchedules",
-                  relationships: {
-                    app: { data: { type: "apps", id: app_id } },
-                    baseTerritory: { data: { type: "territories", id: "USA" } },
-                    manualPrices: { data: [{ type: "appPrices", id: "${p0}" }] } } },
-          included: [{ type: "appPrices", id: "${p0}",
-                      relationships: { appPricePoint: { data: { type: "appPricePoints", id: free_id } } } }] })
-    else
-      puts "  ÉCHEC point de prix gratuit introuvable"
-    end
+    puts "  ÉCHEC point de prix gratuit introuvable"
   end
 
-  # Diagnostic DAC7 (déclaration « service personnel ») : on inspecte l'appInfo.
-  code, infos = req(:get, "/v1/apps/#{app_id}/appInfos?limit=5")
-  if code == 200
-    (infos["data"] || []).each do |ai|
-      puts "appInfo #{ai["id"]} attrs=#{ai["attributes"].inspect}"
-    end
-  end
-
-  # Conformité export : si le build attaché n'a pas de déclaration de chiffrement,
-  # on en crée une EXEMPTE (l'app n'utilise que du HTTPS/TLS standard).
-  code, b = req(:get, "/v1/appStoreVersions/#{version_id}/build")
-  build_id = b.dig("data", "id")
-  if build_id
-    code, ed = req(:get, "/v1/builds/#{build_id}/appEncryptionDeclaration")
-    if code == 200 && ed["data"]
-      puts "Conformité export : déjà présente (#{ed.dig("data", "attributes", "appEncryptionDeclarationState")})"
-    else
-      # App exempte : uniquement du chiffrement standard OS (HTTPS/TLS), aucun
-      # algorithme propriétaire ni tiers → containsProprietary/ThirdParty = false.
-      ok, resp = write("déclaration de chiffrement (exempte)", :post, "/v1/appEncryptionDeclarations",
-        { data: { type: "appEncryptionDeclarations",
-                  attributes: { appDescription: "Kiwio — application de nutrition. HTTPS/TLS standard uniquement.",
-                                availableOnFrenchStore: true,
-                                containsProprietaryCryptography: false,
-                                containsThirdPartyCryptography: false },
-                  relationships: { app: { data: { type: "apps", id: app_id } } } } })
-      if ok
-        decl_id = resp["data"]["id"]
-        write("rattachement build↔déclaration", :post, "/v1/appEncryptionDeclarations/#{decl_id}/relationships/builds",
-          { data: [{ type: "builds", id: build_id }] })
-      end
-    end
-  end
+  # Note : conformité export déjà OK (build TestFlight) — pas dans les bloqueurs.
+  # DAC7 « service personnel » : traité en amont si SUBMIT_DAC7 fourni (voir plus bas).
 
   # 1) Soumission : réutiliser une soumission ouverte, sinon en créer une.
   sub_id = nil
