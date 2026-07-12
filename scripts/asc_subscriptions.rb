@@ -104,7 +104,10 @@ def sub_snapshot(sub_id)
   }
 
   locs = get_all("/v1/subscriptions/#{sub_id}/subscriptionLocalizations?limit=50")
-  snap[:localizations] = locs.map { |l| l["attributes"].slice("locale", "name", "state") }
+  snap[:localizations] = locs.map do |l|
+    a = l["attributes"]
+    { locale: a["locale"], name: a["name"], state: a["state"], hasDescription: !a["description"].to_s.strip.empty? }
+  end
 
   code, pr = req(:get, "/v1/subscriptions/#{sub_id}/prices?filter[territory]=FRA&include=subscriptionPricePoint&limit=200")
   snap[:prices_fra] =
