@@ -338,14 +338,18 @@ struct AuthView: View {
     }
 
     // MARK: - Header
-    /// DA actuelle (crème + kiwi vert) : le LOGO de l'app (le demi-kiwi en
-    /// contour, identique au splash) + le wordmark « Kiwio ». L'ancien header
-    /// (mascotte + titre bleu, dégradé indigo) jurait avec le reste de l'app —
-    /// remplacé par le couple logo + nom, neutre et raccord. Un sous-titre
-    /// discret rappelle l'action en cours (connexion vs inscription).
+    /// DA actuelle (crème + kiwi vert) : le VRAI logo de l'app (le kiwi 3D
+    /// Fluent, celui de l'icône) + le wordmark « Kiwio ». L'ancien header
+    /// (mascotte plate + titre bleu, dégradé indigo) jurait avec le reste de
+    /// l'app — remplacé par le couple logo + nom, neutre et raccord. Un
+    /// sous-titre discret rappelle l'action en cours (connexion vs inscription).
     private var headerSection: some View {
         VStack(spacing: Theme.spacingMD) {
-            KiwiContourMark(size: 76, color: .kiwiCharcoal)
+            Image(Fluent3D.kiwi)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 84, height: 84)
+                .accessibilityHidden(true)
 
             (Text("kiwi").foregroundStyle(Color.kiwiCharcoal)
              + Text("o").foregroundStyle(Color.kiwiGreen))
