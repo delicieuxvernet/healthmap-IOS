@@ -127,11 +127,34 @@ enum SuiviEngineV4 {
         }
     }
 
-    /// Cœur de calcul d'une carte, isolé pour la testabilité.
+    /// Variante PAR SYMPTÔME : chaque symptôme reçoit sa PROPRE série de
+    /// ressentis (`feelingsById[symptomId]`) → chaque courbe évolue
+    /// indépendamment (l'une peut monter pendant que l'autre descend, fin du
+    /// « tout bon ou tout mauvais »). `step` réduit (3) pour une courbe plus
+    /// douce/lissée sur la fenêtre de suivi.
+    static func symptomEvolutions(symptomes: [SymptomeV2]?,
+                                  feelingsById: [String: [Int]],
+                                  isTracking: Bool,
+                                  step: Int = 3) -> [SymptomEvolution] {
+        guard let symptomes, !symptomes.isEmpty else { return [] }
+        return symptomes.compactMap { s in
+            guard let nom = s.nom, !nom.isEmpty else { return nil }
+            let sid = s.id ?? nom
+            let trend = SymptomTrend.make(from: nom)
+            let tracking: SuiviTracking = isTracking
+                ? .real(feelings: feelingsById[sid] ?? [])
+                : .example
+            return evolution(id: sid, nom: nom, trend: trend, tracking: tracking, step: step)
+        }
+    }
+
+    /// Cœur de calcul d'une carte, isolé pour la testabilité. `step` = pas de
+    /// déplacement du niveau par check-in (6 par défaut ; le carrousel v2 passe 3).
     static func evolution(id: String,
                           nom: String,
                           trend: SymptomTrend,
-                          tracking: SuiviTracking) -> SymptomEvolution {
+                          tracking: SuiviTracking,
+                          step: Int = 6) -> SymptomEvolution {
         // La courbe « toi » et son verdict dépendent du MODE :
         //  • example → trajectoire illustrative (rien de réel, badgée « Exemple »).
         //  • real    → série construite UNIQUEMENT à partir des check-ins réels.
@@ -158,7 +181,7 @@ enum SuiviEngineV4 {
 
         case .real(let feelings):
             isExample = false
-            let series = buildRealSeries(baseline: 50, dir: trend.dir, feelings: feelings)
+            let series = buildRealSeries(baseline: 50, dir: trend.dir, feelings: feelings, step: step)
             reel = series.map(Double.init)
             sansKiwio = flatSansKiwio(baseline: 50, count: max(2, series.count))
             // Variation réelle : significative seulement avec ≥ 2 points (≥ 1 check-in).
@@ -327,6 +350,97 @@ enum SuiviEngineV4 {
         }
         guard !daily.isEmpty else { return nil }
         return Int((Double(daily.reduce(0, +)) / Double(daily.count)).rounded())
+    }
+
+    // MARK: - 3bis. Séries quotidiennes (courbes macros / micros du carrousel)
+
+    /// Un point de courbe : une journée + sa valeur MESURÉE. `nil` = aucun scan
+    /// ce jour-là → trou honnête dans la courbe, jamais un 0 inventé.
+    struct DayPoint: Equatable {
+        let date: Date
+        let value: Double?
+    }
+
+    /// Les macros suivies par le carrousel (ordre d'affichage).
+    enum MacroKind: String, CaseIterable, Identifiable {
+        case calories, proteins, carbs, fats, fiber
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .calories: return "Calories"
+            case .proteins: return "Protéines"
+            case .carbs:    return "Glucides"
+            case .fats:     return "Lipides"
+            case .fiber:    return "Fibres"
+            }
+        }
+        var unit: String { self == .calories ? "kcal" : "g" }
+        func value(_ m: MealJournalService.MealMacros) -> Double {
+            switch self {
+            case .calories: return Double(m.calories)
+            case .proteins: return m.proteins
+            case .carbs:    return m.carbs
+            case .fats:     return m.fats
+            case .fiber:    return m.fiber
+            }
+        }
+    }
+
+    /// L'axe des `days` derniers jours (début de journée), du plus ANCIEN à
+    /// aujourd'hui.
+    static func dailyAxis(days: Int, now: Date = Date(), calendar: Calendar = .current) -> [Date] {
+        let today = calendar.startOfDay(for: now)
+        return (0..<max(1, days)).reversed().compactMap {
+            calendar.date(byAdding: .day, value: -$0, to: today)
+        }
+    }
+
+    /// Série quotidienne d'UNE macro sur `days` jours : valeur = somme de la
+    /// macro sur les repas du jour ; jour sans repas = `nil` (trou honnête).
+    static func macroDailySeries(fortnight: [MealJournalService.MealRecord],
+                                 macro: MacroKind,
+                                 days: Int = 14,
+                                 now: Date = Date(),
+                                 calendar: Calendar = .current) -> [DayPoint] {
+        let byDay = Dictionary(grouping: fortnight) { calendar.startOfDay(for: $0.consumedAt) }
+        return dailyAxis(days: days, now: now, calendar: calendar).map { day in
+            guard let meals = byDay[day], !meals.isEmpty else { return DayPoint(date: day, value: nil) }
+            return DayPoint(date: day, value: meals.reduce(0.0) { $0 + macro.value($1.macros) })
+        }
+    }
+
+    /// Série quotidienne de couverture d'un micronutriment : `min(100, Σ pctRDA)`
+    /// par jour (même formule que `averageDailyCoverage`, mais en SÉRIE) ; jour
+    /// sans micro = `nil`.
+    static func microDailySeries(fortnight: [MealJournalService.MealRecord],
+                                 id: String,
+                                 days: Int = 14,
+                                 now: Date = Date(),
+                                 calendar: Calendar = .current) -> [DayPoint] {
+        let byDay = Dictionary(grouping: fortnight.filter { !$0.micros.isEmpty }) {
+            calendar.startOfDay(for: $0.consumedAt)
+        }
+        return dailyAxis(days: days, now: now, calendar: calendar).map { day in
+            guard let meals = byDay[day] else { return DayPoint(date: day, value: nil) }
+            let sum = meals.flatMap(\.micros).filter { $0.id == id }.map(\.pctRDA).reduce(0, +)
+            return DayPoint(date: day, value: Double(min(100, sum)))
+        }
+    }
+
+    /// Résumé « il y a N j : X · aujourd'hui : Y » d'une série : premier et
+    /// dernier points RÉELS (non nil) + écart en jours entre eux. `nil` si
+    /// aucun point mesuré. Sert à l'insight honnête sous chaque courbe.
+    struct SeriesSummary: Equatable {
+        let first: Double
+        let last: Double
+        let gapDays: Int
+        var delta: Double { last - first }
+    }
+    static func seriesSummary(_ points: [DayPoint], calendar: Calendar = .current) -> SeriesSummary? {
+        let real = points.filter { $0.value != nil }
+        guard let f = real.first, let l = real.last, let fv = f.value, let lv = l.value else { return nil }
+        let gap = calendar.dateComponents([.day], from: f.date, to: l.date).day ?? 0
+        return SeriesSummary(first: fv, last: lv, gapDays: gap)
     }
 
     // MARK: - 4. « Pour faire mieux la semaine prochaine » (2 conseils)
@@ -540,6 +654,41 @@ enum SuiviCheckinHistory {
             guard let d = calendar.date(byAdding: .day, value: -k, to: now) else { continue }
             let dict = UserDefaults.standard.dictionary(forKey: dayKey(dayString(d))) as? [String: Int]
             if let v = dict?[feelKey] { out.append(v) }
+        }
+        return out
+    }
+
+    /// Clé de ressenti PAR symptôme dans le dict quotidien (`feel_<id>`).
+    /// Partagée avec `SuiviCheckinStore.saveToday` (écriture) — ne pas diverger.
+    static func feelKeyFor(_ symptomId: String) -> String { "feel_\(symptomId)" }
+
+    /// Ressentis PAR symptôme depuis `start` : pour chaque id, sa série de
+    /// ressentis réels (0/1/2), du plus ANCIEN au plus récent. Un jour sans
+    /// réponse pour un symptôme est absent de SA série (chaque courbe est donc
+    /// indépendante). Repli : pour le PREMIER id (symptôme principal), l'ancienne
+    /// clé unique `symptome_today` des comptes existants est acceptée si la clé
+    /// par symptôme manque ce jour-là (continuité).
+    static func feelingsById(symptomIds: [String],
+                             since start: Date,
+                             now: Date = Date(),
+                             calendar: Calendar = .current) -> [String: [Int]] {
+        let from = calendar.startOfDay(for: start)
+        let to = calendar.startOfDay(for: now)
+        let dayCount = calendar.dateComponents([.day], from: from, to: to).day ?? 0
+        guard dayCount >= 0, !symptomIds.isEmpty else { return [:] }
+        let primary = symptomIds.first
+        var out: [String: [Int]] = [:]
+        for k in 0...dayCount {
+            guard let d = calendar.date(byAdding: .day, value: k, to: from),
+                  let dict = UserDefaults.standard.dictionary(forKey: dayKey(dayString(d))) as? [String: Int]
+            else { continue }
+            for sid in symptomIds {
+                if let v = dict[feelKeyFor(sid)] {
+                    out[sid, default: []].append(v)
+                } else if sid == primary, let legacy = dict[feelKey] {
+                    out[sid, default: []].append(legacy)
+                }
+            }
         }
         return out
     }

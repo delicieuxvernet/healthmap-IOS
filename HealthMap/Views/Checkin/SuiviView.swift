@@ -56,6 +56,10 @@ struct SuiviView: View {
     /// par les check-ins réels. Initialisé depuis SuiviTrackingStore à l'affichage.
     @State private var isTracking = false
 
+    /// Incrémenté après chaque check-in pour forcer le recalcul des courbes
+    /// symptômes (qui relisent les ressentis persistés à la volée).
+    @State private var checkinTick = 0
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -65,11 +69,12 @@ struct SuiviView: View {
                     VStack(spacing: 14) {
                         titleBlock
                         SuiviStatsRow(stats: stats)
-                        symptomSection
+                        macroCarousel
+                        microCarousel
+                        symptomCarousel
                         SuiviNeedsCard(delta: stats.besoinsDuJourDeltaPct,
                                        stepsToday: stepsToday,
                                        tips: weeklyTips)
-                        SuiviCoverageCard(coverage: coverage)
                         SuiviPaliersCard(paliers: paliers)
                     }
                     .padding(.horizontal, 20)
@@ -99,12 +104,12 @@ struct SuiviView: View {
             .overlay {
                 if showCheckin {
                     SuiviCheckinPopup(
-                        symptomTrend: primaryTrend,
+                        symptoms: checkinSymptoms,
                         reduceMotion: reduceMotion,
-                        onFinish: { feel, energy in
-                            SuiviCheckinStore.saveToday(symptomFeel: feel, energyFeel: energy)
+                        onFinish: { feels, energy in
+                            SuiviCheckinStore.saveToday(symptomFeels: feels, energyFeel: energy)
                             gamification.recordCheckin()
-                            checkinHistory = SuiviCheckinHistory.recentFeelings()
+                            checkinTick += 1
                             HapticService.shared.success()
                         },
                         onLater: {
@@ -135,8 +140,10 @@ struct SuiviView: View {
                 Task { await journal.load() }
             }
             .onAppear {
-                // Présenté UNE fois par jour, jamais si déjà répondu / snoozé.
-                if SuiviCheckinStore.shouldPromptToday() {
+                // Présenté UNE fois par jour, jamais si déjà répondu / snoozé, et
+                // uniquement s'il y a au moins un symptôme déclaré à suivre (sinon
+                // le pop-up n'aurait aucune question exploitable).
+                if SuiviCheckinStore.shouldPromptToday(), !checkinSymptoms.isEmpty {
                     if reduceMotion {
                         showCheckin = true
                     } else {
@@ -163,32 +170,147 @@ struct SuiviView: View {
         .padding(.top, 4)
     }
 
-    // MARK: - 3. Section symptômes (1 carte auto-explicite par symptôme)
+    // MARK: - 3. Carrousel MACROS (vraies grammes/kcal par jour, scannées)
+    private var macroCarousel: some View {
+        let kinds = SuiviEngineV4.MacroKind.allCases
+        return SuiviCarouselBlock(
+            title: "Macros du jour",
+            systemIcon: "flame.fill",
+            tint: Color.kiwiGreen,
+            pageTitles: kinds.map(\.label),
+            pageHeight: 168
+        ) { i in
+            let kind = kinds[i]
+            let series = SuiviEngineV4.macroDailySeries(fortnight: journal.fortnight, macro: kind)
+            VStack(alignment: .leading, spacing: 10) {
+                SuiviValueChart(points: series, color: macroColor(kind), fixedPercent: false)
+                    .frame(height: 112)
+                SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: kind.unit)
+            }
+        }
+    }
+
+    // MARK: - 4. Carrousel MICROS (couverture % AJR par jour, apports à renforcer)
     @ViewBuilder
-    private var symptomSection: some View {
-        // Mode réel dès que le suivi est démarré : la courbe « toi » ne réagit
-        // qu'aux check-ins réels enregistrés depuis la date de début. Sinon, on
-        // montre l'EXEMPLE (badgé, avec un bandeau « Commencer mon suivi »).
-        let tracking: SuiviEngineV4.SuiviTracking = isTracking
-            ? .real(feelings: SuiviCheckinHistory.feelingsSince(SuiviTrackingStore.startDate() ?? Date()))
-            : .example
+    private var microCarousel: some View {
+        let ids = microIds
+        if ids.isEmpty {
+            emptyMicroCard
+        } else {
+            SuiviCarouselBlock(
+                title: "Micros à renforcer",
+                systemIcon: "flask.fill",
+                tint: Color(hex: "C9A227"),
+                pageTitles: ids.map { NutrientData.definition(for: $0)?.label ?? $0 },
+                pageHeight: 168
+            ) { i in
+                let id = ids[i]
+                let series = SuiviEngineV4.microDailySeries(fortnight: journal.fortnight, id: id)
+                VStack(alignment: .leading, spacing: 10) {
+                    SuiviValueChart(points: series, color: microColor(id), fixedPercent: true)
+                        .frame(height: 112)
+                    SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: "%")
+                }
+            }
+        }
+    }
+
+    private var emptyMicroCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "flask")
+                .font(.system(size: 18))
+                .foregroundStyle(Color.healthMapMuted)
+            Text("Scanne des repas pour suivre tes apports à renforcer.")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.healthMapSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .kiwiCard()
+    }
+
+    // MARK: - 5. Carrousel SYMPTÔMES (cumulé +/- PAR symptôme, indépendant)
+    @ViewBuilder
+    private var symptomCarousel: some View {
+        // `checkinTick` est LU ici pour forcer le recalcul après un check-in
+        // (les ressentis sont relus depuis UserDefaults à la volée).
+        let _ = checkinTick
+        let ids = checkinSymptomIds
+        // Mode réel dès le suivi démarré : chaque courbe ne réagit qu'aux
+        // check-ins réels de SON symptôme (`feelingsById`). Sinon EXEMPLE badgé.
+        let feelingsById = isTracking
+            ? SuiviCheckinHistory.feelingsById(symptomIds: ids,
+                                               since: SuiviTrackingStore.startDate() ?? Date())
+            : [:]
         let evolutions = SuiviEngineV4.symptomEvolutions(
             symptomes: dashboardVM.analysisV2?.bilan?.symptomes,
-            tracking: tracking
+            feelingsById: feelingsById,
+            isTracking: isTracking
         )
         if !evolutions.isEmpty {
-            // Bandeau UNIQUE en tête de section, uniquement en mode exemple.
-            if !isTracking {
-                SuiviStartBanner(action: startTracking)
-            }
-            ForEach(evolutions) { evo in
-                SuiviSymptomCard(evolution: evo, reduceMotion: reduceMotion)
+            VStack(spacing: 10) {
+                if !isTracking {
+                    SuiviStartBanner(action: startTracking)
+                }
+                SuiviCarouselBlock(
+                    title: "Symptômes",
+                    systemIcon: "heart.text.square",
+                    tint: Color(hex: "5B49B5"),
+                    pageTitles: evolutions.map { capitalized($0.nom) },
+                    pageHeight: 214
+                ) { i in
+                    SuiviSymptomPage(evolution: evolutions[i], reduceMotion: reduceMotion)
+                }
             }
         } else if dashboardVM.isLoadingAnalysisV2 {
             SuiviLoadingCard(text: "On regarde tes symptômes déclarés…")
         } else {
             SuiviNoSymptomCard()
         }
+    }
+
+    // MARK: - Sélecteurs de données des carrousels
+
+    /// Symptômes déclarés (id + nom + sens) — pilotent le carrousel ET le check-in.
+    private var checkinSymptoms: [(id: String, nom: String, trend: SymptomTrend)] {
+        (dashboardVM.analysisV2?.bilan?.symptomes ?? []).compactMap { s in
+            guard let nom = s.nom, !nom.isEmpty else { return nil }
+            return (s.id ?? nom, nom, SymptomTrend.make(from: nom))
+        }
+    }
+    private var checkinSymptomIds: [String] { checkinSymptoms.map(\.id) }
+
+    /// Micros du carrousel : apports à renforcer (< 60) en priorité ; à défaut,
+    /// tous les micros réellement présents dans les scans. Ordre canonique, ≤ 8.
+    private var microIds: [String] {
+        let weak = weakNutrientIds
+        let base = weak.isEmpty
+            ? Array(Set(journal.fortnight.flatMap { $0.micros.map(\.id) }))
+            : weak
+        let canonical = NutrientData.all.map { $0.id.rawValue }
+        let sorted = base.sorted { a, b in
+            let ia = canonical.firstIndex(of: a) ?? Int.max
+            let ib = canonical.firstIndex(of: b) ?? Int.max
+            return ia == ib ? a < b : ia < ib
+        }
+        return Array(sorted.prefix(8))
+    }
+
+    private func macroColor(_ k: SuiviEngineV4.MacroKind) -> Color {
+        switch k {
+        case .calories: return Color.kiwiCharcoal
+        case .proteins: return Color.macroProtein
+        case .carbs:    return Color.macroCarb
+        case .fats:     return Color.macroFat
+        case .fiber:    return Color.kiwiGreen
+        }
+    }
+    private func microColor(_ id: String) -> Color { Color.nutrientColor(for: id) }
+
+    private func capitalized(_ s: String) -> String {
+        guard let f = s.first else { return s }
+        return f.uppercased() + s.dropFirst()
     }
 
     /// Bascule vers le VRAI suivi : fige la date de début et recharge la série
@@ -240,13 +362,6 @@ struct SuiviView: View {
     private var paliers: SuiviEngineV4.NextPaliers {
         SuiviEngineV4.nextPaliers(streak: gamification.currentStreak,
                                   besoinsCouvertsPct: stats.besoinsCouvertsPct)
-    }
-
-    /// Sens/libellés du 1er symptôme déclaré — pilote la 1re question du pop-up.
-    private var primaryTrend: SymptomTrend? {
-        guard let nom = dashboardVM.analysisV2?.bilan?.symptomes?.first?.nom,
-              !nom.isEmpty else { return nil }
-        return SymptomTrend.make(from: nom)
     }
 
     // MARK: - Apple Santé (lecture des pas du jour, hors main pour ne pas bloquer)
@@ -440,7 +555,7 @@ private struct SuiviStartBanner: View {
 /// Verdict d'abord (pastille), phrase d'insight en gros, variation signée, puis
 /// mini-graphe à 3 séries avec labels POSÉS directement sur les courbes (« toi »
 /// / « sans Kiwio ») et sur les pôles de l'axe. Plus d'onglets ni de légende.
-private struct SuiviSymptomCard: View {
+private struct SuiviSymptomPage: View {
     let evolution: SuiviEngineV4.SymptomEvolution
     let reduceMotion: Bool
 
@@ -496,18 +611,11 @@ private struct SuiviSymptomCard: View {
     }
 
     var body: some View {
+        // Le nom du symptôme est déjà porté par l'en-tête du carrousel : ici on
+        // ne garde que la pastille de verdict, l'insight et la courbe (pas de
+        // carte — le bloc carrousel fournit déjà la carte crème).
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center) {
-                HStack(spacing: 6) {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 7))
-                        .foregroundStyle(Color.kiwiGreenInk)
-                    Text(capitalizedNom)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.kiwiGreenInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
+            HStack {
                 Spacer(minLength: 8)
                 HStack(spacing: 5) {
                     if let icon = pillIcon {
@@ -523,26 +631,21 @@ private struct SuiviSymptomCard: View {
                 .background(Capsule().fill(pillBg))
             }
 
-            // Pas de pourcentage chiffré ici : la base de comparaison ("sans Kiwio")
-            // est une trajectoire de référence illustrative, pas une mesure precise
-            // du symptôme — un chiffre à deux décimales de confiance ("-38%")
-            // laisserait croire à une precision qui n'existe pas (audit du
-            // 2026-07-05). Le verdict (pastille) + la phrase d'insight suffisent.
+            // Pas de pourcentage chiffré : la référence ("sans Kiwio") est une
+            // trajectoire illustrative, pas une mesure précise du symptôme — un
+            // "-38%" laisserait croire à une précision qui n'existe pas (audit
+            // 2026-07-05). Le verdict (pastille) + l'insight suffisent.
             Text(insightSentence)
-                .font(.system(size: 17, weight: .heavy))
+                .font(.system(size: 15.5, weight: .heavy))
                 .foregroundStyle(Color.kiwiCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 9)
+                .padding(.top, 6)
 
             SuiviPosedChart(evolution: evolution, progress: progress)
                 .frame(height: 132)
-                .padding(.top, 12)
+                .padding(.top, 10)
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 18)
-        .padding(.bottom, 14)
-        .frame(maxWidth: .infinity)
-        .kiwiCard()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             if reduceMotion { progress = 1 }
             else { withAnimation(.easeOut(duration: 1.0).delay(0.1)) { progress = 1 } }
@@ -1099,23 +1202,26 @@ private struct GaugeBar: View {
 /// / énergie), bouton « Plus tard », confirmation verte quand les 2 sont
 /// répondues. Écrit dans SuiviCheckinStore (mêmes clés que SuiviCheckinHistory).
 private struct SuiviCheckinPopup: View {
-    /// Sens/libellés du 1er symptôme (nil = pas de symptôme → question générique).
-    let symptomTrend: SymptomTrend?
+    /// Symptômes déclarés (id + nom + sens) — UNE question 1-tap par symptôme,
+    /// pour que chaque courbe évolue indépendamment.
+    let symptoms: [(id: String, nom: String, trend: SymptomTrend)]
     let reduceMotion: Bool
-    let onFinish: (_ symptomFeel: Int, _ energyFeel: Int) -> Void
+    /// Ressenti PAR symptôme (id → 0/1/2) + énergie optionnelle.
+    let onFinish: (_ symptomFeels: [String: Int], _ energyFeel: Int?) -> Void
     let onLater: () -> Void
     @Binding var isPresented: Bool
 
-    @State private var symptomChoice: Int?
+    @State private var choices: [String: Int] = [:]
     @State private var energyChoice: Int?
     @State private var confirmed = false
 
-    /// Libellés de la 1re question (dépend du symptôme, sinon « en forme »).
-    private var symptomQuestion: String {
-        symptomTrend?.checkinQuestion ?? "En forme cette semaine\u{00A0}?"
+    private func choiceBinding(_ id: String) -> Binding<Int?> {
+        Binding(get: { choices[id] }, set: { choices[id] = $0 })
     }
-    private var symptomBetter: String { symptomTrend?.betterLabel ?? "Mieux" }
-    private var symptomWorse: String { symptomTrend?.worseLabel ?? "Moins bien" }
+    private func capitalized(_ s: String) -> String {
+        guard let f = s.first else { return s }
+        return f.uppercased() + s.dropFirst()
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -1155,10 +1261,10 @@ private struct SuiviCheckinPopup: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("2 questions rapides")
+                    Text("Comment tu te sens ?")
                         .font(.system(size: 20, weight: .heavy))
                         .foregroundStyle(Color.kiwiCharcoal)
-                    Text("10 secondes — ça met tes courbes à jour")
+                    Text("Un tap par symptôme — ça met tes courbes à jour")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.healthMapMuted)
                 }
@@ -1175,25 +1281,31 @@ private struct SuiviCheckinPopup: View {
                 .accessibilityLabel("Plus tard")
             }
 
-            // Question 1 — symptôme
-            questionBlock(
-                icon: "hand.raised.fingers.spread",
-                title: symptomQuestion,
-                better: symptomBetter,
-                worse: symptomWorse,
-                selection: $symptomChoice
-            )
-            .padding(.top, 16)
-
-            // Question 2 — énergie (toujours « plus haut = mieux »)
-            questionBlock(
-                icon: "bolt.fill",
-                title: "Ton énergie, aujourd'hui\u{00A0}?",
-                better: "En forme",
-                worse: "À plat",
-                selection: $energyChoice
-            )
-            .padding(.top, 14)
+            // Une question 1-tap par symptôme déclaré, puis l'énergie du jour.
+            // Scrollable + hauteur bornée : reste utilisable même avec 3 symptômes.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(symptoms, id: \.id) { s in
+                        questionBlock(
+                            icon: "heart.text.square",
+                            title: capitalized(s.nom),
+                            better: s.trend.betterLabel,
+                            worse: s.trend.worseLabel,
+                            selection: choiceBinding(s.id)
+                        )
+                    }
+                    questionBlock(
+                        icon: "bolt.fill",
+                        title: "Ton énergie, aujourd'hui\u{00A0}?",
+                        better: "En forme",
+                        worse: "À plat",
+                        selection: $energyChoice
+                    )
+                }
+                .padding(.top, 16)
+            }
+            .frame(maxHeight: 356)
+            .scrollBounceBehavior(.basedOnSize)
 
             Button { validate() } label: {
                 Text("C'est noté")
@@ -1203,13 +1315,13 @@ private struct SuiviCheckinPopup: View {
                     .frame(minHeight: 50)
                     .background(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(bothAnswered ? Color.kiwiGreen : Color.healthMapMuted)
+                            .fill(anyAnswered ? Color.kiwiGreen : Color.healthMapMuted)
                     )
             }
             .buttonStyle(.healthMapPressed)
-            .disabled(!bothAnswered)
-            .padding(.top, 18)
-            .accessibilityHint(bothAnswered ? "Enregistre tes réponses" : "Réponds aux deux questions d'abord")
+            .disabled(!anyAnswered)
+            .padding(.top, 16)
+            .accessibilityHint(anyAnswered ? "Enregistre tes réponses" : "Réponds à au moins un symptôme")
         }
     }
 
@@ -1289,11 +1401,11 @@ private struct SuiviCheckinPopup: View {
         .accessibilityLabel("\(label)\(isSelected ? ", sélectionné" : "")")
     }
 
-    private var bothAnswered: Bool { symptomChoice != nil && energyChoice != nil }
+    private var anyAnswered: Bool { !choices.isEmpty }
 
     private func validate() {
-        guard let symptom = symptomChoice, let energy = energyChoice else { return }
-        onFinish(symptom, energy)
+        guard !choices.isEmpty else { return }
+        onFinish(choices, energyChoice)
         if reduceMotion {
             confirmed = true
         } else {
@@ -1315,7 +1427,8 @@ private struct SuiviCheckinPopup: View {
 }
 
 // MARK: - Maths partagées des courbes (lissage Catmull-Rom → Bézier)
-private enum SuiviCurveMath {
+// Interne (pas `private`) : réutilisé par `SuiviValueChart` (autre fichier).
+enum SuiviCurveMath {
     static func smoothPath(_ p: [CGPoint]) -> Path {
         var path = Path()
         guard p.count > 1 else { return path }
@@ -1362,10 +1475,12 @@ enum SuiviCheckinStore {
         "healthmap_suivi_prompted_\(uid)_\(day)"
     }
 
-    /// Réponse du jour déjà enregistrée (courbe « toi » nourrie) ?
+    /// Réponse du jour déjà enregistrée (au moins un symptôme) ?
     static func hasAnsweredToday() -> Bool {
-        let dict = UserDefaults.standard.dictionary(forKey: checkinKey(dayString())) as? [String: Int]
-        return dict?[symptomFeelKey] != nil
+        guard let dict = UserDefaults.standard.dictionary(forKey: checkinKey(dayString())) as? [String: Int]
+        else { return false }
+        // Nouveau format : au moins une clé `feel_<id>` ; repli ancien format.
+        return dict.keys.contains { $0.hasPrefix("feel_") } || dict[symptomFeelKey] != nil
     }
 
     /// Faut-il présenter le pop-up aujourd'hui ? Non si déjà répondu OU reporté.
@@ -1374,12 +1489,14 @@ enum SuiviCheckinStore {
         return !UserDefaults.standard.bool(forKey: promptedKey(dayString()))
     }
 
-    /// Enregistre les 2 ressentis du jour dans le dictionnaire scopé jour, et
-    /// marque le pop-up comme présenté.
-    static func saveToday(symptomFeel: Int, energyFeel: Int) {
+    /// Enregistre le ressenti de CHAQUE symptôme répondu (`feel_<id>`) + l'énergie
+    /// optionnelle dans le dictionnaire scopé jour, et marque le pop-up présenté.
+    static func saveToday(symptomFeels: [String: Int], energyFeel: Int?) {
         var dict = (UserDefaults.standard.dictionary(forKey: checkinKey(dayString())) as? [String: Int]) ?? [:]
-        dict[symptomFeelKey] = symptomFeel
-        dict[energyFeelKey] = energyFeel
+        for (sid, feel) in symptomFeels {
+            dict[SuiviCheckinHistory.feelKeyFor(sid)] = feel
+        }
+        if let energyFeel { dict[energyFeelKey] = energyFeel }
         UserDefaults.standard.set(dict, forKey: checkinKey(dayString()))
         UserDefaults.standard.set(true, forKey: promptedKey(dayString()))
     }
