@@ -244,6 +244,26 @@ final class DashboardViewModel: ObservableObject {
         }
 
         isLoadingProfile = false
+
+        // Hydrate le bilan v2 depuis le CACHE DB si le profil n'a pas changé
+        // (hash identique) — AVANT de débloquer le routing et de lancer
+        // l'analyse. Sinon `analysisV2` reste nil pendant le round-trip de
+        // `fetchBilanV2`, et la gate de chargement plein écran (AnalysisGateView,
+        // condition `analysisV2 == nil && isLoadingAnalysisV2`) CLIGNOTE à chaque
+        // ouverture. En posant le bilan caché ici, la gate ne s'affiche plus que
+        // pour un tout premier bilan (aucun cache) ou un profil modifié (hash
+        // différent). Lecture DB pure — aucun appel IA. `triggerAnalysis()`
+        // rafraîchira ensuite en arrière-plan sans re-vider `analysisV2`.
+        if hasCompletedQuestionnaire, analysisV2 == nil {
+            let hash = AIAnalysisService.hashProfile(profile)
+            // `(try? …) ?? nil` aplatit le double-optionnel (la fonction rend déjà
+            // `AIAnalysisV2?`) — même motif que dans AIAnalysisService.fetchBilanV2.
+            if let cached = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil,
+               cached.meta?.profileHash == hash {
+                analysisV2 = cached
+            }
+        }
+
         // Le statut de routing (`hasCompletedQuestionnaire`) est désormais
         // connu → on peut afficher la bonne branche sans clignotement.
         didFinishInitialLoad = true
