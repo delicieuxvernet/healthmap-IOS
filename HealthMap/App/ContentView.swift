@@ -269,6 +269,23 @@ struct MainTabView: View {
     // (bug persistant builds 179→202).
 
     var body: some View {
+        // Tant que le PREMIER chargement du profil n'est pas terminé, on tient
+        // le MÊME écran de chargement que le splash racine : la transition
+        // splash → ici est invisible (pixels identiques), et surtout on ne rend
+        // JAMAIS le questionnaire / les onglets verrouillés avec un état encore
+        // inconnu (fin du clignotement d'« écrans faux » au démarrage à froid).
+        Group {
+            if dashboardVM.didFinishInitialLoad {
+                mainInterface
+            } else {
+                LaunchScreenView()
+            }
+        }
+        .animation(reduceMotion ? .none : .easeInOut(duration: 0.3),
+                   value: dashboardVM.didFinishInitialLoad)
+    }
+
+    private var mainInterface: some View {
         TabView(selection: $selectedTab) {
             // Tab 1: Bilan (Dashboard or Questionnaire)
             Group {
