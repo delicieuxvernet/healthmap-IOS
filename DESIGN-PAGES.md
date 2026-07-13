@@ -140,6 +140,34 @@ carte « Check-in du jour » (3 gros boutons glass Énergie/Sommeil/Stress + CTA
 position 2 ; delta vert « +N depuis ton dernier bilan » en tête. Jamais de faux chiffres,
 jamais de culpabilisation (pas de compteur d'inactivité).
 
+### 4bis — Refonte « 3 carrousels de courbes » (13 juil. 2026, maquette validée)
+
+L'onglet Suivi passe d'une pile verticale à **3 carrousels de courbes défilables
+à flèches ‹ ›** (ordre haut→bas validé : **Macros → Micros → Symptômes**). Corps :
+titre · `SuiviStatsRow` · carrousel Macros · carrousel Micros · carrousel Symptômes ·
+`SuiviNeedsCard` (conseils) · `SuiviPaliersCard`. Les anciennes **barres de couverture**
+(`SuiviCoverageCard`) ne sont plus affichées (remplacées par le carrousel Micros).
+
+- **Carrousel Macros** — pages Calories / Protéines / Glucides / Lipides / Fibres :
+  **vraies valeurs mesurées par jour** (somme des scans du jour, 14 j) ; jours sans
+  scan = trou (jamais un 0 inventé) ; insight « il y a N j : X · aujourd'hui : Y ».
+- **Carrousel Micros** — pages = apports à renforcer (< 60), sinon micros présents :
+  couverture **% AJR par jour** `min(100, Σ pctRDA)`, repère 100 % ; même insight.
+- **Carrousel Symptômes** — 1 page par symptôme déclaré : courbe cumulée **+/- PAR
+  symptôme** (chaque courbe indépendante — fin du « tout bon ou tout mauvais »),
+  `step 3` (lissée), pastille de verdict. Bandeau « Commencer mon suivi » tant que
+  le suivi n'est pas démarré (courbes = exemples badgés).
+- **Check-in PAR symptôme** : le pop-up quotidien pose **une question 1-tap par
+  symptôme** (mieux / pareil / moins bien) + énergie ; stockage `feel_<id>` (repli
+  ancienne clé `symptome_today` pour le symptôme principal). Chaque ressenti nourrit
+  UNIQUEMENT la courbe de SON symptôme.
+
+Code : `SuiviView.swift` · `SuiviCarouselComponents.swift` (`SuiviCarouselBlock`,
+`SuiviValueChart`, `SuiviCurveInsight`) · `SuiviEngineV4.swift` (`macroDailySeries`,
+`microDailySeries`, `seriesSummary`, `symptomEvolutions(feelingsById:)`,
+`SuiviCheckinHistory.feelingsById`). Fenêtre 14 j = `MealJournalViewModel.fortnight`
+(aucun chargement réseau en plus).
+
 ## 5. MES COMPLÉMENTS (future page, remplacera l'onglet Profil — P6)
 
 Timeline « Matin / Soir » (sections vides affichées : « Aucun complément le soir pour
