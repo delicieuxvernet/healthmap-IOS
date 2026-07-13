@@ -49,7 +49,7 @@ struct AuthView: View {
 
     var body: some View {
         ZStack {
-            Color.healthMapBackground
+            Color.kiwiCream
                 .ignoresSafeArea()
                 .onTapGesture { focusedField = nil }
 
@@ -108,7 +108,7 @@ struct AuthView: View {
                                 } label: {
                                     Text("Mot de passe oublie ?")
                                         .font(Theme.captionBoldFont)
-                                        .foregroundStyle(Color.healthMapBlue)
+                                        .foregroundStyle(Color.kiwiGreenInk)
                                         .frame(minHeight: 44)
                                         .contentShape(Rectangle())
                                 }
@@ -157,12 +157,9 @@ struct AuthView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
-                        .background(LinearGradient.healthMapBrand)
+                        .background(Color.kiwiGreen)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                        .shadow(color: Color.healthMapBlue.opacity(Theme.shadowBrandGlow.opacity),
-                                radius: Theme.shadowBrandGlow.radius,
-                                x: 0,
-                                y: Theme.shadowBrandGlow.y)
+                        .shadow(color: Color.kiwiGreen.opacity(0.34), radius: 13, x: 0, y: 10)
                     }
                     .buttonStyle(.healthMapPressed)
                     .disabled(authViewModel.isProcessing)
@@ -242,7 +239,7 @@ struct AuthView: View {
                         } label: {
                             Text(isSignUp ? "Se connecter" : "Creer un compte")
                                 .font(Theme.subheadlineFont.weight(.semibold))
-                                .foregroundStyle(Color.healthMapBlue)
+                                .foregroundStyle(Color.kiwiGreenInk)
                                 .frame(minHeight: 44)
                                 .contentShape(Rectangle())
                         }
@@ -341,19 +338,23 @@ struct AuthView: View {
     }
 
     // MARK: - Header
-    /// Typo harmonisée via ThemeConstants : titre = l'ACTION en cours (le
-    /// wordmark Kiwio vit sur la LandingView, visible derrière le sheet),
-    /// tailles Dynamic-Type-aware, tout centré. La petite mascotte fait le
-    /// lien visuel avec la page de garde.
+    /// DA actuelle (crème + kiwi vert) : le VRAI logo de l'app (le kiwi 3D
+    /// Fluent, celui de l'icône) + le wordmark « Kiwio ». L'ancien header
+    /// (mascotte plate + titre bleu, dégradé indigo) jurait avec le reste de
+    /// l'app — remplacé par le couple logo + nom, neutre et raccord. Un
+    /// sous-titre discret rappelle l'action en cours (connexion vs inscription).
     private var headerSection: some View {
-        VStack(spacing: Theme.spacingSM) {
-            MascotView(mood: .idle, size: 64)
+        VStack(spacing: Theme.spacingMD) {
+            Image(Fluent3D.kiwi)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 84, height: 84)
+                .accessibilityHidden(true)
 
-            Text(isSignUp ? "Crée ton compte" : "Content de te revoir")
-                .font(Theme.titleFont)
+            (Text("kiwi").foregroundStyle(Color.kiwiCharcoal)
+             + Text("o").foregroundStyle(Color.kiwiGreen))
+                .font(.system(size: 30, weight: .bold, design: .rounded))
                 .brandTitleKerning()
-                .foregroundStyle(Color.healthMapText)
-                .multilineTextAlignment(.center)
 
             Text(isSignUp
                  ? "Gratuit — ton bilan nutritionnel t'attend."

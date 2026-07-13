@@ -16,6 +16,14 @@ final class DashboardViewModel: ObservableObject {
     @Published var healthScore: Int = 0
     @Published var nutrientScores: [String: Int] = [:]
     @Published var hasCompletedQuestionnaire = false
+    /// Passe à `true` une fois le PREMIER `loadProfile` terminé (succès, échec
+    /// ou pas de session) — succès OU échec. Tant qu'il est `false`, la racine
+    /// (`MainTabView`) tient un écran de chargement propre AU LIEU de rendre
+    /// une branche dont l'état n'est pas encore connu : sinon, au démarrage à
+    /// froid, `hasCompletedQuestionnaire` valant `false` par défaut faisait
+    /// clignoter le questionnaire (ou les onglets verrouillés) une fraction de
+    /// seconde avant de basculer sur le Dashboard (« écrans faux » au réveil).
+    @Published var didFinishInitialLoad = false
     @Published var errorMessage: String?
     /// Erreur dédiée au bilan v2 (écran de chargement/gate onboarding).
     /// Distincte de `errorMessage` (v7, autre bandeau) pour ne pas faire
@@ -157,6 +165,14 @@ final class DashboardViewModel: ObservableObject {
         initTask = Task {
             await loadProfile()
         }
+        // Filet de sécurité : ne JAMAIS piéger l'utilisateur sur l'écran de
+        // chargement racine si le fetch profil traîne (réseau cassé, SDK bloqué).
+        // Passé 8 s, on autorise le routing avec l'état dont on dispose — même
+        // esprit que le garde-fou de 10 s d'`AuthViewModel.isLoading`.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            self?.didFinishInitialLoad = true
+        }
         observeReconnect()
     }
 
@@ -197,6 +213,9 @@ final class DashboardViewModel: ObservableObject {
         guard !isLoadingProfile else { return }
 
         guard let session = await AuthService.shared.currentSession else {
+            // Pas de session résolue : on a « essayé », on débloque le routing
+            // pour ne pas rester coincé sur l'écran de chargement racine.
+            didFinishInitialLoad = true
             return
         }
 
@@ -225,6 +244,9 @@ final class DashboardViewModel: ObservableObject {
         }
 
         isLoadingProfile = false
+        // Le statut de routing (`hasCompletedQuestionnaire`) est désormais
+        // connu → on peut afficher la bonne branche sans clignotement.
+        didFinishInitialLoad = true
 
         // Compute local scores immediately (deterministic, no async needed)
         computeLocalScores()
