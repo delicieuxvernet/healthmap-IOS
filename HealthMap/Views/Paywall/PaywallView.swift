@@ -24,6 +24,14 @@ struct PaywallView: View {
         subscriptionService.offerings?.current?.availablePackages.first { $0.packageType == .monthly }
     }
 
+    private var weeklyPackage: Package? {
+        subscriptionService.offerings?.current?.availablePackages.first { $0.packageType == .weekly }
+    }
+
+    /// Formule courte mise en avant à côté de l'annuel : hebdo si présente,
+    /// sinon mensuelle (l'offering peut évoluer sans retoucher le paywall).
+    private var shortPlan: Package? { weeklyPackage ?? monthlyPackage }
+
     var body: some View {
         ZStack {
             Color.healthMapBackground
@@ -35,7 +43,7 @@ struct PaywallView: View {
                     header
                     featureList
 
-                    if annualPackage == nil && monthlyPackage == nil {
+                    if annualPackage == nil && shortPlan == nil {
                         loadingState
                     } else {
                         planCards
@@ -52,14 +60,14 @@ struct PaywallView: View {
                 await subscriptionService.loadOfferings()
             }
             if selectedPackage == nil {
-                selectedPackage = annualPackage ?? monthlyPackage
+                selectedPackage = annualPackage ?? shortPlan
             }
         }
         // L'offering peut arriver après l'apparition (cold start, réseau lent) :
         // on sélectionne alors la formule annuelle par défaut dès qu'elle existe.
         .onChange(of: subscriptionService.offerings) { _, _ in
             if selectedPackage == nil {
-                selectedPackage = annualPackage ?? monthlyPackage
+                selectedPackage = annualPackage ?? shortPlan
             }
         }
         .alert("Kiwio Premium", isPresented: $showAlert) {
@@ -151,11 +159,18 @@ struct PaywallView: View {
                     badge: annualBadge(annual)
                 )
             }
-            if let monthly = monthlyPackage {
+            if let weekly = weeklyPackage {
+                planCard(
+                    package: weekly,
+                    title: "Hebdomadaire",
+                    subtitle: shortSubtitle(weekly, unit: "sem"),
+                    badge: nil
+                )
+            } else if let monthly = monthlyPackage {
                 planCard(
                     package: monthly,
                     title: "Mensuel",
-                    subtitle: monthlySubtitle(monthly),
+                    subtitle: shortSubtitle(monthly, unit: "mois"),
                     badge: nil
                 )
             }
@@ -319,7 +334,12 @@ struct PaywallView: View {
     private var ctaNote: String {
         guard let package = selectedPackage else { return "" }
         let price = package.localizedPriceString
-        let period = package.packageType == .annual ? "an" : "mois"
+        let period: String
+        switch package.packageType {
+        case .annual: period = "an"
+        case .weekly: period = "semaine"
+        default: period = "mois"
+        }
         if let trial = trialLabel(for: package) {
             return "Gratuit \(trial), puis \(price) / \(period). Annulable à tout moment."
         }
@@ -334,25 +354,27 @@ struct PaywallView: View {
         return parts.joined(separator: " · ")
     }
 
-    private func monthlySubtitle(_ package: Package) -> String {
-        var parts = ["\(package.localizedPriceString) / mois"]
+    /// Sous-titre d'une formule courte (hebdo ou mensuelle) : prix / unité + essai.
+    private func shortSubtitle(_ package: Package, unit: String) -> String {
+        var parts = ["\(package.localizedPriceString) / \(unit)"]
         if let trial = trialLabel(for: package) {
             parts.append("\(trial) gratuits")
         }
         return parts.joined(separator: " · ")
     }
 
-    /// Badge de la carte annuelle : essai + économie vs 12 mois de mensuel,
-    /// calculée depuis les prix StoreKit (rien de codé en dur).
+    /// Badge de la carte annuelle : essai + économie vs 1 an de la formule courte
+    /// (hebdo ×52 ou mensuel ×12), calculée depuis les prix StoreKit (rien codé en dur).
     private func annualBadge(_ annual: Package) -> String? {
         var parts: [String] = []
         if let trial = trialLabel(for: annual) {
             parts.append("\(trial) gratuits")
         }
-        if let monthly = monthlyPackage {
-            let yearAtMonthlyRate = monthly.storeProduct.price * 12
-            if yearAtMonthlyRate > 0 {
-                let savings: Decimal = (1 - annual.storeProduct.price / yearAtMonthlyRate) * 100
+        if let short = shortPlan {
+            let periodsPerYear: Decimal = short.packageType == .weekly ? 52 : 12
+            let yearAtShortRate = short.storeProduct.price * periodsPerYear
+            if yearAtShortRate > 0 {
+                let savings: Decimal = (1 - annual.storeProduct.price / yearAtShortRate) * 100
                 let percent = Int((savings as NSDecimalNumber).doubleValue.rounded())
                 if percent > 0 {
                     parts.append("−\(percent) %")
