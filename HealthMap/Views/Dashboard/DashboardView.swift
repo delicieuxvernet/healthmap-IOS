@@ -221,6 +221,11 @@ struct DashboardView: View {
                     RedFlagsCardView(flags: otherRedFlags)
                         .padding(.horizontal, Theme.spacingLG)
                 }
+
+                // 8. Sources scientifiques (App Store guideline 1.4.1) — citations
+                // cliquables des références nutritionnelles officielles.
+                SourcesSection()
+                    .padding(.horizontal, Theme.spacingLG)
             }
             .padding(.vertical, Theme.spacingMD)
         }

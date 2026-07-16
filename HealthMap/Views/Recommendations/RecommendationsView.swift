@@ -133,6 +133,11 @@ struct RecommendationsContentView: View {
                     .kiwiCard()
                     .padding(.horizontal, 24)
                 }
+
+                // Sources scientifiques (App Store guideline 1.4.1) — citations
+                // cliquables des références fondant les recommandations du plan.
+                SourcesSection()
+                    .padding(.horizontal, 24)
             }
             .padding(.vertical, 12)
             .padding(.bottom, 24)
