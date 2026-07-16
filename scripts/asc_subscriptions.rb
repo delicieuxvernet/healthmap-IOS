@@ -43,7 +43,8 @@ def req(method, path, body = nil)
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = true
   http.read_timeout = 60
-  klass = { get: Net::HTTP::Get, post: Net::HTTP::Post, patch: Net::HTTP::Patch }.fetch(method)
+  klass = { get: Net::HTTP::Get, post: Net::HTTP::Post, patch: Net::HTTP::Patch,
+            delete: Net::HTTP::Delete }.fetch(method)
   r = klass.new(uri)
   r["Authorization"] = "Bearer #{token}"
   r["Content-Type"] = "application/json"
@@ -639,20 +640,45 @@ if MODE == "submit"
   # Note : conformité export déjà OK (build TestFlight) — pas dans les bloqueurs.
   # DAC7 « service personnel » : traité en amont si SUBMIT_DAC7 fourni (voir plus bas).
 
-  # 1) Soumission : réutiliser une soumission ouverte, sinon en créer une.
-  sub_id = nil
-  code, existing = req(:get, "/v1/apps/#{app_id}/reviewSubmissions?filter[state]=READY_FOR_REVIEW&limit=10")
-  if code == 200 && existing["data"]&.any?
-    sub_id = existing["data"][0]["id"]
-    puts "Soumission ouverte réutilisée : #{sub_id}"
-  else
-    ok, resp = write("création de la soumission", :post, "/v1/reviewSubmissions",
-      { data: { type: "reviewSubmissions",
-                attributes: { platform: "IOS" },
-                relationships: { app: { data: { type: "apps", id: app_id } } } } })
-    sub_id = resp["data"]["id"] if ok
+  # 1) Nettoyer les soumissions bloquantes puis repartir d'une soumission neuve.
+  #    Après un refus, la version reste piégée dans une soumission UNRESOLVED_ISSUES
+  #    (d'où le 409 ITEM_PART_OF_ANOTHER_SUBMISSION), et un run précédent a pu
+  #    laisser une soumission vide READY_FOR_REVIEW. On annule tout ce qui n'est
+  #    PAS en review active (WAITING/IN_REVIEW), pour libérer la version + les IAP.
+  cancel_states = %w[READY_FOR_REVIEW UNRESOLVED_ISSUES]
+  existing = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+  to_cancel = existing.select { |s| cancel_states.include?(s.dig("attributes", "state")) }
+  to_cancel.each do |s|
+    st = s.dig("attributes", "state")
+    if st == "READY_FOR_REVIEW"
+      # Pas encore soumise à Apple → suppression directe (canceled ne s'applique pas).
+      write("suppression soumission vide #{s["id"]}", :delete, "/v1/reviewSubmissions/#{s["id"]}", nil)
+    else
+      # Soumise puis refusée (UNRESOLVED_ISSUES) → annulation pour libérer les items.
+      write("annulation soumission #{s["id"]} (#{st})", :patch,
+        "/v1/reviewSubmissions/#{s["id"]}",
+        { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
+    end
   end
-  abort_with("reviewSubmissions", 0, "impossible de créer/trouver une soumission") unless sub_id
+  # Annulation asynchrone : attendre que plus aucune soumission ne détienne les items.
+  unless to_cancel.empty?
+    10.times do
+      sleep 3
+      still = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+             .select { |s| (cancel_states + %w[CANCELING]).include?(s.dig("attributes", "state")) }
+      break if still.empty?
+      puts "  … annulation en cours (#{still.size} soumission(s) encore ouverte(s))"
+    end
+  end
+
+  # 2) Créer une soumission neuve
+  sub_id = nil
+  ok, resp = write("création de la soumission", :post, "/v1/reviewSubmissions",
+    { data: { type: "reviewSubmissions",
+              attributes: { platform: "IOS" },
+              relationships: { app: { data: { type: "apps", id: app_id } } } } })
+  sub_id = resp["data"]["id"] if ok
+  abort_with("reviewSubmissions", 0, "impossible de créer une soumission") unless sub_id
 
   # 2) Ajouter la version comme item
   ok, = write("ajout de la version à la soumission", :post, "/v1/reviewSubmissionItems",
