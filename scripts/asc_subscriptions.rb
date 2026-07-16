@@ -373,6 +373,21 @@ if MODE == "app-audit"
       end
   end
 
+  # Soumissions de review (pour diagnostiquer un refus / une soumission bloquée) :
+  # quel submission détient la version + les abonnements, et dans quel état.
+  report[:reviewSubmissions] = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50").map do |s|
+    a = s["attributes"]
+    items = get_all("/v1/reviewSubmissions/#{s["id"]}/items?limit=50")
+    kinds = items.map do |it|
+      rel = it["relationships"] || {}
+      k = rel.keys.find { |key| rel[key].is_a?(Hash) && rel[key]["data"] }
+      k ? "#{k}:#{rel[k]["data"]["id"]}" : (it.dig("attributes", "state") || "?")
+    end
+    { id: s["id"], state: a["state"], submitted: a["submitted"],
+      submittedDate: a["submittedDate"], platform: a["platform"],
+      itemsCount: items.size, items: kinds }
+  end
+
   puts "\n===== APP AUDIT ====="
   puts JSON.pretty_generate(report)
   exit 0
