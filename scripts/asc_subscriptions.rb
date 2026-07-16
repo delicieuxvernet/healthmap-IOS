@@ -633,6 +633,23 @@ if MODE == "submit"
               relationships: { reviewSubmission: { data: { type: "reviewSubmissions", id: sub_id } },
                                appStoreVersion: { data: { type: "appStoreVersions", id: version_id } } } } })
 
+  # 2 bis) Ajouter les ABONNEMENTS (fix refus 2.1(b) : les IAP référencés dans
+  # l'app doivent être soumis à la review, pas seulement le binaire).
+  groups_s = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
+  submitted_subs = []
+  groups_s.each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      next unless s.dig("attributes", "state") == "READY_TO_SUBMIT"
+      pid = s.dig("attributes", "productId")
+      okc, = write("ajout abonnement #{pid} à la soumission", :post, "/v1/reviewSubmissionItems",
+        { data: { type: "reviewSubmissionItems",
+                  relationships: { reviewSubmission: { data: { type: "reviewSubmissions", id: sub_id } },
+                                   subscription: { data: { type: "subscriptions", id: s["id"] } } } } })
+      submitted_subs << pid if okc
+    end
+  end
+  puts "Abonnements ajoutés à la soumission : #{submitted_subs.join(", ")}"
+
   # 3) Soumettre
   write("SOUMISSION à Apple (submitted=true)", :patch, "/v1/reviewSubmissions/#{sub_id}",
     { data: { type: "reviewSubmissions", id: sub_id, attributes: { submitted: true } } })
