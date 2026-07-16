@@ -640,76 +640,79 @@ if MODE == "submit"
   # Note : conformité export déjà OK (build TestFlight) — pas dans les bloqueurs.
   # DAC7 « service personnel » : traité en amont si SUBMIT_DAC7 fourni (voir plus bas).
 
-  # 1) Nettoyer les soumissions bloquantes puis repartir d'une soumission neuve.
-  #    Après un refus, la version reste piégée dans une soumission UNRESOLVED_ISSUES
-  #    (d'où le 409 ITEM_PART_OF_ANOTHER_SUBMISSION), et un run précédent a pu
-  #    laisser une soumission vide READY_FOR_REVIEW. On annule tout ce qui n'est
-  #    PAS en review active (WAITING/IN_REVIEW), pour libérer la version + les IAP.
-  cancel_states = %w[READY_FOR_REVIEW UNRESOLVED_ISSUES]
-  existing = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
-  to_cancel = existing.select { |s| cancel_states.include?(s.dig("attributes", "state")) }
-  to_cancel.each do |s|
-    st = s.dig("attributes", "state")
-    if st == "READY_FOR_REVIEW"
-      # Pas encore soumise à Apple → suppression directe (canceled ne s'applique pas).
-      write("suppression soumission vide #{s["id"]}", :delete, "/v1/reviewSubmissions/#{s["id"]}", nil)
-    else
-      # Soumise puis refusée (UNRESOLVED_ISSUES) → annulation pour libérer les items.
-      write("annulation soumission #{s["id"]} (#{st})", :patch,
-        "/v1/reviewSubmissions/#{s["id"]}",
-        { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
+  # 1) La VERSION est-elle déjà en review active ? (idempotence : ne pas la
+  #    re-soumettre, sinon 409 ITEM_PART_OF_ANOTHER_SUBMISSION).
+  active_states = %w[WAITING_FOR_REVIEW IN_REVIEW]
+  subs_list = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+  version_live = subs_list.any? { |s| active_states.include?(s.dig("attributes", "state")) }
+
+  if version_live
+    puts "Version déjà en review (soumission active) — on saute la re-soumission de la version."
+  else
+    # Nettoyer les soumissions bloquantes : après un refus la version reste piégée
+    # dans une soumission UNRESOLVED_ISSUES (409 ITEM_PART_OF_ANOTHER_SUBMISSION),
+    # et un run précédent a pu laisser une soumission vide READY_FOR_REVIEW.
+    cancel_states = %w[READY_FOR_REVIEW UNRESOLVED_ISSUES]
+    to_cancel = subs_list.select { |s| cancel_states.include?(s.dig("attributes", "state")) }
+    to_cancel.each do |s|
+      st = s.dig("attributes", "state")
+      if st == "READY_FOR_REVIEW"
+        write("suppression soumission vide #{s["id"]}", :delete, "/v1/reviewSubmissions/#{s["id"]}", nil)
+      else
+        write("annulation soumission #{s["id"]} (#{st})", :patch,
+          "/v1/reviewSubmissions/#{s["id"]}",
+          { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
+      end
     end
-  end
-  # Annulation asynchrone : attendre que plus aucune soumission ne détienne les items.
-  unless to_cancel.empty?
-    10.times do
-      sleep 3
-      still = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
-             .select { |s| (cancel_states + %w[CANCELING]).include?(s.dig("attributes", "state")) }
-      break if still.empty?
-      puts "  … annulation en cours (#{still.size} soumission(s) encore ouverte(s))"
+    unless to_cancel.empty?
+      10.times do
+        sleep 3
+        still = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+               .select { |s| (cancel_states + %w[CANCELING]).include?(s.dig("attributes", "state")) }
+        break if still.empty?
+        puts "  … annulation en cours (#{still.size} soumission(s) encore ouverte(s))"
+      end
     end
+
+    ok, resp = write("création de la soumission (version)", :post, "/v1/reviewSubmissions",
+      { data: { type: "reviewSubmissions",
+                attributes: { platform: "IOS" },
+                relationships: { app: { data: { type: "apps", id: app_id } } } } })
+    rev_id = resp["data"]["id"] if ok
+    abort_with("reviewSubmissions", 0, "impossible de créer une soumission") unless rev_id
+
+    write("ajout de la version à la soumission", :post, "/v1/reviewSubmissionItems",
+      { data: { type: "reviewSubmissionItems",
+                relationships: { reviewSubmission: { data: { type: "reviewSubmissions", id: rev_id } },
+                                 appStoreVersion: { data: { type: "appStoreVersions", id: version_id } } } } })
+
+    write("SOUMISSION version à Apple (submitted=true)", :patch, "/v1/reviewSubmissions/#{rev_id}",
+      { data: { type: "reviewSubmissions", id: rev_id, attributes: { submitted: true } } })
   end
 
-  # 2) Créer une soumission neuve
-  sub_id = nil
-  ok, resp = write("création de la soumission", :post, "/v1/reviewSubmissions",
-    { data: { type: "reviewSubmissions",
-              attributes: { platform: "IOS" },
-              relationships: { app: { data: { type: "apps", id: app_id } } } } })
-  sub_id = resp["data"]["id"] if ok
-  abort_with("reviewSubmissions", 0, "impossible de créer une soumission") unless sub_id
-
-  # 2) Ajouter la version comme item
-  ok, = write("ajout de la version à la soumission", :post, "/v1/reviewSubmissionItems",
-    { data: { type: "reviewSubmissionItems",
-              relationships: { reviewSubmission: { data: { type: "reviewSubmissions", id: sub_id } },
-                               appStoreVersion: { data: { type: "appStoreVersions", id: version_id } } } } })
-
-  # 2 bis) Ajouter les ABONNEMENTS (fix refus 2.1(b) : les IAP référencés dans
-  # l'app doivent être soumis à la review, pas seulement le binaire).
-  groups_s = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
+  # 2) Soumettre les ABONNEMENTS via l'endpoint DÉDIÉ subscriptionSubmissions
+  #    (fix refus 2.1(b) : le 1er abonnement DOIT partir avec la nouvelle version.
+  #    'subscription' n'est PAS une relation de reviewSubmissionItems — l'API le
+  #    refuse ENTITY_ERROR.RELATIONSHIP.UNKNOWN ; c'est subscriptionSubmissions).
   submitted_subs = []
-  groups_s.each do |g|
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
     get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
       next unless s.dig("attributes", "state") == "READY_TO_SUBMIT"
       pid = s.dig("attributes", "productId")
-      okc, = write("ajout abonnement #{pid} à la soumission", :post, "/v1/reviewSubmissionItems",
-        { data: { type: "reviewSubmissionItems",
-                  relationships: { reviewSubmission: { data: { type: "reviewSubmissions", id: sub_id } },
-                                   subscription: { data: { type: "subscriptions", id: s["id"] } } } } })
+      okc, = write("soumission abonnement #{pid}", :post, "/v1/subscriptionSubmissions",
+        { data: { type: "subscriptionSubmissions",
+                  relationships: { subscription: { data: { type: "subscriptions", id: s["id"] } } } } })
       submitted_subs << pid if okc
     end
   end
-  puts "Abonnements ajoutés à la soumission : #{submitted_subs.join(", ")}"
+  puts "\nAbonnements soumis : #{submitted_subs.empty? ? "(aucun READY_TO_SUBMIT — déjà soumis ?)" : submitted_subs.join(", ")}"
 
-  # 3) Soumettre
-  write("SOUMISSION à Apple (submitted=true)", :patch, "/v1/reviewSubmissions/#{sub_id}",
-    { data: { type: "reviewSubmissions", id: sub_id, attributes: { submitted: true } } })
-
-  code, s = req(:get, "/v1/reviewSubmissions/#{sub_id}")
-  puts "\n===== ÉTAT SOUMISSION ====="
-  puts JSON.pretty_generate(code == 200 ? s["data"]["attributes"] : s)
+  # 3) État final de toutes les soumissions
+  puts "\n===== ÉTAT SOUMISSIONS ====="
+  get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50").each do |s|
+    a = s["attributes"]
+    puts "  reviewSubmission #{s["id"]} → #{a["state"]} (soumis: #{a["submittedDate"] || "—"})"
+  end
   exit 0
 end
 
