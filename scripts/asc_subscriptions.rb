@@ -94,6 +94,24 @@ def write(what, method, path, body)
   end
 end
 
+# États d'une version App Store qui restent ÉDITABLES / re-soumissibles.
+# Après un refus Apple la version passe REJECTED (pas PREPARE_FOR_SUBMISSION) :
+# on doit quand même pouvoir la retrouver pour rattacher un build et re-soumettre.
+EDITABLE_VERSION_STATES = %w[
+  PREPARE_FOR_SUBMISSION DEVELOPER_REJECTED REJECTED METADATA_REJECTED
+  INVALID_BINARY PENDING_CONTRACT
+].freeze
+
+# Retourne [version_id, attributes] de la version éditable (1.0), ou nil.
+def find_editable_version(app_id)
+  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=10" \
+    "&fields[appStoreVersions]=versionString,appStoreState,platform,releaseType")
+  return nil unless code == 200 && v["data"]&.any?
+  hit = v["data"].find { |x| EDITABLE_VERSION_STATES.include?(x.dig("attributes", "appStoreState")) }
+  hit ||= v["data"][0]
+  [hit["id"], hit["attributes"]]
+end
+
 def sub_snapshot(sub_id)
   code, body = req(:get, "/v1/subscriptions/#{sub_id}")
   return { error: code } unless code == 200
@@ -362,10 +380,9 @@ end
 
 # ── MODE apply-app : infos review + rattache le dernier build à la v1.0 ─────
 if MODE == "apply-app"
-  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=1&filter[appStoreState]=PREPARE_FOR_SUBMISSION")
-  abort_with("appStoreVersions", code, v) unless code == 200 && v["data"]&.any?
-  version_id = v["data"][0]["id"]
-  puts "Version éditable : #{v["data"][0].dig("attributes", "versionString")} (#{version_id})"
+  version_id, vattrs = find_editable_version(app_id)
+  abort_with("appStoreVersions", 0, "aucune version éditable (1.0) trouvée") unless version_id
+  puts "Version éditable : #{vattrs["versionString"]} état=#{vattrs["appStoreState"]} (#{version_id})"
 
   # Sortie MANUELLE (choix Arthur) : l'app ne devient PAS publique automatiquement
   # à l'approbation ; Arthur déclenche la mise en ligne. releaseType = MANUAL.
@@ -522,9 +539,8 @@ end
 # ── MODE screenshots : upload des captures de la fiche App Store (ordre inclus) ──
 if MODE == "screenshots"
   display_type = ENV["DISPLAY_TYPE"] || "APP_IPHONE_67"
-  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=1&filter[appStoreState]=PREPARE_FOR_SUBMISSION")
-  abort_with("appStoreVersions", code, v) unless code == 200 && v["data"]&.any?
-  version_id = v["data"][0]["id"]
+  version_id, = find_editable_version(app_id)
+  abort_with("appStoreVersions", 0, "aucune version éditable (1.0) trouvée") unless version_id
   locs = get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20")
   loc = locs.find { |l| l.dig("attributes", "locale").to_s.start_with?("fr") } || locs[0]
   loc_id = loc["id"]
@@ -577,13 +593,9 @@ end
 
 # ── MODE submit : conformité export + soumission de la version à App Review ──
 if MODE == "submit"
-  code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=1&filter[appStoreState]=PREPARE_FOR_SUBMISSION")
-  unless code == 200 && v["data"]&.any?
-    code, v = req(:get, "/v1/apps/#{app_id}/appStoreVersions?limit=1&sort=-createdDate")
-  end
-  abort_with("appStoreVersions", code, v) unless code == 200 && v["data"]&.any?
-  version_id = v["data"][0]["id"]
-  puts "Version : #{v["data"][0].dig("attributes", "versionString")} (#{version_id}) état=#{v["data"][0].dig("attributes", "appStoreState")}"
+  version_id, vattrs = find_editable_version(app_id)
+  abort_with("appStoreVersions", 0, "aucune version éditable (1.0) trouvée") unless version_id
+  puts "Version : #{vattrs["versionString"]} (#{version_id}) état=#{vattrs["appStoreState"]}"
 
   # Prix de l'app = GRATUIT (le schedule existe toujours mais peut être vide ;
   # requis même pour un freemium avec achats intégrés). On (re)pose le prix gratuit.
