@@ -144,7 +144,10 @@ extension QuestionnaireSection {
                 .init("equilibre", "Equilibre nutritionnel", emoji: "🥗"),
             ]
         ),
-        Question(id: "firstName", text: "Comment tu t'appelles ?", type: .textInput(placeholder: "Prenom")),
+        // Masquée si le prénom est déjà connu (signup email OU Sign in with Apple) :
+        // Authentication Services le fournit déjà, on ne le redemande jamais (Gl. 4).
+        Question(id: "firstName", text: "Comment tu t'appelles ?", type: .textInput(placeholder: "Prenom"),
+                 showIf: { $0.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
         Question(id: "age", text: "Quel age as-tu ?", type: .numericInput(placeholder: "25", suffix: "ans")),
         Question(
             id: "gender",

@@ -123,6 +123,15 @@ struct QuestionnaireContainerView: View {
             }
         }
         .onAppear {
+            // Pré-remplit le prénom déjà connu (signup email OU Sign in with Apple,
+            // via profiles.first_name porté par dashboardVM) UNIQUEMENT s'il est
+            // vide — ne jamais écraser un draft. La question « prénom » est alors
+            // masquée (showIf), donc jamais redemandée après Sign in with Apple
+            // (App Review Guideline 4).
+            if viewModel.profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               !dashboardVM.profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                viewModel.profile.firstName = dashboardVM.profile.firstName
+            }
             // Parcours unique adaptatif : plus d'écran de choix express/complet,
             // on démarre directement (draft restauré ou non). Trace le début une
             // seule fois par session.
