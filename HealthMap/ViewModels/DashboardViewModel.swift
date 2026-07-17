@@ -231,6 +231,10 @@ final class DashboardViewModel: ObservableObject {
                     self.hasCompletedQuestionnaire = questionnaireData.completed
                 } else {
                     self.profile = .empty
+                    // Conserve le prénom déjà connu (signup email OU Sign in with
+                    // Apple → profiles.first_name) même sans questionnaire, pour ne
+                    // PAS le redemander dans l'onboarding (App Review Guideline 4).
+                    self.profile.firstName = profileRow.firstName ?? ""
                     self.hasCompletedQuestionnaire = false
                 }
                 // `baseline_nutrient_scores` est une colonne sœur de
