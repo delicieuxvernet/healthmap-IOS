@@ -82,9 +82,9 @@ struct EditProfileView: View {
 
             ScrollView {
                 VStack(spacing: Theme.spacingSM) {
-                    if HealthKitService.shared.isAvailable {
-                        appleHealthCard
-                    }
+                    // Toujours visible (même sur iPad où HealthKit est indisponible) pour
+                    // identifier clairement la fonctionnalité Apple Santé — App Review 2.5.1.
+                    appleHealthCard
                     ForEach(EditSection.allCases) { section in
                         sectionCard(section)
                     }
@@ -188,7 +188,7 @@ struct EditProfileView: View {
                     Divider().padding(.horizontal, Theme.spacingMD)
                     healthRow(icon: "moon.fill", label: "Sommeil", value: sleepDisplay(healthSnapshot))
                 }
-            } else {
+            } else if HealthKitService.shared.isAvailable {
                 Button { connectHealth() } label: {
                     HStack(spacing: 8) {
                         if healthSyncing {
@@ -206,6 +206,20 @@ struct EditProfileView: View {
                 }
                 .buttonStyle(.healthMapPressed)
                 .disabled(healthSyncing)
+                .padding(.horizontal, Theme.spacingMD)
+                .padding(.bottom, Theme.spacingMD)
+            } else {
+                // HealthKit indisponible (ex. iPad) : l'encart reste affiché avec sa
+                // description, on indique juste que la connexion se fait sur iPhone.
+                HStack(spacing: 8) {
+                    Image(systemName: "iphone").font(.system(size: 14))
+                    Text("Connexion disponible sur iPhone")
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.healthMapSecondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.healthMapBackground))
                 .padding(.horizontal, Theme.spacingMD)
                 .padding(.bottom, Theme.spacingMD)
             }
