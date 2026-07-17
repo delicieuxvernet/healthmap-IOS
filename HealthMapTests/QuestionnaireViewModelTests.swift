@@ -236,11 +236,13 @@ final class QuestionnaireViewModelTests: XCTestCase {
         // Fresh profile → symptoms (Q1, multi-choice, empty) is the first unanswered
         XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 0, "Fresh profile should resume at the first question")
 
-        // Answer symptoms + goals + firstName → next unanswered is age (flat index 3)
+        // Answer symptoms + goals + firstName → une fois le prénom renseigné, la
+        // question « prénom » est masquée (déjà connu, App Review Gl. 4), donc la
+        // prochaine non répondue est age, désormais à l'index plat 2 (et non 3).
         vm.updateAnswer(questionId: "symptoms", value: ["fatigue_chronic"])
         vm.updateAnswer(questionId: "goals", value: ["energie"])
         vm.updateAnswer(questionId: "firstName", value: "Lea")
-        XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 3, "Should resume at the first unanswered question (age)")
+        XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 2, "Should resume at age; firstName is hidden once known")
     }
 
     // MARK: - clearDraft
