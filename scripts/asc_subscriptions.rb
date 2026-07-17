@@ -716,6 +716,107 @@ if MODE == "submit"
   exit 0
 end
 
+# ── MODE fix-meta : annule la soumission en cours + corrige les métadonnées ──
+#    (refus 3.1.2(c) : lien CGU/EULA absent des métadonnées ; 2.5.1 : notes review
+#     localisant HealthKit) et REND la version éditable pour que la soumission
+#     version + 3 abonnements se fasse dans l'UI web (l'API interdit de soumettre
+#     le 1er abonnement — FIRST_SUBSCRIPTION_MUST_BE_SUBMITTED_ON_VERSION).
+if MODE == "fix-meta"
+  terms_url = "https://healthmap.fr/terms"
+  privacy_url = "https://healthmap.fr/privacy"
+
+  # 1) Rendre la version éditable : annuler toute soumission en cours.
+  cancel_states = %w[READY_FOR_REVIEW WAITING_FOR_REVIEW UNRESOLVED_ISSUES]
+  to_cancel = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+             .select { |s| cancel_states.include?(s.dig("attributes", "state")) }
+  to_cancel.each do |s|
+    st = s.dig("attributes", "state")
+    if st == "READY_FOR_REVIEW"
+      write("suppression soumission vide #{s["id"]}", :delete, "/v1/reviewSubmissions/#{s["id"]}", nil)
+    else
+      write("annulation soumission #{s["id"]} (#{st})", :patch,
+        "/v1/reviewSubmissions/#{s["id"]}",
+        { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
+    end
+  end
+  unless to_cancel.empty?
+    10.times do
+      sleep 3
+      still = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+             .select { |s| (cancel_states + %w[CANCELING]).include?(s.dig("attributes", "state")) }
+      break if still.empty?
+      puts "  … annulation en cours (#{still.size})"
+    end
+  end
+
+  version_id, vattrs = find_editable_version(app_id)
+  abort_with("appStoreVersions", 0, "aucune version éditable") unless version_id
+  puts "Version éditable : #{vattrs["versionString"]} état=#{vattrs["appStoreState"]}"
+
+  # 2) Description : ajouter les liens CGU/EULA + confidentialité (idempotent,
+  #    garde-fou 4000 caractères max imposé par Apple).
+  footer = "\n\nConditions d'utilisation (CGU) : #{terms_url}\nConfidentialite : #{privacy_url}"
+  get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20").each do |l|
+    loc = l.dig("attributes", "locale")
+    desc = l.dig("attributes", "description").to_s
+    if desc.include?("healthmap.fr/terms")
+      puts "  (description #{loc} : liens déjà présents)"
+      next
+    end
+    if (desc + footer).length > 4000
+      puts "  ATTENTION description #{loc} trop longue pour ajouter les liens (#{desc.length} car.) — à faire en UI"
+      next
+    end
+    write("liens CGU+confidentialité dans description #{loc}", :patch,
+      "/v1/appStoreVersionLocalizations/#{l["id"]}",
+      { data: { type: "appStoreVersionLocalizations", id: l["id"],
+                attributes: { description: desc + footer } } })
+  end
+
+  # 3) URL de politique de confidentialité au niveau appInfo (best-effort).
+  get_all("/v1/apps/#{app_id}/appInfos?limit=5").each do |ai|
+    get_all("/v1/appInfos/#{ai["id"]}/appInfoLocalizations?limit=20").each do |ail|
+      next if ail.dig("attributes", "privacyPolicyUrl").to_s == privacy_url
+      write("privacyPolicyUrl #{ail.dig("attributes", "locale")}", :patch,
+        "/v1/appInfoLocalizations/#{ail["id"]}",
+        { data: { type: "appInfoLocalizations", id: ail["id"],
+                  attributes: { privacyPolicyUrl: privacy_url } } })
+    end
+  end
+
+  # 4) Notes de review : localiser HealthKit (2.5.1) + détailler les abonnements (2.1b/3.1.2c).
+  notes = <<~NOTES.strip
+    Kiwio is a French nutrition app. Demo account: audit-a@test.com
+
+    HEALTHKIT (Guideline 2.5.1): Apple Health is used read-only. In-app path:
+    Profil tab > "Modifier mon profil" > "Importer depuis Apple Sante" (imports
+    weight, steps and sleep to personalize recommendations). The Scan tab also
+    reads active energy (kcal) from Apple Health.
+
+    SUBSCRIPTIONS (2.1(b) / 3.1.2(c)): Kiwio Premium = 3 auto-renewable subscriptions
+    (Weekly 0.99 EUR, Monthly 4.99 EUR, Annual 50 EUR), all submitted with this
+    version. Paywall path: Profil > Premium (also reachable from the Bilan). Title,
+    duration and price are shown on the paywall.
+    Terms of Use (EULA): #{terms_url}
+    Privacy Policy: #{privacy_url}
+    (Both are also tappable at the bottom of the paywall in-app.)
+  NOTES
+  code, rd = req(:get, "/v1/appStoreVersions/#{version_id}/appStoreReviewDetail")
+  if code == 200 && rd["data"]
+    write("notes de review", :patch, "/v1/appStoreReviewDetails/#{rd["data"]["id"]}",
+      { data: { type: "appStoreReviewDetails", id: rd["data"]["id"], attributes: { notes: notes } } })
+  else
+    write("notes de review (création)", :post, "/v1/appStoreReviewDetails",
+      { data: { type: "appStoreReviewDetails", attributes: { notes: notes },
+                relationships: { appStoreVersion: { data: { type: "appStoreVersions", id: version_id } } } } })
+  end
+
+  puts "\n===== MÉTADONNÉES CORRIGÉES ====="
+  puts "Version #{vattrs["versionString"]} rendue éditable ; liens CGU+confidentialité + notes review posés."
+  puts "PROCHAINE ÉTAPE (UI web) : soumettre la version 1.0 + les 3 abonnements ENSEMBLE."
+  exit 0
+end
+
 groups = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
 abort_with("subscriptionGroups", 0, "aucun groupe d'abonnement") if groups.empty?
 
