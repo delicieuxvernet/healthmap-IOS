@@ -640,10 +640,28 @@ if MODE == "submit"
   # Note : conformité export déjà OK (build TestFlight) — pas dans les bloqueurs.
   # DAC7 « service personnel » : traité en amont si SUBMIT_DAC7 fourni (voir plus bas).
 
-  # 1) La VERSION est-elle déjà en review active ? (idempotence : ne pas la
-  #    re-soumettre, sinon 409 ITEM_PART_OF_ANOTHER_SUBMISSION).
   active_states = %w[WAITING_FOR_REVIEW IN_REVIEW]
   subs_list = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+
+  # 0) PRIORITÉ : une soumission déjà PRÉPARÉE avec des items (montée via l'UI
+  #    web — seule voie possible pour le 1er abonnement) doit être ENVOYÉE telle
+  #    quelle, jamais détruite. On la soumet et on s'arrête là.
+  staged = subs_list.find do |s|
+    next false unless s.dig("attributes", "state") == "READY_FOR_REVIEW"
+    get_all("/v1/reviewSubmissions/#{s["id"]}/items?limit=50").size.positive?
+  end
+  if staged
+    puts "Soumission préparée trouvée (#{staged["id"]}) — envoi tel quel."
+    write("ENVOI de la soumission préparée", :patch, "/v1/reviewSubmissions/#{staged["id"]}",
+      { data: { type: "reviewSubmissions", id: staged["id"], attributes: { submitted: true } } })
+    code, s = req(:get, "/v1/reviewSubmissions/#{staged["id"]}")
+    puts "\n===== ÉTAT SOUMISSION ====="
+    puts JSON.pretty_generate(code == 200 ? s["data"]["attributes"] : s)
+    exit 0
+  end
+
+  # 1) La VERSION est-elle déjà en review active ? (idempotence : ne pas la
+  #    re-soumettre, sinon 409 ITEM_PART_OF_ANOTHER_SUBMISSION).
   version_live = subs_list.any? { |s| active_states.include?(s.dig("attributes", "state")) }
 
   if version_live
