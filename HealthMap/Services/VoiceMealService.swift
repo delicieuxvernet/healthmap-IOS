@@ -50,16 +50,27 @@ final class VoiceMealService {
         let confiance: Double
         let kcal: Int?
         let portions: [Portion]
+        /// Valeurs pour 100 g — permettent d'enregistrer un aliment même absent
+        /// de la base (`foodId == nil`) au lieu de le jeter.
+        let per100: Per100?
 
         var id: Int { index }
 
         enum CodingKeys: String, CodingKey {
-            case index, nom, marque, kcal, portions
+            case index, nom, marque, kcal, portions, per100
             case foodId
             case grammes = "g"
             case besoinQuantite = "besoin_quantite"
             case confiance
         }
+    }
+
+    struct Per100: Decodable, Equatable {
+        let kcal: Double
+        let proteines: Double
+        let glucides: Double
+        let lipides: Double
+        let fibres: Double
     }
 
     struct Portion: Decodable, Equatable, Hashable {

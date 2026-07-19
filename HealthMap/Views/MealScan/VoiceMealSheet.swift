@@ -33,6 +33,15 @@ struct VoiceMealSheet: View {
 
     enum Phase { case listening, analyzing, results, failed }
 
+    /// Exemples montrés pendant l'écoute. Ils portent tous une quantité —
+    /// explicitement, parce que c'est ce que les gens oublient de dire et que
+    /// c'est ce qui décide de la justesse du comptage.
+    private static let exemples = [
+        "« Ce midi, une cuisse de poulet avec environ 100 grammes de pâtes »",
+        "« Un filet d'huile d'olive, deux œufs et trois cœurs de canard »",
+        "« Un bol de riz, 150 g de saumon et un yaourt »",
+    ]
+
     // MARK: - Corps
 
     var body: some View {
@@ -63,23 +72,52 @@ struct VoiceMealSheet: View {
     // MARK: - 1. Écoute
 
     private var listeningView: some View {
-        VStack(spacing: 20) {
-            Waveform(active: speech.state == .listening)
+        VStack(spacing: 18) {
+            // Waveform pilotée par le VOLUME RÉEL du micro (cf. les vocaux
+            // iMessage) : on doit voir que ça écoute, pas une animation décorative.
+            Waveform(level: speech.level, active: speech.state == .listening)
                 .frame(height: 56)
-                .padding(.top, 24)
+                .padding(.top, 20)
 
             ScrollView {
-                Text(speech.transcript.isEmpty
-                     ? "Dis par exemple : « ce midi, du poulet rôti avec des pâtes »"
-                     : speech.transcript)
-                    .font(.system(size: 17))
-                    .foregroundStyle(speech.transcript.isEmpty ? Color.healthMapMuted : Color.healthMapText)
+                if speech.transcript.isEmpty {
+                    // Tant que rien n'est dit, on APPREND à la personne comment
+                    // dicter — avec des quantités, puisque c'est ce qui manque
+                    // le plus souvent pour compter juste.
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Dis par exemple :")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.healthMapSecondary)
+                        ForEach(Self.exemples, id: \.self) { ex in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("•").foregroundStyle(Color.healthMapBlue)
+                                Text(ex)
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(Color.healthMapSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        Text("Donne les quantités quand tu les connais — sinon je te les demanderai.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.healthMapMuted)
+                            .padding(.top, 2)
+                    }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
                     .background(Color.healthMapCard, in: RoundedRectangle(cornerRadius: 14))
-                    .accessibilityLabel(speech.transcript.isEmpty ? "En attente de votre voix" : speech.transcript)
+                } else {
+                    // Le texte se construit sous les yeux : la zone se remplit
+                    // au fil de ce qui est dit, elle ne reste pas vide.
+                    Text(speech.transcript)
+                        .font(.system(size: 17))
+                        .foregroundStyle(Color.healthMapText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(Color.healthMapCard, in: RoundedRectangle(cornerRadius: 14))
+                        .accessibilityLabel(speech.transcript)
+                }
             }
-            .frame(maxHeight: 200)
+            .frame(maxHeight: 260)
 
             if let err = speech.error {
                 Text(err.message)
@@ -148,10 +186,21 @@ struct VoiceMealSheet: View {
                     )
                 }
 
+                if !estimatedNames.isEmpty {
+                    Text(estimatedNames.count == 1
+                         ? "« \(estimatedNames[0]) » n'a pas de fiche exacte : les valeurs sont estimées. C'est bien compté dans ta journée."
+                         : "\(estimatedNames.count) aliments n'ont pas de fiche exacte : leurs valeurs sont estimées. Ils sont bien comptés.")
+                        .font(.caption)
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.healthMapSelectFill, in: RoundedRectangle(cornerRadius: 10))
+                }
+
                 if !ignoredNames.isEmpty {
                     Text(ignoredNames.count == 1
-                         ? "« \(ignoredNames[0]) » n'est pas dans notre base : il ne sera pas enregistré."
-                         : "\(ignoredNames.count) aliments ne sont pas dans notre base : ils ne seront pas enregistrés.")
+                         ? "Je n'arrive pas à chiffrer « \(ignoredNames[0]) » — retire-le ou reformule."
+                         : "Je n'arrive pas à chiffrer \(ignoredNames.count) aliments — retire-les ou reformule.")
                         .font(.caption)
                         .foregroundStyle(Color.scoreLow)
                         .padding(10)
@@ -244,15 +293,25 @@ struct VoiceMealSheet: View {
     private var visibleItems: [VoiceMealService.Item] {
         items.filter { !removed.contains($0.index) }
     }
-    /// Items retenus ET enregistrables (en base, avec un grammage).
+    /// Enregistrable = on a un grammage ET de quoi le chiffrer : soit un aliment
+    /// de la base, soit l'estimation du serveur. Un aliment absent de la base
+    /// n'est plus jeté — le jeter faussait le total de la journée.
     private var savableItems: [VoiceMealService.Item] {
-        visibleItems.filter { $0.foodId != nil && (grams[$0.index] ?? 0) > 0 }
+        visibleItems.filter {
+            (grams[$0.index] ?? 0) > 0 && ($0.foodId != nil || $0.per100 != nil)
+        }
     }
     private var missingNames: [String] {
         visibleItems.filter { (grams[$0.index] ?? 0) <= 0 }.map(\.nom)
     }
+    /// Vraiment inexploitables : ni fiche, ni estimation. Devenu rare.
     private var ignoredNames: [String] {
-        visibleItems.filter { $0.foodId == nil }.map(\.nom)
+        visibleItems.filter { $0.foodId == nil && $0.per100 == nil }.map(\.nom)
+    }
+    /// Comptés à partir d'une estimation plutôt que d'une fiche — on le dit,
+    /// sans alarmer : l'aliment EST enregistré.
+    private var estimatedNames: [String] {
+        visibleItems.filter { $0.foodId == nil && $0.per100 != nil }.map(\.nom)
     }
     /// Total affiché : proportionnel aux kcal renvoyées par le serveur pour la
     /// quantité qu'il avait résolue. Aucun calcul nutritionnel côté app.
@@ -306,14 +365,41 @@ struct VoiceMealSheet: View {
         // de celui résolu par le serveur.
         var entries: [MealJournalService.FoodEntry] = []
         for item in savableItems {
-            guard let foodId = item.foodId, let g = grams[item.index], g > 0 else { continue }
-            do {
-                let detail = try await journal.foodDetail(id: foodId)
-                if let entry = MealJournalService.entry(for: detail, grams: g) {
-                    entries.append(entry)
+            guard let g = grams[item.index], g > 0 else { continue }
+
+            if let foodId = item.foodId {
+                // Aliment de la base : on repasse par get_food, le MÊME chemin
+                // que l'ajout depuis la recherche (micros et arrondis identiques).
+                do {
+                    let detail = try await journal.foodDetail(id: foodId)
+                    if let entry = MealJournalService.entry(for: detail, grams: g) {
+                        entries.append(entry)
+                        continue
+                    }
+                } catch {
+                    AppLogger.analysis.error("get_food(\(foodId, privacy: .public)) indisponible")
                 }
-            } catch {
-                AppLogger.analysis.error("get_food(\(foodId, privacy: .public)) indisponible")
+            }
+
+            // Aliment absent de la base (« cœurs de canard ») : on l'enregistre
+            // quand même à partir de l'estimation du serveur. `meal_scans` stocke
+            // les aliments en JSONB, sans contrainte de code produit — rien
+            // n'oblige à le jeter, et le jeter faussait le total de la journée.
+            if let p = item.per100 {
+                let f = g / 100.0
+                func r1(_ x: Double) -> Double { (x * 10).rounded() / 10 }
+                entries.append(MealJournalService.FoodEntry(
+                    name: item.nom,
+                    portionG: g,
+                    macros: MealJournalService.MealMacros(
+                        calories: Int((p.kcal * f).rounded()),
+                        proteins: r1(p.proteines * f),
+                        carbs: r1(p.glucides * f),
+                        fats: r1(p.lipides * f),
+                        fiber: r1(p.fibres * f)
+                    ),
+                    micros: []
+                ))
             }
         }
 
@@ -417,34 +503,43 @@ private struct VoiceItemRow: View {
 
 // MARK: - Waveform
 
-/// 21 barres animées. Respecte Réduire les animations (règle d'accessibilité
-/// du projet : aucune animation infinie non gatée).
+/// Waveform pilotée par le VOLUME RÉEL du micro.
+///
+/// Le premier jet était une animation décorative en boucle : joli, mais ça ne
+/// prouvait rien — on ne savait pas si l'app écoutait vraiment. Ici chaque barre
+/// suit le niveau sonore mesuré sur le buffer audio, comme les mémos vocaux
+/// d'iMessage : quand on se tait, ça retombe ; quand on parle, ça bouge.
 private struct Waveform: View {
+    /// Niveau instantané 0…1 publié par SpeechCaptureService.
+    let level: Float
     let active: Bool
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var animating = false
+    /// Historique glissant : la barre la plus à droite est l'instant présent,
+    /// les autres défilent vers la gauche — d'où l'effet de « trace sonore ».
+    @State private var historique: [CGFloat] = Array(repeating: 0.08, count: 21)
+
+    private let nbBarres = 21
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(0..<21, id: \.self) { i in
+            ForEach(Array(historique.enumerated()), id: \.offset) { _, h in
                 Capsule()
-                    .fill(Color.healthMapBlue)
-                    .frame(width: 4, height: barHeight(i))
-                    .animation(
-                        reduceMotion || !active
-                            ? nil
-                            : .easeInOut(duration: 0.6 + Double(i % 5) * 0.1)
-                                .repeatForever(autoreverses: true),
-                        value: animating
-                    )
+                    .fill(Color.healthMapBlue.opacity(active ? 1 : 0.35))
+                    .frame(width: 4, height: max(4, h * 52))
             }
         }
-        .onAppear { animating = true }
+        .animation(reduceMotion ? nil : .linear(duration: 0.08), value: historique)
+        .onChange(of: level) { _, nouveau in
+            guard active else { return }
+            // Plancher pour que ça respire même dans le silence, plafond à 1.
+            let v = CGFloat(max(0.08, min(1, nouveau)))
+            historique.removeFirst()
+            historique.append(v)
+        }
+        .onChange(of: active) { _, estActif in
+            if !estActif { historique = Array(repeating: 0.08, count: nbBarres) }
+        }
         .accessibilityHidden(true)
-    }
-
-    private func barHeight(_ i: Int) -> CGFloat {
-        guard active, !reduceMotion else { return 18 }
-        return animating ? CGFloat(14 + (i * 7) % 30) : 12
     }
 }
