@@ -328,7 +328,7 @@ struct MealScanView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Dicte ton repas")
                             .font(.system(size: 16, weight: .semibold))
-                        Text("« ce midi, du poulet avec des pâtes »")
+                        Text("« une cuisse de poulet, 100 g de pâtes »")
                             .font(.system(size: 12))
                             .opacity(0.85)
                     }
