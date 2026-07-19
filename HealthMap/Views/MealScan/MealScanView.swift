@@ -27,6 +27,8 @@ struct MealScanView: View {
     /// Recherche d'aliment présentée en bottom-sheet depuis la barre d'accueil
     /// (remplace l'ancien plein écran piloté par `selectedTab`).
     @State private var showSearch = false
+    @State private var showVoice = false
+    @State private var voiceConfirmation: String?
     /// Apports quotidiens (score) des 7 derniers jours — courbe « apports vs besoins ».
     @State private var curve: [Int] = []
     /// Énergie active du jour (Apple Santé) → colonne « dépensées » de la jauge kcal.
@@ -74,6 +76,14 @@ struct MealScanView: View {
                                 .foregroundStyle(Color.kiwiGreen)
                         }
                         .accessibilityLabel("Profil")
+                    }
+                }
+                .sheet(isPresented: $showVoice) {
+                    if let uid = AuthService.shared.cachedCurrentUserIdString {
+                        VoiceMealSheet(userId: uid) { count, kcal in
+                            voiceConfirmation = "\(count) aliment\(count > 1 ? "s" : "") ajouté\(count > 1 ? "s" : "") · \(kcal) kcal"
+                            Task { await journal.load() }
+                        }
                     }
                 }
                 .sheet(isPresented: $showPaywall) {
@@ -180,6 +190,8 @@ struct MealScanView: View {
             .padding(.horizontal, Theme.spacingLG)
 
             captureBlock
+
+            voiceEntry
 
             searchEntry
 
@@ -303,6 +315,46 @@ struct MealScanView: View {
     }
 
     // MARK: - Entrée recherche (surface l'onglet recherche existant)
+    /// Point d'entrée de la fonction phare : dicter son repas. Placé AVANT la
+    /// recherche et le scan photo — c'est le chemin qu'on met en avant.
+    private var voiceEntry: some View {
+        VStack(spacing: Theme.spacingSM) {
+            Button {
+                showVoice = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Dicte ton repas")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("« ce midi, du poulet avec des pâtes »")
+                            .font(.system(size: 12))
+                            .opacity(0.85)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .opacity(0.7)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                .background(Color.healthMapBlue, in: RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dicter ton repas")
+
+            if let msg = voiceConfirmation {
+                Text(msg)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.scoreExcellent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
     private var searchEntry: some View {
         VStack(spacing: Theme.spacingMD) {
             HStack(spacing: 12) {

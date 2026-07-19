@@ -358,6 +358,46 @@ final class MealJournalService {
         try await client.from("meal_scans").insert(row).execute()
     }
 
+    /// Insère PLUSIEURS aliments comme UN SEUL repas (une ligne `meal_scans`
+    /// multi-aliments), à l'image d'un scan photo — c'est la forme d'un repas
+    /// dicté : « poulet, pâtes et un yaourt » est un repas, pas trois.
+    /// Agrégats de la ligne recalculés depuis les items via `aggregatesFromItems`,
+    /// donc cohérents avec l'édition de quantité et avec `day_summary`.
+    @discardableResult
+    func insertFoods(userId: String,
+                     entries: [FoodEntry],
+                     slot: MealSlot,
+                     consumedAt: Date = Date()) async throws -> Bool {
+        guard !entries.isEmpty else { return false }
+
+        struct InsertRow: Encodable {
+            let userId: String
+            let consumedAt: String
+            let mealType: String
+            let detectedFoods: [FoodEntry]
+            let macros: MealMacros
+            let micros: [MicroPct]
+            enum CodingKeys: String, CodingKey {
+                case userId = "user_id"
+                case consumedAt = "consumed_at"
+                case mealType = "meal_type"
+                case detectedFoods = "detected_foods"
+                case macros, micros
+            }
+        }
+        let agg = Self.aggregatesFromItems(entries)
+        let row = InsertRow(
+            userId: userId,
+            consumedAt: Self.iso.string(from: consumedAt),
+            mealType: slot.rawValue,
+            detectedFoods: entries,
+            macros: agg.macros,
+            micros: agg.micros
+        )
+        try await client.from("meal_scans").insert(row).execute()
+        return true
+    }
+
     // MARK: - Lecture des repas (jour ou plage)
 
     func loadDay(userId: String, day: Date = Date(), calendar: Calendar = .current) async throws -> [MealRecord] {

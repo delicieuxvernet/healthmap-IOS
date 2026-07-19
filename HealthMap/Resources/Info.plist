@@ -65,6 +65,15 @@
     <string>HealthMap utilise la caméra pour photographier tes repas et analyser leur composition nutritionnelle.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>HealthMap accède à vos photos pour importer des images de repas ou d'étiquettes nutritionnelles que vous souhaitez analyser.</string>
+    <!-- Saisie vocale (fonction phare) : dictée du repas via Speech.framework.
+         Les DEUX clés sont obligatoires — sans elles l'app plante à la première
+         dictée et la soumission est rejetée. La reconnaissance est demandée
+         on-device quand l'appareil le permet : l'audio ne quitte pas le téléphone,
+         seul le texte transcrit est envoyé à notre serveur pour être analysé. -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Kiwio utilise le micro pour que tu puisses dicter ton repas au lieu de le saisir. L'enregistrement n'est pas conservé : seul le texte transcrit sert à identifier tes aliments.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Kiwio transcrit ta voix en texte pour reconnaître les aliments de ton repas et calculer tes calories. La transcription se fait sur ton iPhone quand c'est possible.</string>
     <!-- HealthKit : lecture seule (activité, poids, sommeil) pour pré-remplir le profil. -->
     <key>NSHealthShareUsageDescription</key>
     <string>Kiwio lit ton activité, ton poids et ton sommeil depuis Apple Santé pour pré-remplir ton profil et personnaliser ton bilan. Lecture seule : Kiwio n'écrit jamais dans Santé.</string>
