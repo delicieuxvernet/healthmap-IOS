@@ -2,7 +2,19 @@
 
 > **Ce fichier est la mémoire long terme du projet iOS.**
 > À lire intégralement au début de CHAQUE session avant d'écrire la moindre ligne de code.
-> Dernière mise à jour : 9 juin 2026 (migration Supabase Auth native — Clerk retiré d'iOS)
+> Dernière mise à jour : 19 juillet 2026 (saisie vocale + règle « iOS uniquement »)
+
+> ## 🎯 CE REPO EST LE SEUL PRODUIT
+>
+> **Kiwio est une app iOS, et rien d'autre.** Le repo web
+> (`Desktop\Claude\Healthmap\code`) est un **brouillon abandonné** : on n'y
+> touche plus que le dossier `supabase/` (backend partagé). Décision d'Arthur,
+> 19 juillet 2026 : « oublie à tout jamais le site web […] on bosse seulement
+> sur l'appli ».
+>
+> ⚠️ Une maquette jointe en `.html` est un **format de présentation d'écran**
+> (cf. méthode globale d'Arthur), **pas** une cible web : elle se porte en
+> SwiftUI dans ce repo.
 
 ---
 
