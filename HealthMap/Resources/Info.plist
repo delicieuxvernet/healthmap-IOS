@@ -73,7 +73,7 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Kiwio utilise le micro pour que tu puisses dicter ton repas au lieu de le saisir. L'enregistrement n'est pas conservé : seul le texte transcrit sert à identifier tes aliments.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>Kiwio transcrit ta voix en texte pour reconnaître les aliments de ton repas et calculer tes calories. La transcription se fait sur ton iPhone quand c'est possible.</string>
+    <string>Kiwio transcrit ta voix en texte pour reconnaître les aliments de ton repas et calculer tes calories. La transcription se fait sur ton iPhone quand il le permet ; sinon elle est traitée par les serveurs d'Apple. Seul le texte obtenu est envoyé à Kiwio, jamais l'enregistrement.</string>
     <!-- HealthKit : lecture seule (activité, poids, sommeil) pour pré-remplir le profil. -->
     <key>NSHealthShareUsageDescription</key>
     <string>Kiwio lit ton activité, ton poids et ton sommeil depuis Apple Santé pour pré-remplir ton profil et personnaliser ton bilan. Lecture seule : Kiwio n'écrit jamais dans Santé.</string>

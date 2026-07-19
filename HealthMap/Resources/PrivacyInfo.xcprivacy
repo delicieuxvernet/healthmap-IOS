@@ -93,11 +93,19 @@
         </dict>
 
         <!-- ==== Other User Content ==== -->
-        <!-- Meal photos imported from the photo library via `PhotosPicker`.
+        <!-- 1) Meal photos imported from the photo library via `PhotosPicker`.
              Sent to our AI backend for nutrient analysis, then discarded —
              the photo itself is never persisted server-side, only the
              derived nutrient breakdown. Still declared here because the
-             bytes transit our infrastructure. -->
+             bytes transit our infrastructure.
+             2) Voice-dictated meal descriptions (`VoiceMealService`). The
+             AUDIO is never collected by us: SFSpeechRecognizer transcribes it
+             on-device when the device supports it, otherwise through Apple's
+             own service. Only the resulting TEXT reaches our edge function
+             `parse-meal-voice`, which returns the identified foods. The text
+             is not persisted server-side either — only the journal entry is.
+             No `NSPrivacyCollectedDataTypeAudioData` declaration is required
+             precisely because no audio ever reaches our infrastructure. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
