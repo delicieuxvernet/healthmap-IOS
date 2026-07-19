@@ -340,7 +340,7 @@ struct MealScanView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-                .background(Color.healthMapBlue, in: RoundedRectangle(cornerRadius: 16))
+                .background(Kiwio.vert, in: RoundedRectangle(cornerRadius: 16))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Dicter ton repas")
