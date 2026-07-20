@@ -75,6 +75,46 @@ enum TimingSlot: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Contre-indication (affichée en précaution, jamais un filtre silencieux)
+/// Le profil ne capte pas la plupart de ces conditions (allergie, thyroïde,
+/// hémochromatose…). Plutôt que masquer un produit, on affiche l'avertissement
+/// et on laisse l'utilisateur / son médecin trancher.
+enum Contraindication: String, CaseIterable, Equatable {
+    case grossesse
+    case allaitement
+    case hemochromatose
+    case hyperthyroidie
+    case hypercalcemie
+    case insuffisanceRenaleSevere = "insuffisance_renale_severe"
+    case allergiePoisson = "allergie_poisson"
+
+    /// Titre court de la précaution.
+    var title: String {
+        switch self {
+        case .grossesse: return "Grossesse"
+        case .allaitement: return "Allaitement"
+        case .hemochromatose: return "Hémochromatose"
+        case .hyperthyroidie: return "Thyroïde"
+        case .hypercalcemie: return "Hypercalcémie"
+        case .insuffisanceRenaleSevere: return "Reins"
+        case .allergiePoisson: return "Allergie poisson"
+        }
+    }
+
+    /// Message affiché à l'utilisateur.
+    var warningLabel: String {
+        switch self {
+        case .grossesse: return "Demande l'avis de ton médecin ou ta sage-femme avant de te supplémenter."
+        case .allaitement: return "Demande l'avis de ton médecin avant de te supplémenter pendant l'allaitement."
+        case .hemochromatose: return "Déconseillé en cas d'hémochromatose (surcharge en fer)."
+        case .hyperthyroidie: return "Déconseillé en cas d'hyperthyroïdie — demande l'avis de ton médecin."
+        case .hypercalcemie: return "Déconseillé en cas d'hypercalcémie."
+        case .insuffisanceRenaleSevere: return "Prudence en cas d'insuffisance rénale sévère — demande l'avis de ton médecin."
+        case .allergiePoisson: return "Contient de l'huile de poisson — à éviter en cas d'allergie (préfère la version algue)."
+        }
+    }
+}
+
 // MARK: - Supplement Product
 struct SupplementProduct: Identifiable, Equatable {
     let id: String           // slug
@@ -82,17 +122,31 @@ struct SupplementProduct: Identifiable, Equatable {
     let nutrientID: NutrientID
     let brand: String
     let dosage: String
+    /// Nombre de prises par jour (gélules/gouttes/dosettes). Sert au calcul de coût.
+    let unitsPerDay: Int
     let timing: TimingSlot
-    let price: Double        // EUR
+    let price: Double         // EUR (prix de référence, hors promo)
     let unitsPerPackage: Int
+    /// Fiche produit officielle de la marque (source « lien direct », option a).
+    let productURL: String
     let isVegan: Bool
-    let contraindications: [String]
+    let contraindications: [Contraindication]
     let antiInteractions: [String]
     let tier: ProductTier
     let whyBrand: String
+    /// Date du dernier audit web du catalogue (prix / dosage / disponibilité).
+    /// Tous les produits sont vérifiés en une passe → source unique dans
+    /// `SupplementEngine.catalogVerifiedAt`. Exclu de l'init memberwise (défaut).
+    let verifiedAt: String = SupplementEngine.catalogVerifiedAt
 
+    /// Nombre de jours couverts par une boîte, en tenant compte des prises/jour.
+    var daysPerPackage: Int {
+        max(1, unitsPerPackage / max(1, unitsPerDay))
+    }
+
+    /// Coût journalier réel = prix × prises par jour / unités par boîte.
     var dailyCost: Double {
-        price / Double(unitsPerPackage)
+        price * Double(max(1, unitsPerDay)) / Double(max(1, unitsPerPackage))
     }
 
     var monthlyCost: Double {

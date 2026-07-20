@@ -25,13 +25,16 @@ struct SupplementPrecaution: Identifiable {
 // MARK: - Helpers de mapping (markup → données réelles)
 enum SupplementsV4 {
 
+    /// Produit affiché selon le mode Premium / Éco choisi (avec repli sur l'autre tier).
+    static func product(_ rec: SupplementRecommendation, premium: Bool) -> SupplementProduct? {
+        premium
+            ? (rec.premiumProduct ?? rec.valueProduct)
+            : (rec.valueProduct ?? rec.premiumProduct)
+    }
+
     /// Prix mensuel affiché selon le mode Premium / Éco choisi.
     static func monthlyPrice(_ rec: SupplementRecommendation, premium: Bool) -> Double {
-        if premium {
-            return (rec.premiumProduct ?? rec.valueProduct)?.monthlyCost ?? 0
-        } else {
-            return (rec.valueProduct ?? rec.premiumProduct)?.monthlyCost ?? 0
-        }
+        product(rec, premium: premium)?.monthlyCost ?? 0
     }
 
     static func priceLabel(_ rec: SupplementRecommendation, premium: Bool) -> String {
@@ -73,6 +76,17 @@ enum SupplementsV4 {
                     ))
                 }
             }
+
+            // 3) Contre-indications du produit (affichées, jamais masquées).
+            for ci in product.contraindications {
+                items.append(SupplementPrecaution(
+                    icon: "cross.case.fill",
+                    bg: Color.scoreLow.opacity(0.16),
+                    color: Color.scoreLow,
+                    title: ci.title,
+                    note: ci.warningLabel
+                ))
+            }
         }
 
         return items
@@ -88,6 +102,7 @@ enum SupplementsV4 {
         case "anticoagulant": return "Avec ton anticoagulant"
         case "ppi": return "Avec ton IPP"
         case "metformin": return "Avec la metformine"
+        case "grossesse": return "Grossesse"
         default: return w.severity == .critical ? "À surveiller de près" : "Bon à savoir"
         }
     }
@@ -117,7 +132,11 @@ struct SupplementCardV4: View {
     let onSeeFoodPlan: () -> Void   // CTA assiette → Plan
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openURL) private var openURL
     @State private var suppFill: CGFloat = 0
+
+    /// Produit effectivement affiché (selon le toggle Premium / Éco).
+    private var shownProduct: SupplementProduct? { SupplementsV4.product(rec, premium: premium) }
 
     private var color: Color { Color.scoreColor(for: rec.score) }
     private var essential: Bool { rec.score < 45 }
@@ -160,7 +179,7 @@ struct SupplementCardV4: View {
                                         : Color.healthMapMuted.opacity(0.14))
                                 )
                         }
-                        if let product = rec.bestProduct {
+                        if let product = shownProduct {
                             Text("\(product.dosage) · \(product.timing.displayGroup.lowercased())")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(Color.healthMapSecondary)
@@ -199,6 +218,40 @@ struct SupplementCardV4: View {
                     .buttonStyle(.healthMapPressed)
                     .accessibilityLabel("\(interCount) précautions pour \(rec.nutrientLabel)")
                 }
+            }
+
+            // Marque + lien vers la fiche officielle (option a : site de la marque).
+            if let product = shownProduct {
+                HStack(spacing: 10) {
+                    Text(String(product.brand.prefix(1)))
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(width: 26, height: 26)
+                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.kiwiCharcoal))
+                        .accessibilityHidden(true)
+                    Text(product.brand)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Button {
+                        if let url = URL(string: product.productURL) { openURL(url) }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text("Voir le produit")
+                                .font(.system(size: 12, weight: .bold))
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 12, weight: .bold))
+                        }
+                        .foregroundStyle(Color.kiwiGreenInk)
+                    }
+                    .buttonStyle(.healthMapPressed)
+                    .accessibilityLabel("Voir \(product.name) chez \(product.brand)")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color(hex: "FAF8F3")))
+                .padding(.top, 13)
             }
 
             // Jauge « couvre ton besoin » : alimentation (gris) + complément (vert).
@@ -458,8 +511,8 @@ struct SupplementCartCard: View {
             if !taken.isEmpty {
                 Button(action: onOrder) {
                     HStack(spacing: 8) {
-                        Image(systemName: "bag.fill").font(.system(size: 17))
-                        Text("Commander ma sélection · \(totalLabel)/mois")
+                        Image(systemName: "arrow.up.right.square.fill").font(.system(size: 17))
+                        Text("Voir mes produits · \(totalLabel)/mois")
                             .font(.system(size: 15, weight: .bold))
                     }
                     .foregroundStyle(.white)
@@ -485,6 +538,7 @@ struct SupplementWhySheet: View {
     let rec: SupplementRecommendation
     let onChoose: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     private var color: Color { Color.scoreColor(for: rec.score) }
     private var essential: Bool { rec.score < 45 }
@@ -548,12 +602,14 @@ struct SupplementWhySheet: View {
                 HStack(spacing: 10) {
                     if let premiumProduct = rec.premiumProduct {
                         tierCard(icon: "crown.fill", title: "Premium", titleColor: .kiwiGreenInk,
-                                 form: premiumProduct.dosage, price: premiumProduct.monthlyCost,
+                                 brand: premiumProduct.brand, form: premiumProduct.dosage,
+                                 price: premiumProduct.monthlyCost, url: premiumProduct.productURL,
                                  priceColor: .kiwiGreenInk, highlighted: true)
                     }
                     if let value = rec.valueProduct {
                         tierCard(icon: "leaf.fill", title: "Économique", titleColor: .healthMapSecondary,
-                                 form: value.dosage, price: value.monthlyCost,
+                                 brand: value.brand, form: value.dosage,
+                                 price: value.monthlyCost, url: value.productURL,
                                  priceColor: Color(hex: "3A3833"), highlighted: false)
                     }
                 }
@@ -611,41 +667,60 @@ struct SupplementWhySheet: View {
     }
 
     private func tierCard(icon: String, title: String, titleColor: Color,
-                          form: String, price: Double, priceColor: Color, highlighted: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 15))
-                    .foregroundStyle(highlighted ? Color.kiwiGreen : Color(hex: "928C7E"))
-                Text(title)
-                    .font(.system(size: 12.5, weight: .bold))
-                    .foregroundStyle(titleColor)
+                          brand: String, form: String, price: Double, url: String,
+                          priceColor: Color, highlighted: Bool) -> some View {
+        Button {
+            if let u = URL(string: url) { openURL(u) }
+        } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Image(systemName: icon)
+                        .font(.system(size: 15))
+                        .foregroundStyle(highlighted ? Color.kiwiGreen : Color(hex: "928C7E"))
+                    Text(title)
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(titleColor)
+                }
+                Text(brand)
+                    .font(.system(size: 12.5, weight: .heavy))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                    .lineLimit(1)
+                Text(form)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(String(format: "%.0f €", price))
+                        .font(.system(size: 17, weight: .bold, design: .monospaced))
+                        .foregroundStyle(priceColor)
+                    Text("/mois")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.healthMapMuted)
+                }
+                .padding(.top, 3)
+                HStack(spacing: 4) {
+                    Text("Voir le produit")
+                        .font(.system(size: 11, weight: .bold))
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundStyle(Color.kiwiGreenInk)
+                .padding(.top, 2)
             }
-            Text(form)
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(Color.healthMapSecondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(String(format: "%.0f €", price))
-                    .font(.system(size: 17, weight: .bold, design: .monospaced))
-                    .foregroundStyle(priceColor)
-                Text("/mois")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.healthMapMuted)
-            }
-            .padding(.top, 3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(highlighted ? Color.kiwiGreen : Color.kiwiCharcoal.opacity(0.08),
+                            lineWidth: highlighted ? 1.5 : 1)
+            )
+            .shadow(color: highlighted ? Color.kiwiGreen.opacity(0.12) : .clear, radius: 16, x: 0, y: 6)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 13)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(highlighted ? Color.kiwiGreen : Color.kiwiCharcoal.opacity(0.08),
-                        lineWidth: highlighted ? 1.5 : 1)
-        )
-        .shadow(color: highlighted ? Color.kiwiGreen.opacity(0.12) : .clear, radius: 16, x: 0, y: 6)
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel("\(title), \(brand), \(String(format: "%.0f €", price)) par mois. Voir le produit.")
     }
 }
 
