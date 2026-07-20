@@ -431,9 +431,10 @@ if MODE == "apply-app"
       1. Bilan tab (first tab) > tap the "Kiwio Premium" card visible on the
          screen > the paywall opens.
       2. Bilan tab > profile icon (top-right) > "Passer a Premium".
-      The paywall lists the 3 auto-renewable subscriptions of group Kiwio Premium
-      (Weekly 0.99 EUR, Monthly 4.99 EUR, Annual 50 EUR - names, durations and
-      prices are displayed). All 3 are submitted with this version.
+      The paywall displays the auto-renewable subscriptions of group Kiwio
+      Premium with their names, durations and prices (Annual 50 EUR and a
+      short plan - Weekly 0.99 EUR or Monthly 4.99 EUR). All 3 subscriptions
+      (Weekly, Monthly, Annual) are submitted with this version.
 
       HEALTHKIT (2.5.1): Apple Health is read-only. Path: Bilan tab > profile
       icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports
