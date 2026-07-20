@@ -1,42 +1,43 @@
-import Foundation
 import AVFoundation
+import Foundation
 import Speech
 
-/// Dictée vocale native — la brique de capture de la fonction phare Kiwio.
+/// Capture vocale façon mémo vocal (Snapchat, Instagram, WhatsApp) :
+/// **on enregistre d'abord, on transcrit ensuite**.
 ///
-/// POURQUOI SFSpeechRecognizer ET PAS UN STT SERVEUR :
-///   • transcription EN DIRECT, mot à mot — c'est ce qui rend la fonction
-///     crédible (on voit que ça écoute) ;
-///   • l'audio ne quitte pas l'appareil quand la reconnaissance est on-device
-///     (`requiresOnDeviceRecognition`), seul le TEXTE part vers notre backend ;
-///   • aucun coût par minute, aucune latence d'upload.
+/// ⚠️ POURQUOI CETTE ARCHITECTURE — à lire avant de « simplifier ».
 ///
-/// ⚠️ Info.plist DOIT porter `NSMicrophoneUsageDescription` et
-/// `NSSpeechRecognitionUsageDescription`.
+/// La version précédente faisait de la reconnaissance EN DIRECT
+/// (`SFSpeechAudioBufferRecognitionRequest` sur le flux du micro). C'est
+/// séduisant — le texte s'affiche pendant qu'on parle — mais iOS impose deux
+/// contraintes qui rendent ce mode inutilisable pour dicter un repas :
 ///
-/// ── DEUX PIÈGES CORRIGÉS ICI (bug constaté sur appareil le 19 juil. 2026) ──
+///   1. la reconnaissance se termine d'elle-même après un silence ;
+///   2. une session est plafonnée à ~1 minute.
 ///
-/// 1. `result.bestTranscription.formattedString` ne contient QUE la session de
-///    reconnaissance en cours. Après un silence, iOS clôture la session : si on
-///    affecte ce texte à `transcript`, on ÉCRASE tout ce qui précède. Arthur a
-///    perdu pommes de terre, steak et légumes de cette façon — seuls les trois
-///    derniers aliments avaient survécu. On accumule donc dans `finalizedText`,
-///    et `transcript` = accumulé + partiel en cours.
+/// Il faut donc relancer une session et recoller les morceaux. Ce recollage a
+/// été tenté (accumulateur `finalizedText` + relance automatique, PR #153) : il
+/// a réduit le problème sans l'éliminer, et l'utilisateur perdait toujours une
+/// partie de son repas après une pause — signalé deux fois sur appareil.
+/// **Chaque couture est une occasion de perdre de l'audio** : celui qui arrive
+/// pendant qu'on redémarre la session n'est capté par personne.
 ///
-/// 2. iOS coupe la reconnaissance après quelques secondes de silence (et au
-///    bout d'environ une minute). Sans relance, la personne continue de parler
-///    dans le vide. On relance TANT QUE l'utilisateur n'a pas dit « Terminer »,
-///    en gardant le moteur audio et le tap en place — seule la requête est
-///    renouvelée.
+/// Les vocaux des réseaux sociaux ne procèdent pas ainsi : ils écrivent l'audio
+/// dans un fichier, en continu, sans rien interpréter. Aucune session, aucun
+/// timeout, aucune couture — donc rien à perdre. La transcription se fait à la
+/// fin, sur le fichier complet (`SFSpeechURLRecognitionRequest`), qui n'a ni
+/// limite de durée ni coupure sur silence.
 ///
-/// La version web faisait déjà les deux ; leur absence était une régression de
-/// portage, pas une limite de la plateforme.
+/// Le prix assumé : le texte ne défile plus pendant qu'on parle, et il faut 1 à
+/// 3 s à la fin. Sans commune mesure avec le coût de perdre la moitié d'un repas.
 @MainActor
 final class SpeechCaptureService: ObservableObject {
 
     enum State: Equatable {
         case idle
         case listening
+        /// Le fichier est complet, la reconnaissance tourne dessus.
+        case transcribing
         case stopped
     }
 
@@ -44,6 +45,7 @@ final class SpeechCaptureService: ObservableObject {
         case permissionDenied
         case recognizerUnavailable
         case failed(String)
+        case silence
 
         var message: String {
             switch self {
@@ -53,206 +55,187 @@ final class SpeechCaptureService: ObservableObject {
                 return "La dictée en français n'est pas disponible sur cet appareil."
             case .failed:
                 return "La dictée s'est interrompue. Réessaie."
+            case .silence:
+                return "Je n'ai rien entendu. Réessaie en parlant un peu plus fort."
             }
         }
     }
 
     @Published private(set) var state: State = .idle
-    /// Ce qu'on affiche : tout ce qui a été dit depuis le début de la dictée.
+    /// Texte final. Écrit UNE SEULE FOIS, à la fin — donc rien ne peut plus
+    /// l'écraser en cours de route, ce qui était la cause exacte de la perte.
     @Published private(set) var transcript: String = ""
-    /// Niveau sonore instantané, 0…1 — alimente la waveform réactive.
+    /// Niveau sonore 0…1 pour la courbe, issu du metering du recorder.
     @Published private(set) var level: Float = 0
     @Published private(set) var error: CaptureError?
+    /// Durée écoulée, pour le minuteur de la bulle.
+    @Published private(set) var duree: TimeInterval = 0
 
-    private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "fr-FR"))
-    private let audioEngine = AVAudioEngine()
-    private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var task: SFSpeechRecognitionTask?
-
-    /// Tout ce qui a été DÉFINITIVEMENT reconnu, toutes sessions confondues.
-    /// Ne doit jamais être écrasé — uniquement complété.
-    private var finalizedText = ""
-    /// L'utilisateur a-t-il demandé l'arrêt ? Sinon, on relance après chaque fin.
-    private var stopRequested = false
-
-    var isAvailable: Bool { recognizer?.isAvailable ?? false }
+    private var recorder: AVAudioRecorder?
+    private var horloge: Timer?
+    private var fichier: URL?
 
     // MARK: - Autorisations
 
     func requestPermissions() async -> Bool {
-        let speechOK = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
-            SFSpeechRecognizer.requestAuthorization { status in
-                cont.resume(returning: status == .authorized)
-            }
+        let micro = await withCheckedContinuation { suite in
+            AVAudioApplication.requestRecordPermission { suite.resume(returning: $0) }
         }
-        guard speechOK else { return false }
-
-        return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
-            AVAudioApplication.requestRecordPermission { granted in
-                cont.resume(returning: granted)
-            }
+        let parole = await withCheckedContinuation { suite in
+            SFSpeechRecognizer.requestAuthorization { suite.resume(returning: $0) }
         }
+        return micro && parole == .authorized
     }
 
-    // MARK: - Capture
+    // MARK: - Enregistrement
 
     func start() async {
-        error = nil
-        finalizedText = ""
-        transcript = ""
-        level = 0
-        stopRequested = false
+        guard state != .listening else { return }
+        reset()
 
-        guard let recognizer, recognizer.isAvailable else {
-            error = .recognizerUnavailable
-            return
-        }
         guard await requestPermissions() else {
-            error = .permissionDenied
+            echouer(.permissionDenied)
             return
         }
 
         do {
-            try configureSession()
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.record, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true, options: [])
 
-            let input = audioEngine.inputNode
-            let format = input.outputFormat(forBus: 0)
-            input.removeTap(onBus: 0)
-            // Le tap vise `self.request`, pas une requête capturée : à la relance
-            // on remplace simplement la requête, sans toucher au moteur audio.
-            input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-                guard let self else { return }
-                let rms = Self.rms(of: buffer)
-                Task { @MainActor in
-                    self.request?.append(buffer)
-                    self.level = rms
-                }
+            // AAC 22 kHz mono : largement suffisant pour de la parole, et le
+            // fichier reste petit (~20 ko / 10 s). Il ne quitte jamais l'appareil
+            // et il est supprimé dès la transcription faite.
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("kiwio-dictee-\(UUID().uuidString).m4a")
+            let reglages: [String: Any] = [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 22_050,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue,
+            ]
+
+            let rec = try AVAudioRecorder(url: url, settings: reglages)
+            rec.isMeteringEnabled = true
+            guard rec.record() else {
+                echouer(.failed("record() a refusé de démarrer"))
+                return
             }
 
-            audioEngine.prepare()
-            try audioEngine.start()
+            recorder = rec
+            fichier = url
             state = .listening
-            startRecognitionSession()
+            demarrerHorloge()
         } catch {
-            self.error = .failed(error.localizedDescription)
-            teardown()
+            echouer(.failed(error.localizedDescription))
         }
     }
 
-    /// Ouvre une session de reconnaissance. Appelée au démarrage ET à chaque
-    /// relance après une coupure due au silence.
-    private func startRecognitionSession() {
-        guard let recognizer, !stopRequested else { return }
-
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        if recognizer.supportsOnDeviceRecognition {
-            request.requiresOnDeviceRecognition = true
-        }
-        self.request = request
-
-        task = recognizer.recognitionTask(with: request) { [weak self] result, err in
-            guard let self else { return }
-            Task { @MainActor in
-                if let result {
-                    let courant = result.bestTranscription.formattedString
-                    if result.isFinal {
-                        // Session close : on CONSOLIDE dans l'accumulateur.
-                        self.finalizedText = Self.join(self.finalizedText, courant)
-                        self.transcript = self.finalizedText
-                    } else {
-                        // Partiel : accumulé + ce qui est en train d'être dit.
-                        self.transcript = Self.join(self.finalizedText, courant)
-                    }
-                }
-
-                guard result?.isFinal == true || err != nil else { return }
-
-                // Une erreur après du texte déjà capté, c'est la coupure normale
-                // sur silence — pas une panne. On ne la remonte que si on n'a
-                // strictement rien et qu'on n'a pas encore commencé.
-                if err != nil, self.finalizedText.isEmpty, self.transcript.isEmpty,
-                   self.state == .listening, !self.stopRequested {
-                    self.error = .failed(err?.localizedDescription ?? "")
-                }
-
-                self.task = nil
-                self.request = nil
-
-                if self.stopRequested {
-                    self.teardown()
-                } else if self.state == .listening {
-                    // La personne parle peut-être encore : on rouvre une session.
-                    self.startRecognitionSession()
-                }
+    /// `averagePower` est en dB (-160 muet → 0 saturé). On le ramène en 0…1 sur
+    /// une échelle qui rend la parole normale bien visible plutôt que collée au
+    /// plancher, avec un lissage : sans lui la courbe scintille au lieu d'onduler.
+    private func demarrerHorloge() {
+        horloge?.invalidate()
+        horloge = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let rec = self.recorder, rec.isRecording else { return }
+                rec.updateMeters()
+                let db = rec.averagePower(forChannel: 0)
+                let normalise = max(0, min(1, (db + 50) / 50))
+                self.level = self.level * 0.6 + normalise * 0.4
+                self.duree = rec.currentTime
             }
         }
     }
 
-    /// Arrêt volontaire (bouton « Terminer »). Tout le texte accumulé est conservé.
+    // MARK: - Fin : transcription du fichier complet
+
+    /// Termine l'enregistrement et transcrit l'enregistrement ENTIER.
+    /// Renvoie le texte, ou une chaîne vide si rien n'a été compris.
+    @discardableResult
+    func finishAndTranscribe() async -> String {
+        guard state == .listening, let rec = recorder, let url = fichier else { return transcript }
+
+        rec.stop()
+        horloge?.invalidate(); horloge = nil
+        level = 0
+        state = .transcribing
+        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+
+        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "fr-FR")),
+              recognizer.isAvailable else {
+            echouer(.recognizerUnavailable)
+            return ""
+        }
+
+        let requete = SFSpeechURLRecognitionRequest(url: url)
+        requete.shouldReportPartialResults = false
+        // Sur appareil quand c'est possible : ce qu'on mange reste privé, et ça
+        // marche sans réseau. iOS retombe sur le service Apple si le modèle
+        // français n'est pas installé localement.
+        if recognizer.supportsOnDeviceRecognition {
+            requete.requiresOnDeviceRecognition = true
+        }
+
+        let texte: String = await withCheckedContinuation { suite in
+            var repris = false
+            recognizer.recognitionTask(with: requete) { resultat, erreur in
+                guard !repris else { return }
+                if let resultat, resultat.isFinal {
+                    repris = true
+                    suite.resume(returning: resultat.bestTranscription.formattedString)
+                } else if erreur != nil {
+                    repris = true
+                    suite.resume(returning: "")
+                }
+            }
+        }
+
+        nettoyerFichier()
+
+        guard !texte.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            echouer(.silence)
+            return ""
+        }
+
+        transcript = texte
+        state = .stopped
+        return texte
+    }
+
+    /// Annulation : on jette l'audio sans le transcrire.
     func stop() {
-        stopRequested = true
-        request?.endAudio()
-        // Si aucune session n'est en cours, rien ne rappellera teardown().
-        if task == nil { teardown() }
+        recorder?.stop()
+        horloge?.invalidate(); horloge = nil
+        level = 0
+        nettoyerFichier()
+        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+        if state == .listening { state = .stopped }
     }
 
     func reset() {
-        stopRequested = true
-        teardown()
-        finalizedText = ""
+        stop()
         transcript = ""
-        level = 0
         error = nil
+        duree = 0
         state = .idle
     }
 
     // MARK: - Interne
 
-    private func configureSession() throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
-    }
-
-    /// Libère micro, moteur audio et session. Idempotent.
-    private func teardown() {
-        if audioEngine.isRunning {
-            audioEngine.stop()
-            audioEngine.inputNode.removeTap(onBus: 0)
-        }
-        task?.cancel()
-        task = nil
-        request = nil
+    private func echouer(_ e: CaptureError) {
+        error = e
+        state = .stopped
+        horloge?.invalidate(); horloge = nil
         level = 0
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        if state == .listening { state = .stopped }
+        nettoyerFichier()
     }
 
-    /// Concatène deux fragments sans doubler les espaces.
-    private static func join(_ a: String, _ b: String) -> String {
-        let ga = a.trimmingCharacters(in: .whitespacesAndNewlines)
-        let gb = b.trimmingCharacters(in: .whitespacesAndNewlines)
-        if ga.isEmpty { return gb }
-        if gb.isEmpty { return ga }
-        return ga + " " + gb
-    }
-
-    /// Niveau sonore normalisé 0…1 à partir du buffer, pour la waveform.
-    /// RMS → dBFS → échelle utilisable (−50 dB = silence, 0 dB = saturation).
-    private nonisolated static func rms(of buffer: AVAudioPCMBuffer) -> Float {
-        guard let data = buffer.floatChannelData?[0] else { return 0 }
-        let n = Int(buffer.frameLength)
-        guard n > 0 else { return 0 }
-        var somme: Float = 0
-        for i in 0..<n { somme += data[i] * data[i] }
-        let rms = sqrt(somme / Float(n))
-        guard rms > 0 else { return 0 }
-        let db = 20 * log10(rms)
-        return max(0, min(1, (db + 50) / 50))
-    }
-
-    deinit {
-        task?.cancel()
+    /// L'audio ne sert qu'à produire le texte : une fois transcrit, il n'a plus
+    /// aucune raison de rester sur l'appareil.
+    private func nettoyerFichier() {
+        if let url = fichier { try? FileManager.default.removeItem(at: url) }
+        fichier = nil
+        recorder = nil
     }
 }

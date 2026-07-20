@@ -3,8 +3,8 @@ import SwiftUI
 /// La fonction phare de Kiwio : on dicte son repas, l'app compte les calories.
 ///
 /// Trois états, comme le design (`Scan - kcal autonome.html`) :
-///   1. écoute   — pilule waveform + minuteur, transcription en direct
-///   2. analyse  — « J'identifie tes aliments… »
+///   1. écoute   — bulle compacte : pilule waveform + minuteur
+///   2. analyse  — transcription du vocal puis « J'identifie tes aliments… »
 ///   3. résultat — lignes compactes, UNE seule carte déployée à la fois,
 ///                 total en direct, CTA bloqué tant qu'il manque une quantité.
 ///
@@ -33,10 +33,8 @@ struct VoiceMealSheet: View {
     @State private var slot: MealJournalService.MealSlot = .lunch
     @State private var errorMessage: String?
     @State private var isSaving = false
-    @State private var secondes = 0
 
     private let journal = MealJournalService.shared
-    private let tic = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     enum Phase { case listening, analyzing, results, failed }
 
@@ -59,14 +57,11 @@ struct VoiceMealSheet: View {
         .presentationDragIndicator(.visible)
         .task { await speech.start() }
         .onDisappear { speech.reset() }
-        .onReceive(tic) { _ in
-            if phase == .listening, speech.state == .listening { secondes += 1 }
-        }
     }
 
     private var hauteurs: Set<PresentationDetent> {
         switch phase {
-        case .listening: return [.height(440)]
+        case .listening: return [.height(330)]
         case .analyzing: return [.height(260)]
         case .results, .failed: return [.large]
         }
@@ -99,27 +94,15 @@ struct VoiceMealSheet: View {
             .frame(maxWidth: .infinity)
             .background(Kiwio.neutre, in: Capsule())
 
-            ScrollView {
-                if speech.transcript.isEmpty {
-                    // Tant que rien n'est dit, on APPREND à dicter — avec des
-                    // quantités, puisque c'est ce qui manque le plus souvent
-                    // pour compter juste.
-                    Text("Dis par exemple : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt nature » — précise les quantités si tu les connais.")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Kiwio.discret)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    // Le texte se construit sous les yeux : la zone se remplit
-                    // au fil de ce qui est dit, elle ne reste pas vide.
-                    Text(speech.transcript)
-                        .font(.system(size: 17))
-                        .foregroundStyle(Kiwio.encre)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityLabel(speech.transcript)
-                }
-            }
-            .frame(maxHeight: 150)
+            // On n'affiche plus de transcription en direct : il n'y en a plus.
+            // L'audio est enregistré d'un bloc et transcrit à la fin, comme un
+            // vocal Snapchat — c'est ce qui supprime la perte après une pause.
+            // Reste donc la consigne, qui insiste sur les quantités.
+            Text("Dis par exemple : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt nature » — précise les quantités si tu les connais.")
+                .font(.system(size: 14))
+                .foregroundStyle(Kiwio.discret)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if let err = speech.error {
                 Text(err.message)
@@ -138,7 +121,10 @@ struct VoiceMealSheet: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Kiwio.vert)
-            .disabled(speech.transcript.trimmingCharacters(in: .whitespaces).count < 3)
+            // Le transcript est vide pendant l'enregistrement (il n'existe qu'à
+            // la fin) : on se fie donc à la durée. Moins d'une seconde, il n'y a
+            // rien à transcrire.
+            .disabled(speech.duree < 1 || speech.state != .listening)
 
             Button("Annuler") { speech.reset(); dismiss() }
                 .font(.system(size: 15))
@@ -149,8 +135,11 @@ struct VoiceMealSheet: View {
         .padding(.horizontal, 20)
     }
 
+    /// Piloté par la durée réelle du recorder, pas par un compteur parallèle qui
+    /// pourrait dériver de l'enregistrement.
     private var minuteur: String {
-        String(format: "%d:%02d", secondes / 60, secondes % 60)
+        let s = Int(speech.duree)
+        return String(format: "%d:%02d", s / 60, s % 60)
     }
 
     // MARK: - 2. Analyse
@@ -398,9 +387,16 @@ struct VoiceMealSheet: View {
     // MARK: - Actions
 
     private func finishListening() async {
-        let text = speech.transcript
-        speech.stop()
+        // L'audio est transcrit MAINTENANT, en une fois, sur le fichier complet.
+        // C'est ce qui garantit qu'une pause au milieu de la phrase ne coûte
+        // plus rien : il n'y a jamais eu qu'un seul enregistrement.
         phase = .analyzing
+        let text = await speech.finishAndTranscribe()
+        guard !text.isEmpty else {
+            errorMessage = speech.error?.message ?? "Je n'ai rien entendu. Réessaie."
+            phase = .failed
+            return
+        }
         do {
             let analysis = try await VoiceMealService.shared.analyze(transcript: text)
             quotedTranscript = analysis.transcript
@@ -426,7 +422,6 @@ struct VoiceMealSheet: View {
         deployee = nil
         errorMessage = nil
         quotedTranscript = ""
-        secondes = 0
         phase = .listening
         speech.reset()
         await speech.start()
