@@ -16,6 +16,15 @@ struct PaywallView: View {
     @State private var alertMessage: String?
     @State private var showAlert = false
 
+    /// Le chargement des offerings a échoué (ou dépassé le timeout) : on montre
+    /// un message + bouton Réessayer au lieu d'un spinner infini. Sans cet état,
+    /// un échec RevenueCat laissait le paywall bloqué sur « Chargement des
+    /// offres… » sans issue (symptôme du refus App Review 2.1(b) du 20 juillet).
+    @State private var offeringsFailed = false
+
+    /// Durée max d'attente des offerings avant de basculer en état d'échec.
+    private static let offeringsTimeout: Duration = .seconds(10)
+
     private var annualPackage: Package? {
         subscriptionService.offerings?.current?.availablePackages.first { $0.packageType == .annual }
     }
@@ -44,7 +53,11 @@ struct PaywallView: View {
                     featureList
 
                     if annualPackage == nil && shortPlan == nil {
-                        loadingState
+                        if offeringsFailed {
+                            offeringsErrorState
+                        } else {
+                            loadingState
+                        }
                     } else {
                         planCards
                         ctaButton
@@ -56,16 +69,15 @@ struct PaywallView: View {
             }
         }
         .task {
-            if subscriptionService.offerings == nil {
-                await subscriptionService.loadOfferings()
-            }
-            if selectedPackage == nil {
-                selectedPackage = annualPackage ?? shortPlan
-            }
+            await loadOfferingsWithTimeout()
         }
         // L'offering peut arriver après l'apparition (cold start, réseau lent) :
-        // on sélectionne alors la formule annuelle par défaut dès qu'elle existe.
+        // on sélectionne alors la formule annuelle par défaut dès qu'elle existe,
+        // et on efface un éventuel état d'échec affiché entre-temps.
         .onChange(of: subscriptionService.offerings) { _, _ in
+            if annualPackage != nil || shortPlan != nil {
+                offeringsFailed = false
+            }
             if selectedPackage == nil {
                 selectedPackage = annualPackage ?? shortPlan
             }
@@ -277,6 +289,35 @@ struct PaywallView: View {
         .padding(.vertical, Theme.spacingXL)
     }
 
+    /// Échec (ou timeout) du chargement des offres StoreKit : message clair +
+    /// Réessayer. Jamais de spinner sans issue.
+    private var offeringsErrorState: some View {
+        VStack(spacing: Theme.spacingSM) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 28))
+                .foregroundStyle(Color.healthMapMuted)
+                .accessibilityHidden(true)
+
+            Text("Impossible de charger les offres.\nVérifie ta connexion et réessaie.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.healthMapSecondary)
+                .multilineTextAlignment(.center)
+
+            Button {
+                Task { await loadOfferingsWithTimeout(force: true) }
+            } label: {
+                Text("Réessayer")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 140)
+                    .frame(height: 44)
+                    .background(Capsule().fill(Color.kiwiGreen))
+            }
+            .buttonStyle(.healthMapPressed)
+        }
+        .padding(.vertical, Theme.spacingXL)
+    }
+
     private var footerLinks: some View {
         VStack(spacing: Theme.spacingSM) {
             // Feuille système Apple de saisie d'un code promo (offer code).
@@ -412,6 +453,37 @@ struct PaywallView: View {
     }
 
     // MARK: - Actions
+
+    /// Charge les offerings avec un timeout : au-delà de `offeringsTimeout`
+    /// sans paquet exploitable, on bascule sur l'état d'échec (Réessayer).
+    /// `force: true` (bouton Réessayer) relance même si un cache vide existe.
+    private func loadOfferingsWithTimeout(force: Bool = false) async {
+        offeringsFailed = false
+
+        if force || subscriptionService.offerings == nil {
+            // Chien de garde : si loadOfferings (réseau RevenueCat) traîne,
+            // on affiche l'échec sans attendre son retour. La tâche de chargement
+            // continue en arrière-plan — si elle aboutit finalement, onChange
+            // des offerings resélectionne un paquet et l'UI se rétablit seule.
+            let watchdog = Task {
+                try? await Task.sleep(for: Self.offeringsTimeout)
+                if !Task.isCancelled && annualPackage == nil && shortPlan == nil {
+                    offeringsFailed = true
+                }
+            }
+            await subscriptionService.loadOfferings()
+            watchdog.cancel()
+        }
+
+        if selectedPackage == nil {
+            selectedPackage = annualPackage ?? shortPlan
+        }
+        // loadOfferings a rendu la main mais rien d'affichable : échec réseau
+        // RevenueCat (erreur catchée dans le service) ou offering vide côté ASC.
+        if annualPackage == nil && shortPlan == nil {
+            offeringsFailed = true
+        }
+    }
 
     private func purchaseSelected() async {
         guard let package = selectedPackage, !isPurchasing else { return }

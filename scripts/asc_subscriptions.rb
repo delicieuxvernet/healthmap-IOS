@@ -405,20 +405,22 @@ if MODE == "apply-app"
   write("sortie manuelle (releaseType=MANUAL)", :patch, "/v1/appStoreVersions/#{version_id}",
     { data: { type: "appStoreVersions", id: version_id, attributes: { releaseType: "MANUAL" } } })
 
-  # Infos App Review : contact + compte démo (compte de test partagé du repo,
-  # celui que les reviewers utiliseront). Le téléphone reste à compléter.
+  # Infos App Review : contact + compte démo. ⚠️ audit-b UNIQUEMENT : c'est le
+  # seul compte test avec une row auth.users côté Supabase Auth (le chemin
+  # d'auth iOS) — audit-a/c sont Clerk-only et NE PEUVENT PAS se connecter
+  # dans l'app (cause racine du refus 2.1(b) du 20 juillet 2026).
   code, rd = req(:get, "/v1/appStoreVersions/#{version_id}/appStoreReviewDetail")
   review_attrs = {
     contactFirstName: "Arthur",
     contactLastName: "Vernet",
     contactEmail: "contact@healthmap.fr",
     contactPhone: ENV["REVIEW_CONTACT_PHONE"].to_s,
-    demoAccountName: "audit-a@test.com",
+    demoAccountName: "audit-b@test.com",
     demoAccountPassword: ENV["DEMO_ACCOUNT_PASSWORD"].to_s,
     demoAccountRequired: true,
     notes: "Application en francais. Compte demo fourni (profil complet avec bilan). " \
-           "L'abonnement Kiwio Premium (mensuel/annuel) se teste depuis l'onglet Profil " \
-           "ou une section Premium du bilan.",
+           "Paywall : onglet Bilan > icone profil en haut a droite > Passer a Premium, " \
+           "ou carte Kiwio Premium directement sur l'ecran Bilan.",
   }
   review_attrs.delete(:contactPhone) if review_attrs[:contactPhone].empty?
   review_attrs.delete(:demoAccountPassword) if review_attrs[:demoAccountPassword].empty?
@@ -804,17 +806,23 @@ if MODE == "fix-meta"
 
   # 4) Notes de review : localiser HealthKit (2.5.1) + détailler les abonnements (2.1b/3.1.2c).
   notes = <<~NOTES.strip
-    Kiwio is a French nutrition app. Demo account: audit-a@test.com
+    Kiwio is a French nutrition app. Demo account: audit-b@test.com
 
-    HEALTHKIT (Guideline 2.5.1): Apple Health is used read-only. In-app path:
-    Profil tab > "Modifier mon profil" > "Importer depuis Apple Sante" (imports
-    weight, steps and sleep to personalize recommendations). The Scan tab also
-    reads active energy (kcal) from Apple Health.
+    IMPORTANT - the app has NO "Profil" tab. The profile opens as a sheet from
+    the profile icon (person symbol) at the TOP-RIGHT of the Bilan tab.
 
-    SUBSCRIPTIONS (2.1(b) / 3.1.2(c)): Kiwio Premium = 3 auto-renewable subscriptions
-    (Weekly 0.99 EUR, Monthly 4.99 EUR, Annual 50 EUR), all submitted with this
-    version. Paywall path: Profil > Premium (also reachable from the Bilan). Title,
-    duration and price are shown on the paywall.
+    HOW TO FIND THE IN-APP PURCHASES (2.1(b)) - two paths:
+    1. Bilan tab (first tab) > tap the "Kiwio Premium" card visible on the
+       screen > the paywall opens.
+    2. Bilan tab > profile icon (top-right) > "Passer a Premium".
+    The paywall lists the 3 auto-renewable subscriptions of group Kiwio Premium
+    (Weekly 0.99 EUR, Monthly 4.99 EUR, Annual 50 EUR - names, durations and
+    prices are displayed). All 3 are submitted with this version.
+
+    HEALTHKIT (2.5.1): Apple Health is read-only. Path: Bilan tab > profile
+    icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports
+    weight, steps and sleep). The Scanner tab also reads active energy (kcal).
+
     Terms of Use (EULA): #{terms_url}
     Privacy Policy: #{privacy_url}
     (Both are also tappable at the bottom of the paywall in-app.)
