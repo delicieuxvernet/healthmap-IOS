@@ -215,19 +215,119 @@ final class SupplementEngineTests: XCTestCase {
         }
     }
 
-    // MARK: - filterContraindications
+    // MARK: - Grossesse & fer (le fer n'est plus masqué)
 
-    /// Pregnant user should not receive iron products with "grossesse" contraindication.
-    func testFilterContraindications_pregnantExcluded() {
+    /// Une femme enceinte avec fer bas DOIT recevoir une reco fer,
+    /// accompagnée d'une précaution de supervision médicale.
+    func testPregnant_iron_shownWithMedicalNote() {
         let profile = makeProfile(dietType: "omnivore", pregnancyStatus: "pregnant")
         let scores = scoresWithDeficiency(.iron, score: 20)
+        let result = SupplementEngine.generateRecommendations(scores: scores, profile: profile)
+
+        let ironRec = result.topRecommendations.first { $0.nutrientID == .iron }
+        XCTAssertNotNil(ironRec, "La grossesse ne doit plus masquer le fer")
+        XCTAssertNotNil(ironRec?.bestProduct, "Un produit fer doit être proposé")
+
+        let hasPregnancyNote = result.warnings.contains { w in
+            let n = Set(w.nutrients)
+            return n.contains("grossesse") && n.contains("iron")
+        }
+        XCTAssertTrue(hasPregnancyNote, "Une note grossesse doit accompagner le fer")
+    }
+
+    /// Le produit fer ne doit plus porter la contre-indication grossesse.
+    func testIron_noPregnancyContraindication() {
+        let profile = makeProfile()
+        let scores = scoresWithDeficiency(.iron, score: 20)
+        let recs = SupplementEngine.selectProducts(scores: scores, profile: profile)
+        guard let iron = recs.first(where: { $0.nutrientID == .iron })?.bestProduct else {
+            XCTFail("Should recommend iron"); return
+        }
+        XCTAssertFalse(iron.contraindications.contains(.grossesse),
+                       "Le fer ne doit plus être contre-indiqué en grossesse (c'est une précaution, pas un blocage)")
+    }
+
+    // MARK: - Régime végétarien & oméga-3
+
+    /// Les végétariens ne doivent pas recevoir d'oméga-3 de poisson,
+    /// mais doivent tout de même recevoir l'alternative végétale (algue).
+    func testSelectProducts_vegetarian_excludesFishOmega3() {
+        let profile = makeProfile(dietType: "vegetarien")
+        let scores = scoresWithDeficiency(.omega3, score: 20)
         let recs = SupplementEngine.selectProducts(scores: scores, profile: profile)
 
-        for rec in recs where rec.nutrientID == .iron {
-            if let premium = rec.premiumProduct {
-                let hasGrossesse = premium.contraindications.contains { $0.lowercased().contains("grossesse") }
-                XCTAssertFalse(hasGrossesse, "Pregnant user should not receive iron product with grossesse contraindication")
-            }
+        for rec in recs where rec.nutrientID == .omega3 {
+            if let p = rec.premiumProduct { XCTAssertTrue(p.isVegan, "Végétarien : pas d'oméga-3 de poisson") }
+            if let v = rec.valueProduct { XCTAssertTrue(v.isVegan, "Végétarien : pas d'oméga-3 de poisson") }
+        }
+        let omega = recs.first { $0.nutrientID == .omega3 }
+        XCTAssertNotNil(omega?.bestProduct, "Végétarien doit recevoir l'oméga-3 végétal (algue)")
+    }
+
+    // MARK: - Contre-indications affichées (jamais masquées)
+
+    /// L'oméga-3 de poisson (omnivore) doit porter la contre-indication allergie poisson.
+    func testOmega3_fishProduct_carriesFishAllergyContraindication() {
+        let profile = makeProfile(dietType: "omnivore")
+        let scores = scoresWithDeficiency(.omega3, score: 20)
+        let recs = SupplementEngine.selectProducts(scores: scores, profile: profile)
+        guard let omega = recs.first(where: { $0.nutrientID == .omega3 }),
+              let product = omega.bestProduct, !product.isVegan else {
+            XCTFail("Omnivore should get a fish omega-3"); return
+        }
+        XCTAssertTrue(product.contraindications.contains(.allergiePoisson),
+                       "L'oméga-3 de poisson doit porter la contre-indication allergie poisson")
+    }
+
+    /// L'iode doit porter la contre-indication hyperthyroïdie (affichée en précaution).
+    func testIodine_carriesHyperthyroidContraindication() {
+        let profile = makeProfile()
+        let scores = scoresWithDeficiency(.iodine, score: 20)
+        let recs = SupplementEngine.selectProducts(scores: scores, profile: profile)
+        guard let iodine = recs.first(where: { $0.nutrientID == .iodine })?.bestProduct else {
+            XCTFail("Should recommend iodine"); return
+        }
+        XCTAssertTrue(iodine.contraindications.contains(.hyperthyroidie))
+    }
+
+    // MARK: - Interactions médicamenteuses
+
+    /// Profil IPP + metformine : les deux interactions doivent être signalées.
+    func testMedicationInteractions_ppiAndMetformin() {
+        var profile = makeProfile(dietType: "vegan", age: "67")
+        profile.medications = ["ppi", "metformin"]
+        let scores = scoresWithMultipleDeficiencies([(.vitB12, 20), (.iron, 25)])
+        let result = SupplementEngine.generateRecommendations(scores: scores, profile: profile)
+
+        let hasMetforminB12 = result.warnings.contains { Set($0.nutrients) == Set(["vitB12", "metformin"]) }
+        XCTAssertTrue(hasMetforminB12, "Metformine + B12 doit être signalé")
+
+        let hasPPIiron = result.warnings.contains { Set($0.nutrients) == Set(["iron", "ppi"]) }
+        XCTAssertTrue(hasPPIiron, "IPP + Fer doit être signalé")
+    }
+
+    // MARK: - Coût réel (prises/jour)
+
+    /// Le coût mensuel doit tenir compte du nombre de prises par jour.
+    func testProduct_monthlyCost_accountsForUnitsPerDay() {
+        let profile = makeProfile()
+        let scores = scoresWithDeficiency(.magnesium, score: 20)
+        let recs = SupplementEngine.selectProducts(scores: scores, profile: profile)
+        guard let mag = recs.first(where: { $0.nutrientID == .magnesium })?.bestProduct else {
+            XCTFail("Should recommend magnesium"); return
+        }
+        let expected = mag.price * Double(mag.unitsPerDay) / Double(mag.unitsPerPackage) * 30
+        XCTAssertEqual(mag.monthlyCost, expected, accuracy: 0.001)
+        XCTAssertGreaterThan(mag.unitsPerDay, 1, "Le magnésium se prend en plusieurs gélules/jour")
+    }
+
+    /// Chaque produit du catalogue doit avoir une URL fiche et une date de vérification.
+    func testCatalog_everyProductHasURLAndVerifiedAt() {
+        for product in SupplementEngine.catalog {
+            XCTAssertTrue(product.productURL.hasPrefix("https://"),
+                           "\(product.id) doit avoir une URL fiche valide")
+            XCTAssertFalse(product.verifiedAt.isEmpty, "\(product.id) doit être daté")
+            XCTAssertGreaterThan(product.unitsPerDay, 0, "\(product.id) doit avoir unitsPerDay > 0")
         }
     }
 

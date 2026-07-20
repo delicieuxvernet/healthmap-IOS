@@ -187,29 +187,26 @@ enum SupplementEngine {
 
     private static func filterByDiet(product: SupplementProduct, profile: UserProfile) -> Bool {
         let diet = getDietType(profile)
-        guard diet == "vegan" || diet == "vegetarien" else { return true }
 
-        // Filter out fish-based omega-3 for vegans
-        if diet == "vegan" && product.nutrientID == .omega3 && !product.isVegan {
+        // Poisson exclu pour vegan ET végétarien (le pescétarien garde le poisson).
+        if (diet == "vegan" || diet == "vegetarien")
+            && product.nutrientID == .omega3
+            && !product.isVegan {
             return false
         }
 
         return true
     }
 
-    private static func filterContraindications(product: SupplementProduct, profile: UserProfile) -> Bool {
-        if product.contraindications.isEmpty { return true }
+    // Les contre-indications ne sont PLUS un filtre silencieux : le profil ne
+    // capte ni allergie, ni thyroïde, ni hémochromatose. On affiche le produit
+    // AVEC une précaution (voir SupplementsV4.precautions) plutôt que de le
+    // masquer. La grossesse déclenche une note « valide avec ton médecin »
+    // (detectConditionWarnings) sans exclure le fer, dont le besoin augmente.
 
-        for ci in product.contraindications {
-            let ciLower = ci.lowercased()
-            if ciLower.contains("grossesse") && isPregnant(profile) { return false }
-            if ciLower.contains("hemochromatose") { /* skip unless we have explicit info */ }
-        }
-
-        return true
-    }
-
-    /// Find matching products for a given nutrient
+    /// Find matching products for a given nutrient.
+    /// Le catalogue est ordonné pour que le premier produit d'un tier soit le
+    /// meilleur (premium) / le moins cher (value) — sélection déterministe.
     private static func findProducts(for nutrientID: NutrientID, profile: UserProfile) -> (premium: SupplementProduct?, value: SupplementProduct?) {
         var premium: SupplementProduct?
         var value: SupplementProduct?
@@ -217,7 +214,6 @@ enum SupplementEngine {
         for product in catalog {
             guard product.nutrientID == nutrientID else { continue }
             guard filterByDiet(product: product, profile: profile) else { continue }
-            guard filterContraindications(product: product, profile: profile) else { continue }
 
             switch product.tier {
             case .premium where premium == nil:
@@ -465,8 +461,34 @@ enum SupplementEngine {
         if medicationSet.contains("metformin") && recommendedNutrients.contains(.vitB12) {
             warnings.append(InteractionWarning(
                 emoji: "💉🔴",
-                message: "Metformine + B12 : la metformine reduit l'absorption de la B12. Un supplement est recommande, idealement sous forme sublinguale.",
+                message: "Metformine + B12 : la metformine reduit l'absorption de la B12. Une supplementation est recommandee (methylcobalamine ou forme sublinguale).",
                 nutrients: ["vitB12", "metformin"],
+                severity: .moderate
+            ))
+        }
+
+        return warnings
+    }
+
+    // ============================================================
+    // 7c. CONDITION NOTES (profil : grossesse, etc.)
+    // ============================================================
+
+    /// Notes liées à l'état de l'utilisateur (pas à un médicament).
+    /// La grossesse n'exclut plus le fer — elle ajoute une précaution de
+    /// supervision médicale (les besoins en fer augmentent en grossesse).
+    static func detectConditionWarnings(
+        recommendations: [SupplementRecommendation],
+        profile: UserProfile
+    ) -> [InteractionWarning] {
+        var warnings: [InteractionWarning] = []
+        let recommendedNutrients = Set(recommendations.map { $0.nutrientID })
+
+        if isPregnant(profile) && recommendedNutrients.contains(.iron) {
+            warnings.append(InteractionWarning(
+                emoji: "🤰🩸",
+                message: "Grossesse : tes besoins en fer augmentent, mais valide le dosage avec ton medecin ou ta sage-femme avant de te supplementer.",
+                nutrients: ["iron", "grossesse"],
                 severity: .moderate
             ))
         }
@@ -511,8 +533,12 @@ enum SupplementEngine {
             recommendations: recommendations,
             medications: profile.medications
         )
-        // Merge supplement-supplement and supplement-medication warnings
-        let warnings = supplementWarnings + medicationWarnings
+        let conditionWarnings = detectConditionWarnings(
+            recommendations: recommendations,
+            profile: profile
+        )
+        // Merge supplement-supplement, supplement-medication and condition warnings
+        let warnings = supplementWarnings + medicationWarnings + conditionWarnings
         let cost = calculateCost(from: recommendations)
 
         return SupplementEngineResult(

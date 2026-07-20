@@ -14,6 +14,7 @@ import SwiftUI
 struct SupplementsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openURL) private var openURL
 
     // États locaux du design final
     @State private var premium = true
@@ -178,7 +179,7 @@ struct SupplementsView: View {
                         taken: takenRecs,
                         premium: premium,
                         totalLabel: cartTotalLabel,
-                        onOrder: { goToPlan() }
+                        onOrder: { openTakenProducts() }
                     )
                 } else {
                     aiFallbackSection
@@ -246,6 +247,17 @@ struct SupplementsView: View {
             name: .healthmapNavigateToTab,
             object: NavCardDestination.plan.rawValue
         )
+    }
+
+    /// Ouvre la fiche officielle du complément prioritaire de la sélection
+    /// (le plus haut dans la liste = carence la plus prioritaire). Chaque carte
+    /// garde par ailleurs son propre lien « Voir le produit ».
+    private func openTakenProducts() {
+        HapticService.shared.selection()
+        guard let first = takenRecs.first,
+              let product = SupplementsV4.product(first, premium: premium),
+              let url = URL(string: product.productURL) else { return }
+        openURL(url)
     }
 
     /// Nombre d'interactions du profil concernant ce complément (badge rouge).
