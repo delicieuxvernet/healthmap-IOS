@@ -742,9 +742,28 @@ if MODE == "submit"
     get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
       next unless s.dig("attributes", "state") == "READY_TO_SUBMIT"
       pid = s.dig("attributes", "productId")
-      okc, = write("soumission abonnement #{pid}", :post, "/v1/subscriptionSubmissions",
-        { data: { type: "subscriptionSubmissions",
-                  relationships: { subscription: { data: { type: "subscriptions", id: s["id"] } } } } })
+      sub_payload = { data: { type: "subscriptionSubmissions",
+                  relationships: { subscription: { data: { type: "subscriptions", id: s["id"] } } } } }
+      okc, resp = write("soumission abonnement #{pid}", :post, "/v1/subscriptionSubmissions", sub_payload)
+
+      # Après un refus App Review, l'abonnement n'a plus de « pending version »
+      # (409 ENTITY_ERROR.RELATIONSHIP.INVALID) : re-sauver sa localisation à
+      # l'identique régénère un brouillon soumissible — c'est l'équivalent API
+      # du bouton « Resubmit » de l'UI Monetization.
+      if !okc && resp.is_a?(Hash) &&
+         resp.dig("errors", 0, "detail").to_s.include?("no pending version")
+        loc = get_all("/v1/subscriptions/#{s["id"]}/subscriptionLocalizations?limit=10").first
+        if loc
+          write("re-création d'une version pending (#{pid})", :patch,
+            "/v1/subscriptionLocalizations/#{loc["id"]}",
+            { data: { type: "subscriptionLocalizations", id: loc["id"],
+                      attributes: { description: loc.dig("attributes", "description").to_s } } })
+          sleep 2
+          okc, = write("soumission abonnement #{pid} (2e tentative)", :post,
+            "/v1/subscriptionSubmissions", sub_payload)
+        end
+      end
+
       submitted_subs << pid if okc
     end
   end
