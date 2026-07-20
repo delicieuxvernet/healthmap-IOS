@@ -250,7 +250,7 @@ struct SupplementsView: View {
     }
 
     /// Ouvre la fiche officielle du complément prioritaire de la sélection
-    /// (le plus haut dans la liste = carence la plus prioritaire). Chaque carte
+    /// (le plus haut dans la liste = l'apport le plus prioritaire). Chaque carte
     /// garde par ailleurs son propre lien « Voir le produit ».
     private func openTakenProducts() {
         HapticService.shared.selection()
