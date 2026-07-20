@@ -747,18 +747,21 @@ if MODE == "submit"
       okc, resp = write("soumission abonnement #{pid}", :post, "/v1/subscriptionSubmissions", sub_payload)
 
       # Après un refus App Review, l'abonnement n'a plus de « pending version »
-      # (409 ENTITY_ERROR.RELATIONSHIP.INVALID) : re-sauver sa localisation à
-      # l'identique régénère un brouillon soumissible — c'est l'équivalent API
-      # du bouton « Resubmit » de l'UI Monetization.
+      # (409 ENTITY_ERROR.RELATIONSHIP.INVALID). Un PATCH de localisation à
+      # l'identique est un no-op pour ASC (testé : le 409 persiste) — il faut
+      # une modification RÉELLE pour régénérer un brouillon soumissible.
+      # La moins invasive : supprimer puis re-uploader le screenshot de review
+      # (même PNG → aucun changement visible, mais nouvelle version pending).
       if !okc && resp.is_a?(Hash) &&
-         resp.dig("errors", 0, "detail").to_s.include?("no pending version")
-        loc = get_all("/v1/subscriptions/#{s["id"]}/subscriptionLocalizations?limit=10").first
-        if loc
-          write("re-création d'une version pending (#{pid})", :patch,
-            "/v1/subscriptionLocalizations/#{loc["id"]}",
-            { data: { type: "subscriptionLocalizations", id: loc["id"],
-                      attributes: { description: loc.dig("attributes", "description").to_s } } })
-          sleep 2
+         resp.dig("errors", 0, "detail").to_s.include?("no pending version") &&
+         ENV["REVIEW_SCREENSHOT_PATH"].to_s != "" && File.exist?(ENV["REVIEW_SCREENSHOT_PATH"])
+        code_shot, shot = req(:get, "/v1/subscriptions/#{s["id"]}/appStoreReviewScreenshot")
+        if code_shot == 200 && shot["data"]
+          write("suppression ancien screenshot (#{pid})", :delete,
+            "/v1/subscriptionAppStoreReviewScreenshots/#{shot["data"]["id"]}", nil)
+        end
+        if upload_review_screenshot(s["id"], ENV["REVIEW_SCREENSHOT_PATH"])
+          sleep 3
           okc, = write("soumission abonnement #{pid} (2e tentative)", :post,
             "/v1/subscriptionSubmissions", sub_payload)
         end
