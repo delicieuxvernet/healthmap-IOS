@@ -802,11 +802,22 @@ struct DerniersRepasV6Card: View {
     @ViewBuilder
     private func row(_ meal: MealJournalService.MealRecord) -> some View {
         HStack(spacing: 14) {
-            ZStack {
-                Circle().fill(Color.kiwiGreenSoft).frame(width: 52, height: 52)
-                Image(systemName: "fork.knife")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Color.kiwiGreen)
+            // Mini-photo du scan quand la vignette locale existe (retour build
+            // 319) ; sinon l'illustration fourchette existante.
+            if let thumb = MealThumbnailStore.image(mealId: meal.id, consumedAt: meal.consumedAt) {
+                Image(uiImage: thumb)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 52, height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .accessibilityHidden(true)
+            } else {
+                ZStack {
+                    Circle().fill(Color.kiwiGreenSoft).frame(width: 52, height: 52)
+                    Image(systemName: "fork.knife")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.kiwiGreen)
+                }
             }
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {

@@ -228,6 +228,9 @@ final class AuthViewModel: ObservableObject {
         for key in keysToRemove {
             defaults.removeObject(forKey: key)
         }
+        // Vignettes locales des repas scannés : données du compte, l'utilisateur
+        // suivant sur cet appareil ne doit pas voir les photos du précédent.
+        MealThumbnailStore.clearAll()
     }
 
     // MARK: - Sign In

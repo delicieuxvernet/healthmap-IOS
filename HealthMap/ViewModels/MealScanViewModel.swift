@@ -156,6 +156,8 @@ final class MealScanViewModel: ObservableObject {
     /// Ligne `meal_scans` renvoyée sous la clé `scan`. Valeurs par aliment dans
     /// `detected_foods[].micros`, totaux dans `macros`/`micros`.
     private struct EdgeScan: Decodable {
+        /// id de la row insérée — clé de la vignette locale (MealThumbnailStore).
+        let id: String?
         let detectedFoods: [EdgeDetectedFood]?
         let macros: EdgeMacros?
         let micros: [EdgeMicro]?
@@ -163,6 +165,7 @@ final class MealScanViewModel: ObservableObject {
         let perfectMix: EdgePerfectMix?
 
         enum CodingKeys: String, CodingKey {
+            case id
             case detectedFoods = "detected_foods"
             case macros, micros
             case mealScore = "meal_score"
@@ -437,6 +440,13 @@ final class MealScanViewModel: ObservableObject {
             // sinon le score hebdo du Bilan et « Ta journée » restent figés sur
             // un instantané antérieur au scan.
             NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
+
+            // Vignette LOCALE de la photo pour « Scans récents » / « Tes derniers
+            // repas » — la photo ne quitte jamais l'appareil (meal_scans ne
+            // stocke aucune image, décision RGPD/coût).
+            if let photo = selectedImage {
+                MealThumbnailStore.save(photo: photo, mealId: response.scan?.id)
+            }
 
             // Compteur de scans restants — la fonction renvoie rate_limit.remaining.
             updateScansRemaining(response.rateLimit?.remaining)

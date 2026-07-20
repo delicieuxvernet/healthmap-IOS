@@ -176,39 +176,47 @@ struct MealScanView: View {
     // kcal · apports micros du jour · macros du jour · dernier plat · récents.
     private var scanHome: some View {
         VStack(spacing: Theme.spacingLG) {
-            HStack {
-                Text("Scan")
-                    .font(.system(size: 28, weight: .heavy))
-                    .foregroundStyle(Color.kiwiCharcoal)
+            // Header unifié (retour build 319) : titre + nav jour fusionnés dans
+            // la DA kiwi (fini le bloc monospace détaché), badge scans à droite.
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Scan")
+                        .font(.system(size: 28, weight: .heavy))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    ScanDayNav(
+                        label: journal.dayLabel,
+                        sub: journal.daySub,
+                        canNext: journal.canGoNext,
+                        onPrev: { journal.goPrevDay() },
+                        onNext: { journal.goNextDay() }
+                    )
+                }
                 Spacer()
+                if !subscriptionService.isPremium, let remaining = viewModel.scansRemaining {
+                    freeScanCounter(remaining)
+                }
             }
             .padding(.horizontal, Theme.spacingLG)
 
-            ScanDayNav(
-                label: journal.dayLabel,
-                sub: journal.daySub,
-                canNext: journal.canGoNext,
-                onPrev: { journal.goPrevDay() },
-                onNext: { journal.goNextDay() }
+            // Ordre validé (maquette 20 juillet) : ① vocal (fonction phare)
+            // ② kcal du jour ③ recherche produit/marque ④ photo compacte.
+            voiceEntry
+
+            ScanKcalGauge(
+                consommees: journal.dayCalories,
+                objectif: dashboardVM.physicalMetrics.macros?.calories,
+                depensees: isTodaySelected ? activeEnergyToday : nil,
+                isToday: isTodaySelected
             )
             .padding(.horizontal, Theme.spacingLG)
 
-            captureBlock
-
-            voiceEntry
-
             searchEntry
+
+            captureBlock
 
             ScanCardHeader(icon: "flame.fill", title: "Ta journée")
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Theme.spacingLG)
-            ScanKcalGauge(
-                consommees: journal.dayCalories,
-                objectif: dashboardVM.physicalMetrics.macros?.calories,
-                depensees: isTodaySelected ? activeEnergyToday : nil,   // dépense active du jour (Apple Santé) ; nil si non lié ou jour passé (non backfillé) → colonne masquée
-                isToday: isTodaySelected
-            )
-            .padding(.horizontal, Theme.spacingLG)
 
             ScanMicrosJourCard(
                 items: microItems,
@@ -292,9 +300,7 @@ struct MealScanView: View {
                 }
                 .padding(Theme.spacingXL)
             } else {
-                if !subscriptionService.isPremium, let remaining = viewModel.scansRemaining {
-                    freeScanCounter(remaining)
-                }
+                // Le compteur de scans gratuits vit désormais dans le header.
                 captureZone
             }
 
@@ -371,68 +377,96 @@ struct MealScanView: View {
         .padding(.horizontal, Theme.spacingLG)
     }
 
+    // Barre pilule (maquette 20 juillet) — placée sous la jauge kcal, le
+    // séparateur « ou » n'a plus de sens depuis la réorganisation.
     private var searchEntry: some View {
-        VStack(spacing: Theme.spacingMD) {
-            HStack(spacing: 12) {
-                line
-                Text("ou")
-                    .font(.system(size: 12, weight: .semibold))
+        Button {
+            showSearch = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15))
                     .foregroundStyle(Color.healthMapMuted)
-                line
+                Text("Produit, marque ou ingrédient…")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.healthMapSecondary)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.healthMapMuted)
             }
-            Button {
-                showSearch = true
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color.healthMapMuted)
-                    Text("Rechercher un produit ou une marque")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.healthMapMuted)
-                }
-                .padding(.horizontal, Theme.spacingMD)
-                .frame(minHeight: 48)
-                .background(Color.healthMapCard)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1)
-                )
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityLabel("Rechercher un produit ou une marque")
+            .padding(.horizontal, Theme.spacingMD)
+            .frame(minHeight: 48)
+            .background(Color.healthMapCard)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel("Rechercher un produit, une marque ou un ingrédient")
         .padding(.horizontal, Theme.spacingLG)
     }
 
-    private var line: some View {
-        Rectangle()
-            .fill(Color.kiwiCharcoal.opacity(0.08))
-            .frame(height: 1)
+    // MARK: - Carte photo compacte
+    /// Remplace le viseur plein écran quand aucune photo n'est choisie :
+    /// vignette caméra + libellé + chevron, bordure pointillée verte (repère
+    /// « zone d'ajout »). Le tap ouvre le choix appareil photo / galerie.
+    private var compactCapturePrompt: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.kiwiTint)
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.kiwiGreenInk)
+            }
+            .frame(width: 38, height: 38)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Photographie ton assiette")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Text("appareil photo ou galerie")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Color.healthMapMuted)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.healthMapMuted)
+        }
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, minHeight: 60)
+        .background(Color.healthMapCard, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.kiwiGreen, style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Photographie ton assiette. Appareil photo ou galerie.")
     }
 
-    // MARK: - Compteur de scans gratuits
+    // MARK: - Compteur de scans gratuits (badge compact du header)
     private func freeScanCounter(_ remaining: Int) -> some View {
         let ok = remaining > 0
         let plural = remaining > 1 ? "s" : ""
-        return HStack(spacing: 6) {
+        return HStack(spacing: 5) {
             Image(systemName: ok ? "bolt.fill" : "lock.fill")
-                .font(.system(size: 11))
-            Text(ok ? "\(remaining) scan\(plural) gratuit\(plural) restant\(plural)" : "Scans gratuits épuisés")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 10))
+            Text(ok ? "\(remaining) scan\(plural)" : "Épuisés")
+                .font(.system(size: 12, weight: .semibold))
         }
         .foregroundStyle(ok ? Color.kiwiGreenInk : Color.scoreLow)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background((ok ? Color.kiwiGreen : Color.scoreLow).opacity(0.10))
         .clipShape(Capsule())
         .onTapGesture { if !ok { showPaywall = true } }
+        .accessibilityLabel(ok
+            ? "\(remaining) scan\(plural) photo gratuit\(plural) restant\(plural) aujourd'hui"
+            : "Scans gratuits épuisés")
         .accessibilityHint(ok ? "" : "Passer en premium pour scanner sans limite")
     }
 
@@ -471,8 +505,10 @@ struct MealScanView: View {
                                 alignment: .topTrailing
                             )
                     } else {
-                        // Viseur animé (ligne de scan + coins) — polish V3.
-                        ScanViewfinderPrompt()
+                        // Carte compacte (maquette 20 juillet) : le grand viseur
+                        // 250 pt écrasait la page — la photo n'est plus le chemin
+                        // n°1 (le vocal l'est), une ligne suffit.
+                        compactCapturePrompt
                     }
                 }
             }
