@@ -418,9 +418,31 @@ if MODE == "apply-app"
     demoAccountName: "audit-b@test.com",
     demoAccountPassword: ENV["DEMO_ACCOUNT_PASSWORD"].to_s,
     demoAccountRequired: true,
-    notes: "Application en francais. Compte demo fourni (profil complet avec bilan). " \
-           "Paywall : onglet Bilan > icone profil en haut a droite > Passer a Premium, " \
-           "ou carte Kiwio Premium directement sur l'ecran Bilan.",
+    # Mêmes notes longues (EN) que fix-meta — une seule source de vérité :
+    # le reviewer est anglophone et le refus 2.1(b) venait en partie de notes
+    # imprécises. Ne JAMAIS reposer une version courte qui écrase celle-ci.
+    notes: <<~NOTES.strip,
+      Kiwio is a French nutrition app. Demo account: audit-b@test.com
+
+      IMPORTANT - the app has NO "Profil" tab. The profile opens as a sheet from
+      the profile icon (person symbol) at the TOP-RIGHT of the Bilan tab.
+
+      HOW TO FIND THE IN-APP PURCHASES (2.1(b)) - two paths:
+      1. Bilan tab (first tab) > tap the "Kiwio Premium" card visible on the
+         screen > the paywall opens.
+      2. Bilan tab > profile icon (top-right) > "Passer a Premium".
+      The paywall lists the 3 auto-renewable subscriptions of group Kiwio Premium
+      (Weekly 0.99 EUR, Monthly 4.99 EUR, Annual 50 EUR - names, durations and
+      prices are displayed). All 3 are submitted with this version.
+
+      HEALTHKIT (2.5.1): Apple Health is read-only. Path: Bilan tab > profile
+      icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports
+      weight, steps and sleep). The Scanner tab also reads active energy (kcal).
+
+      Terms of Use (EULA): https://healthmap.fr/terms
+      Privacy Policy: https://healthmap.fr/privacy
+      (Both are also tappable at the bottom of the paywall in-app.)
+    NOTES
   }
   review_attrs.delete(:contactPhone) if review_attrs[:contactPhone].empty?
   review_attrs.delete(:demoAccountPassword) if review_attrs[:demoAccountPassword].empty?
