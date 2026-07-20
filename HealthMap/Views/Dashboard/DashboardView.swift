@@ -27,6 +27,10 @@ struct DashboardView: View {
     @State private var selectedApport: ApportV2?
     @State private var selectedSymptome: SymptomeV2?
 
+    /// Paywall ouvert par la carte « Kiwio Premium » du Bilan (entrée visible,
+    /// fix App Review 2.1(b) — l'avatar Profil reste l'autre chemin).
+    @State private var showPaywall = false
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -76,6 +80,11 @@ struct DashboardView: View {
                     selectedSymptome = nil
                     openTab(.plan)
                 }
+            }
+            // Paywall ouvert par la carte Premium du Bilan.
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
+                    .healthMapFullSheet()
             }
         }
     }
@@ -159,13 +168,24 @@ struct DashboardView: View {
                 .padding(.horizontal, Theme.spacingLG)
                 .staggeredAppear(index: 0)
 
+                // 1bis. Entrée Premium visible (non-premium uniquement) —
+                // maquette validée 20 juillet 2026, fix App Review 2.1(b).
+                if !subscriptionService.isPremium {
+                    PremiumEntryCard {
+                        HapticService.shared.tap()
+                        showPaywall = true
+                    }
+                    .padding(.horizontal, Theme.spacingLG)
+                    .staggeredAppear(index: 1)
+                }
+
                 // 2. Ta journée (repas scannés du jour — tap → onglet Scanner)
                 TaJourneeV6Card(meals: journal.meals) {
                     HapticService.shared.tap()
                     openTab(.scanner)
                 }
                 .padding(.horizontal, Theme.spacingLG)
-                .staggeredAppear(index: 1)
+                .staggeredAppear(index: 2)
 
                 // 3. Apports à renforcer (insight + jauges cliquables)
                 if let apports = v2.bilan?.apports, !apports.isEmpty {
@@ -177,20 +197,20 @@ struct DashboardView: View {
                         selectedApport = apport
                     }
                     .padding(.horizontal, Theme.spacingLG)
-                    .staggeredAppear(index: 2)
+                    .staggeredAppear(index: 3)
                 }
 
                 // 4. Tuiles Symptôme + Ta récolte (récolte masquée en mode zen)
                 tilesRow(v2)
                     .padding(.horizontal, Theme.spacingLG)
-                    .staggeredAppear(index: 3)
+                    .staggeredAppear(index: 4)
 
                 // 5. Interactions détectées (≤2, contrat v2)
                 if let interactions = v2.bilan?.interactions,
                    interactions.contains(where: { ($0.tipBold?.isEmpty == false) || ($0.tipRest?.isEmpty == false) }) {
                     InteractionsV6Card(interactions: Array(interactions.prefix(2)))
                         .padding(.horizontal, Theme.spacingLG)
-                        .staggeredAppear(index: 4)
+                        .staggeredAppear(index: 5)
                 }
 
                 // 6. Tes derniers repas (journal réel — masquée si vide)
@@ -200,7 +220,7 @@ struct DashboardView: View {
                         openTab(.scanner)
                     }
                     .padding(.horizontal, Theme.spacingLG)
-                    .staggeredAppear(index: 5)
+                    .staggeredAppear(index: 6)
                 }
 
                 // Indicateur de rafraîchissement (bilan déjà présent)

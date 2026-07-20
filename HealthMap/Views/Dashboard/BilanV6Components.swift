@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import RevenueCat
 
 // MARK: - Bilan « v6 — vivant » (contrat API v2, juillet 2026)
 //
@@ -1206,5 +1207,87 @@ struct SymptomeV6Sheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(30)
+    }
+}
+
+// MARK: - Carte « Kiwio Premium » (entrée paywall visible sur le Bilan)
+/// Entrée Premium directement sur l'écran principal — maquette validée le
+/// 20 juillet 2026. Raison d'être : l'unique entrée paywall était l'avatar
+/// Profil (invisible pour App Review → refus 2.1(b) « cannot locate the
+/// In-App Purchases »). Affichée uniquement pour les non-premium.
+/// Le sous-titre (essai gratuit + prix hebdo/mensuel) est lu depuis StoreKit
+/// via l'offering RevenueCat — jamais codé en dur. Sans offering chargée,
+/// repli sur la promesse produit, sans prix.
+struct PremiumEntryCard: View {
+    let onTap: () -> Void
+
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
+
+    /// Formule courte de l'offering courante (hebdo prioritaire, sinon mensuel)
+    /// — même logique que PaywallView.shortPlan.
+    private var shortPackage: Package? {
+        let packages = subscriptionService.offerings?.current?.availablePackages
+        return packages?.first { $0.packageType == .weekly }
+            ?? packages?.first { $0.packageType == .monthly }
+    }
+
+    private var subtitle: String {
+        guard let package = shortPackage else {
+            return "Toute ton analyse, sans limite"
+        }
+        let price = package.localizedPriceString
+        let unit = package.packageType == .weekly ? "sem" : "mois"
+        if let discount = package.storeProduct.introductoryDiscount,
+           discount.paymentMode == .freeTrial {
+            let period = discount.subscriptionPeriod
+            let days: Int
+            switch period.unit {
+            case .day: days = period.value
+            case .week: days = period.value * 7
+            case .month: days = period.value * 30
+            case .year: days = period.value * 365
+            }
+            return "\(days) jours offerts, puis \(price) / \(unit)"
+        }
+        return "\(price) / \(unit) · Annulable à tout moment"
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.kiwiGreenInk)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Kiwio Premium")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.kiwiGreenInk)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.kiwiGreenInk)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color.kiwiTint)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Color.kiwiGreen, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel("Kiwio Premium. \(subtitle). Touche pour voir les formules.")
     }
 }
