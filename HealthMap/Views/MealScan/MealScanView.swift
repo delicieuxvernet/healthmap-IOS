@@ -16,6 +16,10 @@ struct MealScanView: View {
     @StateObject private var journal = MealJournalViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var selectedItem: PhotosPickerItem?
+    /// Choix appareil photo / galerie au tap sur la zone de capture.
+    @State private var showCaptureChoice = false
+    @State private var showCamera = false
+    @State private var showPhotoLibrary = false
     /// Fiche 100 g de l'aliment tapé dans la recherche (fetch `get_food`).
     @State private var selectedSearchDetail: MealJournalService.FoodDetail?
     @State private var isAddingFood = false
@@ -435,7 +439,17 @@ struct MealScanView: View {
     // MARK: - Capture Zone
     private var captureZone: some View {
         VStack(spacing: Theme.spacingMD) {
-            PhotosPicker(selection: $selectedItem, matching: .images) {
+            // Le tap ouvre un CHOIX appareil photo / galerie (retour build 319 :
+            // la galerie seule ne suffit pas, on doit pouvoir photographier
+            // l'assiette directement). Sur simulateur (pas de caméra), on passe
+            // directement à la galerie sans dialogue inutile.
+            Button {
+                if CameraPicker.isAvailable {
+                    showCaptureChoice = true
+                } else {
+                    showPhotoLibrary = true
+                }
+            } label: {
                 VStack(spacing: Theme.spacingMD) {
                     if let imageData = viewModel.selectedImage, let uiImage = UIImage(data: imageData) {
                         Image(uiImage: uiImage)
@@ -463,6 +477,18 @@ struct MealScanView: View {
                 }
             }
             .buttonStyle(.healthMapPressed)
+            .confirmationDialog("Ajouter une photo de ton repas", isPresented: $showCaptureChoice, titleVisibility: .visible) {
+                Button("Prendre une photo") { showCamera = true }
+                Button("Choisir dans la galerie") { showPhotoLibrary = true }
+                Button("Annuler", role: .cancel) {}
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPicker { data in
+                    viewModel.selectedImage = data
+                }
+                .ignoresSafeArea()
+            }
+            .photosPicker(isPresented: $showPhotoLibrary, selection: $selectedItem, matching: .images)
             .onChange(of: selectedItem) { _, item in
                 Task {
                     if let data = try? await item?.loadTransferable(type: Data.self) {

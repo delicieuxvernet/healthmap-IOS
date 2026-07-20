@@ -248,6 +248,10 @@ struct DashboardView: View {
                     .padding(.horizontal, Theme.spacingLG)
             }
             .padding(.vertical, Theme.spacingMD)
+            // Verrou anti-dérive horizontale (même correctif que Suivi #134 et
+            // Scan #120) : la largeur du contenu est épinglée à celle du
+            // ScrollView → plus de slide latéral vers une marge vide.
+            .containerRelativeFrame(.horizontal)
         }
         .task { await journal.load() }
         .refreshable {

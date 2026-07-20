@@ -100,7 +100,14 @@ final class SpeechCaptureService: ObservableObject {
 
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.record, mode: .spokenAudio, options: [.duckOthers])
+            // ⚠️ Catégorie .record SANS option : `.duckOthers` (et les autres
+            // options de mixage) ne s'appliquent qu'aux catégories de LECTURE —
+            // les passer avec .record fait échouer setCategory (OSStatus -50)
+            // → « La dictée s'est interrompue » dès l'appui (bug build 319).
+            // iOS met de toute façon la musique des autres apps en pause en
+            // .record. Mode .default : .spokenAudio est lui aussi un mode de
+            // lecture, pas d'enregistrement.
+            try session.setCategory(.record, mode: .default)
             try session.setActive(true, options: [])
 
             // AAC 22 kHz mono : largement suffisant pour de la parole, et le
