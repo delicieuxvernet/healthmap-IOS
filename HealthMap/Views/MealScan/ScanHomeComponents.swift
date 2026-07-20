@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Scan Home (journal calories du jour) — sous-vues
 //
@@ -50,35 +51,29 @@ struct ScanDayNav: View {
     let onPrev: () -> Void
     let onNext: () -> Void
 
+    // Version compacte intégrée au header (retour build 319) : le bloc
+    // monospace + gros cercles blancs détonnait de la DA — la nav jour vit
+    // désormais sur UNE ligne discrète sous le titre « Scan », chevrons
+    // inline vert kiwi (zone tactile 44 pt conservée via frame).
     var body: some View {
-        HStack {
+        HStack(spacing: 2) {
             chevron("chevron.left", enabled: true, hint: "Jour précédent", action: onPrev)
-            Spacer()
-            VStack(spacing: 2) {
-                Text(label)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                Text(sub)
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Color.healthMapMuted)
-            }
-            Spacer()
+            Text("\(label) · \(sub)")
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(Color.healthMapSecondary)
+                .lineLimit(1)
             chevron("chevron.right", enabled: canNext, hint: "Jour suivant", action: onNext)
         }
-        .padding(.horizontal, 4)
         .accessibilityElement(children: .combine)
     }
 
     private func chevron(_ icon: String, enabled: Bool, hint: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.kiwiInk)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(enabled ? Color.kiwiGreenInk : Color.healthMapMuted.opacity(0.5))
                 .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.healthMapCard))
-                .overlay(Circle().stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1))
-                .opacity(enabled ? 1 : 0.35)
-                .contentShape(Circle())
+                .contentShape(Rectangle())
         }
         .buttonStyle(.healthMapPressed)
         .disabled(!enabled)
@@ -406,11 +401,23 @@ struct ScanRecentScansList: View {
         let icon = meal.micros.first.map { Fluent3D.symbol(for: $0.id) } ?? "fork.knife"
         let title = meal.foods.isEmpty ? "Repas" : meal.foods.joined(separator: ", ")
         return HStack(spacing: 11) {
-            ZStack {
-                Circle().fill(Color.kiwiGreenSoft).frame(width: 34, height: 34)
-                Image(systemName: icon)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.kiwiGreen)
+            // Mini-photo du scan quand elle existe (vignette locale — retour
+            // build 319) ; sinon l'illustration existante (dictée, recherche,
+            // scan fait sur un autre appareil).
+            if let thumb = MealThumbnailStore.image(mealId: meal.id, consumedAt: meal.consumedAt) {
+                Image(uiImage: thumb)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 34, height: 34)
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .accessibilityHidden(true)
+            } else {
+                ZStack {
+                    Circle().fill(Color.kiwiGreenSoft).frame(width: 34, height: 34)
+                    Image(systemName: icon)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.kiwiGreen)
+                }
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
