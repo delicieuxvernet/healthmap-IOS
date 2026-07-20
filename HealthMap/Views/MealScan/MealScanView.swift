@@ -318,40 +318,52 @@ struct MealScanView: View {
     /// Point d'entrée de la fonction phare : dicter son repas. Placé AVANT la
     /// recherche et le scan photo — c'est le chemin qu'on met en avant.
     private var voiceEntry: some View {
-        VStack(spacing: Theme.spacingSM) {
+        VStack(spacing: 10) {
+            // Bouton rond 78 pt entouré de deux ondes qui battent : c'est LA
+            // fonction phare, elle doit se voir comme telle. Un rectangle plein
+            // façon ligne de menu (le premier jet) la noyait dans le reste.
             Button {
                 showVoice = true
             } label: {
-                HStack(spacing: 10) {
+                ZStack {
+                    OndePulsante(delai: 0)
+                    OndePulsante(delai: 0.9)
+                    Circle()
+                        .fill(Kiwio.vert)
+                        .frame(width: 78, height: 78)
                     Image(systemName: "mic.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Dicte ton repas")
-                            .font(.system(size: 16, weight: .semibold))
-                        Text("« une cuisse de poulet, 100 g de pâtes »")
-                            .font(.system(size: 12))
-                            .opacity(0.85)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .opacity(0.7)
+                        .font(.system(size: 29, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
-                .background(Kiwio.vert, in: RoundedRectangle(cornerRadius: 16))
+                .frame(width: 124, height: 124)
+                .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Dicter ton repas")
+            .accessibilityHint("Décris ton repas à voix haute, Kiwio compte les calories")
+
+            Text("Dicte ton repas")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Kiwio.encre)
+
+            // L'exemple porte des QUANTITÉS, volontairement : c'est ce que les
+            // gens oublient de dire, et c'est ce qui décide de la justesse du
+            // comptage. Sans quantité, l'app doit reposer la question.
+            Text("« Ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt »")
+                .font(.system(size: 13))
+                .foregroundStyle(Kiwio.secondaire)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 12)
 
             if let msg = voiceConfirmation {
                 Text(msg)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.scoreExcellent)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .multilineTextAlignment(.center)
             }
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, Theme.spacingLG)
     }
 
@@ -1125,6 +1137,38 @@ private struct NeedImpactDetailSheet: View {
             }
         }
         .frame(width: 132, height: 132)
+    }
+}
+
+// MARK: - Onde pulsante du héros micro
+
+/// Anneau vert qui s'écarte et s'efface, en boucle. Deux exemplaires décalés
+/// donnent la « double onde » du design : le bouton respire, on comprend sans
+/// notice qu'il écoute.
+///
+/// Gardé purement décoratif et coupé sous « Réduire les animations » — une
+/// boucle infinie non gardée est exactement ce que la règle d'accessibilité du
+/// projet interdit.
+private struct OndePulsante: View {
+    let delai: Double
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var etendue = false
+
+    var body: some View {
+        Circle()
+            .stroke(Kiwio.vert.opacity(0.32), lineWidth: 2)
+            .frame(width: 78, height: 78)
+            .scaleEffect(etendue ? 1.5 : 1)
+            .opacity(etendue ? 0 : 0.9)
+            .animation(
+                reduceMotion
+                ? nil
+                : .easeOut(duration: 1.8).repeatForever(autoreverses: false).delay(delai),
+                value: etendue
+            )
+            .onAppear { etendue = true }
+            .accessibilityHidden(true)
     }
 }
 
