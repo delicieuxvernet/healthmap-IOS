@@ -61,8 +61,10 @@ struct VoiceMealSheet: View {
 
     private var hauteurs: Set<PresentationDetent> {
         switch phase {
-        case .listening: return [.height(330)]
-        case .analyzing: return [.height(260)]
+        // 400/300 pt : la bulle à 330 croppait le contenu (consigne 3 lignes +
+        // waveform + 2 boutons) dès que le texte grossissait — retour build 319.
+        case .listening: return [.height(400)]
+        case .analyzing: return [.height(300)]
         case .results, .failed: return [.large]
         }
     }
