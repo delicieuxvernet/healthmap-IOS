@@ -369,11 +369,10 @@ struct MainTabView: View {
             // laisse miroiter des onglets verrouillés. EmptyView sinon → l'inset
             // ne réserve aucune hauteur, le questionnaire occupe tout l'écran.
             if dashboardVM.hasCompletedQuestionnaire {
+                // v7 : la barre dessine elle-même son fond translucide pleine
+                // largeur + sa hairline ; aucun encart ici, sinon le bouton
+                // Scan surélevé se retrouverait rogné.
                 KiwiFloatingTabBar(selected: $selectedTab)
-                    .padding(.horizontal, 14)
-                    .padding(.top, 8)
-                    .padding(.bottom, 2)
-                    .background(Color.kiwiCream.ignoresSafeArea(edges: .bottom))
             }
         }
         // Overlay de célébrations gamification (« Badge débloqué / Niveau
