@@ -676,6 +676,25 @@ if MODE == "submit"
     get_all("/v1/reviewSubmissions/#{s["id"]}/items?limit=50").size.positive?
   end
   if staged
+    # GARDE-FOU (incident 2e refus, 21 juil. 2026) : ne JAMAIS envoyer une
+    # soumission qui ne contient que la version alors que des abonnements
+    # attendent d'être soumis. C'est exactement ce qui a été envoyé le 20 et
+    # re-refusé en 2.1(b) — Apple cherche les achats dans le binaire et la
+    # soumission ne les portait pas.
+    pending_subs = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").flat_map do |g|
+      get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50")
+        .select { |s| s.dig("attributes", "state") == "READY_TO_SUBMIT" }
+        .map { |s| s.dig("attributes", "productId") }
+    end
+    unless pending_subs.empty?
+      puts "\n⛔ ENVOI BLOQUÉ — #{pending_subs.size} abonnement(s) encore READY_TO_SUBMIT :"
+      pending_subs.each { |p| puts "     - #{p}" }
+      puts "   L'API ne sait PAS les attacher (subscriptionSubmissions → 409 « no pending"
+      puts "   version » ; reviewSubmissionItems → 409 relation inconnue). Il faut cliquer"
+      puts "   « Resubmit » sur chaque abo dans App Store Connect → Monetization, puis"
+      puts "   relancer ce mode. Soumission #{staged["id"]} laissée préparée, non envoyée."
+      exit 1
+    end
     puts "Soumission préparée trouvée (#{staged["id"]}) — envoi tel quel."
     write("ENVOI de la soumission préparée", :patch, "/v1/reviewSubmissions/#{staged["id"]}",
       { data: { type: "reviewSubmissions", id: staged["id"], attributes: { submitted: true } } })
