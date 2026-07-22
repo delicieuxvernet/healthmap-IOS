@@ -323,6 +323,63 @@ app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
 # ── MODE app-audit : état de préparation à la soumission App Store ──────────
+# ── MODE fix-subs : corrige la config des abonnements (défauts deep-audit) ──
+#    1) reviewNote : App Review y cherche le chemin de l'achat dans l'app —
+#       vide sur les 3 abos, en cause directe dans le refus 2.1(b).
+#    2) libellés : espaces parasites en début/fin.
+#    3) tente ensuite la re-soumission : modifier l'abonnement lui-même crée
+#       une « pending version », ce que le re-upload de screenshot ne faisait pas.
+if MODE == "fix-subs"
+  note = <<~NOTE.strip
+    HOW TO REACH THIS SUBSCRIPTION IN THE APP (demo account: audit-b@test.com)
+    1. Launch the app and sign in with the demo account.
+    2. Open the "Bilan" tab (first tab).
+    3. Tap the "Kiwio Premium" card shown on that screen — the paywall opens.
+       (Alternative path: profile icon at the TOP-RIGHT of the Bilan tab >
+       "Passer a Premium".)
+    The paywall lists the Kiwio Premium subscriptions with their name, duration
+    and price, and has "Restaurer mes achats" plus links to the Terms of Use
+    (EULA) and Privacy Policy. The app has NO "Profil" tab.
+  NOTE
+
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      sid = s["id"]
+      pid = s.dig("attributes", "productId")
+      nom = s.dig("attributes", "name").to_s
+
+      write("note de review + libellé (#{pid})", :patch, "/v1/subscriptions/#{sid}",
+        { data: { type: "subscriptions", id: sid,
+                  attributes: { name: nom.strip, reviewNote: note } } })
+
+      get_all("/v1/subscriptions/#{sid}/subscriptionLocalizations?limit=50").each do |l|
+        ln = l.dig("attributes", "name").to_s
+        next if ln == ln.strip
+        write("nom d'affichage sans espace parasite (#{pid}/#{l.dig("attributes", "locale")})",
+          :patch, "/v1/subscriptionLocalizations/#{l["id"]}",
+          { data: { type: "subscriptionLocalizations", id: l["id"],
+                    attributes: { name: ln.strip } } })
+      end
+    end
+  end
+
+  # La modification a-t-elle rouvert une version soumissible ?
+  puts "\n--- tentative de re-soumission des abonnements ---"
+  soumis = []
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      next unless s.dig("attributes", "state") == "READY_TO_SUBMIT"
+      pid = s.dig("attributes", "productId")
+      okc, = write("soumission abonnement #{pid}", :post, "/v1/subscriptionSubmissions",
+        { data: { type: "subscriptionSubmissions",
+                  relationships: { subscription: { data: { type: "subscriptions", id: s["id"] } } } } })
+      soumis << pid if okc
+    end
+  end
+  puts "\nAbonnements soumis : #{soumis.empty? ? "AUCUN — le bouton Resubmit de l'UI reste nécessaire" : soumis.join(", ")}"
+  exit 0
+end
+
 # ── MODE deep-audit : diagnostic COMPLET de la config abonnements ──────────
 #    Couvre ce que `audit` ne montre pas : note de review par abo, partage
 #    familial, accords (Paid Apps), disponibilité de l'app, cohérence des
