@@ -60,8 +60,11 @@ struct KiwiFloatingTabBar: View {
         }
         // Bouton Scan surélevé : posé en overlay (centré horizontalement) pour
         // déborder au-dessus de la barre sans être rogné, zone tactile intacte.
+        // Maquette : le cercle est posé à -26 pt DANS la colonne, qui commence
+        // après les 9 pt de padding haut → il dépasse de 17 pt au-dessus de la
+        // barre.
         .overlay(alignment: .top) {
-            scanButton.offset(y: -26)
+            scanButton.offset(y: -17)
         }
         .accessibilityElement(children: .contain)
     }
