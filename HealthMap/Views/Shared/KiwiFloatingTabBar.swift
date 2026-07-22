@@ -1,12 +1,21 @@
 import SwiftUI
 
-// MARK: - Barre d'onglets flottante (langage v4 — maquette p-scanner)
+// MARK: - Barre d'onglets (langage v7 — maquette « Kiwio - Bilan (standalone) »)
 //
-// Pill blanche flottante posée en overlay bas de `MainTabView` (la barre native
-// est masquée par onglet via `.toolbar(.hidden, for: .tabBar)`). Accent vert
-// kiwi sur l'onglet actif. Pilote `MainTabView.Tab` (binding).
+// Barre pleine largeur translucide (`.ultraThinMaterial` teinté crème) avec
+// hairline haute de 0.5 pt, posée en overlay bas de `MainTabView` (la barre
+// native est masquée par onglet via `.toolbar(.hidden, for: .tabBar)`).
+// Onglet actif = vert kiwi, inactif = gris #9AA0A6.
+//
+// Le Scan est un BOUTON CENTRAL SURÉLEVÉ : cercle 56 pt vert plein, icône
+// caméra blanche, ombre portée + anneau crème de 5 pt (effet « bouton qui
+// dépasse »). Il est posé en overlay du haut de la barre pour déborder sans
+// être rogné, et garde sa propre zone tactile de 56 pt.
 struct KiwiFloatingTabBar: View {
     @Binding var selected: MainTabView.Tab
+
+    /// Hauteur de la barre elle-même (hors safe area basse).
+    static let barHeight: CGFloat = 58
 
     private struct Item: Identifiable {
         var id: MainTabView.Tab { tab }
@@ -15,55 +24,118 @@ struct KiwiFloatingTabBar: View {
         let label: String
     }
 
-    private let items: [Item] = [
-        Item(tab: .bilan, icon: "heart.text.clipboard", label: "Bilan"),
+    /// Ordre maquette : Bilan · Suivi · [Scan] · Plan · Compléments.
+    /// Le Scan n'est pas dans cette liste : il occupe la colonne centrale via
+    /// `scanLabelColumn` + l'overlay du cercle surélevé.
+    private let leading: [Item] = [
+        Item(tab: .bilan, icon: "heart.text.square", label: "Bilan"),
         Item(tab: .suivi, icon: "checkmark.circle", label: "Suivi"),
-        Item(tab: .scanner, icon: "camera", label: "Scanner"),
-        Item(tab: .plan, icon: "list.bullet.clipboard", label: "Plan"),
+    ]
+
+    private let trailing: [Item] = [
+        Item(tab: .plan, icon: "list.clipboard", label: "Plan"),
         Item(tab: .complements, icon: "pills", label: "Compléments"),
     ]
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(items) { item in
-                let active = selected == item.tab
-                Button {
-                    HapticService.shared.selection()
-                    selected = item.tab
-                } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: item.icon)
-                            .font(.system(size: active ? 23 : 22, weight: active ? .semibold : .regular))
-                        Text(item.label)
-                            .font(.system(size: 10, weight: active ? .bold : .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                    }
-                    .foregroundStyle(active ? Color.kiwiGreen : Color(hex: "9AA0A6"))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 60)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(item.label)
-                .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
-            }
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(leading) { tabButton($0) }
+            scanLabelColumn
+            ForEach(trailing) { tabButton($0) }
         }
+        .padding(.top, 9)
         .padding(.horizontal, 6)
-        .frame(height: 64)
-        .background(
-            Capsule(style: .continuous)
-                .fill(Color.healthMapCard)
-                .shadow(color: Color.kiwiCharcoal.opacity(0.12), radius: 24, x: 0, y: 6)
-                .shadow(color: Color.kiwiCharcoal.opacity(0.06), radius: 3, x: 0, y: 1)
-        )
+        .frame(height: Self.barHeight, alignment: .top)
+        .frame(maxWidth: .infinity)
+        .background {
+            ZStack(alignment: .top) {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .overlay(Color.kiwiCream.opacity(0.5))
+                Rectangle()
+                    .fill(Color.kiwiCharcoal.opacity(0.14))
+                    .frame(height: 0.5)
+            }
+            .ignoresSafeArea(edges: .bottom)
+        }
+        // Bouton Scan surélevé : posé en overlay (centré horizontalement) pour
+        // déborder au-dessus de la barre sans être rogné, zone tactile intacte.
+        .overlay(alignment: .top) {
+            scanButton.offset(y: -26)
+        }
         .accessibilityElement(children: .contain)
+    }
+
+    // MARK: - Onglet standard
+    private func tabButton(_ item: Item) -> some View {
+        let active = selected == item.tab
+        return Button {
+            HapticService.shared.selection()
+            selected = item.tab
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: item.icon)
+                    .font(.system(size: active ? 23 : 22, weight: active ? .semibold : .regular))
+                Text(item.label)
+                    .font(.system(size: 9.5, weight: active ? .bold : .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(active ? Color.kiwiGreen : Color(hex: "9AA0A6"))
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.label)
+        .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+    }
+
+    // MARK: - Colonne centrale (réserve la place du cercle + porte le label)
+    private var scanLabelColumn: some View {
+        VStack(spacing: 3) {
+            Spacer(minLength: 0)
+            Text("Scan")
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundStyle(Color.kiwiGreen)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 46)
+        .padding(.bottom, 4)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    // MARK: - Bouton Scan central surélevé
+    private var scanButton: some View {
+        Button {
+            HapticService.shared.selection()
+            selected = .scanner
+        } label: {
+            Circle()
+                .fill(Color.kiwiGreen)
+                .frame(width: 56, height: 56)
+                .overlay(
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white)
+                )
+                .overlay(
+                    Circle().stroke(Color.kiwiCream, lineWidth: 5)
+                )
+                .shadow(color: Color.kiwiGreen.opacity(0.4), radius: 10, x: 0, y: 8)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Scan")
+        .accessibilityAddTraits(selected == .scanner ? [.isButton, .isSelected] : .isButton)
     }
 }
 
-// MARK: - Réservation d'espace pour la barre flottante
-/// Réserve la hauteur de la pill (8 pt de marge haute + 64 pt + 2 pt basse
-/// = 74 pt) pour que le contenu défilant s'arrête AU-DESSUS de la barre.
+// MARK: - Réservation d'espace pour la barre
+/// Réserve la hauteur de la barre (58 pt) pour que le contenu défilant
+/// s'arrête AU-DESSUS. Le cercle Scan déborde volontairement par-dessus le
+/// contenu (effet « bouton qui dépasse » de la maquette).
 /// ⚠️ À appliquer au CONTENU RACINE, À L'INTÉRIEUR du NavigationStack de
 /// chaque onglet : un inset posé sur le TabView ou autour du NavigationStack
 /// ne se propage pas à la safe area du scroll (hébergement UIKit) — c'était
@@ -71,7 +143,7 @@ struct KiwiFloatingTabBar: View {
 extension View {
     func kiwiTabBarBottomInset() -> some View {
         safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: 74)
+            Color.clear.frame(height: KiwiFloatingTabBar.barHeight)
         }
     }
 }

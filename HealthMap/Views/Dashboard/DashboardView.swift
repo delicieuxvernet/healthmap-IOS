@@ -1,17 +1,23 @@
 import SwiftUI
 
-// MARK: - Dashboard View (onglet Bilan — refonte « v6 vivant », juillet 2026)
+// MARK: - Dashboard View (onglet Bilan — refonte « v7 dashboard », 22 juillet 2026)
 //
-// Langage v6 : greeting « Bonjour {prénom} » + petit anneau de score (58 pt),
-// carte « Ta journée » (repas du jour, meal_scans), carte « Apports à
-// renforcer » (insight + 3 jauges du CONTRAT v2, pop-up bottom-sheet), tuiles
-// Symptôme / Ta récolte côte à côte, « Interactions détectées », derniers
-// repas du journal. Source maquette : « Bilan v6 - vivant ».
+// Maquette de référence : « Kiwio - Bilan (standalone) » (iPhone 393 pt).
+// Ordre de lecture Z1 → Z7 :
+//   Z1 en-tête « Bilan » + date + pill Premium
+//   Z2 score du jour compact (anneau 64 pt + phrase de tendance)
+//   Z3 tes apports à renforcer — HÉROS (priorité + jauges)
+//   Z3b points d'attention (interactions du contrat v2)
+//   Z4 tes symptômes suivis (+ CTA « Voir mes solutions »)
+//   Z5 ta série (streak + prochain trophée)
+//   Z6 tes derniers repas
+//   Z7 Kiwio Premium (grande carte verte, non-premium uniquement)
+//   puis sources scientifiques (exigence App Review 1.4.1).
 //
-// Source de données : `DashboardViewModel.analysisV2` (contrat API v2,
-// tache "bilan"). Tant que le bilan v2 n'est pas là, le flux de chargement
-// existant reste inchangé (FullAnalysisLoadingView « 2-3 min » /
-// AnalysisErrorRetryView).
+// Source de données : `DashboardViewModel.analysisV2` (contrat API v2) +
+// journal `meal_scans` + `WeekScoreEngine` + `SuiviEngineV4` +
+// `GamificationService`. Aucune valeur n'est inventée : une section sans
+// donnée réelle est simplement masquée.
 //
 // Inchangé côté sécurité : les red flags URGENTS passent TOUJOURS au-dessus
 // du contenu (une alerte ne doit pas attendre l'IA).
@@ -20,16 +26,14 @@ struct DashboardView: View {
     @ObservedObject var gamification = GamificationService.shared
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
-    /// Journal du jour (table `meal_scans`) — nourrit « Ta journée » et
+    /// Journal du jour (table `meal_scans`) — nourrit le score du jour et
     /// « Tes derniers repas ». Lecture seule, aucun calcul touché.
     @StateObject private var journal = MealJournalViewModel()
 
     @State private var selectedApport: ApportV2?
-    @State private var selectedSymptome: SymptomeV2?
-
-    /// Paywall ouvert par la carte « Kiwio Premium » du Bilan (entrée visible,
-    /// fix App Review 2.1(b) — l'avatar Profil reste l'autre chemin).
     @State private var showPaywall = false
+    @State private var showTrophies = false
+    @State private var showScoreDetail = false
 
     var body: some View {
         NavigationStack {
@@ -45,8 +49,8 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
                 Task { await journal.load() }
             }
-            // v6 : le greeting fait office de titre — la barre reste inline et
-            // vide, seul l'avatar Profil y demeure.
+            // v7 : l'en-tête de l'écran fait office de titre — la barre reste
+            // inline et vide, seul l'avatar Profil y demeure.
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -63,6 +67,10 @@ struct DashboardView: View {
                     .accessibilityLabel("Profil")
                 }
             }
+            .navigationDestination(isPresented: $showScoreDetail) {
+                ScoreHistoryView()
+                    .environmentObject(viewModel)
+            }
             // Pop-up détail d'un apport (contrat v2). .sheet(item:) garantit que
             // la feuille reçoit toujours l'apport courant.
             .sheet(item: $selectedApport) { apport in
@@ -71,17 +79,11 @@ struct DashboardView: View {
                     openTab(.plan)
                 }
             }
-            // « Voir pourquoi » d'un symptôme — causes mappées sur les apports v2.
-            .sheet(item: $selectedSymptome) { symptome in
-                SymptomeV6Sheet(
-                    symptome: symptome,
-                    apports: viewModel.analysisV2?.bilan?.apports ?? []
-                ) {
-                    selectedSymptome = nil
-                    openTab(.plan)
-                }
+            // Trophées de la récolte (feuille existante, alimentée par la série).
+            .sheet(isPresented: $showTrophies) {
+                RecolteDetailSheet(streak: gamification.currentStreak)
             }
-            // Paywall ouvert par la carte Premium du Bilan.
+            // Paywall ouvert par la pill et la carte Premium du Bilan.
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
                     .healthMapFullSheet()
@@ -89,7 +91,7 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Contenu (v6 si bilan v2 dispo, sinon flux chargement existant)
+    // MARK: - Contenu (v7 si bilan v2 dispo, sinon flux chargement existant)
     @ViewBuilder
     private var content: some View {
         if let v2 = viewModel.analysisV2, v2.isValidV2 {
@@ -123,104 +125,87 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Score de la semaine (déterministe, repas scannés)
-    /// Recalculé à chaque rendu depuis le journal 14 jours + les apports à
-    /// renforcer du profil (scores locaux < 60, même seuil que le scan).
-    private var weekScore: WeekScoreEngine.WeekScore {
-        WeekScoreEngine.compute(
-            meals: journal.fortnight,
-            weakNutrients: viewModel.nutrientScores
-                .filter { $0.value < 60 }
-                .map(\.key)
-                .sorted()
-        )
-    }
-
-    // MARK: - Red flags (sécurité — inchangé)
-    private var immediateRedFlags: [RedFlag] {
-        viewModel.redFlags.filter { $0.urgency == .immediate }
-    }
-
-    private var otherRedFlags: [RedFlag] {
-        viewModel.redFlags.filter { $0.urgency != .immediate }
-    }
-
-    // MARK: - Main Content (langage v6)
-    // Ordre maquette : greeting+score → ta journée → apports → tuiles
-    // symptôme/récolte → interactions → derniers repas. (Red flags urgents
-    // au-dessus pour la sécurité ; disclaimer + red flags non urgents en bas.)
+    // MARK: - Main Content (langage v7)
     private func mainContent(_ v2: AIAnalysisV2) -> some View {
         ScrollView {
-            VStack(spacing: 13) {
+            VStack(spacing: BilanV7.cardGap) {
                 if !immediateRedFlags.isEmpty {
                     RedFlagsCardView(flags: immediateRedFlags)
-                        .padding(.horizontal, Theme.spacingLG)
                 }
 
-                // 1. Greeting + date + score de la SEMAINE (repas scannés,
-                // WeekScoreEngine) + barres des 7 jours + insight. Le score
-                // figé du questionnaire ne s'affiche plus ici (retour Arthur
-                // 3 juillet : noter le suivi réel, pas un chiffre statique).
-                BilanGreetingHeader(
-                    firstName: viewModel.firstName,
-                    week: weekScore
-                )
-                .padding(.horizontal, Theme.spacingLG)
+                // Z1 · En-tête + pill Premium
+                BilanV7Header(
+                    date: Date(),
+                    showsPremiumPill: !subscriptionService.isPremium
+                ) {
+                    HapticService.shared.tap()
+                    showPaywall = true
+                }
                 .staggeredAppear(index: 0)
 
-                // 1bis. Entrée Premium visible (non-premium uniquement) —
-                // maquette validée 20 juillet 2026, fix App Review 2.1(b).
-                if !subscriptionService.isPremium {
-                    PremiumEntryCard {
-                        HapticService.shared.tap()
-                        showPaywall = true
-                    }
-                    .padding(.horizontal, Theme.spacingLG)
-                    .staggeredAppear(index: 1)
-                }
-
-                // 2. Ta journée (repas scannés du jour — tap → onglet Scanner)
-                TaJourneeV6Card(meals: journal.meals) {
+                // Z2 · Score du jour (anneau compact + tendance de la semaine)
+                BilanV7ScoreCard(
+                    score: todayScore,
+                    delta: weekScore.delta,
+                    insight: v2.bilan?.scoreInsight
+                ) {
                     HapticService.shared.tap()
-                    openTab(.scanner)
+                    showScoreDetail = true
                 }
-                .padding(.horizontal, Theme.spacingLG)
-                .staggeredAppear(index: 2)
+                .staggeredAppear(index: 1)
 
-                // 3. Apports à renforcer (insight + jauges cliquables)
+                // Z3 · HÉROS — tes apports à renforcer
                 if let apports = v2.bilan?.apports, !apports.isEmpty {
-                    ApportsV6Card(
-                        insight: v2.bilan?.apportsInsight,
-                        apports: Array(apports.prefix(3))
+                    BilanV7ApportsCard(
+                        apports: Array(apports.prefix(3)),
+                        total: NutrientData.all.count
                     ) { apport in
-                        HapticService.shared.tap()
                         selectedApport = apport
                     }
-                    .padding(.horizontal, Theme.spacingLG)
+                    .staggeredAppear(index: 2)
+                }
+
+                // Z3b · Points d'attention (interactions du contrat)
+                if !attentionItems.isEmpty {
+                    BilanV7AttentionCard(items: attentionItems) { _ in
+                        openTab(.plan)
+                    }
                     .staggeredAppear(index: 3)
                 }
 
-                // 4. Tuiles Symptôme + Ta récolte (récolte masquée en mode zen)
-                tilesRow(v2)
-                    .padding(.horizontal, Theme.spacingLG)
+                // Z4 · Tes symptômes suivis + CTA solutions
+                let rows = symptomRows(v2)
+                if !rows.isEmpty {
+                    BilanV7SymptomesCard(
+                        rows: rows,
+                        solutionsCount: solutionsCount(v2),
+                        onTapSymptom: { _ in openTab(.suivi) },
+                        onSolutions: { openTab(.plan) }
+                    )
                     .staggeredAppear(index: 4)
-
-                // 5. Interactions détectées (≤2, contrat v2)
-                if let interactions = v2.bilan?.interactions,
-                   interactions.contains(where: { ($0.tipBold?.isEmpty == false) || ($0.tipRest?.isEmpty == false) }) {
-                    InteractionsV6Card(interactions: Array(interactions.prefix(2)))
-                        .padding(.horizontal, Theme.spacingLG)
-                        .staggeredAppear(index: 5)
                 }
 
-                // 6. Tes derniers repas (journal réel — masquée si vide)
-                if !journal.meals.isEmpty {
-                    DerniersRepasV6Card(meals: journal.meals) {
-                        HapticService.shared.tap()
-                        openTab(.scanner)
+                // Z5 · Ta série (masquée en mode zen, comme la récolte v6)
+                if !gamification.isZenMode {
+                    BilanV7SerieCard(streak: gamification.currentStreak) {
+                        showTrophies = true
                     }
-                    .padding(.horizontal, Theme.spacingLG)
-                    .staggeredAppear(index: 6)
+                    .staggeredAppear(index: 5)
+                }
+
+                // Z6 · Tes derniers repas (bilan du journal — masqué si vide)
+                if !repasLines.isEmpty {
+                    BilanV7RepasCard(lines: repasLines)
+                        .staggeredAppear(index: 6)
+                }
+
+                // Z7 · Kiwio Premium (non-premium uniquement)
+                if !subscriptionService.isPremium {
+                    BilanV7PremiumCard {
+                        HapticService.shared.tap()
+                        showPaywall = true
+                    }
+                    .staggeredAppear(index: 7)
                 }
 
                 // Indicateur de rafraîchissement (bilan déjà présent)
@@ -231,23 +216,21 @@ struct DashboardView: View {
                             .font(Theme.captionFont)
                             .foregroundStyle(Color.healthMapSecondary)
                     }
-                    .padding()
+                    .padding(.vertical, Theme.spacingSM)
                 }
 
-                // 7. Disclaimer + red flags non urgents
-                disclaimerCard
-
+                // Red flags non urgents (sécurité — inchangé)
                 if !otherRedFlags.isEmpty {
                     RedFlagsCardView(flags: otherRedFlags)
-                        .padding(.horizontal, Theme.spacingLG)
                 }
 
-                // 8. Sources scientifiques (App Store guideline 1.4.1) — citations
-                // cliquables des références nutritionnelles officielles.
-                SourcesSection()
-                    .padding(.horizontal, Theme.spacingLG)
+                // Sources scientifiques (App Store guideline 1.4.1)
+                BilanV7SourcesFooter()
+                    .padding(.top, 4)
             }
-            .padding(.vertical, Theme.spacingMD)
+            .padding(.horizontal, BilanV7.gutter)
+            .padding(.top, Theme.spacingXS)
+            .padding(.bottom, Theme.spacingLG)
             // Verrou anti-dérive horizontale (même correctif que Suivi #134 et
             // Scan #120) : la largeur du contenu est épinglée à celle du
             // ScrollView → plus de slide latéral vers une marge vide.
@@ -260,33 +243,141 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Rangée de tuiles (symptôme du contrat + récolte)
-    @ViewBuilder
-    private func tilesRow(_ v2: AIAnalysisV2) -> some View {
-        let symptome = v2.bilan?.symptomes?.first(where: { $0.nom?.isEmpty == false })
-        if symptome != nil || !gamification.isZenMode {
-            HStack(alignment: .top, spacing: 12) {
-                if let symptome {
-                    SymptomeV6Tile(nom: symptome.nom ?? "") {
-                        HapticService.shared.tap()
-                        selectedSymptome = symptome
-                    }
-                }
-                if !gamification.isZenMode {
-                    RecolteV6Tile(streak: gamification.currentStreak)
-                }
-            }
+    // MARK: - Score du jour (déterministe, repas scannés)
+    /// Recalculé à chaque rendu depuis le journal 14 jours + les apports à
+    /// renforcer du profil (scores locaux < 60, même seuil que le scan).
+    private var weekScore: WeekScoreEngine.WeekScore {
+        WeekScoreEngine.compute(
+            meals: journal.fortnight,
+            weakNutrients: weakNutrientIds
+        )
+    }
+
+    /// Anneau Z2 : la couverture du JOUR si des repas y ont été scannés ;
+    /// à défaut la moyenne de la semaine (le chiffre reste réel), sinon rien.
+    private var todayScore: Int? {
+        weekScore.days.first(where: { $0.isToday })?.score ?? weekScore.score
+    }
+
+    private var weakNutrientIds: [String] {
+        viewModel.nutrientScores
+            .filter { $0.value < 60 }
+            .map(\.key)
+            .sorted()
+    }
+
+    // MARK: - Points d'attention (interactions du contrat v2, ≤2)
+    private var attentionItems: [InteractionV2] {
+        guard let interactions = viewModel.analysisV2?.bilan?.interactions else { return [] }
+        return Array(
+            interactions
+                .filter { ($0.tipBold?.isEmpty == false) || ($0.tipRest?.isEmpty == false) }
+                .prefix(2)
+        )
+    }
+
+    // MARK: - Symptômes suivis (mêmes verdicts que l'onglet Suivi)
+    /// La tendance n'est affichée QUE si le suivi a réellement démarré :
+    /// sinon `SuiviEngineV4` renvoie une courbe d'exemple, qu'on ne présente
+    /// jamais comme une évolution vécue.
+    private func symptomRows(_ v2: AIAnalysisV2) -> [BilanV7SymptomRow] {
+        let symptomes = v2.bilan?.symptomes ?? []
+        guard !symptomes.isEmpty else { return [] }
+
+        let isTracking = SuiviTrackingStore.isStarted()
+        let ids = symptomes.compactMap { $0.id ?? $0.nom }
+        let feelingsById = isTracking
+            ? SuiviCheckinHistory.feelingsById(
+                symptomIds: ids,
+                since: SuiviTrackingStore.startDate() ?? Date()
+            )
+            : [:]
+
+        return SuiviEngineV4.symptomEvolutions(
+            symptomes: symptomes,
+            feelingsById: feelingsById,
+            isTracking: isTracking
+        ).map { evolution in
+            BilanV7SymptomRow(
+                id: evolution.id,
+                nom: capitalizedFirst(evolution.nom),
+                verdict: evolution.verdict,
+                improving: evolution.improving,
+                showsTrend: !evolution.isExample
+            )
         }
+    }
+
+    /// Badge bleu du CTA : nombre de solutions réellement présentes dans le plan.
+    private func solutionsCount(_ v2: AIAnalysisV2) -> Int {
+        (v2.plan?.sections ?? []).reduce(0) { total, section in
+            let solutions = section.solutions
+            return total
+                + (solutions?.nutrition?.count ?? 0)
+                + (solutions?.habitudes?.count ?? 0)
+                + (solutions?.complements?.count ?? 0)
+        }
+    }
+
+    // MARK: - Bilan des derniers repas (dérivé du journal réel)
+    /// Deux lignes maximum, construites sur la couverture 7 jours calculée par
+    /// `SuiviEngineV4` : le nutriment le mieux couvert et celui qui manque le
+    /// plus. Aucune phrase inventée — les chiffres viennent des scans.
+    private var repasLines: [BilanV7RepasLine] {
+        guard !journal.fortnight.isEmpty else { return [] }
+        let coverage = SuiviEngineV4.nutrientCoverage(
+            fortnight: journal.fortnight,
+            focusIds: weakNutrientIds
+        )
+        guard !coverage.isEmpty else { return [] }
+
+        var lines: [BilanV7RepasLine] = []
+        let best = coverage.max(by: { $0.pct < $1.pct })
+        let worst = coverage.min(by: { $0.pct < $1.pct })
+
+        if let best, best.pct >= 60 {
+            lines.append(
+                BilanV7RepasLine(
+                    id: "positif-\(best.id)",
+                    positive: true,
+                    text: "\(best.nom) bien couvert sur tes 7 derniers jours (\(best.pct) % de ton besoin)."
+                )
+            )
+        }
+        if let worst, worst.pct < 60, worst.id != best?.id || lines.isEmpty {
+            lines.append(
+                BilanV7RepasLine(
+                    id: "manque-\(worst.id)",
+                    positive: false,
+                    text: "Peu de \(worst.nom.lowercased()) ces 7 derniers jours (\(worst.pct) % de ton besoin)."
+                )
+            )
+        }
+        return lines
+    }
+
+    private func capitalizedFirst(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        return first.uppercased() + text.dropFirst()
+    }
+
+    // MARK: - Red flags (sécurité — inchangé)
+    private var immediateRedFlags: [RedFlag] {
+        viewModel.redFlags.filter { $0.urgency == .immediate }
+    }
+
+    private var otherRedFlags: [RedFlag] {
+        viewModel.redFlags.filter { $0.urgency != .immediate }
     }
 
     // MARK: - Navigation onglets (mécanisme existant)
     private func openTab(_ destination: NavCardDestination) {
+        HapticService.shared.tap()
         NotificationCenter.default.post(
             name: .healthmapNavigateToTab,
             object: destination.rawValue
         )
     }
-
 }
 
 // MARK: - Staggered Appear (loi 17)
@@ -301,12 +392,12 @@ private struct StaggeredAppear: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 12)
+            .offset(y: appeared ? 0 : 10)
             .onAppear {
                 if reduceMotion {
                     appeared = true
                 } else {
-                    withAnimation(.healthMapSpring.delay(Double(index) * 0.06)) {
+                    withAnimation(.healthMapSpring.delay(Double(index) * 0.04)) {
                         appeared = true
                     }
                 }
