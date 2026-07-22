@@ -323,6 +323,98 @@ app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
 # ── MODE app-audit : état de préparation à la soumission App Store ──────────
+# ── MODE deep-audit : diagnostic COMPLET de la config abonnements ──────────
+#    Couvre ce que `audit` ne montre pas : note de review par abo, partage
+#    familial, accords (Paid Apps), disponibilité de l'app, cohérence des
+#    localisations, propreté des libellés. Lecture seule.
+if MODE == "deep-audit"
+  problemes = []
+  infos = []
+
+  # 1) Accords (Paid Apps) — cause n°1 d'un paywall vide chez le reviewer.
+  ["/v1/agreements?limit=50", "/v1/paidApplicationsAgreements?limit=50"].each do |path|
+    code, resp = req(:get, path)
+    infos << "accords #{path} -> HTTP #{code} #{code == 200 ? JSON.generate(resp["data"]).slice(0, 400) : resp.dig("errors", 0, "detail")}"
+  end
+
+  # 2) App : territoires de vente + infos de fiche
+  code, av = req(:get, "/v1/apps/#{app_id}/appAvailabilityV2")
+  infos << "appAvailabilityV2 -> HTTP #{code}"
+  code, ai = req(:get, "/v1/apps/#{app_id}?fields[apps]=name,bundleId,primaryLocale,contentRightsDeclaration")
+  if code == 200
+    a = ai["data"]["attributes"]
+    infos << "app: #{a["name"]} | primaryLocale=#{a["primaryLocale"]} | contentRights=#{a["contentRightsDeclaration"].inspect}"
+    @primary_locale = a["primaryLocale"]
+  end
+
+  # 3) Groupe d'abonnements + ses localisations
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    glocs = get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptionGroupLocalizations?limit=50")
+    locales = glocs.map { |l| l.dig("attributes", "locale") }
+    infos << "groupe « #{g.dig("attributes", "referenceName")} » : localisations = #{locales.join(", ")}"
+    if @primary_locale && !locales.include?(@primary_locale)
+      problemes << "Groupe d'abonnements : AUCUNE localisation pour la langue principale de l'app (#{@primary_locale}) — présentes : #{locales.join(", ")}"
+    end
+    glocs.each do |l|
+      nom = l.dig("attributes", "name").to_s
+      problemes << "Groupe : nom « #{nom} » a un espace en trop en début/fin" if nom != nom.strip
+    end
+
+    # 4) Chaque abonnement, en détail
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      sid = s["id"]
+      code, full = req(:get, "/v1/subscriptions/#{sid}?fields[subscriptions]=name,productId,state,subscriptionPeriod,familySharable,reviewNote,groupLevel")
+      at = code == 200 ? full["data"]["attributes"] : s["attributes"]
+      pid = at["productId"]
+
+      infos << "#{pid} : state=#{at["state"]} période=#{at["subscriptionPeriod"]} niveau=#{at["groupLevel"]} familySharable=#{at["familySharable"].inspect} reviewNote=#{at["reviewNote"].to_s.empty? ? "VIDE" : "présente"}"
+
+      problemes << "#{pid} : nom « #{at["name"]} » a un espace en trop en début/fin" if at["name"].to_s != at["name"].to_s.strip
+      problemes << "#{pid} : aucune note de review (App Review lit ce champ pour trouver l'achat dans l'app)" if at["reviewNote"].to_s.strip.empty?
+
+      slocs = get_all("/v1/subscriptions/#{sid}/subscriptionLocalizations?limit=50")
+      slocales = slocs.map { |l| l.dig("attributes", "locale") }
+      if @primary_locale && !slocales.include?(@primary_locale)
+        problemes << "#{pid} : aucune localisation pour la langue principale (#{@primary_locale}) — présentes : #{slocales.join(", ")}"
+      end
+      slocs.each do |l|
+        n = l.dig("attributes", "name").to_s
+        d = l.dig("attributes", "description").to_s
+        problemes << "#{pid} (#{l.dig("attributes", "locale")}) : nom d'affichage « #{n} » a un espace en trop" if n != n.strip
+        problemes << "#{pid} (#{l.dig("attributes", "locale")}) : description vide" if d.strip.empty?
+      end
+
+      code, shot = req(:get, "/v1/subscriptions/#{sid}/appStoreReviewScreenshot")
+      if code != 200 || shot["data"].nil?
+        problemes << "#{pid} : AUCUNE capture d'écran de review (obligatoire)"
+      elsif shot.dig("data", "attributes", "assetDeliveryState", "state") != "COMPLETE"
+        problemes << "#{pid} : capture de review non finalisée (#{shot.dig("data", "attributes", "assetDeliveryState", "state")})"
+      end
+
+      offers = get_all("/v1/subscriptions/#{sid}/introductoryOffers?limit=50")
+      infos << "#{pid} : #{offers.size} offre(s) d'introduction"
+
+      code, avail = req(:get, "/v1/subscriptions/#{sid}/subscriptionAvailability?include=availableTerritories&limit[availableTerritories]=200")
+      if code == 200 && avail["data"]
+        n = (avail["included"] || []).size
+        problemes << "#{pid} : disponible dans #{n} territoire(s) seulement" if n.positive? && n < 100
+      else
+        problemes << "#{pid} : disponibilité illisible (HTTP #{code})"
+      end
+    end
+  end
+
+  puts "\n===== INFOS ====="
+  infos.each { |i| puts "  · #{i}" }
+  puts "\n===== POINTS À CORRIGER (#{problemes.size}) ====="
+  if problemes.empty?
+    puts "  Aucun défaut détecté par l'API sur la config des abonnements."
+  else
+    problemes.each { |p| puts "  ⚠️  #{p}" }
+  end
+  exit 0
+end
+
 if MODE == "app-audit"
   report = { appId: app_id }
 

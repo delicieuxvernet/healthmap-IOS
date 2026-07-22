@@ -12,7 +12,7 @@ on:
         required: true
         default: audit
         type: choice
-        options: [audit, apply, app-audit, apply-app, offers, screenshots, submit, fix-meta]
+        options: [audit, apply, app-audit, deep-audit, apply-app, offers, screenshots, submit, fix-meta]
       display_type:
         description: "screenshots : type d'écran Apple (APP_IPHONE_67 = 1290x2796)"
         required: false
