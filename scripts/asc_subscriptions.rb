@@ -451,12 +451,15 @@ if MODE == "deep-audit"
       offers = get_all("/v1/subscriptions/#{sid}/introductoryOffers?limit=50")
       infos << "#{pid} : #{offers.size} offre(s) d'introduction"
 
-      code, avail = req(:get, "/v1/subscriptions/#{sid}/subscriptionAvailability?include=availableTerritories&limit[availableTerritories]=200")
+      # Territoires : passer par la ressource subscriptionAvailabilities (le
+      # paramètre `include` sur subscriptionAvailability répond 400).
+      code, avail = req(:get, "/v1/subscriptions/#{sid}/subscriptionAvailability")
       if code == 200 && avail["data"]
-        n = (avail["included"] || []).size
-        problemes << "#{pid} : disponible dans #{n} territoire(s) seulement" if n.positive? && n < 100
+        n = get_all("/v1/subscriptionAvailabilities/#{avail.dig("data", "id")}/availableTerritories?limit=200&fields[territories]=currency").size
+        infos << "#{pid} : #{n} territoire(s)"
+        problemes << "#{pid} : disponible dans #{n} territoire(s) seulement" if n < 100
       else
-        problemes << "#{pid} : disponibilité illisible (HTTP #{code})"
+        problemes << "#{pid} : aucune disponibilité configurée (HTTP #{code})"
       end
     end
   end
