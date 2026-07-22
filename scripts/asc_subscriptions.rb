@@ -729,6 +729,36 @@ if MODE == "submit"
                 relationships: { reviewSubmission: { data: { type: "reviewSubmissions", id: rev_id } },
                                  appStoreVersion: { data: { type: "appStoreVersions", id: version_id } } } } })
 
+    # Les ABONNEMENTS dans la MÊME soumission que la version — c'est ce
+    # qu'exige un refus 2.1(b) (« IAP could not be found in the binary »).
+    # `subscriptionSubmissions` échoue en 409 sur un abo rejeté (« no pending
+    # version »), mais un abo revenu à READY_TO_SUBMIT peut s'attacher
+    # directement comme item de la soumission.
+    get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+      get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+        next unless s.dig("attributes", "state") == "READY_TO_SUBMIT"
+        write("ajout de l'abonnement #{s.dig("attributes", "productId")} à la soumission",
+          :post, "/v1/reviewSubmissionItems",
+          { data: { type: "reviewSubmissionItems",
+                    relationships: { reviewSubmission: { data: { type: "reviewSubmissions", id: rev_id } },
+                                     subscription: { data: { type: "subscriptions", id: s["id"] } } } } })
+      end
+    end
+
+    # STAGE_ONLY : on prépare la soumission (version + abos) SANS l'envoyer.
+    # Utile tant qu'un prérequis hors-API manque (accord Paid Apps, vidéo
+    # sandbox exigée par App Review) : envoyer trop tôt = refus assuré.
+    if ENV["STAGE_ONLY"] == "1"
+      puts "\nSTAGE_ONLY=1 — soumission PRÉPARÉE mais NON envoyée (#{rev_id})."
+      puts "Contenu :"
+      get_all("/v1/reviewSubmissions/#{rev_id}/items?limit=50").each do |it|
+        rel = (it["relationships"] || {}).find { |_, v| v.is_a?(Hash) && v["data"] }
+        puts "  - #{rel ? "#{rel[0]}:#{rel[1]["data"]["id"]}" : it.dig("attributes", "state")}"
+      end
+      puts "Pour l'envoyer : relancer submit sans STAGE_ONLY (elle sera envoyée telle quelle)."
+      exit 0
+    end
+
     write("SOUMISSION version à Apple (submitted=true)", :patch, "/v1/reviewSubmissions/#{rev_id}",
       { data: { type: "reviewSubmissions", id: rev_id, attributes: { submitted: true } } })
   end

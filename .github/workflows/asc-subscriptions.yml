@@ -23,6 +23,11 @@ on:
         required: false
         default: ""
         type: string
+      stage_only:
+        description: "submit : PRÉPARER la soumission (version + abos) sans l'envoyer à Apple"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -65,4 +70,5 @@ jobs:
           DISPLAY_TYPE: ${{ inputs.display_type }}
           ONLY_PRODUCT: ${{ inputs.only_product }}
           MODE: ${{ inputs.mode }}
+          STAGE_ONLY: ${{ inputs.stage_only && '1' || '0' }}
         run: ruby scripts/asc_subscriptions.rb
