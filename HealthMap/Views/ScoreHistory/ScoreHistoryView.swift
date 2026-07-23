@@ -9,6 +9,12 @@ struct ScoreHistoryView: View {
     @State private var history: [ScoreSnapshot] = []
     @State private var isLoading = true
     @State private var scoreDeltaInfo: (delta: Int, weeks: Int, text: String)?
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
+
+    /// Famille 2 (verrouillé) : le dernier delta reste net (le présent), la
+    /// trajectoire (courbe + tableau) est l'ordonnance. Rien à gater tant qu'il
+    /// n'y a pas d'historique traçable.
+    private var gateTrajectory: Bool { !subscriptionService.isPremium && history.count >= 2 }
 
     var body: some View {
         ZStack {
@@ -25,21 +31,39 @@ struct ScoreHistoryView: View {
             } else {
                 ScrollView {
                     VStack(spacing: Theme.spacingLG) {
-                        // Delta card
+                        // Delta card — le présent, toujours net.
                         if let info = scoreDeltaInfo, history.count >= 2 {
                             deltaCard(delta: info.delta, text: info.text)
                         }
 
-                        // Chart
                         if history.count >= 2 {
-                            chartSection
+                            if gateTrajectory {
+                                // Famille 2 : silhouette de la courbe + du tableau
+                                // sous flou, la trajectoire chiffrée est gatée.
+                                GatedOverlay(intensity: .locked) {
+                                    VStack(spacing: Theme.spacingLG) {
+                                        chartSection
+                                        historyTable
+                                    }
+                                }
+                                UnlockDoor(
+                                    icon: "chart.xyaxis.line",
+                                    title: "Vois ta trajectoire complète",
+                                    subtitle: "Ta courbe et ton historique, semaine après semaine",
+                                    zone: "historique_score"
+                                )
+                                .padding(.horizontal, Theme.spacingLG)
+                            } else {
+                                chartSection
+                                if !history.isEmpty {
+                                    historyTable
+                                }
+                            }
                         } else {
                             emptyState
-                        }
-
-                        // History table
-                        if !history.isEmpty {
-                            historyTable
+                            if !history.isEmpty {
+                                historyTable
+                            }
                         }
                     }
                     .padding(.vertical, Theme.spacingMD)

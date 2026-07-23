@@ -368,26 +368,40 @@ struct NutrientDetailSheet: View {
         let synergie = nutrient.synergie?.isEmpty == false ? nutrient.synergie : nil
         guard hack != nil || synergie != nil else { return nil }
 
-        let title = hack != nil ? "Le hack \(nutrient.label)" : "La synergie \(nutrient.label)"
+        // Famille 1 (fiche apport) : le hack + la synergie sont l'ordonnance —
+        // floutés en teaser (6px) sous une porte verte au bénéfice spécifique.
+        // Premium → rendu net, sans porte.
+        let rows = VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            if let hack {
+                premiumRow(icon: "lightbulb.fill", tint: Color.accentSky, label: "Astuce", text: hack)
+            }
+
+            if hack != nil && synergie != nil {
+                Divider()
+            }
+
+            if let synergie {
+                premiumRow(icon: "arrow.triangle.merge", tint: Color.accentIndigo, label: "Synergie", text: synergie)
+            }
+        }
+        .padding(Theme.spacingMD)
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        if isPremium {
+            return AnyView(rows.cardStyle())
+        }
+
+        let doorTitle = hack != nil
+            ? "Débloque le hack \(nutrient.label)"
+            : "Débloque la synergie \(nutrient.label)"
+        let doorSubtitle = (hack != nil && synergie != nil)
+            ? "L'astuce d'absorption + la synergie entre nutriments"
+            : (hack != nil ? "L'astuce d'absorption qui change tout" : "La synergie entre tes nutriments")
 
         return AnyView(
-            BlurredSection(isPremium: true, title: title) {
-                VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                    if let hack {
-                        premiumRow(icon: "lightbulb.fill", tint: Color.accentSky, label: "Astuce", text: hack)
-                    }
-
-                    if hack != nil && synergie != nil {
-                        Divider()
-                    }
-
-                    if let synergie {
-                        premiumRow(icon: "arrow.triangle.merge", tint: Color.accentIndigo, label: "Synergie", text: synergie)
-                    }
-                }
-                .padding(Theme.spacingMD)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .cardStyle()
+            VStack(spacing: Theme.spacingSM) {
+                GatedOverlay(intensity: .teaser) { rows }
+                UnlockDoor(icon: "lock.fill", title: doorTitle, subtitle: doorSubtitle, zone: "fiche_apport")
             }
         )
     }
