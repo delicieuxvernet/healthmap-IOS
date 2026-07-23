@@ -804,14 +804,36 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Bandeau premium (quota — aucune info masquée)
+    // MARK: - Bandeau premium (quota — famille 5 : aucune info masquée)
+    // Compteur motivant tant qu'il reste des scans ; mur non punitif au bout.
+    // Total gratuit = 3 (quota serveur actuel « à vie »). Le wording hebdo du
+    // handoff (« attends lundi ») s'activera avec la bascule serveur vers
+    // 3/semaine — ici on reste honnête sur la réalité courante.
     @ViewBuilder
     private var premiumScanBanner: some View {
         if !subscriptionService.isPremium {
-            PremiumScanBannerV4(remaining: viewModel.scansRemaining ?? 0) {
-                showPaywall = true
+            let remaining = max(0, viewModel.scansRemaining ?? 0)
+            let total = max(3, remaining)
+            if remaining == 0 {
+                QuotaWall(
+                    message: "Tes scans gratuits sont utilisés — passe en illimité pour continuer à analyser tes repas.",
+                    unlockTitle: "Scanner en illimité",
+                    escapeText: "ton journal et ton bilan restent gratuits, toujours",
+                    zone: "scan_quota"
+                ) {
+                    showPaywall = true
+                }
+                .padding(.horizontal, Theme.spacingLG)
+            } else {
+                QuotaMeter(
+                    used: total - remaining,
+                    total: total,
+                    icon: "camera",
+                    label: "Tes scans gratuits",
+                    unit: "scan"
+                )
+                .padding(.horizontal, Theme.spacingLG)
             }
-            .padding(.horizontal, Theme.spacingLG)
         }
     }
 

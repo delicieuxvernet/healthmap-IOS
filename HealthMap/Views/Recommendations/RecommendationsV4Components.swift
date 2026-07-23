@@ -81,6 +81,8 @@ struct PlanTopicCardV4: View {
     let topic: PlanTopic
     let onSeeSolutions: () -> Void
 
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // En-tête : kicker accentué + nom + pastille icône teintée.
@@ -114,7 +116,9 @@ struct PlanTopicCardV4: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
 
-            // « Ton rituel du jour » : matin / midi / soir.
+            // « Ton rituel du jour » : matin / midi / soir. Famille 3 (locked) —
+            // l'en-tête et la silhouette des 3 créneaux restent visibles (le
+            // programme existe), le pas-à-pas est gaté. Net pour les abonnés.
             if !topic.ritual.isEmpty {
                 Text("TON RITUEL DU JOUR")
                     .font(.system(size: 11, weight: .heavy))
@@ -122,8 +126,24 @@ struct PlanTopicCardV4: View {
                     .foregroundStyle(Color(hex: "B0A99B"))
                     .padding(.top, 20)
 
-                PlanRitualRowV4(steps: topic.ritual)
+                if subscriptionService.isPremium {
+                    PlanRitualRowV4(steps: topic.ritual)
+                        .padding(.top, 14)
+                } else {
+                    GatedOverlay(intensity: .locked) {
+                        PlanRitualRowV4(steps: topic.ritual)
+                    }
                     .padding(.top, 14)
+
+                    UnlockDoor(
+                        icon: "lock.fill",
+                        title: "Débloque ton rituel du jour",
+                        subtitle: nil,
+                        zone: "plan_rituel",
+                        compact: true
+                    )
+                    .padding(.top, 12)
+                }
             }
 
             // Bouton « Voir mes solutions » + badge nombre.
