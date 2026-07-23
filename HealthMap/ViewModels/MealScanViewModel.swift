@@ -3,6 +3,19 @@ import SwiftUI
 import UIKit
 import Supabase
 
+struct ScanQuotaPresentation: Equatable {
+    let remaining: Int
+    let total: Int
+
+    var used: Int { max(0, total - remaining) }
+
+    init(remaining: Int, dailyLimit: Int?) {
+        let resolvedTotal = max(1, dailyLimit ?? max(3, remaining))
+        total = resolvedTotal
+        self.remaining = min(max(0, remaining), resolvedTotal)
+    }
+}
+
 @MainActor
 final class MealScanViewModel: ObservableObject {
 
@@ -15,14 +28,30 @@ final class MealScanViewModel: ObservableObject {
     @Published var searchResults: [MealJournalService.FoodHit] = []
     @Published var isSearching = false
     @Published var selectedTab: MealScanTab = .analyze
-    /// Scans gratuits restants (iOS free) renvoyés par la fonction ; nil si
-    /// inconnu / premium. Mis en cache pour s'afficher dès l'ouverture.
-    @Published var scansRemaining: Int? = UserDefaults.standard.object(forKey: "hm_scans_remaining") as? Int
+    /// Scans gratuits restants aujourd’hui, renvoyés par la fonction ; nil si
+    /// inconnu / premium. Le cache n’est réutilisé que le jour où il a été reçu.
+    @Published var scansRemaining: Int?
+    @Published var scanDailyLimit: Int?
     /// Passe à true quand le quota gratuit est épuisé → la vue ouvre le paywall.
     @Published var quotaExhausted = false
 
     private var client: SupabaseClient { SupabaseService.shared.client }
     private var searchTask: Task<Void, Never>?
+
+    init() {
+        let defaults = UserDefaults.standard
+        if let cachedAt = defaults.object(forKey: "hm_scan_quota_date") as? Date,
+           Calendar.current.isDateInToday(cachedAt) {
+            scansRemaining = defaults.object(forKey: "hm_scans_remaining") as? Int
+            scanDailyLimit = defaults.object(forKey: "hm_scan_daily_limit") as? Int
+        } else {
+            scansRemaining = nil
+            scanDailyLimit = nil
+            defaults.removeObject(forKey: "hm_scans_remaining")
+            defaults.removeObject(forKey: "hm_scan_daily_limit")
+            defaults.removeObject(forKey: "hm_scan_quota_date")
+        }
+    }
 
     enum MealScanTab: String, CaseIterable {
         case analyze = "Analyser un repas"
@@ -233,7 +262,7 @@ final class MealScanViewModel: ObservableObject {
     private struct MealAnalyzeRequest: Encodable {
         let image: String
         let deficiencies: [String]
-        /// "ios" -> active le quota « 3 scans gratuits à vie » côté serveur.
+        /// "ios" -> active le quota journalier selon le tier côté serveur.
         let client: String
         /// "v2" -> opt-in contrat v2 : la fonction (version 10+) ajoute le
         /// bloc `scan_v2` à sa réponse (les anciennes versions l'ignorent).
@@ -448,8 +477,8 @@ final class MealScanViewModel: ObservableObject {
                 MealThumbnailStore.save(photo: photo, mealId: response.scan?.id)
             }
 
-            // Compteur de scans restants — la fonction renvoie rate_limit.remaining.
-            updateScansRemaining(response.rateLimit?.remaining)
+            // Compteur journalier — la fonction renvoie remaining + daily_limit.
+            updateScanQuota(response.rateLimit)
 
         } catch is CancellationError {
             errorMessage = nil // User cancelled, no error
@@ -470,8 +499,8 @@ final class MealScanViewModel: ObservableObject {
             // Handle HTTP / Supabase errors by inspecting the error description
             let desc = String(describing: error).lowercased()
             if desc.contains("429") || desc.contains("quota") || desc.contains("rate") {
-                // Pour un compte free, un 429 = quota « 3 scans gratuits à vie »
-                // épuisé (la limite à vie (3) tombe AVANT la limite/jour (15)).
+                // Pour un compte Free, un 429 correspond au quota journalier.
+                // Pour Premium, le serveur conserve un plafond anti-abus plus élevé.
                 if SubscriptionService.shared.isPremium {
                     errorMessage = "Trop de requetes. Attends quelques secondes avant de reessayer."
                 } else {
@@ -549,6 +578,16 @@ final class MealScanViewModel: ObservableObject {
         guard let value else { return }
         scansRemaining = value
         UserDefaults.standard.set(value, forKey: "hm_scans_remaining")
+        UserDefaults.standard.set(Date(), forKey: "hm_scan_quota_date")
+    }
+
+    private func updateScanQuota(_ quota: EdgeRateLimit?) {
+        guard let quota else { return }
+        updateScansRemaining(quota.remaining)
+        if let dailyLimit = quota.dailyLimit {
+            scanDailyLimit = dailyLimit
+            UserDefaults.standard.set(dailyLimit, forKey: "hm_scan_daily_limit")
+        }
     }
 
     /// Resolve user deficiencies by recomputing local nutrient scores from the saved profile.

@@ -10,11 +10,14 @@ struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
+    let source: String
+
     @State private var selectedPackage: Package?
     @State private var isPurchasing = false
     @State private var isRestoring = false
     @State private var alertMessage: String?
     @State private var showAlert = false
+    @State private var showPurchaseSuccess = false
 
     /// Le chargement des offerings a échoué (ou dépassé le timeout) : on montre
     /// un message + bouton Réessayer au lieu d'un spinner infini. Sans cet état,
@@ -24,6 +27,10 @@ struct PaywallView: View {
 
     /// Durée max d'attente des offerings avant de basculer en état d'échec.
     private static let offeringsTimeout: Duration = .seconds(10)
+
+    init(source: String = "generic") {
+        self.source = source
+    }
 
     private var annualPackage: Package? {
         subscriptionService.offerings?.current?.availablePackages.first { $0.packageType == .annual }
@@ -71,6 +78,9 @@ struct PaywallView: View {
         .task {
             await loadOfferingsWithTimeout()
         }
+        .onAppear {
+            AnalyticsService.shared.track(.paywallShown, properties: ["source": source])
+        }
         // L'offering peut arriver après l'apparition (cold start, réseau lent) :
         // on sélectionne alors la formule annuelle par défaut dès qu'elle existe,
         // et on efface un éventuel état d'échec affiché entre-temps.
@@ -87,6 +97,18 @@ struct PaywallView: View {
         } message: {
             Text(alertMessage ?? "")
         }
+        .sheet(isPresented: $showPurchaseSuccess) {
+            PremiumPurchaseSuccessView(
+                onExplore: {
+                    completeSuccess()
+                },
+                onBilan: {
+                    completeSuccess(destination: .bilan)
+                }
+            )
+            .healthMapActionSheet()
+            .interactiveDismissDisabled()
+        }
     }
 
     // MARK: - Header
@@ -95,6 +117,10 @@ struct PaywallView: View {
         HStack {
             Spacer()
             Button {
+                AnalyticsService.shared.track(.paywallDismissed, properties: [
+                    "source": source,
+                    "outcome": "closed",
+                ])
                 dismiss()
             } label: {
                 Image(systemName: "xmark.circle.fill")
@@ -118,7 +144,7 @@ struct PaywallView: View {
                 .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.healthMapText)
 
-            Text("Toute ton analyse, sans limite")
+            Text("Toute ton analyse, avec plus de profondeur")
                 .font(Theme.subheadlineFont)
                 .foregroundStyle(Color.healthMapSecondary)
         }
@@ -126,11 +152,10 @@ struct PaywallView: View {
 
     private var featureList: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            featureRow("camera.fill", "Scans repas illimités")
-            featureRow("chart.bar.fill", "Vitamines et minéraux complets")
-            featureRow("calendar", "Historique et tendances du journal")
-            featureRow("pills.fill", "Timing et interactions des compléments")
-            featureRow("square.and.arrow.up", "Export PDF de tes analyses")
+            featureRow("camera.fill", "Jusqu’à 30 scans repas par jour")
+            featureRow("chart.xyaxis.line", "Tendances détaillées de tes apports")
+            featureRow("sparkles", "Astuces et synergies personnalisées")
+            featureRow("list.bullet.clipboard.fill", "Rituels et solutions détaillés")
         }
         .padding(.horizontal, Theme.spacingXL)
     }
@@ -491,14 +516,35 @@ struct PaywallView: View {
         defer { isPurchasing = false }
 
         do {
-            let completed = try await subscriptionService.purchase(package: package)
-            if completed {
-                dismiss()
+            let outcome = try await subscriptionService.purchase(package: package)
+            switch outcome {
+            case .activated:
+                AnalyticsService.shared.track(.paywallConverted, properties: [
+                    "source": source,
+                    "package": package.identifier,
+                ])
+                AnalyticsService.shared.track(.subscriptionStarted, properties: [
+                    "package": package.identifier,
+                ])
+                showPurchaseSuccess = true
+            case .cancelled:
+                AnalyticsService.shared.track(.paywallDismissed, properties: [
+                    "source": source,
+                    "outcome": "purchase_cancelled",
+                ])
+            case .entitlementPending:
+                // Le service transforme cet état en erreur après une seconde
+                // lecture RevenueCat ; ce cas reste défensif.
+                alertMessage = "Ton achat est en cours d’activation. Réessaie dans un instant."
+                showAlert = true
             }
-            // Annulation utilisateur : on ne montre rien, il est resté sur le paywall.
         } catch {
             AppLogger.subscription.report(error, context: "paywall/purchase")
-            alertMessage = "L'achat n'a pas abouti. Réessaie dans un instant."
+            if error is SubscriptionPurchaseError {
+                alertMessage = "Ton achat est confirmé, mais l’accès Premium est encore en cours d’activation. Patiente quelques secondes puis utilise « Restaurer mes achats »."
+            } else {
+                alertMessage = "L’achat n’a pas abouti. Réessaie dans un instant."
+            }
             showAlert = true
         }
     }
@@ -511,9 +557,11 @@ struct PaywallView: View {
         do {
             try await subscriptionService.restorePurchases()
             if subscriptionService.isPremium {
-                alertMessage = "Abonnement Premium restauré."
-                showAlert = true
-                dismiss()
+                AnalyticsService.shared.track(.subscriptionRestored, properties: [
+                    "outcome": "success",
+                    "source": source,
+                ])
+                showPurchaseSuccess = true
             } else {
                 alertMessage = "Aucun abonnement actif trouvé pour cet identifiant Apple."
                 showAlert = true
@@ -523,6 +571,132 @@ struct PaywallView: View {
             alertMessage = "La restauration n'a pas abouti. Réessaie dans un instant."
             showAlert = true
         }
+    }
+
+    private func completeSuccess(destination: NavCardDestination? = nil) {
+        showPurchaseSuccess = false
+        if let destination {
+            NotificationCenter.default.post(
+                name: .healthmapNavigateToTab,
+                object: destination.rawValue
+            )
+        }
+        dismiss()
+    }
+}
+
+// MARK: - Confirmation d'activation Premium
+private struct PremiumPurchaseSuccessView: View {
+    let onExplore: () -> Void
+    let onBilan: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var revealed = false
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Theme.spacingMD) {
+                ZStack {
+                    Circle()
+                        .fill(Color.kiwiTint)
+                        .frame(width: 80, height: 80)
+                    Circle()
+                        .stroke(Color.kiwiGreen.opacity(0.22), lineWidth: 8)
+                        .frame(width: 64, height: 64)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 28, weight: .heavy))
+                        .foregroundStyle(Color.kiwiGreen)
+                }
+                .scaleEffect(revealed ? 1 : 0.82)
+                .opacity(revealed ? 1 : 0)
+                .accessibilityHidden(true)
+
+                VStack(spacing: Theme.spacingXS) {
+                    Text("Bienvenue dans Kiwio Premium")
+                        .font(.system(size: 23, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                        .multilineTextAlignment(.center)
+
+                    Text("Merci pour ta confiance. Ton abonnement est actif et tes avantages sont disponibles maintenant.")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(spacing: 0) {
+                    benefitRow(icon: "camera.fill", title: "Jusqu’à 30 scans par jour")
+                    Divider().padding(.leading, 44)
+                    benefitRow(icon: "chart.xyaxis.line", title: "Tendances détaillées de tes apports")
+                    Divider().padding(.leading, 44)
+                    benefitRow(icon: "list.bullet.clipboard.fill", title: "Rituels et solutions détaillés")
+                }
+                .padding(.horizontal, Theme.spacingMD)
+                .background(
+                    Color.healthMapCard,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+
+                Button(action: onExplore) {
+                    Text("Découvrir mes avantages")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(
+                            Color.kiwiGreen,
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.healthMapPressed)
+
+                Button(action: onBilan) {
+                    Text("Continuer sur mon bilan")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.kiwiInk)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.kiwiGreen.opacity(0.18), lineWidth: 1)
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.healthMapPressed)
+            }
+            .padding(.horizontal, Theme.spacingLG)
+            .padding(.top, Theme.spacingLG)
+            .padding(.bottom, Theme.spacingMD)
+            .containerRelativeFrame(.horizontal)
+        }
+        .background(Color.healthMapWarm.ignoresSafeArea())
+        .onAppear {
+            HapticService.shared.success()
+            if reduceMotion {
+                revealed = true
+            } else {
+                withAnimation(.healthMapSpring) {
+                    revealed = true
+                }
+            }
+        }
+        .dynamicTypeSize(.large ... .accessibility3)
+    }
+
+    private func benefitRow(icon: String, title: String) -> some View {
+        HStack(spacing: Theme.spacingSM) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.kiwiGreen)
+                .frame(width: 28, height: 44)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.system(size: 13.5, weight: .semibold))
+                .foregroundStyle(Color.kiwiCharcoal)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

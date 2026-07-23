@@ -2,6 +2,28 @@ import Foundation
 import RevenueCat
 import SwiftUI
 
+enum PurchaseOutcome: Equatable {
+    case cancelled
+    case activated
+    case entitlementPending
+
+    static func resolve(userCancelled: Bool, entitlementIsActive: Bool) -> PurchaseOutcome {
+        if userCancelled { return .cancelled }
+        return entitlementIsActive ? .activated : .entitlementPending
+    }
+}
+
+enum SubscriptionPurchaseError: LocalizedError {
+    case entitlementNotActivated
+
+    var errorDescription: String? {
+        switch self {
+        case .entitlementNotActivated:
+            return "L’achat a été confirmé, mais l’accès Premium n’est pas encore actif."
+        }
+    }
+}
+
 // MARK: - Subscription Service (RevenueCat)
 @MainActor
 final class SubscriptionService: ObservableObject {
@@ -37,19 +59,42 @@ final class SubscriptionService: ObservableObject {
     }
 
     // MARK: - Purchase
-    func purchase(package: Package) async throws -> Bool {
+    func purchase(package: Package) async throws -> PurchaseOutcome {
         let result = try await Purchases.shared.purchase(package: package)
         customerInfo = result.customerInfo
         isPremium = result.customerInfo.entitlements["premium"]?.isActive == true
 
+        var outcome = PurchaseOutcome.resolve(
+            userCancelled: result.userCancelled,
+            entitlementIsActive: isPremium
+        )
+
+        // RevenueCat peut confirmer la transaction quelques instants avant de
+        // rafraîchir l'entitlement. Une seconde lecture évite de laisser l’utilisateur
+        // dans un faux état d'échec, sans jamais accorder l'accès côté client.
+        if outcome == .entitlementPending {
+            let refreshed = try await Purchases.shared.customerInfo()
+            customerInfo = refreshed
+            isPremium = refreshed.entitlements["premium"]?.isActive == true
+            outcome = PurchaseOutcome.resolve(
+                userCancelled: false,
+                entitlementIsActive: isPremium
+            )
+        }
+
+        guard outcome != .entitlementPending else {
+            throw SubscriptionPurchaseError.entitlementNotActivated
+        }
+
         // Post-purchase StoreKit 2 verification (non-blocking).
-        if !result.userCancelled, let userId = try? await Purchases.shared.customerInfo().originalAppUserId {
+        if outcome == .activated {
+            let userId = result.customerInfo.originalAppUserId
             Task {
                 await ReceiptValidationService.shared.verifyCurrentEntitlements(userId: userId)
             }
         }
 
-        return !result.userCancelled
+        return outcome
     }
 
     // MARK: - Restore Purchases

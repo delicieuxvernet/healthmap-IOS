@@ -519,12 +519,12 @@ struct PremiumScanBannerV4: View {
                         .foregroundStyle(.white)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Passe en illimité")
+                    Text("Débloque 30 scans par jour")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(Color.kiwiGreenInk)
                     Text(remaining > 0
-                         ? "Il te reste \(remaining) scan\(plural) gratuit\(plural) · scanne chaque jour"
-                         : "Scanne chaque jour et garde ton historique")
+                         ? "Il te reste \(remaining) scan\(plural) gratuit\(plural) aujourd’hui"
+                         : "Continue aujourd’hui et garde ton historique")
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(Color.kiwiGreenInk.opacity(0.85))
                         .fixedSize(horizontal: false, vertical: true)
@@ -541,8 +541,8 @@ struct PremiumScanBannerV4: View {
         }
         .buttonStyle(.healthMapPressed)
         .accessibilityLabel(remaining > 0
-            ? "Passe en illimité. Il te reste \(remaining) scan\(plural) gratuit\(plural)."
-            : "Passe en illimité pour scanner chaque jour.")
+            ? "Débloque 30 scans par jour. Il te reste \(remaining) scan\(plural) gratuit\(plural) aujourd’hui."
+            : "Débloque jusqu’à 30 scans par jour.")
     }
 }
 

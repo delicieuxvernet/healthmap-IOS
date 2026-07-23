@@ -1244,7 +1244,7 @@ struct PremiumEntryCard: View {
 
     private var subtitle: String {
         guard let package = shortPackage else {
-            return "Toute ton analyse, sans limite"
+            return "30 scans par jour et un suivi plus détaillé"
         }
         let price = package.localizedPriceString
         let unit = package.packageType == .weekly ? "sem" : "mois"

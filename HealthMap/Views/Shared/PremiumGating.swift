@@ -133,22 +133,13 @@ struct UnlockDoor: View {
                 .contentShape(Rectangle())
             }
         }
-        .buttonStyle(UnlockDoorPressStyle())
+        .buttonStyle(.healthMapPressed)
         .accessibilityLabel(subtitle == nil ? title : "\(title). \(subtitle ?? "")")
         .accessibilityAddTraits(.isButton)
         .sheet(isPresented: $showPaywall) {
-            PaywallView()
+            PaywallView(source: zone.isEmpty ? "premium_gate" : zone)
                 .healthMapFullSheet()
         }
-    }
-}
-
-/// Appui = scale .98 (grammaire de la planche `.door:active`).
-private struct UnlockDoorPressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -159,7 +150,7 @@ struct QuotaMeter: View {
     let used: Int
     let total: Int
     var icon: String = "camera"
-    var label: String = "Tes scans cette semaine"
+    var label: String = "Tes scans aujourd’hui"
     /// Nom de l'unité au singulier (« scan », « dictée »).
     var unit: String = "scan"
 
@@ -194,7 +185,7 @@ struct QuotaMeter: View {
             (Text("Il te reste ")
                 + Text("\(remaining) \(unit)\(remaining > 1 ? "s" : "")")
                     .font(.system(size: 12.5, weight: .heavy)).foregroundColor(Color.kiwiInk)
-                + Text(remaining > 1 ? " — encore de quoi avancer cette semaine." : " — profites-en avant lundi."))
+                + Text(remaining > 1 ? " — encore de quoi avancer aujourd’hui." : " — ton quota revient demain."))
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundColor(Color(hex: "3A3833"))
                 .padding(.top, 11)
@@ -213,15 +204,15 @@ struct QuotaMeter: View {
 }
 
 // MARK: - QuotaWall — le mur (famille 5, état B)
-/// Quota atteint. Message positif, échappatoire gratuite (« ou attends lundi »),
-/// porte « en illimité ». Jamais punitif.
+/// Quota atteint. Message positif, échappatoire gratuite (« reviens demain »)
+/// et bénéfice Premium honnête. Jamais punitif.
 struct QuotaWall: View {
     var icon: String = "infinity"
-    var title: String = "Tu es à fond cette semaine"
+    var title: String = "Tu es à fond aujourd’hui"
     var message: String
     var unlockIcon: String = "bolt.fill"
-    var unlockTitle: String = "Scanner en illimité"
-    var escapeText: String = "ou attends lundi — 3 nouveaux scans t'attendent"
+    var unlockTitle: String = "Débloquer 30 scans par jour"
+    var escapeText: String = "ou reviens demain — 3 nouveaux scans t’attendent"
     var zone: String = ""
     var onUnlock: (() -> Void)? = nil
 
@@ -288,7 +279,7 @@ struct QuotaWall: View {
 
             QuotaMeter(used: 2, total: 3)
 
-            QuotaWall(message: "Tes 3 scans sont utilisés — reviens lundi, ou passe en illimité pour continuer maintenant.")
+            QuotaWall(message: "Tes 3 scans du jour sont utilisés — reviens demain, ou débloque jusqu’à 30 scans par jour.")
         }
         .padding()
     }

@@ -32,6 +32,7 @@ import Foundation
 struct SuiviView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @ObservedObject private var gamification = GamificationService.shared
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Journal alimentaire (14 derniers jours) — chargé À L'AFFICHAGE (lecture
@@ -197,19 +198,31 @@ struct SuiviView: View {
         if ids.isEmpty {
             emptyMicroCard
         } else {
-            SuiviCarouselBlock(
-                title: "Micros à renforcer",
-                systemIcon: "flask.fill",
-                tint: Color(hex: "C9A227"),
-                pageTitles: ids.map { NutrientData.definition(for: $0)?.label ?? $0 },
-                pageHeight: 168
-            ) { i in
-                let id = ids[i]
-                let series = SuiviEngineV4.microDailySeries(fortnight: journal.fortnight, id: id)
-                VStack(alignment: .leading, spacing: 10) {
-                    SuiviValueChart(points: series, color: microColor(id), fixedPercent: true)
-                        .frame(height: 112)
-                    SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: "%")
+            VStack(spacing: 12) {
+                SuiviCarouselBlock(
+                    title: "Micros à renforcer",
+                    systemIcon: "flask.fill",
+                    tint: Color(hex: "C9A227"),
+                    pageTitles: ids.map { NutrientData.definition(for: $0)?.label ?? $0 },
+                    pageHeight: 168,
+                    isLocked: !subscriptionService.isPremium
+                ) { i in
+                    let id = ids[i]
+                    let series = SuiviEngineV4.microDailySeries(fortnight: journal.fortnight, id: id)
+                    VStack(alignment: .leading, spacing: 10) {
+                        SuiviValueChart(points: series, color: microColor(id), fixedPercent: true)
+                            .frame(height: 112)
+                        SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: "%")
+                    }
+                }
+
+                if !subscriptionService.isPremium {
+                    UnlockDoor(
+                        icon: "chart.xyaxis.line",
+                        title: "Débloque la tendance de tes apports",
+                        subtitle: "Visualise leur évolution jour après jour",
+                        zone: "suivi_micros"
+                    )
                 }
             }
         }

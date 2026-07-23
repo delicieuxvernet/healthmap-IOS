@@ -153,6 +153,8 @@ titre · `SuiviStatsRow` · carrousel Macros · carrousel Micros · carrousel Sy
   scan = trou (jamais un 0 inventé) ; insight « il y a N j : X · aujourd'hui : Y ».
 - **Carrousel Micros** — pages = apports à renforcer (< 60), sinon micros présents :
   couverture **% AJR par jour** `min(100, Σ pctRDA)`, repère 100 % ; même insight.
+  Pour Free, l’en-tête et le nom de l’apport restent lisibles mais la courbe et
+  son insight sont floutés ; Premium débloque la trajectoire détaillée.
 - **Carrousel Symptômes** — 1 page par symptôme déclaré : courbe cumulée **+/- PAR
   symptôme** (chaque courbe indépendante — fin du « tout bon ou tout mauvais »),
   `step 3` (lissée), pastille de verdict. Bandeau « Commencer mon suivi » tant que
