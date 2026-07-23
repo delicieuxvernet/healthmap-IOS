@@ -960,6 +960,12 @@ private enum SuiviTipIcon {
 private struct SuiviCoverageCard: View {
     let coverage: [SuiviEngineV4.NutrientCoverage7d]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
+
+    /// Famille 2 (verrouillé) : hors abonnement, la preuve chiffrée de
+    /// progression est l'ordonnance — silhouette des barres visible, gains
+    /// gatés. Rien à gater si la carte est vide (état honnête inchangé).
+    private var shouldGate: Bool { !subscriptionService.isPremium && !coverage.isEmpty }
 
     /// Moyenne arrondie des gains (aujourd'hui - départ) sur les lignes où le
     /// gain est positif. 0 s'il n'y a aucun progrès à afficher.
@@ -996,17 +1002,21 @@ private struct SuiviCoverageCard: View {
 
             if coverage.isEmpty {
                 emptyState
-            } else {
-                ForEach(Array(coverage.enumerated()), id: \.element.id) { idx, n in
-                    row(n)
-                        .overlay(alignment: .top) {
-                            if idx > 0 {
-                                Rectangle()
-                                    .fill(Color.kiwiCharcoal.opacity(0.06))
-                                    .frame(height: 1)
-                            }
-                        }
+            } else if shouldGate {
+                GatedOverlay(intensity: .locked) {
+                    rowsStack
                 }
+                .padding(.top, 6)
+                UnlockDoor(
+                    icon: "chart.xyaxis.line",
+                    title: "Vois tes progrès depuis le départ",
+                    subtitle: "Combien tu as gagné sur chaque apport, semaine après semaine",
+                    zone: "suivi_progression"
+                )
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+            } else {
+                rowsStack
             }
         }
         .padding(.horizontal, 18)
@@ -1014,6 +1024,20 @@ private struct SuiviCoverageCard: View {
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity)
         .kiwiCard()
+    }
+
+    @ViewBuilder
+    private var rowsStack: some View {
+        ForEach(Array(coverage.enumerated()), id: \.element.id) { idx, n in
+            row(n)
+                .overlay(alignment: .top) {
+                    if idx > 0 {
+                        Rectangle()
+                            .fill(Color.kiwiCharcoal.opacity(0.06))
+                            .frame(height: 1)
+                    }
+                }
+        }
     }
 
     private func row(_ n: SuiviEngineV4.NutrientCoverage7d) -> some View {
