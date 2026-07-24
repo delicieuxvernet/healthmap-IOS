@@ -829,33 +829,36 @@ if MODE == "submit"
   # 0) PRIORITÉ : une soumission déjà PRÉPARÉE avec des items (montée via l'UI
   #    web — seule voie possible pour le 1er abonnement) doit être ENVOYÉE telle
   #    quelle, jamais détruite. On la soumet et on s'arrête là.
-  staged = subs_list.find do |s|
-    next false unless s.dig("attributes", "state") == "READY_FOR_REVIEW"
-    get_all("/v1/reviewSubmissions/#{s["id"]}/items?limit=50").size.positive?
+  staged_with_items = subs_list.filter_map do |s|
+    next unless s.dig("attributes", "state") == "READY_FOR_REVIEW"
+    items = get_all("/v1/reviewSubmissions/#{s["id"]}/items?limit=50")
+    [s, items] if items.size.positive?
   end
-  if staged
-    # GARDE-FOU (incident 2e refus, 21 juil. 2026) : ne JAMAIS envoyer une
-    # soumission qui ne contient que la version alors que des abonnements
-    # attendent d'être soumis. C'est exactement ce qui a été envoyé le 20 et
-    # re-refusé en 2.1(b) — Apple cherche les achats dans le binaire et la
-    # soumission ne les portait pas.
+  if staged_with_items.any?
+    # Le nouveau workflow App Store Connect place le groupe et ses abonnements
+    # dans le brouillon, mais leur API conserve encore l'état READY_TO_SUBMIT et
+    # ne révèle pas leur relation dans reviewSubmissionItems. Pour une première
+    # soumission : version + groupe + N abonnements = N + 2 éléments attendus.
+    staged, staged_items = staged_with_items.max_by { |_, items| items.size }
     pending_subs = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").flat_map do |g|
       get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50")
         .select { |s| s.dig("attributes", "state") == "READY_TO_SUBMIT" }
         .map { |s| s.dig("attributes", "productId") }
     end
-    unless pending_subs.empty?
-      puts "\n⛔ ENVOI BLOQUÉ — #{pending_subs.size} abonnement(s) encore READY_TO_SUBMIT :"
+    expected_items = pending_subs.size + 2
+    if staged_items.size < expected_items
+      puts "\n⛔ ENVOI BLOQUÉ — brouillon incomplet :"
+      puts "   #{staged_items.size} élément(s) présent(s), #{expected_items} attendu(s)"
+      puts "   (version + groupe + #{pending_subs.size} abonnement(s))."
       pending_subs.each { |p| puts "     - #{p}" }
-      puts "   L'API ne sait PAS les attacher (subscriptionSubmissions → 409 « no pending"
-      puts "   version » ; reviewSubmissionItems → 409 relation inconnue). Il faut cliquer"
-      puts "   « Resubmit » sur chaque abo dans App Store Connect → Monetization, puis"
-      puts "   relancer ce mode. Soumission #{staged["id"]} laissée préparée, non envoyée."
+      puts "   Soumission #{staged["id"]} laissée préparée, non envoyée."
       exit 1
     end
-    puts "Soumission préparée trouvée (#{staged["id"]}) — envoi tel quel."
-    write("ENVOI de la soumission préparée", :patch, "/v1/reviewSubmissions/#{staged["id"]}",
+    puts "Soumission préparée complète (#{staged["id"]}) :"
+    puts "  #{staged_items.size} élément(s) pour #{pending_subs.size} abonnement(s)."
+    ok, = write("ENVOI de la soumission préparée", :patch, "/v1/reviewSubmissions/#{staged["id"]}",
       { data: { type: "reviewSubmissions", id: staged["id"], attributes: { submitted: true } } })
+    exit 1 unless ok
     code, s = req(:get, "/v1/reviewSubmissions/#{staged["id"]}")
     puts "\n===== ÉTAT SOUMISSION ====="
     puts JSON.pretty_generate(code == 200 ? s["data"]["attributes"] : s)
