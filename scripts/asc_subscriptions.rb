@@ -539,7 +539,8 @@ if MODE == "app-audit"
     kinds = items.map do |it|
       rel = it["relationships"] || {}
       k = rel.keys.find { |key| rel[key].is_a?(Hash) && rel[key]["data"] }
-      k ? "#{k}:#{rel[k]["data"]["id"]}" : (it.dig("attributes", "state") || "?")
+      k ? "#{k}:#{rel[k]["data"]["id"]}" :
+        "relations=#{rel.keys.join(",")};state=#{it.dig("attributes", "state") || "?"}"
     end
     { id: s["id"], state: a["state"], submitted: a["submitted"],
       submittedDate: a["submittedDate"], platform: a["platform"],
