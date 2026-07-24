@@ -1280,10 +1280,26 @@ TARGETS.each do |product_id, spec|
     elsif shot.dig("assetDeliveryState", "state") == "COMPLETE" &&
           desired_checksum &&
           shot["sourceFileChecksum"].to_s != desired_checksum
-      ok, = write("suppression screenshot review obsolète", :delete,
-        "/v1/subscriptionAppStoreReviewScreenshots/#{shot[:id]}", nil)
-      failures << "#{product_id}: suppression screenshot obsolète" unless ok
-      ok
+      code, response = req(:delete,
+        "/v1/subscriptionAppStoreReviewScreenshots/#{shot[:id]}")
+      locked = code == 409 &&
+        Array(response.is_a?(Hash) ? response["errors"] : nil).any? do |error|
+          error["code"] == "ENTITY_ERROR.MEDIA_ASSET_DELETE_NOT_ALLOWED"
+        end
+      if (200..299).cover?(code)
+        puts "  OK  suppression screenshot review obsolète (HTTP #{code})"
+        true
+      elsif locked
+        # Après un premier rattachement à une soumission, Apple conserve l'asset
+        # COMPLETE mais interdit son remplacement. Il reste valide pour la revue.
+        puts "  INFO screenshot review COMPLETE verrouillé par Apple"
+        false
+      else
+        puts "  ÉCHEC suppression screenshot review obsolète -> HTTP #{code}"
+        puts(response.is_a?(String) ? response : JSON.pretty_generate(response))
+        failures << "#{product_id}: suppression screenshot obsolète"
+        false
+      end
     elsif shot.dig("assetDeliveryState", "state") == "COMPLETE"
       false
     else
