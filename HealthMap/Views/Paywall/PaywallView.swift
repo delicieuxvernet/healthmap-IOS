@@ -406,10 +406,16 @@ struct PaywallView: View {
         case .weekly: period = "semaine"
         default: period = "mois"
         }
+        let base: String
         if let trial = trialLabel(for: package) {
-            return "Gratuit \(trial), puis \(price) / \(period). Annulable à tout moment."
+            base = "Gratuit \(trial), puis \(price) / \(period)."
+        } else {
+            base = "\(price) / \(period)."
         }
-        return "\(price) / \(period). Annulable à tout moment."
+        // Divulgation d'auto-renouvellement exigée par App Store 3.1.2 : montant,
+        // durée, renouvellement automatique, et où/quand résilier. Affichée au
+        // point d'achat, sous le bouton, en plus du titre/durée/prix des cartes.
+        return base + " Abonnement à renouvellement automatique : reconduit pour la même durée sauf résiliation au moins 24 h avant la fin de la période en cours, dans les Réglages de ton compte Apple."
     }
 
     private func annualSubtitle(_ package: Package) -> String {
