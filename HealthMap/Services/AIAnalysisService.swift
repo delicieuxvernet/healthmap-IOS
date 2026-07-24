@@ -7,8 +7,14 @@ import Supabase
 @MainActor
 final class AIAnalysisService: AIAnalysisServiceProtocol {
     static let shared = AIAnalysisService()
+    /// Versions du contrat IA attendues par ce build. Un cache d'une version
+    /// antérieure est ignoré pour garantir la régénération avec le contexte
+    /// questionnaire exhaustif et la traçabilité serveur.
+    static let expectedSchemaVersionV7 = 8
+    static let expectedSchemaVersionV2 = "v2.2"
+
     private var client: SupabaseClient { SupabaseService.shared.client }
-    private let schemaVersion = 7
+    private let schemaVersion = AIAnalysisService.expectedSchemaVersionV7
 
     // Circuit breaker: prevents hammering a failing Edge Function
     // Thread-safe via @MainActor isolation.
@@ -36,6 +42,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         let cached = (try? await DatabaseService.shared.loadAIAnalysis(userId: userId))?.sanitized()
 
         if let cached, cached.isValidV7,
+           cached.meta?.schemaVersion == schemaVersion,
            cached.meta?.profileHash == currentHash {
             // Cache valid — merge with fresh local scores
             return mergeWithCanonical(aiData: cached, localScores: localScores, healthScore: healthScore, redFlags: redFlags)
@@ -143,8 +150,9 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         // inconnue remise à nil — on ne jette jamais toute l'analyse.
         let analysis = rawAnalysis.sanitized()
 
-        guard analysis.isValidV7 else {
-            AppLogger.analysis.error("AI response failed v7 validation (summary inexploitable)")
+        guard analysis.isValidV7,
+              analysis.meta?.schemaVersion == schemaVersion else {
+            AppLogger.analysis.error("AI response failed validation or uses an obsolete contract")
             return nil
         }
 
@@ -220,6 +228,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         if !forceRefresh,
            let cached = ((try? await DatabaseService.shared.loadAIAnalysisV2(userId: userId)) ?? nil),
            cached.isValidV2,
+           cached.meta?.schemaVersion == Self.expectedSchemaVersionV2,
            cached.meta?.profileHash == profileHash {
             return cached
         }
@@ -306,8 +315,9 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         consecutiveFailures = 0
         circuitOpenUntil = nil
 
-        guard analysis.isValidV2 else {
-            AppLogger.analysis.error("Bilan v2 : réponse sans apports exploitables")
+        guard analysis.isValidV2,
+              analysis.meta?.schemaVersion == Self.expectedSchemaVersionV2 else {
+            AppLogger.analysis.error("Bilan v2 : réponse inexploitable ou contrat obsolète")
             throw AIAnalysisError.invalidResponse
         }
 
@@ -316,6 +326,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         // notice et n'affecte pas le retour.
         var toCache = analysis
         if toCache.meta == nil { toCache.meta = MetaV2() }
+        toCache.meta?.schemaVersion = Self.expectedSchemaVersionV2
         toCache.meta?.profileHash = profileHash
         Task {
             do {

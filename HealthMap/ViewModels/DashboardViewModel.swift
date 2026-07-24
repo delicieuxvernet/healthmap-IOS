@@ -263,6 +263,8 @@ final class DashboardViewModel: ObservableObject {
             // `(try? …) ?? nil` aplatit le double-optionnel (la fonction rend déjà
             // `AIAnalysisV2?`) — même motif que dans AIAnalysisService.fetchBilanV2.
             if let cached = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil,
+               cached.isValidV2,
+               cached.meta?.schemaVersion == AIAnalysisService.expectedSchemaVersionV2,
                cached.meta?.profileHash == hash {
                 analysisV2 = cached
             }

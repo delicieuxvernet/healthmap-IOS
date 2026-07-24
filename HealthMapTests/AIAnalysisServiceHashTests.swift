@@ -9,6 +9,11 @@ import XCTest
 // sorted-key serialization of the groceries dictionary.
 @MainActor
 final class AIAnalysisServiceHashTests: XCTestCase {
+    func testExpectedAIContractVersionsInvalidateLegacyCaches() {
+        XCTAssertEqual(AIAnalysisService.expectedSchemaVersionV7, 8)
+        XCTAssertEqual(AIAnalysisService.expectedSchemaVersionV2, "v2.2")
+    }
+
 
     func testHashIsDeterministicAcrossRepeatedCalls() {
         var profile = UserProfile.empty
