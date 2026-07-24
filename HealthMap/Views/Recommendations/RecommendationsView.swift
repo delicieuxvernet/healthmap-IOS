@@ -16,6 +16,12 @@ import Combine
 struct RecommendationsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
 
+    /// Topics dérivés du contrat v2 (repli quand `aiAnalysis` v7 manque).
+    private var v2Topics: [PlanTopic] {
+        guard let v2 = dashboardVM.analysisV2 else { return [] }
+        return planTopicsFromV2(v2)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -24,7 +30,12 @@ struct RecommendationsView: View {
 
                 if let analysis = dashboardVM.aiAnalysis {
                     RecommendationsContentView(analysis: analysis)
-                } else if dashboardVM.isLoadingAnalysis {
+                } else if !v2Topics.isEmpty {
+                    // Repli : le v7 (aiAnalysis) manque mais le bilan v2 a un
+                    // plan → on le rend depuis le contrat v2 (le Plan ne reste
+                    // plus jamais vide quand le Bilan, lui, s'affiche).
+                    RecommendationsV2ContentView(topics: v2Topics)
+                } else if dashboardVM.isLoadingAnalysis || dashboardVM.isLoadingAnalysisV2 {
                     VStack(spacing: Theme.spacingMD) {
                         // Loader signature : le kiwi qui marche remplace le
                         // spinner nu — l'attente reste non bloquante.
@@ -45,6 +56,15 @@ struct RecommendationsView: View {
                 }
             }
             .kiwiTabBarBottomInset()
+            // Sécurité : si l'utilisateur ouvre le Plan sans qu'aucune analyse
+            // n'ait été déclenchée (ni v7 ni v2), on lance (garde de ré-entrance
+            // dans le VM). N'écrase rien si une analyse est déjà là / en cours.
+            .task {
+                if dashboardVM.aiAnalysis == nil, dashboardVM.analysisV2 == nil,
+                   !dashboardVM.isLoadingAnalysis, !dashboardVM.isLoadingAnalysisV2 {
+                    await dashboardVM.triggerAnalysis()
+                }
+            }
             .navigationTitle("Ton plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
