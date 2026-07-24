@@ -236,3 +236,23 @@ struct SuiviCurveInsight: View {
         }
     }
 }
+
+// MARK: - Note « Exemple » sous une courbe illustrative
+/// Affichée à la place de l'insight tant que l'utilisateur n'a pas complété
+/// 3 jours d'affilée de scans : la courbe montrée est un exemple, pas ses vraies
+/// données. Même esprit que le badge d'exemple des symptômes.
+struct SuiviExampleNote: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.kiwiGreenInk)
+            (Text("Exemple").fontWeight(.heavy)
+             + Text(" — complète 3 jours d'affilée pour voir tes vraies courbes."))
+                .font(.system(size: 12.5))
+                .foregroundStyle(Color.healthMapSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+    }
+}
