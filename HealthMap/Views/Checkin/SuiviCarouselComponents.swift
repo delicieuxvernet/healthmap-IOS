@@ -14,6 +14,7 @@ struct SuiviCarouselBlock<Content: View>: View {
     let tint: Color
     let pageTitles: [String]
     let pageHeight: CGFloat
+    var isLocked = false
     @ViewBuilder var page: (Int) -> Content
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -59,13 +60,13 @@ struct SuiviCarouselBlock<Content: View>: View {
             }
             .padding(.top, 8)
 
-            TabView(selection: $index) {
-                ForEach(0..<count, id: \.self) { i in
-                    page(i).tag(i).padding(.top, 6)
+            if isLocked {
+                GatedOverlay(intensity: .locked) {
+                    pageDeck
                 }
+            } else {
+                pageDeck
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: pageHeight)
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
@@ -77,6 +78,16 @@ struct SuiviCarouselBlock<Content: View>: View {
         .onChange(of: count) { _, newCount in
             if index >= newCount { index = max(0, newCount - 1) }
         }
+    }
+
+    private var pageDeck: some View {
+        TabView(selection: $index) {
+            ForEach(0..<count, id: \.self) { i in
+                page(i).tag(i).padding(.top, 6)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .frame(height: pageHeight)
     }
 
     private func arrow(_ icon: String, delta: Int) -> some View {

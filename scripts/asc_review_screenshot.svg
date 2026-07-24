@@ -12,18 +12,16 @@
 
   <!-- Avantages -->
   <g font-family="Helvetica, Arial, sans-serif" font-size="44" fill="#211F1A">
-    <text x="240" y="960">Scans repas illimités</text>
-    <text x="240" y="1080">Vitamines et minéraux complets</text>
-    <text x="240" y="1200">Historique et tendances du journal</text>
-    <text x="240" y="1320">Timing et interactions des compléments</text>
-    <text x="240" y="1440">Export PDF de vos analyses</text>
+    <text x="240" y="960">Jusqu’à 30 scans repas par jour</text>
+    <text x="240" y="1080">Tendances détaillées de vos apports</text>
+    <text x="240" y="1200">Astuces et synergies personnalisées</text>
+    <text x="240" y="1320">Rituels et solutions détaillés</text>
   </g>
   <g fill="#5DA838" font-family="Helvetica, Arial, sans-serif" font-size="44" font-weight="700">
     <text x="160" y="960">✓</text>
     <text x="160" y="1080">✓</text>
     <text x="160" y="1200">✓</text>
     <text x="160" y="1320">✓</text>
-    <text x="160" y="1440">✓</text>
   </g>
 
   <!-- Carte Annuel -->

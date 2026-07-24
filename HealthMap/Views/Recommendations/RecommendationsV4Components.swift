@@ -82,6 +82,7 @@ struct PlanTopicCardV4: View {
     let onSeeSolutions: () -> Void
 
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @State private var showPaywall = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -146,10 +147,17 @@ struct PlanTopicCardV4: View {
                 }
             }
 
-            // Bouton « Voir mes solutions » + badge nombre.
-            Button(action: onSeeSolutions) {
+            // Les détails du plan ne doivent pas rester accessibles par ce
+            // raccourci lorsque le rituel est verrouillé.
+            Button {
+                if subscriptionService.isPremium {
+                    onSeeSolutions()
+                } else {
+                    showPaywall = true
+                }
+            } label: {
                 HStack(spacing: 12) {
-                    Text("Voir mes solutions")
+                    Text(subscriptionService.isPremium ? "Voir mes solutions" : "Débloquer mes solutions")
                         .font(.system(size: 15.5, weight: .bold))
                         .foregroundStyle(.white)
                     Spacer(minLength: 0)
@@ -158,7 +166,7 @@ struct PlanTopicCardV4: View {
                             Circle()
                                 .fill(.white)
                                 .frame(width: 40, height: 40)
-                            Image(systemName: "arrow.right")
+                            Image(systemName: subscriptionService.isPremium ? "arrow.right" : "lock.fill")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(Color.kiwiGreen)
                         }
@@ -194,6 +202,10 @@ struct PlanTopicCardV4: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .kiwiCard()
         .accessibilityElement(children: .contain)
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(source: "plan_solutions")
+                .healthMapFullSheet()
+        }
     }
 }
 

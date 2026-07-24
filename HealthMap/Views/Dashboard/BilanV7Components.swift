@@ -804,7 +804,7 @@ struct BilanV7PremiumCard: View {
                         .font(.system(size: 16.5, weight: .heavy))
                         .tracking(-0.3)
                         .foregroundStyle(.white)
-                    Text("Scans illimités, plan complet et suivi avancé")
+                    Text("30 scans par jour, plan détaillé et suivi avancé")
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.leading)
@@ -823,8 +823,8 @@ struct BilanV7PremiumCard: View {
             .background(Color.kiwiGreen, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .contentShape(Rectangle())
         }
-        .buttonStyle(BilanV7PressStyle())
-        .accessibilityLabel("Kiwio Premium : scans illimités, plan complet et suivi avancé")
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel("Kiwio Premium : 30 scans par jour, plan détaillé et suivi avancé")
     }
 }
 

@@ -19,10 +19,13 @@ require "openssl"
 
 BUNDLE_ID = "fr.healthmap.app"
 TARGETS = {
-  "healthmap_weekly"  => { price: "0.99",  name: "Kiwio Hebdo",   period: "ONE_WEEK",  level: 3 },
+  # Même service Premium, seules la durée et la facturation changent :
+  # Apple recommande donc le même niveau pour obtenir un crossgrade.
+  "healthmap_weekly"  => { price: "0.99",  name: "Kiwio Hebdo",   period: "ONE_WEEK",  level: 1 },
   "healthmap_monthly" => { price: "4.99",  name: "Kiwio Mensuel", period: "ONE_MONTH", level: 1 },
-  "healthmap_annual"  => { price: "50.00", name: "Kiwio Annuel",  period: "ONE_YEAR",  level: 2 },
+  "healthmap_annual"  => { price: "50.00", name: "Kiwio Annuel",  period: "ONE_YEAR",  level: 1 },
 }.freeze
+SUBSCRIPTION_DESCRIPTION = "Kiwio Premium : jusqu’à 30 scans par jour, tendances et plan détaillés.".freeze
 # ONLY_PRODUCT : si défini, apply ne configure QUE ce produit (les autres intacts).
 ONLY_PRODUCT = ENV["ONLY_PRODUCT"].to_s.strip
 MODE = (ENV["MODE"] || "audit").downcase
@@ -1141,13 +1144,33 @@ TARGETS.each do |product_id, spec|
   sub_id = entry[:id]
   snap = sub_snapshot(sub_id)
 
+  # Les trois durées ouvrent exactement les mêmes avantages. Un niveau identique
+  # évite qu'Apple interprète un simple changement de durée comme un
+  # upgrade/downgrade de service.
+  if snap[:groupLevel].to_i != spec[:level]
+    ok, = write("niveau Premium commun", :patch, "/v1/subscriptions/#{sub_id}",
+      { data: { type: "subscriptions", id: sub_id,
+                attributes: { groupLevel: spec[:level] } } })
+    failures << "#{product_id}: niveau" unless ok
+  end
+
   # Localisation fr-FR
-  if snap[:localizations].none? { |l| l["locale"].to_s.start_with?("fr") }
+  french_localizations = get_all("/v1/subscriptions/#{sub_id}/subscriptionLocalizations?limit=50")
+                         .select { |l| l.dig("attributes", "locale").to_s.start_with?("fr") }
+  if french_localizations.empty?
     ok, = write("localisation fr-FR", :post, "/v1/subscriptionLocalizations",
       { data: { type: "subscriptionLocalizations",
-                attributes: { locale: "fr-FR", name: spec[:name], description: "Kiwio Premium : scans illimités, analyses complètes." },
+                attributes: { locale: "fr-FR", name: spec[:name], description: SUBSCRIPTION_DESCRIPTION },
                 relationships: { subscription: { data: { type: "subscriptions", id: sub_id } } } } })
     failures << "#{product_id}: localisation" unless ok
+  else
+    french_localizations.each do |loc|
+      next if loc.dig("attributes", "description").to_s == SUBSCRIPTION_DESCRIPTION
+      ok, = write("description fr-FR honnête", :patch, "/v1/subscriptionLocalizations/#{loc["id"]}",
+        { data: { type: "subscriptionLocalizations", id: loc["id"],
+                  attributes: { description: SUBSCRIPTION_DESCRIPTION } } })
+      failures << "#{product_id}: description" unless ok
+    end
   end
 
   # Prix : base France, puis égalisation explicite sur tous les territoires —

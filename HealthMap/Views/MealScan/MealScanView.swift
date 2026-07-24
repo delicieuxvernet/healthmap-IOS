@@ -467,7 +467,7 @@ struct MealScanView: View {
         .accessibilityLabel(ok
             ? "\(remaining) scan\(plural) photo gratuit\(plural) restant\(plural) aujourd'hui"
             : "Scans gratuits épuisés")
-        .accessibilityHint(ok ? "" : "Passer en premium pour scanner sans limite")
+        .accessibilityHint(ok ? "" : "Passer en Premium pour débloquer jusqu’à 30 scans par jour")
     }
 
     // MARK: - Capture Zone
@@ -806,19 +806,20 @@ struct MealScanView: View {
 
     // MARK: - Bandeau premium (quota — famille 5 : aucune info masquée)
     // Compteur motivant tant qu'il reste des scans ; mur non punitif au bout.
-    // Total gratuit = 3 (quota serveur actuel « à vie »). Le wording hebdo du
-    // handoff (« attends lundi ») s'activera avec la bascule serveur vers
-    // 3/semaine — ici on reste honnête sur la réalité courante.
+    // Le total et le restant sont lus depuis le quota journalier du serveur.
     @ViewBuilder
     private var premiumScanBanner: some View {
-        if !subscriptionService.isPremium {
-            let remaining = max(0, viewModel.scansRemaining ?? 0)
-            let total = max(3, remaining)
-            if remaining == 0 {
+        if !subscriptionService.isPremium,
+           let remaining = viewModel.scansRemaining {
+            let quota = ScanQuotaPresentation(
+                remaining: remaining,
+                dailyLimit: viewModel.scanDailyLimit
+            )
+            if quota.remaining == 0 {
                 QuotaWall(
-                    message: "Tes scans gratuits sont utilisés — passe en illimité pour continuer à analyser tes repas.",
-                    unlockTitle: "Scanner en illimité",
-                    escapeText: "ton journal et ton bilan restent gratuits, toujours",
+                    message: "Tes scans gratuits du jour sont utilisés. Premium en débloque jusqu’à 30 par jour.",
+                    unlockTitle: "Débloquer 30 scans par jour",
+                    escapeText: "ou reviens demain — 3 nouveaux scans t’attendent",
                     zone: "scan_quota"
                 ) {
                     showPaywall = true
@@ -826,10 +827,10 @@ struct MealScanView: View {
                 .padding(.horizontal, Theme.spacingLG)
             } else {
                 QuotaMeter(
-                    used: total - remaining,
-                    total: total,
+                    used: quota.used,
+                    total: quota.total,
                     icon: "camera",
-                    label: "Tes scans gratuits",
+                    label: "Tes scans aujourd’hui",
                     unit: "scan"
                 )
                 .padding(.horizontal, Theme.spacingLG)
