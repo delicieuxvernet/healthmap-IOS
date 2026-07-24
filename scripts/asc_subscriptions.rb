@@ -5,9 +5,11 @@
 # si un accord (ex. vérification DSA) bloque l'écriture.
 #
 #   MODE=audit : lit et rapporte l'état complet des abonnements (aucune écriture)
-#   MODE=apply : fixe les prix validés (4,99 € mensuel / 30 € annuel, base FRA,
+#   MODE=apply : fixe les prix validés (0,99 € hebdo / 4,99 € mensuel /
+#                50 € annuel, base FRA,
 #                autres territoires égalisés par Apple), crée localisation fr-FR et
-#                disponibilité manquantes, essai gratuit 7 j — puis relit l'état.
+#                disponibilité manquantes, essai gratuit 7 j, rafraîchit la capture
+#                App Review si son checksum change — puis relit l'état.
 #   MODE=offers : crée les codes promo (NAIA = 3 mois offerts / LANCEMENT50 = -50%).
 
 require "base64"
@@ -1144,16 +1146,6 @@ TARGETS.each do |product_id, spec|
   sub_id = entry[:id]
   snap = sub_snapshot(sub_id)
 
-  # Les trois durées ouvrent exactement les mêmes avantages. Un niveau identique
-  # évite qu'Apple interprète un simple changement de durée comme un
-  # upgrade/downgrade de service.
-  if snap[:groupLevel].to_i != spec[:level]
-    ok, = write("niveau Premium commun", :patch, "/v1/subscriptions/#{sub_id}",
-      { data: { type: "subscriptions", id: sub_id,
-                attributes: { groupLevel: spec[:level] } } })
-    failures << "#{product_id}: niveau" unless ok
-  end
-
   # Localisation fr-FR
   french_localizations = get_all("/v1/subscriptions/#{sub_id}/subscriptionLocalizations?limit=50")
                          .select { |l| l.dig("attributes", "locale").to_s.start_with?("fr") }
@@ -1166,10 +1158,9 @@ TARGETS.each do |product_id, spec|
   else
     french_localizations.each do |loc|
       next if loc.dig("attributes", "description").to_s == SUBSCRIPTION_DESCRIPTION
-      ok, = write("description fr-FR honnête", :patch, "/v1/subscriptionLocalizations/#{loc["id"]}",
-        { data: { type: "subscriptionLocalizations", id: loc["id"],
-                  attributes: { description: SUBSCRIPTION_DESCRIPTION } } })
-      failures << "#{product_id}: description" unless ok
+      # Apple verrouille DESCRIPTION dès que l'abonnement atteint READY_TO_SUBMIT.
+      # La capture de revue et la note App Review portent alors le wording exact.
+      puts "  INFO description fr-FR existante verrouillée par Apple"
     end
   end
 
@@ -1277,26 +1268,32 @@ TARGETS.each do |product_id, spec|
     end
   end
 
-  # Screenshot review : requis pour sortir de MISSING_METADATA
+  # Screenshot review : requis pour sortir de MISSING_METADATA. Une capture
+  # COMPLETE peut néanmoins être obsolète : comparer son checksum au PNG rendu.
   shot = snap[:reviewScreenshot]
+  png = ENV["REVIEW_SCREENSHOT_PATH"]
+  desired_checksum =
+    png && File.exist?(png) ? Digest::MD5.file(png).hexdigest : nil
   needs_upload =
     if shot.is_a?(String)
       true # absent
+    elsif shot.dig("assetDeliveryState", "state") == "COMPLETE" &&
+          desired_checksum &&
+          shot["sourceFileChecksum"].to_s != desired_checksum
+      ok, = write("suppression screenshot review obsolète", :delete,
+        "/v1/subscriptionAppStoreReviewScreenshots/#{shot[:id]}", nil)
+      failures << "#{product_id}: suppression screenshot obsolète" unless ok
+      ok
     elsif shot.dig("assetDeliveryState", "state") == "COMPLETE"
       false
     else
       # réservation jamais finalisée (AWAITING_UPLOAD / FAILED) : suppression puis ré-upload
-      uri = URI(BASE + "/v1/subscriptionAppStoreReviewScreenshots/#{shot[:id]}")
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-      del = Net::HTTP::Delete.new(uri)
-      del["Authorization"] = "Bearer #{token}"
-      res = http.request(del)
-      puts "  suppression screenshot non finalisé -> HTTP #{res.code}"
-      true
+      ok, = write("suppression screenshot non finalisé", :delete,
+        "/v1/subscriptionAppStoreReviewScreenshots/#{shot[:id]}", nil)
+      failures << "#{product_id}: suppression screenshot non finalisé" unless ok
+      ok
     end
   if needs_upload
-    png = ENV["REVIEW_SCREENSHOT_PATH"]
     if png && File.exist?(png)
       failures << "#{product_id}: screenshot review" unless upload_review_screenshot(sub_id, png)
     else
@@ -1331,4 +1328,5 @@ if failures.empty?
   puts "Toutes les écritures ont réussi."
 else
   puts "Écritures en échec : #{failures.join(" | ")}"
+  exit 1
 end
