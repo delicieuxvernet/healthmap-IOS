@@ -427,6 +427,49 @@ enum SuiviEngineV4 {
         }
     }
 
+    // MARK: - Seuil « 3 jours d'affilée » + courbes d'exemple
+
+    /// Plus longue série de jours CONSÉCUTIFS (sur `days`) avec au moins un repas
+    /// scanné. Sert de seuil : tant qu'il est < 3, les carrousels macros/micros
+    /// affichent une courbe d'EXEMPLE (badgée) plutôt que des trous — on ne
+    /// montre les vraies courbes qu'une fois 3 jours d'affilée complétés.
+    static func maxConsecutiveScannedDays(fortnight: [MealJournalService.MealRecord],
+                                          days: Int = 14,
+                                          now: Date = Date(),
+                                          calendar: Calendar = .current) -> Int {
+        let scannedDays = Set(fortnight.map { calendar.startOfDay(for: $0.consumedAt) })
+        var best = 0, run = 0
+        for day in dailyAxis(days: days, now: now, calendar: calendar) {
+            if scannedDays.contains(day) { run += 1; best = Swift.max(best, run) } else { run = 0 }
+        }
+        return best
+    }
+
+    /// Série d'EXEMPLE d'une macro (7 jours, tendance douce montante). Purement
+    /// illustrative — affichée badgée « Exemple », jamais présentée comme réelle.
+    static func exampleMacroSeries(_ macro: MacroKind,
+                                   now: Date = Date(),
+                                   calendar: Calendar = .current) -> [DayPoint] {
+        let axis = dailyAxis(days: 7, now: now, calendar: calendar)
+        let base: [Double]
+        switch macro {
+        case .calories: base = [1500, 1650, 1580, 1720, 1800, 1760, 1900]
+        case .proteins: base = [52, 58, 55, 64, 70, 68, 78]
+        case .carbs:    base = [160, 175, 168, 182, 190, 186, 200]
+        case .fats:     base = [48, 52, 50, 55, 58, 56, 62]
+        case .fiber:    base = [14, 16, 15, 19, 22, 21, 25]
+        }
+        return zip(axis, base).map { DayPoint(date: $0, value: $1) }
+    }
+
+    /// Série d'EXEMPLE de couverture d'un micronutriment (%, tendance montante).
+    static func exampleMicroSeries(now: Date = Date(),
+                                   calendar: Calendar = .current) -> [DayPoint] {
+        let axis = dailyAxis(days: 7, now: now, calendar: calendar)
+        let base: [Double] = [38, 45, 42, 54, 60, 58, 70]
+        return zip(axis, base).map { DayPoint(date: $0, value: $1) }
+    }
+
     /// Résumé « il y a N j : X · aujourd'hui : Y » d'une série : premier et
     /// dernier points RÉELS (non nil) + écart en jours entre eux. `nil` si
     /// aucun point mesuré. Sert à l'insight honnête sous chaque courbe.

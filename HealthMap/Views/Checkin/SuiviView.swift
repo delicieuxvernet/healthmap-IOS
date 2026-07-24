@@ -171,9 +171,19 @@ struct SuiviView: View {
         .padding(.top, 4)
     }
 
+    // MARK: - Seuil « 3 jours d'affilée » avant les vraies courbes
+    /// Tant que l'utilisateur n'a pas scanné 3 jours consécutifs, macros et
+    /// micros affichent une courbe d'EXEMPLE badgée (comme les symptômes) au
+    /// lieu de graphiques vides / à trous. Ses vraies données restent masquées
+    /// jusque-là (demande produit : pas de résultats avant 3 jours complétés).
+    private var hasEnoughScanData: Bool {
+        SuiviEngineV4.maxConsecutiveScannedDays(fortnight: journal.fortnight) >= 3
+    }
+
     // MARK: - 3. Carrousel MACROS (vraies grammes/kcal par jour, scannées)
     private var macroCarousel: some View {
         let kinds = SuiviEngineV4.MacroKind.allCases
+        let showExample = !hasEnoughScanData
         return SuiviCarouselBlock(
             title: "Macros du jour",
             systemIcon: "flame.fill",
@@ -182,11 +192,17 @@ struct SuiviView: View {
             pageHeight: 168
         ) { i in
             let kind = kinds[i]
-            let series = SuiviEngineV4.macroDailySeries(fortnight: journal.fortnight, macro: kind)
+            let series = showExample
+                ? SuiviEngineV4.exampleMacroSeries(kind)
+                : SuiviEngineV4.macroDailySeries(fortnight: journal.fortnight, macro: kind)
             VStack(alignment: .leading, spacing: 10) {
                 SuiviValueChart(points: series, color: macroColor(kind), fixedPercent: false)
                     .frame(height: 112)
-                SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: kind.unit)
+                if showExample {
+                    SuiviExampleNote()
+                } else {
+                    SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: kind.unit)
+                }
             }
         }
     }
@@ -194,7 +210,10 @@ struct SuiviView: View {
     // MARK: - 4. Carrousel MICROS (couverture % AJR par jour, apports à renforcer)
     @ViewBuilder
     private var microCarousel: some View {
-        let ids = microIds
+        let showExample = !hasEnoughScanData
+        // En mode exemple, on garde des courbes vivantes même sans scan : à
+        // défaut d'apports à renforcer détectés, on illustre sur 3 micros types.
+        let ids = showExample && microIds.isEmpty ? ["iron", "magnesium", "vitD"] : microIds
         if ids.isEmpty {
             emptyMicroCard
         } else {
@@ -208,11 +227,17 @@ struct SuiviView: View {
                     isLocked: !subscriptionService.isPremium
                 ) { i in
                     let id = ids[i]
-                    let series = SuiviEngineV4.microDailySeries(fortnight: journal.fortnight, id: id)
+                    let series = showExample
+                        ? SuiviEngineV4.exampleMicroSeries()
+                        : SuiviEngineV4.microDailySeries(fortnight: journal.fortnight, id: id)
                     VStack(alignment: .leading, spacing: 10) {
                         SuiviValueChart(points: series, color: microColor(id), fixedPercent: true)
                             .frame(height: 112)
-                        SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: "%")
+                        if showExample {
+                            SuiviExampleNote()
+                        } else {
+                            SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: "%")
+                        }
                     }
                 }
 
