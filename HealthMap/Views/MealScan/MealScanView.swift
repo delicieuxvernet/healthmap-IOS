@@ -198,9 +198,10 @@ struct MealScanView: View {
             }
             .padding(.horizontal, Theme.spacingLG)
 
-            // Ordre validé (maquette 20 juillet) : ① vocal (fonction phare)
-            // ② kcal du jour ③ recherche produit/marque ④ photo compacte.
-            voiceEntry
+            // Les deux gestes principaux côte à côte (dicter | scanner), puis
+            // l'exemple de dictée, la jauge kcal et la recherche produit.
+            dualEntry
+            voiceHint
 
             ScanKcalGauge(
                 consommees: journal.dayCalories,
@@ -299,8 +300,10 @@ struct MealScanView: View {
                         .multilineTextAlignment(.center)
                 }
                 .padding(Theme.spacingXL)
-            } else {
-                // Le compteur de scans gratuits vit désormais dans le header.
+            } else if viewModel.selectedImage != nil {
+                // L'ENTRÉE photo vit désormais dans le bloc à deux colonnes
+                // (dualEntry) : ici on ne montre plus que la photo choisie et
+                // son bouton d'analyse, sinon la carte faisait doublon.
                 captureZone
             }
 
@@ -327,34 +330,94 @@ struct MealScanView: View {
     // MARK: - Entrée recherche (surface l'onglet recherche existant)
     /// Point d'entrée de la fonction phare : dicter son repas. Placé AVANT la
     /// recherche et le scan photo — c'est le chemin qu'on met en avant.
-    private var voiceEntry: some View {
-        VStack(spacing: 10) {
-            // Bouton rond 78 pt entouré de deux ondes qui battent : c'est LA
-            // fonction phare, elle doit se voir comme telle. Un rectangle plein
-            // façon ligne de menu (le premier jet) la noyait dans le reste.
-            Button {
+    /// Les DEUX supports de la page, côte à côte, séparés au milieu :
+    /// « Dicte ton repas » (vocal, fonction phare) à gauche · « Scanne ton
+    /// repas » (photo) à droite. Remplace l'empilement vocal → recherche →
+    /// photo, qui noyait les deux gestes principaux.
+    /// Les anciennes ondes pulsantes (animation infinie autour du micro) ont
+    /// été retirées : elles produisaient un cercle qui semblait s'envoler.
+    private var dualEntry: some View {
+        HStack(spacing: 0) {
+            entryColumn(
+                icon: "mic.fill",
+                iconColor: .white,
+                circleFill: Kiwio.vert,
+                title: "Dicte ton repas",
+                subtitle: "À voix haute",
+                accessibilityHint: "Décris ton repas à voix haute, Kiwio compte les calories"
+            ) {
                 showVoice = true
-            } label: {
-                ZStack {
-                    OndePulsante(delai: 0)
-                    OndePulsante(delai: 0.9)
-                    Circle()
-                        .fill(Kiwio.vert)
-                        .frame(width: 78, height: 78)
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 29, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 124, height: 124)
-                .contentShape(Circle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Dicter ton repas")
-            .accessibilityHint("Décris ton repas à voix haute, Kiwio compte les calories")
 
-            Text("Dicte ton repas")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(Kiwio.encre)
+            Rectangle()
+                .fill(Color.kiwiCharcoal.opacity(0.08))
+                .frame(width: 1)
+                .padding(.vertical, 14)
+
+            entryColumn(
+                icon: "camera.fill",
+                iconColor: Color.kiwiGreenInk,
+                circleFill: Color.kiwiTint,
+                title: "Scanne ton repas",
+                subtitle: "Photo de l'assiette",
+                accessibilityHint: "Prends une photo de ton assiette pour l'analyser"
+            ) {
+                if CameraPicker.isAvailable {
+                    showCaptureChoice = true
+                } else {
+                    showPhotoLibrary = true
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.healthMapCard)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1)
+        )
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    private func entryColumn(
+        icon: String,
+        iconColor: Color,
+        circleFill: Color,
+        title: String,
+        subtitle: String,
+        accessibilityHint: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 9) {
+                ZStack {
+                    Circle()
+                        .fill(circleFill)
+                        .frame(width: 58, height: 58)
+                    Image(systemName: icon)
+                        .font(.system(size: 23, weight: .semibold))
+                        .foregroundStyle(iconColor)
+                }
+                Text(title)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Kiwio.encre)
+                    .multilineTextAlignment(.center)
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Kiwio.secondaire)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel(title)
+        .accessibilityHint(accessibilityHint)
+    }
+
+    /// Exemple de dictée + confirmation, sous le bloc à deux colonnes.
+    private var voiceHint: some View {
+        VStack(spacing: 10) {
 
             // L'exemple porte des QUANTITÉS, volontairement : c'est ce que les
             // gens oublient de dire, et c'est ce qui décide de la justesse du
@@ -1227,35 +1290,10 @@ private struct NeedImpactDetailSheet: View {
 
 // MARK: - Onde pulsante du héros micro
 
-/// Anneau vert qui s'écarte et s'efface, en boucle. Deux exemplaires décalés
-/// donnent la « double onde » du design : le bouton respire, on comprend sans
-/// notice qu'il écoute.
-///
-/// Gardé purement décoratif et coupé sous « Réduire les animations » — une
-/// boucle infinie non gardée est exactement ce que la règle d'accessibilité du
-/// projet interdit.
-private struct OndePulsante: View {
-    let delai: Double
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var etendue = false
-
-    var body: some View {
-        Circle()
-            .stroke(Kiwio.vert.opacity(0.32), lineWidth: 2)
-            .frame(width: 78, height: 78)
-            .scaleEffect(etendue ? 1.5 : 1)
-            .opacity(etendue ? 0 : 0.9)
-            .animation(
-                reduceMotion
-                ? nil
-                : .easeOut(duration: 1.8).repeatForever(autoreverses: false).delay(delai),
-                value: etendue
-            )
-            .onAppear { etendue = true }
-            .accessibilityHidden(true)
-    }
-}
+// `OndePulsante` (anneaux verts qui s'écartaient en boucle autour du micro) a
+// été retiré : à l'usage, l'anneau donnait l'impression d'un cercle qui
+// s'envole depuis le milieu de l'écran (retour device du 24 juillet). Le bloc
+// à deux colonnes met déjà la dictée en avant, sans animation infinie.
 
 #Preview {
     MealScanView()
