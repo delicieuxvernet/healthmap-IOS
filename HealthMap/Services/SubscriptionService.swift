@@ -33,6 +33,24 @@ final class SubscriptionService: ObservableObject {
     @Published var offerings: Offerings?
     @Published var customerInfo: CustomerInfo?
 
+    /// Repli : produits lus DIRECTEMENT depuis StoreKit par identifiant, quand
+    /// l'offering RevenueCat ne renvoie rien d'exploitable (offering « current »
+    /// absente, mal configurée, ou ne contenant pas toutes les formules).
+    /// Sans ce repli, une erreur de configuration côté tableau de bord rendait
+    /// le paywall VIDE dans l'app — c'est ce qu'App Review a constaté (2.1(b) :
+    /// « In-app purchase products ... could not be found in the submitted
+    /// binary », l'hebdo « Kiwio Hebdo » étant nommément cité).
+    @Published var directProducts: [StoreProduct] = []
+
+    /// Identifiants App Store Connect des abonnements (source de vérité ASC).
+    /// Utilisés UNIQUEMENT pour le repli ci-dessus ; les prix, durées et essais
+    /// restent lus depuis StoreKit, jamais codés en dur.
+    static let subscriptionProductIds = [
+        "healthmap_weekly",
+        "healthmap_monthly",
+        "healthmap_annual",
+    ]
+
     private init() {
         // Listen to customer info changes
         Purchases.shared.delegate = HMPurchasesDelegate.shared
@@ -49,18 +67,48 @@ final class SubscriptionService: ObservableObject {
         }
     }
 
-    // MARK: - Load Offerings
+    // MARK: - Load Offerings (+ repli StoreKit par identifiant)
     func loadOfferings() async {
         do {
             offerings = try await Purchases.shared.offerings()
         } catch {
             AppLogger.subscription.report(error, context: "loadOfferings")
         }
+
+        // L'offering « current » couvre-t-elle bien les 3 formules ? Sinon on
+        // complète depuis StoreKit : le paywall doit TOUJOURS pouvoir afficher
+        // les abonnements actifs sur App Store Connect, quelle que soit la
+        // configuration du tableau de bord RevenueCat.
+        let packaged = Set((offerings?.current?.availablePackages ?? []).map(\.storeProduct.productIdentifier))
+        let missing = Self.subscriptionProductIds.filter { !packaged.contains($0) }
+        guard !missing.isEmpty else {
+            directProducts = []
+            return
+        }
+
+        let fetched = await Purchases.shared.products(missing)
+        if !fetched.isEmpty {
+            directProducts = fetched
+            AppLogger.subscription.info(
+                "Repli StoreKit : \(fetched.count, privacy: .public) produit(s) chargé(s) hors offering"
+            )
+        }
     }
 
     // MARK: - Purchase
     func purchase(package: Package) async throws -> PurchaseOutcome {
-        let result = try await Purchases.shared.purchase(package: package)
+        try await finish(result: await Purchases.shared.purchase(package: package))
+    }
+
+    /// Achat d'un produit chargé hors offering (repli `directProducts`).
+    /// Passe par RevenueCat comme l'achat par package : l'entitlement « premium »
+    /// est donc suivi à l'identique.
+    func purchase(product: StoreProduct) async throws -> PurchaseOutcome {
+        try await finish(result: await Purchases.shared.purchase(product: product))
+    }
+
+    /// Suite commune aux deux chemins d'achat (entitlement, reprise, vérification).
+    private func finish(result: PurchaseResultData) async throws -> PurchaseOutcome {
         customerInfo = result.customerInfo
         isPremium = result.customerInfo.entitlements["premium"]?.isActive == true
 

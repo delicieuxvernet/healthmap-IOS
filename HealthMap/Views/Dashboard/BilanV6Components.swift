@@ -1234,21 +1234,24 @@ struct PremiumEntryCard: View {
 
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
-    /// Formule courte de l'offering courante (hebdo prioritaire, sinon mensuel)
-    /// — même logique que PaywallView.shortPlan.
-    private var shortPackage: Package? {
-        let packages = subscriptionService.offerings?.current?.availablePackages
-        return packages?.first { $0.packageType == .weekly }
-            ?? packages?.first { $0.packageType == .monthly }
+    /// Formule courte (hebdo prioritaire, sinon mensuel) — même logique que
+    /// `PaywallView.shortPlan`, repli StoreKit compris : le prix reste affiché
+    /// même si l'offering RevenueCat ne contient pas la formule.
+    private var shortProduct: StoreProduct? {
+        var products = (subscriptionService.offerings?.current?.availablePackages ?? []).map(\.storeProduct)
+        let known = Set(products.map(\.productIdentifier))
+        products += subscriptionService.directProducts.filter { !known.contains($0.productIdentifier) }
+        return products.first { $0.subscriptionPeriod?.unit == .week }
+            ?? products.first { $0.subscriptionPeriod?.unit == .month }
     }
 
     private var subtitle: String {
-        guard let package = shortPackage else {
+        guard let product = shortProduct else {
             return "30 scans par jour et un suivi plus détaillé"
         }
-        let price = package.localizedPriceString
-        let unit = package.packageType == .weekly ? "sem" : "mois"
-        if let discount = package.storeProduct.introductoryDiscount,
+        let price = product.localizedPriceString
+        let unit = product.subscriptionPeriod?.unit == .week ? "sem" : "mois"
+        if let discount = product.introductoryDiscount,
            discount.paymentMode == .freeTrial {
             let period = discount.subscriptionPeriod
             let days: Int
