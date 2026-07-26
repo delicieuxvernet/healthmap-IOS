@@ -823,6 +823,49 @@ if MODE == "submit"
   # Note : conformité export déjà OK (build TestFlight) — pas dans les bloqueurs.
   # DAC7 « service personnel » : traité en amont si SUBMIT_DAC7 fourni (voir plus bas).
 
+  # ── Abonnements D'ABORD (ordre critique) ─────────────────────────────────
+  # Les abonnements doivent rejoindre le dossier AVANT tout contrôle de
+  # complétude. Sinon le garde-fou « brouillon incomplet » sort en erreur sans
+  # avoir jamais tenté de les soumettre : la version partait seule en review,
+  # d'où le 2.1(b) « In-app purchase products could not be found » à répétition.
+  # Après un refus, les abos sont en REJECTED et n'ont plus de version
+  # modifiable : on la régénère en re-uploadant le screenshot de review.
+  resubmittable_states = %w[READY_TO_SUBMIT REJECTED DEVELOPER_ACTION_NEEDED]
+  presubmitted = []
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      st = s.dig("attributes", "state")
+      next unless resubmittable_states.include?(st)
+      pid = s.dig("attributes", "productId")
+      puts "  · #{pid} : état=#{st} → soumission de l'abonnement"
+      payload = { data: { type: "subscriptionSubmissions",
+                          relationships: { subscription: { data: { type: "subscriptions", id: s["id"] } } } } }
+      okc, resp = write("soumission abonnement #{pid}", :post, "/v1/subscriptionSubmissions", payload)
+
+      detail = resp.is_a?(Hash) ? resp.dig("errors", 0, "detail").to_s : ""
+      err_code = resp.is_a?(Hash) ? resp.dig("errors", 0, "code").to_s : ""
+      needs_pending = detail.include?("pending version") || err_code.include?("RELATIONSHIP.INVALID")
+      if !okc && needs_pending &&
+         ENV["REVIEW_SCREENSHOT_PATH"].to_s != "" && File.exist?(ENV["REVIEW_SCREENSHOT_PATH"])
+        code_shot, shot = req(:get, "/v1/subscriptions/#{s["id"]}/appStoreReviewScreenshot")
+        if code_shot == 200 && shot["data"]
+          write("suppression ancien screenshot (#{pid})", :delete,
+            "/v1/subscriptionAppStoreReviewScreenshots/#{shot["data"]["id"]}", nil)
+        end
+        if upload_review_screenshot(s["id"], ENV["REVIEW_SCREENSHOT_PATH"])
+          sleep 3
+          okc, = write("soumission abonnement #{pid} (2e tentative)", :post,
+            "/v1/subscriptionSubmissions", payload)
+        end
+      end
+      presubmitted << pid if okc
+    end
+  end
+  unless presubmitted.empty?
+    puts "\nAbonnements repassés en soumission : #{presubmitted.join(", ")}"
+    sleep 5
+  end
+
   active_states = %w[WAITING_FOR_REVIEW IN_REVIEW]
   subs_list = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
 
@@ -856,6 +899,13 @@ if MODE == "submit"
     end
     puts "Soumission préparée complète (#{staged["id"]}) :"
     puts "  #{staged_items.size} élément(s) pour #{pending_subs.size} abonnement(s)."
+    # STAGE_ONLY doit être respecté ICI AUSSI : ce chemin envoyait à Apple même
+    # en mode préparation (seul le chemin « nouvelle soumission » le vérifiait).
+    if ENV["STAGE_ONLY"] == "1"
+      puts "STAGE_ONLY=1 — soumission COMPLÈTE mais NON envoyée (#{staged["id"]})."
+      puts "Pour l'envoyer : relancer submit sans STAGE_ONLY."
+      exit 0
+    end
     ok, = write("ENVOI de la soumission préparée", :patch, "/v1/reviewSubmissions/#{staged["id"]}",
       { data: { type: "reviewSubmissions", id: staged["id"], attributes: { submitted: true } } })
     exit 1 unless ok
