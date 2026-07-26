@@ -947,11 +947,19 @@ if MODE == "submit"
   #    (fix refus 2.1(b) : le 1er abonnement DOIT partir avec la nouvelle version.
   #    'subscription' n'est PAS une relation de reviewSubmissionItems — l'API le
   #    refuse ENTITY_ERROR.RELATIONSHIP.UNKNOWN ; c'est subscriptionSubmissions).
+  # ⚠️ Ne PAS filtrer sur le seul READY_TO_SUBMIT : après un refus App Review les
+  # abonnements retombent en REJECTED, et les sauter ici empêchait la reprise
+  # ci-dessous (régénération d'une pending version) de tourner — l'app repartait
+  # donc en review SANS ses abonnements, d'où le 2.1(b) « could not be found »
+  # à répétition. On traite aussi REJECTED / DEVELOPER_ACTION_NEEDED.
   submitted_subs = []
+  resubmittable = %w[READY_TO_SUBMIT REJECTED DEVELOPER_ACTION_NEEDED]
   get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
     get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
-      next unless s.dig("attributes", "state") == "READY_TO_SUBMIT"
+      state = s.dig("attributes", "state")
+      next unless resubmittable.include?(state)
       pid = s.dig("attributes", "productId")
+      puts "  · #{pid} : état=#{state} → tentative de soumission"
       sub_payload = { data: { type: "subscriptionSubmissions",
                   relationships: { subscription: { data: { type: "subscriptions", id: s["id"] } } } } }
       okc, resp = write("soumission abonnement #{pid}", :post, "/v1/subscriptionSubmissions", sub_payload)
@@ -962,8 +970,15 @@ if MODE == "submit"
       # une modification RÉELLE pour régénérer un brouillon soumissible.
       # La moins invasive : supprimer puis re-uploader le screenshot de review
       # (même PNG → aucun changement visible, mais nouvelle version pending).
-      if !okc && resp.is_a?(Hash) &&
-         resp.dig("errors", 0, "detail").to_s.include?("no pending version") &&
+      # Le libellé exact varie selon l'état de départ (REJECTED vs READY_TO_SUBMIT) :
+      # on tente la reprise dès qu'un échec évoque l'absence de version modifiable,
+      # au lieu de matcher la seule phrase « no pending version ».
+      detail = resp.is_a?(Hash) ? resp.dig("errors", 0, "detail").to_s : ""
+      needs_pending = detail.include?("no pending version") ||
+                      detail.include?("pending version") ||
+                      detail.include?("RELATIONSHIP.INVALID") ||
+                      (resp.is_a?(Hash) && resp.dig("errors", 0, "code").to_s.include?("RELATIONSHIP.INVALID"))
+      if !okc && needs_pending &&
          ENV["REVIEW_SCREENSHOT_PATH"].to_s != "" && File.exist?(ENV["REVIEW_SCREENSHOT_PATH"])
         code_shot, shot = req(:get, "/v1/subscriptions/#{s["id"]}/appStoreReviewScreenshot")
         if code_shot == 200 && shot["data"]
