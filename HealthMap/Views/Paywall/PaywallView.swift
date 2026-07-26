@@ -6,13 +6,31 @@ import RevenueCat
 // (annuelle mise en avant, mensuelle) pilotées par l'offering courante
 // RevenueCat. Les prix et l'essai gratuit sont lus depuis StoreKit —
 // jamais codés en dur, ils suivent App Store Connect.
+/// Une formule affichable par le paywall : soit un package de l'offering
+/// RevenueCat, soit un produit lu DIRECTEMENT depuis StoreKit (repli quand
+/// l'offering est vide ou incomplète). Le paywall ne manipule que ce type, ce
+/// qui rend l'affichage indépendant de la configuration du tableau de bord.
+struct PlanOption: Identifiable, Equatable {
+    let product: StoreProduct
+    /// nil quand la formule vient du repli StoreKit.
+    let package: Package?
+
+    var id: String { product.productIdentifier }
+    var localizedPriceString: String { product.localizedPriceString }
+    var price: Decimal { product.price }
+    var introductoryDiscount: StoreProductDiscount? { product.introductoryDiscount }
+    var periodUnit: SubscriptionPeriod.Unit? { product.subscriptionPeriod?.unit }
+
+    static func == (lhs: PlanOption, rhs: PlanOption) -> Bool { lhs.id == rhs.id }
+}
+
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     let source: String
 
-    @State private var selectedPackage: Package?
+    @State private var selectedPlan: PlanOption?
     @State private var isPurchasing = false
     @State private var isRestoring = false
     @State private var alertMessage: String?
@@ -32,21 +50,27 @@ struct PaywallView: View {
         self.source = source
     }
 
-    private var annualPackage: Package? {
-        subscriptionService.offerings?.current?.availablePackages.first { $0.packageType == .annual }
+    /// Formules disponibles : celles de l'offering RevenueCat, COMPLÉTÉES par
+    /// les produits lus directement depuis StoreKit (repli). La durée provient
+    /// du produit lui-même, jamais du type de package — une formule reste donc
+    /// affichable même absente de l'offering.
+    private var planOptions: [PlanOption] {
+        var options = (subscriptionService.offerings?.current?.availablePackages ?? [])
+            .map { PlanOption(product: $0.storeProduct, package: $0) }
+        let known = Set(options.map(\.id))
+        options += subscriptionService.directProducts
+            .filter { !known.contains($0.productIdentifier) }
+            .map { PlanOption(product: $0, package: nil) }
+        return options
     }
 
-    private var monthlyPackage: Package? {
-        subscriptionService.offerings?.current?.availablePackages.first { $0.packageType == .monthly }
-    }
-
-    private var weeklyPackage: Package? {
-        subscriptionService.offerings?.current?.availablePackages.first { $0.packageType == .weekly }
-    }
+    private var annualPlan: PlanOption? { planOptions.first { $0.periodUnit == .year } }
+    private var monthlyPlan: PlanOption? { planOptions.first { $0.periodUnit == .month } }
+    private var weeklyPlan: PlanOption? { planOptions.first { $0.periodUnit == .week } }
 
     /// Formule courte mise en avant à côté de l'annuel : hebdo si présente,
     /// sinon mensuelle (l'offering peut évoluer sans retoucher le paywall).
-    private var shortPlan: Package? { weeklyPackage ?? monthlyPackage }
+    private var shortPlan: PlanOption? { weeklyPlan ?? monthlyPlan }
 
     var body: some View {
         ZStack {
@@ -59,7 +83,7 @@ struct PaywallView: View {
                     header
                     featureList
 
-                    if annualPackage == nil && shortPlan == nil {
+                    if annualPlan == nil && shortPlan == nil {
                         if offeringsFailed {
                             offeringsErrorState
                         } else {
@@ -84,14 +108,9 @@ struct PaywallView: View {
         // L'offering peut arriver après l'apparition (cold start, réseau lent) :
         // on sélectionne alors la formule annuelle par défaut dès qu'elle existe,
         // et on efface un éventuel état d'échec affiché entre-temps.
-        .onChange(of: subscriptionService.offerings) { _, _ in
-            if annualPackage != nil || shortPlan != nil {
-                offeringsFailed = false
-            }
-            if selectedPackage == nil {
-                selectedPackage = annualPackage ?? shortPlan
-            }
-        }
+        .onChange(of: subscriptionService.offerings) { _, _ in syncSelection() }
+        // Le repli StoreKit peut arriver après l'offering : même resynchronisation.
+        .onChange(of: subscriptionService.directProducts.count) { _, _ in syncSelection() }
         .alert("Kiwio Premium", isPresented: $showAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -186,26 +205,37 @@ struct PaywallView: View {
 
     // MARK: - Plans
 
+    /// Sélectionne une formule par défaut dès qu'une devient disponible, et
+    /// efface l'état d'échec affiché entre-temps.
+    private func syncSelection() {
+        if annualPlan != nil || shortPlan != nil {
+            offeringsFailed = false
+        }
+        if selectedPlan == nil {
+            selectedPlan = annualPlan ?? shortPlan
+        }
+    }
+
     private var planCards: some View {
         VStack(spacing: Theme.spacingSM) {
-            if let annual = annualPackage {
+            if let annual = annualPlan {
                 planCard(
-                    package: annual,
+                    plan: annual,
                     title: "Annuel",
                     subtitle: annualSubtitle(annual),
                     badge: annualBadge(annual)
                 )
             }
-            if let weekly = weeklyPackage {
+            if let weekly = weeklyPlan {
                 planCard(
-                    package: weekly,
+                    plan: weekly,
                     title: "Hebdomadaire",
                     subtitle: shortSubtitle(weekly, unit: "sem"),
                     badge: nil
                 )
-            } else if let monthly = monthlyPackage {
+            } else if let monthly = monthlyPlan {
                 planCard(
-                    package: monthly,
+                    plan: monthly,
                     title: "Mensuel",
                     subtitle: shortSubtitle(monthly, unit: "mois"),
                     badge: nil
@@ -216,11 +246,11 @@ struct PaywallView: View {
         .padding(.top, Theme.spacingSM)
     }
 
-    private func planCard(package: Package, title: String, subtitle: String, badge: String?) -> some View {
-        let isSelected = selectedPackage?.identifier == package.identifier
+    private func planCard(plan: PlanOption, title: String, subtitle: String, badge: String?) -> some View {
+        let isSelected = selectedPlan?.id == plan.id
 
         return Button {
-            selectedPackage = package
+            selectedPlan = plan
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -292,7 +322,7 @@ struct PaywallView: View {
                 .background(Capsule().fill(Color.kiwiGreen))
             }
             .buttonStyle(.healthMapPressed)
-            .disabled(isPurchasing || selectedPackage == nil)
+            .disabled(isPurchasing || selectedPlan == nil)
             .padding(.horizontal, Theme.spacingMD)
 
             Text(ctaNote)
@@ -391,23 +421,24 @@ struct PaywallView: View {
     // MARK: - Textes dérivés des produits StoreKit
 
     private var ctaTitle: String {
-        if let trial = trialLabel(for: selectedPackage) {
+        if let trial = trialLabel(for: selectedPlan) {
             return "Commencer mes \(trial)"
         }
         return "Continuer"
     }
 
     private var ctaNote: String {
-        guard let package = selectedPackage else { return "" }
-        let price = package.localizedPriceString
+        guard let plan = selectedPlan else { return "" }
+        let price = plan.localizedPriceString
         let period: String
-        switch package.packageType {
-        case .annual: period = "an"
-        case .weekly: period = "semaine"
+        switch plan.periodUnit {
+        case .year: period = "an"
+        case .week: period = "semaine"
+        case .day: period = "jour"
         default: period = "mois"
         }
         let base: String
-        if let trial = trialLabel(for: package) {
+        if let trial = trialLabel(for: plan) {
             base = "Gratuit \(trial), puis \(price) / \(period)."
         } else {
             base = "\(price) / \(period)."
@@ -418,18 +449,18 @@ struct PaywallView: View {
         return base + " Abonnement à renouvellement automatique : reconduit pour la même durée sauf résiliation au moins 24 h avant la fin de la période en cours, dans les Réglages de ton compte Apple."
     }
 
-    private func annualSubtitle(_ package: Package) -> String {
-        var parts = ["\(package.localizedPriceString) / an"]
-        if let monthlyEquivalent = perMonthLabel(for: package) {
+    private func annualSubtitle(_ plan: PlanOption) -> String {
+        var parts = ["\(plan.localizedPriceString) / an"]
+        if let monthlyEquivalent = perMonthLabel(for: plan) {
             parts.append("soit \(monthlyEquivalent) / mois")
         }
         return parts.joined(separator: " · ")
     }
 
     /// Sous-titre d'une formule courte (hebdo ou mensuelle) : prix / unité + essai.
-    private func shortSubtitle(_ package: Package, unit: String) -> String {
-        var parts = ["\(package.localizedPriceString) / \(unit)"]
-        if let trial = trialLabel(for: package) {
+    private func shortSubtitle(_ plan: PlanOption, unit: String) -> String {
+        var parts = ["\(plan.localizedPriceString) / \(unit)"]
+        if let trial = trialLabel(for: plan) {
             parts.append("\(trial) gratuits")
         }
         return parts.joined(separator: " · ")
@@ -437,16 +468,16 @@ struct PaywallView: View {
 
     /// Badge de la carte annuelle : essai + économie vs 1 an de la formule courte
     /// (hebdo ×52 ou mensuel ×12), calculée depuis les prix StoreKit (rien codé en dur).
-    private func annualBadge(_ annual: Package) -> String? {
+    private func annualBadge(_ annual: PlanOption) -> String? {
         var parts: [String] = []
         if let trial = trialLabel(for: annual) {
             parts.append("\(trial) gratuits")
         }
         if let short = shortPlan {
-            let periodsPerYear: Decimal = short.packageType == .weekly ? 52 : 12
-            let yearAtShortRate = short.storeProduct.price * periodsPerYear
+            let periodsPerYear: Decimal = short.periodUnit == .week ? 52 : 12
+            let yearAtShortRate = short.price * periodsPerYear
             if yearAtShortRate > 0 {
-                let savings: Decimal = (1 - annual.storeProduct.price / yearAtShortRate) * 100
+                let savings: Decimal = (1 - annual.price / yearAtShortRate) * 100
                 let percent = Int((savings as NSDecimalNumber).doubleValue.rounded())
                 if percent > 0 {
                     parts.append("−\(percent) %")
@@ -459,8 +490,8 @@ struct PaywallView: View {
     /// « 7 jours » / « 1 mois »… lu depuis l'offre d'introduction StoreKit.
     /// Nil si le produit n'a pas d'essai gratuit — on ne promet jamais un
     /// essai qui n'existe pas côté App Store.
-    private func trialLabel(for package: Package?) -> String? {
-        guard let discount = package?.storeProduct.introductoryDiscount,
+    private func trialLabel(for plan: PlanOption?) -> String? {
+        guard let discount = plan?.introductoryDiscount,
               discount.paymentMode == .freeTrial else {
             return nil
         }
@@ -473,9 +504,9 @@ struct PaywallView: View {
         }
     }
 
-    private func perMonthLabel(for annual: Package) -> String? {
-        let perMonth = annual.storeProduct.price / 12
-        let formatter = annual.storeProduct.priceFormatter ?? {
+    private func perMonthLabel(for annual: PlanOption) -> String? {
+        let perMonth = annual.price / 12
+        let formatter = annual.product.priceFormatter ?? {
             let f = NumberFormatter()
             f.numberStyle = .currency
             return f
@@ -498,7 +529,7 @@ struct PaywallView: View {
             // des offerings resélectionne un paquet et l'UI se rétablit seule.
             let watchdog = Task {
                 try? await Task.sleep(for: Self.offeringsTimeout)
-                if !Task.isCancelled && annualPackage == nil && shortPlan == nil {
+                if !Task.isCancelled && annualPlan == nil && shortPlan == nil {
                     offeringsFailed = true
                 }
             }
@@ -506,31 +537,39 @@ struct PaywallView: View {
             watchdog.cancel()
         }
 
-        if selectedPackage == nil {
-            selectedPackage = annualPackage ?? shortPlan
+        if selectedPlan == nil {
+            selectedPlan = annualPlan ?? shortPlan
         }
-        // loadOfferings a rendu la main mais rien d'affichable : échec réseau
-        // RevenueCat (erreur catchée dans le service) ou offering vide côté ASC.
-        if annualPackage == nil && shortPlan == nil {
+        // loadOfferings a rendu la main mais rien d'affichable : ni offering
+        // RevenueCat, ni produit StoreKit (abonnements inactifs côté ASC).
+        if annualPlan == nil && shortPlan == nil {
             offeringsFailed = true
         }
     }
 
     private func purchaseSelected() async {
-        guard let package = selectedPackage, !isPurchasing else { return }
+        guard let plan = selectedPlan, !isPurchasing else { return }
         isPurchasing = true
         defer { isPurchasing = false }
 
         do {
-            let outcome = try await subscriptionService.purchase(package: package)
+            // Package de l'offering quand il existe, sinon achat direct du
+            // produit StoreKit (repli) — l'entitlement passe par RevenueCat
+            // dans les deux cas.
+            let outcome: PurchaseOutcome
+            if let package = plan.package {
+                outcome = try await subscriptionService.purchase(package: package)
+            } else {
+                outcome = try await subscriptionService.purchase(product: plan.product)
+            }
             switch outcome {
             case .activated:
                 AnalyticsService.shared.track(.paywallConverted, properties: [
                     "source": source,
-                    "package": package.identifier,
+                    "package": plan.id,
                 ])
                 AnalyticsService.shared.track(.subscriptionStarted, properties: [
-                    "package": package.identifier,
+                    "package": plan.id,
                 ])
                 showPurchaseSuccess = true
             case .cancelled:
