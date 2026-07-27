@@ -257,9 +257,7 @@ struct AuthView: View {
                     .transition(.opacity)
 
                 VStack(spacing: Theme.spacingMD) {
-                    ProgressView()
-                        .tint(.white)
-                        .scaleEffect(1.4)
+                    KiwiLoader(size: 56, color: .white)
                     Text("Connexion a Apple...")
                         .font(Theme.subheadlineFont)
                         .foregroundStyle(.white)

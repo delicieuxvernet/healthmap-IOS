@@ -149,7 +149,7 @@ struct VoiceMealSheet: View {
     private var analyzingView: some View {
         VStack(spacing: 12) {
             Spacer()
-            ProgressView().controlSize(.large)
+            KiwiLoader(size: 60, color: Kiwio.encre)
             Text("J'identifie tes aliments…")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Kiwio.encre)
