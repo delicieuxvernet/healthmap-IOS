@@ -929,13 +929,14 @@ if MODE == "submit"
     to_cancel = subs_list.select { |s| cancel_states.include?(s.dig("attributes", "state")) }
     to_cancel.each do |s|
       st = s.dig("attributes", "state")
-      if st == "READY_FOR_REVIEW"
-        write("suppression soumission vide #{s["id"]}", :delete, "/v1/reviewSubmissions/#{s["id"]}", nil)
-      else
-        write("annulation soumission #{s["id"]} (#{st})", :patch,
-          "/v1/reviewSubmissions/#{s["id"]}",
-          { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
-      end
+      # L'API REFUSE le DELETE sur reviewSubmissions (403 FORBIDDEN_ERROR :
+      # « Allowed operations are: CREATE, GET_COLLECTION, GET_INSTANCE,
+      # UPDATE »). Une soumission préparée s'annule donc par PATCH, quel que
+      # soit son état — sinon la version restait piégée en READY_FOR_REVIEW,
+      # donc non éditable, et le build ne pouvait plus être remplacé.
+      write("annulation soumission #{s["id"]} (#{st})", :patch,
+        "/v1/reviewSubmissions/#{s["id"]}",
+        { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
     end
     unless to_cancel.empty?
       10.times do
