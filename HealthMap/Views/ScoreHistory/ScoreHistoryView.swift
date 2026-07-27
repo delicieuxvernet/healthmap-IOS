@@ -22,8 +22,7 @@ struct ScoreHistoryView: View {
 
             if isLoading {
                 VStack(spacing: Theme.spacingMD) {
-                    ProgressView()
-                        .tint(Color.healthMapBlue)
+                    KiwiLoader(size: 52)
                     Text("Chargement de l'historique...")
                         .font(Theme.captionFont)
                         .foregroundStyle(Color.healthMapSecondary)

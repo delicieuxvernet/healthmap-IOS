@@ -336,7 +336,7 @@ struct PaywallView: View {
 
     private var loadingState: some View {
         VStack(spacing: Theme.spacingSM) {
-            ProgressView()
+            KiwiLoader(size: 48)
             Text("Chargement des offres…")
                 .font(.system(size: 12))
                 .foregroundStyle(Color.healthMapMuted)

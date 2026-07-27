@@ -832,8 +832,9 @@ private struct QuestionnaireGateView: View {
     private var analyzingView: some View {
         VStack(spacing: Theme.spacingLG) {
             Spacer()
-            Fluent3DIcon(name: Fluent3D.kiwi, size: 56)
-            ProgressView().tint(Color.kiwiGreen)
+            // Un seul kiwi : le loader remplace l'icône 3D + le spinner, qui
+            // empilaient deux fois le même fruit.
+            KiwiLoader(size: 72)
             Text("Analyse de tes réponses…")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.healthMapSecondary)
