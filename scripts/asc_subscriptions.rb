@@ -929,13 +929,14 @@ if MODE == "submit"
     to_cancel = subs_list.select { |s| cancel_states.include?(s.dig("attributes", "state")) }
     to_cancel.each do |s|
       st = s.dig("attributes", "state")
-      if st == "READY_FOR_REVIEW"
-        write("suppression soumission vide #{s["id"]}", :delete, "/v1/reviewSubmissions/#{s["id"]}", nil)
-      else
-        write("annulation soumission #{s["id"]} (#{st})", :patch,
-          "/v1/reviewSubmissions/#{s["id"]}",
-          { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
-      end
+      # L'API REFUSE le DELETE sur reviewSubmissions (403 FORBIDDEN_ERROR :
+      # « Allowed operations are: CREATE, GET_COLLECTION, GET_INSTANCE,
+      # UPDATE »). Une soumission préparée s'annule donc par PATCH, quel que
+      # soit son état — sinon la version restait piégée en READY_FOR_REVIEW,
+      # donc non éditable, et le build ne pouvait plus être remplacé.
+      write("annulation soumission #{s["id"]} (#{st})", :patch,
+        "/v1/reviewSubmissions/#{s["id"]}",
+        { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
     end
     unless to_cancel.empty?
       10.times do
@@ -1071,8 +1072,21 @@ if MODE == "fix-meta"
              .select { |s| cancel_states.include?(s.dig("attributes", "state")) }
   to_cancel.each do |s|
     st = s.dig("attributes", "state")
+    # Une soumission PRÉPARÉE (READY_FOR_REVIEW, jamais envoyée) n'est ni
+    # supprimable (403 : DELETE interdit sur reviewSubmissions) ni annulable
+    # (409 « Resource is not in cancellable state »). Le seul moyen de libérer
+    # la version est de RETIRER ses éléments : le brouillon redevient vide et
+    # la version repasse éditable (on peut alors changer le build attaché).
     if st == "READY_FOR_REVIEW"
-      write("suppression soumission vide #{s["id"]}", :delete, "/v1/reviewSubmissions/#{s["id"]}", nil)
+      items = get_all("/v1/reviewSubmissions/#{s["id"]}/items?limit=50")
+      if items.empty?
+        puts "  (soumission #{s["id"]} déjà vide)"
+      else
+        items.each do |it|
+          write("retrait d'un élément du brouillon #{s["id"]}", :delete,
+            "/v1/reviewSubmissionItems/#{it["id"]}", nil)
+        end
+      end
     else
       write("annulation soumission #{s["id"]} (#{st})", :patch,
         "/v1/reviewSubmissions/#{s["id"]}",
