@@ -1072,13 +1072,10 @@ if MODE == "fix-meta"
              .select { |s| cancel_states.include?(s.dig("attributes", "state")) }
   to_cancel.each do |s|
     st = s.dig("attributes", "state")
-    if st == "READY_FOR_REVIEW"
-      write("suppression soumission vide #{s["id"]}", :delete, "/v1/reviewSubmissions/#{s["id"]}", nil)
-    else
-      write("annulation soumission #{s["id"]} (#{st})", :patch,
-        "/v1/reviewSubmissions/#{s["id"]}",
-        { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
-    end
+    # DELETE interdit par l'API (403) — l'annulation passe par PATCH.
+    write("annulation soumission #{s["id"]} (#{st})", :patch,
+      "/v1/reviewSubmissions/#{s["id"]}",
+      { data: { type: "reviewSubmissions", id: s["id"], attributes: { canceled: true } } })
   end
   unless to_cancel.empty?
     10.times do
