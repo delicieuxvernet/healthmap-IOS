@@ -34,6 +34,14 @@ struct VoiceMealSheet: View {
     @State private var errorMessage: String?
     @State private var isSaving = false
 
+    /// Geste « maintenir pour parler » (choix produit du 27 juillet, façon
+    /// Instagram / Snapchat) : l'enregistrement ne démarre PLUS tout seul à
+    /// l'ouverture — il court tant que le doigt reste posé sur le micro.
+    @State private var doigtPose = false
+    /// Affiché quand on relâche trop vite pour qu'il y ait quoi que ce soit
+    /// à transcrire.
+    @State private var tropCourt = false
+
     private let journal = MealJournalService.shared
 
     enum Phase { case listening, analyzing, results, failed }
@@ -55,17 +63,11 @@ struct VoiceMealSheet: View {
         // c'était le reproche principal sur la build TestFlight.
         .presentationDetents(hauteurs)
         .presentationDragIndicator(.visible)
-        .task { await speech.start() }
-        // Retour haptique aux moments clés — sans lui, on ne SENT pas quand
-        // l'app se met à écouter (retour device : « on ne comprend pas quand
-        // est-ce qu'on est écouté »). Une frappe nette au démarrage de l'écoute,
-        // comme un vocal Instagram / Snapchat.
-        .onChange(of: speech.state) { ancien, nouveau in
-            guard ancien != nouveau else { return }
-            if nouveau == .listening {
-                HapticService.shared.primary()
-            }
-        }
+        // Plus de démarrage automatique : on demande seulement les
+        // autorisations micro / reconnaissance. L'écoute attend le doigt.
+        // (Le retour haptique est déclenché par le geste lui-même — appui,
+        // relâchement, appui trop court — voir `pressionMicro`.)
+        .task { _ = await speech.requestPermissions() }
         .onDisappear { speech.reset() }
     }
 
@@ -73,9 +75,9 @@ struct VoiceMealSheet: View {
         switch phase {
         // 400/300 pt : la bulle à 330 croppait le contenu (consigne 3 lignes +
         // waveform + 2 boutons) dès que le texte grossissait — retour build 319.
-        // 500 pt depuis l'ajout du micro vivant (104 pt) : à 400 le bouton
-        // « Terminer » se faisait rogner.
-        case .listening: return [.height(500)]
+        // 480 pt : place le micro maintenu (104 pt) à portée du pouce, avec la
+        // waveform et la consigne sous les yeux pendant qu'on parle.
+        case .listening: return [.height(480)]
         case .analyzing: return [.height(300)]
         case .results, .failed: return [.large]
         }
@@ -83,28 +85,31 @@ struct VoiceMealSheet: View {
 
     // MARK: - 1. Écoute
 
+    /// Écoute « maintenir pour parler » : rien ne s'enregistre tant que le doigt
+    /// n'est pas posé sur le micro, tout part à l'analyse dès qu'on relâche.
     private var listeningView: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
-                PointEnregistrement()
-                Text(speech.state == .listening ? "Je t'écoute…" : "Un instant…")
+                if enregistre { PointEnregistrement() }
+                Text(titreEcoute)
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Kiwio.encre)
+                    .foregroundStyle(enregistre ? Kiwio.encre : Kiwio.secondaire)
                 Spacer()
             }
             .padding(.top, 22)
 
-            // Micro qui RÉAGIT à la voix : le halo suit le volume réel du
-            // micro, donc il bouge quand on parle et retombe quand on se tait.
-            // C'est le signal « ça enregistre » que l'écran n'avait pas.
-            MicroVivant(level: speech.level, active: speech.state == .listening)
+            // Le micro EST le bouton : halo piloté par le VOLUME RÉEL, il
+            // s'ouvre quand on parle et retombe quand on se tait.
+            MicroVivant(level: speech.level, active: enregistre, pressed: doigtPose)
                 .frame(maxWidth: .infinity)
+                .contentShape(Circle())
+                .gesture(pressionMicro)
+                .accessibilityLabel("Maintiens pour parler")
+                .accessibilityHint("Garde le doigt appuyé pendant que tu décris ton repas, relâche pour lancer l'analyse.")
 
-            // Waveform pilotée par le VOLUME RÉEL du micro (cf. les vocaux
-            // iMessage) : on doit voir que ça écoute, pas une animation
-            // décorative. Le minuteur à droite est la seconde preuve de vie.
+            // Waveform + minuteur : les deux preuves de vie pendant la dictée.
             HStack(spacing: 12) {
-                Waveform(level: speech.level, active: speech.state == .listening)
+                Waveform(level: speech.level, active: enregistre)
                 Text(minuteur)
                     .font(.kiwioMono(13, .medium))
                     .foregroundStyle(Kiwio.secondaire)
@@ -113,16 +118,21 @@ struct VoiceMealSheet: View {
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity)
             .background(Kiwio.neutre, in: Capsule())
+            .opacity(enregistre ? 1 : 0.45)
 
-            // On n'affiche plus de transcription en direct : il n'y en a plus.
-            // L'audio est enregistré d'un bloc et transcrit à la fin, comme un
-            // vocal Snapchat — c'est ce qui supprime la perte après une pause.
-            // Reste donc la consigne, qui insiste sur les quantités.
-            Text("Dis par exemple : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt nature » — précise les quantités si tu les connais.")
+            Text(enregistre
+                 ? "Continue, je note. Relâche quand tu as fini."
+                 : "Dis par exemple : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt nature » — précise les quantités si tu les connais.")
                 .font(.system(size: 14))
                 .foregroundStyle(Kiwio.discret)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            if tropCourt {
+                Text("Trop court — garde le doigt appuyé le temps de parler.")
+                    .font(.footnote)
+                    .foregroundStyle(Kiwio.rouge)
+            }
 
             if let err = speech.error {
                 Text(err.message)
@@ -132,22 +142,6 @@ struct VoiceMealSheet: View {
 
             Spacer(minLength: 0)
 
-            Button {
-                // Frappe franche au relâchement : on sent que l'écoute s'arrête.
-                HapticService.shared.strong()
-                Task { await finishListening() }
-            } label: {
-                Text("Terminer")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(maxWidth: .infinity, minHeight: 52)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Kiwio.vert)
-            // Le transcript est vide pendant l'enregistrement (il n'existe qu'à
-            // la fin) : on se fie donc à la durée. Moins d'une seconde, il n'y a
-            // rien à transcrire.
-            .disabled(speech.duree < 1 || speech.state != .listening)
-
             Button("Annuler") { HapticService.shared.tap(); speech.reset(); dismiss() }
                 .font(.system(size: 15))
                 .foregroundStyle(Kiwio.secondaire)
@@ -155,6 +149,41 @@ struct VoiceMealSheet: View {
                 .padding(.bottom, 8)
         }
         .padding(.horizontal, 20)
+    }
+
+    /// Vrai uniquement quand le service capte réellement.
+    private var enregistre: Bool { speech.state == .listening }
+
+    private var titreEcoute: String {
+        if enregistre { return "Je t'écoute…" }
+        return doigtPose ? "Un instant…" : "Maintiens pour parler"
+    }
+
+    /// Appui maintenu : démarre l'écoute au contact, la termine au relâchement.
+    /// `minimumDistance: 0` pour réagir dès le contact, sans attendre un glissement.
+    private var pressionMicro: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                guard !doigtPose else { return }
+                doigtPose = true
+                tropCourt = false
+                HapticService.shared.primary()
+                Task { await speech.start() }
+            }
+            .onEnded { _ in
+                guard doigtPose else { return }
+                doigtPose = false
+                // Moins d'une seconde : rien à transcrire, on annule sans partir
+                // en analyse (sinon l'utilisateur attend pour rien).
+                guard speech.duree >= 1 else {
+                    HapticService.shared.warning()
+                    speech.reset()
+                    tropCourt = true
+                    return
+                }
+                HapticService.shared.strong()
+                Task { await finishListening() }
+            }
     }
 
     /// Piloté par la durée réelle du recorder, pas par un compteur parallèle qui
@@ -444,9 +473,12 @@ struct VoiceMealSheet: View {
         deployee = nil
         errorMessage = nil
         quotedTranscript = ""
+        tropCourt = false
+        doigtPose = false
         phase = .listening
+        // On ne relance PAS l'écoute : depuis le passage au « maintenir pour
+        // parler », c'est le doigt qui la démarre.
         speech.reset()
-        await speech.start()
     }
 
     private func save() async {
@@ -724,6 +756,8 @@ private struct MicroVivant: View {
     /// Niveau instantané 0…1 publié par le service de capture.
     let level: Float
     let active: Bool
+    /// Doigt posé : le bouton s'enfonce légèrement, comme un vocal Instagram.
+    var pressed: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -748,14 +782,19 @@ private struct MicroVivant: View {
 
             Circle()
                 .fill(active ? Kiwio.vert : Kiwio.secondaire)
-                .frame(width: 60, height: 60)
+                .frame(width: 68, height: 68)
+                .scaleEffect(pressed ? 0.94 : 1)
+                .shadow(color: active ? Kiwio.vert.opacity(0.35) : .clear,
+                        radius: 12, x: 0, y: 6)
 
             Image(systemName: "mic.fill")
-                .font(.system(size: 25, weight: .semibold))
+                .font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(.white)
+                .scaleEffect(pressed ? 0.94 : 1)
         }
         .frame(height: 104)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: amplitude)
+        .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.7), value: pressed)
         .accessibilityHidden(true)
     }
 }
