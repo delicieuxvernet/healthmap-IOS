@@ -36,9 +36,9 @@ jamais la vague N+1 avec la vague N à moitié poussée.
 | V2 | Scan — hiérarchie des entrées + recherche & code-barres | `MealScanView.swift`, `BarcodeScannerSheet.swift`, `Info.plist` | ✅ mergé | [#183](https://github.com/delicieuxvernet/healthmap-IOS/pull/183) |
 | V3 | Vocal — maintien pour enregistrer | `MealScanView.swift`, `VoiceMealSheet.swift` | ✅ mergé | [#184](https://github.com/delicieuxvernet/healthmap-IOS/pull/184) |
 | V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | ✅ mergé côté app · ⏳ **déploiement edge en attente** | [#185](https://github.com/delicieuxvernet/healthmap-IOS/pull/185) · web [#13](https://github.com/delicieuxvernet/healthmap/pull/13) |
-| V5 | Chrome — barre blanche en haut | `WarmBackground.swift` + 5 racines d'onglet | 🔄 en cours | — |
-| V6 | Typographie homogène | `KiwioPalette.swift` + toutes les vues | 🔄 en cours | — |
-| V7 | Calendrier navigable | `DailyMealJournalView.swift`, `MealJournalViewModel.swift` | ⬜ à faire | — |
+| V5 | Chrome — barre blanche en haut | `WarmBackground.swift` + 5 racines d'onglet | ✅ mergé | [#186](https://github.com/delicieuxvernet/healthmap-IOS/pull/186) |
+| V6 | Typographie homogène | `KiwioPalette.swift` + toutes les vues | ✅ mergé | [#186](https://github.com/delicieuxvernet/healthmap-IOS/pull/186) |
+| V7 | Calendrier navigable | `DailyMealJournalView.swift`, `MealJournalViewModel.swift` | 🔄 en cours | — |
 
 Légende : ⬜ à faire · 🔄 en cours · ✅ mergé sur `main`
 
@@ -199,3 +199,27 @@ Concrètement : les 45 `design: .monospaced` deviennent
 `design: .rounded` + `.monospacedDigit()`, `Font.kiwioMono` aussi, le serif
 disparaît, et les titres de page (28 pt heavy) passent en arrondi — c'est ce qui
 mettait Compléments en décalage avec l'onboarding et le questionnaire.
+
+### V7 — calendrier navigable
+
+Le bouton calendrier ouvrait un journal figé sur aujourd'hui, et le modèle ne
+chargeait que 14 jours (semaine courante + précédente) — la navigation par jour
+de l'accueil butait donc sur cette borne.
+
+- `MealJournalViewModel` : nouvelle réserve `archives`, chargée **par mois** à la
+  demande quand on remonte au-delà de la quinzaine (`chargerArchiveSiBesoin`,
+  `allerAuJour`). Volontairement séparée de `fortnight`, que lit le score de la
+  semaine : allonger cette fenêtre-là aurait faussé le score.
+- `dayMeals` puise dans les deux ; `dayRows(in:)` / `dayCalories(in:)` donnent
+  au journal les lignes du jour **sélectionné** (`rows(in:)` reste sur
+  aujourd'hui pour les écrans sans navigation).
+- `DailyMealJournalView` : barre de jour (chevrons + libellé) et bouton
+  calendrier ouvrant un `DatePicker` graphique borné au passé. L'en-tête, les
+  macros et les créneaux suivent la date choisie.
+- Le « + » d'ajout disparaît sur un jour passé : l'écriture vise toujours
+  aujourd'hui, mieux vaut ne pas le proposer que de faire atterrir l'aliment sur
+  la mauvaise date.
+
+**Non fait, à décider** : afficher une pastille sur les jours du calendrier qui
+portent des scans (il faudrait charger le mois AVANT de l'afficher, donc un
+appel par mois feuilleté).

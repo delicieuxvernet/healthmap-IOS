@@ -19,6 +19,11 @@ struct DailyMealJournalView: View {
     /// Créneau dont le « + » a été touché → page de recherche.
     @State private var searchSlot: MealJournalService.MealSlot?
     @State private var selectedRow: MealJournalRow?
+    @State private var montreCalendrier = false
+
+    private var estAujourdhui: Bool {
+        Calendar.current.isDateInToday(vm.selectedDay)
+    }
 
     var body: some View {
         NavigationStack {
@@ -26,6 +31,7 @@ struct DailyMealJournalView: View {
                 WarmBackground()
                 ScrollView {
                     VStack(spacing: Theme.spacingLG) {
+                        barreDeJour
                         headerCard
                         ForEach(MealJournalService.MealSlot.allCases, id: \.self) { slot in
                             slotSection(slot)
@@ -35,7 +41,7 @@ struct DailyMealJournalView: View {
                     .padding(.horizontal, Theme.spacingLG)
                 }
             }
-            .navigationTitle("Journal du jour")
+            .navigationTitle("Journal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -50,6 +56,7 @@ struct DailyMealJournalView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
                 Task { await vm.load() }
             }
+            .sheet(isPresented: $montreCalendrier) { feuilleCalendrier }
             .sheet(item: $searchSlot) { slot in
                 FoodSearchSheet(slot: slot) { detail, grams in
                     await vm.addFood(detail: detail, grams: grams, slot: slot)
@@ -73,12 +80,100 @@ struct DailyMealJournalView: View {
         }
     }
 
+    // MARK: - Barre de jour + calendrier
+
+    /// Navigation par date : chevrons pour feuilleter jour à jour, bouton
+    /// calendrier pour sauter n'importe où dans le passé. Le journal ne montrait
+    /// qu'aujourd'hui — on ne pouvait pas relire sa semaine (retour du 29 juil.).
+    private var barreDeJour: some View {
+        HStack(spacing: 4) {
+            Button {
+                Task { await vm.allerAuJour(Calendar.current.date(byAdding: .day, value: -1, to: vm.selectedDay) ?? vm.selectedDay) }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.kiwiGreenInk)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Jour précédent")
+
+            Spacer(minLength: 0)
+
+            Button { montreCalendrier = true } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14, weight: .semibold))
+                    VStack(spacing: 1) {
+                        Text(vm.dayLabel)
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                        Text(vm.daySub)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.healthMapMuted)
+                    }
+                    if vm.chargeLArchive {
+                        ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
+                    }
+                }
+                .foregroundStyle(Color.kiwiCharcoal)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Choisir une date. Jour affiché : \(vm.dayLabel)")
+
+            Spacer(minLength: 0)
+
+            Button {
+                Task { await vm.allerAuJour(Calendar.current.date(byAdding: .day, value: 1, to: vm.selectedDay) ?? vm.selectedDay) }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(vm.canGoNext ? Color.kiwiGreenInk : Color.healthMapMuted.opacity(0.4))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .disabled(!vm.canGoNext)
+            .accessibilityLabel("Jour suivant")
+        }
+        .padding(.horizontal, 4)
+        .kiwiCard(radius: 20)
+    }
+
+    private var feuilleCalendrier: some View {
+        NavigationStack {
+            DatePicker(
+                "Jour",
+                selection: Binding(
+                    get: { vm.selectedDay },
+                    set: { nouveau in Task { await vm.allerAuJour(nouveau) } }
+                ),
+                in: ...Date(),
+                displayedComponents: .date
+            )
+            .datePickerStyle(.graphical)
+            .tint(Color.kiwiGreen)
+            .padding(.horizontal, Theme.spacingMD)
+            .navigationTitle("Aller à une date")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("OK") { montreCalendrier = false }
+                        .foregroundStyle(Color.kiwiGreenInk)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
     // MARK: - En-tête (kcal restantes + macros vs cibles réelles)
 
     private var headerCard: some View {
-        let consumed = vm.totalCalories
+        let consumed = vm.dayCalories
         return VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            Text("Aujourd'hui · \(Self.dayFormatter.string(from: Date()))")
+            Text(estAujourdhui
+                 ? "Aujourd'hui · \(Self.dayFormatter.string(from: vm.selectedDay))"
+                 : Self.dayFormatter.string(from: vm.selectedDay).capitalized)
                 .font(.system(size: 12))
                 .foregroundStyle(Color.healthMapMuted)
 
@@ -89,7 +184,7 @@ struct DailyMealJournalView: View {
                         Text("\(abs(rest))")
                             .font(.system(size: 28, weight: .semibold, design: .rounded))
                             .foregroundStyle(rest >= 0 ? Color.kiwiGreenInk : Color.scoreDeficient)
-                        Text(rest >= 0 ? "kcal restantes" : "kcal au-dessus")
+                        Text(rest >= 0 ? (estAujourdhui ? "kcal restantes" : "kcal sous l'objectif") : "kcal au-dessus")
                             .font(.system(size: 13))
                             .foregroundStyle(Color.healthMapSecondary)
                     }
@@ -111,16 +206,16 @@ struct DailyMealJournalView: View {
                     Text("\(consumed)")
                         .font(.system(size: 28, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.healthMapText)
-                    Text("kcal aujourd'hui")
+                    Text(estAujourdhui ? "kcal aujourd'hui" : "kcal ce jour-là")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.healthMapSecondary)
                 }
             }
 
             HStack(spacing: Theme.spacingMD) {
-                macroBar("Protéines", vm.totalProteins, target: protTarget, color: .macroProtein)
-                macroBar("Glucides", vm.totalCarbs, target: carbTarget, color: .macroCarb)
-                macroBar("Lipides", vm.totalFats, target: fatTarget, color: .macroFat)
+                macroBar("Protéines", vm.dayProteins, target: protTarget, color: .macroProtein)
+                macroBar("Glucides", vm.dayCarbs, target: carbTarget, color: .macroCarb)
+                macroBar("Lipides", vm.dayFats, target: fatTarget, color: .macroFat)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -160,7 +255,7 @@ struct DailyMealJournalView: View {
     // MARK: - Créneau (Matin / Midi / Soir / Encas)
 
     private func slotSection(_ slot: MealJournalService.MealSlot) -> some View {
-        let rows = vm.rows(in: slot)
+        let rows = vm.dayRows(in: slot)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 Text(slot.emoji).font(.system(size: 15))
@@ -168,24 +263,29 @@ struct DailyMealJournalView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.healthMapText)
                 if !rows.isEmpty {
-                    Text("\(vm.calories(in: slot)) kcal")
+                    Text("\(vm.dayCalories(in: slot)) kcal")
                         .font(.system(size: 12, design: .rounded))
                         .foregroundStyle(Color.healthMapMuted)
                 }
                 Spacer()
-                Button {
-                    searchSlot = slot
-                } label: {
-                    ZStack {
-                        Circle().fill(Color.kiwiGreenSoft).frame(width: 28, height: 28)
-                        Image(systemName: "plus")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.kiwiGreenInk)
+                // L'ajout écrit toujours sur AUJOURD'HUI : on ne le propose donc
+                // pas quand on relit un jour passé, plutôt que de faire atterrir
+                // l'aliment sur la mauvaise date.
+                if estAujourdhui {
+                    Button {
+                        searchSlot = slot
+                    } label: {
+                        ZStack {
+                            Circle().fill(Color.kiwiGreenSoft).frame(width: 28, height: 28)
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color.kiwiGreenInk)
+                        }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                     }
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .accessibilityLabel("Ajouter un aliment — \(slot.label)")
                 }
-                .accessibilityLabel("Ajouter un aliment — \(slot.label)")
             }
             .padding(.horizontal, 4)
 

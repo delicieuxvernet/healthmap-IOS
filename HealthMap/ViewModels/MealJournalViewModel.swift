@@ -18,6 +18,15 @@ final class MealJournalViewModel: ObservableObject {
     /// aujourd'hui — cette navigation ne concerne QUE l'affichage du journal.
     @Published var selectedDay: Date = Calendar.current.startOfDay(for: Date())
 
+    /// Repas ANTÉRIEURS à la quinzaine, chargés à la demande quand on remonte
+    /// le calendrier. Volontairement séparés de `fortnight` : ce dernier nourrit
+    /// le score de la semaine, qui n'a rien à voir avec la profondeur d'archive
+    /// que l'utilisateur consulte.
+    @Published private(set) var archives: [MealJournalService.MealRecord] = []
+    /// Plus ancien jour effectivement chargé (quinzaine, puis archives).
+    @Published private(set) var jourLePlusAncienCharge: Date = Calendar.current.startOfDay(for: Date())
+    @Published private(set) var chargeLArchive = false
+
     private let service = MealJournalService.shared
 
     // MARK: - Chargement
@@ -35,6 +44,7 @@ final class MealJournalViewModel: ObservableObject {
             let all = try await service.loadRange(userId: userId, from: from, to: week.end)
             fortnight = all
             meals = all.filter { Calendar.current.isDateInToday($0.consumedAt) }
+            jourLePlusAncienCharge = min(jourLePlusAncienCharge, Calendar.current.startOfDay(for: from))
         } catch {
             AppLogger.database.warning("Journal load failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -170,13 +180,32 @@ final class MealJournalViewModel: ObservableObject {
 
     // MARK: - Jour sélectionné (page d'accueil Scan)
 
-    /// Repas du jour sélectionné : sous-ensemble de `fortnight`, trié
-    /// chronologiquement. Recalculé à chaque accès → suit `selectedDay` et tout
-    /// rechargement de `fortnight` (ex. après un scan).
+    /// Repas du jour sélectionné, triés chronologiquement. Recalculé à chaque
+    /// accès → suit `selectedDay` et tout rechargement (ex. après un scan).
+    /// Puise dans la quinzaine ET dans les mois plus anciens chargés à la
+    /// demande par le calendrier.
     var dayMeals: [MealJournalService.MealRecord] {
-        fortnight
+        (fortnight + archives)
             .filter { Calendar.current.isDate($0.consumedAt, inSameDayAs: selectedDay) }
             .sorted { $0.consumedAt < $1.consumedAt }
+    }
+
+    /// Lignes affichables d'un créneau POUR LE JOUR SÉLECTIONNÉ. `rows(in:)`
+    /// reste sur aujourd'hui : c'est ce que lisent les écrans sans navigation
+    /// par date.
+    func dayRows(in slot: MealJournalService.MealSlot) -> [MealJournalRow] {
+        dayMeals
+            .filter { $0.slot == slot }
+            .flatMap { record -> [MealJournalRow] in
+                guard record.hasItemDetail else {
+                    return [MealJournalRow(record: record, itemIndex: nil)]
+                }
+                return record.items.indices.map { MealJournalRow(record: record, itemIndex: $0) }
+            }
+    }
+
+    func dayCalories(in slot: MealJournalService.MealSlot) -> Int {
+        dayMeals.filter { $0.slot == slot }.reduce(0) { $0 + $1.macros.calories }
     }
 
     // MARK: - Totaux du jour sélectionné
@@ -230,6 +259,44 @@ final class MealJournalViewModel: ObservableObject {
         guard let prev = cal.date(byAdding: .day, value: -1, to: selectedDay) else { return }
         let clamped = cal.startOfDay(for: prev)
         if clamped >= earliestDay { selectedDay = clamped }
+    }
+
+    // MARK: - Calendrier (journal du jour)
+
+    /// Va à une date quelconque du passé et charge ce qu'il faut pour l'afficher.
+    /// Le futur est refusé — on ne mange pas demain.
+    func allerAuJour(_ date: Date) async {
+        let cal = Calendar.current
+        let jour = min(cal.startOfDay(for: date), cal.startOfDay(for: Date()))
+        selectedDay = jour
+        await chargerArchiveSiBesoin(pour: jour)
+    }
+
+    /// Charge le mois du jour demandé s'il est plus ancien que ce qu'on a déjà.
+    /// On charge par MOIS entier : le calendrier affiche un mois à la fois, et
+    /// une requête par jour feuilleté serait absurde.
+    func chargerArchiveSiBesoin(pour date: Date) async {
+        let cal = Calendar.current
+        let jour = cal.startOfDay(for: date)
+        guard jour < jourLePlusAncienCharge else { return }
+        guard let userId = AuthService.shared.cachedCurrentUserIdString else { return }
+        guard let debutMois = cal.date(from: cal.dateComponents([.year, .month], from: jour)) else { return }
+
+        chargeLArchive = true
+        defer { chargeLArchive = false }
+        do {
+            let anciens = try await service.loadRange(
+                userId: userId,
+                from: debutMois,
+                to: jourLePlusAncienCharge
+            )
+            // Dédoublonnage : la borne haute recouvre le premier jour déjà chargé.
+            let dejaLa = Set((fortnight + archives).map(\.id))
+            archives.append(contentsOf: anciens.filter { !dejaLa.contains($0.id) })
+            jourLePlusAncienCharge = min(jourLePlusAncienCharge, debutMois)
+        } catch {
+            AppLogger.database.warning("Archive journal indisponible: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func goNextDay() {
