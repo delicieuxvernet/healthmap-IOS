@@ -408,7 +408,7 @@ struct PaywallView: View {
             .accessibilityHint("Restaure un abonnement Premium acheté précédemment avec ce même identifiant Apple.")
 
             HStack(spacing: 8) {
-                Link("Conditions d'utilisation", destination: URL(string: "https://healthmap.fr/terms")!)
+                Link("Conditions d'utilisation", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                 Text("\u{00B7}")
                     .foregroundStyle(Color.healthMapMuted)
                 Link("Politique de confidentialité", destination: URL(string: "https://healthmap.fr/privacy")!)

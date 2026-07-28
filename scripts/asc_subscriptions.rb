@@ -598,7 +598,7 @@ if MODE == "apply-app"
       icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports
       weight, steps and sleep). The Scanner tab also reads active energy (kcal).
 
-      Terms of Use (EULA): https://healthmap.fr/terms
+      Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
       Privacy Policy: https://healthmap.fr/privacy
       (Both are also tappable at the bottom of the paywall in-app.)
     NOTES
@@ -1063,7 +1063,7 @@ end
 #     version + 3 abonnements se fasse dans l'UI web (l'API interdit de soumettre
 #     le 1er abonnement — FIRST_SUBSCRIPTION_MUST_BE_SUBMITTED_ON_VERSION).
 if MODE == "fix-meta"
-  terms_url = "https://healthmap.fr/terms"
+  terms_url = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
   privacy_url = "https://healthmap.fr/privacy"
 
   # 1) Rendre la version éditable : annuler toute soumission en cours.
@@ -1110,11 +1110,27 @@ if MODE == "fix-meta"
   # 2) Description : ajouter les liens CGU/EULA + confidentialité (idempotent,
   #    garde-fou 4000 caractères max imposé par Apple).
   footer = "\n\nConditions d'utilisation (CGU) : #{terms_url}\nConfidentialite : #{privacy_url}"
+  # ⚠️ `healthmap.fr/terms` n'a JAMAIS existé (aucune route côté web) : la page
+  # renvoyait un 404 rendu en JavaScript, donc HTTP 200 mais « Page introuvable »
+  # à l'écran. C'est ce lien mort, présent dans la description ET dans le
+  # paywall, qui a valu trois refus 3.1.2(c) — le reviewer cliquait et tombait
+  # sur la 404. On le REMPLACE partout par l'EULA standard d'Apple.
+  dead_terms = "https://healthmap.fr/terms"
   get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20").each do |l|
     loc = l.dig("attributes", "locale")
     desc = l.dig("attributes", "description").to_s
-    if desc.include?("healthmap.fr/terms")
-      puts "  (description #{loc} : liens déjà présents)"
+
+    if desc.include?(dead_terms)
+      fixed = desc.gsub(dead_terms, terms_url)
+      write("remplacement du lien CGU mort dans description #{loc}", :patch,
+        "/v1/appStoreVersionLocalizations/#{l["id"]}",
+        { data: { type: "appStoreVersionLocalizations", id: l["id"],
+                  attributes: { description: fixed } } })
+      next
+    end
+
+    if desc.include?(terms_url)
+      puts "  (description #{loc} : lien EULA valide déjà présent)"
       next
     end
     if (desc + footer).length > 4000
