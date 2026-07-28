@@ -289,37 +289,83 @@ struct RecommendationsContentView: View {
     // exemple borné (le créneau « à jeun / avec vitamine C / pas de thé-café »
     // est un repère générique, jamais un dosage inventé). cf. gaps.
     private func ritual(for nutrients: [EnrichedNutrient], kind: PlanTopic.Kind) -> [PlanRitualStep] {
-        let names = nutrients.map { $0.label.lowercased() }
-        let primary = nutrients.first?.label ?? "tes apports"
-
-        if kind == .symptome {
-            let matinDetail = nutrients.isEmpty
-                ? "Tes apports clés"
-                : nutrients.prefix(2).map { $0.label }.joined(separator: " + ")
+        // Aucun apport ciblé (objectif d'hygiène de vie) : on reste sur des
+        // leviers de mode de vie, sans parachuter de nutriment.
+        guard !nutrients.isEmpty else {
             return [
-                PlanRitualStep(slot: .matin, title: "Matin", detail: "\(matinDetail)\nà jeun"),
-                PlanRitualStep(slot: .journee, title: "Midi",
-                               detail: names.contains("fer") ? "Fer +\nvitamine C" : "\(primary)\nau repas"),
-                PlanRitualStep(slot: .soir, title: "Soir",
-                               detail: names.contains("fer") ? "Pas de\nthé / café" : "Repas\nléger")
-            ]
-        } else {
-            // Objectif sans apport ciblé : rituel d'hygiène de vie (aucun nutriment
-            // parachuté). Sinon, repère lié à l'apport principal.
-            if nutrients.isEmpty {
-                return [
-                    PlanRitualStep(slot: .matin, title: "Matin", detail: "Lumière\n+ mouvement"),
-                    PlanRitualStep(slot: .journee, title: "Journée", detail: "20 min\nde marche"),
-                    PlanRitualStep(slot: .soir, title: "Soir", detail: "Routine\nau calme")
-                ]
-            }
-            return [
-                PlanRitualStep(slot: .matin, title: "Matin",
-                               detail: names.contains("vitb12") || names.contains("b12") ? "B12\nsublinguale" : "\(primary)\nau réveil"),
+                PlanRitualStep(slot: .matin, title: "Matin", detail: "15 min de lumière\ndehors"),
                 PlanRitualStep(slot: .journee, title: "Journée", detail: "20 min\nde marche"),
-                PlanRitualStep(slot: .soir, title: "Soir", detail: "Sommeil\nrégulier")
+                PlanRitualStep(slot: .soir, title: "Soir", detail: "Écrans coupés\n1 h avant le lit")
             ]
         }
+
+        // Chaque apport a son créneau d'absorption. On construit le rituel
+        // AUTOUR d'eux : le créneau qui leur convient, un aliment concret qui
+        // les apporte, et la règle d'association qui compte vraiment.
+        let ids = nutrients.map(\.id)
+        let principal = nutrients[0]
+
+        var matin = repereRituel(for: principal, slot: .matin)
+        var midi = nutrients.count > 1
+            ? repereRituel(for: nutrients[1], slot: .journee)
+            : "\(alimentConcret(principal))\nau déjeuner"
+        var soir = nutrients.count > 2
+            ? repereRituel(for: nutrients[2], slot: .soir)
+            : "Repas léger\net coucher régulier"
+
+        // Interactions qui changent réellement l'absorption : elles prennent le
+        // pas sur le repère générique du créneau concerné.
+        if ids.contains("iron") {
+            midi = "Fer + vitamine C\n(kiwi, poivron)"
+            soir = "Thé et café\nà distance du fer"
+        }
+        if ids.contains("calcium") && ids.contains("iron") {
+            soir = "Calcium le soir,\nloin du fer"
+        }
+        if ids.contains("magnesium") {
+            soir = "Magnésium au dîner\npour la récupération"
+        }
+        if ids.contains("vitD") {
+            matin = "Vitamine D au petit-déj\navec un peu de gras"
+        }
+        if kind == .objectif && nutrients.count < 2 {
+            midi = "20 min de marche\naprès le déjeuner"
+        }
+
+        return [
+            PlanRitualStep(slot: .matin, title: "Matin", detail: matin),
+            PlanRitualStep(slot: .journee, title: kind == .objectif ? "Journée" : "Midi", detail: midi),
+            PlanRitualStep(slot: .soir, title: "Soir", detail: soir)
+        ]
+    }
+
+    /// Repère concret pour UN apport sur un créneau : quand le prendre et avec
+    /// quoi. Les règles suivent l'absorption connue de chaque nutriment — aucun
+    /// dosage n'est inventé, on parle aliments et moments.
+    private func repereRituel(for n: EnrichedNutrient, slot: PlanRitualStep.Slot) -> String {
+        let aliment = alimentConcret(n)
+        switch n.id {
+        case "vitD":      return "Vitamine D au petit-déj\navec un peu de gras"
+        case "vitB12":    return "\(aliment)\nau petit-déjeuner"
+        case "iron":      return "\(aliment)\navec de la vitamine C"
+        case "calcium":   return "\(aliment)\nà distance du fer"
+        case "magnesium": return "\(aliment)\nen fin de journée"
+        case "omega3":    return "\(aliment)\nau repas principal"
+        case "zinc":      return "\(aliment)\nau déjeuner"
+        case "vitC":      return "\(aliment)\ncru, au repas"
+        case "iodine":    return "\(aliment)\nau repas"
+        case "fiber":     return "\(aliment)\nréparties sur la journée"
+        default:
+            // Moment renvoyé par l'analyse quand il existe, sinon repère neutre.
+            if let quand = n.solution?.quand, !quand.isEmpty { return "\(aliment)\n\(quand)" }
+            return "\(aliment)\nau repas"
+        }
+    }
+
+    /// Premier aliment du catalogue qui couvre cet apport — ce que la personne
+    /// doit réellement mettre dans son assiette.
+    private func alimentConcret(_ n: EnrichedNutrient) -> String {
+        Fluent3D.foodSources(for: n.id).first?.label ?? n.label
     }
 
     // MARK: - Solutions « Par la nutrition »
