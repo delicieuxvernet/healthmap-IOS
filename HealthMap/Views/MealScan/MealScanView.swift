@@ -94,7 +94,6 @@ struct MealScanView: View {
                     }
                 }
                 .modifier(PhotoPresentations(
-                    showCaptureChoice: $showCaptureChoice,
                     showCamera: $showCamera,
                     showPhotoLibrary: $showPhotoLibrary,
                     selectedItem: $selectedItem,
@@ -213,29 +212,15 @@ struct MealScanView: View {
             dualEntry
             voiceHint
 
-            ScanKcalGauge(
+            // Une seule carte pour la journée : kcal restantes vs budget, barre
+            // de progression, énergie dépensée et les quatre macros. Remplace la
+            // jauge à trois colonnes (nombres qui se touchaient) ET la carte
+            // macros à anneaux, qui répétait la même journée deux cartes plus bas.
+            ScanJourneeCard(
                 consommees: journal.dayCalories,
                 objectif: dashboardVM.physicalMetrics.macros?.calories,
                 depensees: isTodaySelected ? activeEnergyToday : nil,
-                isToday: isTodaySelected
-            )
-            .padding(.horizontal, Theme.spacingLG)
-
-            searchEntry
-
-            captureBlock
-
-            ScanCardHeader(icon: "flame.fill", title: "Ta journée")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Theme.spacingLG)
-
-            ScanMicrosJourCard(
-                items: microItems,
-                headline: MealJournalViewModel.dayMicroHeadline(microItems, isToday: isTodaySelected)
-            )
-            .padding(.horizontal, Theme.spacingLG)
-
-            ScanMacrosJourCard(
+                isToday: isTodaySelected,
                 prot: (g: journal.dayProteins, target: dashboardVM.physicalMetrics.macros?.protein),
                 carb: (g: journal.dayCarbs, target: dashboardVM.physicalMetrics.macros?.carbs),
                 fat: (g: journal.dayFats, target: dashboardVM.physicalMetrics.macros?.fat),
@@ -247,6 +232,16 @@ struct MealScanView: View {
                     fiber: (g: journal.dayFiber, target: 30),
                     isToday: isTodaySelected
                 )
+            )
+            .padding(.horizontal, Theme.spacingLG)
+
+            searchEntry
+
+            captureBlock
+
+            ScanMicrosJourCard(
+                items: microItems,
+                headline: MealJournalViewModel.dayMicroHeadline(microItems, isToday: isTodaySelected)
             )
             .padding(.horizontal, Theme.spacingLG)
 
@@ -400,6 +395,19 @@ struct MealScanView: View {
                 } else {
                     showPhotoLibrary = true
                 }
+            }
+            // Le choix appareil photo / galerie est porté PAR le bouton, pas par
+            // l'écran : depuis iOS 26 la feuille émerge du contrôle qui l'a
+            // déclenchée, et attachée au scaffold sa flèche visait le milieu de
+            // la page au lieu de « Scanne ton repas ».
+            .confirmationDialog(
+                "Ajouter une photo de ton repas",
+                isPresented: $showCaptureChoice,
+                titleVisibility: .visible
+            ) {
+                Button("Prendre une photo") { showCamera = true }
+                Button("Choisir dans la galerie") { showPhotoLibrary = true }
+                Button("Annuler", role: .cancel) {}
             }
         }
         .frame(maxWidth: .infinity)
@@ -1320,7 +1328,6 @@ private struct NeedImpactDetailSheet: View {
 /// cette zone n'était plus rendue (aucune photo choisie) : le bouton
 /// « Scanne ton repas » basculait bien le flag, mais plus rien ne s'ouvrait.
 struct PhotoPresentations: ViewModifier {
-    @Binding var showCaptureChoice: Bool
     @Binding var showCamera: Bool
     @Binding var showPhotoLibrary: Bool
     @Binding var selectedItem: PhotosPickerItem?
@@ -1328,13 +1335,6 @@ struct PhotoPresentations: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .confirmationDialog("Ajouter une photo de ton repas",
-                                isPresented: $showCaptureChoice,
-                                titleVisibility: .visible) {
-                Button("Prendre une photo") { showCamera = true }
-                Button("Choisir dans la galerie") { showPhotoLibrary = true }
-                Button("Annuler", role: .cancel) {}
-            }
             .fullScreenCover(isPresented: $showCamera) {
                 CameraPicker { data in onImage(data) }
                     .ignoresSafeArea()

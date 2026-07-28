@@ -81,7 +81,147 @@ struct ScanDayNav: View {
     }
 }
 
-// MARK: - Jauge kcal « Ta journée »
+// MARK: - Carte « Ta journée » (kcal restantes + macros)
+/// Le bloc que porte l'en-tête du journal du jour, remonté sur l'accueil Scan
+/// (retour Arthur du 29 juil. 2026 : « très concis, beaucoup d'informations
+/// clés rapidement »). Il remplace l'ancienne jauge à trois colonnes, où les
+/// nombres consommées / restantes se touchaient faute de place.
+///
+/// Une seule carte porte donc désormais : kcal restantes vs budget, la barre de
+/// progression, l'énergie dépensée (Apple Santé) et les quatre macros. Le budget
+/// reste `objectif + dépensées`, comme la jauge qu'elle remplace.
+///
+/// Sans objectif calculable : aucun objectif inventé — on affiche les kcal
+/// consommées seules, sans barre. Jour passé : on ne parle pas de « restantes »
+/// (la journée est finie), on rapporte le consommé à l'objectif du jour.
+struct ScanJourneeCard: View {
+    let consommees: Int
+    let objectif: Int?
+    let depensees: Int?
+    let isToday: Bool
+    let prot: (g: Double, target: Int?)
+    let carb: (g: Double, target: Int?)
+    let fat: (g: Double, target: Int?)
+    let fiber: (g: Double, target: Int?)
+    /// Phrase de synthèse des macros (`dayMacroHeadline`) — reprise de la carte
+    /// à anneaux qu'on remplace : elle disait ce qui manque, on ne la perd pas.
+    let headline: String
+
+    private var budget: Int { (objectif ?? 0) + (depensees ?? 0) }
+    private var restantes: Int { budget - consommees }
+    private var over: Bool { objectif != nil && restantes < 0 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ScanCardHeader(icon: "flame.fill", title: "Ta journée")
+
+            if objectif == nil {
+                // Objectif non calculable : le consommé, rien d'autre.
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(consommees)")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    Text("kcal")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(abs(isToday ? restantes : consommees))")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundStyle(over ? Color.scoreDeficient : Color.kiwiGreenInk)
+                    Text(titreKcal)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                    Spacer(minLength: 8)
+                    Text("\(consommees) / \(budget)")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .layoutPriority(1)
+                }
+
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.kiwiGreen.opacity(0.14))
+                        Capsule()
+                            .fill(over ? Color.scoreDeficient : Color.kiwiGreen)
+                            .frame(width: max(4, g.size.width * fractionRemplie))
+                    }
+                }
+                .frame(height: 8)
+
+                if let depensees, depensees > 0 {
+                    Text("Budget élargi de \(depensees) kcal dépensées · Apple Santé")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.healthMapMuted)
+                }
+            }
+
+            Text(headline)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Color.kiwiCharcoal)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(alignment: .top, spacing: 12) {
+                macroBar("Protéines", prot, .macroProtein)
+                macroBar("Glucides", carb, .macroCarb)
+                macroBar("Lipides", fat, .macroFat)
+                macroBar("Fibres", fiber, .kiwiGreen)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .kiwiCard(radius: 20)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var titreKcal: String {
+        if !isToday { return "kcal sur \(budget)" }
+        return over ? "kcal au-dessus" : "kcal restantes"
+    }
+
+    private var fractionRemplie: CGFloat {
+        guard budget > 0 else { return 0 }
+        return max(0, min(1, CGFloat(consommees) / CGFloat(budget)))
+    }
+
+    /// Barre macro : rempli vs cible réelle du profil ; SANS cible → grammes
+    /// seuls sur piste neutre vide (jamais un ratio inventé).
+    private func macroBar(_ label: String, _ m: (g: Double, target: Int?), _ color: Color) -> some View {
+        let grammes = Int(m.g.rounded())
+        let hasTarget = (m.target ?? 0) > 0
+        return VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.healthMapMuted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(hasTarget ? "\(grammes)/\(m.target!) g" : "\(grammes) g")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.healthMapSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            GeometryReader { g in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(color.opacity(0.16))
+                    if hasTarget {
+                        Capsule().fill(color)
+                            .frame(width: max(2, g.size.width * CGFloat(min(1, m.g / Double(m.target!)))))
+                    }
+                }
+            }
+            .frame(height: 5)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) : \(grammes) grammes\(hasTarget ? " sur \(m.target!)" : "").")
+    }
+}
+
+// MARK: - Jauge kcal « Ta journée » (ancienne version, hors écran depuis le
+// 29 juil. 2026 — conservée le temps qu'Arthur valide `ScanJourneeCard`.
+// Si la nouvelle carte est validée, supprimer `ScanKcalGauge` et
+// `ScanMacrosJourCard` ; si elle ne l'est pas, le retour est d'une ligne.)
 /// Carte kcal du jour : consommées · anneau budget · (dépensées, si dispo).
 /// Budget = objectif (kcal) + dépensées (Apple Santé). Anneau vert tant que le
 /// budget n'est pas dépassé, rouge en surplus. Sans objectif calculable : aucun
