@@ -256,8 +256,24 @@ struct MainTabView: View {
 
     /// Internal tab identifier. Uses a symbolic enum rather than `Int` so
     /// adding or reordering tabs doesn't silently break the deep-link mapping.
-    enum Tab: Hashable {
+    enum Tab: Hashable, CaseIterable, Identifiable {
         case bilan, suivi, scanner, plan, complements
+
+        var id: Self { self }
+
+        /// Position dans la barre d'onglets — c'est elle qui donne le SENS de
+        /// la transition (aller vers un onglet à gauche = l'écran glisse vers
+        /// la droite). Ne pas dériver de `allCases` ailleurs : l'ordre visuel
+        /// de la barre est la seule référence.
+        var position: Int {
+            switch self {
+            case .bilan: return 0
+            case .suivi: return 1
+            case .scanner: return 2
+            case .plan: return 3
+            case .complements: return 4
+            }
+        }
     }
 
     // La réservation d'espace pour la barre flottante vit désormais DANS
@@ -284,84 +300,93 @@ struct MainTabView: View {
                    value: dashboardVM.didFinishInitialLoad)
     }
 
-    private var mainInterface: some View {
-        TabView(selection: $selectedTab) {
-            // Tab 1: Bilan (Dashboard or Questionnaire)
-            Group {
-                if dashboardVM.hasCompletedQuestionnaire {
-                    DashboardView()
-                        .environmentObject(dashboardVM)
-                } else {
-                    QuestionnaireContainerView()
-                        .environmentObject(questionnaireVM)
-                        .environmentObject(dashboardVM)
-                }
-            }
-            .toolbar(.hidden, for: .tabBar)
-            .tabItem { Label("Bilan", systemImage: "heart.text.clipboard") }
-            .tag(Tab.bilan)
+    /// Conteneur d'onglets maison (remplace `TabView` depuis le 28 juillet).
+    ///
+    /// Raison : un `TabView` bascule sans transition — on ne comprenait pas le
+    /// LIEN entre les écrans. Ici, changer d'onglet fait GLISSER le contenu dans
+    /// le sens de la barre : aller vers un onglet situé à gauche (ex. Compléments
+    /// → Bilan via « combler par l'assiette ») fait glisser vers la droite.
+    ///
+    /// Les cinq onglets restent MONTÉS en permanence (comme le faisait TabView) :
+    /// leur état — position de scroll, données déjà chargées, `@StateObject` —
+    /// survit au changement d'onglet. Seuls l'offset, l'opacité et la capture
+    /// tactile changent.
+    /// Décalage horizontal d'un onglet. L'onglet courant est à 0 ; les autres
+    /// attendent hors écran, du côté qui correspond à leur position dans la
+    /// barre — c'est ce qui produit un sens de glissement toujours cohérent.
+    /// Le sortant ne parcourt que 35 % de la largeur (effet de parallaxe).
+    private func decalage(for tab: Tab, largeur: CGFloat) -> CGFloat {
+        guard tab != selectedTab else { return 0 }
+        let aGauche = tab.position < selectedTab.position
+        return aGauche ? -largeur * 0.35 : largeur
+    }
 
-            // Tab 2: Suivi (DESIGN-PAGES §4 — découverte + actif)
-            Group {
-                if dashboardVM.hasCompletedQuestionnaire {
-                    SuiviView()
-                        .environmentObject(dashboardVM)
-                } else {
-                    LockedFeatureView(title: "Suivi", message: "Complete ton bilan pour acceder au suivi quotidien.")
-                }
+    /// Contenu d'un onglet — mêmes écrans et mêmes garde-fous qu'avant
+    /// (verrouillage tant que le bilan n'est pas complété).
+    @ViewBuilder
+    private func tabContent(_ tab: Tab) -> some View {
+        switch tab {
+        case .bilan:
+            if dashboardVM.hasCompletedQuestionnaire {
+                DashboardView().environmentObject(dashboardVM)
+            } else {
+                QuestionnaireContainerView()
+                    .environmentObject(questionnaireVM)
+                    .environmentObject(dashboardVM)
             }
-            .toolbar(.hidden, for: .tabBar)
-            .tabItem { Label("Suivi", systemImage: "checkmark.circle") }
-            .tag(Tab.suivi)
-
-            // Tab 3: Scanner (MealScan)
-            Group {
-                if dashboardVM.hasCompletedQuestionnaire {
-                    MealScanView()
-                        .environmentObject(dashboardVM)
-                } else {
-                    LockedFeatureView(title: "Scanner", message: "Complete ton bilan pour scanner tes repas.")
-                }
+        case .suivi:
+            if dashboardVM.hasCompletedQuestionnaire {
+                SuiviView().environmentObject(dashboardVM)
+            } else {
+                LockedFeatureView(title: "Suivi", message: "Complete ton bilan pour acceder au suivi quotidien.")
             }
-            .toolbar(.hidden, for: .tabBar)
-            .tabItem { Label("Scanner", systemImage: "camera") }
-            .tag(Tab.scanner)
-
-            // Tab 4: Mon Plan (Recommendations)
-            Group {
-                if dashboardVM.hasCompletedQuestionnaire {
-                    RecommendationsView()
-                        .environmentObject(dashboardVM)
-                } else {
-                    LockedFeatureView(title: "Mon Plan", message: "Complete ton bilan pour acceder a ton plan personnalise.")
-                }
+        case .scanner:
+            if dashboardVM.hasCompletedQuestionnaire {
+                MealScanView().environmentObject(dashboardVM)
+            } else {
+                LockedFeatureView(title: "Scanner", message: "Complete ton bilan pour scanner tes repas.")
             }
-            .toolbar(.hidden, for: .tabBar)
-            .tabItem { Label("Plan", systemImage: "list.bullet.clipboard") }
-            .tag(Tab.plan)
-
-            // Tab 5: Mes compléments (remplace Profil — P6). Le Profil devient
-            // un bouton avatar en haut à droite du Bilan (sheet ci-dessous).
-            Group {
-                if dashboardVM.hasCompletedQuestionnaire {
-                    SupplementsView()
-                        .environmentObject(dashboardVM)
-                } else {
-                    LockedFeatureView(title: "Mes compléments", message: "Complete ton bilan pour voir tes compléments.")
-                }
+        case .plan:
+            if dashboardVM.hasCompletedQuestionnaire {
+                RecommendationsView().environmentObject(dashboardVM)
+            } else {
+                LockedFeatureView(title: "Mon Plan", message: "Complete ton bilan pour acceder a ton plan personnalise.")
             }
-            .toolbar(.hidden, for: .tabBar)
-            .tabItem { Label("Compléments", systemImage: "pills") }
-            .tag(Tab.complements)
+        case .complements:
+            if dashboardVM.hasCompletedQuestionnaire {
+                SupplementsView().environmentObject(dashboardVM)
+            } else {
+                LockedFeatureView(title: "Mes compléments", message: "Complete ton bilan pour voir tes compléments.")
+            }
         }
+    }
+
+    private var mainInterface: some View {
+        GeometryReader { geo in
+            ZStack {
+                ForEach(Tab.allCases) { tab in
+                    tabContent(tab)
+                        // Parallaxe : le sortant part à 35 % de la course, ce
+                        // qui donne la profondeur (l'entrant « pousse »).
+                        .offset(x: decalage(for: tab, largeur: geo.size.width))
+                        .opacity(tab == selectedTab ? 1 : 0)
+                        .allowsHitTesting(tab == selectedTab)
+                        .accessibilityHidden(tab != selectedTab)
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
+            .animation(reduceMotion ? .none : .easeOut(duration: 0.28), value: selectedTab)
+        }
+        .ignoresSafeArea(.keyboard)
         .tint(Color.kiwiGreen)
-        // Tab bar flottante (langage v4). ⚠️ L'inset posé sur le TabView dessine
-        // la barre mais NE se propage PAS aux écrans des onglets (TabView =
-        // conteneur UIKit : chaque onglet a sa propre safe area) — le contenu
-        // passait dessous (bug build 198). La réservation d'espace se fait donc
-        // DANS chaque écran via `.kiwiTabBarBottomInset()` ; ici on ne fait que
-        // dessiner la pill au-dessus du home indicator.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        // Tab bar flottante (langage v4). ⚠️ SURIMPRESSION, pas `safeAreaInset` :
+        // depuis le passage au conteneur maison (plus de TabView UIKit), un
+        // inset posé ici se propagerait aux écrans — qui réservent DÉJÀ la
+        // hauteur via `.kiwiTabBarBottomInset()`. On aurait donc un double
+        // espacement. La réservation reste dans chaque écran, la barre se
+        // contente de se dessiner par-dessus.
+        .overlay(alignment: .bottom) {
             // La barre flottante n'apparaît qu'une fois le bilan complété.
             // Pendant le questionnaire (onglet Bilan = QuestionnaireContainerView),
             // elle est masquée : sinon elle chevauche le bouton « Continuer » et
