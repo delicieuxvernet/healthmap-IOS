@@ -314,8 +314,10 @@ struct PlanSolutionsSheetV4: View {
     private var premium: Bool { subscriptionService.isPremium }
 
     /// Bloc de lignes rendu net ou flouté (verrouillé) selon l'abonnement.
+    /// `rows` doit être `@escaping` : `GatedOverlay` la stocke.
     @ViewBuilder
-    private func gatedRows<Content: View>(locked: Bool, @ViewBuilder rows: () -> Content) -> some View {
+    private func gatedRows<Content: View>(locked: Bool,
+                                          @ViewBuilder rows: @escaping () -> Content) -> some View {
         Group {
             if locked {
                 GatedOverlay(intensity: .locked) { VStack(spacing: 0) { rows() } }
