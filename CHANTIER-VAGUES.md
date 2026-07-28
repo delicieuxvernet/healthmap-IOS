@@ -38,7 +38,7 @@ jamais la vague N+1 avec la vague N à moitié poussée.
 | V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | ✅ mergé côté app · ⏳ **déploiement edge en attente** | [#185](https://github.com/delicieuxvernet/healthmap-IOS/pull/185) · web [#13](https://github.com/delicieuxvernet/healthmap/pull/13) |
 | V5 | Chrome — barre blanche en haut | `WarmBackground.swift` + 5 racines d'onglet | ✅ mergé | [#186](https://github.com/delicieuxvernet/healthmap-IOS/pull/186) |
 | V6 | Typographie homogène | `KiwioPalette.swift` + toutes les vues | ✅ mergé | [#186](https://github.com/delicieuxvernet/healthmap-IOS/pull/186) |
-| V7 | Calendrier navigable | `DailyMealJournalView.swift`, `MealJournalViewModel.swift` | 🔄 en cours | — |
+| V7 | Calendrier navigable | `DailyMealJournalView.swift`, `MealJournalViewModel.swift` | ✅ mergé | [#187](https://github.com/delicieuxvernet/healthmap-IOS/pull/187) |
 
 Légende : ⬜ à faire · 🔄 en cours · ✅ mergé sur `main`
 
@@ -200,7 +200,7 @@ Concrètement : les 45 `design: .monospaced` deviennent
 disparaît, et les titres de page (28 pt heavy) passent en arrondi — c'est ce qui
 mettait Compléments en décalage avec l'onboarding et le questionnaire.
 
-### V7 — calendrier navigable
+### V7 — calendrier navigable (PR #187, mergée)
 
 Le bouton calendrier ouvrait un journal figé sur aujourd'hui, et le modèle ne
 chargeait que 14 jours (semaine courante + précédente) — la navigation par jour
@@ -223,3 +223,19 @@ de l'accueil butait donc sur cette borne.
 **Non fait, à décider** : afficher une pastille sur les jours du calendrier qui
 portent des scans (il faudrait charger le mois AVANT de l'afficher, donc un
 appel par mois feuilleté).
+
+---
+
+## Ce qui reste, au 29 juillet au matin
+
+1. **Déployer l'edge function `parse-meal-voice`** (voir § V4) — c'est le seul
+   correctif de la nuit qui n'est PAS en ligne. Tant qu'il ne l'est pas, l'app
+   tronque les dictées à 1 200 caractères ; une fois déployé, remonter
+   `VoiceTranscript.maxChars` à 4000.
+2. **Valider sur device** ce que la CI ne peut pas voir : la lecture d'un
+   code-barres, le maintien du doigt sur « Dicte ton repas », et la disparition
+   effective de la barre blanche.
+3. **Trancher sur l'anneau des calories** (V1) : la carte du journal a pris sa
+   place. Si l'anneau doit revenir, `ScanKcalGauge` et `ScanMacrosJourCard` sont
+   toujours dans `ScanHomeComponents.swift`, hors écran. Sinon : les supprimer.
+4. `supabase/functions/_shared/` manque sur `main` du repo web (voir § V4).
