@@ -56,6 +56,16 @@ struct VoiceMealSheet: View {
         .presentationDetents(hauteurs)
         .presentationDragIndicator(.visible)
         .task { await speech.start() }
+        // Retour haptique aux moments clés — sans lui, on ne SENT pas quand
+        // l'app se met à écouter (retour device : « on ne comprend pas quand
+        // est-ce qu'on est écouté »). Une frappe nette au démarrage de l'écoute,
+        // comme un vocal Instagram / Snapchat.
+        .onChange(of: speech.state) { ancien, nouveau in
+            guard ancien != nouveau else { return }
+            if nouveau == .listening {
+                HapticService.shared.primary()
+            }
+        }
         .onDisappear { speech.reset() }
     }
 
@@ -63,7 +73,9 @@ struct VoiceMealSheet: View {
         switch phase {
         // 400/300 pt : la bulle à 330 croppait le contenu (consigne 3 lignes +
         // waveform + 2 boutons) dès que le texte grossissait — retour build 319.
-        case .listening: return [.height(400)]
+        // 500 pt depuis l'ajout du micro vivant (104 pt) : à 400 le bouton
+        // « Terminer » se faisait rogner.
+        case .listening: return [.height(500)]
         case .analyzing: return [.height(300)]
         case .results, .failed: return [.large]
         }
@@ -75,12 +87,18 @@ struct VoiceMealSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 PointEnregistrement()
-                Text("Je t'écoute…")
+                Text(speech.state == .listening ? "Je t'écoute…" : "Un instant…")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Kiwio.encre)
                 Spacer()
             }
             .padding(.top, 22)
+
+            // Micro qui RÉAGIT à la voix : le halo suit le volume réel du
+            // micro, donc il bouge quand on parle et retombe quand on se tait.
+            // C'est le signal « ça enregistre » que l'écran n'avait pas.
+            MicroVivant(level: speech.level, active: speech.state == .listening)
+                .frame(maxWidth: .infinity)
 
             // Waveform pilotée par le VOLUME RÉEL du micro (cf. les vocaux
             // iMessage) : on doit voir que ça écoute, pas une animation
@@ -115,6 +133,8 @@ struct VoiceMealSheet: View {
             Spacer(minLength: 0)
 
             Button {
+                // Frappe franche au relâchement : on sent que l'écoute s'arrête.
+                HapticService.shared.strong()
                 Task { await finishListening() }
             } label: {
                 Text("Terminer")
@@ -128,7 +148,7 @@ struct VoiceMealSheet: View {
             // rien à transcrire.
             .disabled(speech.duree < 1 || speech.state != .listening)
 
-            Button("Annuler") { speech.reset(); dismiss() }
+            Button("Annuler") { HapticService.shared.tap(); speech.reset(); dismiss() }
                 .font(.system(size: 15))
                 .foregroundStyle(Kiwio.secondaire)
                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -690,6 +710,53 @@ private struct BoutonPas: View {
         .buttonStyle(.plain)
         .disabled(!actif)
         .accessibilityLabel(symbole == "plus" ? "Ajouter 5 grammes" : "Retirer 5 grammes")
+    }
+}
+
+// MARK: - Micro vivant (halo piloté par le volume réel)
+
+/// Gros micro entouré de deux halos dont le rayon suit le NIVEAU SONORE mesuré
+/// (`SpeechCaptureService.level`), pas une boucle décorative : quand on parle,
+/// ça s'ouvre ; quand on se tait, ça retombe. C'est le repère « je suis
+/// écouté » qui manquait — l'équivalent du retour visuel d'un vocal Instagram
+/// ou Snapchat. Sous « Réduire les animations », le halo reste fixe.
+private struct MicroVivant: View {
+    /// Niveau instantané 0…1 publié par le service de capture.
+    let level: Float
+    let active: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Niveau borné et légèrement rehaussé : une voix normale doit déjà faire
+    /// respirer le halo, sinon on croit que rien ne se passe.
+    private var amplitude: CGFloat {
+        guard active else { return 0 }
+        return min(1, max(0, CGFloat(level)) * 1.6)
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Kiwio.vert.opacity(0.10))
+                .frame(width: 96, height: 96)
+                .scaleEffect(reduceMotion ? 1 : 1 + amplitude * 0.30)
+
+            Circle()
+                .fill(Kiwio.vert.opacity(0.16))
+                .frame(width: 76, height: 76)
+                .scaleEffect(reduceMotion ? 1 : 1 + amplitude * 0.18)
+
+            Circle()
+                .fill(active ? Kiwio.vert : Kiwio.secondaire)
+                .frame(width: 60, height: 60)
+
+            Image(systemName: "mic.fill")
+                .font(.system(size: 25, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .frame(height: 104)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: amplitude)
+        .accessibilityHidden(true)
     }
 }
 

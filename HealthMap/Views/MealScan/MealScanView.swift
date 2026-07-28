@@ -90,6 +90,13 @@ struct MealScanView: View {
                         }
                     }
                 }
+                .modifier(PhotoPresentations(
+                    showCaptureChoice: $showCaptureChoice,
+                    showCamera: $showCamera,
+                    showPhotoLibrary: $showPhotoLibrary,
+                    selectedItem: $selectedItem,
+                    onImage: { data in viewModel.selectedImage = data }
+                ))
                 .sheet(isPresented: $showPaywall) {
                     PaywallView().healthMapFullSheet()
                 }
@@ -576,25 +583,11 @@ struct MealScanView: View {
                 }
             }
             .buttonStyle(.healthMapPressed)
-            .confirmationDialog("Ajouter une photo de ton repas", isPresented: $showCaptureChoice, titleVisibility: .visible) {
-                Button("Prendre une photo") { showCamera = true }
-                Button("Choisir dans la galerie") { showPhotoLibrary = true }
-                Button("Annuler", role: .cancel) {}
-            }
-            .fullScreenCover(isPresented: $showCamera) {
-                CameraPicker { data in
-                    viewModel.selectedImage = data
-                }
-                .ignoresSafeArea()
-            }
-            .photosPicker(isPresented: $showPhotoLibrary, selection: $selectedItem, matching: .images)
-            .onChange(of: selectedItem) { _, item in
-                Task {
-                    if let data = try? await item?.loadTransferable(type: Data.self) {
-                        viewModel.selectedImage = data
-                    }
-                }
-            }
+            // ⚠️ Les présentations photo (dialogue, caméra, galerie) NE SONT PLUS
+            // attachées ici : `captureZone` n'est monté que lorsqu'une photo est
+            // déjà choisie, donc les modificateurs disparaissaient de la
+            // hiérarchie et le bouton « Scanne ton repas » ne présentait rien.
+            // Elles vivent désormais à la racine de l'écran (voir `photoPresentations`).
 
             if viewModel.selectedImage != nil {
                 Button {
@@ -1294,6 +1287,42 @@ private struct NeedImpactDetailSheet: View {
 // été retiré : à l'usage, l'anneau donnait l'impression d'un cercle qui
 // s'envole depuis le milieu de l'écran (retour device du 24 juillet). Le bloc
 // à deux colonnes met déjà la dictée en avant, sans animation infinie.
+
+// MARK: - Présentations photo (dialogue · caméra · galerie)
+/// Regroupées dans un modificateur posé à la RACINE de l'écran. Attachées
+/// auparavant à `captureZone`, elles disparaissaient de la hiérarchie dès que
+/// cette zone n'était plus rendue (aucune photo choisie) : le bouton
+/// « Scanne ton repas » basculait bien le flag, mais plus rien ne s'ouvrait.
+struct PhotoPresentations: ViewModifier {
+    @Binding var showCaptureChoice: Bool
+    @Binding var showCamera: Bool
+    @Binding var showPhotoLibrary: Bool
+    @Binding var selectedItem: PhotosPickerItem?
+    let onImage: (Data) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog("Ajouter une photo de ton repas",
+                                isPresented: $showCaptureChoice,
+                                titleVisibility: .visible) {
+                Button("Prendre une photo") { showCamera = true }
+                Button("Choisir dans la galerie") { showPhotoLibrary = true }
+                Button("Annuler", role: .cancel) {}
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPicker { data in onImage(data) }
+                    .ignoresSafeArea()
+            }
+            .photosPicker(isPresented: $showPhotoLibrary, selection: $selectedItem, matching: .images)
+            .onChange(of: selectedItem) { _, item in
+                Task {
+                    if let data = try? await item?.loadTransferable(type: Data.self) {
+                        onImage(data)
+                    }
+                }
+            }
+    }
+}
 
 #Preview {
     MealScanView()
