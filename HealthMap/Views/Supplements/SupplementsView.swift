@@ -22,6 +22,9 @@ struct SupplementsView: View {
     @State private var choices: [String: SupplementChoice] = [:]
     @State private var whyRec: SupplementRecommendation?
     @State private var interRec: SupplementRecommendation?
+    /// Apport dont la fiche « comment le couvrir par l'assiette » est ouverte
+    /// (aliments, quantités, moments) — même pop-up que depuis le Bilan.
+    @State private var assietteNutrient: EnrichedNutrient?
 
     /// Rituel du jour (tête de l'onglet) — dérivé du bilan v2 caché de façon
     /// déterministe, coche persistée localement. Recalculé à l'apparition et à
@@ -120,6 +123,14 @@ struct SupplementsView: View {
                 let warnings = engineResult?.warnings ?? []
                 let items = SupplementsV4.precautions(for: rec, warnings: warnings)
                 SupplementPrecautionsSheet(rec: rec, items: items, tip: SupplementsV4.tip(for: items))
+            }
+            // « Combler par l'assiette » → la MÊME fiche que depuis le Bilan :
+            // quels aliments couvrent cet apport, en quelle quantité, quand.
+            .sheet(item: $assietteNutrient) { nutrient in
+                NutrientDetailSheet(
+                    nutrient: nutrient,
+                    isPremium: SubscriptionService.shared.isPremium
+                )
             }
         }
     }
@@ -229,9 +240,21 @@ struct SupplementsView: View {
     /// « Par l'assiette » : (dé)sélectionne le mode assiette (affiche le CTA Plan).
     private func chooseAssiette(_ rec: SupplementRecommendation) {
         HapticService.shared.selection()
+        let activation = choices[rec.id] != .assiette
         withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
-            choices[rec.id] = (choices[rec.id] == .assiette) ? SupplementChoice.none : .assiette
+            choices[rec.id] = activation ? .assiette : SupplementChoice.none
         }
+        // Choisir « par l'assiette » sans dire COMMENT laissait l'utilisateur
+        // sans réponse. On enchaîne donc sur la fiche de l'apport concerné :
+        // les aliments qui le couvrent, les quantités et les moments de prise.
+        guard activation else { return }
+        assietteNutrient = nutrientDetail(for: rec.nutrientID)
+    }
+
+    /// Fiche détaillée de l'apport visé par une recommandation, si l'analyse
+    /// l'a produite. `nil` → on n'ouvre rien plutôt que d'afficher une coquille.
+    private func nutrientDetail(for id: NutrientID) -> EnrichedNutrient? {
+        dashboardVM.nutrients.first { $0.id == id.rawValue }
     }
 
     /// Depuis la fiche « Pourquoi pour toi » → ajoute au panier (mode complément).
