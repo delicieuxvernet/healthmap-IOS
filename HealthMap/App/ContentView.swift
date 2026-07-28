@@ -214,14 +214,13 @@ struct LaunchScreenView: View {
         ZStack {
             WarmBackground()
             VStack(spacing: 22) {
-                // Logo en contour épuré (le demi-kiwi réduit à ses traits, monochrome).
-                KiwiContourMark(size: 104, color: .kiwiCharcoal)
+                // Le logo EST l'indicateur d'attente : même dessin qu'au repos
+                // (`KiwiContourMark`), pépins qui s'allument en traînée. Le
+                // spinner sous le nom devenait redondant — il a sauté.
+                KiwiLoader(size: 104, color: .kiwiCharcoal, showFibers: true)
                 Text("Kiwio")
                     .font(.system(size: 30, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.kiwiCharcoal)
-                ProgressView()
-                    .tint(Color.kiwiGreen)
-                    .padding(.top, 4)
             }
         }
     }
