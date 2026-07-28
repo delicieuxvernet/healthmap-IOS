@@ -15,11 +15,17 @@ import SwiftUI
 struct VoiceMealSheet: View {
 
     let userId: String
+    /// Capture audio possédée par l'appelant. Elle est injectée — et non créée
+    /// ici — pour que la dictée puisse DÉMARRER sur l'accueil, le doigt posé sur
+    /// « Dicte ton repas », et se terminer dans cette feuille.
+    @ObservedObject var speech: SpeechCaptureService
+    /// Vrai quand la dictée a déjà été enregistrée sur l'accueil : la feuille
+    /// s'ouvre alors directement sur l'analyse, sans redemander de parler.
+    var analyseImmediate: Bool = false
     /// Appelé après enregistrement : (nb d'aliments ajoutés, kcal du repas).
     var onAdded: (Int, Int) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var speech = SpeechCaptureService()
 
     @State private var phase: Phase = .listening
     @State private var items: [VoiceMealService.Item] = []
@@ -67,7 +73,16 @@ struct VoiceMealSheet: View {
         // autorisations micro / reconnaissance. L'écoute attend le doigt.
         // (Le retour haptique est déclenché par le geste lui-même — appui,
         // relâchement, appui trop court — voir `pressionMicro`.)
-        .task { _ = await speech.requestPermissions() }
+        .task {
+            // Dictée déjà enregistrée depuis l'accueil : on enchaîne sur la
+            // transcription + l'analyse, la feuille n'a plus rien à écouter.
+            if analyseImmediate {
+                phase = .analyzing
+                await finishListening()
+            } else {
+                _ = await speech.requestPermissions()
+            }
+        }
         .onDisappear { speech.reset() }
     }
 
@@ -752,7 +767,7 @@ private struct BoutonPas: View {
 /// ça s'ouvre ; quand on se tait, ça retombe. C'est le repère « je suis
 /// écouté » qui manquait — l'équivalent du retour visuel d'un vocal Instagram
 /// ou Snapchat. Sous « Réduire les animations », le halo reste fixe.
-private struct MicroVivant: View {
+struct MicroVivant: View {
     /// Niveau instantané 0…1 publié par le service de capture.
     let level: Float
     let active: Bool
@@ -803,7 +818,7 @@ private struct MicroVivant: View {
 
 /// Point rouge qui bat, comme sur un enregistreur. Première preuve que l'app
 /// écoute vraiment — avant même que la waveform ne bouge.
-private struct PointEnregistrement: View {
+struct PointEnregistrement: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var actif = false
 
@@ -829,7 +844,7 @@ private struct PointEnregistrement: View {
 /// prouvait rien — on ne savait pas si l'app écoutait vraiment. Ici chaque barre
 /// suit le niveau sonore mesuré sur le buffer audio, comme les mémos vocaux
 /// d'iMessage : quand on se tait, ça retombe à ~3 pt ; quand on parle, ça monte.
-private struct Waveform: View {
+struct Waveform: View {
     /// Niveau instantané 0…1 publié par SpeechCaptureService.
     let level: Float
     let active: Bool

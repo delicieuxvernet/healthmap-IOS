@@ -40,6 +40,16 @@ struct MealScanView: View {
     @State private var barcodeDetail: MealJournalService.FoodDetail?
     @State private var barcodeIntrouvable: String?
     @State private var showVoice = false
+    /// Capture audio de l'accueil : elle démarre sous le doigt posé sur « Dicte
+    /// ton repas » et se termine dans la feuille vocale, à qui on la passe.
+    @StateObject private var speech = SpeechCaptureService()
+    @State private var doigtSurMicro = false
+    @State private var dicteeEnCours = false
+    @State private var dicteeTropCourte = false
+    @State private var analyseVocaleImmediate = false
+    /// Démarrage différé : sans ce délai, un appui simple lancerait puis
+    /// couperait l'enregistrement dans la foulée, pour rien.
+    @State private var demarrageDictee: Task<Void, Never>?
     @State private var voiceConfirmation: String?
     /// Apports quotidiens (score) des 7 derniers jours — courbe « apports vs besoins ».
     @State private var curve: [Int] = []
@@ -92,7 +102,11 @@ struct MealScanView: View {
                 }
                 .sheet(isPresented: $showVoice) {
                     if let uid = AuthService.shared.cachedCurrentUserIdString {
-                        VoiceMealSheet(userId: uid) { count, kcal in
+                        VoiceMealSheet(
+                            userId: uid,
+                            speech: speech,
+                            analyseImmediate: analyseVocaleImmediate
+                        ) { count, kcal in
                             voiceConfirmation = "\(count) aliment\(count > 1 ? "s" : "") ajouté\(count > 1 ? "s" : "") · \(kcal) kcal"
                             // Le quota ne se décompte QUE si la dictée a abouti
                             // à un enregistrement — un essai annulé ne coûte rien.
@@ -206,7 +220,15 @@ struct MealScanView: View {
                     // toute dérive/scroll horizontal (le scroll reste vertical only).
                     .containerRelativeFrame(.horizontal)
             }
+
+            if dicteeEnCours {
+                Color.kiwiCharcoal.opacity(0.25)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                bandeauDictee
+            }
         }
+        .animation(.easeOut(duration: 0.18), value: dicteeEnCours)
     }
 
     // MARK: - Page d'accueil Scan = journal calories du jour
@@ -240,6 +262,16 @@ struct MealScanView: View {
             // l'exemple de dictée, la jauge kcal et la recherche produit.
             dualEntry
             voiceHint
+
+            if dicteeTropCourte || speech.error != nil {
+                Text(speech.error?.message ?? "Trop court — garde le doigt appuyé le temps de parler.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Kiwio.rouge)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, Theme.spacingLG)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
+            }
 
             // Troisième entrée, juste sous les deux gestes phares : chercher un
             // produit — au clavier, ou par son code-barres.
@@ -390,43 +422,50 @@ struct MealScanView: View {
 
     private var dualEntry: some View {
         HStack(spacing: 0) {
-            entryColumn(
+            // Colonne micro : pas un `Button`, mais le même visuel piloté par un
+            // geste — c'est le doigt POSÉ qui enregistre (façon Instagram), et un
+            // bouton n'aurait rapporté que le relâchement.
+            entryColumnLabel(
                 icon: "mic.fill",
                 iconColor: .white,
                 circleFill: Kiwio.vert,
                 title: "Dicte ton repas",
-                subtitle: sousTitreVocal,
-                accessibilityHint: "Décris ton repas à voix haute, Kiwio compte les calories"
-            ) {
-                // Quota (famille 5) : une dictée par jour hors abonnement.
-                // On le vérifie AVANT d'ouvrir la feuille — plutôt que de
-                // laisser l'utilisateur parler pour échouer ensuite.
-                if peutDicter {
-                    showVoice = true
-                } else {
-                    showPaywall = true
-                }
-            }
+                subtitle: sousTitreVocal
+            )
+            .scaleEffect(doigtSurMicro ? 0.97 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: doigtSurMicro)
+            .contentShape(Rectangle())
+            .gesture(pressionDictee)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("Dicte ton repas")
+            .accessibilityHint("Maintiens le doigt pour enregistrer, relâche pour lancer l'analyse. Un appui simple ouvre la dictée.")
+            .accessibilityAction { ouvrirDicteeSansEnregistrer() }
 
             Rectangle()
                 .fill(Color.kiwiCharcoal.opacity(0.08))
                 .frame(width: 1)
                 .padding(.vertical, 14)
 
-            entryColumn(
-                icon: "camera.fill",
-                iconColor: Color.kiwiGreenInk,
-                circleFill: Color.kiwiTint,
-                title: "Scanne ton repas",
-                subtitle: "Photo de l'assiette",
-                accessibilityHint: "Prends une photo de ton assiette pour l'analyser"
-            ) {
+            Button {
                 if CameraPicker.isAvailable {
                     showCaptureChoice = true
                 } else {
                     showPhotoLibrary = true
                 }
+            } label: {
+                entryColumnLabel(
+                    icon: "camera.fill",
+                    iconColor: Color.kiwiGreenInk,
+                    circleFill: Color.kiwiTint,
+                    title: "Scanne ton repas",
+                    subtitle: "Photo de l'assiette"
+                )
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.healthMapPressed)
+            .accessibilityLabel("Scanne ton repas")
+            .accessibilityHint("Prends une photo de ton assiette pour l'analyser")
             // Le choix appareil photo / galerie est porté PAR le bouton, pas par
             // l'écran : depuis iOS 26 la feuille émerge du contrôle qui l'a
             // déclenchée, et attachée au scaffold sa flèche visait le milieu de
@@ -451,40 +490,148 @@ struct MealScanView: View {
         .padding(.horizontal, Theme.spacingLG)
     }
 
-    private func entryColumn(
+    /// Visuel d'une colonne d'entrée. Séparé de son interaction : le micro est
+    /// piloté par un geste maintenu, la photo par un bouton classique.
+    private func entryColumnLabel(
         icon: String,
         iconColor: Color,
         circleFill: Color,
         title: String,
-        subtitle: String,
-        accessibilityHint: String,
-        action: @escaping () -> Void
+        subtitle: String
     ) -> some View {
-        Button(action: action) {
-            VStack(spacing: 9) {
-                ZStack {
-                    Circle()
-                        .fill(circleFill)
-                        .frame(width: 58, height: 58)
-                    Image(systemName: icon)
-                        .font(.system(size: 23, weight: .semibold))
-                        .foregroundStyle(iconColor)
+        VStack(spacing: 9) {
+            ZStack {
+                Circle()
+                    .fill(circleFill)
+                    .frame(width: 58, height: 58)
+                Image(systemName: icon)
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(iconColor)
+            }
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Kiwio.encre)
+                .multilineTextAlignment(.center)
+            Text(subtitle)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Kiwio.secondaire)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
+    }
+
+    // MARK: - Dictée maintenue depuis l'accueil
+
+    /// Appui simple (moins de `delaiAvantEnregistrement`) : on ouvre la feuille
+    /// comme avant, sans rien enregistrer. Appui maintenu : l'enregistrement
+    /// démarre ICI, sous le doigt, et la feuille ne s'ouvre qu'au relâchement,
+    /// directement sur l'analyse. C'est le geste demandé le 29 juillet — le
+    /// détour par « ouvrir la feuille, puis maintenir le micro » a sauté.
+    private static let delaiAvantEnregistrement: UInt64 = 250_000_000
+
+    private var pressionDictee: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                guard !doigtSurMicro else { return }
+                doigtSurMicro = true
+                dicteeTropCourte = false
+                // Quota (famille 5) : vérifié AVANT d'enregistrer — plutôt que
+                // de laisser parler pour échouer ensuite.
+                guard peutDicter else { return }
+                HapticService.shared.primary()
+                demarrageDictee = Task {
+                    try? await Task.sleep(nanoseconds: Self.delaiAvantEnregistrement)
+                    guard !Task.isCancelled, doigtSurMicro else { return }
+                    dicteeEnCours = true
+                    await speech.start()
+
+                    // Garde-fou : dans un ScrollView, un geste peut être avalé
+                    // par le défilement et ne jamais rendre son `onEnded`. Sans
+                    // ce plafond, le micro tournerait indéfiniment.
+                    try? await Task.sleep(nanoseconds: 60_000_000_000)
+                    guard !Task.isCancelled, dicteeEnCours else { return }
+                    doigtSurMicro = false
+                    terminerDictee()
                 }
-                Text(title)
-                    .font(.system(size: 15, weight: .bold))
+            }
+            .onEnded { _ in
+                doigtSurMicro = false
+                demarrageDictee?.cancel()
+                demarrageDictee = nil
+
+                guard peutDicter else {
+                    showPaywall = true
+                    return
+                }
+
+                // Rien n'a démarré : c'était un appui simple.
+                guard dicteeEnCours else {
+                    ouvrirDicteeSansEnregistrer()
+                    return
+                }
+                terminerDictee()
+            }
+    }
+
+    /// Clôt la dictée maintenue : trop courte, on annule sans faire attendre ;
+    /// sinon la feuille s'ouvre directement sur l'analyse de ce qui vient
+    /// d'être enregistré.
+    private func terminerDictee() {
+        dicteeEnCours = false
+        guard speech.duree >= 1 else {
+            HapticService.shared.warning()
+            speech.reset()
+            dicteeTropCourte = true
+            return
+        }
+        HapticService.shared.strong()
+        analyseVocaleImmediate = true
+        showVoice = true
+    }
+
+    /// Ouvre la feuille vocale en mode écoute (le micro s'y maintient), sans
+    /// avoir rien enregistré depuis l'accueil.
+    private func ouvrirDicteeSansEnregistrer() {
+        guard peutDicter else {
+            showPaywall = true
+            return
+        }
+        analyseVocaleImmediate = false
+        showVoice = true
+    }
+
+    /// Bandeau d'enregistrement, tant que le doigt reste posé sur « Dicte ton
+    /// repas » : le halo réagit au volume réel, le minuteur prouve que ça tourne.
+    private var bandeauDictee: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 8) {
+                PointEnregistrement()
+                Text("Je t'écoute…")
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Kiwio.encre)
-                    .multilineTextAlignment(.center)
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .medium))
+            }
+            MicroVivant(level: speech.level, active: speech.state == .listening, pressed: true)
+            HStack(spacing: 12) {
+                Waveform(level: speech.level, active: speech.state == .listening)
+                Text(String(format: "%d:%02d", Int(speech.duree) / 60, Int(speech.duree) % 60))
+                    .font(.kiwioMono(13, .medium))
                     .foregroundStyle(Kiwio.secondaire)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(Kiwio.neutre, in: Capsule())
+
+            Text("Relâche quand tu as fini.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Kiwio.discret)
         }
-        .buttonStyle(.healthMapPressed)
-        .accessibilityLabel(title)
-        .accessibilityHint(accessibilityHint)
+        .padding(24)
+        .background(Kiwio.fondSheet, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: Color.kiwiCharcoal.opacity(0.18), radius: 30, y: 12)
+        .padding(.horizontal, 40)
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Enregistrement en cours. Relâche pour lancer l'analyse.")
     }
 
     /// Exemple de dictée + confirmation, sous le bloc à deux colonnes.
