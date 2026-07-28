@@ -11,6 +11,33 @@ import Supabase
 /// quantité n'est devinée. Un aliment dont la quantité n'a pas été dite revient
 /// avec `besoinQuantite = true` — l'app DOIT poser la question plutôt que
 /// d'inventer un grammage (une portion de féculent varie du simple au triple).
+/// Bornes de la dictée envoyée au serveur. Hors de `VoiceMealService`, qui est
+/// `@MainActor` : ce sont des fonctions pures, elles n'ont aucune raison d'être
+/// isolées — et les tests peuvent les appeler directement.
+enum VoiceTranscript {
+    /// Longueur maximale acceptée par l'edge function EN LIGNE (~1 min de
+    /// parole). Au-delà elle répond 400, que le client aplatissait en
+    /// « L'analyse n'a pas abouti » : c'est la cause n°1 des échecs signalés sur
+    /// les dictées longues. On coupe donc AVANT d'envoyer — un repas incomplet
+    /// vaut mieux qu'une erreur.
+    ///
+    /// La version corrigée de la fonction (branche `fix/parse-meal-voice-long`
+    /// du repo web) tronque elle-même à 4 000 caractères : une fois déployée,
+    /// remonter cette valeur à 4000.
+    static let maxChars = 1200
+
+    /// Coupe sur une frontière de mot — couper en plein milieu d'« omelette »
+    /// donnerait un aliment fantôme à l'extraction.
+    static func tronquerSiBesoin(_ texte: String) -> String {
+        guard texte.count > maxChars else { return texte }
+        let coupe = texte.prefix(maxChars)
+        if let dernierEspace = coupe.lastIndex(of: " "), dernierEspace > coupe.startIndex {
+            return String(coupe[..<dernierEspace])
+        }
+        return String(coupe)
+    }
+}
+
 @MainActor
 final class VoiceMealService {
 
@@ -161,7 +188,11 @@ final class VoiceMealService {
     }
 
     func analyze(transcript: String) async throws -> Analysis {
-        let clean = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let brut = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = VoiceTranscript.tronquerSiBesoin(brut)
+        if clean.count < brut.count {
+            AppLogger.analysis.error("dictée tronquée avant envoi (\(brut.count, privacy: .public) → \(clean.count, privacy: .public) car.)")
+        }
         guard clean.count >= 3 else { throw VoiceError.tooShort }
 
         let fmt = DateFormatter()

@@ -47,6 +47,9 @@ struct VoiceMealSheet: View {
     /// Affiché quand on relâche trop vite pour qu'il y ait quoi que ce soit
     /// à transcrire.
     @State private var tropCourt = false
+    /// Dernière transcription obtenue : permet de relancer l'analyse après un
+    /// échec serveur sans redemander à l'utilisateur de reparler.
+    @State private var dernierTranscript = ""
 
     private let journal = MealJournalService.shared
 
@@ -376,9 +379,31 @@ struct VoiceMealSheet: View {
                 .font(.system(size: 15))
                 .foregroundStyle(Kiwio.secondaire)
                 .multilineTextAlignment(.center)
-            Button("Réessayer") { Task { await restart() } }
+            // Relancer l'ANALYSE sur ce qui a déjà été dit, sans refaire parler :
+            // l'échec vient presque toujours du serveur, pas de la dictée, et
+            // reparler était le vrai coût de l'erreur.
+            if !dernierTranscript.isEmpty {
+                Button("Relancer l'analyse") {
+                    Task { await analyser(dernierTranscript) }
+                }
                 .buttonStyle(.borderedProminent)
                 .tint(Kiwio.vert)
+
+                Text("« \(dernierTranscript) »")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Kiwio.discret)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .padding(.horizontal, 8)
+
+                Button("Redire mon repas") { Task { await restart() } }
+                    .font(.system(size: 15))
+                    .foregroundStyle(Kiwio.secondaire)
+            } else {
+                Button("Réessayer") { Task { await restart() } }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Kiwio.vert)
+            }
             Spacer()
         }
         .padding(.horizontal, 20)
@@ -463,6 +488,16 @@ struct VoiceMealSheet: View {
             phase = .failed
             return
         }
+        // Conservé pour pouvoir relancer l'analyse sans refaire parler.
+        dernierTranscript = text
+        await analyser(text)
+    }
+
+    /// Analyse d'un texte déjà transcrit. Séparé de la capture pour qu'un échec
+    /// serveur se rejoue d'un bouton, au lieu d'imposer une nouvelle dictée.
+    private func analyser(_ text: String) async {
+        phase = .analyzing
+        errorMessage = nil
         do {
             let analysis = try await VoiceMealService.shared.analyze(transcript: text)
             quotedTranscript = analysis.transcript
@@ -490,6 +525,7 @@ struct VoiceMealSheet: View {
         quotedTranscript = ""
         tropCourt = false
         doigtPose = false
+        dernierTranscript = ""
         phase = .listening
         // On ne relance PAS l'écoute : depuis le passage au « maintenir pour
         // parler », c'est le doigt qui la démarre.
