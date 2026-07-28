@@ -160,8 +160,33 @@ final class VoiceMealService {
         }
     }
 
+    /// Longueur maximale acceptée par l'edge function en ligne (~1 min de
+    /// parole). Au-delà elle répondait 400, que le client aplatissait en
+    /// « L'analyse n'a pas abouti » : c'est la cause n°1 des échecs signalés sur
+    /// les dictées longues. On coupe donc AVANT d'envoyer — un repas incomplet
+    /// vaut mieux qu'une erreur.
+    ///
+    /// La version corrigée de la fonction (`fix/parse-meal-voice-long`) tronque
+    /// elle-même à 4 000 caractères : une fois déployée, remonter cette valeur.
+    static let maxTranscriptChars = 1200
+
+    /// Coupe sur une frontière de mot — couper en plein milieu d'« omelette »
+    /// donnerait un aliment fantôme à l'extraction.
+    static func tronquerSiBesoin(_ texte: String) -> String {
+        guard texte.count > maxTranscriptChars else { return texte }
+        let coupe = texte.prefix(maxTranscriptChars)
+        if let dernierEspace = coupe.lastIndex(of: " "), dernierEspace > coupe.startIndex {
+            return String(coupe[..<dernierEspace])
+        }
+        return String(coupe)
+    }
+
     func analyze(transcript: String) async throws -> Analysis {
-        let clean = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let brut = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = Self.tronquerSiBesoin(brut)
+        if clean.count < brut.count {
+            AppLogger.analysis.error("dictée tronquée avant envoi (\(brut.count, privacy: .public) → \(clean.count, privacy: .public) car.)")
+        }
         guard clean.count >= 3 else { throw VoiceError.tooShort }
 
         let fmt = DateFormatter()

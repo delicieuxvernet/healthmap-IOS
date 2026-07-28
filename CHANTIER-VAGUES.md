@@ -34,8 +34,8 @@ jamais la vague N+1 avec la vague N à moitié poussée.
 |---|---|---|---|---|
 | V1 | Scan — bloc calories + flèche du pop-up | `MealScanView.swift`, `ScanHomeComponents.swift` | ✅ mergé | [#182](https://github.com/delicieuxvernet/healthmap-IOS/pull/182) |
 | V2 | Scan — hiérarchie des entrées + recherche & code-barres | `MealScanView.swift`, `BarcodeScannerSheet.swift`, `Info.plist` | ✅ mergé | [#183](https://github.com/delicieuxvernet/healthmap-IOS/pull/183) |
-| V3 | Vocal — maintien pour enregistrer | `MealScanView.swift`, `VoiceMealSheet.swift` | 🔄 en cours | — |
-| V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | ⬜ à faire | — |
+| V3 | Vocal — maintien pour enregistrer | `MealScanView.swift`, `VoiceMealSheet.swift` | ✅ mergé | [#184](https://github.com/delicieuxvernet/healthmap-IOS/pull/184) |
+| V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | 🔄 en cours · **déploiement edge en attente** | — |
 | V5 | Chrome — barre blanche en haut | vues racine des onglets | ⬜ à faire | — |
 | V6 | Typographie homogène | `ThemeConstants.swift` + vues | ⬜ à faire | — |
 | V7 | Calendrier navigable | `DailyMealJournalView.swift`, `MealJournalViewModel.swift` | ⬜ à faire | — |
@@ -115,3 +115,48 @@ qui a été volontairement laissé de côté)_
 - Garde-fou 60 s : dans un `ScrollView`, un geste peut être avalé par le
   défilement et ne jamais rendre son `onEnded` — sans plafond le micro
   tournerait indéfiniment.
+
+### V4 — fiabilité du vocal (en cours)
+
+**Diagnostic.** Contrairement à l'intuition (« ça n'utilise pas d'API, que du
+cache »), la dictée appelle bien Claude — deux fois : extraction des aliments,
+puis appariement à la base. Trois défauts, tous côté serveur :
+
+1. `MAX_TRANSCRIPT_CHARS = 1200` (~1 min de parole) → **400** au-delà. Le client
+   aplatissait tout code non-429 en « L'analyse n'a pas abouti » : d'où
+   l'impression d'aléatoire, alors que la règle était déterministe (dictée
+   longue = échec garanti). **C'est la cause n°1.**
+2. `max_tokens` d'appariement à 1200 : avec ~12 aliments le JSON sortait
+   tronqué, donc invalide, donc 502.
+3. Retry aveugle : à `temperature: 0`, réessayer un JSON invalide redonne le
+   même JSON invalide, 30 s plus tard.
+
+**Correctif serveur** — branche `fix/parse-meal-voice-long` du repo **web**
+(`Healthmap/code`), PR ouverte : limite à 4 000 caractères **avec troncature au
+lieu du refus**, `max_tokens` 3000/2500, erreurs classées (retry seulement si
+429/5xx/timeout), troncature `max_tokens` nommée dans les logs.
+
+> ⚠️ **Déploiement en attente.** L'edge function n'est PAS encore déployée : le
+> déploiement par MCP exige de réinjecter les 60 Ko de source
+> (`index.ts` + `prompt.ts` + `quantities.ts` + `_shared/*`) dans un seul appel,
+> ce qui dépasse la taille d'un message. La CLI Supabase n'est pas authentifiée
+> localement (`~/.supabase/access-token` absent).
+> **Reprise :** `npx supabase login` puis
+> `npx supabase functions deploy parse-meal-voice --project-ref ftwfxdfkghkemnpwtzlu --no-verify-jwt`
+> depuis `Healthmap/code` sur la branche `fix/parse-meal-voice-long`.
+> Une fois déployée : remonter `VoiceMealService.maxTranscriptChars` à 4000.
+
+**Correctif client (celui qui part en TestFlight ce soir)** — il fonctionne avec
+la fonction **actuellement en ligne** :
+
+- `VoiceMealService` tronque la dictée à 1 200 caractères **avant** l'envoi, sur
+  une frontière de mot (couper « omelette » en « omel » inventerait un aliment).
+  Couvert par `HealthMapTests/VoiceTranscriptTests.swift`.
+- En cas d'échec serveur, la feuille propose **« Relancer l'analyse »** sur la
+  transcription déjà obtenue, au lieu d'exiger une nouvelle dictée — le vrai
+  coût de l'erreur, c'était de devoir reparler.
+
+**Note repo web** : `supabase/functions/_shared/` n'existe que sur la branche
+`deploy/origin-main`, pas sur `main`, alors que `parse-meal-voice/index.ts`
+l'importe. `main` est donc non déployable en l'état. Non corrigé ici (hors
+périmètre), mais à traiter.
