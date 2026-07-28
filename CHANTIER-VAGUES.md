@@ -33,8 +33,8 @@ jamais la vague N+1 avec la vague N à moitié poussée.
 | Vague | Sujet | Fichiers pivots | État | PR |
 |---|---|---|---|---|
 | V1 | Scan — bloc calories + flèche du pop-up | `MealScanView.swift`, `ScanHomeComponents.swift` | ✅ mergé | [#182](https://github.com/delicieuxvernet/healthmap-IOS/pull/182) |
-| V2 | Scan — hiérarchie des entrées + recherche & code-barres | `MealScanView.swift`, `BarcodeScannerSheet.swift`, `Info.plist` | 🔄 en cours | — |
-| V3 | Vocal — maintien pour enregistrer | `MealScanView.swift`, `VoiceMealSheet.swift` | ⬜ à faire | — |
+| V2 | Scan — hiérarchie des entrées + recherche & code-barres | `MealScanView.swift`, `BarcodeScannerSheet.swift`, `Info.plist` | ✅ mergé | [#183](https://github.com/delicieuxvernet/healthmap-IOS/pull/183) |
+| V3 | Vocal — maintien pour enregistrer | `MealScanView.swift`, `VoiceMealSheet.swift` | 🔄 en cours | — |
 | V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | ⬜ à faire | — |
 | V5 | Chrome — barre blanche en haut | vues racine des onglets | ⬜ à faire | — |
 | V6 | Typographie homogène | `ThemeConstants.swift` + vues | ⬜ à faire | — |
@@ -98,3 +98,20 @@ qui a été volontairement laissé de côté)_
 - L'ancien écran code-barres (supprimé en juin, commit `66be05b`) ne scannait
   rien : c'était une saisie manuelle du code. Rien à restaurer, tout à écrire.
 - `NSCameraUsageDescription` mentionne désormais le code-barres (revue App Store).
+- **Non vérifiable en CI** (pas de caméra) : la lecture réelle d'un code-barres
+  se valide sur device.
+
+### V3 — maintien pour enregistrer (en cours)
+
+- L'enregistrement démarre sur l'ACCUEIL, doigt posé sur « Dicte ton repas »,
+  après 250 ms de maintien (en deçà, c'est un appui simple : la feuille s'ouvre
+  comme avant, sans rien enregistrer).
+- Pendant le maintien, un bandeau reprend le micro vivant, la waveform et le
+  minuteur de la feuille (`MicroVivant`, `Waveform`, `PointEnregistrement` sont
+  passés d'internes au fichier vocal à partagés — aucune duplication de dessin).
+- Au relâchement, la feuille s'ouvre directement sur l'analyse. La capture est
+  **injectée** dans `VoiceMealSheet` (`@ObservedObject`) au lieu d'être créée
+  par elle : c'est ce qui permet de commencer dehors et de finir dedans.
+- Garde-fou 60 s : dans un `ScrollView`, un geste peut être avalé par le
+  défilement et ne jamais rendre son `onEnded` — sans plafond le micro
+  tournerait indéfiniment.
