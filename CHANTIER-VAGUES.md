@@ -32,8 +32,8 @@ jamais la vague N+1 avec la vague N à moitié poussée.
 
 | Vague | Sujet | Fichiers pivots | État | PR |
 |---|---|---|---|---|
-| V1 | Scan — bloc calories + flèche du pop-up | `MealScanView.swift`, `ScanHomeComponents.swift`, `DailyMealJournalView.swift` | ⬜ à faire | — |
-| V2 | Scan — hiérarchie des entrées + recherche & code-barres | `MealScanView.swift`, `JournalEditorComponents.swift`, `FoodScanService.swift` | ⬜ à faire | — |
+| V1 | Scan — bloc calories + flèche du pop-up | `MealScanView.swift`, `ScanHomeComponents.swift` | ✅ mergé | [#182](https://github.com/delicieuxvernet/healthmap-IOS/pull/182) |
+| V2 | Scan — hiérarchie des entrées + recherche & code-barres | `MealScanView.swift`, `BarcodeScannerSheet.swift`, `Info.plist` | 🔄 en cours | — |
 | V3 | Vocal — maintien pour enregistrer | `MealScanView.swift`, `VoiceMealSheet.swift` | ⬜ à faire | — |
 | V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | ⬜ à faire | — |
 | V5 | Chrome — barre blanche en haut | vues racine des onglets | ⬜ à faire | — |
@@ -71,3 +71,30 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ mergé sur `main`
 
 _(chaque vague ajoute ici : ce qui a été fait, comment ça a été vérifié, et ce
 qui a été volontairement laissé de côté)_
+
+### V1 — bloc calories + flèche du pop-up (PR #182, mergée, CI verte 6 min)
+
+- `ScanJourneeCard` remplace `ScanKcalGauge` : kcal restantes en grand, consommé /
+  budget, barre de progression, légende Apple Santé, phrase de synthèse et les
+  4 macros en barres. La carte macros à anneaux et le titre de section « Ta
+  journée » sortent de l'écran (la carte porte son propre titre).
+- `ScanKcalGauge` et `ScanMacrosJourCard` restent dans `ScanHomeComponents.swift`,
+  hors écran, jusqu'à validation d'Arthur. **Si validée → les supprimer.**
+- Le `confirmationDialog` photo est porté par le bouton « Scanne ton repas »
+  (avant : par le scaffold, d'où la flèche au centre de l'écran).
+- Laissé de côté : l'anneau circulaire disparaît de l'accueil. Arthur avait
+  d'abord demandé « un rond avec l'espace bien réparti », puis demandé que le
+  bloc du journal prenne cette place — la seconde consigne l'emporte, à
+  reconfirmer au réveil.
+
+### V2 — entrées + recherche & code-barres (en cours)
+
+- La barre de recherche remonte juste sous les deux gestes phares (3ᵉ fonction).
+- Un bouton code-barres vit DANS cette barre, à droite (52×48 pt).
+- `BarcodeScannerSheet` : nouveau. `AVCaptureMetadataOutput` (EAN-13/8, UPC-E),
+  gestion des trois états d'autorisation caméra. Le code lu est résolu par
+  `foodDetail(id: "off:<code>")` — le MÊME chemin que la recherche texte, donc la
+  fiche portion et l'ajout au journal sont ceux déjà testés.
+- L'ancien écran code-barres (supprimé en juin, commit `66be05b`) ne scannait
+  rien : c'était une saisie manuelle du code. Rien à restaurer, tout à écrire.
+- `NSCameraUsageDescription` mentionne désormais le code-barres (revue App Store).
