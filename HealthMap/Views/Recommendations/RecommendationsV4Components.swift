@@ -308,6 +308,25 @@ struct PlanSolutionsSheetV4: View {
     let onSeeSupplements: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var expanded: Set<UUID> = []
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
+
+    /// Abonné : tout est net, aucune porte.
+    private var premium: Bool { subscriptionService.isPremium }
+
+    /// Bloc de lignes rendu net ou flouté (verrouillé) selon l'abonnement.
+    @ViewBuilder
+    private func gatedRows<Content: View>(locked: Bool, @ViewBuilder rows: () -> Content) -> some View {
+        Group {
+            if locked {
+                GatedOverlay(intensity: .locked) { VStack(spacing: 0) { rows() } }
+            } else {
+                VStack(spacing: 0) { rows() }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 4)
+        .kiwiCard(radius: 18)
+    }
 
     var body: some View {
         ScrollView {
@@ -353,12 +372,16 @@ struct PlanSolutionsSheetV4: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 14)
 
-                // Par la nutrition (lignes dépliables).
+                // Par la nutrition — TEASER (famille 1/3 du handoff) : le premier
+                // aliment reste net et dépliable, le reste est flouté sous une
+                // porte. On prouve la matière sans livrer toute l'ordonnance.
                 if !topic.nutrition.isEmpty {
                     sectionHeader(symbol: "leaf.fill", tint: Color.kiwiGreenInk,
                                   bg: Color.kiwiGreenSoft, title: "Par la nutrition")
+                    let visibles = premium ? topic.nutrition : Array(topic.nutrition.prefix(1))
+                    let gatees = premium ? [] : Array(topic.nutrition.dropFirst())
                     VStack(spacing: 0) {
-                        ForEach(Array(topic.nutrition.enumerated()), id: \.element.id) { idx, n in
+                        ForEach(Array(visibles.enumerated()), id: \.element.id) { idx, n in
                             PlanNutritionRowV4(
                                 solution: n,
                                 isExpanded: expanded.contains(n.id),
@@ -366,38 +389,68 @@ struct PlanSolutionsSheetV4: View {
                                 onToggle: { toggle(n.id) }
                             )
                         }
+                        if !gatees.isEmpty {
+                            GatedOverlay(intensity: .teaser) {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(gatees.enumerated()), id: \.element.id) { idx, n in
+                                        PlanNutritionRowV4(solution: n, isExpanded: false,
+                                                           showDivider: true, onToggle: {})
+                                    }
+                                }
+                            }
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 4)
                     .kiwiCard(radius: 18)
+
+                    if !gatees.isEmpty {
+                        UnlockDoor(
+                            icon: "leaf.fill",
+                            title: "Débloque tes \(gatees.count) autres aliments",
+                            subtitle: "Combien, quand, comment les préparer",
+                            zone: "plan_nutrition"
+                        )
+                    }
                 }
 
-                // Par les habitudes.
+                // Par les habitudes — VERROUILLÉ : la catégorie reste visible
+                // (on voit qu'il y a des leviers), le contenu est gaté.
                 if !topic.habitudes.isEmpty {
                     sectionHeader(symbol: "arrow.triangle.2.circlepath", tint: Color(hex: "2F6FE0"),
                                   bg: Color(hex: "EAF0FB"), title: "Par les habitudes")
-                    VStack(spacing: 0) {
+                    gatedRows(locked: !premium) {
                         ForEach(Array(topic.habitudes.enumerated()), id: \.element.id) { idx, ha in
                             PlanHabitRowV4(solution: ha, showDivider: idx > 0)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 4)
-                    .kiwiCard(radius: 18)
+                    if !premium {
+                        UnlockDoor(
+                            icon: "lock.fill",
+                            title: "Débloque tes leviers d'hygiène de vie",
+                            subtitle: "Ce qui joue au-delà de l'assiette",
+                            zone: "plan_habitudes"
+                        )
+                    }
                 }
 
-                // Par les compléments.
+                // Par les compléments — VERROUILLÉ (même logique).
                 if !topic.complements.isEmpty {
                     sectionHeader(symbol: "pills.fill", tint: topic.accent,
                                   bg: topic.tint, title: "Par les compléments")
-                    VStack(spacing: 0) {
+                    gatedRows(locked: !premium) {
                         ForEach(Array(topic.complements.enumerated()), id: \.element.id) { idx, c in
                             PlanSupplementRowV4(solution: c, showDivider: idx > 0)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 4)
-                    .kiwiCard(radius: 18)
+                    if !premium {
+                        UnlockDoor(
+                            icon: "pills.fill",
+                            title: "Débloque ton protocole de compléments",
+                            subtitle: "Lesquels, à quelle dose, à quel moment",
+                            zone: "plan_complements"
+                        )
+                    }
                 }
 
                 // CTA « Voir mes compléments recommandés ».
