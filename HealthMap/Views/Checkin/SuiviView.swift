@@ -298,7 +298,20 @@ struct SuiviView: View {
                     pageTitles: evolutions.map { capitalized($0.nom) },
                     pageHeight: 214
                 ) { i in
-                    SuiviSymptomPage(evolution: evolutions[i], reduceMotion: reduceMotion)
+                    SuiviSymptomPage(evolution: evolutions[i],
+                                     reduceMotion: reduceMotion,
+                                     locked: !subscriptionService.isPremium)
+                }
+
+                // Porte affichée seulement s'il y a une VRAIE trajectoire à
+                // débloquer (en mode exemple, la courbe est déjà visible).
+                if !subscriptionService.isPremium, evolutions.contains(where: { !$0.isExample }) {
+                    UnlockDoor(
+                        icon: "chart.xyaxis.line",
+                        title: "Vois l'évolution de tes symptômes",
+                        subtitle: "Ta trajectoire, semaine après semaine",
+                        zone: "suivi_symptomes"
+                    )
                 }
             }
         } else if dashboardVM.isLoadingAnalysisV2 {
@@ -596,6 +609,12 @@ private struct SuiviStartBanner: View {
 private struct SuiviSymptomPage: View {
     let evolution: SuiviEngineV4.SymptomEvolution
     let reduceMotion: Bool
+    /// Famille 2 du handoff Premium : le verdict du jour reste NET, seule la
+    /// trajectoire dans le temps est gatée. On ne floute jamais une courbe
+    /// d'EXEMPLE (le suivi n'a pas démarré) : ce serait cacher une démo.
+    var locked: Bool = false
+
+    private var chartLocked: Bool { locked && !evolution.isExample }
 
     @State private var progress: CGFloat = 0
 
@@ -679,9 +698,17 @@ private struct SuiviSymptomPage: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
 
-            SuiviPosedChart(evolution: evolution, progress: progress)
-                .frame(height: 132)
+            if chartLocked {
+                GatedOverlay(intensity: .teaser) {
+                    SuiviPosedChart(evolution: evolution, progress: progress)
+                        .frame(height: 132)
+                }
                 .padding(.top, 10)
+            } else {
+                SuiviPosedChart(evolution: evolution, progress: progress)
+                    .frame(height: 132)
+                    .padding(.top, 10)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
