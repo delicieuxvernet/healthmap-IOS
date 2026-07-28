@@ -99,6 +99,36 @@ final class VoiceMealService {
         }
     }
 
+    // MARK: - Quota de dictées (famille 5 du handoff Premium)
+    /// Compteur LOCAL de dictées, scopé utilisateur + jour. Le gratuit a droit
+    /// à une dictée par jour ; Premium est illimité. Le serveur garde son
+    /// propre garde-fou (`VoiceError.rateLimited`) — celui-ci sert à afficher
+    /// l'état AVANT de lancer l'enregistrement, plutôt que d'échouer après.
+    enum QuotaStore {
+        /// Dictées offertes par jour hors abonnement.
+        static let dictéesGratuitesParJour = 1
+
+        private static func clef(_ userId: String, _ date: Date = Date()) -> String {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            return "hm_voice_uses_\(userId)_\(f.string(from: date))"
+        }
+
+        static func utiliséesAujourdhui(userId: String) -> Int {
+            UserDefaults.standard.integer(forKey: clef(userId))
+        }
+
+        static func enregistrerUneDictée(userId: String) {
+            let k = clef(userId)
+            UserDefaults.standard.set(UserDefaults.standard.integer(forKey: k) + 1, forKey: k)
+        }
+
+        /// Reste-t-il une dictée aujourd'hui ? Toujours vrai pour un abonné.
+        static func peutDicter(userId: String, isPremium: Bool) -> Bool {
+            isPremium || utiliséesAujourdhui(userId: userId) < dictéesGratuitesParJour
+        }
+    }
+
     enum VoiceError: LocalizedError {
         case tooShort
         case rateLimited
