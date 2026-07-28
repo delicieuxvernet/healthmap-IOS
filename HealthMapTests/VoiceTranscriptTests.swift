@@ -8,19 +8,19 @@ final class VoiceTranscriptTests: XCTestCase {
 
     func testTexteCourtInchange() {
         let texte = "ce midi, du poulet rôti avec du riz et une compote"
-        XCTAssertEqual(VoiceMealService.tronquerSiBesoin(texte), texte)
+        XCTAssertEqual(VoiceTranscript.tronquerSiBesoin(texte), texte)
     }
 
     func testTexteALaLimiteInchange() {
-        let texte = String(repeating: "a", count: VoiceMealService.maxTranscriptChars)
-        XCTAssertEqual(VoiceMealService.tronquerSiBesoin(texte).count,
-                       VoiceMealService.maxTranscriptChars)
+        let texte = String(repeating: "a", count: VoiceTranscript.maxChars)
+        XCTAssertEqual(VoiceTranscript.tronquerSiBesoin(texte).count,
+                       VoiceTranscript.maxChars)
     }
 
     func testTexteTropLongEstTronque() {
         let texte = String(repeating: "mot ", count: 1000)   // 4 000 caractères
-        let coupe = VoiceMealService.tronquerSiBesoin(texte)
-        XCTAssertLessThanOrEqual(coupe.count, VoiceMealService.maxTranscriptChars)
+        let coupe = VoiceTranscript.tronquerSiBesoin(texte)
+        XCTAssertLessThanOrEqual(coupe.count, VoiceTranscript.maxChars)
         XCTAssertGreaterThan(coupe.count, 0)
     }
 
@@ -28,7 +28,7 @@ final class VoiceTranscriptTests: XCTestCase {
     /// (« omel » au lieu d'« omelette »).
     func testCoupeSurUneFrontiereDeMot() {
         let texte = String(repeating: "omelette ", count: 400)
-        let coupe = VoiceMealService.tronquerSiBesoin(texte)
+        let coupe = VoiceTranscript.tronquerSiBesoin(texte)
         XCTAssertFalse(coupe.hasSuffix(" "), "la coupe ne doit pas laisser d'espace final")
         let dernierMot = coupe.split(separator: " ").last.map(String.init) ?? ""
         XCTAssertEqual(dernierMot, "omelette", "le dernier mot doit être entier")
@@ -38,7 +38,7 @@ final class VoiceTranscriptTests: XCTestCase {
     /// que de renvoyer une chaîne vide.
     func testTexteSansEspaceEstCoupeNet() {
         let texte = String(repeating: "a", count: 2000)
-        let coupe = VoiceMealService.tronquerSiBesoin(texte)
-        XCTAssertEqual(coupe.count, VoiceMealService.maxTranscriptChars)
+        let coupe = VoiceTranscript.tronquerSiBesoin(texte)
+        XCTAssertEqual(coupe.count, VoiceTranscript.maxChars)
     }
 }

@@ -144,7 +144,7 @@ lieu du refus**, `max_tokens` 3000/2500, erreurs classées (retry seulement si
 > **Reprise :** `npx supabase login` puis
 > `npx supabase functions deploy parse-meal-voice --project-ref ftwfxdfkghkemnpwtzlu --no-verify-jwt`
 > depuis `Healthmap/code` sur la branche `fix/parse-meal-voice-long`.
-> Une fois déployée : remonter `VoiceMealService.maxTranscriptChars` à 4000.
+> Une fois déployée : remonter `VoiceTranscript.maxChars` à 4000.
 
 **Correctif client (celui qui part en TestFlight ce soir)** — il fonctionne avec
 la fonction **actuellement en ligne** :
