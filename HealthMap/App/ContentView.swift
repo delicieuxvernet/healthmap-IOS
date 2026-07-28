@@ -782,7 +782,7 @@ struct ProfileView: View {
                         Label("Politique de confidentialite", systemImage: "hand.raised.fill")
                     }
 
-                    Link(destination: URL(string: "https://healthmap.fr/terms")!) {
+                    Link(destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!) {
                         Label("Conditions d'utilisation", systemImage: "doc.text.fill")
                     }
                 }
