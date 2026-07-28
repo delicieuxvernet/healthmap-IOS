@@ -227,7 +227,9 @@ struct NutrientDetailSheet: View {
                 .accessibilityHidden(true)
 
             Text(comparaison)
-                .font(.system(size: 14, weight: .regular, design: .serif))
+                // Le serif était la seule occurrence de cette famille dans toute
+                // l'app : l'italique suffit à marquer la citation.
+                .font(.system(size: 14, weight: .regular))
                 .italic()
                 .foregroundStyle(Color.healthMapSecondary)
                 .lineLimit(3)

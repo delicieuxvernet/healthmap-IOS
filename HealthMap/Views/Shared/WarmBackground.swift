@@ -18,6 +18,22 @@ import SwiftUI
 ///     contenu
 /// }
 /// ```
+extension View {
+    /// Aligne la barre de navigation sur le fond de l'app.
+    ///
+    /// Sans ça, iOS pose la sienne : un bandeau clair figé sous l'heure et la
+    /// batterie, qui ne s'en va jamais (barre `.inline`, titre vide) et tranche
+    /// avec le crème de toutes nos pages. Ce n'est pas une marge parasite —
+    /// c'est le fond par défaut de la barre de navigation.
+    ///
+    /// À poser sur le contenu racine de CHAQUE onglet, dans son `NavigationStack`.
+    func kiwiNavigationBarBackground() -> some View {
+        self
+            .toolbarBackground(Color.healthMapWarm, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+
 struct WarmBackground: View {
     var body: some View {
         ZStack {

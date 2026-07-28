@@ -35,9 +35,9 @@ jamais la vague N+1 avec la vague N à moitié poussée.
 | V1 | Scan — bloc calories + flèche du pop-up | `MealScanView.swift`, `ScanHomeComponents.swift` | ✅ mergé | [#182](https://github.com/delicieuxvernet/healthmap-IOS/pull/182) |
 | V2 | Scan — hiérarchie des entrées + recherche & code-barres | `MealScanView.swift`, `BarcodeScannerSheet.swift`, `Info.plist` | ✅ mergé | [#183](https://github.com/delicieuxvernet/healthmap-IOS/pull/183) |
 | V3 | Vocal — maintien pour enregistrer | `MealScanView.swift`, `VoiceMealSheet.swift` | ✅ mergé | [#184](https://github.com/delicieuxvernet/healthmap-IOS/pull/184) |
-| V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | 🔄 en cours · **déploiement edge en attente** | — |
-| V5 | Chrome — barre blanche en haut | vues racine des onglets | ⬜ à faire | — |
-| V6 | Typographie homogène | `ThemeConstants.swift` + vues | ⬜ à faire | — |
+| V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | ✅ mergé côté app · ⏳ **déploiement edge en attente** | [#185](https://github.com/delicieuxvernet/healthmap-IOS/pull/185) · web [#13](https://github.com/delicieuxvernet/healthmap/pull/13) |
+| V5 | Chrome — barre blanche en haut | `WarmBackground.swift` + 5 racines d'onglet | 🔄 en cours | — |
+| V6 | Typographie homogène | `KiwioPalette.swift` + toutes les vues | 🔄 en cours | — |
 | V7 | Calendrier navigable | `DailyMealJournalView.swift`, `MealJournalViewModel.swift` | ⬜ à faire | — |
 
 Légende : ⬜ à faire · 🔄 en cours · ✅ mergé sur `main`
@@ -160,3 +160,42 @@ la fonction **actuellement en ligne** :
 `deploy/origin-main`, pas sur `main`, alors que `parse-meal-voice/index.ts`
 l'importe. `main` est donc non déployable en l'état. Non corrigé ici (hors
 périmètre), mais à traiter.
+
+### V5 — la barre blanche en haut
+
+Ce n'était pas une marge parasite : c'est le **fond par défaut de la barre de
+navigation**. Les cinq onglets ouvrent un `NavigationStack` avec un titre vide
+en `.inline` ; iOS pose alors sa propre barre, claire et opaque, qui tranche
+avec le crème de toutes les pages et ne s'efface jamais.
+
+Correctif : `kiwiNavigationBarBackground()` (dans `WarmBackground.swift`) pose
+`Color.healthMapWarm` en fond de barre, visible — la barre existe toujours
+(les boutons restent lisibles) mais devient indiscernable de la page. Appliqué
+aux cinq racines d'onglet.
+
+**À confirmer sur device** : si un liseré subsiste, c'est que la cause est
+ailleurs (séparateur de barre, ou safe area d'un écran particulier).
+
+### V6 — typographie homogène
+
+Audit : **quatre** familles cohabitaient dans l'app.
+
+| Famille | Usages | Verdict |
+|---|---|---|
+| SF Pro (système) | texte courant, et les titres de page des 5 onglets | gardée — texte |
+| SF Pro Rounded | tokens `Theme.titleFont/headlineFont/subheadlineFont`, 52 usages ad hoc | gardée — titres et chiffres |
+| SF Mono | 45 usages (`design: .monospaced`) pour les chiffres | **supprimée** |
+| Serif | 1 usage (`NutrientDetailSheet`) | **supprimée** |
+
+La règle appliquée, qui est celle que les tokens `Theme` disaient déjà :
+
+1. **Titres et chiffres-héros → SF Pro Rounded.**
+2. **Texte, sous-titres, légendes → SF Pro.**
+3. **Chiffres alignés → `.monospacedDigit()` sur la police du rôle**, pas une
+   police à chasse fixe. L'alignement est conservé (un total qui passe de 99 à
+   100 ne fait pas sauter la ligne) sans introduire de troisième famille.
+
+Concrètement : les 45 `design: .monospaced` deviennent
+`design: .rounded` + `.monospacedDigit()`, `Font.kiwioMono` aussi, le serif
+disparaît, et les titres de page (28 pt heavy) passent en arrondi — c'est ce qui
+mettait Compléments en décalage avec l'onboarding et le questionnaire.

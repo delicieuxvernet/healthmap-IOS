@@ -89,6 +89,7 @@ struct SuiviView: View {
             }
             .kiwiTabBarBottomInset()
             .navigationBarTitleDisplayMode(.inline)
+            .kiwiNavigationBarBackground()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -159,7 +160,7 @@ struct SuiviView: View {
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Mon suivi")
-                .font(.system(size: 28, weight: .heavy))
+                .font(.system(size: 28, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.kiwiCharcoal)
             Text("Mis à jour tout seul, d'après tes scans et Santé")
                 .font(.system(size: 13, weight: .medium))
@@ -510,7 +511,7 @@ private struct SuiviStatsRow: View {
                 .minimumScaleFactor(0.85)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(.system(size: 24, weight: .heavy, design: .monospaced))
+                    .font(.system(size: 24, weight: .heavy, design: .rounded).monospacedDigit())
                     .foregroundStyle(color)
                 Text(suffix)
                     .font(.system(size: 12, weight: .bold))
@@ -964,7 +965,7 @@ private struct SuiviNeedsCard: View {
             Spacer(minLength: 4)
             VStack(spacing: 2) {
                 Text("+\(delta)%")
-                    .font(.system(size: 27, weight: .heavy, design: .monospaced))
+                    .font(.system(size: 27, weight: .heavy, design: .rounded).monospacedDigit())
                     .foregroundStyle(Color.kiwiGreenInk)
                 Text("besoins")
                     .font(.system(size: 9, weight: .bold))
@@ -1117,7 +1118,7 @@ private struct SuiviCoverageCard: View {
                     .foregroundStyle(Color.kiwiCharcoal)
                 Spacer()
                 Text("\(cur)%")
-                    .font(.system(size: 15, weight: .heavy, design: .monospaced))
+                    .font(.system(size: 15, weight: .heavy, design: .rounded).monospacedDigit())
                     .foregroundStyle(color)
             }
             // Barre continue : track + socle (départ) + gain dégradé + repère.
@@ -1251,7 +1252,7 @@ private struct SuiviPaliersCard: View {
         Group {
             if paliers.joursRestants > 0 {
                 (Text("\(paliers.fruitName) débloqué dans ")
-                    + Text("\(paliers.joursRestants) j").font(.system(size: 13.5, weight: .heavy, design: .monospaced)).foregroundColor(Color.kiwiGreenInk))
+                    + Text("\(paliers.joursRestants) j").font(.system(size: 13.5, weight: .heavy, design: .rounded).monospacedDigit()).foregroundColor(Color.kiwiGreenInk))
             } else {
                 Text("\(paliers.fruitName) débloqué\u{00A0}!")
             }

@@ -356,7 +356,7 @@ struct EmailCodeVerificationSheet: View {
                 TextField("Code a 6 chiffres", text: $code)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
-                    .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 24, weight: .semibold, design: .rounded).monospacedDigit())
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.spacingMD)
                     .frame(height: 60)

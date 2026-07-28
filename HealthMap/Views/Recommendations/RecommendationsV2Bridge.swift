@@ -110,7 +110,7 @@ struct RecommendationsV2ContentView: View {
             VStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Ton plan")
-                        .font(.system(size: 28, weight: .heavy))
+                        .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.kiwiCharcoal)
                     Text("La cause, quoi faire, et quand — pour chaque symptôme")
                         .font(.system(size: 13, weight: .medium))

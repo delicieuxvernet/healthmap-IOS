@@ -171,7 +171,7 @@ struct BilanV7ScoreRing: View {
                 .stroke(Color.kiwiGreen, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(score == nil ? "—" : "\(shown)")
-                .font(.system(size: 19, weight: .heavy, design: .monospaced))
+                .font(.system(size: 19, weight: .heavy, design: .rounded).monospacedDigit())
                 .tracking(-0.8)
                 .foregroundStyle(BilanV7.ink)
                 .monospacedDigit()
@@ -225,7 +225,7 @@ struct BilanV7Header: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Bilan")
-                    .font(.system(size: 28, weight: .heavy))
+                    .font(.system(size: 28, weight: .heavy, design: .rounded))
                     .tracking(-0.7)
                     .foregroundStyle(BilanV7.ink)
                 Text(Self.dayFormatter.string(from: date))
@@ -273,7 +273,7 @@ struct BilanV7ScoreCard: View {
         let color = delta > 0 ? Color.kiwiInk : BilanV7.alertInk
         var line = Text(lead)
             + Text(value)
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                 .foregroundStyle(color)
             + Text(" cette semaine.")
         if let insight, !insight.isEmpty {
@@ -422,7 +422,7 @@ struct BilanV7ApportsCard: View {
                         .foregroundStyle(BilanV7.ink)
                     Spacer()
                     Text("\(pct)%")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(apport.statut.v7Ink)
                 }
                 BilanV7Bar(value: Double(pct) / 100, color: apport.statut.v7Color, delay: delay)
@@ -641,7 +641,7 @@ struct BilanV7SymptomesCard: View {
                         .foregroundStyle(.white)
                     if solutionsCount > 0 {
                         Text("\(solutionsCount)")
-                            .font(.system(size: 11.5, weight: .heavy, design: .monospaced))
+                            .font(.system(size: 11.5, weight: .heavy, design: .rounded).monospacedDigit())
                             .foregroundStyle(.white)
                             .frame(minWidth: 20, minHeight: 20)
                             .background(BilanV7.blue, in: Capsule())
@@ -691,7 +691,7 @@ struct BilanV7SerieCard: View {
         return Text("Prochain trophée : ")
             + Text(rung.name).font(.system(size: 12, weight: .bold)).foregroundStyle(BilanV7.ink)
             + Text(" dans ")
-            + Text("\(daysLeft)").font(.system(size: 12, weight: .bold, design: .monospaced))
+            + Text("\(daysLeft)").font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
             + Text(daysLeft > 1 ? " jours" : " jour")
     }
 
@@ -718,7 +718,7 @@ struct BilanV7SerieCard: View {
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        (Text("\(streak)").font(.system(size: 14.5, weight: .heavy, design: .monospaced))
+                        (Text("\(streak)").font(.system(size: 14.5, weight: .heavy, design: .rounded).monospacedDigit())
                             + Text(streak > 1 ? " jours d'affilée" : " jour d'affilée")
                                 .font(.system(size: 14.5, weight: .heavy)))
                             .tracking(-0.2)

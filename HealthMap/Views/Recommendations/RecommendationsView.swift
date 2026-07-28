@@ -67,6 +67,7 @@ struct RecommendationsView: View {
             }
             .navigationTitle("Ton plan")
             .navigationBarTitleDisplayMode(.inline)
+            .kiwiNavigationBarBackground()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -107,7 +108,7 @@ struct RecommendationsContentView: View {
                 // 1. Titre éditorial (sentence case — maquette « Ton plan »).
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Ton plan")
-                        .font(.system(size: 28, weight: .heavy))
+                        .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.kiwiCharcoal)
                     Text("La cause, quoi faire, et quand — pour chaque symptôme")
                         .font(.system(size: 13, weight: .medium))

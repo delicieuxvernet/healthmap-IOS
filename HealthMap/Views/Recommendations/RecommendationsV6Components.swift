@@ -45,7 +45,7 @@ struct PlanFocusCardV6: View {
                 }
                 Spacer(minLength: 8)
                 Text("\(focus.done)/\(focus.total)")
-                    .font(.system(size: 13, weight: .heavy, design: .monospaced))
+                    .font(.system(size: 13, weight: .heavy, design: .rounded).monospacedDigit())
                     .foregroundStyle(Color.kiwiGreenInk)
             }
 

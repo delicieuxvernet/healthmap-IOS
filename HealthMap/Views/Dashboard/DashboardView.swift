@@ -53,6 +53,7 @@ struct DashboardView: View {
             // inline et vide, seul l'avatar Profil y demeure.
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .kiwiNavigationBarBackground()
             .toolbar {
                 // Avatar Profil en haut à droite (ouvre le Profil en sheet via
                 // NotificationCenter, consommé par MainTabView). Accent vert kiwi.

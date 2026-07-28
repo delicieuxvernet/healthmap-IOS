@@ -169,7 +169,7 @@ struct QuotaMeter: View {
                 .foregroundStyle(Color.kiwiInk)
                 Spacer()
                 Text("\(used) / \(total)")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(Color.healthMapSecondary)
             }
 
