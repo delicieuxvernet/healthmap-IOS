@@ -86,6 +86,9 @@ struct MealScanView: View {
                     if let uid = AuthService.shared.cachedCurrentUserIdString {
                         VoiceMealSheet(userId: uid) { count, kcal in
                             voiceConfirmation = "\(count) aliment\(count > 1 ? "s" : "") ajouté\(count > 1 ? "s" : "") · \(kcal) kcal"
+                            // Le quota ne se décompte QUE si la dictée a abouti
+                            // à un enregistrement — un essai annulé ne coûte rien.
+                            VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
                             Task { await journal.load() }
                         }
                     }
@@ -343,6 +346,22 @@ struct MealScanView: View {
     /// photo, qui noyait les deux gestes principaux.
     /// Les anciennes ondes pulsantes (animation infinie autour du micro) ont
     /// été retirées : elles produisaient un cercle qui semblait s'envoler.
+    /// Reste-t-il une dictée aujourd'hui ? (illimité pour un abonné)
+    private var peutDicter: Bool {
+        guard let uid = AuthService.shared.cachedCurrentUserIdString else { return true }
+        return VoiceMealService.QuotaStore.peutDicter(
+            userId: uid,
+            isPremium: subscriptionService.isPremium
+        )
+    }
+
+    /// Sous-titre de la colonne micro : la contrainte est annoncée d'emblée,
+    /// jamais découverte après avoir parlé.
+    private var sousTitreVocal: String {
+        if subscriptionService.isPremium { return "À voix haute" }
+        return peutDicter ? "1 dictée offerte aujourd'hui" : "Dictée du jour utilisée"
+    }
+
     private var dualEntry: some View {
         HStack(spacing: 0) {
             entryColumn(
@@ -350,10 +369,17 @@ struct MealScanView: View {
                 iconColor: .white,
                 circleFill: Kiwio.vert,
                 title: "Dicte ton repas",
-                subtitle: "À voix haute",
+                subtitle: sousTitreVocal,
                 accessibilityHint: "Décris ton repas à voix haute, Kiwio compte les calories"
             ) {
-                showVoice = true
+                // Quota (famille 5) : une dictée par jour hors abonnement.
+                // On le vérifie AVANT d'ouvrir la feuille — plutôt que de
+                // laisser l'utilisateur parler pour échouer ensuite.
+                if peutDicter {
+                    showVoice = true
+                } else {
+                    showPaywall = true
+                }
             }
 
             Rectangle()
