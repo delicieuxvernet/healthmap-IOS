@@ -649,7 +649,7 @@ private struct PremiumPurchaseSuccessView: View {
                         .stroke(Color.kiwiGreen.opacity(0.22), lineWidth: 8)
                         .frame(width: 64, height: 64)
                     Image(systemName: "checkmark")
-                        .font(.system(size: 28, weight: .heavy))
+                        .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.kiwiGreen)
                 }
                 .scaleEffect(revealed ? 1 : 0.82)

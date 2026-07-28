@@ -278,7 +278,7 @@ struct ScanKcalGauge: View {
     private func sideColumn(value: Int, label: String, sub: String?) -> some View {
         VStack(spacing: 3) {
             Text("\(value)")
-                .font(.system(size: 22, weight: .bold, design: .monospaced))
+                .font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
                 .foregroundStyle(Color.kiwiCharcoal)
             Text(label)
                 .font(.system(size: 11, weight: .medium))
@@ -311,7 +311,7 @@ struct ScanKcalGauge: View {
         if objectif == nil {
             VStack(spacing: 2) {
                 Text("\(consommees)")
-                    .font(.system(size: 30, weight: .bold, design: .monospaced))
+                    .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(Color.kiwiCharcoal)
                 Text("kcal")
                     .font(.system(size: 12, weight: .bold))
@@ -322,7 +322,7 @@ struct ScanKcalGauge: View {
             // montre ce qui a été consommé, rapporté à l'objectif du jour.
             VStack(spacing: 2) {
                 Text("\(consommees)")
-                    .font(.system(size: 30, weight: .bold, design: .monospaced))
+                    .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(Color.kiwiCharcoal)
                 Text("sur \(objectif ?? 0) kcal")
                     .font(.system(size: 11, weight: .bold))
@@ -337,7 +337,7 @@ struct ScanKcalGauge: View {
                     .font(.system(size: 16))
                     .foregroundStyle(arcColor)
                 Text((over ? "+" : "") + "\(shown)")
-                    .font(.system(size: 30, weight: .bold, design: .monospaced))
+                    .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(Color.kiwiCharcoal)
                 Text(over ? "kcal de surplus" : "kcal restantes")
                     .font(.system(size: 11, weight: .bold))
@@ -477,7 +477,7 @@ private struct MacroRing: View {
                 .rotationEffect(.degrees(-90))
             HStack(alignment: .firstTextBaseline, spacing: 0) {
                 Text("\(grams)")
-                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .font(.system(size: 15, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(Color.kiwiCharcoal)
                 Text("g")
                     .font(.system(size: 10, weight: .bold))
@@ -572,7 +572,7 @@ struct ScanRecentScansList: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color.healthMapMuted)
                     Text("\(meal.macros.calories) kcal")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.healthMapSecondary)
                 }
             }

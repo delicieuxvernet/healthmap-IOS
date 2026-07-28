@@ -136,7 +136,7 @@ struct MealCoverageHero: View {
                 .rotationEffect(.degrees(-90))
             HStack(alignment: .firstTextBaseline, spacing: 1) {
                 Text("\(coveredCount)")
-                    .font(.system(size: 26, weight: .bold, design: .monospaced))
+                    .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(Color.kiwiCharcoal)
                 Text("/\(totalCount)")
                     .font(.system(size: 14, weight: .bold))
@@ -318,7 +318,7 @@ struct NeedImpactCard: View {
                 Fluent3DIcon(name: asset, size: 22)
             } else {
                 Text("\(pct)%")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(color)
             }
         }
@@ -344,7 +344,7 @@ struct MacrosCardV4: View {
                 Spacer()
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text("\(macros.calories)")
-                        .font(.system(size: 18, weight: .bold, design: .monospaced))
+                        .font(.system(size: 18, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.kiwiCharcoal)
                     Text("kcal")
                         .font(.system(size: 13, weight: .medium))
@@ -392,7 +392,7 @@ struct MacrosCardV4: View {
                     .foregroundStyle(Color.healthMapSecondary)
             }
             Text("\(Int(grams.rounded()))g")
-                .font(.system(size: 17, weight: .bold, design: .monospaced))
+                .font(.system(size: 17, weight: .bold, design: .rounded).monospacedDigit())
                 .foregroundStyle(Color.kiwiCharcoal)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -655,7 +655,7 @@ struct FoodDetailSheetV4: View {
     private func macroTile(_ label: String, _ value: String, _ unit: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
                 .foregroundStyle(Color.kiwiCharcoal)
             Text(unit).font(.system(size: 9)).foregroundStyle(Color.healthMapMuted)
             Text(label)
@@ -758,7 +758,7 @@ struct ScanNeedTile: View {
                     .font(.system(size: 19))
                     .foregroundStyle(color)
                 Text("\(pct)%")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(color)
             }
         }
@@ -791,7 +791,7 @@ struct TaJourneeCard: View {
                 Spacer()
                 HStack(spacing: 0) {
                     Text("\(doneCount)")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.kiwiCharcoal)
                     Text("/\(slots.count) repas")
                         .font(.system(size: 11.5, weight: .bold))
@@ -976,7 +976,7 @@ struct BesoinsCourbeCard: View {
             // jours
             let labels = Self.dayLabels(count: n)
             for (i, lab) in labels.enumerated() {
-                ctx.draw(Text(lab).font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundColor(Color(hex: "C2BDB0")),
+                ctx.draw(Text(lab).font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit()).foregroundColor(Color(hex: "C2BDB0")),
                          at: CGPoint(x: px(i), y: h + 11))
             }
         }

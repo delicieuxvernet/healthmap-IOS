@@ -83,7 +83,7 @@ struct BilanScoreCard: View {
             VStack(spacing: 1) {
                 AnimatedNumberView(
                     targetValue: score,
-                    font: .system(size: 24, weight: .bold, design: .monospaced),
+                    font: .system(size: 24, weight: .bold, design: .rounded).monospacedDigit(),
                     color: color
                 )
                 Text("/ 100")
@@ -134,7 +134,7 @@ private struct ApportColumn: View {
             VStack(spacing: 9) {
                 DotFieldGauge(pct: Double(nutrient.score) / 100, color: color)
                 Text("\(nutrient.score)%")
-                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(color)
                 Text(nutrient.label)
                     .font(.system(size: 11, weight: .medium))
@@ -734,7 +734,7 @@ struct ApportDetailSheet: View {
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 2) {
                 Text("\(nutrient.score)%")
-                    .font(.system(size: 34, weight: .bold, design: .monospaced))
+                    .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(color)
                 Text("de ton besoin")
                     .font(.system(size: 10, weight: .bold))

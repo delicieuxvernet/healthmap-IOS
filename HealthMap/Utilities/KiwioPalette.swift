@@ -65,10 +65,15 @@ enum Kiwio {
 }
 
 extension Font {
-    /// Chiffres clés (kcal, grammes, minuteur) en chasse fixe, comme le design.
-    /// `monospacedDigit` garde l'alignement quand la valeur change sous les yeux —
-    /// sans lui, un total qui passe de 99 à 100 fait sauter toute la ligne.
+    /// Chiffres clés (kcal, grammes, minuteur).
+    ///
+    /// `monospacedDigit()` garde l'alignement quand la valeur change sous les
+    /// yeux — sans lui, un total qui passe de 99 à 100 fait sauter toute la
+    /// ligne. Mais la police reste **arrondie**, comme les titres : la chasse
+    /// fixe (`design: .monospaced`) introduisait une troisième famille, visible
+    /// dès qu'un chiffre côtoyait son libellé (retour du 29 juil. 2026). Les
+    /// chiffres restent alignés, ils ne changent plus de police.
     static func kiwioMono(_ taille: CGFloat, _ poids: Font.Weight = .semibold) -> Font {
-        .system(size: taille, weight: poids, design: .monospaced)
+        .system(size: taille, weight: poids, design: .rounded).monospacedDigit()
     }
 }

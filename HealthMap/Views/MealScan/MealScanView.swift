@@ -80,6 +80,7 @@ struct MealScanView: View {
                 // barre de navigation réduite à ses boutons (journal + profil).
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
+                .kiwiNavigationBarBackground()
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button { showJournal = true } label: {
@@ -241,7 +242,7 @@ struct MealScanView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Scan")
-                        .font(.system(size: 28, weight: .heavy))
+                        .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.kiwiCharcoal)
                     ScanDayNav(
                         label: journal.dayLabel,
@@ -1524,7 +1525,7 @@ private struct NeedImpactDetailSheet: View {
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 2) {
                 Text("\(pct)%")
-                    .font(.system(size: 34, weight: .bold, design: .monospaced))
+                    .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(color)
                 Text("de ton besoin")
                     .font(.system(size: 10, weight: .bold))

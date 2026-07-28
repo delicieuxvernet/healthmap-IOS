@@ -104,6 +104,7 @@ struct SupplementsView: View {
             .onAppear { refreshRituel() }
             .onChange(of: complementsSignature) { _, _ in refreshRituel() }
             .navigationBarTitleDisplayMode(.inline)
+            .kiwiNavigationBarBackground()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -142,7 +143,7 @@ struct SupplementsView: View {
                 // Titre + sous-titre
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Mes compléments")
-                        .font(.system(size: 28, weight: .heavy))
+                        .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.kiwiCharcoal)
                     Text("Choisis ce que tu prends — le reste passe par l'assiette")
                         .font(.system(size: 13, weight: .medium))

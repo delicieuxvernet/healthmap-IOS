@@ -241,12 +241,12 @@ struct BilanGreetingHeader: View {
                 if let score = week.score {
                     AnimatedNumberView(
                         targetValue: score,
-                        font: .system(size: 16, weight: .bold, design: .monospaced),
+                        font: .system(size: 16, weight: .bold, design: .rounded).monospacedDigit(),
                         color: .kiwiCharcoal
                     )
                 } else {
                     Text("—")
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.healthMapSecondary)
                 }
                 Text("semaine")
@@ -328,7 +328,7 @@ struct TaJourneeV6Card: View {
                 Spacer()
                 HStack(spacing: 4) {
                     (Text("\(doneCount)")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.kiwiCharcoal)
                      + Text("/3 repas")
                         .font(.system(size: 12, weight: .semibold))
@@ -484,7 +484,7 @@ struct ApportsV6Card: View {
         } label: {
             VStack(spacing: 7) {
                 Text("\(pct)%")
-                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(apport.statut.inkColor)
                 ApportGaugeBar(pct: pct, statut: apport.statut)
                     .padding(.horizontal, 2)
@@ -612,7 +612,7 @@ struct RecolteV6Tile: View {
                 .foregroundStyle(Color.kiwiGreenInk)
                 Spacer()
                 (Text("\(unlockedCount)")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(Color.kiwiCharcoal)
                  + Text("/\(ladder.count)")
                     .font(.system(size: 11, weight: .bold))
@@ -1065,7 +1065,7 @@ struct ApportV2DetailSheet: View {
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 2) {
                 Text("\(pct)%")
-                    .font(.system(size: 34, weight: .bold, design: .monospaced))
+                    .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(statut.inkColor)
                 Text("de ton besoin")
                     .font(.system(size: 10, weight: .bold))
@@ -1174,7 +1174,7 @@ struct SymptomeV6Sheet: View {
                                 Spacer()
                                 if let pct = row.pct {
                                     Text("\(min(100, max(0, pct)))%")
-                                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                        .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
                                         .foregroundStyle(row.statut.inkColor)
                                 }
                             }

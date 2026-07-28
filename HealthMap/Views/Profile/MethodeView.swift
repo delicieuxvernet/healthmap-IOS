@@ -267,7 +267,7 @@ struct MethodeView: View {
             Spacer()
 
             Text(range)
-                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                .font(.system(size: 13, weight: .medium, design: .rounded).monospacedDigit())
                 .foregroundStyle(Color.healthMapSecondary)
         }
     }

@@ -38,7 +38,7 @@ struct ComplementsRituelCard: View {
                 Spacer(minLength: 8)
                 if !rituel.isEmpty {
                     Text(countLabel)
-                        .font(.system(size: 13, weight: .heavy, design: .monospaced))
+                        .font(.system(size: 13, weight: .heavy, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.kiwiGreenInk)
                 }
             }

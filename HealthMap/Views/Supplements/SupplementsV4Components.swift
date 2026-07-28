@@ -277,14 +277,14 @@ struct SupplementCardV4: View {
                         .frame(height: 8)
 
                         Text("100%")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                             .foregroundStyle(Color.kiwiGreenInk)
                     }
 
                     HStack(spacing: 0) {
                         Text("Couvre ton besoin · ")
                         Text("\(rec.score)% ")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .font(.system(size: 11, weight: .medium, design: .rounded).monospacedDigit())
                         Text("assiette + complément")
                     }
                     .font(.system(size: 11, weight: .medium))
@@ -304,7 +304,7 @@ struct SupplementCardV4: View {
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(isComplement ? .white : Color.kiwiCharcoal)
                         Text("\(SupplementsV4.priceLabel(rec, premium: premium))/mois")
-                            .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded).monospacedDigit())
                             .foregroundStyle(isComplement ? Color.white.opacity(0.85) : Color.healthMapSecondary)
                     }
                     .frame(maxWidth: .infinity)
@@ -500,7 +500,7 @@ struct SupplementCartCard: View {
                                 .foregroundStyle(Color.kiwiCharcoal)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             Text("\(SupplementsV4.priceLabel(rec, premium: premium))/mois")
-                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
                                 .foregroundStyle(Color.kiwiGreenInk)
                         }
                     }
@@ -692,7 +692,7 @@ struct SupplementWhySheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(String(format: "%.0f €", price))
-                        .font(.system(size: 17, weight: .bold, design: .monospaced))
+                        .font(.system(size: 17, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(priceColor)
                     Text("/mois")
                         .font(.system(size: 11, weight: .semibold))
