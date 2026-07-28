@@ -62,7 +62,7 @@
     <!-- Privacy usage descriptions (required by App Store review) -->
     <!-- Photo library only: meal scan flow relies on UIImagePickerController in .photoLibrary mode. -->
     <key>NSCameraUsageDescription</key>
-    <string>HealthMap utilise la caméra pour photographier tes repas et analyser leur composition nutritionnelle.</string>
+    <string>Kiwio utilise la caméra pour photographier tes repas et lire le code-barres des produits, afin d'analyser ce qu'ils t'apportent.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>HealthMap accède à vos photos pour importer des images de repas ou d'étiquettes nutritionnelles que vous souhaitez analyser.</string>
     <!-- Saisie vocale (fonction phare) : dictée du repas via Speech.framework.

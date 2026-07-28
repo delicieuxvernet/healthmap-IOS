@@ -31,6 +31,14 @@ struct MealScanView: View {
     /// Recherche d'aliment présentée en bottom-sheet depuis la barre d'accueil
     /// (remplace l'ancien plein écran piloté par `selectedTab`).
     @State private var showSearch = false
+    /// Scanner de code-barres, ouvert par le bouton logé dans la barre de recherche.
+    @State private var showBarcode = false
+    /// Code lu, en attente de résolution produit. Passe par un `@State` plutôt
+    /// qu'un appel direct depuis la feuille : la résolution démarre pendant que
+    /// le scanner se referme, la fiche portion s'ouvre donc sur un écran libre.
+    @State private var scannedBarcode: String?
+    @State private var barcodeDetail: MealJournalService.FoodDetail?
+    @State private var barcodeIntrouvable: String?
     @State private var showVoice = false
     @State private var voiceConfirmation: String?
     /// Apports quotidiens (score) des 7 derniers jours — courbe « apports vs besoins ».
@@ -119,6 +127,27 @@ struct MealScanView: View {
                 // Recherche d'aliment en bottom-sheet depuis la barre d'accueil.
                 .sheet(isPresented: $showSearch) {
                     searchSheet
+                }
+                .sheet(isPresented: $showBarcode) {
+                    BarcodeScannerSheet { code in scannedBarcode = code }
+                }
+                .sheet(item: $barcodeDetail) { detail in
+                    ajoutPortionSheet(detail)
+                }
+                .onChange(of: scannedBarcode) { _, code in
+                    guard let code else { return }
+                    Task { await résoudreCodeBarres(code) }
+                }
+                .alert(
+                    "Produit introuvable",
+                    isPresented: Binding(
+                        get: { barcodeIntrouvable != nil },
+                        set: { if !$0 { barcodeIntrouvable = nil } }
+                    )
+                ) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(barcodeIntrouvable ?? "")
                 }
         }
     }
@@ -212,6 +241,10 @@ struct MealScanView: View {
             dualEntry
             voiceHint
 
+            // Troisième entrée, juste sous les deux gestes phares : chercher un
+            // produit — au clavier, ou par son code-barres.
+            searchEntry
+
             // Une seule carte pour la journée : kcal restantes vs budget, barre
             // de progression, énergie dépensée et les quatre macros. Remplace la
             // jauge à trois colonnes (nombres qui se touchaient) ET la carte
@@ -234,8 +267,6 @@ struct MealScanView: View {
                 )
             )
             .padding(.horizontal, Theme.spacingLG)
-
-            searchEntry
 
             captureBlock
 
@@ -483,31 +514,53 @@ struct MealScanView: View {
 
     // Barre pilule (maquette 20 juillet) — placée sous la jauge kcal, le
     // séparateur « ou » n'a plus de sens depuis la réorganisation.
+    /// Troisième entrée de la page, sous les deux gestes principaux : la barre
+    /// de recherche produit. Le code-barres vit DANS cette barre, à droite —
+    /// c'est la même intention (« trouver un produit »), pas un quatrième bouton.
+    /// Deux boutons distincts plutôt qu'un bouton dans un bouton : SwiftUI ne
+    /// sait pas router le tap entre deux boutons imbriqués.
     private var searchEntry: some View {
-        Button {
-            showSearch = true
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.healthMapMuted)
-                Text("Produit, marque ou ingrédient…")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.healthMapMuted)
+        HStack(spacing: 0) {
+            Button {
+                showSearch = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.healthMapMuted)
+                    Text("Produit, marque ou ingrédient…")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 0)
+                }
+                .padding(.leading, Theme.spacingMD)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, Theme.spacingMD)
-            .frame(minHeight: 48)
-            .background(Color.healthMapCard)
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1))
-            .contentShape(Rectangle())
+            .buttonStyle(.healthMapPressed)
+            .accessibilityLabel("Rechercher un produit, une marque ou un ingrédient")
+
+            Rectangle()
+                .fill(Color.kiwiCharcoal.opacity(0.08))
+                .frame(width: 1, height: 22)
+
+            Button {
+                showBarcode = true
+            } label: {
+                Image(systemName: "barcode.viewfinder")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(Color.kiwiGreen)
+                    .frame(width: 52, height: 48)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.healthMapPressed)
+            .accessibilityLabel("Scanner un code-barres")
         }
-        .buttonStyle(.healthMapPressed)
-        .accessibilityLabel("Rechercher un produit, une marque ou un ingrédient")
+        .background(Color.healthMapCard)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1))
         .padding(.horizontal, Theme.spacingLG)
     }
 
@@ -1091,25 +1144,31 @@ struct MealScanView: View {
         // Fiche portion unifiée (quantité libre) — l'ajout passe par le VM
         // journal (ligne riche éditable), créneau déduit de l'heure.
         .sheet(item: $selectedSearchDetail) { detail in
-            PortionSheet(mode: .add(detail: detail,
-                                    slot: MealJournalService.MealSlot.from(date: Date())),
-                         onAdd: { grams in
-                             let ok = await journal.addFood(detail: detail,
-                                                            grams: grams,
-                                                            slot: MealJournalService.MealSlot.from(date: Date()))
-                             if ok {
-                                 let kcal = Int(((detail.kcal100g ?? 0) * grams / 100).rounded())
-                                 withAnimation { addFoodConfirmation = "\(detail.name) ajouté · \(kcal) kcal" }
-                                 Task {
-                                     try? await Task.sleep(nanoseconds: 2_500_000_000)
-                                     withAnimation { addFoodConfirmation = nil }
-                                 }
-                             }
-                             return ok
-                         })
-            .presentationDetents([.height(420)])
-            .presentationDragIndicator(.visible)
+            ajoutPortionSheet(detail)
         }
+    }
+
+    /// Fiche portion d'ajout — partagée par la recherche texte et le scan de
+    /// code-barres : un seul chemin d'ajout, donc un seul comportement à tester.
+    private func ajoutPortionSheet(_ detail: MealJournalService.FoodDetail) -> some View {
+        PortionSheet(mode: .add(detail: detail,
+                                slot: MealJournalService.MealSlot.from(date: Date())),
+                     onAdd: { grams in
+                         let ok = await journal.addFood(detail: detail,
+                                                        grams: grams,
+                                                        slot: MealJournalService.MealSlot.from(date: Date()))
+                         if ok {
+                             let kcal = Int(((detail.kcal100g ?? 0) * grams / 100).rounded())
+                             withAnimation { addFoodConfirmation = "\(detail.name) ajouté · \(kcal) kcal" }
+                             Task {
+                                 try? await Task.sleep(nanoseconds: 2_500_000_000)
+                                 withAnimation { addFoodConfirmation = nil }
+                             }
+                         }
+                         return ok
+                     })
+        .presentationDetents([.height(420)])
+        .presentationDragIndicator(.visible)
     }
 
     private func searchHitSub(_ hit: MealJournalService.FoodHit) -> String {
@@ -1118,6 +1177,20 @@ struct MealScanView: View {
             parts.append("\(Int(kcal.rounded())) kcal / 100 g")
         }
         return parts.joined(separator: " · ")
+    }
+
+    /// Résout un code-barres par le MÊME chemin que la recherche texte :
+    /// `off:<code>` est déjà l'identifiant que renvoient les résultats Open Food
+    /// Facts, et `foodDetail` sait le charger. Aucun second moteur produit.
+    private func résoudreCodeBarres(_ code: String) async {
+        scannedBarcode = nil
+        do {
+            barcodeDetail = try await MealJournalService.shared.foodDetail(id: "off:\(code)")
+            HapticService.shared.selection()
+        } catch {
+            AppLogger.analysis.report(error, context: "MealScan code-barres")
+            barcodeIntrouvable = "Aucun produit ne correspond au code \(code). Essaie la recherche par nom."
+        }
     }
 
     private func openSearchDetail(_ hit: MealJournalService.FoodHit) {
