@@ -19,18 +19,30 @@ import SwiftUI
 /// }
 /// ```
 extension View {
-    /// Aligne la barre de navigation sur le fond de l'app.
+    /// Efface le fond de la barre de navigation : la page passe dessous.
     ///
-    /// Sans ça, iOS pose la sienne : un bandeau clair figé sous l'heure et la
+    /// Sans réglage, iOS pose le sien — un bandeau clair figé sous l'heure et la
     /// batterie, qui ne s'en va jamais (barre `.inline`, titre vide) et tranche
-    /// avec le crème de toutes nos pages. Ce n'est pas une marge parasite —
-    /// c'est le fond par défaut de la barre de navigation.
+    /// avec le crème de nos pages.
+    ///
+    /// ⚠️ Première tentative (build #388) : PEINDRE ce bandeau en `healthMapWarm`
+    /// pour le fondre dans la page. Raté, et spectaculairement — retour d'Arthur :
+    /// « ça se voit dix fois plus, il y en a deux maintenant ». Deux raisons :
+    ///
+    /// 1. nos pages ne sont pas d'un crème uni. `WarmBackground` est un dégradé
+    ///    avec un halo chaud centré à 16 % de la hauteur, donc juste sous la
+    ///    barre : un aplat figé par-dessus ne peut pas coïncider, et le filet de
+    ///    séparation de la barre se lit alors comme une seconde ligne ;
+    /// 2. les cinq onglets restent MONTÉS en permanence (conteneur maison, cf.
+    ///    `MainTabView`), chacun avec son `NavigationStack`. Forcer `.visible`
+    ///    faisait peindre sa barre à chacun, empilées au même endroit.
+    ///
+    /// On n'imite donc plus le fond : on le supprime. Les boutons de barre
+    /// restent lisibles, la page glisse dessous comme partout ailleurs sur iOS.
     ///
     /// À poser sur le contenu racine de CHAQUE onglet, dans son `NavigationStack`.
     func kiwiNavigationBarBackground() -> some View {
-        self
-            .toolbarBackground(Color.healthMapWarm, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+        toolbarBackground(.hidden, for: .navigationBar)
     }
 }
 
