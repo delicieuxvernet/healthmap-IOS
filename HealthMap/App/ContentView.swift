@@ -254,6 +254,16 @@ struct MainTabView: View {
     @AppStorage("hasSeenTabTour") private var hasSeenTabTour = false
     @State private var showTabTour = false
 
+    /// Jour où le bilan a été reçu (horodatage). Sert à choisir l'onglet
+    /// d'arrivée : le Bilan le jour même — c'est le résultat qu'on vient de
+    /// mériter — puis le Scan les jours suivants, qui est ce pour quoi on
+    /// rouvre l'app (compter son repas, voir ses macros).
+    ///
+    /// `0` = jamais horodaté : soit le questionnaire n'est pas fait, soit le
+    /// bilan date d'avant cette version. Dans le second cas on part sur le
+    /// Scan, ce qui est le bon comportement pour un compte déjà installé.
+    @AppStorage("bilanRecuLe") private var bilanRecuLe: Double = 0
+
     /// Internal tab identifier. Uses a symbolic enum rather than `Int` so
     /// adding or reordering tabs doesn't silently break the deep-link mapping.
     enum Tab: Hashable, CaseIterable, Identifiable {
@@ -422,6 +432,9 @@ struct MainTabView: View {
             UITabBar.appearance().scrollEdgeAppearance = appearance
 
             gamification.recordCheckin()
+            // Onglet d'arrivée AVANT la route en attente : une notification ou
+            // un lien profond doit pouvoir écraser ce choix, pas l'inverse.
+            choisirOngletDArrivee()
             // Consume any pending route queued while MainTabView did not exist
             // (e.g. cold start from a notification tap — the delegate fires
             // before SwiftUI has built this view).
@@ -456,6 +469,13 @@ struct MainTabView: View {
         // Fix: onAppear doesn't re-fire when the questionnaire is completed
         // inside MainTabView (Bilan tab). This onChange catches the transition.
         .onChange(of: dashboardVM.hasCompletedQuestionnaire) { _, completed in
+            // Le bilan vient d'être obtenu, dans cette session : on horodate le
+            // jour. Les lancements du MÊME jour rouvriront sur le Bilan, ceux
+            // d'après sur le Scan. On ne change PAS d'onglet ici — on est déjà
+            // sur le Bilan, c'est tout l'intérêt du moment.
+            if completed && bilanRecuLe == 0 {
+                bilanRecuLe = Date().timeIntervalSince1970
+            }
             if completed && !hasSeenTabTour {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     showTabTour = true
@@ -505,6 +525,26 @@ struct MainTabView: View {
             AnalysisGateView()
                 .environmentObject(dashboardVM)
         }
+    }
+
+    /// Choisit l'onglet sur lequel l'app s'ouvre.
+    ///
+    /// Le jour où le bilan est reçu, on rouvre dessus : c'est le résultat qu'on
+    /// vient de mériter. Les jours suivants, on ouvre sur le **Scan** — on ne
+    /// rouvre pas Kiwio pour relire son bilan, on le rouvre pour compter un
+    /// repas et voir ses macros et micronutriments.
+    ///
+    /// Sans questionnaire terminé, rien à choisir : les autres onglets sont
+    /// verrouillés, l'app reste sur le Bilan (qui porte le questionnaire).
+    private func choisirOngletDArrivee() {
+        guard dashboardVM.hasCompletedQuestionnaire else { return }
+        // Bilan reçu aujourd'hui → on y retourne. Jamais horodaté (compte
+        // antérieur à cette version) → le bilan n'est pas du jour, donc Scan.
+        if bilanRecuLe > 0,
+           Calendar.current.isDateInToday(Date(timeIntervalSince1970: bilanRecuLe)) {
+            return
+        }
+        selectedTab = .scanner
     }
 
     /// Routes a queued `DeepLinkRoute` to the matching tab or modal, then
