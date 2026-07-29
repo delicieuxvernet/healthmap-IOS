@@ -35,7 +35,7 @@ jamais la vague N+1 avec la vague N à moitié poussée.
 | V1 | Scan — bloc calories + flèche du pop-up | `MealScanView.swift`, `ScanHomeComponents.swift` | ✅ mergé | [#182](https://github.com/delicieuxvernet/healthmap-IOS/pull/182) |
 | V2 | Scan — hiérarchie des entrées + recherche & code-barres | `MealScanView.swift`, `BarcodeScannerSheet.swift`, `Info.plist` | ✅ mergé | [#183](https://github.com/delicieuxvernet/healthmap-IOS/pull/183) |
 | V3 | Vocal — maintien pour enregistrer | `MealScanView.swift`, `VoiceMealSheet.swift` | ✅ mergé | [#184](https://github.com/delicieuxvernet/healthmap-IOS/pull/184) |
-| V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | ✅ mergé côté app · ⏳ **déploiement edge en attente** | [#185](https://github.com/delicieuxvernet/healthmap-IOS/pull/185) · web [#13](https://github.com/delicieuxvernet/healthmap/pull/13) |
+| V4 | Vocal — fiabilité de l'analyse | `VoiceMealService.swift` + edge `parse-meal-voice` (repo web) | ✅ mergé · edge v6 déployée | [#185](https://github.com/delicieuxvernet/healthmap-IOS/pull/185) · web [#13](https://github.com/delicieuxvernet/healthmap/pull/13) |
 | V5 | Chrome — barre blanche en haut | `WarmBackground.swift` + 5 racines d'onglet | ✅ mergé | [#186](https://github.com/delicieuxvernet/healthmap-IOS/pull/186) |
 | V6 | Typographie homogène | `KiwioPalette.swift` + toutes les vues | ✅ mergé | [#186](https://github.com/delicieuxvernet/healthmap-IOS/pull/186) |
 | V7 | Calendrier navigable | `DailyMealJournalView.swift`, `MealJournalViewModel.swift` | ✅ mergé | [#187](https://github.com/delicieuxvernet/healthmap-IOS/pull/187) |
@@ -136,20 +136,20 @@ puis appariement à la base. Trois défauts, tous côté serveur :
 lieu du refus**, `max_tokens` 3000/2500, erreurs classées (retry seulement si
 429/5xx/timeout), troncature `max_tokens` nommée dans les logs.
 
-> ⚠️ **Déploiement en attente.** L'edge function n'est PAS encore déployée : le
-> déploiement par MCP exige de réinjecter les 60 Ko de source
-> (`index.ts` + `prompt.ts` + `quantities.ts` + `_shared/*`) dans un seul appel,
-> ce qui dépasse la taille d'un message. La CLI Supabase n'est pas authentifiée
-> localement (`~/.supabase/access-token` absent).
-> **Reprise :** `npx supabase login` puis
-> `npx supabase functions deploy parse-meal-voice --project-ref ftwfxdfkghkemnpwtzlu --no-verify-jwt`
-> depuis `Healthmap/code` sur la branche `fix/parse-meal-voice-long`.
-> Une fois déployée : remonter `VoiceTranscript.maxChars` à 4000.
+> ✅ **Déployée le 29 juil. 2026 — `parse-meal-voice` v6.** La CLI Supabase
+> ÉTAIT authentifiée (le jeton ne vit pas dans `~/.supabase/access-token` sous
+> Windows) : `npx supabase projects list` le prouve en une commande — à tester
+> avant de conclure qu'un déploiement est bloqué.
+> Déployée depuis un worktree `deploy/origin-main` + cherry-pick du correctif,
+> parce que la branche `fix/parse-meal-voice-long` seule ne contient PAS
+> `supabase/functions/_shared/` qu'importe `index.ts` (helpers jamais poussés).
+>
+> **Vérifié en prod** avec une dictée de 1 211 caractères (le cas qui échouait) :
+> HTTP 200, repas analysé en 18 s, 12 aliments rendus. Avant : 400 sec.
 
-**Correctif client (celui qui part en TestFlight ce soir)** — il fonctionne avec
-la fonction **actuellement en ligne** :
+**Correctif client** — il fonctionne avec la fonction **actuellement en ligne** :
 
-- `VoiceMealService` tronque la dictée à 1 200 caractères **avant** l'envoi, sur
+- `VoiceMealService` tronque la dictée à 4 000 caractères **avant** l'envoi, sur
   une frontière de mot (couper « omelette » en « omel » inventerait un aliment).
   Couvert par `HealthMapTests/VoiceTranscriptTests.swift`.
 - En cas d'échec serveur, la feuille propose **« Relancer l'analyse »** sur la
@@ -226,16 +226,35 @@ appel par mois feuilleté).
 
 ---
 
-## Ce qui reste, au 29 juillet au matin
+## Ce qui reste, au 29 juillet
 
-1. **Déployer l'edge function `parse-meal-voice`** (voir § V4) — c'est le seul
-   correctif de la nuit qui n'est PAS en ligne. Tant qu'il ne l'est pas, l'app
-   tronque les dictées à 1 200 caractères ; une fois déployé, remonter
-   `VoiceTranscript.maxChars` à 4000.
+1. ~~Déployer l'edge function~~ ✅ **faite** — `parse-meal-voice` v6 en prod,
+   vérifiée sur une dictée de 1 211 caractères. `VoiceTranscript.maxChars` est
+   remonté à 4000 en conséquence.
 2. **Valider sur device** ce que la CI ne peut pas voir : la lecture d'un
    code-barres, le maintien du doigt sur « Dicte ton repas », et la disparition
    effective de la barre blanche.
 3. **Trancher sur l'anneau des calories** (V1) : la carte du journal a pris sa
    place. Si l'anneau doit revenir, `ScanKcalGauge` et `ScanMacrosJourCard` sont
    toujours dans `ScanHomeComponents.swift`, hors écran. Sinon : les supprimer.
-4. `supabase/functions/_shared/` manque sur `main` du repo web (voir § V4).
+4. `supabase/functions/_shared/` manque sur `main` du repo web (voir § V4) —
+   ce qui tourne en prod n'est donc pas entièrement reconstructible depuis `main`.
+
+### Constat d'audit sur les dictées « journée entière »
+
+Le smoke en prod (§ V4) montre une limite qui n'est PAS une régression, mais qui
+mérite une décision produit :
+
+- `MAX_ITEMS = 12` côté serveur : une dictée qui raconte petit-déjeuner + déjeuner
+  + goûter dépasse 12 aliments, et **les derniers disparaissent en silence**.
+- Tout est rangé dans UN créneau (`repas=dejeuner`), alors que la dictée couvrait
+  trois moments de la journée.
+- Sur 12 aliments rendus, 8 sont revenus sans quantité (« ⚠️ quantité ») : c'est
+  le comportement voulu (l'app demande), mais 8 questions d'affilée, c'est long.
+- Un appariement franchement faux observé : « salade de tomates avec de la
+  mozzarella » → « Sandwich baguette, thon, crudités, mayonnaise » (confiance
+  0,40).
+
+Piste, si Arthur veut la suivre : découper une dictée longue en repas distincts
+(le modèle sait déjà dire « ce matin / ce midi / ce soir »), et remonter
+`MAX_ITEMS` — ou au minimum dire à l'écran « je n'ai gardé que les 12 premiers ».
