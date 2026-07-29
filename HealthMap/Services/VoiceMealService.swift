@@ -15,16 +15,15 @@ import Supabase
 /// `@MainActor` : ce sont des fonctions pures, elles n'ont aucune raison d'être
 /// isolées — et les tests peuvent les appeler directement.
 enum VoiceTranscript {
-    /// Longueur maximale acceptée par l'edge function EN LIGNE (~1 min de
-    /// parole). Au-delà elle répond 400, que le client aplatissait en
-    /// « L'analyse n'a pas abouti » : c'est la cause n°1 des échecs signalés sur
-    /// les dictées longues. On coupe donc AVANT d'envoyer — un repas incomplet
-    /// vaut mieux qu'une erreur.
+    /// Longueur maximale acceptée par l'edge function EN LIGNE — ~3 minutes de
+    /// parole. Aligné sur `MAX_TRANSCRIPT_CHARS` de `parse-meal-voice`, déployée
+    /// en v6 le 29 juil. 2026 : au-delà, le serveur tronque au lieu de répondre
+    /// 400 (l'ancienne limite de 1 200 caractères, ~1 min, était la cause n°1
+    /// des échecs signalés sur les dictées longues).
     ///
-    /// La version corrigée de la fonction (branche `fix/parse-meal-voice-long`
-    /// du repo web) tronque elle-même à 4 000 caractères : une fois déployée,
-    /// remonter cette valeur à 4000.
-    static let maxChars = 1200
+    /// On coupe quand même côté client : c'est ce qui garantit qu'une coupure se
+    /// fait sur un mot entier, et non au milieu d'« omelette ».
+    static let maxChars = 4000
 
     /// Coupe sur une frontière de mot — couper en plein milieu d'« omelette »
     /// donnerait un aliment fantôme à l'extraction.
