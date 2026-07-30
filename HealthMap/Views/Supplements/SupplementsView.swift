@@ -1,65 +1,59 @@
 import SwiftUI
 
-// MARK: - Supplements View (Mes compléments — design FINAL « v4 »)
+// MARK: - Supplements View (onglet « Compléments » — design « v6 »)
 //
-// Écran « Mes compléments » FINAL : titre + sous-titre, encart de transparence,
-// section « Recommandés pour toi » avec toggle Premium / Éco, une carte par
-// complément (source réelle `SupplementEngine.generateRecommendations` +
-// catalogue), panier dynamique « D'après tes choix » (somme des prix cochés),
-// et deux pop-up (détail « Pourquoi pour toi » + « Précautions »).
+// L'écran part des APPORTS DU BILAN et descend vers la recommandation : une
+// chaîne visuelle par apport (pastille colorée → rail pointillé → flèche →
+// carte). Les 3 chaînes sont générées depuis le bilan, jamais depuis une liste
+// de produits figée : si un apport disparaît du bilan, sa chaîne disparaît.
 //
-// Logique INCHANGÉE : `SupplementEngine` (score, whyText causal, produits, prix,
-// interactions) + repli planning IA. Panier (coché + total) = @State local.
-// Premium / Éco = @State toggle local. Aucun nouvel appel service.
+// Hiérarchie (cf. `SupplementsChainV6.swift`) : 1. le nutriment · 2. le pourquoi
+// (carte bleue) · 3. les précautions (carte ambre) · hors hiérarchie : le panier,
+// une ligne de texte discrète — on ne gagne rien sur ces compléments.
+//
+// Un SEUL sélecteur, figé au-dessus de la tab bar, bascule toute la page entre
+// « Compléments » et « Par l'assiette ».
+//
+// Sources INCHANGÉES : `SupplementEngine` (score, whyText, produits, prix,
+// interactions) et le bilan v2 déjà chargé (`AIAnalysisV2`). Aucun nouvel appel.
 struct SupplementsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openURL) private var openURL
 
-    // États locaux du design final
+    /// Voie affichée — pilote TOUTE la page (chaînes + pied de page + rituel).
+    @State private var voie: ComplementsVoie = .complements
+    /// Qualité des produits chiffrés dans le budget mensuel.
     @State private var premium = true
-    /// Choix par complément : panier (complément) ou couverture par l'assiette.
-    @State private var choices: [String: SupplementChoice] = [:]
-    @State private var whyRec: SupplementRecommendation?
-    @State private var interRec: SupplementRecommendation?
-    /// Apport dont la fiche « comment le couvrir par l'assiette » est ouverte
-    /// (aliments, quantités, moments) — même pop-up que depuis le Bilan.
+    /// Compléments mis au panier (ids de nutriment).
+    @State private var taken: Set<String> = []
+
+    /// Explication ouverte en bottom sheet (carte bleue « pourquoi »).
+    @State private var explanation: ChainExplanation?
+    /// Recommandation dont les précautions sont ouvertes (carte ambre).
+    @State private var precautionRec: SupplementRecommendation?
+    /// Apport dont la fiche « comment le couvrir par l'assiette » est ouverte.
     @State private var assietteNutrient: EnrichedNutrient?
 
-    /// Rituel du jour (tête de l'onglet) — dérivé du bilan v2 caché de façon
-    /// déterministe, coche persistée localement. Recalculé à l'apparition et à
-    /// chaque bascule (le moteur relit UserDefaults). Aucun appel réseau/IA.
+    /// Rituel du jour — dérivé du bilan v2 de façon déterministe, coche
+    /// persistée localement. Aucun appel réseau / IA.
     @State private var rituel: SuiviEngineV4.ComplementsRituel?
 
-    /// Compléments du bilan v2 caché (source du rituel du jour). nil si le bilan
-    /// n'est pas encore disponible → carte en état vide propre, jamais de crash.
-    private var complementsV2: ComplementsV2? {
-        dashboardVM.analysisV2?.complements
-    }
+    private var complementsV2: ComplementsV2? { dashboardVM.analysisV2?.complements }
 
-    /// Signature légère (Equatable) des compléments du bilan, pour ré-armer le
-    /// rituel quand le bilan v2 arrive/change sans exiger `AIAnalysisV2: Equatable`.
     private var complementsSignature: String {
-        (complementsV2?.complements ?? [])
-            .compactMap { $0.id }
-            .joined(separator: "|")
+        (complementsV2?.complements ?? []).compactMap { $0.id }.joined(separator: "|")
     }
 
-    // Moteur (à partir des scores + profil)
+    // Moteur (scores + profil) — source des produits, prix et interactions.
     private var engineResult: SupplementEngineResult? {
         let scores = dashboardVM.nutrientScores
         guard !scores.isEmpty else { return nil }
         return SupplementEngine.generateRecommendations(scores: scores, profile: dashboardVM.profile)
     }
 
-    // Repli : planning IA de l'analyse
     private var aiSchedule: SupplementsSchedule? {
         dashboardVM.aiAnalysis?.supplementsSchedule
-    }
-
-    private var hasEngineResults: Bool {
-        guard let result = engineResult else { return false }
-        return !result.topRecommendations.isEmpty
     }
 
     private var hasAISchedule: Bool {
@@ -69,18 +63,85 @@ struct SupplementsView: View {
             || !(schedule.evening ?? []).isEmpty
     }
 
-    private var hasContent: Bool { hasEngineResults || hasAISchedule }
+    private var hasContent: Bool { !chains.isEmpty || hasAISchedule }
 
-    // Compléments cochés (dans l'ordre de la liste recommandée)
-    private var takenRecs: [SupplementRecommendation] {
-        engineResult?.topRecommendations.filter { choices[$0.id] == .complement } ?? []
+    // MARK: - Les chaînes (bilan → recommandation)
+
+    /// Une chaîne par apport du bilan v2 (source canonique, exactement 3), jointe
+    /// aux recommandations du moteur. Repli : les recommandations seules, quand
+    /// le bilan v2 n'est pas encore disponible.
+    private var chains: [ComplementChain] {
+        let recs = engineResult?.topRecommendations ?? []
+        let apports = dashboardVM.analysisV2?.bilan?.apports ?? []
+
+        guard apports.isEmpty else {
+            return apports.compactMap { apport in
+                guard let id = apport.id, !id.isEmpty else { return nil }
+                let rec = recs.first { $0.nutrientID.rawValue == id }
+                return ComplementChain(
+                    id: id,
+                    nom: apport.nom ?? rec?.nutrientLabel ?? id,
+                    pct: apport.pctBesoin,
+                    statut: apport.statut,
+                    symbol: Fluent3D.symbol(for: id),
+                    tint: Color.nutrientColor(for: id),
+                    rec: rec,
+                    apport: apport
+                )
+            }
+        }
+
+        return recs.map { rec in
+            ComplementChain(
+                id: rec.id,
+                nom: rec.nutrientLabel,
+                pct: rec.score,
+                statut: Self.statut(forScore: rec.score),
+                symbol: Fluent3D.symbol(for: rec.nutrientID.rawValue),
+                tint: rec.nutrientColor,
+                rec: rec,
+                apport: nil
+            )
+        }
+    }
+
+    /// Repli de statut quand le bilan v2 n'a pas encore répondu. Mêmes paliers
+    /// que le reste de l'app (< 40 à combler, < 70 à renforcer).
+    private static func statut(forScore score: Int) -> StatutV2 {
+        if score < 40 { return .aCombler }
+        if score < 70 { return .aRenforcer }
+        return .couvre
+    }
+
+    // MARK: - Panier
+
+    /// Chaînes réellement chiffrables et cochées (une chaîne sans produit n'a
+    /// pas de ligne panier — cas « plutôt par l'assiette »).
+    private var takenChains: [ComplementChain] {
+        chains.filter { chain in
+            guard let rec = chain.rec, product(for: rec) != nil else { return false }
+            return taken.contains(chain.id)
+        }
     }
 
     private var cartTotal: Double {
-        takenRecs.reduce(0) { $0 + SupplementsV4.monthlyPrice($1, premium: premium) }
+        takenChains.reduce(0) { total, chain in
+            guard let rec = chain.rec else { return total }
+            return total + SupplementsV4.monthlyPrice(rec, premium: premium)
+        }
     }
 
-    private var cartTotalLabel: String { String(format: "%.0f €", cartTotal) }
+    private var cartTotalLabel: String { String(format: "%.0f", cartTotal) }
+
+    private func product(for rec: SupplementRecommendation) -> SupplementProduct? {
+        SupplementsV4.product(rec, premium: premium)
+    }
+
+    private func priceLabel(for rec: SupplementRecommendation) -> String {
+        String(format: "%.0f €", SupplementsV4.monthlyPrice(rec, premium: premium))
+    }
+
+    // MARK: - Body
 
     var body: some View {
         NavigationStack {
@@ -117,16 +178,16 @@ struct SupplementsView: View {
                     .accessibilityLabel("Profil")
                 }
             }
-            .sheet(item: $whyRec) { rec in
-                SupplementWhySheet(rec: rec) { addToCart(rec) }
+            .sheet(item: $explanation) { item in
+                ChainExplanationSheet(explanation: item) { explanation = nil }
             }
-            .sheet(item: $interRec) { rec in
+            .sheet(item: $precautionRec) { rec in
                 let warnings = engineResult?.warnings ?? []
                 let items = SupplementsV4.precautions(for: rec, warnings: warnings)
                 SupplementPrecautionsSheet(rec: rec, items: items, tip: SupplementsV4.tip(for: items))
             }
-            // « Combler par l'assiette » → la MÊME fiche que depuis le Bilan :
-            // quels aliments couvrent cet apport, en quelle quantité, quand.
+            // La MÊME fiche que depuis le Bilan : quels aliments couvrent cet
+            // apport, en quelle quantité, à quel moment.
             .sheet(item: $assietteNutrient) { nutrient in
                 NutrientDetailSheet(
                     nutrient: nutrient,
@@ -137,82 +198,372 @@ struct SupplementsView: View {
     }
 
     // MARK: - Contenu principal
+
     private var mainContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                // Titre + sous-titre
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Mes compléments")
-                        .font(.system(size: 28, weight: .heavy, design: .rounded))
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                ComplementsEngagementCard().padding(.top, 14)
+
+                // Le rituel n'a de sens que dans la voie « compléments ».
+                if voie == .complements, let rituel {
+                    ComplementsRituelStrip(rituel: rituel) { toggleRituel($0) }
+                        .padding(.top, 12)
+                }
+
+                chainHeader.padding(.top, 22)
+
+                if chains.isEmpty {
+                    aiFallbackSection.padding(.top, 14)
+                } else {
+                    VStack(spacing: 16) {
+                        ForEach(chains) { chain in
+                            ChainRow(chain: chain) { chainCard(for: chain) }
+                        }
+                    }
+                    .padding(.top, 14)
+
+                    footerBlock.padding(.top, 20)
+                }
+
+                infoCard.padding(.top, 18)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 4)
+            .padding(.bottom, 16)
+        }
+        // Le sélecteur est FIGÉ : `safeAreaInset` réserve sa place, donc le
+        // budget mensuel ne passe jamais dessous.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            ComplementsVoieSwitch(voie: $voie)
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text("Compléments")
+                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .tracking(-0.7)
+                .foregroundStyle(Color.kiwiCharcoal)
+            Text(subtitle)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(Color.healthMapMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 2)
+    }
+
+    private var subtitle: String {
+        let count = chains.count
+        guard count > 0 else { return "Calé sur ton bilan" }
+        return "Calé sur \(count == 1 ? "ton apport" : "tes \(count) apports") à renforcer"
+    }
+
+    private var chainHeader: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.healthMapMuted)
+                    .accessibilityHidden(true)
+                Text(voie == .complements ? "Tes apports → tes compléments"
+                                          : "Tes apports → ton assiette")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.healthMapMuted)
+            }
+            Text(voie == .complements
+                 ? "Chaque complément répond à un apport détecté dans ton bilan."
+                 : "Chaque apport se comble aussi par un aliment précis.")
+                .font(.system(size: 16.5, weight: .heavy))
+                .tracking(-0.35)
+                .foregroundStyle(Color.kiwiCharcoal)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 2)
+    }
+
+    // MARK: - Carte au bout de la chaîne (selon la voie)
+
+    @ViewBuilder
+    private func chainCard(for chain: ComplementChain) -> some View {
+        switch voie {
+        case .complements: complementCard(for: chain)
+        case .assiette: assietteCard(for: chain)
+        }
+    }
+
+    // MARK: Voie « compléments »
+
+    @ViewBuilder
+    private func complementCard(for chain: ComplementChain) -> some View {
+        let rec = chain.rec
+        let prod = rec.flatMap { product(for: $0) }
+
+        VStack(alignment: .leading, spacing: 0) {
+            // Ligne de tête : visuel + nom / dose · moment + priorité.
+            HStack(spacing: 11) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(hex: "F4F1EA"))
+                    .frame(width: 38, height: 38)
+                    .overlay(
+                        Image(systemName: prod == nil ? "carrot" : "pills.fill")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(prod == nil ? Color.kiwiGreen : chain.tint)
+                    )
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(prod?.name ?? "Plutôt par l'assiette")
+                        .font(.system(size: 13.5, weight: .heavy))
                         .foregroundStyle(Color.kiwiCharcoal)
-                    Text("Choisis ce que tu prends — le reste passe par l'assiette")
-                        .font(.system(size: 13, weight: .medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(momentLabel(for: prod, chain: chain))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color.healthMapSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                // « Ton rituel du jour » EN TÊTE (cochable, persistant local).
-                if let rituel {
-                    ComplementsRituelCard(rituel: rituel) { id in
-                        toggleRituel(id)
-                    }
-                }
-
-                SupplementTransparencyCard()
-
-                if let result = engineResult, !result.topRecommendations.isEmpty {
-                    // Section header + toggle Premium / Éco
-                    HStack {
-                        Text("Recommandés pour toi")
-                            .font(.system(size: 16, weight: .heavy))
-                            .foregroundStyle(Color.kiwiCharcoal)
-                        Spacer()
-                        SupplementQualityToggle(premium: $premium)
-                    }
-
-                    VStack(spacing: 12) {
-                        ForEach(result.topRecommendations) { rec in
-                            SupplementCardV4(
-                                rec: rec,
-                                premium: premium,
-                                interCount: interactionCount(for: rec, warnings: result.warnings),
-                                choice: choices[rec.id] ?? .none,
-                                onCapsule: { openWhy(rec) },
-                                onInteractions: { openInter(rec) },
-                                onComplement: { chooseComplement(rec) },
-                                onAssiette: { chooseAssiette(rec) },
-                                onSeeFoodPlan: { goToPlan() }
-                            )
-                        }
-                    }
-
-                    // Panier dynamique « D'après tes choix »
-                    SupplementCartCard(
-                        taken: takenRecs,
-                        premium: premium,
-                        totalLabel: cartTotalLabel,
-                        onOrder: { openTakenProducts() }
-                    )
-                } else {
-                    aiFallbackSection
-                }
-
-                infoCard
+                Text(prod == nil ? "0 €" : priorityLabel(for: chain))
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundStyle(Color.healthMapMuted)
+                    .fixedSize()
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 8)
-            .padding(.bottom, 24)
+
+            // PRIORITÉ 2 — le pourquoi.
+            if let why = whyExplanation(for: chain, product: prod) {
+                ChainWhyCard(
+                    title: prod == nil ? "Pourquoi pas de gélule ?" : "Pourquoi ce format ?",
+                    resume: why.resume
+                ) {
+                    HapticService.shared.selection()
+                    explanation = why
+                }
+                .padding(.top, 11)
+            }
+
+            // PRIORITÉ 3 — les précautions.
+            if let rec, let care = careSummary(for: rec) {
+                ChainCareCard(title: care.title, resume: care.resume) {
+                    HapticService.shared.selection()
+                    precautionRec = rec
+                }
+                .padding(.top, 8)
+            }
+
+            // Hors hiérarchie — l'acte d'achat, discret.
+            if let rec, prod != nil {
+                ChainCartLine(
+                    priceLabel: priceLabel(for: rec),
+                    taken: taken.contains(chain.id)
+                ) {
+                    toggleCart(chain.id)
+                }
+            }
+        }
+    }
+
+    /// « 1000 µg · 1 le matin, à jeun ». Sans produit, on explique pourquoi.
+    private func momentLabel(for product: SupplementProduct?, chain: ComplementChain) -> String {
+        guard let product else {
+            return "Ton écart est faible — l'assiette suffit"
+        }
+        let dosage = product.dosage.trimmingCharacters(in: .whitespaces)
+        guard !dosage.isEmpty else { return product.timing.label }
+        return "\(dosage) · \(product.timing.label)"
+    }
+
+    /// Priorité affichée en petit texte gris (jamais un badge criard).
+    private func priorityLabel(for chain: ComplementChain) -> String {
+        switch chain.statut {
+        case .aCombler: return "essentiel"
+        case .aRenforcer: return "utile"
+        default: return "confort"
+        }
+    }
+
+    // MARK: Voie « par l'assiette »
+
+    @ViewBuilder
+    private func assietteCard(for chain: ComplementChain) -> some View {
+        let foods = foodList(for: chain)
+
+        VStack(alignment: .leading, spacing: 0) {
+            if let first = foods.first {
+                Button {
+                    HapticService.shared.selection()
+                    assietteNutrient = nutrientDetail(for: chain.id)
+                } label: {
+                    HStack(spacing: 11) {
+                        SafeFluent3DIcon(name: first.icon, size: 38)
+                            .accessibilityHidden(true)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(first.label)
+                                .font(.system(size: 13.5, weight: .heavy))
+                                .foregroundStyle(Color.kiwiCharcoal)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("Couvre ton apport en \(chain.nom.lowercased())")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.kiwiGreenInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.healthMapMuted)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.healthMapPressed)
+                .accessibilityHint("Ouvre la fiche de l'apport : aliments, quantités, moments")
+            }
+
+            // PRIORITÉ 2 — le pourquoi (texte réel du bilan, jamais inventé).
+            if let why = foodExplanation(for: chain) {
+                ChainWhyCard(title: "Pourquoi cet aliment ?", resume: why.resume) {
+                    HapticService.shared.selection()
+                    explanation = why
+                }
+                .padding(.top, 11)
+            }
+
+            // Les alternatives, en une ligne discrète.
+            if foods.count > 1 {
+                HStack(spacing: 7) {
+                    SafeFluent3DIcon(name: foods[1].icon, size: 22)
+                        .accessibilityHidden(true)
+                    Text("aussi : " + foods.dropFirst().map(\.label).joined(separator: " · "))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 11)
+            }
+        }
+    }
+
+    private struct ChainFood {
+        let icon: String?
+        let label: String
+    }
+
+    /// Aliments de l'apport : ceux du bilan v2 (personnalisés) en priorité,
+    /// sinon les sources canoniques du catalogue. Aucune donnée inventée.
+    private func foodList(for chain: ComplementChain) -> [ChainFood] {
+        if let aliments = chain.apport?.aliments, !aliments.isEmpty {
+            return aliments.compactMap { aliment in
+                guard let nom = aliment.nom, !nom.isEmpty else { return nil }
+                return ChainFood(icon: aliment.icone, label: nom)
+            }
+        }
+        return Fluent3D.foodSources(for: chain.id).map {
+            ChainFood(icon: $0.asset, label: $0.label)
+        }
+    }
+
+    // MARK: - Explications
+
+    /// « Pourquoi ce format ? » — construit sur le texte du catalogue (la forme
+    /// choisie) et la raison causale du moteur. Sans produit : pourquoi l'assiette
+    /// suffit, expliqué par le bilan.
+    private func whyExplanation(for chain: ComplementChain, product: SupplementProduct?) -> ChainExplanation? {
+        guard let product else {
+            guard let why = chain.apport?.why, !why.isEmpty else { return nil }
+            return ChainExplanation(
+                id: "\(chain.id)-nopill",
+                kind: .why,
+                kicker: "POURQUOI PAS DE GÉLULE",
+                titre: "L'assiette suffit pour cet apport",
+                resume: "Ton écart est faible — l'alimentation le comble seule.",
+                body: why,
+                practice: practiceText(for: chain)
+            )
+        }
+
+        let brand = product.whyBrand.trimmingCharacters(in: .whitespacesAndNewlines)
+        let causal = chain.rec?.whyText.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let body = [causal, brand].filter { !$0.isEmpty }.joined(separator: "\n\n")
+        guard !body.isEmpty else { return nil }
+
+        return ChainExplanation(
+            id: "\(chain.id)-why",
+            kind: .why,
+            kicker: "POURQUOI CE FORMAT",
+            titre: product.name,
+            resume: firstSentence(brand.isEmpty ? causal : brand),
+            body: body,
+            practice: "\(product.dosage) · \(product.timing.label)."
+        )
+    }
+
+    /// « Pourquoi cet aliment ? » — uniquement du texte réel du bilan.
+    private func foodExplanation(for chain: ComplementChain) -> ChainExplanation? {
+        guard let apport = chain.apport,
+              let why = apport.why, !why.isEmpty,
+              let food = foodList(for: chain).first else { return nil }
+        return ChainExplanation(
+            id: "\(chain.id)-food",
+            kind: .why,
+            kicker: "POURQUOI CET ALIMENT",
+            titre: food.label,
+            resume: firstSentence(why),
+            body: why,
+            practice: practiceText(for: chain)
+        )
+    }
+
+    /// Bloc « EN PRATIQUE » du bilan (conseil court + suite), sans rien inventer.
+    private func practiceText(for chain: ComplementChain) -> String {
+        let bold = chain.apport?.tipBold?.trimmingCharacters(in: .whitespaces) ?? ""
+        let rest = chain.apport?.tipRest?.trimmingCharacters(in: .whitespaces) ?? ""
+        return [bold, rest].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    /// Résumé de la carte ambre : combien d'interactions, et laquelle en premier.
+    private func careSummary(for rec: SupplementRecommendation) -> (title: String, resume: String)? {
+        let items = SupplementsV4.precautions(for: rec, warnings: engineResult?.warnings ?? [])
+        guard let first = items.first else { return nil }
+        let title = items.count > 1
+            ? "\(items.count) précautions à connaître"
+            : "1 précaution à connaître"
+        return (title, firstSentence(first.note.isEmpty ? first.title : first.note))
+    }
+
+    /// Première phrase d'un texte — sert de résumé sur la carte (1 ligne visible).
+    private func firstSentence(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let end = trimmed.firstIndex(of: ".") else { return trimmed }
+        return String(trimmed[...end])
+    }
+
+    // MARK: - Pied de page (selon la voie)
+
+    @ViewBuilder
+    private var footerBlock: some View {
+        switch voie {
+        case .complements:
+            ComplementsBudgetCard(
+                premium: $premium,
+                count: takenChains.count,
+                totalLabel: cartTotalLabel
+            )
+        case .assiette:
+            ComplementsAssietteZeroCard()
         }
     }
 
     // MARK: - Actions
 
-    /// (Re)construit le rituel du jour à partir du bilan v2 caché (déterministe).
     private func refreshRituel() {
         rituel = SuiviEngineV4.complementsRituel(complements: complementsV2)
     }
 
-    /// Coche/décoche un item du rituel pour aujourd'hui (persisté localement).
     private func toggleRituel(_ id: String) {
         HapticService.shared.selection()
         withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
@@ -220,76 +571,21 @@ struct SupplementsView: View {
         }
     }
 
-    private func openWhy(_ rec: SupplementRecommendation) {
-        HapticService.shared.selection()
-        whyRec = rec
-    }
-
-    private func openInter(_ rec: SupplementRecommendation) {
-        HapticService.shared.selection()
-        interRec = rec
-    }
-
-    /// « Je le prends » : (dé)sélectionne le mode complément (panier).
-    private func chooseComplement(_ rec: SupplementRecommendation) {
+    private func toggleCart(_ id: String) {
         HapticService.shared.selection()
         withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
-            choices[rec.id] = (choices[rec.id] == .complement) ? SupplementChoice.none : .complement
+            if taken.contains(id) { taken.remove(id) } else { taken.insert(id) }
         }
     }
 
-    /// « Par l'assiette » : (dé)sélectionne le mode assiette (affiche le CTA Plan).
-    private func chooseAssiette(_ rec: SupplementRecommendation) {
-        HapticService.shared.selection()
-        let activation = choices[rec.id] != .assiette
-        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
-            choices[rec.id] = activation ? .assiette : SupplementChoice.none
-        }
-        // Choisir « par l'assiette » sans dire COMMENT laissait l'utilisateur
-        // sans réponse. On enchaîne donc sur la fiche de l'apport concerné :
-        // les aliments qui le couvrent, les quantités et les moments de prise.
-        guard activation else { return }
-        assietteNutrient = nutrientDetail(for: rec.nutrientID)
-    }
-
-    /// Fiche détaillée de l'apport visé par une recommandation, si l'analyse
-    /// l'a produite. `nil` → on n'ouvre rien plutôt que d'afficher une coquille.
-    private func nutrientDetail(for id: NutrientID) -> EnrichedNutrient? {
-        dashboardVM.nutrients.first { $0.id == id.rawValue }
-    }
-
-    /// Depuis la fiche « Pourquoi pour toi » → ajoute au panier (mode complément).
-    private func addToCart(_ rec: SupplementRecommendation) {
-        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
-            choices[rec.id] = .complement
-        }
-    }
-
-    private func goToPlan() {
-        HapticService.shared.selection()
-        NotificationCenter.default.post(
-            name: .healthmapNavigateToTab,
-            object: NavCardDestination.plan.rawValue
-        )
-    }
-
-    /// Ouvre la fiche officielle du complément prioritaire de la sélection
-    /// (le plus haut dans la liste = l'apport le plus prioritaire). Chaque carte
-    /// garde par ailleurs son propre lien « Voir le produit ».
-    private func openTakenProducts() {
-        HapticService.shared.selection()
-        guard let first = takenRecs.first,
-              let product = SupplementsV4.product(first, premium: premium),
-              let url = URL(string: product.productURL) else { return }
-        openURL(url)
-    }
-
-    /// Nombre d'interactions du profil concernant ce complément (badge rouge).
-    private func interactionCount(for rec: SupplementRecommendation, warnings: [InteractionWarning]) -> Int {
-        SupplementsV4.precautions(for: rec, warnings: warnings).count
+    /// Fiche détaillée de l'apport, si l'analyse l'a produite. `nil` → on
+    /// n'ouvre rien plutôt que d'afficher une coquille.
+    private func nutrientDetail(for id: String) -> EnrichedNutrient? {
+        dashboardVM.nutrients.first { $0.id == id }
     }
 
     // MARK: - Repli planning IA (rare : moteur vide mais analyse présente)
+
     @ViewBuilder
     private var aiFallbackSection: some View {
         if let schedule = aiSchedule {
@@ -298,54 +594,56 @@ struct SupplementsView: View {
                 ("Midi", "sun.max.fill", schedule.afternoon ?? []),
                 ("Soir", "moon.fill", schedule.evening ?? []),
             ]
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                let label = block.0
-                let icon = block.1
-                let entries = block.2
-                if !entries.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 8) {
-                            Image(systemName: icon)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color.kiwiGreen)
-                                .accessibilityHidden(true)
-                            Text(label)
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color.kiwiCharcoal)
-                            Spacer()
-                        }
-                        ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
-                            HStack(spacing: 12) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color.kiwiGreenSoft)
-                                        .frame(width: 40, height: 40)
-                                    Image(systemName: "pills.fill")
-                                        .font(.system(size: 18))
-                                        .foregroundStyle(Color.kiwiGreen)
-                                }
-                                .accessibilityHidden(true)
-                                Text(entry.displayText)
-                                    .font(.system(size: 14, weight: .medium))
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                    let entries = block.2
+                    if !entries.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
+                                Image(systemName: block.1)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Color.kiwiGreen)
+                                    .accessibilityHidden(true)
+                                Text(block.0)
+                                    .font(.system(size: 13, weight: .bold))
                                     .foregroundStyle(Color.kiwiCharcoal)
                                 Spacer()
                             }
+                            ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(Color.kiwiGreenSoft)
+                                            .frame(width: 40, height: 40)
+                                        Image(systemName: "pills.fill")
+                                            .font(.system(size: 18))
+                                            .foregroundStyle(Color.kiwiGreen)
+                                    }
+                                    .accessibilityHidden(true)
+                                    Text(entry.displayText)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(Color.kiwiCharcoal)
+                                    Spacer()
+                                }
+                            }
                         }
+                        .padding(16)
+                        .frame(maxWidth: .infinity)
+                        .kiwiCard(radius: 20)
                     }
-                    .padding(16)
-                    .frame(maxWidth: .infinity)
-                    .kiwiCard(radius: 20)
                 }
             }
         }
     }
 
     // MARK: - Disclaimer
+
     private var infoCard: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "info.circle.fill")
                 .font(.system(size: 14))
                 .foregroundStyle(Color.healthMapMuted)
+                .accessibilityHidden(true)
             Text("Suggestions basées sur ton bilan · ne remplacent pas un avis médical.")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color.healthMapMuted)
@@ -353,10 +651,10 @@ struct SupplementsView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 4)
     }
 
     // MARK: - État vide
+
     private var emptyState: some View {
         VStack(spacing: 16) {
             ZStack {
