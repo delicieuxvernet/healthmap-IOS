@@ -256,75 +256,6 @@ struct FoodTileV4: View {
     }
 }
 
-// MARK: - Carte « Impact sur tes besoins » (anneaux d'apport)
-/// Pour chaque besoin du jour : un anneau plein de la part couverte par ce repas.
-/// Vert ≥ 60 % · ambre 30–59 % · rouge < 30 % (« à combler »). Cliquable.
-struct NeedImpactCard: View {
-    let micro: MealScanViewModel.MicroNutrient
-    let onTap: () -> Void
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var animated: CGFloat = 0
-
-    private var pct: Int { micro.pctRDA }
-    private var color: Color {
-        pct >= 60 ? .kiwiGreen : (pct >= 30 ? .scoreLow : .scoreDeficient)
-    }
-    private var def: NutrientDefinition? { NutrientData.definition(for: micro.nutrientId) }
-    private var label: String { def?.label ?? micro.label }
-    private var statusText: String { pct >= 30 ? "\(pct)% du besoin" : "à combler" }
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                ring
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label)
-                        .font(.system(size: 13.5, weight: .bold))
-                        .foregroundStyle(Color.kiwiCharcoal)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text(statusText)
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(color)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .kiwiCard(radius: 16)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.healthMapPressed)
-        .onAppear {
-            let target = CGFloat(min(100, max(0, pct))) / 100
-            if reduceMotion { animated = target }
-            else { withAnimation(.easeOut(duration: 1.0).delay(0.3)) { animated = target } }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label), \(pct) pour cent du besoin. Touche pour le détail.")
-    }
-
-    @ViewBuilder
-    private var ring: some View {
-        ZStack {
-            Circle().stroke(color.opacity(0.16), lineWidth: 6).frame(width: 50, height: 50)
-            Circle()
-                .trim(from: 0, to: animated)
-                .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .frame(width: 50, height: 50)
-                .rotationEffect(.degrees(-90))
-            if let asset = MealScanFluent.asset(forNutrientId: micro.nutrientId) {
-                Fluent3DIcon(name: asset, size: 22)
-            } else {
-                Text("\(pct)%")
-                    .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(color)
-            }
-        }
-        .frame(width: 50, height: 50)
-    }
-}
 
 // MARK: - Carte macros (façon FoodVisor : barre segmentée + total + fibres)
 struct MacrosCardV4: View {
@@ -500,51 +431,6 @@ struct CompleteMealCardV4: View {
     }
 }
 
-// MARK: - Bandeau premium (quota — aucune info masquée)
-struct PremiumScanBannerV4: View {
-    let remaining: Int
-    let onTap: () -> Void
-
-    private var plural: String { remaining > 1 ? "s" : "" }
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 13) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .fill(Color.kiwiGreen)
-                        .frame(width: 42, height: 42)
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Débloque 30 scans par jour")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Color.kiwiGreenInk)
-                    Text(remaining > 0
-                         ? "Il te reste \(remaining) scan\(plural) gratuit\(plural) aujourd’hui"
-                         : "Continue aujourd’hui et garde ton historique")
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(Color.kiwiGreenInk.opacity(0.85))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.kiwiGreen)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.kiwiGreenSoft))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.healthMapPressed)
-        .accessibilityLabel(remaining > 0
-            ? "Débloque 30 scans par jour. Il te reste \(remaining) scan\(plural) gratuit\(plural) aujourd’hui."
-            : "Débloque jusqu’à 30 scans par jour.")
-    }
-}
 
 // MARK: - Fiche détail d'un aliment (bottom sheet v4)
 /// Tout visible (plus aucun floutage premium) : macros, ce qu'il apporte à tes

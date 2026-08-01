@@ -77,32 +77,6 @@ struct NutrientRowView: View {
     }
 }
 
-// MARK: - Nutrient Grid (all 10 nutrients)
-struct NutrientGridView: View {
-    let nutrients: [EnrichedNutrient]
-    var onTapNutrient: ((EnrichedNutrient) -> Void)?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(nutrients) { nutrient in
-                Button {
-                    onTapNutrient?(nutrient)
-                } label: {
-                    NutrientRowView(nutrient: nutrient)
-                }
-                .buttonStyle(.healthMapPressed)
-
-                if nutrient.id != nutrients.last?.id {
-                    Divider()
-                        .padding(.leading, 44)
-                }
-            }
-        }
-        .padding(.horizontal, Theme.spacingMD)
-        .padding(.vertical, Theme.spacingSM)
-        .cardStyle()
-    }
-}
 
 #Preview {
     let sample = EnrichedNutrient(
