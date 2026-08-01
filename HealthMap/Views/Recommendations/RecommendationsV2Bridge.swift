@@ -9,9 +9,13 @@ import SwiftUI
 //
 // Ce pont rend le Plan résilient : quand `aiAnalysis` manque mais que
 // `analysisV2.plan` est présent, on construit les mêmes `PlanTopic` à partir du
-// contrat v2 et on réutilise `PlanTopicCardV4` + `PlanSolutionsSheetV4`. Les
-// repères génériques (« au repas principal », etc.) sont EXACTEMENT ceux que le
-// builder v7 pose déjà — aucune donnée inventée de plus que l'existant.
+// contrat v2 et on rend la MÊME carte radiale (`PlanRadialScreen`). Les repères
+// génériques (« au repas principal », etc.) sont EXACTEMENT ceux que le builder
+// v7 pose déjà — aucune donnée inventée de plus que l'existant.
+//
+// Une nuance assumée : le contrat v2 ne porte pas le score des apports ni le
+// délai d'effet. `evidence` reste donc vide et la cause s'écrit sans chiffre —
+// plutôt que d'en inventer un.
 
 /// Construit les topics du Plan à partir du contrat v2 (`plan.sections`).
 func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
@@ -98,52 +102,13 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
 }
 
 // MARK: - Contenu du Plan à partir du contrat v2 (repli quand aiAnalysis manque)
-/// Même mise en page que `RecommendationsContentView` (titre éditorial, une
-/// carte par topic, pop-up solutions, sources), mais alimentée par le contrat
-/// v2. Réutilise `PlanTopicCardV4` et `PlanSolutionsSheetV4`.
+/// Exactement la même carte radiale que le flux v7, alimentée par le contrat v2.
+/// Pas de focus de la semaine ici : il se calcule sur les repas scannés, que ce
+/// repli ne charge pas.
 struct RecommendationsV2ContentView: View {
     let topics: [PlanTopic]
-    @State private var activeTopic: PlanTopic?
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Ton plan")
-                        .font(.system(size: 28, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.kiwiCharcoal)
-                    Text("La cause, quoi faire, et quand — pour chaque symptôme")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .padding(.top, 4)
-
-                ForEach(topics) { topic in
-                    PlanTopicCardV4(topic: topic) {
-                        HapticService.shared.tap()
-                        activeTopic = topic
-                    }
-                    .padding(.horizontal, 24)
-                }
-
-                SourcesSection()
-                    .padding(.horizontal, 24)
-            }
-            .padding(.vertical, 12)
-            .padding(.bottom, 24)
-        }
-        .scrollIndicators(.hidden)
-        .sheet(item: $activeTopic) { topic in
-            PlanSolutionsSheetV4(topic: topic) {
-                activeTopic = nil
-                NotificationCenter.default.post(
-                    name: .healthmapNavigateToTab,
-                    object: "complements"
-                )
-            }
-        }
+        PlanRadialScreen(topics: topics, focus: nil)
     }
 }

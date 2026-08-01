@@ -284,6 +284,18 @@ struct MainTabView: View {
             case .complements: return 4
             }
         }
+
+        /// Identifiant partagé avec les deep links (`NavCardDestination`), pour
+        /// que les écrans puissent réagir à leur propre apparition.
+        var route: String {
+            switch self {
+            case .bilan: return NavCardDestination.bilan.rawValue
+            case .suivi: return NavCardDestination.suivi.rawValue
+            case .scanner: return NavCardDestination.scanner.rawValue
+            case .plan: return NavCardDestination.plan.rawValue
+            case .complements: return NavCardDestination.complements.rawValue
+            }
+        }
     }
 
     // La réservation d'espace pour la barre flottante vit désormais DANS
@@ -387,6 +399,15 @@ struct MainTabView: View {
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
             .animation(reduceMotion ? .none : .easeOut(duration: 0.28), value: selectedTab)
+        }
+        // Les cinq onglets restent montés : `onAppear` ne se déclenche qu'une
+        // fois, au lancement. Un écran qui rejoue une entrée à chaque visite
+        // (la carte radiale du Plan) a besoin de ce signal-là.
+        .onChange(of: selectedTab) { _, nouvel in
+            NotificationCenter.default.post(
+                name: .healthmapTabDidChange,
+                object: nouvel.route
+            )
         }
         .ignoresSafeArea(.keyboard)
         .tint(Color.kiwiGreen)

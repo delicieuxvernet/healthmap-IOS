@@ -555,16 +555,11 @@ struct BilanV7SymptomesCard: View {
     let onTapSymptom: (BilanV7SymptomRow) -> Void
     let onSolutions: () -> Void
 
-    /// Icône par famille de symptôme (mots-clés du questionnaire).
+    /// Icône par famille de symptôme (mots-clés du questionnaire). Table unique
+    /// partagée avec la carte radiale du Plan : un même symptôme porte la même
+    /// icône d'un onglet à l'autre.
     private func icon(for nom: String) -> String {
-        let n = nom.folding(options: .diacriticInsensitive, locale: .current).lowercased()
-        if n.contains("ongle") || n.contains("cheveu") { return "hand.point.up" }
-        if n.contains("fatigue") || n.contains("energie") { return "battery.25" }
-        if n.contains("sommeil") || n.contains("dormir") { return "moon.fill" }
-        if n.contains("digest") || n.contains("ventre") { return "circle.dotted" }
-        if n.contains("humeur") || n.contains("stress") { return "brain.head.profile" }
-        if n.contains("peau") { return "face.smiling" }
-        return "waveform.path.ecg"
+        PlanNodeIcon.symptome(nom)
     }
 
     private func trendIcon(_ row: BilanV7SymptomRow) -> String {
