@@ -21,6 +21,9 @@
 1. `CLAUDE.md` (racine) — règles produit, conventions, comptes de test, historique. **Prioritaire.**
 2. `DESIGN-PAGES.md` (racine) — structure de chaque écran. À lire avant tout ajustement UI.
 3. Vault Obsidian `C:\Users\stana\Desktop\Claude\Obsidian\Healthmap\` — architecture canonique (le POURQUOI). Lecture à la demande, jamais en bloc.
+   - **Section `09 — Passation`** (créée le 1er août 2026) — reprise de projet : accès et clés vérifiés, runbook de déploiement, état des chantiers, pièges connus. **C'est la partie la plus à jour du vault** ; les sections 01 à 08 datent d'avril-juillet et décrivent surtout le web abandonné.
+
+⛔ **Deux fichiers de la racine sont périmés** et portent un bandeau d'avertissement : `README-SETUP.md` et `MAC-CLAUDE-BRIEF.md` (ils décrivent Clerk comme auth iOS — faux depuis le 7 juin 2026).
 
 ---
 

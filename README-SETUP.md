@@ -1,5 +1,22 @@
 # Kiwio iOS — Guide de configuration
 
+> ## ⛔ CE DOCUMENT EST PARTIELLEMENT PÉRIMÉ (constaté le 1er août 2026)
+>
+> Il décrit **Clerk** comme fournisseur d'authentification iOS. **C'est faux depuis le
+> 7 juin 2026** : iOS est passé à **Supabase Auth natif** et Clerk en a été entièrement
+> retiré (le web, lui, reste sur Clerk). La `CLERK_PUBLISHABLE_KEY` encore présente dans
+> `Config.xcconfig` est un résidu inutilisé.
+>
+> Sont également dépassés : l'étape 1 (le projet Xcode existe, généré par **XcodeGen**
+> depuis `project.yml`), le paquet SPM Clerk, et le bloc « Statut App Store » ci-dessous —
+> `delete-user` est déployée et la capability Sign in with Apple est active.
+>
+> **Restent valables** : la configuration `Config.xcconfig`, RevenueCat, Sentry, PostHog,
+> la table `analytics_events`, les secrets CI et la partie tests.
+>
+> **En cas de contradiction, l'ordre de confiance est :**
+> `AGENTS.md` → `CLAUDE.md` → vault Obsidian `09 — Passation` → ce fichier.
+
 > 🥝 **Kiwio = HealthMap** (marque renommée, juin 2026). Les noms **internes** restent inchangés pour stabilité : target/module Swift `HealthMap`, bundle id `fr.healthmap.app`, domaine `healthmap.fr`, repo `healthmap-IOS`.
 
 App native SwiftUI (iOS 17+) pour Kiwio. Backend partagé avec healthmap.fr (Supabase).
