@@ -231,10 +231,14 @@ struct SupplementsView: View {
             .padding(.horizontal, 20)
             .padding(.top, 4)
             .padding(.bottom, 16)
+            // Le contenu fait EXACTEMENT la largeur du conteneur, jamais plus.
+            // C'est la seule garantie qui tienne : `scrollBounceBehavior` ne
+            // suffit pas, `.basedOnSize` laisse justement rebondir quand le
+            // contenu est plus large. Ici un enfant trop large se comprime au
+            // lieu d'élargir la zone défilable, donc la page ne peut plus
+            // glisser de côté ni laisser voir de marge vide.
+            .containerRelativeFrame(.horizontal, alignment: .leading)
         }
-        // Garde-fou : la page ne doit jamais pouvoir partir de côté. Sans ça,
-        // le moindre élément trop large rend la ScrollView pannable à
-        // l'horizontale et l'écran « rebondit » sous le pouce.
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         // Le sélecteur est FIGÉ : `safeAreaInset` réserve sa place, donc le
         // budget mensuel ne passe jamais dessous.
@@ -332,7 +336,8 @@ struct SupplementsView: View {
                 Text(prod == nil ? "0 €" : priorityLabel(for: chain))
                     .font(.system(size: 10.5, weight: .bold))
                     .foregroundStyle(Color.healthMapMuted)
-                    .fixedSize()
+                    .lineLimit(1)
+                    .layoutPriority(1)
             }
 
             // PRIORITÉ 2 — le pourquoi.
