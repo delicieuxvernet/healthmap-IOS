@@ -494,23 +494,22 @@ struct ChainRow<Content: View>: View {
     }
 }
 
-/// Rail pointillé vertical, gris — porte le lien bilan → recommandation.
+/// Rail pointillé vertical, gris. Porte le lien bilan → recommandation.
+/// Tracé natif : la première version empilait 40 rectangles masqués, soit 120
+/// vues pour trois chaînes, et laissait planer un doute sur la largeur
+/// réellement demandée. Un `StrokeStyle(dash:)` fait la même chose.
 private struct ChainRail: View {
     var body: some View {
-        Rectangle()
-            .fill(.clear)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(ComplementsChainPalette.rail)
-                    .frame(width: 2)
-                    .mask(
-                        VStack(spacing: 4) {
-                            ForEach(0..<40, id: \.self) { _ in
-                                Rectangle().frame(height: 5)
-                            }
-                        }
-                    )
+        GeometryReader { geo in
+            Path { chemin in
+                chemin.move(to: CGPoint(x: geo.size.width / 2, y: 0))
+                chemin.addLine(to: CGPoint(x: geo.size.width / 2, y: geo.size.height))
             }
+            .stroke(
+                ComplementsChainPalette.rail,
+                style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [5, 4])
+            )
+        }
     }
 }
 
@@ -653,8 +652,9 @@ struct ComplementsBudgetCard: View {
                     Text("€/mois")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.healthMapMuted)
+                        .lineLimit(1)
                 }
-                .fixedSize()
+                .layoutPriority(1)
             }
             .padding(.top, 13)
         }
