@@ -73,6 +73,44 @@ struct ChainExplanation: Identifiable, Equatable {
     let body: String
     /// Bloc « EN PRATIQUE » : quoi faire concrètement.
     let practice: String
+
+    /// Le corps découpé en paragraphes : un pavé de quatre phrases ne se lit
+    /// pas sur un téléphone, deux blocs courts si.
+    var paragraphes: [String] {
+        body.components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+// MARK: - Nettoyage typographique des textes affichés
+enum KiwiProse {
+    /// Le tiret cadratin en incise (« … — … ») ne se prononce pas, hache la
+    /// lecture, et c'est la signature typographique des textes générés par
+    /// machine. On le ramène à la ponctuation qu'on écrirait à la main.
+    /// À appliquer à TOUT texte venant de l'IA ou du catalogue avant affichage.
+    static func lisible(_ texte: String) -> String {
+        var sortie = texte.trimmingCharacters(in: .whitespacesAndNewlines)
+        for tiret in [" — ", " – ", " − ", " -- "] {
+            sortie = sortie.replacingOccurrences(of: tiret, with: ", ")
+        }
+        for prefixe in ["— ", "– ", "-- "] where sortie.hasPrefix(prefixe) {
+            sortie.removeFirst(prefixe.count)
+        }
+        return sortie
+            .replacingOccurrences(of: " ,", with: ",")
+            .replacingOccurrences(of: ", ,", with: ",")
+            .replacingOccurrences(of: "  ", with: " ")
+    }
+}
+
+extension String {
+    /// Première lettre en capitale, le reste intact (`capitalized` casserait
+    /// les sigles et les noms de molécules).
+    var capitalizedFirstLetter: String {
+        guard let first else { return self }
+        return String(first).uppercased() + dropFirst()
+    }
 }
 
 // MARK: - Une chaîne = un apport du bilan + sa recommandation
@@ -122,8 +160,9 @@ struct ComplementsEngagementCard: View {
                     .font(.system(size: 14.5, weight: .heavy))
                     .foregroundStyle(Color(hex: "27510A"))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Aucune marque partenaire, aucune commission — juste ce qui te sert.")
+                Text("Aucune marque partenaire, aucune commission.")
                     .font(.system(size: 12, weight: .medium))
+                    .lineSpacing(2)
                     .foregroundStyle(Color.kiwiGreenInk)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -173,13 +212,26 @@ struct ComplementsRituelStrip: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if !rituel.isEmpty {
+                // 4 pastilles au maximum. Chaque case a une zone tactile
+                // RIGIDE de 44 pt : au-delà de 4 prises, la ligne dépassait la
+                // largeur de l'écran et toute la page se mettait à rebondir
+                // horizontalement. L'anneau porte déjà le compte complet.
+                let visibles = Array(rituel.items.prefix(4))
+                let reste = rituel.items.count - visibles.count
                 HStack(spacing: 5) {
-                    ForEach(rituel.items) { item in
+                    ForEach(visibles) { item in
                         RituelPastille(item: item, reduceMotion: reduceMotion) {
                             onToggle(item.id)
                         }
                     }
+                    if reste > 0 {
+                        Text("+\(reste)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.healthMapMuted)
+                            .accessibilityLabel("et \(reste) autre\(reste > 1 ? "s" : "")")
+                    }
                 }
+                .layoutPriority(1)
             }
         }
         .padding(.horizontal, 14)
@@ -265,7 +317,8 @@ struct ChainWhyCard: View {
                         .foregroundStyle(ComplementsChainPalette.whyInk)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(resume)
-                        .font(.system(size: 11.5, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
+                        .lineSpacing(2)
                         .foregroundStyle(Color(hex: "3A3833"))
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -318,7 +371,8 @@ struct ChainCareCard: View {
                         .foregroundStyle(ComplementsChainPalette.careInk)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(resume)
-                        .font(.system(size: 11.5, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
+                        .lineSpacing(2)
                         .foregroundStyle(Color.healthMapSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -403,8 +457,12 @@ struct ChainRow<Content: View>: View {
                 Text(chain.statutLabel)
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(chain.statut.inkColor)
+                    // Jamais sur deux lignes, mais jamais rigide non plus : un
+                    // `fixedSize` ici pouvait pousser la ligne au-delà de la
+                    // largeur de l'écran et déclencher le rebond horizontal.
                     .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .minimumScaleFactor(0.85)
+                    .layoutPriority(1)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(
@@ -524,7 +582,11 @@ struct ComplementsVoieSwitch: View {
         )
         .shadow(color: Color.kiwiCharcoal.opacity(0.14), radius: 9, x: 0, y: 5)
         .padding(.horizontal, 20)
-        .padding(.bottom, 10)
+        // Le bouton Scan de la tab bar est surélevé : il déborde de 17 pt
+        // au-dessus de la barre (+ son anneau crème de 5 pt). Sous 24 pt de
+        // marge, le sélecteur passait derrière lui. 32 pt laissent l'air
+        // nécessaire pour que les deux se lisent séparément.
+        .padding(.bottom, 32)
         .accessibilityLabel("Voie choisie")
     }
 }
@@ -574,9 +636,10 @@ struct ComplementsBudgetCard: View {
             .padding(.top, 11)
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(premium ? "Formes chélatées, dosages testés"
-                             : "Formes simples, efficaces mais moins assimilées")
+                Text(premium ? "Les formes que ton corps absorbe le mieux."
+                             : "Des formes plus simples, un peu moins bien absorbées.")
                     .font(.system(size: 12.5, weight: .semibold))
+                    .lineSpacing(2)
                     .foregroundStyle(Color.healthMapSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -638,8 +701,9 @@ struct ComplementsAssietteZeroCard: View {
                     .font(.system(size: 13.5, weight: .heavy))
                     .foregroundStyle(Color.kiwiCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Ces aliments couvrent tes apports à renforcer. Compte 4 à 6 semaines pour voir l'effet.")
+                Text("Ces aliments couvrent tes besoins. Compte un mois pour sentir la différence.")
                     .font(.system(size: 11.5, weight: .medium))
+                    .lineSpacing(2)
                     .foregroundStyle(Color.healthMapSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -698,19 +762,24 @@ struct ChainExplanationSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                // Le mécanisme.
-                Text(explanation.body)
-                    .font(.system(size: 13, weight: .medium))
-                    .lineSpacing(3)
-                    .foregroundStyle(Color(hex: "3A3833"))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white)
-                    )
-                    .padding(.top, 14)
+                // Le mécanisme, aéré en paragraphes courts.
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(explanation.paragraphes.enumerated()), id: \.offset) { _, paragraphe in
+                        Text(paragraphe)
+                            .font(.system(size: 14, weight: .medium))
+                            .lineSpacing(5)
+                            .foregroundStyle(Color(hex: "3A3833"))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white)
+                )
+                .padding(.top, 14)
 
                 // Ce qu'on en fait concrètement.
                 if !explanation.practice.isEmpty {
@@ -719,13 +788,13 @@ struct ChainExplanationSheet: View {
                             .font(.system(size: 11, weight: .heavy))
                             .foregroundStyle(Color.kiwiGreenInk)
                         Text(explanation.practice)
-                            .font(.system(size: 12.5, weight: .medium))
-                            .lineSpacing(3)
+                            .font(.system(size: 13.5, weight: .medium))
+                            .lineSpacing(5)
                             .foregroundStyle(Color(hex: "3A3833"))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
+                    .padding(15)
                     .background(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(Color.white)

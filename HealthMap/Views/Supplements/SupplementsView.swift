@@ -232,6 +232,10 @@ struct SupplementsView: View {
             .padding(.top, 4)
             .padding(.bottom, 16)
         }
+        // Garde-fou : la page ne doit jamais pouvoir partir de côté. Sans ça,
+        // le moindre élément trop large rend la ScrollView pannable à
+        // l'horizontale et l'écran « rebondit » sous le pouce.
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         // Le sélecteur est FIGÉ : `safeAreaInset` réserve sa place, donc le
         // budget mensuel ne passe jamais dessous.
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -364,14 +368,29 @@ struct SupplementsView: View {
         }
     }
 
-    /// « 1000 µg · 1 le matin, à jeun ». Sans produit, on explique pourquoi.
+    /// « 1000 µg, le matin à jeun ». Sans produit, on explique pourquoi.
     private func momentLabel(for product: SupplementProduct?, chain: ComplementChain) -> String {
         guard let product else {
-            return "Ton écart est faible — l'assiette suffit"
+            return "Ton écart est petit, l'assiette suffit"
         }
         let dosage = product.dosage.trimmingCharacters(in: .whitespaces)
-        guard !dosage.isEmpty else { return product.timing.label }
-        return "\(dosage) · \(product.timing.label)"
+        let moment = momentPhrase(product.timing)
+        guard !dosage.isEmpty else { return moment.capitalizedFirstLetter }
+        return "\(dosage), \(moment)"
+    }
+
+    /// Formulation parlée du moment de prise. `TimingSlot.label` est écrit sans
+    /// accents et sur un ton d'étiquette (« Soir avec diner ») ; ici on
+    /// s'adresse à quelqu'un.
+    private func momentPhrase(_ slot: TimingSlot) -> String {
+        switch slot {
+        case .matinAJeun: return "le matin à jeun"
+        case .matinRepas: return "le matin au petit-déjeuner"
+        case .midiRepas: return "le midi, pendant le repas"
+        case .soirRepas: return "le soir, pendant le dîner"
+        case .coucher: return "au coucher"
+        case .entreRepas: return "entre deux repas"
+        }
     }
 
     /// Priorité affichée en petit texte gris (jamais un badge criard).
@@ -437,8 +456,9 @@ struct SupplementsView: View {
                 HStack(spacing: 7) {
                     SafeFluent3DIcon(name: foods[1].icon, size: 22)
                         .accessibilityHidden(true)
-                    Text("aussi : " + foods.dropFirst().map(\.label).joined(separator: " · "))
-                        .font(.system(size: 11, weight: .semibold))
+                    Text("Aussi : " + foods.dropFirst().map(\.label).joined(separator: ", "))
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .lineSpacing(2)
                         .foregroundStyle(Color.healthMapSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -480,14 +500,14 @@ struct SupplementsView: View {
                 kind: .why,
                 kicker: "POURQUOI PAS DE GÉLULE",
                 titre: "L'assiette suffit pour cet apport",
-                resume: "Ton écart est faible — l'alimentation le comble seule.",
-                body: why,
+                resume: "Ton écart est petit, l'alimentation le comble seule.",
+                body: KiwiProse.lisible(why),
                 practice: practiceText(for: chain)
             )
         }
 
-        let brand = product.whyBrand.trimmingCharacters(in: .whitespacesAndNewlines)
-        let causal = chain.rec?.whyText.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let brand = KiwiProse.lisible(product.whyBrand)
+        let causal = KiwiProse.lisible(chain.rec?.whyText ?? "")
         let body = [causal, brand].filter { !$0.isEmpty }.joined(separator: "\n\n")
         guard !body.isEmpty else { return nil }
 
@@ -498,7 +518,7 @@ struct SupplementsView: View {
             titre: product.name,
             resume: firstSentence(brand.isEmpty ? causal : brand),
             body: body,
-            practice: "\(product.dosage) · \(product.timing.label)."
+            practice: "\(product.dosage), \(momentPhrase(product.timing))."
         )
     }
 
@@ -512,16 +532,16 @@ struct SupplementsView: View {
             kind: .why,
             kicker: "POURQUOI CET ALIMENT",
             titre: food.label,
-            resume: firstSentence(why),
-            body: why,
+            resume: firstSentence(KiwiProse.lisible(why)),
+            body: KiwiProse.lisible(why),
             practice: practiceText(for: chain)
         )
     }
 
     /// Bloc « EN PRATIQUE » du bilan (conseil court + suite), sans rien inventer.
     private func practiceText(for chain: ComplementChain) -> String {
-        let bold = chain.apport?.tipBold?.trimmingCharacters(in: .whitespaces) ?? ""
-        let rest = chain.apport?.tipRest?.trimmingCharacters(in: .whitespaces) ?? ""
+        let bold = KiwiProse.lisible(chain.apport?.tipBold ?? "")
+        let rest = KiwiProse.lisible(chain.apport?.tipRest ?? "")
         return [bold, rest].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
@@ -535,11 +555,15 @@ struct SupplementsView: View {
         return (title, firstSentence(first.note.isEmpty ? first.title : first.note))
     }
 
-    /// Première phrase d'un texte — sert de résumé sur la carte (1 ligne visible).
-    private func firstSentence(_ text: String) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let end = trimmed.firstIndex(of: ".") else { return trimmed }
-        return String(trimmed[...end])
+    /// Accroche de carte : la première phrase, plafonnée. La carte n'a la place
+    /// que d'une accroche, pas d'un paragraphe ; on coupe sur un mot entier.
+    private func firstSentence(_ text: String, limite: Int = 90) -> String {
+        let propre = KiwiProse.lisible(text)
+        let phrase = propre.firstIndex(of: ".").map { String(propre[...$0]) } ?? propre
+        guard phrase.count > limite else { return phrase }
+        let coupe = phrase.prefix(limite)
+        guard let espace = coupe.lastIndex(of: " ") else { return String(coupe) + "…" }
+        return String(coupe[..<espace]) + "…"
     }
 
     // MARK: - Pied de page (selon la voie)
@@ -644,7 +668,7 @@ struct SupplementsView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(Color.healthMapMuted)
                 .accessibilityHidden(true)
-            Text("Suggestions basées sur ton bilan · ne remplacent pas un avis médical.")
+            Text("Ces suggestions viennent de ton bilan. Elles ne remplacent pas l'avis d'un médecin.")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color.healthMapMuted)
                 .multilineTextAlignment(.center)
@@ -666,11 +690,12 @@ struct SupplementsView: View {
                     .foregroundStyle(Color.kiwiGreen)
             }
             .accessibilityHidden(true)
-            Text("Aucun complément à ajouter")
+            Text("Rien à ajouter pour l'instant")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Color.kiwiCharcoal)
-            Text("Ton bilan n'a pas identifié de complément à ajouter, ou l'analyse n'a pas encore été effectuée.")
+            Text("Ton bilan ne fait ressortir aucun complément utile. Si tu viens de le remplir, laisse-lui un instant.")
                 .font(.system(size: 14, weight: .medium))
+                .lineSpacing(3)
                 .foregroundStyle(Color.healthMapSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
