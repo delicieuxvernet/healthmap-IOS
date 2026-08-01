@@ -17,6 +17,10 @@ extension Notification.Name {
     /// fonction Edge). Les écrans en aval (Bilan → score hebdo, journal du jour
     /// « Ta journée ») rechargent leur journal à réception.
     static let healthmapMealScanned = Notification.Name("healthmapMealScanned")
+    /// Émise quand l'onglet affiché change (`object` = `NavCardDestination`
+    /// brut). Les cinq onglets restant montés en permanence, `onAppear` ne
+    /// suffit pas à un écran qui rejoue une entrée à chaque visite.
+    static let healthmapTabDidChange = Notification.Name("healthmapTabDidChange")
 }
 
 // MARK: - Profile Toolbar (avatar Profil sur TOUS les onglets — A1)

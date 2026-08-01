@@ -1,18 +1,20 @@
 import SwiftUI
 import Combine
 
-// MARK: - Recommendations View (« Ton plan » — langage v4 3D, maquette FINALE)
+// MARK: - Recommendations View (« Ton plan » — carte radiale, maquette v5)
 //
-// Refonte FINALE (maquette « impl_Plan.html ») : fond crème, cartes blanches
-// arrondies (.kiwiCard). Plus de héros gamifié (XP / niveau retirés). Pour
-// chaque symptôme déclaré et chaque objectif : une carte « la cause, quoi faire,
-// et quand » avec un rituel matin/midi/soir et un bouton « Voir mes solutions »
-// qui ouvre une pop-up (bottom sheet) détaillant les solutions par la nutrition,
-// les habitudes et les compléments.
+// Refonte (maquette « Plan v5 - radial ») : plus de blocs empilés ni de scroll.
+// Le kiwi au centre, un nœud par symptôme déclaré et par objectif tout autour,
+// reliés par des flèches. Les solutions restent CACHÉES jusqu'au tap : on montre
+// les portes, pas les pièces. Un tap ouvre une pop-up courte — la cause en une
+// phrase citant les vraies valeurs du bilan, puis 3 leviers (nutrition,
+// compléments, habitudes) de 2 puces chacun, le délai d'effet, un seul bouton.
 //
 // Les bindings au ViewModel sont conservés : le contenu est dérivé de
 // dashboardVM.aiAnalysis (symptomesAnalyse, objectifsAnalyse, priorityActions,
 // nutriments + solutions) et du catalogue de sources d'aliments (Fluent3D).
+// La mise en page vit dans `PlanRadialScreen` (PlanRadialComponents.swift),
+// partagée avec le repli sur contrat v2.
 struct RecommendationsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
 
@@ -65,7 +67,9 @@ struct RecommendationsView: View {
                     await dashboardVM.triggerAnalysis()
                 }
             }
-            .navigationTitle("Ton plan")
+            // L'en-tête de l'écran fait office de titre (même parti que le
+            // Bilan v7) — la barre reste inline et vide, seul le Profil y est.
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .kiwiNavigationBarBackground()
             .toolbar {
@@ -90,110 +94,34 @@ struct RecommendationsView: View {
 struct RecommendationsContentView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @StateObject private var vm: RecommendationsViewModel
-    /// Journal alimentaire (repas scannés de la quinzaine) — nourrit la carte
-    /// « Focus de la semaine » en tête du Plan. Chargé une fois via `.task`.
+    /// Journal alimentaire (repas scannés de la quinzaine) — nourrit la ligne
+    /// « Focus de la semaine » sous la carte. Chargé une fois via `.task`.
     @StateObject private var journalVM = MealJournalViewModel()
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// Topic dont la pop-up « Voir mes solutions » est ouverte.
-    @State private var activeTopic: PlanTopic?
 
     init(analysis: MergedAnalysis) {
         _vm = StateObject(wrappedValue: RecommendationsViewModel(analysis: analysis))
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // 1. Titre éditorial (sentence case — maquette « Ton plan »).
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Ton plan")
-                        .font(.system(size: 28, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.kiwiCharcoal)
-                    Text("La cause, quoi faire, et quand — pour chaque symptôme")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+        PlanRadialScreen(topics: topics, focus: planFocus)
+            .onReceive(dashboardVM.$aiAnalysis) { newAnalysis in
+                if let newAnalysis {
+                    vm.updateAnalysis(newAnalysis)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .padding(.top, 4)
-
-                // 1 bis. « Focus de la semaine » : une mission unique dérivée des
-                // scans (moteur déterministe). Affichée seulement si on peut la
-                // calculer honnêtement (des repas scannés existent) — sinon rien,
-                // jamais de chiffre inventé.
-                if let focus = planFocus {
-                    PlanFocusCardV6(focus: focus, reduceMotion: reduceMotion)
-                        .padding(.horizontal, 24)
-                }
-
-                // 2. Une carte par symptôme / objectif.
-                ForEach(topics) { topic in
-                    PlanTopicCardV4(topic: topic) {
-                        HapticService.shared.tap()
-                        activeTopic = topic
-                    }
-                    .padding(.horizontal, 24)
-                }
-
-                // État vide : aucun symptôme/objectif exploitable dans l'analyse.
-                if topics.isEmpty {
-                    VStack(spacing: 10) {
-                        MascotView(mood: .happy, size: 64)
-                        Text("Rien à signaler pour l'instant")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color.kiwiCharcoal)
-                        Text("Ton plan s'enrichira au fil de tes bilans et de tes scans.")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.healthMapSecondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(24)
-                    .frame(maxWidth: .infinity)
-                    .kiwiCard()
-                    .padding(.horizontal, 24)
-                }
-
-                // Sources scientifiques (App Store guideline 1.4.1) — citations
-                // cliquables des références fondant les recommandations du plan.
-                SourcesSection()
-                    .padding(.horizontal, 24)
             }
-            .padding(.vertical, 12)
-            .padding(.bottom, 24)
-        }
-        .scrollIndicators(.hidden)
-        .sheet(item: $activeTopic) { topic in
-            PlanSolutionsSheetV4(topic: topic) {
-                // CTA « Voir mes compléments recommandés » : ferme la pop-up et
-                // bascule vers l'onglet Compléments (best effort via le canal de
-                // navigation partagé). cf. gap si l'onglet n'est pas routé.
-                activeTopic = nil
-                NotificationCenter.default.post(
-                    name: .healthmapNavigateToTab,
-                    object: "complements"
-                )
+            .task {
+                // Repas scannés de la quinzaine (lecture seule) pour le focus.
+                // Aucun LLM : la mission est calculée localement (SuiviEngineV4).
+                await journalVM.load()
             }
-        }
-        .onReceive(dashboardVM.$aiAnalysis) { newAnalysis in
-            if let newAnalysis {
-                vm.updateAnalysis(newAnalysis)
+            // Un scan fait dans l'onglet Scanner ne relance pas ce .task : on
+            // recharge pour que le focus intègre le nouveau scan.
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
+                Task { await journalVM.load() }
             }
-        }
-        .task {
-            // Repas scannés de la quinzaine (lecture seule) pour la carte Focus.
-            // Aucun LLM : la mission est ensuite calculée localement (SuiviEngineV4).
-            await journalVM.load()
-        }
-        // Un scan fait dans l'onglet Scanner ne relance pas ce .task : on recharge
-        // pour que la carte Focus (repas qui comptent) intègre le nouveau scan.
-        .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
-            Task { await journalVM.load() }
-        }
     }
 
-    // MARK: - Focus de la semaine (carte en tête, 100 % déterministe)
+    // MARK: - Focus de la semaine (une ligne, 100 % déterministe)
     /// Mission unique de la semaine, dérivée des repas réellement scannés :
     /// couverture 7 jours des apports à renforcer → apport le plus à combler →
     /// mission « 3 repas riches en X » + progrès compté sur les scans de la
@@ -270,8 +198,8 @@ struct RecommendationsContentView: View {
         return result
     }
 
-    /// Assemble un PlanTopic à partir des apports DÉJÀ attribués à cette carte
-    /// (distincts des autres cartes — voir `topics`).
+    /// Assemble un PlanTopic à partir des apports DÉJÀ attribués à ce nœud
+    /// (distincts des autres nœuds — voir `topics`).
     private func makeTopic(id: String, kind: PlanTopic.Kind, name: String, intro: String, focus: [EnrichedNutrient]) -> PlanTopic {
         PlanTopic(
             id: id,
@@ -281,7 +209,11 @@ struct RecommendationsContentView: View {
             ritual: ritual(for: focus, kind: kind),
             nutrition: nutritionSolutions(for: focus),
             habitudes: habits(for: focus, kind: kind, objectifName: name),
-            complements: supplementSolutions(for: focus)
+            complements: supplementSolutions(for: focus),
+            // Les vraies valeurs du bilan, citées telles quelles par la pop-up.
+            evidence: focus.map { PlanEvidence(label: $0.label, score: $0.score) },
+            // Délai d'effet : celui de l'analyse, ou rien.
+            delai: focus.compactMap { $0.solution?.delai }.first { !$0.isEmpty }
         )
     }
 
