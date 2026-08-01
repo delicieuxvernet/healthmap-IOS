@@ -1,5 +1,18 @@
 # 🎯 BRIEF MAC CLAUDE — HealthMap iOS Setup & Deploy
 
+> ## ⛔ DOCUMENT HISTORIQUE — NE PLUS SUIVRE (constaté le 1er août 2026)
+>
+> Ce brief a été écrit en **mai 2026** pour une session sur un Mac loué, quand le projet
+> Xcode n'existait pas encore. **Toutes ses phases 1 à 8 sont faites** : le projet est
+> généré par XcodeGen, la CI GitHub Actions builde et publie sur TestFlight, l'app est
+> soumise à App Review.
+>
+> Il décrit aussi **Clerk** comme auth iOS — faux depuis le 7 juin 2026 (Supabase Auth natif).
+>
+> **Ne pas s'en servir comme plan de travail.** Conservé pour la trace historique.
+> Le brief opérationnel à jour est **`AGENTS.md`**, et la reprise de projet est décrite
+> dans le vault Obsidian, section **`09 — Passation`**.
+
 > **À LIRE EN PREMIER.** Tu es Claude Code sur un Mac (MacInCloud), nouvelle session.
 > Ton job : finaliser le projet Xcode HealthMap iOS, builder, tester et préparer la soumission App Store.
 
