@@ -202,23 +202,25 @@ struct SupplementsView: View {
     private var mainContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                header
-                ComplementsEngagementCard().padding(.top, 14)
+                header.kiwiEntrance(0)
+                ComplementsEngagementCard().padding(.top, 14).kiwiEntrance(1)
 
                 // Le rituel n'a de sens que dans la voie « compléments ».
                 if voie == .complements, let rituel {
                     ComplementsRituelStrip(rituel: rituel) { toggleRituel($0) }
                         .padding(.top, 12)
+                        .kiwiEntrance(2)
                 }
 
-                chainHeader.padding(.top, 22)
+                chainHeader.padding(.top, 22).kiwiEntrance(3)
 
                 if chains.isEmpty {
-                    aiFallbackSection.padding(.top, 14)
+                    aiFallbackSection.padding(.top, 14).kiwiEntrance(4)
                 } else {
                     VStack(spacing: 16) {
-                        ForEach(chains) { chain in
+                        ForEach(Array(chains.enumerated()), id: \.element.id) { index, chain in
                             ChainRow(chain: chain) { chainCard(for: chain) }
+                                .kiwiEntrance(4 + index)
                         }
                     }
                     .padding(.top, 14)
