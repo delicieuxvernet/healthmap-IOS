@@ -86,10 +86,10 @@ enum HealthMapError: LocalizedError, Equatable {
         case .network(let err):
             switch err {
             case .offline: return "Pas de connexion Internet. Vérifie ta connexion et réessaie."
-            case .timeout: return "La requête a pris trop de temps. Réessaie dans quelques instants."
+            case .timeout: return "Ça a pris trop de temps. Réessaie dans quelques instants."
             case .serverError(let code): return "Le serveur a renvoyé une erreur (\(code)). Réessaie plus tard."
             case .decoding: return "Impossible de lire la réponse du serveur."
-            case .rateLimited: return "Tu envoies trop de requêtes. Attends un instant."
+            case .rateLimited: return "Trop de demandes d'un coup. Attends un instant."
             case .unknown(let msg): return "Erreur réseau : \(msg)"
             }
         case .auth(let err):
@@ -105,7 +105,7 @@ enum HealthMapError: LocalizedError, Equatable {
             case .signInIncomplete: return "Connexion incomplète. Une étape supplémentaire est requise."
             case .invalidEmailCode: return "Ce code est incorrect. Vérifie tes mails et réessaie."
             case .emailCodeExpired: return "Ce code a expiré. Demande un nouveau code."
-            case .profileResolutionTimeout: return "Connexion lente — impossible de charger ton profil. Réessaie."
+            case .profileResolutionTimeout: return "Connexion lente. Impossible de charger ton profil, réessaie."
             case .tooManyResendAttempts: return "Trop de demandes de renvoi. Patiente une minute avant de réessayer."
             case .unknown(let msg): return "Erreur d'authentification : \(msg)"
             }

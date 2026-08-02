@@ -265,7 +265,7 @@ struct MealScanView: View {
             voiceHint
 
             if dicteeTropCourte || speech.error != nil {
-                Text(speech.error?.message ?? "Trop court — garde le doigt appuyé le temps de parler.")
+                Text(speech.error?.message ?? "Trop court. Garde le doigt appuyé le temps de parler.")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Kiwio.rouge)
                     .fixedSize(horizontal: false, vertical: true)
@@ -360,10 +360,10 @@ struct MealScanView: View {
             if viewModel.isAnalyzing {
                 VStack(spacing: Theme.spacingMD) {
                     KiwiWalkerView(size: 140)
-                    Text("Analyse en cours...")
+                    Text("Analyse en cours…")
                         .font(Theme.bodyFont)
                         .foregroundStyle(Color.healthMapSecondary)
-                    Text("Notre IA identifie les aliments et calcule ce qu'ils t'apportent")
+                    Text("J'identifie les aliments et je calcule ce qu'ils t'apportent")
                         .font(Theme.captionFont)
                         .foregroundStyle(Color.healthMapMuted)
                         .multilineTextAlignment(.center)
@@ -389,7 +389,7 @@ struct MealScanView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .padding(.horizontal, Theme.spacingLG)
 
-                Button("Reessayer") { viewModel.reset() }
+                Button("Réessayer") { viewModel.reset() }
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.kiwiGreen)
             }
@@ -1110,7 +1110,7 @@ struct MealScanView: View {
                 QuotaWall(
                     message: "Tes scans gratuits du jour sont utilisés. Premium en débloque jusqu’à 30 par jour.",
                     unlockTitle: "Débloquer 30 scans par jour",
-                    escapeText: "ou reviens demain — 3 nouveaux scans t’attendent",
+                    escapeText: "ou reviens demain, 3 nouveaux scans t’attendent",
                     zone: "scan_quota"
                 ) {
                     showPaywall = true
@@ -1196,7 +1196,7 @@ struct MealScanView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(Color.healthMapMuted)
-                TextField("Rechercher un aliment...", text: $viewModel.searchQuery)
+                TextField("Rechercher un aliment…", text: $viewModel.searchQuery)
                     .font(Theme.bodyFont)
                     .autocorrectionDisabled()
                     .onChange(of: viewModel.searchQuery) { _, _ in
@@ -1223,7 +1223,7 @@ struct MealScanView: View {
                         .font(Theme.captionFont)
                         .foregroundStyle(Color.healthMapSecondary)
                     HStack(spacing: 8) {
-                        quickSearchButton("Epinards")
+                        quickSearchButton("Épinards")
                         quickSearchButton("Saumon")
                         quickSearchButton("Lentilles")
                     }
@@ -1394,12 +1394,14 @@ private struct NeedImpactDetailSheet: View {
 
     private var why: String {
         if pct >= 60 {
-            return "Ce repas couvre déjà \(pct) % de ton besoin du jour en \(label.lowercased()). Beau geste — continue sur cette lancée."
+            return "Ce repas couvre déjà \(pct) % de ton besoin du jour en \(label.lowercased()). Beau geste, continue sur cette lancée."
         }
         if pct >= 30 {
-            return "Ce repas apporte \(pct) % de ton besoin du jour en \(label.lowercased()). Un complément dans la journée et c'est validé."
+            return "Ce repas apporte \(pct) % de ton besoin du jour en \(label.lowercased()). Un peu plus dans la journée et c'est bon."
         }
-        return "Ce repas n'apporte presque pas de \(label.lowercased()). Ajoute une source ci-dessous pour mieux couvrir ce besoin du jour."
+        // Tournure choisie pour éviter l'élision : « pas de oméga-3 » et
+        // « pas de iode » étaient fautifs, le nutriment passe donc en tête.
+        return "\(label) : ce repas n'en apporte presque pas. Ajoute un des aliments ci-dessous pour mieux couvrir ce besoin du jour."
     }
 
     var body: some View {

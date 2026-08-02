@@ -185,7 +185,7 @@ struct QuotaMeter: View {
             (Text("Il te reste ")
                 + Text("\(remaining) \(unit)\(remaining > 1 ? "s" : "")")
                     .font(.system(size: 12.5, weight: .heavy)).foregroundColor(Color.kiwiInk)
-                + Text(remaining > 1 ? " — encore de quoi avancer aujourd’hui." : " — ton quota revient demain."))
+                + Text(remaining > 1 ? ", encore de quoi avancer aujourd’hui." : ". Ton quota revient demain."))
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundColor(Color(hex: "3A3833"))
                 .padding(.top, 11)
@@ -212,7 +212,7 @@ struct QuotaWall: View {
     var message: String
     var unlockIcon: String = "bolt.fill"
     var unlockTitle: String = "Débloquer 30 scans par jour"
-    var escapeText: String = "ou reviens demain — 3 nouveaux scans t’attendent"
+    var escapeText: String = "ou reviens demain : 3 nouveaux scans t’attendent"
     var zone: String = ""
     var onUnlock: (() -> Void)? = nil
 
@@ -269,7 +269,7 @@ struct QuotaWall: View {
             GatedOverlay(intensity: .teaser) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Où la trouver").font(.system(size: 11, weight: .heavy)).foregroundStyle(Color.kiwiInk)
-                    Text("Œufs · Sardines · Fromage — associe la B12 à des folates pour doubler l'assimilation.")
+                    Text("Œufs · Sardines · Fromage. Associe la B12 à des folates pour doubler l'assimilation.")
                         .font(.system(size: 12))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -279,7 +279,7 @@ struct QuotaWall: View {
 
             QuotaMeter(used: 2, total: 3)
 
-            QuotaWall(message: "Tes 3 scans du jour sont utilisés — reviens demain, ou débloque jusqu’à 30 scans par jour.")
+            QuotaWall(message: "Tes 3 scans du jour sont utilisés. Reviens demain, ou débloque jusqu’à 30 scans par jour.")
         }
         .padding()
     }

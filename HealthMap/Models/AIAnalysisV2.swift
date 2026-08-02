@@ -335,6 +335,20 @@ private extension KeyedDecodingContainer {
         (try? decodeIfPresent(T.self, forKey: key)) ?? nil
     }
 
+    /// Surcharge texte : tout ce que l'IA renvoie sous forme de chaîne est
+    /// nettoyé DÈS LE DÉCODAGE, avant d'atteindre le moindre écran.
+    ///
+    /// Le modèle produit encore des tirets cadratins en incise malgré la
+    /// consigne du prompt ; les filtrer ici plutôt que dans chaque vue évite
+    /// d'avoir à y penser à chaque nouvel écran. Swift choisit cette surcharge
+    /// non générique dès que le contexte attend un `String?`.
+    /// Sans effet sur les identifiants (« vitD », « v2 ») : ils ne contiennent
+    /// ni tiret cadratin ni espace superflue.
+    func v2Lenient(_ key: Key) -> String? {
+        guard let brut: String = (try? decodeIfPresent(String.self, forKey: key)) ?? nil else { return nil }
+        return KiwiProse.lisible(brut)
+    }
+
     /// Tableau indulgent : les entrées malformées sont skippées une à une.
     func v2LenientArray<T: Decodable>(_ key: Key) -> [T]? {
         guard let lossy: LossyDecodableArray<T> = v2Lenient(key) else { return nil }

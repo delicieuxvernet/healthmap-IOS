@@ -104,12 +104,12 @@ struct ContentView: View {
         // (`isPresented:` bool flipped back to false on dismissal) ensures
         // the alert never re-fires after the user acknowledges it.
         .alert(
-            "Votre session a expire",
+            "Ta session a expiré",
             isPresented: $authViewModel.sessionExpiredNotice
         ) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Pour des raisons de securite, vous avez ete deconnecte. Reconnectez-vous pour continuer.")
+            Text("Pour ta sécurité, tu as été déconnecté. Reconnecte-toi pour continuer.")
         }
     }
 
@@ -168,7 +168,7 @@ private struct OfflineBanner: View {
             HStack(spacing: 8) {
                 Image(systemName: "wifi.slash")
                     .font(.system(size: 13, weight: .semibold))
-                Text("Hors ligne — certaines donnees ne sont pas a jour")
+                Text("Hors ligne. Certaines données ne sont pas à jour")
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
@@ -185,7 +185,7 @@ private struct OfflineBanner: View {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("Reconnecte — synchronisation...")
+                    Text("Reconnecté. Synchronisation...")
                         .font(.system(size: 12, weight: .medium))
                 }
                 .foregroundStyle(Color.healthMapBlue)
@@ -194,7 +194,7 @@ private struct OfflineBanner: View {
         }
         .padding(.top, 8)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Hors ligne. Certaines donnees ne sont pas a jour.")
+        .accessibilityLabel("Hors ligne. Certaines données ne sont pas à jour.")
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("healthmapDidReconnect"))) { _ in
             withAnimation(.easeInOut(duration: 0.3)) {
                 showReconnected = true
@@ -360,25 +360,25 @@ struct MainTabView: View {
             if dashboardVM.hasCompletedQuestionnaire {
                 SuiviView().environmentObject(dashboardVM)
             } else {
-                LockedFeatureView(title: "Suivi", message: "Complete ton bilan pour acceder au suivi quotidien.")
+                LockedFeatureView(title: "Suivi", message: "Complète ton bilan pour accéder au suivi quotidien.")
             }
         case .scanner:
             if dashboardVM.hasCompletedQuestionnaire {
                 MealScanView().environmentObject(dashboardVM)
             } else {
-                LockedFeatureView(title: "Scanner", message: "Complete ton bilan pour scanner tes repas.")
+                LockedFeatureView(title: "Scanner", message: "Complète ton bilan pour scanner tes repas.")
             }
         case .plan:
             if dashboardVM.hasCompletedQuestionnaire {
                 RecommendationsView().environmentObject(dashboardVM)
             } else {
-                LockedFeatureView(title: "Mon Plan", message: "Complete ton bilan pour acceder a ton plan personnalise.")
+                LockedFeatureView(title: "Mon Plan", message: "Complète ton bilan pour accéder à ton plan personnalisé.")
             }
         case .complements:
             if dashboardVM.hasCompletedQuestionnaire {
                 SupplementsView().environmentObject(dashboardVM)
             } else {
-                LockedFeatureView(title: "Mes compléments", message: "Complete ton bilan pour voir tes compléments.")
+                LockedFeatureView(title: "Mes compléments", message: "Complète ton bilan pour voir tes compléments.")
             }
         }
     }
@@ -721,11 +721,11 @@ struct ProfileView: View {
                             HStack {
                                 Image(systemName: "gearshape")
                                     .foregroundStyle(Color.healthMapBlue)
-                                Text("Gerer mon abonnement")
+                                Text("Gérer mon abonnement")
                                     .foregroundStyle(Color.healthMapBlue)
                             }
                         }
-                        .accessibilityHint("Ouvre la gestion de ton abonnement (modifier ou annuler) dans les reglages Apple.")
+                        .accessibilityHint("Ouvre la gestion de ton abonnement (modifier ou annuler) dans les réglages Apple.")
                     } else {
                         Button {
                             showPaywall = true
@@ -733,7 +733,7 @@ struct ProfileView: View {
                             HStack {
                                 Image(systemName: "crown.fill")
                                     .foregroundStyle(Color.healthMapBlue)
-                                Text("Passer a Premium")
+                                Text("Passer à Premium")
                                     .foregroundStyle(Color.healthMapBlue)
                             }
                         }
@@ -761,7 +761,7 @@ struct ProfileView: View {
                         }
                     }
                     .disabled(isRestoringPurchases)
-                    .accessibilityHint("Restaure un abonnement Premium achete precedemment avec ce meme identifiant Apple.")
+                    .accessibilityHint("Restaure un abonnement Premium acheté avant avec ce même identifiant Apple.")
                 }
 
                 // Quick links
@@ -777,7 +777,7 @@ struct ProfileView: View {
                         ScoreHistoryView()
                             .environmentObject(dashboardVM)
                     } label: {
-                        Label("Evolution du score", systemImage: "chart.xyaxis.line")
+                        Label("Évolution du score", systemImage: "chart.xyaxis.line")
                     }
 
                     if dashboardVM.hasCompletedQuestionnaire {
@@ -785,14 +785,14 @@ struct ProfileView: View {
                             SupplementsView()
                                 .environmentObject(dashboardVM)
                         } label: {
-                            Label("Mes complements", systemImage: "pills")
+                            Label("Mes compléments", systemImage: "pills")
                         }
                     }
 
                     NavigationLink {
                         MethodeView()
                     } label: {
-                        Label("Notre methode", systemImage: "brain")
+                        Label("Notre méthode", systemImage: "brain")
                     }
                 }
 
@@ -802,7 +802,7 @@ struct ProfileView: View {
                         HStack {
                             Image(systemName: "flame.fill")
                                 .foregroundStyle(Color.accentSky)
-                            Text("Serie actuelle")
+                            Text("Série actuelle")
                             Spacer()
                             Text("\(gamification.currentStreak) jours")
                                 .foregroundStyle(Color.healthMapSecondary)
@@ -811,7 +811,7 @@ struct ProfileView: View {
                         HStack {
                             Image(systemName: "star.fill")
                                 .foregroundStyle(Color.accentSky)
-                            Text("Meilleure serie")
+                            Text("Meilleure série")
                             Spacer()
                             Text("\(gamification.bestStreak) jours")
                                 .foregroundStyle(Color.healthMapSecondary)
@@ -820,7 +820,7 @@ struct ProfileView: View {
                         HStack {
                             Image(systemName: "checkmark.seal.fill")
                                 .foregroundStyle(Color.healthMapBlue)
-                            Text("Check-ins total")
+                            Text("Total des check-ins")
                             Spacer()
                             Text("\(gamification.totalCheckins)")
                                 .foregroundStyle(Color.healthMapSecondary)
@@ -838,9 +838,9 @@ struct ProfileView: View {
                 }
 
                 // Legal
-                Section("Legal") {
+                Section("Légal") {
                     Link(destination: URL(string: "https://healthmap.fr/privacy")!) {
-                        Label("Politique de confidentialite", systemImage: "hand.raised.fill")
+                        Label("Politique de confidentialité", systemImage: "hand.raised.fill")
                     }
 
                     Link(destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!) {
@@ -849,7 +849,7 @@ struct ProfileView: View {
                 }
 
                 // Settings
-                Section("Preferences") {
+                Section("Préférences") {
                     Toggle(isOn: Binding(
                         get: { gamification.isZenMode },
                         set: { _ in gamification.toggleZenMode() }
@@ -859,7 +859,7 @@ struct ProfileView: View {
                                 .foregroundStyle(Color.healthMapBlue)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Mode Zen")
-                                Text("Desactive badges, confetti et notifications")
+                                Text("Désactive les badges, les confettis et les notifications")
                                     .font(.system(size: 11))
                                     .foregroundStyle(Color.healthMapSecondary)
                             }
@@ -868,7 +868,7 @@ struct ProfileView: View {
                 }
 
                 // RGPD — Data Export (Article 20)
-                Section("Mes donnees") {
+                Section("Mes données") {
                     Button {
                         Task { await exportUserData() }
                     } label: {
@@ -881,17 +881,17 @@ struct ProfileView: View {
                                 Image(systemName: "square.and.arrow.up")
                                     .foregroundStyle(Color.healthMapBlue)
                             }
-                            Text("Exporter mes donnees")
+                            Text("Exporter mes données")
                                 .foregroundStyle(Color.healthMapBlue)
                         }
                     }
                     .disabled(isExportingData)
-                    .accessibilityHint("Telecharge toutes tes donnees Kiwio au format JSON (RGPD Article 20).")
+                    .accessibilityHint("Télécharge toutes tes données Kiwio au format JSON (RGPD Article 20).")
                 }
 
                 // Sign out
                 Section {
-                    Button("Se deconnecter", role: .destructive) {
+                    Button("Se déconnecter", role: .destructive) {
                         Task {
                             gamification.reset()
                             await authViewModel.signOut()
@@ -916,7 +916,7 @@ struct ProfileView: View {
                 } header: {
                     Text("Zone dangereuse")
                 } footer: {
-                    Text("La suppression de ton compte est definitive. Toutes tes donnees (profil, bilan, historique, scans) seront effacees immediatement et ne pourront pas etre recuperees. Cette action est requise par le RGPD (Article 17 — droit a l'effacement).")
+                    Text("La suppression de ton compte est définitive. Toutes tes données (profil, bilan, historique, scans) seront effacées tout de suite et ne pourront pas être récupérées. Cette action est requise par le RGPD (Article 17 : droit à l'effacement).")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.healthMapSecondary)
                 }
@@ -955,7 +955,7 @@ struct ProfileView: View {
                     showDeleteSecondConfirm = true
                 }
             } message: {
-                Text("Cette action est irreversible. Tu vas perdre ton bilan, ton historique, tes scans et tous tes rappels. Continue uniquement si tu es sur(e).")
+                Text("Cette action est irréversible. Tu vas perdre ton bilan, ton historique, tes scans et tous tes rappels. Continue seulement si tu es sûr(e).")
             }
             // 2e confirmation — mot tapé pour prouver l'intention (RGPD + Apple review).
             // Detent .large obligatoire : le contenu (icône + bullets + champ +
@@ -972,7 +972,7 @@ struct ProfileView: View {
             .alert("Hors ligne", isPresented: $showExportOfflineAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text("L'export necessite une connexion internet pour recuperer toutes tes donnees. Reconnecte-toi puis reessaie.")
+                Text("L'export a besoin d'une connexion internet pour récupérer toutes tes données. Reconnecte-toi puis réessaie.")
             }
             // Restore Purchases result alert. Uses the existing-message
             // pattern (no `presenting:`) so the alert can be reused for
@@ -1008,18 +1008,18 @@ struct ProfileView: View {
         do {
             try await subscriptionService.restorePurchases()
             if subscriptionService.isPremium {
-                restoreResultMessage = "Achats restaures. Bienvenue dans Premium !"
+                restoreResultMessage = "Achats restaurés. Bienvenue dans Premium !"
                 AnalyticsService.shared.track(.subscriptionRestored, properties: [
                     "outcome": "success",
                 ])
             } else {
-                restoreResultMessage = "Aucun achat a restaurer pour cet identifiant Apple. Si tu penses qu'il y a une erreur, contacte le support."
+                restoreResultMessage = "Aucun achat à restaurer pour cet identifiant Apple. Si tu penses qu'il y a une erreur, écris au support."
                 AnalyticsService.shared.track(.subscriptionRestored, properties: [
                     "outcome": "no_purchase",
                 ])
             }
         } catch {
-            restoreResultMessage = "Erreur lors de la restauration. Verifie ta connexion puis reessaie, ou contacte le support."
+            restoreResultMessage = "La restauration n'a pas abouti. Vérifie ta connexion puis réessaie, ou écris au support."
             AnalyticsService.shared.track(.subscriptionRestored, properties: [
                 "outcome": "error",
             ])
@@ -1090,11 +1090,11 @@ struct ProfileView: View {
 
                     // Rappel des conséquences
                     VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                        bulletRow("Ton profil et ton bilan seront effaces")
-                        bulletRow("Ton historique de scores sera efface")
-                        bulletRow("Tes scans et rappels seront effaces")
-                        bulletRow("Ton abonnement Premium ne sera PAS annule automatiquement (gere-le dans Reglages > Apple ID)")
-                        bulletRow("Cette action est IRREVERSIBLE")
+                        bulletRow("Ton profil et ton bilan seront effacés")
+                        bulletRow("Ton historique de scores sera effacé")
+                        bulletRow("Tes scans et tes rappels seront effacés")
+                        bulletRow("Ton abonnement Premium ne sera PAS annulé automatiquement (gère-le dans Réglages > Apple ID)")
+                        bulletRow("Cette action est IRRÉVERSIBLE")
                     }
 
                     // Champ de confirmation — TextField natif : le placeholder
@@ -1161,7 +1161,7 @@ struct ProfileView: View {
                                 Text("Suppression en cours...")
                             } else {
                                 Image(systemName: "trash")
-                                Text("Supprimer definitivement")
+                                Text("Supprimer définitivement")
                             }
                         }
                         .font(Theme.headlineFont)
@@ -1176,7 +1176,7 @@ struct ProfileView: View {
                     .buttonStyle(.healthMapPressed)
                     .disabled(!isDeleteConfirmed || isDeletingAccount)
                     .accessibilityHint(isDeleteConfirmed
-                        ? "Supprime ton compte immediatement et definitivement."
+                        ? "Supprime ton compte tout de suite et définitivement."
                         : "Tape d'abord le mot SUPPRIMER dans le champ de confirmation.")
 
                     Button {
@@ -1270,7 +1270,7 @@ struct ProfileView: View {
             // Haptique d'erreur : la suppression a échoué, le sheet reste
             // ouvert avec le message d'erreur affiché.
             HapticService.shared.error()
-            deleteErrorMessage = authViewModel.errorMessage ?? "Erreur lors de la suppression. Reessaie ou contacte le support."
+            deleteErrorMessage = authViewModel.errorMessage ?? "La suppression n'a pas abouti. Réessaie ou écris au support."
         }
     }
 }

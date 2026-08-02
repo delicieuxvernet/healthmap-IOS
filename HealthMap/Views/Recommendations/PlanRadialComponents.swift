@@ -535,7 +535,7 @@ struct PlanFocusLineV7: View {
                         .font(.system(size: 13, weight: .heavy))
                         .foregroundStyle(Color.kiwiCharcoal)
                     HStack(spacing: 0) {
-                        Text(missionShort + " — ")
+                        Text(missionShort + " : ")
                             .font(.system(size: 11.5, weight: .medium))
                             .foregroundStyle(Color(hex: "6B7280"))
                             .lineLimit(1)
@@ -600,7 +600,7 @@ struct PlanSolutionsSheetV7: View {
                 // Rien à dire honnêtement → on n'écrit pas d'amorce vide.
                 let cause = topic.radialCause
                 if !cause.isEmpty {
-                    (Text("Ce qu'on voit — ").font(.system(size: 13, weight: .heavy))
+                    (Text("Ce qu'on voit : ").font(.system(size: 13, weight: .heavy))
                         + Text(cause).font(.system(size: 13, weight: .medium)))
                         .foregroundStyle(Color(hex: "3a3833"))
                         .lineSpacing(2)
@@ -617,7 +617,7 @@ struct PlanSolutionsSheetV7: View {
                     UnlockDoor(
                         icon: "lock.fill",
                         title: "Débloque tes solutions pour « \(topic.name) »",
-                        subtitle: "Nutrition, compléments et habitudes — le détail à appliquer.",
+                        subtitle: "Nutrition, compléments et habitudes : le détail à appliquer.",
                         zone: "plan_solutions"
                     )
                     .padding(.top, 12)

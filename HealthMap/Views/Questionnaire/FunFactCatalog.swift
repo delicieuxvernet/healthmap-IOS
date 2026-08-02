@@ -62,7 +62,7 @@ enum FunFactCatalog {
             return "A un cheveu de \(ref.who) (\(ref.cm) cm) !"
         }
         let sens = delta > 0 ? "de plus que" : "de moins que"
-        return "\(cm) cm — soit \(abs(delta)) cm \(sens) \(ref.who) (\(ref.cm) cm)."
+        return "\(cm) cm, soit \(abs(delta)) cm \(sens) \(ref.who) (\(ref.cm) cm)."
     }
 
     // MARK: - Age (14-100 ans)
@@ -71,15 +71,15 @@ enum FunFactCatalog {
     /// pas de célébrité (leur âge change avec le temps -> deviendrait faux).
     private static func ageFact(_ years: Int) -> String {
         switch years {
-        case ..<18: return "En pleine croissance — ton corps a de grands besoins !"
-        case 18..<25: return "La vingtaine qui demarre — de l'energie a revendre !"
-        case 25..<30: return "Le moment ideal pour installer les bons reflexes !"
-        case 30..<40: return "La trentaine — on construit son capital forme !"
-        case 40..<50: return "La quarantaine — experience et vitalite au rendez-vous !"
-        case 50..<60: return "La cinquantaine — le bon moment pour chouchouter ses apports !"
-        case 60..<70: return "La soixantaine — une nouvelle liberte, autant la vivre en forme !"
-        case 70..<85: return "Les bonnes habitudes comptent plus que jamais — et tu es au bon endroit !"
-        default: return "Quelle longevite — respect total !"
+        case ..<18: return "En pleine croissance : ton corps a de grands besoins !"
+        case 18..<25: return "La vingtaine qui demarre, de l'energie a revendre !"
+        case 25..<30: return "Le moment ideal pour installer tes bons reflexes !"
+        case 30..<40: return "La trentaine, tu construis ton capital forme !"
+        case 40..<50: return "La quarantaine, experience et vitalite au rendez-vous !"
+        case 50..<60: return "La cinquantaine, le bon moment pour chouchouter tes apports !"
+        case 60..<70: return "La soixantaine et une nouvelle liberte : autant la vivre en forme !"
+        case 70..<85: return "Les bonnes habitudes comptent plus que jamais, et tu es au bon endroit !"
+        default: return "Quelle longevite, respect total !"
         }
     }
 }

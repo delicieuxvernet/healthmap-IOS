@@ -40,8 +40,8 @@ enum SupplementEngine {
         case .vitD: return "Vitamine D"
         case .vitB12: return "Vitamine B12"
         case .iron: return "Fer"
-        case .magnesium: return "Magnesium"
-        case .omega3: return "Omega-3"
+        case .magnesium: return "Magnésium"
+        case .omega3: return "Oméga-3"
         case .vitC: return "Vitamine C"
         case .calcium: return "Calcium"
         case .zinc: return "Zinc"
@@ -145,37 +145,37 @@ enum SupplementEngine {
         let isDeficient = score < 40
         let diet = getDietType(profile)
 
-        var why = "Votre score \(label) est de \(score)/100"
-        why += isDeficient ? " — a renforcer en priorite." : " — a surveiller."
+        var why = "Ton score \(label) est de \(score)/100"
+        why += isDeficient ? ", à renforcer en priorité." : ", à surveiller."
 
         // Diet-specific context
         if difficulty >= 8 {
             if diet == "vegan" && nutrientID == .vitB12 {
-                why += " La B12 est absente des aliments vegetaux, un supplement est indispensable."
+                why += " La B12 est absente des aliments végétaux, un complément est indispensable."
             } else if nutrientID == .vitD {
-                why += " La vitamine D est quasi impossible a obtenir par l'alimentation seule."
+                why += " La vitamine D est presque impossible à obtenir par l'alimentation seule."
             } else {
-                why += " Ce nutriment est tres difficile a corriger par l'alimentation seule."
+                why += " Ce nutriment est très difficile à rattraper par l'alimentation seule."
             }
         } else if difficulty >= 6 {
-            why += " Ce nutriment est difficile a obtenir en quantite suffisante avec votre profil."
+            why += " Ce nutriment est difficile à obtenir en quantité suffisante avec ton profil."
         }
 
         // Profile-specific reasons
         if nutrientID == .iron && hasHeavyPeriods(profile) {
-            why += " Les regles abondantes augmentent vos pertes de fer."
+            why += " Tes règles abondantes augmentent tes pertes de fer."
         }
         if nutrientID == .iron && (diet == "vegan" || diet == "vegetarien") {
-            why += " Le fer vegetal (non-heminique) est moins bien absorbe."
+            why += " Le fer des végétaux est moins bien absorbé."
         }
         if nutrientID == .vitB12 && isSenior(profile) {
-            why += " L'absorption de la B12 diminue avec l'age."
+            why += " L'absorption de la B12 diminue avec l'âge."
         }
         if nutrientID == .magnesium && hasHighStress(profile) {
-            why += " Le stress chronique epuise vos reserves de magnesium."
+            why += " Un stress qui dure épuise tes réserves de magnésium."
         }
         if nutrientID == .omega3 && (diet == "vegan" || diet == "vegetarien") {
-            why += " Sans poisson, l'apport en EPA/DHA est quasi nul."
+            why += " Sans poisson, l'apport en oméga-3 marins est presque nul."
         }
 
         return why
@@ -325,32 +325,32 @@ enum SupplementEngine {
         (
             pair: ["calcium", "iron"],
             emoji: "🦴🩸",
-            message: "Ne jamais prendre fer et calcium en meme temps — competition d'absorption. Separer de 2h minimum.",
+            message: "Ne prends jamais le fer et le calcium en même temps : ils se gênent l'un l'autre. Espace les prises de 2h minimum.",
             severity: .moderate
         ),
         (
             pair: ["iron", "zinc"],
             emoji: "🩸🛡️",
-            message: "Fer et zinc rivalisent pour l'absorption. Prendre le fer le matin et le zinc le soir.",
+            message: "Le fer et le zinc se gênent l'un l'autre. Prends le fer le matin et le zinc le soir.",
             severity: .moderate
         ),
         (
             pair: ["calcium", "zinc"],
             emoji: "🦴🛡️",
-            message: "Le calcium reduit l'absorption du zinc. Separer les prises de 2h.",
+            message: "Le calcium réduit l'absorption du zinc. Espace les prises de 2h.",
             severity: .moderate
         ),
         (
             pair: ["calcium", "magnesium"],
             emoji: "🦴⚡",
-            message: "Calcium et magnesium rivalisent pour l'absorption a haute dose. Prendre a des repas differents.",
+            message: "À forte dose, le calcium et le magnésium se gênent l'un l'autre. Prends-les à des repas différents.",
             severity: .moderate
         ),
         // Zinc haute dose reduit l'absorption du cuivre
         (
             pair: ["zinc", "copper"],
             emoji: "🛡️🟤",
-            message: "Le zinc a haute dose (>25 mg/jour) reduit l'absorption du cuivre. Privilegier un supplement zinc+cuivre ou limiter la duree de cure.",
+            message: "À forte dose (plus de 25 mg par jour), le zinc réduit l'absorption du cuivre. Préfère un complément zinc + cuivre, ou fais des cures plus courtes.",
             severity: .moderate
         ),
     ]
@@ -388,7 +388,7 @@ enum SupplementEngine {
                         let antiLabel = NutrientID(rawValue: anti).map { nutrientLabel(for: $0) } ?? anti
                         warnings.append(InteractionWarning(
                             emoji: "⚠️",
-                            message: "\(product.name) : ne pas prendre avec \(antiLabel). Separer les prises de 2h minimum.",
+                            message: "\(product.name) : à ne pas prendre avec \(antiLabel). Espace les prises de 2h minimum.",
                             nutrients: Array(pair),
                             severity: .moderate
                         ))
@@ -421,7 +421,7 @@ enum SupplementEngine {
         if medicationSet.contains("anticoagulant") && recommendedNutrients.contains(.omega3) {
             warnings.append(InteractionWarning(
                 emoji: "🩸⚠️",
-                message: "Anticoagulant + Omega-3 : risque hemorragique accru. Consultez votre medecin avant toute supplementation en omega-3.",
+                message: "Anticoagulant + oméga-3 : risque de saignement plus élevé. Demande l'avis de ton médecin avant de prendre des oméga-3.",
                 nutrients: ["omega3", "anticoagulant"],
                 severity: .critical
             ))
@@ -431,7 +431,7 @@ enum SupplementEngine {
         if medicationSet.contains("ppi") && recommendedNutrients.contains(.iron) {
             warnings.append(InteractionWarning(
                 emoji: "💊🩸",
-                message: "IPP + Fer : les IPP reduisent l'acidite gastrique necessaire a l'absorption du fer. Prendre le fer 2h avant l'IPP.",
+                message: "IPP + fer : les IPP réduisent l'acidité de l'estomac, dont le fer a besoin pour être absorbé. Prends le fer 2h avant l'IPP.",
                 nutrients: ["iron", "ppi"],
                 severity: .moderate
             ))
@@ -441,7 +441,7 @@ enum SupplementEngine {
         if medicationSet.contains("ppi") && recommendedNutrients.contains(.calcium) {
             warnings.append(InteractionWarning(
                 emoji: "💊🦴",
-                message: "IPP + Calcium : les IPP reduisent l'absorption du calcium. Privilegier le citrate de calcium et separer les prises.",
+                message: "IPP + calcium : les IPP réduisent l'absorption du calcium. Préfère le citrate de calcium et espace les prises.",
                 nutrients: ["calcium", "ppi"],
                 severity: .moderate
             ))
@@ -451,7 +451,7 @@ enum SupplementEngine {
         if medicationSet.contains("ppi") && recommendedNutrients.contains(.magnesium) {
             warnings.append(InteractionWarning(
                 emoji: "💊⚡",
-                message: "IPP + Magnesium : utilisation prolongee des IPP peut epuiser le magnesium. Surveillance recommandee.",
+                message: "IPP + magnésium : pris longtemps, les IPP peuvent épuiser le magnésium. À surveiller avec ton médecin.",
                 nutrients: ["magnesium", "ppi"],
                 severity: .moderate
             ))
@@ -461,7 +461,7 @@ enum SupplementEngine {
         if medicationSet.contains("metformin") && recommendedNutrients.contains(.vitB12) {
             warnings.append(InteractionWarning(
                 emoji: "💉🔴",
-                message: "Metformine + B12 : la metformine reduit l'absorption de la B12. Une supplementation est recommandee (methylcobalamine ou forme sublinguale).",
+                message: "Metformine + B12 : la metformine réduit l'absorption de la B12. Un complément est recommandé (méthylcobalamine, ou une forme à laisser fondre sous la langue).",
                 nutrients: ["vitB12", "metformin"],
                 severity: .moderate
             ))
@@ -487,7 +487,7 @@ enum SupplementEngine {
         if isPregnant(profile) && recommendedNutrients.contains(.iron) {
             warnings.append(InteractionWarning(
                 emoji: "🤰🩸",
-                message: "Grossesse : tes besoins en fer augmentent, mais valide le dosage avec ton medecin ou ta sage-femme avant de te supplementer.",
+                message: "Grossesse : tes besoins en fer augmentent, mais valide le dosage avec ton médecin ou ta sage-femme avant de te supplémenter.",
                 nutrients: ["iron", "grossesse"],
                 severity: .moderate
             ))

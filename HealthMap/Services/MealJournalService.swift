@@ -60,6 +60,18 @@ final class MealJournalService {
             case .snack:     return "Encas"
             }
         }
+        /// Le créneau tel qu'on l'enchaîne après un verbe (« Ajouter … »).
+        /// `label.lowercased()` derrière « au » produisait « au encas » et des
+        /// tournures bancales (« au matin ») : la préposition dépend du créneau,
+        /// elle ne peut pas être collée à l'appel.
+        var complementDeTemps: String {
+            switch self {
+            case .breakfast: return "le matin"
+            case .lunch:     return "le midi"
+            case .dinner:    return "le soir"
+            case .snack:     return "en encas"
+            }
+        }
         var emoji: String {
             switch self {
             case .breakfast: return "☀️"

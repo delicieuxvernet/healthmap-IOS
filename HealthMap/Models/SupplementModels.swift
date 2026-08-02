@@ -18,10 +18,10 @@ enum TimingSlot: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .matinAJeun: return "Matin a jeun"
-        case .matinRepas: return "Matin avec petit-dejeuner"
-        case .midiRepas: return "Midi avec repas"
-        case .soirRepas: return "Soir avec diner"
+        case .matinAJeun: return "Matin à jeun"
+        case .matinRepas: return "Matin avec le petit-déjeuner"
+        case .midiRepas: return "Midi avec le repas"
+        case .soirRepas: return "Soir avec le dîner"
         case .coucher: return "Au coucher"
         case .entreRepas: return "Entre les repas"
         }
@@ -107,10 +107,10 @@ enum Contraindication: String, CaseIterable, Equatable {
         case .grossesse: return "Demande l'avis de ton médecin ou ta sage-femme avant de te supplémenter."
         case .allaitement: return "Demande l'avis de ton médecin avant de te supplémenter pendant l'allaitement."
         case .hemochromatose: return "Déconseillé en cas d'hémochromatose (surcharge en fer)."
-        case .hyperthyroidie: return "Déconseillé en cas d'hyperthyroïdie — demande l'avis de ton médecin."
+        case .hyperthyroidie: return "Déconseillé en cas d'hyperthyroïdie. Demande l'avis de ton médecin."
         case .hypercalcemie: return "Déconseillé en cas d'hypercalcémie."
-        case .insuffisanceRenaleSevere: return "Prudence en cas d'insuffisance rénale sévère — demande l'avis de ton médecin."
-        case .allergiePoisson: return "Contient de l'huile de poisson — à éviter en cas d'allergie (préfère la version algue)."
+        case .insuffisanceRenaleSevere: return "Prudence en cas d'insuffisance rénale sévère. Demande l'avis de ton médecin."
+        case .allergiePoisson: return "Contient de l'huile de poisson. À éviter en cas d'allergie, préfère la version à base d'algues."
         }
     }
 }

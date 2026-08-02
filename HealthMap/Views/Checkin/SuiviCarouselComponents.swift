@@ -248,7 +248,7 @@ struct SuiviExampleNote: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.kiwiGreenInk)
             (Text("Exemple").fontWeight(.heavy)
-             + Text(" — complète 3 jours d'affilée pour voir tes vraies courbes."))
+             + Text(" : complète 3 jours d'affilée pour voir tes vraies courbes."))
                 .font(.system(size: 12.5))
                 .foregroundStyle(Color.healthMapSecondary)
                 .fixedSize(horizontal: false, vertical: true)

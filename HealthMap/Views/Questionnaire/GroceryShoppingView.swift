@@ -222,7 +222,7 @@ struct GroceryShoppingView: View {
                 Spacer()
                 VStack(spacing: Theme.spacingSM) {
                     Text("🛒").font(.system(size: 34))
-                    Text("Ton caddie est vide — reviens cocher des aliments.")
+                    Text("Ton caddie est vide. Reviens cocher des aliments.")
                         .font(Theme.captionFont)
                         .foregroundStyle(Color.healthMapMuted)
                         .multilineTextAlignment(.center)
