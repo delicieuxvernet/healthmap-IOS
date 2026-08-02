@@ -1,15 +1,18 @@
 import SwiftUI
 
-// MARK: - Supplements View (onglet « Compléments » — design « v6 »)
+// MARK: - Supplements View (onglet « Compléments » — design « v7 »)
 //
 // L'écran part des APPORTS DU BILAN et descend vers la recommandation : une
-// chaîne visuelle par apport (pastille colorée → rail pointillé → flèche →
-// carte). Les 3 chaînes sont générées depuis le bilan, jamais depuis une liste
-// de produits figée : si un apport disparaît du bilan, sa chaîne disparaît.
+// carte REPLIABLE par apport. Les chaînes sont générées depuis le bilan, jamais
+// depuis une liste de produits figée : si un apport disparaît du bilan, sa
+// carte disparaît.
 //
-// Hiérarchie (cf. `SupplementsChainV6.swift`) : 1. le nutriment · 2. le pourquoi
-// (carte bleue) · 3. les précautions (carte ambre) · hors hiérarchie : le panier,
-// une ligne de texte discrète — on ne gagne rien sur ces compléments.
+// Divulgation progressive (cf. `SupplementsChainV6.swift`) : la carte repliée
+// répond à « qu'est-ce que je prends ? » ; le tap déplie le pourquoi (bleu),
+// les précautions (ambre) et la ligne panier. UNE carte ouverte à la fois, la
+// première s'ouvre seule au premier affichage. La synthèse « En un coup d'œil »
+// ouvre la page ; l'engagement transparence est gros à la première visite de
+// l'onglet, puis rétrogradé en ligne de pied de page.
 //
 // Un SEUL sélecteur, figé au-dessus de la tab bar, bascule toute la page entre
 // « Compléments » et « Par l'assiette ».
@@ -39,10 +42,26 @@ struct SupplementsView: View {
     /// persistée localement. Aucun appel réseau / IA.
     @State private var rituel: SuiviEngineV4.ComplementsRituel?
 
+    /// Carte dépliée — UNE seule à la fois, `nil` = tout est replié.
+    @State private var openChainID: String?
+    /// Amorçage fait une seule fois quand les chaînes arrivent : première carte
+    /// ouverte (sinon personne ne découvre que ça s'ouvre) + panier pré-rempli
+    /// avec le plan proposé (la recommandation EST le plan par défaut).
+    @State private var defaultsSeeded = false
+    /// L'engagement transparence a déjà été montré en grand une fois.
+    @AppStorage("complementsEngagementSeen") private var engagementSeen = false
+    /// Cette visite-ci est la première : le bloc reste en grand toute la visite.
+    @State private var engagementEnGrand = false
+
     private var complementsV2: ComplementsV2? { dashboardVM.analysisV2?.complements }
 
     private var complementsSignature: String {
         (complementsV2?.complements ?? []).compactMap { $0.id }.joined(separator: "|")
+    }
+
+    /// Détecte l'arrivée (asynchrone) des chaînes pour amorcer les défauts.
+    private var chainsSignature: String {
+        chains.map(\.id).joined(separator: "|")
     }
 
     // Moteur (scores + profil) — source des produits, prix et interactions.
@@ -162,8 +181,16 @@ struct SupplementsView: View {
                 }
             }
             .kiwiTabBarBottomInset()
-            .onAppear { refreshRituel() }
+            .onAppear {
+                refreshRituel()
+                seedDefaults()
+                if !engagementSeen {
+                    engagementSeen = true
+                    engagementEnGrand = true
+                }
+            }
             .onChange(of: complementsSignature) { _, _ in refreshRituel() }
+            .onChange(of: chainsSignature) { _, _ in seedDefaults() }
             .navigationBarTitleDisplayMode(.inline)
             .kiwiNavigationBarBackground()
             .toolbar {
@@ -203,30 +230,57 @@ struct SupplementsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
-                ComplementsEngagementCard().padding(.top, 14)
+
+                // Première visite de l'onglet : l'engagement mérite un vrai
+                // bloc, une fois. Ensuite il descend en ligne de pied de page.
+                if engagementEnGrand {
+                    ComplementsEngagementCard().padding(.top, 14)
+                }
+
+                // La synthèse répond en 2 secondes, avant toute lecture.
+                if voie == .complements, !chains.isEmpty {
+                    ComplementsSummaryCard(
+                        premium: $premium,
+                        gelules: chiffrableChains.count,
+                        assiette: chains.count - chiffrableChains.count,
+                        totalLabel: cartTotalLabel
+                    )
+                    .padding(.top, engagementEnGrand ? 12 : 14)
+                }
 
                 // Le rituel n'a de sens que dans la voie « compléments ».
                 if voie == .complements, let rituel {
                     ComplementsRituelStrip(rituel: rituel) { toggleRituel($0) }
-                        .padding(.top, 12)
+                        .padding(.top, 10)
                 }
 
-                chainHeader.padding(.top, 22)
+                chainHeader.padding(.top, 20)
 
                 if chains.isEmpty {
-                    aiFallbackSection.padding(.top, 14)
+                    aiFallbackSection.padding(.top, 12)
                 } else {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 10) {
                         ForEach(chains) { chain in
-                            ChainRow(chain: chain) { chainCard(for: chain) }
+                            ChainCollapsibleCard(
+                                chain: chain,
+                                sousTitre: sousTitre(for: chain),
+                                prixLabel: headPrice(for: chain),
+                                isOpen: openChainID == chain.id,
+                                onToggle: { toggleOpen(chain.id) }
+                            ) {
+                                chainCard(for: chain)
+                            }
                         }
                     }
-                    .padding(.top, 14)
+                    .padding(.top, 12)
 
-                    footerBlock.padding(.top, 20)
+                    footerBlock.padding(.top, 16)
                 }
 
-                infoCard.padding(.top, 18)
+                if !engagementEnGrand {
+                    ComplementsEngagementLine().padding(.top, 18)
+                }
+                infoCard.padding(.top, engagementEnGrand ? 18 : 10)
             }
             .padding(.horizontal, 20)
             .padding(.top, 4)
@@ -267,31 +321,57 @@ struct SupplementsView: View {
         return "Calé sur \(count == 1 ? "ton apport" : "tes \(count) apports") à renforcer"
     }
 
+    /// Kicker seul : la grande phrase d'explication du v6 doublait ce que
+    /// chaque carte repliée dit déjà — un titre de section suffit.
     private var chainHeader: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.triangle.branch")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.healthMapMuted)
-                    .accessibilityHidden(true)
-                Text(voie == .complements ? "Tes apports → tes compléments"
-                                          : "Tes apports → ton assiette")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.healthMapMuted)
-            }
-            Text(voie == .complements
-                 ? "Chaque complément répond à un apport détecté dans ton bilan."
-                 : "Chaque apport se comble aussi par un aliment précis.")
-                .font(.system(size: 16.5, weight: .heavy))
-                .tracking(-0.35)
-                .foregroundStyle(Color.kiwiCharcoal)
-                .fixedSize(horizontal: false, vertical: true)
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.healthMapMuted)
+                .accessibilityHidden(true)
+            Text(voie == .complements ? "Tes apports → tes compléments"
+                                      : "Tes apports → ton assiette")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color.healthMapMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 2)
     }
 
-    // MARK: - Carte au bout de la chaîne (selon la voie)
+    // MARK: - Ligne de tête des cartes repliées
+
+    /// Chaînes avec un produit chiffrable — la synthèse et le panier en dérivent.
+    private var chiffrableChains: [ComplementChain] {
+        chains.filter { chain in
+            guard let rec = chain.rec else { return false }
+            return product(for: rec) != nil
+        }
+    }
+
+    /// Le sous-titre de la carte repliée : la réponse, sans ouvrir.
+    private func sousTitre(for chain: ComplementChain) -> String {
+        switch voie {
+        case .complements:
+            guard let rec = chain.rec, let prod = product(for: rec) else {
+                return "Plutôt par l'assiette : ton écart est petit"
+            }
+            return "\(prod.name) · \(momentLabel(for: prod, chain: chain))"
+        case .assiette:
+            guard let food = foodList(for: chain).first else { return "Par l'assiette" }
+            return "Dans l'assiette : \(food.label)"
+        }
+    }
+
+    private func headPrice(for chain: ComplementChain) -> String {
+        guard voie == .complements, let rec = chain.rec, product(for: rec) != nil else {
+            return "0 €"
+        }
+        return priceLabel(for: rec)
+    }
+
+    // MARK: - Détail déplié de la carte (selon la voie)
+    // La ligne de tête vit dans `ChainCollapsibleCard` : ici, uniquement ce qui
+    // n'apparaît qu'au tap — le pourquoi, les précautions, la ligne panier.
 
     @ViewBuilder
     private func chainCard(for chain: ComplementChain) -> some View {
@@ -308,38 +388,7 @@ struct SupplementsView: View {
         let rec = chain.rec
         let prod = rec.flatMap { product(for: $0) }
 
-        VStack(alignment: .leading, spacing: 0) {
-            // Ligne de tête : visuel + nom / dose · moment + priorité.
-            HStack(spacing: 11) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(hex: "F4F1EA"))
-                    .frame(width: 38, height: 38)
-                    .overlay(
-                        Image(systemName: prod == nil ? "carrot" : "pills.fill")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(prod == nil ? Color.kiwiGreen : chain.tint)
-                    )
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(prod?.name ?? "Plutôt par l'assiette")
-                        .font(.system(size: 13.5, weight: .heavy))
-                        .foregroundStyle(Color.kiwiCharcoal)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(momentLabel(for: prod, chain: chain))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text(prod == nil ? "0 €" : priorityLabel(for: chain))
-                    .font(.system(size: 10.5, weight: .bold))
-                    .foregroundStyle(Color.healthMapMuted)
-                    .lineLimit(1)
-                    .layoutPriority(1)
-            }
-
+        VStack(alignment: .leading, spacing: 8) {
             // PRIORITÉ 2 — le pourquoi.
             if let why = whyExplanation(for: chain, product: prod) {
                 ChainWhyCard(
@@ -349,7 +398,6 @@ struct SupplementsView: View {
                     HapticService.shared.selection()
                     explanation = why
                 }
-                .padding(.top, 11)
             }
 
             // PRIORITÉ 3 — les précautions.
@@ -358,7 +406,6 @@ struct SupplementsView: View {
                     HapticService.shared.selection()
                     precautionRec = rec
                 }
-                .padding(.top, 8)
             }
 
             // Hors hiérarchie — l'acte d'achat, discret.
@@ -398,62 +445,19 @@ struct SupplementsView: View {
         }
     }
 
-    /// Priorité affichée en petit texte gris (jamais un badge criard).
-    private func priorityLabel(for chain: ComplementChain) -> String {
-        switch chain.statut {
-        case .aCombler: return "essentiel"
-        case .aRenforcer: return "utile"
-        default: return "confort"
-        }
-    }
-
     // MARK: Voie « par l'assiette »
 
     @ViewBuilder
     private func assietteCard(for chain: ComplementChain) -> some View {
         let foods = foodList(for: chain)
 
-        VStack(alignment: .leading, spacing: 0) {
-            if let first = foods.first {
-                Button {
-                    HapticService.shared.selection()
-                    assietteNutrient = nutrientDetail(for: chain.id)
-                } label: {
-                    HStack(spacing: 11) {
-                        SafeFluent3DIcon(name: first.icon, size: 38)
-                            .accessibilityHidden(true)
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(first.label)
-                                .font(.system(size: 13.5, weight: .heavy))
-                                .foregroundStyle(Color.kiwiCharcoal)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text("Couvre ton apport en \(chain.nom.lowercased())")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Color.kiwiGreenInk)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.healthMapMuted)
-                            .accessibilityHidden(true)
-                    }
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.healthMapPressed)
-                .accessibilityHint("Ouvre la fiche de l'apport : aliments, quantités, moments")
-            }
-
+        VStack(alignment: .leading, spacing: 8) {
             // PRIORITÉ 2 — le pourquoi (texte réel du bilan, jamais inventé).
             if let why = foodExplanation(for: chain) {
                 ChainWhyCard(title: "Pourquoi cet aliment ?", resume: why.resume) {
                     HapticService.shared.selection()
                     explanation = why
                 }
-                .padding(.top, 11)
             }
 
             // Les alternatives, en une ligne discrète.
@@ -468,8 +472,39 @@ struct SupplementsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 11)
             }
+
+            // La fiche complète (la même que depuis le Bilan), en ligne
+            // discrète — le tap de tête sert désormais au dépliage.
+            if let nutrient = nutrientDetail(for: chain.id) {
+                ficheLine(for: nutrient)
+            }
+        }
+    }
+
+    /// Ligne « voir la fiche » : même registre discret que la ligne panier.
+    private func ficheLine(for nutrient: EnrichedNutrient) -> some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.kiwiCharcoal.opacity(0.06))
+                .frame(height: 1)
+                .padding(.top, 2)
+
+            Button {
+                HapticService.shared.selection()
+                assietteNutrient = nutrient
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "book")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Voir la fiche : aliments, quantités, moments")
+                        .font(.system(size: 11.5, weight: .bold))
+                }
+                .foregroundStyle(Color.healthMapSecondary)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.healthMapPressed)
         }
     }
 
@@ -572,17 +607,12 @@ struct SupplementsView: View {
     }
 
     // MARK: - Pied de page (selon la voie)
+    // Voie « compléments » : plus rien ici — le budget vit dans la synthèse
+    // « En un coup d'œil », en tête de page.
 
     @ViewBuilder
     private var footerBlock: some View {
-        switch voie {
-        case .complements:
-            ComplementsBudgetCard(
-                premium: $premium,
-                count: takenChains.count,
-                totalLabel: cartTotalLabel
-            )
-        case .assiette:
+        if voie == .assiette {
             ComplementsAssietteZeroCard()
         }
     }
@@ -591,6 +621,23 @@ struct SupplementsView: View {
 
     private func refreshRituel() {
         rituel = SuiviEngineV4.complementsRituel(complements: complementsV2)
+    }
+
+    /// Une seule fois, quand les chaînes existent : première carte dépliée et
+    /// panier pré-rempli avec tous les produits recommandés (le total affiché
+    /// répond d'emblée à « combien ça me coûte ? » ; décocher retire).
+    private func seedDefaults() {
+        guard !defaultsSeeded, !chains.isEmpty else { return }
+        defaultsSeeded = true
+        openChainID = chains.first?.id
+        taken = Set(chiffrableChains.map(\.id))
+    }
+
+    private func toggleOpen(_ id: String) {
+        HapticService.shared.selection()
+        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
+            openChainID = (openChainID == id) ? nil : id
+        }
     }
 
     private func toggleRituel(_ id: String) {
