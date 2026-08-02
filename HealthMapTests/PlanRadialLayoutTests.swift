@@ -25,7 +25,8 @@ final class PlanRadialLayoutTests: XCTestCase {
 
     func testNodesStayInsideTheBox_forEveryCountAndScreen() {
         for box in boxes {
-            for count in 3...6 {
+            // 1 et 2 nœuds arrivent vraiment (une seule section dans l'analyse).
+            for count in 1...6 {
                 let layout = PlanRadialLayout(size: box, count: count)
                 for index in 0..<count {
                     let p = layout.position(index)
@@ -57,12 +58,27 @@ final class PlanRadialLayoutTests: XCTestCase {
     /// Les bulles ne doivent jamais chevaucher le disque central.
     func testNodesNeverOverlapTheHub() {
         for box in boxes {
-            for count in 3...6 {
+            for count in 1...6 {
                 let layout = PlanRadialLayout(size: box, count: count)
                 XCTAssertGreaterThan(
                     layout.radius,
                     layout.hubDiameter / 2 + layout.nodeDiameter / 2,
                     "Les bulles mordent le moyeu (\(count) nœuds sur \(box))"
+                )
+            }
+        }
+    }
+
+    /// Deux bulles voisines ne se chevauchent jamais — c'est l'invariant qui
+    /// impose le plafond de 6 nœuds (au-delà, la corde passe sous le diamètre).
+    func testAdjacentNodesNeverOverlap() {
+        for box in boxes {
+            for count in 2...6 {
+                let layout = PlanRadialLayout(size: box, count: count)
+                let chord = 2 * layout.radius * sin(.pi / CGFloat(count))
+                XCTAssertGreaterThanOrEqual(
+                    chord, layout.nodeDiameter,
+                    "Deux bulles voisines se chevauchent (\(count) nœuds sur \(box))"
                 )
             }
         }
@@ -177,7 +193,48 @@ final class PlanRadialLayoutTests: XCTestCase {
         XCTAssertEqual(topic.radialComplements.count, 2)
     }
 
-    // MARK: - 4. Icônes partagées avec le Bilan
+    // MARK: - 4. Garde-fous du nombre de nœuds
+
+    /// La liste affichable : ids uniques (un id répété casserait le ForEach)
+    /// et 6 nœuds max, en gardant la première occurrence dans l'ordre.
+    func testRadialDisplayListDedupsAndCapsAtSix() {
+        let topics = (1...9).map { i in
+            Self.makeTopic(id: i == 4 ? "t1" : "t\(i)", name: "Topic \(i)")
+        }
+        let display = topics.radialDisplayList
+
+        XCTAssertEqual(display.count, 6)
+        XCTAssertEqual(Set(display.map(\.id)).count, 6, "Les ids affichés doivent être uniques")
+        // Le doublon (t1 en 4e position) est sauté : c'est le suivant qui entre.
+        XCTAssertEqual(display.map(\.name), ["Topic 1", "Topic 2", "Topic 3", "Topic 5", "Topic 6", "Topic 7"])
+    }
+
+    func testRadialDisplayListLeavesSmallListsIntact() {
+        let topics = [Self.makeTopic(id: "a", name: "A"), Self.makeTopic(id: "b", name: "B")]
+        XCTAssertEqual(topics.radialDisplayList.map(\.id), ["a", "b"])
+        XCTAssertTrue([PlanTopic]().radialDisplayList.isEmpty)
+    }
+
+    /// Le contrat v2 n'a pas de plafond côté serveur : le pont retient
+    /// 3 symptômes puis 3 objectifs — la même sélection que le flux v7.
+    func testPlanTopicsFromV2CapsAtThreePerKind() throws {
+        let sections = (1...5).map { i in
+            #"{"type":"symptome","id":"s\#(i)","titre":"Symptôme \#(i)"}"#
+        } + (1...4).map { i in
+            #"{"type":"objectif","id":"o\#(i)","titre":"Objectif \#(i)"}"#
+        }
+        let json = #"{"contract":"v2","plan":{"sections":[\#(sections.joined(separator: ","))]}}"#
+        let analysis = try JSONDecoder().decode(AIAnalysisV2.self, from: Data(json.utf8))
+
+        let topics = planTopicsFromV2(analysis)
+        XCTAssertEqual(topics.count, 6)
+        XCTAssertEqual(topics.filter { $0.kind == .symptome }.count, 3)
+        XCTAssertEqual(topics.filter { $0.kind == .objectif }.count, 3)
+        // Les symptômes d'abord (le motif de venue), dans l'ordre du serveur.
+        XCTAssertEqual(topics.map(\.id), ["s1", "s2", "s3", "o1", "o2", "o3"])
+    }
+
+    // MARK: - 5. Icônes partagées avec le Bilan
 
     func testNodeIconsCoverTheDeclaredFamilies() {
         XCTAssertEqual(PlanNodeIcon.symptome("Fatigue persistante"), "battery.25")
@@ -192,11 +249,17 @@ final class PlanRadialLayoutTests: XCTestCase {
 
     // MARK: - Helper
 
-    private static func makeTopic(intro: String, evidence: [PlanEvidence], delai: String? = nil) -> PlanTopic {
+    private static func makeTopic(
+        id: String = "t",
+        name: String = "Fatigue",
+        intro: String = "Cause.",
+        evidence: [PlanEvidence] = [],
+        delai: String? = nil
+    ) -> PlanTopic {
         PlanTopic(
-            id: "t",
+            id: id,
             kind: .symptome,
-            name: "Fatigue",
+            name: name,
             intro: intro,
             ritual: [],
             nutrition: [],
