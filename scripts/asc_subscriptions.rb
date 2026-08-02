@@ -590,9 +590,10 @@ if MODE == "apply-app"
          screen > the paywall opens.
       2. Bilan tab > profile icon (top-right) > "Passer a Premium".
       The paywall displays the auto-renewable subscriptions of group Kiwio
-      Premium with their names, durations and prices (Annual 50 EUR and a
-      short plan - Weekly 0.99 EUR or Monthly 4.99 EUR). All 3 subscriptions
-      (Weekly, Monthly, Annual) are submitted with this version.
+      Premium with their names, durations and prices: Annual (50 EUR) and
+      Weekly (0.99 EUR). Both subscriptions (Weekly and Annual) are submitted
+      with this version. The Monthly subscription is NOT part of this
+      submission and is not displayed in the app.
 
       HEALTHKIT (2.5.1): Apple Health is read-only. Path: Bilan tab > profile
       icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports
@@ -631,6 +632,66 @@ if MODE == "apply-app"
   code, rd = req(:get, "/v1/appStoreVersions/#{version_id}/appStoreReviewDetail")
   puts "\n===== ÉTAT FINAL REVIEW DETAIL ====="
   puts JSON.pretty_generate(code == 200 ? rd["data"] : rd)
+  exit 0
+end
+
+# ── MODE attach-video : joint la vidéo sandbox aux infos App Review ─────────
+# Apple exige à la resoumission un screen recording (Home Screen → login démo →
+# paywall → achat sandbox réussi). VIDEO_PATH = fichier téléchargé par le
+# workflow depuis une release GitHub privée. Même patron d'upload que les
+# screenshots : réservation → PUT des chunks → commit MD5.
+if MODE == "attach-video"
+  video_path = ENV["VIDEO_PATH"].to_s
+  abort_with("attach-video", 0, "VIDEO_PATH manquant ou introuvable : #{video_path}") unless File.exist?(video_path)
+
+  version_id, vattrs = find_editable_version(app_id)
+  abort_with("appStoreVersions", 0, "aucune version éditable (1.0) trouvée") unless version_id
+  puts "Version : #{vattrs["versionString"]} état=#{vattrs["appStoreState"]} (#{version_id})"
+
+  code, rd = req(:get, "/v1/appStoreVersions/#{version_id}/appStoreReviewDetail")
+  abort_with("appStoreReviewDetail", code, rd) unless code == 200 && rd["data"]
+  detail_id = rd["data"]["id"]
+
+  # Pièces jointes existantes : on les remplace (une seule vidéo de référence).
+  code, existing = req(:get, "/v1/appStoreReviewDetails/#{detail_id}/appStoreReviewAttachments?limit=50")
+  if code == 200
+    (existing["data"] || []).each do |att|
+      write("suppression ancienne pièce jointe #{att.dig("attributes", "fileName")}",
+        :delete, "/v1/appStoreReviewAttachments/#{att["id"]}", nil)
+    end
+  end
+
+  bytes = File.binread(video_path)
+  ok, resp = write("réservation pièce jointe (#{bytes.bytesize} o)", :post, "/v1/appStoreReviewAttachments",
+    { data: { type: "appStoreReviewAttachments",
+              attributes: { fileName: File.basename(video_path), fileSize: bytes.bytesize },
+              relationships: { appStoreReviewDetail: { data: { type: "appStoreReviewDetails", id: detail_id } } } } })
+  exit 1 unless ok
+
+  att_id = resp["data"]["id"]
+  (resp["data"]["attributes"]["uploadOperations"] || []).each_with_index do |op, i|
+    uri = URI(op["url"])
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    put = Net::HTTP::Put.new(uri)
+    (op["requestHeaders"] || []).each { |h| put[h["name"]] = h["value"] }
+    put.body = bytes[op["offset"], op["length"]]
+    res = http.request(put)
+    unless (200..299).cover?(res.code.to_i)
+      puts "  ÉCHEC upload chunk #{i + 1} -> HTTP #{res.code} #{res.body.to_s[0, 300]}"
+      exit 1
+    end
+    puts "  chunk #{i + 1} : OK (#{op["length"]} o)"
+  end
+
+  ok, = write("commit pièce jointe", :patch, "/v1/appStoreReviewAttachments/#{att_id}",
+    { data: { type: "appStoreReviewAttachments", id: att_id,
+              attributes: { uploaded: true, sourceFileChecksum: Digest::MD5.hexdigest(bytes) } } })
+  exit 1 unless ok
+
+  code, check = req(:get, "/v1/appStoreReviewDetails/#{detail_id}/appStoreReviewAttachments?limit=50")
+  puts "\n===== PIÈCES JOINTES APP REVIEW ====="
+  puts JSON.pretty_generate(code == 200 ? check["data"].map { |a| a["attributes"] } : check)
   exit 0
 end
 
@@ -831,12 +892,21 @@ if MODE == "submit"
   # Après un refus, les abos sont en REJECTED et n'ont plus de version
   # modifiable : on la régénère en re-uploadant le screenshot de review.
   resubmittable_states = %w[READY_TO_SUBMIT REJECTED DEVELOPER_ACTION_NEEDED]
+  # EXCLUDE_PRODUCTS (productIds séparés par des virgules) : abonnements à NE PAS
+  # soumettre — un abo soumis mais introuvable dans l'app = refus 2.1(b) assuré.
+  # Ex. healthmap_monthly : le paywall n'affiche que Annuel + Hebdo (shortPlan).
+  excluded_products = ENV["EXCLUDE_PRODUCTS"].to_s.split(",").map(&:strip).reject(&:empty?)
+  puts "Abonnements exclus de la soumission : #{excluded_products.join(", ")}" unless excluded_products.empty?
   presubmitted = []
   get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
     get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
       st = s.dig("attributes", "state")
       next unless resubmittable_states.include?(st)
       pid = s.dig("attributes", "productId")
+      if excluded_products.include?(pid)
+        puts "  · #{pid} : état=#{st} → EXCLU (EXCLUDE_PRODUCTS)"
+        next
+      end
       puts "  · #{pid} : état=#{st} → soumission de l'abonnement"
       payload = { data: { type: "subscriptionSubmissions",
                           relationships: { subscription: { data: { type: "subscriptions", id: s["id"] } } } } }
@@ -887,6 +957,7 @@ if MODE == "submit"
       get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50")
         .select { |s| s.dig("attributes", "state") == "READY_TO_SUBMIT" }
         .map { |s| s.dig("attributes", "productId") }
+        .reject { |pid| excluded_products.include?(pid) }
     end
     expected_items = pending_subs.size + 2
     if staged_items.size < expected_items
@@ -1165,9 +1236,10 @@ if MODE == "fix-meta"
     1. Bilan tab (first tab) > tap the "Kiwio Premium" card visible on the
        screen > the paywall opens.
     2. Bilan tab > profile icon (top-right) > "Passer a Premium".
-    The paywall lists the 3 auto-renewable subscriptions of group Kiwio Premium
-    (Weekly 0.99 EUR, Monthly 4.99 EUR, Annual 50 EUR - names, durations and
-    prices are displayed). All 3 are submitted with this version.
+    The paywall lists the auto-renewable subscriptions of group Kiwio Premium:
+    Annual (50 EUR) and Weekly (0.99 EUR) - names, durations and prices are
+    displayed. Both are submitted with this version. The Monthly subscription
+    is NOT part of this submission and is not displayed in the app.
 
     HEALTHKIT (2.5.1): Apple Health is read-only. Path: Bilan tab > profile
     icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports

@@ -12,7 +12,7 @@ on:
         required: true
         default: audit
         type: choice
-        options: [audit, apply, app-audit, deep-audit, fix-subs, apply-app, offers, screenshots, submit, fix-meta]
+        options: [audit, apply, app-audit, deep-audit, fix-subs, apply-app, offers, screenshots, submit, fix-meta, attach-video]
       display_type:
         description: "screenshots : type d'écran Apple (APP_IPHONE_67 = 1290x2796)"
         required: false
@@ -28,6 +28,16 @@ on:
         required: false
         default: false
         type: boolean
+      exclude_products:
+        description: "submit : productIds à NE PAS soumettre, séparés par des virgules (ex. healthmap_monthly — abo non affiché par le paywall)"
+        required: false
+        default: ""
+        type: string
+      video_release_tag:
+        description: "attach-video : tag de la release GitHub portant la vidéo sandbox en asset"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -59,6 +69,21 @@ jobs:
           rsvg-convert -w 1284 -h 2778 scripts/asc_review_screenshot.svg -o "$RUNNER_TEMP/kiwio-paywall-review.png"
           ls -la "$RUNNER_TEMP/kiwio-paywall-review.png"
 
+      # Vidéo sandbox (attach-video) : l'API workflow_dispatch ne transporte pas
+      # de fichier — la vidéo transite par une release GitHub PRIVÉE du repo
+      # (asset), téléchargée ici avec le token du job, puis supprimable.
+      - name: Download review video
+        if: inputs.mode == 'attach-video'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/review-video"
+          gh release download "${{ inputs.video_release_tag }}" --dir "$RUNNER_TEMP/review-video" --repo "$GITHUB_REPOSITORY"
+          FILE=$(ls "$RUNNER_TEMP/review-video" | head -1)
+          test -n "$FILE"
+          echo "VIDEO_PATH=$RUNNER_TEMP/review-video/$FILE" >> "$GITHUB_ENV"
+          ls -la "$RUNNER_TEMP/review-video"
+
       - name: Run (${{ inputs.mode }})
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -71,4 +96,5 @@ jobs:
           ONLY_PRODUCT: ${{ inputs.only_product }}
           MODE: ${{ inputs.mode }}
           STAGE_ONLY: ${{ inputs.stage_only && '1' || '0' }}
+          EXCLUDE_PRODUCTS: ${{ inputs.exclude_products }}
         run: ruby scripts/asc_subscriptions.rb
