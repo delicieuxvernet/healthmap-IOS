@@ -103,7 +103,7 @@ struct PortionSheet: View {
     private var subtitleText: String {
         switch mode {
         case .add(let d, _):
-            let base = d.kcal100g.map { "\(Int($0.rounded())) kcal / 100 g" } ?? "kcal indisponibles"
+            let base = d.kcal100g.map { "\(Int($0.rounded())) kcal / 100 g" } ?? "calories inconnues"
             return d.brand.map { "\($0) · \(base)" } ?? base
         case .edit(let r):
             return "\(r.record.slot.label) · aujourd'hui"
@@ -269,16 +269,16 @@ struct PortionSheet: View {
                 macroDot("G", row.macros.carbs, color: .macroCarb)
                 macroDot("L", row.macros.fats, color: .macroFat)
             }
-            noteCard("Le détail par aliment n'est pas disponible pour cette entrée (ancien scan ou ajout manuel). La quantité n'est pas modifiable ; la suppression retire l'entrée entière.")
+            noteCard("Cette ligne vient d'un ancien scan ou d'un ajout à la main : le détail aliment par aliment n'existe pas. Tu ne peux pas changer la quantité, et la supprimer retire le repas en entier.")
         }
     }
 
     private var incomputableNote: some View {
-        noteCard("Les calories de ce produit ne sont pas renseignées dans sa fiche — il ne peut pas être ajouté au compteur.")
+        noteCard("Les calories de ce produit ne sont pas renseignées dans sa fiche. Tu ne peux donc pas l'ajouter au compteur.")
     }
 
     private var microsNote: some View {
-        noteCard("Produit de marque : macros complètes, micronutriments limités (fibres).")
+        noteCard("Produit de marque : les macros sont complètes, mais seules les fibres sont connues côté micronutriments.")
     }
 
     private func noteCard(_ text: String) -> some View {
@@ -305,7 +305,7 @@ struct PortionSheet: View {
     private var actions: some View {
         switch mode {
         case .add(let detail, let slot):
-            primaryButton("Ajouter au \(slot.label.lowercased())",
+            primaryButton("Ajouter \(slot.complementDeTemps)",
                           enabled: grams > 0 && detail.kcal100g != nil) {
                 guard let onAdd else { return }
                 isWorking = true
@@ -440,7 +440,7 @@ struct FoodSearchSheet: View {
                                 .tint(Color.kiwiGreen)
                                 .padding(.top, Theme.spacingLG)
                         } else if vm.hits.isEmpty {
-                            Text("Aucun résultat — essaie un autre nom")
+                            Text("Aucun résultat. Essaie un autre nom.")
                                 .font(.system(size: 13))
                                 .foregroundStyle(Color.healthMapMuted)
                                 .padding(.top, Theme.spacingLG)
@@ -454,7 +454,7 @@ struct FoodSearchSheet: View {
                     .padding(.horizontal, Theme.spacingLG)
                 }
             }
-            .navigationTitle("Ajouter — \(slot.label)")
+            .navigationTitle("Ajouter : \(slot.label)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -574,7 +574,7 @@ struct FoodSearchSheet: View {
                 .contentShape(Rectangle())
             }
             .disabled(loadingHitId != nil)
-            .accessibilityLabel("Ajouter \(hit.name) — 100 grammes")
+            .accessibilityLabel("Ajouter \(hit.name), 100 grammes")
         }
         .padding(12)
         .background(

@@ -92,7 +92,7 @@ struct SourcesSection: View {
                 Image(systemName: "info.circle")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.healthMapMuted)
-                Text("Information nutritionnelle éducative — ne remplace pas un avis médical. Consulte un professionnel de santé pour toute décision de santé.")
+                Text("Information nutritionnelle éducative. Ne remplace pas un avis médical. Consulte un professionnel de santé pour toute décision de santé.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Color.healthMapSecondary)
                     .fixedSize(horizontal: false, vertical: true)

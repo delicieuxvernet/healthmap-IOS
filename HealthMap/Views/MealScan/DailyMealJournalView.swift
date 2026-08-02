@@ -284,7 +284,7 @@ struct DailyMealJournalView: View {
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                     }
-                    .accessibilityLabel("Ajouter un aliment — \(slot.label)")
+                    .accessibilityLabel("Ajouter un aliment, \(slot.label)")
                 }
             }
             .padding(.horizontal, 4)

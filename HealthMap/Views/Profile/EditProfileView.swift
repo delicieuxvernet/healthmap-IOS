@@ -37,10 +37,10 @@ struct EditProfileView: View {
     enum EditSection: String, CaseIterable, Identifiable {
         case profil = "Profil"
         case modeDeVie = "Mode de vie"
-        case sante = "Sante"
+        case sante = "Santé"
         case nutrition = "Nutrition"
-        case symptomes = "Symptomes"
-        case medical = "Medical"
+        case symptomes = "Symptômes"
+        case medical = "Médical"
 
         var id: String { rawValue }
 
@@ -475,13 +475,13 @@ struct EditProfileView: View {
 
         guard SupabaseService.shared.safeClient != nil else {
             isSaving = false
-            saveError = "Client indisponible. Réessaie dans un instant."
+            saveError = "Connexion indisponible. Réessaie dans un instant."
             HapticService.shared.error()
             return
         }
         guard let session = await AuthService.shared.currentSession else {
             isSaving = false
-            saveError = "Session expirée. Merci de te reconnecter."
+            saveError = "Ta connexion a expiré. Reconnecte-toi."
             HapticService.shared.error()
             return
         }
@@ -512,7 +512,7 @@ struct EditProfileView: View {
             isSaving = false
 
             // Toast positif via ToastService (déjà branché en Vague B)
-            ToastService.shared.currentToast = "Profil mis à jour — tes scores ont été recalculés"
+            ToastService.shared.currentToast = "Profil mis à jour. Tes scores ont été recalculés"
             ToastService.shared.isShowing = true
             Task {
                 try? await Task.sleep(for: .seconds(3))
@@ -616,8 +616,8 @@ struct EditProfileView: View {
         switch section {
         case .profil:
             return [
-                EditableField(id: "firstName", label: "Prenom", emoji: "👤", kind: .text(placeholder: "Ton prénom")),
-                EditableField(id: "age", label: "Age", emoji: "🎂", kind: .number(unit: "ans", min: 10, max: 110)),
+                EditableField(id: "firstName", label: "Prénom", emoji: "👤", kind: .text(placeholder: "Ton prénom")),
+                EditableField(id: "age", label: "Âge", emoji: "🎂", kind: .number(unit: "ans", min: 10, max: 110)),
                 EditableField(id: "gender", label: "Genre", emoji: "⚧", kind: .pickerSingle(options: [
                     ("homme", "Homme"), ("femme", "Femme"),
                 ])),
@@ -629,7 +629,7 @@ struct EditProfileView: View {
             ]
         case .modeDeVie:
             return [
-                EditableField(id: "indoorWork", label: "Travail interieur", emoji: "🏢", kind: .pickerSingle(options: [
+                EditableField(id: "indoorWork", label: "Travail à l'intérieur", emoji: "🏢", kind: .pickerSingle(options: [
                     ("yes", "Oui"), ("no", "Non"),
                 ])),
                 EditableField(id: "sunExposure", label: "Exposition soleil", emoji: "☀️", kind: .pickerSingle(options: [
@@ -638,7 +638,7 @@ struct EditProfileView: View {
                 EditableField(id: "skinType", label: "Type de peau", emoji: "🖐️", kind: .pickerSingle(options: [
                     ("very_fair", "Très claire"), ("fair", "Claire"), ("medium", "Mate"), ("dark", "Foncée"), ("very_dark", "Très foncée"),
                 ])),
-                EditableField(id: "strengthTraining", label: "Activite physique", emoji: "🏋️", kind: .pickerSingle(options: [
+                EditableField(id: "strengthTraining", label: "Activité physique", emoji: "🏋️", kind: .pickerSingle(options: [
                     ("none", "Aucune"), ("light", "Légère"), ("moderate", "Modérée"), ("regular", "Régulière"), ("intense", "Intense"),
                 ])),
             ]
@@ -648,10 +648,10 @@ struct EditProfileView: View {
                     ("low", "Faible"), ("moderate", "Modéré"), ("high", "Élevé"), ("very_high", "Très élevé"),
                 ])),
                 EditableField(id: "sleepHours", label: "Heures de sommeil", emoji: "😴", kind: .number(unit: "h", min: 3, max: 12)),
-                EditableField(id: "wakeFeeling", label: "Reveil", emoji: "🌅", kind: .pickerSingle(options: [
+                EditableField(id: "wakeFeeling", label: "Réveil", emoji: "🌅", kind: .pickerSingle(options: [
                     ("rested", "Reposé"), ("ok", "Correct"), ("tired", "Fatigué"), ("exhausted", "Épuisé"),
                 ])),
-                EditableField(id: "caffeineIntake", label: "Cafeine", emoji: "☕", kind: .pickerSingle(options: [
+                EditableField(id: "caffeineIntake", label: "Caféine", emoji: "☕", kind: .pickerSingle(options: [
                     ("none", "Aucune"), ("light", "Légère"), ("moderate", "Modérée"), ("heavy", "Forte"),
                 ])),
                 EditableField(id: "waterIntake", label: "Eau", emoji: "💧", kind: .pickerSingle(options: [
@@ -663,19 +663,19 @@ struct EditProfileView: View {
             ]
         case .nutrition:
             return [
-                EditableField(id: "dietType", label: "Regime", emoji: "🍽️", kind: .pickerSingle(options: [
+                EditableField(id: "dietType", label: "Régime", emoji: "🍽️", kind: .pickerSingle(options: [
                     ("omnivore", "Omnivore"), ("flexitarien", "Flexitarien"), ("vegetarien", "Végétarien"), ("vegan", "Vegan"), ("pescetarien", "Pescétarien"),
                 ])),
-                EditableField(id: "vegetableServings", label: "Legumes/semaine", emoji: "🥦", kind: .number(unit: "portions", min: 0, max: 30)),
+                EditableField(id: "vegetableServings", label: "Légumes/semaine", emoji: "🥦", kind: .number(unit: "portions", min: 0, max: 30)),
                 EditableField(id: "fruitServings", label: "Fruits/semaine", emoji: "🍎", kind: .number(unit: "portions", min: 0, max: 30)),
-                EditableField(id: "fattyFish", label: "Poisson gras/sem", emoji: "🐟", kind: .number(unit: "portions", min: 0, max: 10)),
+                EditableField(id: "fattyFish", label: "Poisson gras/semaine", emoji: "🐟", kind: .number(unit: "portions", min: 0, max: 10)),
                 EditableField(id: "meatPoultry", label: "Viande/semaine", emoji: "🥩", kind: .number(unit: "portions", min: 0, max: 21)),
                 EditableField(id: "dairyServings", label: "Produits laitiers", emoji: "🥛", kind: .number(unit: "portions/j", min: 0, max: 10)),
                 EditableField(id: "nutsPerWeek", label: "Noix/semaine", emoji: "🥜", kind: .number(unit: "portions", min: 0, max: 14)),
             ]
         case .symptomes:
             return [
-                EditableField(id: "symptoms", label: "Symptomes ressentis", emoji: "🩺", kind: .pickerMulti(options: [
+                EditableField(id: "symptoms", label: "Symptômes ressentis", emoji: "🩺", kind: .pickerMulti(options: [
                     ("fatigue", "Fatigue"),
                     ("brain_fog", "Brouillard mental"),
                     ("hair_loss", "Chute de cheveux"),
@@ -690,7 +690,7 @@ struct EditProfileView: View {
             ]
         case .medical:
             return [
-                EditableField(id: "medications", label: "Medicaments", emoji: "💊", kind: .pickerMulti(options: [
+                EditableField(id: "medications", label: "Médicaments", emoji: "💊", kind: .pickerMulti(options: [
                     ("ppi", "IPP / anti-acides"),
                     ("metformin", "Metformine"),
                     ("oral_contraceptive", "Contraception orale"),

@@ -237,7 +237,7 @@ final class AuthViewModel: ObservableObject {
 
     func signIn(email: String, password: String) async {
         guard !email.isEmpty, !password.isEmpty else {
-            errorMessage = "Veuillez remplir tous les champs."
+            errorMessage = "Remplis tous les champs."
             return
         }
 
@@ -300,7 +300,7 @@ final class AuthViewModel: ObservableObject {
 
     func signUp(email: String, password: String, firstName: String) async {
         guard !email.isEmpty, !password.isEmpty, !firstName.isEmpty else {
-            errorMessage = "Veuillez remplir tous les champs."
+            errorMessage = "Remplis tous les champs."
             return
         }
 
@@ -344,7 +344,7 @@ final class AuthViewModel: ObservableObject {
     /// À appeler depuis l'UI après que l'user a entré son code.
     func verifySignUpCode(_ code: String) async {
         guard !code.isEmpty else {
-            errorMessage = "Veuillez saisir le code reçu par email."
+            errorMessage = "Saisis le code reçu par email."
             return
         }
         isProcessing = true
@@ -402,7 +402,7 @@ final class AuthViewModel: ObservableObject {
             // A failed server sign-out still means the user wants to leave:
             // keeping stale state leads to cross-user data leaks.
             AppLogger.auth.notice("Server sign-out failed: \(error.localizedDescription, privacy: .public)")
-            errorMessage = "Deconnexion partielle — tes donnees locales ont ete nettoyees."
+            errorMessage = "Déconnexion partielle. Tes données locales ont bien été effacées."
         }
 
         // Always clear local state, even if server sign-out threw
@@ -464,7 +464,7 @@ final class AuthViewModel: ObservableObject {
             return true
         } catch {
             AppLogger.auth.report(error, context: "AuthViewModel deleteAccount")
-            errorMessage = "Erreur lors de la suppression du compte. Reessayez ou contactez le support."
+            errorMessage = "La suppression du compte n'a pas abouti. Réessaie ou écris au support."
             isProcessing = false
             return false
         }
@@ -492,7 +492,7 @@ final class AuthViewModel: ObservableObject {
 
     func resetPassword(email: String) async -> Bool {
         guard !email.isEmpty else {
-            errorMessage = "Veuillez saisir votre adresse email."
+            errorMessage = "Saisis ton adresse email."
             return false
         }
 
@@ -519,7 +519,7 @@ final class AuthViewModel: ObservableObject {
     /// Clerk n'expose pas de magic-link reset — c'est obligatoirement code + new password.
     func completeResetPassword(code: String, newPassword: String) async -> Bool {
         guard !code.isEmpty else {
-            errorMessage = "Veuillez saisir le code reçu par email."
+            errorMessage = "Saisis le code reçu par email."
             return false
         }
         let validationIssues = PasswordValidator.validate(newPassword)
@@ -582,7 +582,7 @@ final class AuthViewModel: ObservableObject {
     /// d'erreur clair invitant à patienter.
     func resendResetPasswordCode() async -> Bool {
         guard let email = resetPasswordEmail else {
-            errorMessage = "Aucun reset en cours. Recommence depuis l'écran email."
+            errorMessage = "Aucune réinitialisation en cours. Recommence depuis l'écran email."
             return false
         }
         guard resendAttempts < Self.maxResendAttempts else {
@@ -641,7 +641,7 @@ final class AuthViewModel: ObservableObject {
             AnalyticsService.shared.track(.signInCompleted, properties: ["method": "google"])
         } catch {
             AppLogger.auth.report(error, context: "AuthViewModel signInWithGoogle")
-            errorMessage = "Erreur de connexion avec Google."
+            errorMessage = "La connexion avec Google n'a pas abouti. Réessaie."
         }
 
         isProcessing = false
@@ -699,7 +699,7 @@ final class AuthViewModel: ObservableObject {
             AnalyticsService.shared.track(.signInCompleted, properties: ["method": "apple"])
         } catch {
             AppLogger.auth.report(error, context: "AuthViewModel signInWithApple")
-            errorMessage = "Erreur de connexion avec Apple."
+            errorMessage = "La connexion avec Apple n'a pas abouti. Réessaie."
         }
 
         isProcessing = false
@@ -770,13 +770,13 @@ final class AuthViewModel: ObservableObject {
             (["session_exists", "you're already signed in", "already signed in"],
              "Tu es déjà connecté. Patiente un instant…"),
             (["client_state_invalid"],
-             "État invalide. Recommence depuis l'écran de connexion."),
+             "Quelque chose s'est mal passé. Recommence depuis l'écran de connexion."),
             (["too_many_requests", "rate limit"],
              "Trop de tentatives. Réessaie dans quelques minutes."),
             (["captcha_invalid", "captcha_failed"],
-             "Vérification anti-bot échouée. Réessaie."),
+             "La vérification anti-robot n'a pas abouti. Réessaie."),
             (["oauth_access_denied", "oauth_callback"],
-             "Connexion sociale annulée ou refusée."),
+             "Connexion annulée ou refusée."),
             (["email not confirmed"],
              "Vérifie ton email pour activer ton compte."),
             (["network", "timeout", "could not connect"],
@@ -793,7 +793,7 @@ final class AuthViewModel: ObservableObject {
         // pouvoir enrichir le mapping si un nouveau code apparaît, mais on
         // n'expose JAMAIS la description anglaise à l'utilisateur — confusion.
         AppLogger.auth.notice("Unmapped auth error: \(raw, privacy: .public)")
-        return "Une erreur d'authentification est survenue. Réessaie."
+        return "La connexion n'a pas abouti. Réessaie."
     }
 }
 

@@ -145,6 +145,15 @@ private extension KeyedDecodingContainer {
         (try? decodeIfPresent(T.self, forKey: key)) ?? nil
     }
 
+    /// Surcharge texte : la rédaction du scan vient du modèle, elle est
+    /// nettoyée dès le décodage (cf. le pendant dans AIAnalysis.swift et
+    /// AIAnalysisV2.swift). Swift choisit cette surcharge non générique dès
+    /// que le contexte attend un `String?`.
+    func scanLenient(_ key: Key) -> String? {
+        guard let brut: String = (try? decodeIfPresent(String.self, forKey: key)) ?? nil else { return nil }
+        return KiwiProse.lisible(brut)
+    }
+
     /// Tableau indulgent : les entrées malformées sont skippées une à une.
     func scanLenientArray<T: Decodable>(_ key: Key) -> [T]? {
         guard let lossy: LossyDecodableArray<T> = scanLenient(key) else { return nil }

@@ -183,7 +183,7 @@ struct ApportV2DetailSheet: View {
             t = t + Text(bold).font(.system(size: 13, weight: .bold))
         }
         if let rest = apport.tipRest, !rest.isEmpty {
-            let sep = (apport.tipBold?.isEmpty == false) ? " — " : ""
+            let sep = (apport.tipBold?.isEmpty == false) ? " : " : ""
             t = t + Text(sep + rest).font(.system(size: 13, weight: .medium))
         }
         return t

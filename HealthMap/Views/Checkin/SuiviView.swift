@@ -594,7 +594,7 @@ private struct SuiviStartBanner: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.healthMapPressed)
-            .accessibilityHint("Bascule tes courbes vers un vrai suivi nourri par tes check-ins")
+            .accessibilityHint("Bascule tes courbes vers un vrai suivi nourri par tes réponses")
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
@@ -659,7 +659,7 @@ private struct SuiviSymptomPage: View {
             return "Voici à quoi ressemblera ton suivi de \(nom)."
         }
         if isDayZero {
-            return "Ton suivi de \(nom) démarre, tes check-ins vont le dessiner."
+            return "Ton suivi de \(nom) démarre, tes réponses vont le dessiner."
         }
         switch evolution.verdict {
         case "En amélioration": return "Ton suivi de \(nom) s'améliore depuis ton arrivée."
@@ -978,7 +978,7 @@ private struct SuiviNeedsCard: View {
 
     private var stepsSubtitle: String {
         if let s = stepsToday {
-            return "Tu as bougé plus que d'habitude · \(formatSteps(s)) pas via Santé"
+            return "Tu as bougé plus que d'habitude : \(formatSteps(s)) pas via Santé"
         }
         return "Tu as bougé plus que d'habitude aujourd'hui"
     }
@@ -1067,7 +1067,7 @@ private struct SuiviPaliersCard: View {
                         .font(.system(size: 13.5, weight: .heavy))
                         .foregroundStyle(Color.kiwiCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("en suivant ton plan — tu es sur la bonne trajectoire")
+                    Text("en suivant ton plan, tu es sur la bonne trajectoire")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color.healthMapMuted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1192,7 +1192,7 @@ private struct SuiviCheckinPopup: View {
                     Text("Comment tu te sens ?")
                         .font(.system(size: 20, weight: .heavy))
                         .foregroundStyle(Color.kiwiCharcoal)
-                    Text("Un tap par symptôme — ça met tes courbes à jour")
+                    Text("Un tap par symptôme, ça met tes courbes à jour")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.healthMapMuted)
                 }

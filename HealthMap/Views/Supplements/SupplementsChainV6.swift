@@ -83,26 +83,8 @@ struct ChainExplanation: Identifiable, Equatable {
     }
 }
 
-// MARK: - Nettoyage typographique des textes affichés
-enum KiwiProse {
-    /// Le tiret cadratin en incise (« … — … ») ne se prononce pas, hache la
-    /// lecture, et c'est la signature typographique des textes générés par
-    /// machine. On le ramène à la ponctuation qu'on écrirait à la main.
-    /// À appliquer à TOUT texte venant de l'IA ou du catalogue avant affichage.
-    static func lisible(_ texte: String) -> String {
-        var sortie = texte.trimmingCharacters(in: .whitespacesAndNewlines)
-        for tiret in [" — ", " – ", " − ", " -- "] {
-            sortie = sortie.replacingOccurrences(of: tiret, with: ", ")
-        }
-        for prefixe in ["— ", "– ", "-- "] where sortie.hasPrefix(prefixe) {
-            sortie.removeFirst(prefixe.count)
-        }
-        return sortie
-            .replacingOccurrences(of: " ,", with: ",")
-            .replacingOccurrences(of: ", ,", with: ",")
-            .replacingOccurrences(of: "  ", with: " ")
-    }
-}
+// KiwiProse a déménagé dans Views/Shared/KiwiProse.swift le 2 août 2026 :
+// tout texte affiché doit pouvoir y passer, pas seulement l'écran Compléments.
 
 extension String {
     /// Première lettre en capitale, le reste intact (`capitalized` casserait

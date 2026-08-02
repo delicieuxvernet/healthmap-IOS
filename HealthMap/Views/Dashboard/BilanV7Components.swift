@@ -263,12 +263,12 @@ struct BilanV7ScoreCard: View {
     let insight: String?
     let onTap: () -> Void
 
-    /// « En hausse — +5 cette semaine » (le delta en monospace, teinté sens).
+    /// « En hausse : +5 cette semaine » (le delta en monospace, teinté sens).
     private var trendLine: Text {
         guard let delta, delta != 0 else {
-            return Text(insight ?? "Ton suivi démarre — scanne tes repas pour le faire vivre.")
+            return Text(insight ?? "Ton suivi démarre. Scanne tes repas pour le faire vivre.")
         }
-        let lead = delta > 0 ? "En hausse — " : "En baisse — "
+        let lead = delta > 0 ? "En hausse : " : "En baisse : "
         let value = delta > 0 ? "+\(delta)" : "\(delta)"
         let color = delta > 0 ? Color.kiwiInk : BilanV7.alertInk
         var line = Text(lead)
@@ -681,7 +681,7 @@ struct BilanV7SerieCard: View {
     /// « Prochain trophée : Mandarine dans 2 jours » (le nom et le compte en gras).
     private var nextLine: Text {
         guard !complete else {
-            return Text("Récolte complète — tous les trophées sont à toi.")
+            return Text("Récolte complète. Tous les trophées sont à toi.")
         }
         return Text("Prochain trophée : ")
             + Text(rung.name).font(.system(size: 12, weight: .bold)).foregroundStyle(BilanV7.ink)

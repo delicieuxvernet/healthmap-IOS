@@ -28,7 +28,10 @@ final class VoiceComplianceTests: XCTestCase {
         "diagnostic": ["AppLogger.swift", "ConnectivityService.swift", "RedFlag.swift"],
         // EditProfileView.swift mirrors QuestionnaireSection's "Maladie coeliaque" option
         // label — it is a clinical condition name, not user-facing diagnosis language.
-        "maladie": ["RedFlagDetector.swift", "QuestionnaireSection.swift", "EditProfileView.swift"],
+        // RedFlagDetector.swift est sorti de cette liste le 2 août 2026 : ses alertes
+        // ont été réécrites (« Avec un intestin fragile… ») et n'emploient plus le mot.
+        // Ne pas l'y remettre : c'est la seule surface où il resterait alarmant.
+        "maladie": ["QuestionnaireSection.swift", "EditProfileView.swift"],
     ]
 
     func testNoForbiddenWordsInSwiftSources() throws {

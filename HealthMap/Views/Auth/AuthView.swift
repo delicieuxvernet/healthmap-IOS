@@ -65,7 +65,7 @@ struct AuthView: View {
                         if isSignUp {
                             AuthTextField(
                                 icon: "person.fill",
-                                placeholder: "Prenom",
+                                placeholder: "Prénom",
                                 text: $firstName,
                                 contentType: .givenName,
                                 keyboardType: .default,
@@ -106,7 +106,7 @@ struct AuthView: View {
                                 Button {
                                     showForgotPassword = true
                                 } label: {
-                                    Text("Mot de passe oublie ?")
+                                    Text("Mot de passe oublié ?")
                                         .font(Theme.captionBoldFont)
                                         .foregroundStyle(Color.kiwiGreenInk)
                                         .frame(minHeight: 44)
@@ -145,7 +145,7 @@ struct AuthView: View {
                         }
                     } label: {
                         ZStack {
-                            Text(isSignUp ? "Creer mon compte" : "Se connecter")
+                            Text(isSignUp ? "Créer mon compte" : "Se connecter")
                                 .font(Theme.headlineFont)
                                 .foregroundStyle(.white)
                                 .opacity(authViewModel.isProcessing ? 0 : 1)
@@ -226,7 +226,7 @@ struct AuthView: View {
                     // Toggle login/signup — typo subheadline (lisible) +
                     // zone de tap >= 44pt sur le bouton.
                     HStack(spacing: Theme.spacingXS) {
-                        Text(isSignUp ? "Deja un compte ?" : "Pas encore de compte ?")
+                        Text(isSignUp ? "Déjà un compte ?" : "Pas encore de compte ?")
                             .font(Theme.subheadlineFont)
                             .foregroundStyle(Color.healthMapSecondary)
                         // frame+contentShape DANS le label (zone tappable 44pt
@@ -237,7 +237,7 @@ struct AuthView: View {
                                 authViewModel.errorMessage = nil
                             }
                         } label: {
-                            Text(isSignUp ? "Se connecter" : "Creer un compte")
+                            Text(isSignUp ? "Se connecter" : "Créer un compte")
                                 .font(Theme.subheadlineFont.weight(.semibold))
                                 .foregroundStyle(Color.kiwiGreenInk)
                                 .frame(minHeight: 44)
@@ -258,7 +258,7 @@ struct AuthView: View {
 
                 VStack(spacing: Theme.spacingMD) {
                     KiwiLoader(size: 56, color: .white)
-                    Text("Connexion a Apple...")
+                    Text("Connexion à Apple...")
                         .font(Theme.subheadlineFont)
                         .foregroundStyle(.white)
                 }
@@ -312,7 +312,7 @@ struct AuthView: View {
                 let idTokenString = String(data: tokenData, encoding: .utf8),
                 let nonce = authViewModel.pendingAppleNonce
             else {
-                authViewModel.errorMessage = "Apple n'a pas renvoye de token. Reessaie."
+                authViewModel.errorMessage = "Apple n'a pas renvoyé tes infos de connexion. Réessaie."
                 authViewModel.pendingAppleNonce = nil
                 return
             }
@@ -355,7 +355,7 @@ struct AuthView: View {
                 .brandTitleKerning()
 
             Text(isSignUp
-                 ? "Gratuit — ton bilan nutritionnel t'attend."
+                 ? "Gratuit : ton bilan nutritionnel t'attend."
                  : "Connecte-toi pour retrouver ton bilan.")
                 .font(Theme.subheadlineFont)
                 .foregroundStyle(Color.healthMapSecondary)

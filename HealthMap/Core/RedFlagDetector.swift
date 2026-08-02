@@ -20,7 +20,7 @@ enum RedFlagDetector {
         if ["vegan", "vegetarien", "vegetarian"].contains(diet) && !hasSupplement("b12") {
             flags.append(RedFlag(
                 id: .veganNoB12, urgency: .soon,
-                message: "Régime végé sans supplément B12 — signal à prendre au sérieux à long terme. La B12 n'existe pas dans les végétaux."
+                message: "Tu manges végé sans B12 en soutien. Sur la durée, ça compte vraiment : la B12 ne se trouve pas dans les végétaux."
             ))
         }
 
@@ -28,7 +28,7 @@ enum RedFlagDetector {
         if profile.pregnancyStatus == "pregnant" && !hasSupplement("folate") {
             flags.append(RedFlag(
                 id: .pregnantNoFolate, urgency: .immediate,
-                message: "Enceinte sans folate — le folate est critique pour le développement neural du fœtus. Consultez votre médecin immédiatement."
+                message: "Enceinte sans folate : parles-en à ton médecin dès maintenant. Le folate est essentiel au développement du bébé."
             ))
         }
 
@@ -36,7 +36,7 @@ enum RedFlagDetector {
         if profile.pregnancyStatus == "pregnant" && profile.isSmoker {
             flags.append(RedFlag(
                 id: .pregnantSmoking, urgency: .immediate,
-                message: "Enceinte et fumeuse — risque majeur pour le fœtus. Parlez-en à votre médecin."
+                message: "Enceinte et fumeuse : c'est un risque important pour le bébé. Parles-en à ton médecin sans attendre."
             ))
         }
 
@@ -44,7 +44,7 @@ enum RedFlagDetector {
         if profile.pregnancyStatus == "trying_to_conceive" && !hasSupplement("folate") {
             flags.append(RedFlag(
                 id: .tryingConceiveNoFolate, urgency: .soon,
-                message: "Projet de grossesse sans folate — commencez la supplémentation 3 mois avant la conception (400-600µg/jour)."
+                message: "Projet de grossesse sans folate. L'idéal est de commencer 3 mois avant, entre 400 et 600 µg par jour."
             ))
         }
 
@@ -52,7 +52,7 @@ enum RedFlagDetector {
         if profile.periodFlow == "very_heavy" && !hasSupplement("iron") {
             flags.append(RedFlag(
                 id: .heavyPeriodsNoIron, urgency: .soon,
-                message: "Règles très abondantes sans supplément de fer — risque élevé d'anémie. Faites un dosage de ferritine."
+                message: "Règles abondantes et pas de fer en soutien, tes réserves s'épuisent vite. Une prise de sang (ferritine) te donnera une réponse claire."
             ))
         }
 
@@ -60,7 +60,7 @@ enum RedFlagDetector {
         if profile.periodFlow == "very_heavy" && ["vegan", "vegetarien", "vegetarian"].contains(diet) {
             flags.append(RedFlag(
                 id: .heavyPeriodsPlantBased, urgency: .soon,
-                message: "Règles abondantes + régime végétarien = double risque fer. Le fer non-héminique (végétal) est 3x moins absorbé."
+                message: "Règles abondantes et régime végétarien, le fer est doublement sollicité. Celui des végétaux s'absorbe environ 3 fois moins bien."
             ))
         }
 
@@ -68,7 +68,7 @@ enum RedFlagDetector {
         if profile.weightTrend == "losing_unintentionally" {
             flags.append(RedFlag(
                 id: .unintentionalWeightLoss, urgency: .soon,
-                message: "Perte de poids involontaire — consultez un médecin pour écarter une cause sous-jacente."
+                message: "Tu perds du poids sans le chercher. Ça mérite un avis médical, sans attendre."
             ))
         }
 
@@ -76,7 +76,7 @@ enum RedFlagDetector {
         if conditions.contains(where: { ["celiac", "crohns_uc"].contains($0) }) {
             flags.append(RedFlag(
                 id: .malabsorptionCondition, urgency: .routine,
-                message: "Maladie digestive diagnostiquée — malabsorption probable de fer, B12, calcium, zinc, vitamine D, folate. Suivi médical recommandé."
+                message: "Avec un intestin fragile, le fer, la B12, le calcium, le zinc, la vitamine D et les folates passent moins bien. Un suivi médical fait la différence."
             ))
         }
 
@@ -84,7 +84,7 @@ enum RedFlagDetector {
         if medications.contains("ppi") && medications.contains("metformin") {
             flags.append(RedFlag(
                 id: .ppiMetforminB12, urgency: .soon,
-                message: "PPI + Metformine = double risque d'insuffisance en B12. Demandez un dosage sanguin de B12."
+                message: "Ton anti-acide et ta metformine freinent chacun la B12. Un dosage sanguin permet de faire le point."
             ))
         }
 
@@ -92,7 +92,7 @@ enum RedFlagDetector {
         if age >= 65 && medications.filter({ $0 != "none" }).count >= 3 {
             flags.append(RedFlag(
                 id: .elderlyPolypharmacy, urgency: .routine,
-                message: "Plus de 65 ans avec plusieurs médicaments — risque d'interactions nutriment-médicament. Parlez-en à votre pharmacien."
+                message: "Plusieurs médicaments en même temps, certains peuvent gêner l'absorption de tes nutriments. Ton pharmacien peut vérifier ça avec toi."
             ))
         }
 
@@ -101,7 +101,7 @@ enum RedFlagDetector {
             (["vegan", "vegetarien"].contains(diet) || medications.contains("ppi") || medications.contains("metformin")) {
             flags.append(RedFlag(
                 id: .tinglingB12Risk, urgency: .soon,
-                message: "Fourmillements + facteurs de risque B12 — la neuropathie liée à un manque de B12 peut devenir irréversible. Consultez rapidement."
+                message: "Des fourmillements alors que ta B12 est à risque, c'est à voir vite. Les nerfs récupèrent mal si on laisse traîner."
             ))
         }
 
@@ -110,7 +110,7 @@ enum RedFlagDetector {
             (profile.periodFlow == "heavy" || profile.periodFlow == "very_heavy" || ["vegan", "vegetarien"].contains(diet)) {
             flags.append(RedFlag(
                 id: .hairLossIronRisk, urgency: .soon,
-                message: "Perte de cheveux + signaux de risque fer — faites doser votre ferritine (cible > 50 µg/L pour les cheveux)."
+                message: "Tes cheveux tombent et plusieurs signaux pointent le fer. Fais doser ta ferritine, on vise plus de 50 µg/L pour les cheveux."
             ))
         }
 
@@ -120,7 +120,7 @@ enum RedFlagDetector {
         if symptoms.contains("digestive_bleeding") {
             flags.append(RedFlag(
                 id: .digestiveBleeding, urgency: .immediate,
-                message: "Selles noires ou sang dans les selles — consultez rapidement un médecin pour écarter une cause digestive. Un bilan (ferritine + endoscopie selon avis médical) est nécessaire avant toute conclusion nutritionnelle."
+                message: "Selles noires ou du sang dans les selles, consulte vite un médecin. Il faut chercher la cause côté digestif avant toute conclusion sur ton alimentation."
             ))
         }
 

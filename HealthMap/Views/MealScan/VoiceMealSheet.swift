@@ -140,14 +140,14 @@ struct VoiceMealSheet: View {
 
             Text(enregistre
                  ? "Continue, je note. Relâche quand tu as fini."
-                 : "Dis par exemple : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt nature » — précise les quantités si tu les connais.")
+                 : "Dis par exemple : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt nature ». Précise les quantités si tu les connais.")
                 .font(.system(size: 14))
                 .foregroundStyle(Kiwio.discret)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if tropCourt {
-                Text("Trop court — garde le doigt appuyé le temps de parler.")
+                Text("Trop court. Garde le doigt appuyé le temps de parler.")
                     .font(.footnote)
                     .foregroundStyle(Kiwio.rouge)
             }
@@ -279,8 +279,8 @@ struct VoiceMealSheet: View {
                 if !ignoredNames.isEmpty {
                     bandeau(
                         ignoredNames.count == 1
-                        ? "Je n'arrive pas à chiffrer « \(ignoredNames[0]) » — retire-le ou reformule."
-                        : "Je n'arrive pas à chiffrer \(ignoredNames.count) aliments — retire-les ou reformule.",
+                        ? "Je n'arrive pas à chiffrer « \(ignoredNames[0]) ». Retire-le ou reformule."
+                        : "Je n'arrive pas à chiffrer \(ignoredNames.count) aliments. Retire-les ou reformule.",
                         couleur: Kiwio.ambre,
                         fond: Kiwio.ambreFond
                     )
@@ -331,7 +331,7 @@ struct VoiceMealSheet: View {
     @ViewBuilder
     private var ctaBlock: some View {
         if visibleItems.isEmpty {
-            Text("Plus aucun aliment — recommence la dictée.")
+            Text("Plus aucun aliment. Recommence la dictée.")
                 .font(.footnote)
                 .foregroundStyle(Kiwio.discret)
                 .frame(maxWidth: .infinity)
@@ -339,7 +339,7 @@ struct VoiceMealSheet: View {
         } else if let manquant = missingNames.first {
             // Bloquant tant qu'une quantité manque : on n'invente pas un grammage.
             // Un féculent varie du simple au triple selon la portion.
-            Text("Précise la quantité · \(manquant)")
+            Text("Précise la quantité : \(manquant)")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Kiwio.discret)
                 .frame(maxWidth: .infinity, minHeight: 52)
@@ -359,7 +359,7 @@ struct VoiceMealSheet: View {
             .disabled(isSaving || savableItems.isEmpty)
         }
 
-        Button("Recommencer le vocal") {
+        Button("Recommencer la dictée") {
             Task { await restart() }
         }
         .font(.system(size: 14, weight: .medium))
@@ -375,7 +375,7 @@ struct VoiceMealSheet: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 30))
                 .foregroundStyle(Kiwio.ambre)
-            Text(errorMessage ?? "L'analyse n'a pas abouti.")
+            Text(errorMessage ?? "Je n'ai pas réussi à analyser ton repas.")
                 .font(.system(size: 15))
                 .foregroundStyle(Kiwio.secondaire)
                 .multilineTextAlignment(.center)
@@ -580,7 +580,7 @@ struct VoiceMealSheet: View {
         }
 
         guard !entries.isEmpty else {
-            errorMessage = "Aucun de ces aliments n'a pu être enregistré."
+            errorMessage = "Je n'ai pas réussi à enregistrer ces aliments."
             phase = .failed
             return
         }
