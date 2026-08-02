@@ -54,7 +54,11 @@ struct MealScanView: View {
     @State private var dicteeAnnulee = false
     /// Translation du doigt depuis l'appui — la bulle micro la suit.
     @State private var glissementDictee: CGSize = .zero
-    @State private var analyseVocaleImmediate = false
+    /// Appui simple sur le micro : on ne rouvre PLUS l'ancienne feuille
+    /// d'écoute (supprimée le 2 août 2026) — on montre un indice « maintiens
+    /// le bouton », façon WhatsApp, qui s'efface tout seul.
+    @State private var montrerIndiceMaintien = false
+    @State private var masquageIndice: Task<Void, Never>?
     /// Démarrage différé : sans ce délai, un appui simple lancerait puis
     /// couperait l'enregistrement dans la foulée, pour rien.
     @State private var demarrageDictee: Task<Void, Never>?
@@ -113,8 +117,7 @@ struct MealScanView: View {
                     if let uid = AuthService.shared.cachedCurrentUserIdString {
                         VoiceMealSheet(
                             userId: uid,
-                            speech: speech,
-                            analyseImmediate: analyseVocaleImmediate
+                            speech: speech
                         ) { count, kcal in
                             voiceConfirmation = "\(count) aliment\(count > 1 ? "s" : "") ajouté\(count > 1 ? "s" : "") · \(kcal) kcal"
                             // Le quota ne se décompte QUE si la dictée a abouti
@@ -278,6 +281,23 @@ struct MealScanView: View {
                     .padding(.horizontal, Theme.spacingLG)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
+            } else if montrerIndiceMaintien {
+                // Appui simple : on apprend le geste (façon WhatsApp), sans
+                // rien ouvrir. S'efface tout seul (~2,5 s).
+                HStack(spacing: 6) {
+                    Image(systemName: "hand.tap.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .accessibilityHidden(true)
+                    Text("Maintiens le bouton appuyé pour dicter ton repas")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundStyle(Color.kiwiGreenInk)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Color.kiwiGreenSoft))
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, Theme.spacingLG)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             // Troisième entrée, juste sous les deux gestes phares : chercher un
@@ -447,8 +467,8 @@ struct MealScanView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isButton)
                 .accessibilityLabel("Dicte ton repas")
-                .accessibilityHint("Maintiens le doigt pour enregistrer, glisse à gauche pour annuler, vers le haut pour continuer mains libres, relâche pour lancer l'analyse. Un appui simple ouvre la dictée.")
-                .accessibilityAction { ouvrirDicteeSansEnregistrer() }
+                .accessibilityHint("Maintiens le doigt pour enregistrer, glisse à gauche pour annuler, vers le haut pour continuer mains libres, relâche pour lancer l'analyse. En lecture d'écran, active pour dicter mains libres.")
+                .accessibilityAction { demarrerDicteePourAccessibilite() }
 
                 Rectangle()
                     .fill(Color.kiwiCharcoal.opacity(0.08))
@@ -624,13 +644,28 @@ struct MealScanView: View {
                     return
                 }
 
-                // Rien n'a démarré : c'était un appui simple.
+                // Rien n'a démarré : c'était un appui simple. On n'ouvre RIEN
+                // (l'ancienne feuille d'écoute est supprimée) — on apprend le
+                // geste, comme WhatsApp : un indice bref, puis il s'efface.
                 guard dicteeEnCours else {
-                    ouvrirDicteeSansEnregistrer()
+                    afficherIndiceMaintien()
                     return
                 }
                 terminerDictee()
             }
+    }
+
+    /// Indice « maintiens pour dicter » : visible ~2,5 s, remplacé si l'on
+    /// retape, jamais bloquant.
+    private func afficherIndiceMaintien() {
+        HapticService.shared.tap()
+        masquageIndice?.cancel()
+        withAnimation { montrerIndiceMaintien = true }
+        masquageIndice = Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation { montrerIndiceMaintien = false }
+        }
     }
 
     /// Clôt la dictée maintenue : trop courte, on annule sans faire attendre ;
@@ -649,7 +684,6 @@ struct MealScanView: View {
             return
         }
         HapticService.shared.strong()
-        analyseVocaleImmediate = true
         showVoice = true
     }
 
@@ -667,15 +701,22 @@ struct MealScanView: View {
         speech.reset()
     }
 
-    /// Ouvre la feuille vocale en mode écoute (le micro s'y maintient), sans
-    /// avoir rien enregistré depuis l'accueil.
-    private func ouvrirDicteeSansEnregistrer() {
+    /// Accessibilité (VoiceOver ne peut pas « maintenir ») : démarre une
+    /// dictée directement VERROUILLÉE, mains libres — la bulle et ses boutons
+    /// (annuler / envoyer) prennent la main, aucun maintien requis.
+    private func demarrerDicteePourAccessibilite() {
+        guard !dicteeEnCours else { return }
         guard peutDicter else {
             showPaywall = true
             return
         }
-        analyseVocaleImmediate = false
-        showVoice = true
+        dicteeTropCourte = false
+        dicteeAnnulee = false
+        glissementDictee = .zero
+        dicteeEnCours = true
+        dicteeVerrouillee = true
+        HapticService.shared.primary()
+        Task { await speech.start() }
     }
 
     /// La bulle d'enregistrement, DANS la carte à deux colonnes — le voile
@@ -980,7 +1021,20 @@ struct MealScanView: View {
                     coverageHero(result)
                         .padding(.horizontal, Theme.spacingMD)
 
+                    // Lot 3 (2 août 2026) : le meal_score était calculé/stocké
+                    // depuis toujours et jamais affiché. Maquette validée.
+                    if let score = result.mealScore {
+                        mealScoreCard(score: score, reasons: result.scoreReasons)
+                            .padding(.horizontal, Theme.spacingLG)
+                    }
+
                     needTilesSection(result.micros)
+
+                    // Lot 3 : besoins ciblés rédigés par le serveur (scan_v2),
+                    // payés à chaque scan et jamais rendus avant.
+                    if let besoins = result.scanV2?.besoins, !besoins.isEmpty {
+                        besoinsScanSection(besoins)
+                    }
 
                     foodTilesSection(result.foods)
 
@@ -1122,6 +1176,144 @@ struct MealScanView: View {
         }
         guard !result.detectedFoods.isEmpty else { return nil }
         return result.detectedFoods.prefix(4).joined(separator: " · ")
+    }
+
+    // MARK: - Carte « Score de ce repas » (Lot 3 — meal_score + raisons serveur)
+    /// Anneau coloré par l'échelle unique (HealthScale) + mot d'état + jusqu'à
+    /// 3 raisons rédigées par le serveur (score_breakdown.reasons).
+    private func mealScoreCard(score: Int, reasons: [String]) -> some View {
+        let color = Color.scoreColor(for: score)
+        let title = score >= 70 ? "Bon repas pour toi"
+                  : score >= 45 ? "Repas correct pour toi"
+                  : "Repas à rééquilibrer"
+        return HStack(spacing: 14) {
+            ZStack {
+                Circle().stroke(Color.kiwiCharcoal.opacity(0.08), lineWidth: 8)
+                Circle()
+                    .trim(from: 0, to: CGFloat(max(4, min(100, score))) / 100)
+                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                VStack(spacing: 0) {
+                    Text("\(score)")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    Text("/100")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.healthMapMuted)
+                }
+            }
+            .frame(width: 74, height: 74)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                ForEach(Array(reasons.prefix(3).enumerated()), id: \.offset) { _, raison in
+                    scoreReasonRow(raison)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(BilanV7CardStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Score de ce repas : \(score) sur 100. \(title).")
+    }
+
+    /// Une raison du score : préfixe "+N " = gain (coche verte), "-N " = malus
+    /// (triangle ambre). Le texte serveur est affiché tel quel, préfixe retiré.
+    private func scoreReasonRow(_ raw: String) -> some View {
+        let negative = raw.hasPrefix("-")
+        let texte = String(raw.drop(while: { $0 == "+" || $0 == "-" || $0.isNumber }))
+            .trimmingCharacters(in: .whitespaces)
+        return HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Image(systemName: negative ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(negative ? BilanV7.warnInk : Color.kiwiGreenInk)
+                .accessibilityHidden(true)
+            Text(texte)
+                .font(.system(size: 12))
+                .foregroundStyle(Color.healthMapSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - « Tes besoins du jour » (Lot 3 — scan_v2.besoins rédigés serveur)
+    private func besoinsScanSection(_ besoins: [BesoinScanV2]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Tes besoins du jour")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Color.kiwiCharcoal)
+                .padding(.horizontal, 4)
+            VStack(spacing: 0) {
+                let visibles = Array(besoins.prefix(3))
+                ForEach(Array(visibles.enumerated()), id: \.offset) { idx, besoin in
+                    besoinScanRow(besoin)
+                    if idx < visibles.count - 1 {
+                        Divider().overlay(BilanV7.hairline)
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .modifier(BilanV7CardStyle())
+        }
+        .padding(.horizontal, Theme.spacingLG)
+    }
+
+    private func besoinScanRow(_ besoin: BesoinScanV2) -> some View {
+        let pct = max(0, min(100, besoin.pctApporte ?? 0))
+        // Label TOUJOURS depuis NutrientData quand l'id est connu (règle
+        // canonique) ; le nom serveur ne sert que de repli.
+        let label = NutrientData.definition(for: besoin.id ?? "")?.label
+            ?? besoin.nom ?? besoin.id ?? "?"
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(label)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Spacer()
+                Text("ce plat en apporte \(pct) %")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(besoin.statut.v7Ink)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.kiwiCharcoal.opacity(0.07))
+                    Capsule()
+                        .fill(besoin.statut.v7Color)
+                        .frame(width: max(6, geo.size.width * CGFloat(pct) / 100))
+                }
+            }
+            .frame(height: 6)
+            if let why = besoin.why, !why.isEmpty {
+                Text(why)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let complements = besoin.alimentsComplement, !complements.isEmpty {
+                HStack(spacing: 6) {
+                    Text("À compléter :")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Color.healthMapMuted)
+                    ForEach(Array(complements.prefix(3).enumerated()), id: \.offset) { _, aliment in
+                        if let nom = aliment.nom, !nom.isEmpty {
+                            Text(nom)
+                                .font(.system(size: 11.5, weight: .medium))
+                                .foregroundStyle(Color.kiwiCharcoal)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(Color.kiwiCream))
+                                .overlay(Capsule().stroke(BilanV7.hairline, lineWidth: 1))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label) : ce plat apporte \(pct) pour cent du besoin.")
     }
 
     // MARK: - Carte couverture « N de tes besoins » (chevauche le header)

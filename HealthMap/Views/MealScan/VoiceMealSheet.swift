@@ -19,15 +19,12 @@ struct VoiceMealSheet: View {
     /// ici — pour que la dictée puisse DÉMARRER sur l'accueil, le doigt posé sur
     /// « Dicte ton repas », et se terminer dans cette feuille.
     @ObservedObject var speech: SpeechCaptureService
-    /// Vrai quand la dictée a déjà été enregistrée sur l'accueil : la feuille
-    /// s'ouvre alors directement sur l'analyse, sans redemander de parler.
-    var analyseImmediate: Bool = false
     /// Appelé après enregistrement : (nb d'aliments ajoutés, kcal du repas).
     var onAdded: (Int, Int) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var phase: Phase = .listening
+    @State private var phase: Phase = .analyzing
     @State private var items: [VoiceMealService.Item] = []
     @State private var grams: [Int: Double] = [:]      // index item → grammes retenus
     @State private var removed: Set<Int> = []
@@ -43,27 +40,24 @@ struct VoiceMealSheet: View {
     /// La coupe ne doit JAMAIS être silencieuse (règle du 2 août 2026).
     @State private var alimentsIgnoresServeur = 0
 
-    /// Geste « maintenir pour parler » (choix produit du 27 juillet, façon
-    /// Instagram / Snapchat) : l'enregistrement ne démarre PLUS tout seul à
-    /// l'ouverture — il court tant que le doigt reste posé sur le micro.
-    @State private var doigtPose = false
-    /// Affiché quand on relâche trop vite pour qu'il y ait quoi que ce soit
-    /// à transcrire.
-    @State private var tropCourt = false
     /// Dernière transcription obtenue : permet de relancer l'analyse après un
     /// échec serveur sans redemander à l'utilisateur de reparler.
     @State private var dernierTranscript = ""
 
     private let journal = MealJournalService.shared
 
-    enum Phase { case listening, analyzing, results, failed }
+    // Plus de phase « écoute » ici : depuis le 2 août 2026, l'enregistrement
+    // vit ENTIÈREMENT sur l'accueil (maintien du doigt sur « Dicte ton
+    // repas », bulle façon WhatsApp). La feuille ne s'ouvre qu'avec un audio
+    // déjà capté et enchaîne directement transcription → analyse. L'ancien
+    // mode écoute (le « popup » ouvert par un appui simple) est supprimé.
+    enum Phase { case analyzing, results, failed }
 
     // MARK: - Corps
 
     var body: some View {
         Group {
             switch phase {
-            case .listening: listeningView
             case .analyzing: analyzingView
             case .results:   resultsView
             case .failed:    errorView
@@ -71,147 +65,17 @@ struct VoiceMealSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Kiwio.fondSheet.ignoresSafeArea())
-        // Le sheet épouse son contenu pendant l'écoute — pas de grande zone vide,
-        // c'était le reproche principal sur la build TestFlight.
         .presentationDetents(hauteurs)
         .presentationDragIndicator(.visible)
-        // Plus de démarrage automatique : on demande seulement les
-        // autorisations micro / reconnaissance. L'écoute attend le doigt.
-        // (Le retour haptique est déclenché par le geste lui-même — appui,
-        // relâchement, appui trop court — voir `pressionMicro`.)
-        .task {
-            // Dictée déjà enregistrée depuis l'accueil : on enchaîne sur la
-            // transcription + l'analyse, la feuille n'a plus rien à écouter.
-            if analyseImmediate {
-                phase = .analyzing
-                await finishListening()
-            } else {
-                _ = await speech.requestPermissions()
-            }
-        }
+        .task { await finishListening() }
         .onDisappear { speech.reset() }
     }
 
     private var hauteurs: Set<PresentationDetent> {
         switch phase {
-        // 400/300 pt : la bulle à 330 croppait le contenu (consigne 3 lignes +
-        // waveform + 2 boutons) dès que le texte grossissait — retour build 319.
-        // 480 pt : place le micro maintenu (104 pt) à portée du pouce, avec la
-        // waveform et la consigne sous les yeux pendant qu'on parle.
-        case .listening: return [.height(480)]
         case .analyzing: return [.height(300)]
         case .results, .failed: return [.large]
         }
-    }
-
-    // MARK: - 1. Écoute
-
-    /// Écoute « maintenir pour parler » : rien ne s'enregistre tant que le doigt
-    /// n'est pas posé sur le micro, tout part à l'analyse dès qu'on relâche.
-    private var listeningView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                if enregistre { PointEnregistrement() }
-                Text(titreEcoute)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(enregistre ? Kiwio.encre : Kiwio.secondaire)
-                Spacer()
-            }
-            .padding(.top, 22)
-
-            // Le micro EST le bouton : halo piloté par le VOLUME RÉEL, il
-            // s'ouvre quand on parle et retombe quand on se tait.
-            MicroVivant(level: speech.level, active: enregistre, pressed: doigtPose)
-                .frame(maxWidth: .infinity)
-                .contentShape(Circle())
-                .gesture(pressionMicro)
-                .accessibilityLabel("Maintiens pour parler")
-                .accessibilityHint("Garde le doigt appuyé pendant que tu décris ton repas, relâche pour lancer l'analyse.")
-
-            // Waveform + minuteur : les deux preuves de vie pendant la dictée.
-            HStack(spacing: 12) {
-                Waveform(level: speech.level, active: enregistre)
-                Text(minuteur)
-                    .font(.kiwioMono(13, .medium))
-                    .foregroundStyle(Kiwio.secondaire)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity)
-            .background(Kiwio.neutre, in: Capsule())
-            .opacity(enregistre ? 1 : 0.45)
-
-            Text(enregistre
-                 ? "Continue, je note. Relâche quand tu as fini."
-                 : "Dis par exemple : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt nature ». Précise les quantités si tu les connais.")
-                .font(.system(size: 14))
-                .foregroundStyle(Kiwio.discret)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            if tropCourt {
-                Text("Trop court. Garde le doigt appuyé le temps de parler.")
-                    .font(.footnote)
-                    .foregroundStyle(Kiwio.rouge)
-            }
-
-            if let err = speech.error {
-                Text(err.message)
-                    .font(.footnote)
-                    .foregroundStyle(Kiwio.rouge)
-            }
-
-            Spacer(minLength: 0)
-
-            Button("Annuler") { HapticService.shared.tap(); speech.reset(); dismiss() }
-                .font(.system(size: 15))
-                .foregroundStyle(Kiwio.secondaire)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .padding(.bottom, 8)
-        }
-        .padding(.horizontal, 20)
-    }
-
-    /// Vrai uniquement quand le service capte réellement.
-    private var enregistre: Bool { speech.state == .listening }
-
-    private var titreEcoute: String {
-        if enregistre { return "Je t'écoute…" }
-        return doigtPose ? "Un instant…" : "Maintiens pour parler"
-    }
-
-    /// Appui maintenu : démarre l'écoute au contact, la termine au relâchement.
-    /// `minimumDistance: 0` pour réagir dès le contact, sans attendre un glissement.
-    private var pressionMicro: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { _ in
-                guard !doigtPose else { return }
-                doigtPose = true
-                tropCourt = false
-                HapticService.shared.primary()
-                Task { await speech.start() }
-            }
-            .onEnded { _ in
-                guard doigtPose else { return }
-                doigtPose = false
-                // Moins d'une seconde : rien à transcrire, on annule sans partir
-                // en analyse (sinon l'utilisateur attend pour rien).
-                guard speech.duree >= 1 else {
-                    HapticService.shared.warning()
-                    speech.reset()
-                    tropCourt = true
-                    return
-                }
-                HapticService.shared.strong()
-                Task { await finishListening() }
-            }
-    }
-
-    /// Piloté par la durée réelle du recorder, pas par un compteur parallèle qui
-    /// pourrait dériver de l'enregistrement.
-    private var minuteur: String {
-        let s = Int(speech.duree)
-        return String(format: "%d:%02d", s / 60, s % 60)
     }
 
     // MARK: - 2. Analyse
@@ -372,8 +236,11 @@ struct VoiceMealSheet: View {
             .disabled(isSaving || savableItems.isEmpty)
         }
 
+        // La feuille n'écoute plus (2 août 2026) : recommencer = fermer, puis
+        // maintenir à nouveau le micro de l'accueil.
         Button("Recommencer la dictée") {
-            Task { await restart() }
+            HapticService.shared.tap()
+            dismiss()
         }
         .font(.system(size: 14, weight: .medium))
         .foregroundStyle(Kiwio.secondaire)
@@ -409,11 +276,13 @@ struct VoiceMealSheet: View {
                     .lineLimit(3)
                     .padding(.horizontal, 8)
 
-                Button("Redire mon repas") { Task { await restart() } }
+                Button("Redire mon repas") { HapticService.shared.tap(); dismiss() }
                     .font(.system(size: 15))
                     .foregroundStyle(Kiwio.secondaire)
             } else {
-                Button("Réessayer") { Task { await restart() } }
+                // Rien à réanalyser : on referme, l'utilisateur redicte en
+                // maintenant le micro de l'accueil.
+                Button("Réessayer") { HapticService.shared.tap(); dismiss() }
                     .buttonStyle(.borderedProminent)
                     .tint(Kiwio.vert)
             }
@@ -528,22 +397,6 @@ struct VoiceMealSheet: View {
             errorMessage = error.localizedDescription
             phase = .failed
         }
-    }
-
-    private func restart() async {
-        items = []
-        grams = [:]
-        removed = []
-        deployee = nil
-        errorMessage = nil
-        quotedTranscript = ""
-        tropCourt = false
-        doigtPose = false
-        dernierTranscript = ""
-        phase = .listening
-        // On ne relance PAS l'écoute : depuis le passage au « maintenir pour
-        // parler », c'est le doigt qui la démarre.
-        speech.reset()
     }
 
     private func save() async {
