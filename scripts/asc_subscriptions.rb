@@ -760,6 +760,34 @@ if MODE == "trim-monthly"
     target_item = d[:item] if pid == target_pid
   end
 
+  # 2e chance : la réf type 18 est probablement l'id d'une subscriptionSubmission
+  # (créée quand l'abo est « ajouté pour vérification »). On la GET pour lire sa
+  # relation subscription.
+  if target_item.nil?
+    decoded.select { |d| d[:type] == "18" }.each do |d|
+      %W[/v1/subscriptionSubmissions/#{d[:ref]}?include=subscription
+         /v1/subscriptionSubmissions/#{d[:ref]}/relationships/subscription
+         /v1/subscriptionSubmissions/#{d[:ref]}].each do |path|
+        code, body = req(:get, path)
+        puts "  · sonde #{path[0, 60]}… → HTTP #{code}"
+        next unless code == 200 && body["data"]
+        data = body["data"]
+        sub_id = if data.is_a?(Hash) && data["type"] == "subscriptions"
+                   data["id"]
+                 else
+                   data.is_a?(Hash) && data.dig("relationships", "subscription", "data", "id") ||
+                     (body["included"] || []).find { |i| i["type"] == "subscriptions" }&.dig("id")
+                 end
+        if sub_id
+          puts "    → subscription #{sub_id}"
+          target_item = d[:item] if sub_id == target_sub_id
+        end
+        break
+      end
+      break if target_item
+    end
+  end
+
   unless target_item
     puts "\n⛔ Item du #{target_pid} NON identifié — rien supprimé. Retrait à faire dans l'UI ASC."
     puts "   (Corrélation UUID insuffisante ; items type 18 : #{decoded.select { |d| d[:type] == "18" }.map { |d| d[:ref] }.join(", ")})"
