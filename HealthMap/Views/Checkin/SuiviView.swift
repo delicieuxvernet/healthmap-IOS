@@ -68,15 +68,16 @@ struct SuiviView: View {
 
                 ScrollView {
                     VStack(spacing: 14) {
-                        titleBlock
-                        SuiviStatsRow(stats: stats)
-                        macroCarousel
-                        microCarousel
-                        symptomCarousel
+                        titleBlock.kiwiEntrance(0)
+                        SuiviStatsRow(stats: stats).kiwiEntrance(1)
+                        macroCarousel.kiwiEntrance(2)
+                        microCarousel.kiwiEntrance(3)
+                        symptomCarousel.kiwiEntrance(4)
                         SuiviNeedsCard(delta: stats.besoinsDuJourDeltaPct,
                                        stepsToday: stepsToday,
                                        tips: weeklyTips)
-                        SuiviPaliersCard(paliers: paliers)
+                            .kiwiEntrance(5)
+                        SuiviPaliersCard(paliers: paliers).kiwiEntrance(6)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 8)

@@ -84,3 +84,19 @@ struct PlanSupplementSolution: Identifiable {
     let tag: String           // « Prioritaire » / « Si besoin »
     let strong: Bool          // priorité haute -> teinte verte, sinon neutre
 }
+
+extension Array where Element == PlanTopic {
+    /// Ce que la couronne radiale accepte d'afficher : des ids uniques (un id
+    /// répété casserait le ForEach) et 6 nœuds au plus — au-delà, les bulles et
+    /// leurs libellés se chevauchent. Les builders sélectionnent déjà 3 symptômes
+    /// + 3 objectifs ; ce garde-fou tient l'invariant quelle que soit la source.
+    var radialDisplayList: [PlanTopic] {
+        var seen = Set<String>()
+        var out: [PlanTopic] = []
+        for topic in self where seen.insert(topic.id).inserted {
+            out.append(topic)
+            if out.count == 6 { break }
+        }
+        return out
+    }
+}

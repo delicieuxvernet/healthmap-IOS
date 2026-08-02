@@ -229,12 +229,12 @@ struct SupplementsView: View {
     private var mainContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                header
+                header.kiwiEntrance(0)
 
                 // Première visite de l'onglet : l'engagement mérite un vrai
                 // bloc, une fois. Ensuite il descend en ligne de pied de page.
                 if engagementEnGrand {
-                    ComplementsEngagementCard().padding(.top, 14)
+                    ComplementsEngagementCard().padding(.top, 14).kiwiEntrance(1)
                 }
 
                 // La synthèse répond en 2 secondes, avant toute lecture.
@@ -246,21 +246,23 @@ struct SupplementsView: View {
                         totalLabel: cartTotalLabel
                     )
                     .padding(.top, engagementEnGrand ? 12 : 14)
+                    .kiwiEntrance(2)
                 }
 
                 // Le rituel n'a de sens que dans la voie « compléments ».
                 if voie == .complements, let rituel {
                     ComplementsRituelStrip(rituel: rituel) { toggleRituel($0) }
                         .padding(.top, 10)
+                        .kiwiEntrance(3)
                 }
 
-                chainHeader.padding(.top, 20)
+                chainHeader.padding(.top, 20).kiwiEntrance(4)
 
                 if chains.isEmpty {
-                    aiFallbackSection.padding(.top, 12)
+                    aiFallbackSection.padding(.top, 12).kiwiEntrance(5)
                 } else {
                     VStack(spacing: 10) {
-                        ForEach(chains) { chain in
+                        ForEach(Array(chains.enumerated()), id: \.element.id) { index, chain in
                             ChainCollapsibleCard(
                                 chain: chain,
                                 sousTitre: sousTitre(for: chain),
@@ -270,6 +272,7 @@ struct SupplementsView: View {
                             ) {
                                 chainCard(for: chain)
                             }
+                            .kiwiEntrance(5 + index)
                         }
                     }
                     .padding(.top, 12)

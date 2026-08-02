@@ -31,12 +31,14 @@ struct RecommendationsView: View {
                 Color.kiwiCream.ignoresSafeArea()
 
                 if let analysis = dashboardVM.aiAnalysis {
-                    RecommendationsContentView(analysis: analysis)
+                    // Arrivée en fondu d'un bloc, pas en cascade : la carte
+                    // radiale est un tout, la décomposer la ferait clignoter.
+                    RecommendationsContentView(analysis: analysis).kiwiEntrance()
                 } else if !v2Topics.isEmpty {
                     // Repli : le v7 (aiAnalysis) manque mais le bilan v2 a un
                     // plan → on le rend depuis le contrat v2 (le Plan ne reste
                     // plus jamais vide quand le Bilan, lui, s'affiche).
-                    RecommendationsV2ContentView(topics: v2Topics)
+                    RecommendationsV2ContentView(topics: v2Topics).kiwiEntrance()
                 } else if dashboardVM.isLoadingAnalysis || dashboardVM.isLoadingAnalysisV2 {
                     VStack(spacing: Theme.spacingMD) {
                         // Loader signature : le kiwi qui marche remplace le

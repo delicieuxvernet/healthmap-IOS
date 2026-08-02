@@ -18,6 +18,11 @@ import SwiftUI
 // plutôt que d'en inventer un.
 
 /// Construit les topics du Plan à partir du contrat v2 (`plan.sections`).
+///
+/// Le serveur émet UNE section par symptôme et par objectif déclarés, sans
+/// plafond — or la couronne radiale est dessinée pour 3 à 6 nœuds. On retient
+/// donc 3 symptômes puis 3 objectifs, exactement la sélection que le builder
+/// v7 opère déjà : même nombre, même ordre, quel que soit le flux qui répond.
 func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
     guard let sections = analysis.plan?.sections, !sections.isEmpty else { return [] }
 
@@ -30,7 +35,7 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
         uniquingKeysWith: { first, _ in first }
     )
 
-    return sections.compactMap { section -> PlanTopic? in
+    let topics = sections.compactMap { section -> PlanTopic? in
         guard let titre = section.titre, !titre.isEmpty else { return nil }
         let kind: PlanTopic.Kind = section.type == "objectif" ? .objectif : .symptome
 
@@ -99,6 +104,12 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
             complements: complements
         )
     }
+
+    // La sélection du v7 : les symptômes d'abord (le motif de venue), puis les
+    // objectifs, 3 par famille.
+    let symptomes = topics.filter { $0.kind == .symptome }.prefix(3)
+    let objectifs = topics.filter { $0.kind == .objectif }.prefix(3)
+    return Array(symptomes) + Array(objectifs)
 }
 
 // MARK: - Contenu du Plan à partir du contrat v2 (repli quand aiAnalysis manque)
