@@ -721,24 +721,48 @@ if MODE == "trim-monthly"
   submission, items = staged
   puts "Brouillon #{submission["id"]} : #{items.size} élément(s)"
 
-  rel_names = %w[subscription subscriptionGroup appStoreVersion appEvent
-                 appCustomProductPageVersion appStoreVersionExperiment]
-  target_item = nil
-  items.each do |item|
-    found = nil
-    rel_names.each do |rel|
-      code, body = req(:get, "/v1/reviewSubmissionItems/#{item["id"]}/relationships/#{rel}")
-      next unless code == 200 && body["data"]
-      found = { rel: rel, type: body.dig("data", "type"), id: body.dig("data", "id") }
-      break
+  # L'id d'un reviewSubmissionItem est du base64 : "<submissionId>|<type>|<référence>".
+  # Type observé 6 = version (réf numérique), 19 = groupe, 18 = abonnement — la
+  # référence des abonnements est un UUID interne. On le corrèle aux UUID connus
+  # de chaque abonnement (screenshot de review, availability, offres d'intro).
+  require "base64"
+  decoded = items.map do |item|
+    raw = item["id"]
+    raw_padded = raw + "=" * ((4 - raw.length % 4) % 4)
+    plain = Base64.urlsafe_decode64(raw_padded) rescue (Base64.decode64(raw_padded) rescue "")
+    parts = plain.split("|")
+    puts "  · item #{item["id"][0, 24]}… → décodé : type=#{parts[1]} réf=#{parts[2]}"
+    { item: item, type: parts[1], ref: parts[2] }
+  end
+
+  # UUID connus pour chaque abonnement du groupe
+  sub_uuid_index = {}
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      pid = s.dig("attributes", "productId")
+      uuids = []
+      code, shot = req(:get, "/v1/subscriptions/#{s["id"]}/appStoreReviewScreenshot")
+      uuids << shot.dig("data", "id") if code == 200 && shot["data"]
+      code, av = req(:get, "/v1/subscriptions/#{s["id"]}/subscriptionAvailability")
+      uuids << av.dig("data", "id") if code == 200 && av["data"]
+      code, intro = req(:get, "/v1/subscriptions/#{s["id"]}/introductoryOffers?limit=200")
+      (intro["data"] || []).each { |o| uuids << o["id"] } if code == 200
+      uuids.compact.each { |u| sub_uuid_index[u] = pid }
+      puts "  · #{pid} : #{uuids.compact.size} UUID connus"
     end
-    label = found ? "#{found[:rel]}=#{found[:type]}/#{found[:id]}" : "relation non résolue"
-    puts "  · item #{item["id"]} → #{label}"
-    target_item = item if found && found[:id] == target_sub_id
+  end
+
+  target_item = nil
+  decoded.each do |d|
+    pid = sub_uuid_index[d[:ref]]
+    next unless pid
+    puts "  ✓ item #{d[:item]["id"][0, 24]}… identifié = #{pid}"
+    target_item = d[:item] if pid == target_pid
   end
 
   unless target_item
     puts "\n⛔ Item du #{target_pid} NON identifié — rien supprimé. Retrait à faire dans l'UI ASC."
+    puts "   (Corrélation UUID insuffisante ; items type 18 : #{decoded.select { |d| d[:type] == "18" }.map { |d| d[:ref] }.join(", ")})"
     exit 1
   end
 
