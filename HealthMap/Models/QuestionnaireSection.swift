@@ -64,13 +64,17 @@ enum QuestionnaireSection: Int, CaseIterable, Identifiable {
         question(id: id)?.options?.map { ($0.id, $0.label) } ?? []
     }
 
-    /// Clés du parcours Express — 24 questions. (Le commentaire annonçait 21,
-    /// un décompte jamais remis à jour ; le chiffre n'est pas affiché à
-    /// l'utilisateur, `expressCount` ci-dessous évite qu'il redevienne faux.)
+    /// Clés du parcours Express. (Le chiffre n'est pas affiché à l'utilisateur,
+    /// `expressCount` ci-dessous évite qu'un décompte recopié redevienne faux.)
+    ///
+    /// `caffeineTiming` ajouté le 2 août 2026 : non-express dans `.sante`, elle
+    /// était INATTEIGNABLE (`.sante` n'est pas dans `deepGateSections`, aucun
+    /// carrefour ne pouvait la déverrouiller) alors qu'elle pèse -10 sur le fer.
+    /// Son `showIf` (3+ cafés/jour) fait qu'elle n'apparaît qu'aux gros buveurs.
     static let expressKeys: Set<String> = [
         "symptoms", "goals", "firstName", "age", "gender", "height", "weight", "weightTrend",
         "indoorWork", "sunExposure", "strengthTraining", "skinType",
-        "stressLevel", "sleepHours", "wakeFeeling", "screenBeforeBed", "caffeineIntake", "waterIntake", "smoking", "alcohol", "bloating",
+        "stressLevel", "sleepHours", "wakeFeeling", "screenBeforeBed", "caffeineIntake", "caffeineTiming", "waterIntake", "smoking", "alcohol", "bloating",
         "dietType", "groceries", "antibiotics",
     ]
 
