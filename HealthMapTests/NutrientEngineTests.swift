@@ -112,4 +112,44 @@ final class NutrientEngineTests: XCTestCase {
         let legacy = HealthCalculator.analyzeNutrientScores(profile: p)
         XCTAssertFalse(legacy.isEmpty, "Profil valide sans caddie -> scores legacy non vides")
     }
+
+    // MARK: - Parité avec HealthCalculator (régressions du 2 août 2026)
+
+    /// Le sel iodé est une question du parcours COMPLET. Non renseignée, elle
+    /// doit rester neutre : la traiter comme « no » retirait 12 points d'iode
+    /// à tout utilisateur Express pour une question jamais posée.
+    /// `HealthCalculator` portait déjà ce correctif (5 juillet 2026).
+    func testSelIodeNonRenseigneNePenalisePas() {
+        var renseigneNon = makeMarc()
+        renseigneNon.iodizedSalt = "no"
+        var nonRenseigne = makeMarc()
+        nonRenseigne.iodizedSalt = ""
+
+        let scoreNon = NutrientEngine.nutrientScores(profile: renseigneNon)["iodine"] ?? 0
+        let scoreVide = NutrientEngine.nutrientScores(profile: nonRenseigne)["iodine"] ?? 0
+
+        XCTAssertGreaterThan(
+            scoreVide, scoreNon,
+            "Sel iodé non renseigné doit être neutre, pas pénalisé comme un « non »."
+        )
+    }
+
+    /// `sleepDuration` est la clé v6 de `sleepHours`. Les deux étaient scorées
+    /// ensemble : « 7.5 » valait +10 au lieu de +5, et comme `sleepHoursDouble`
+    /// vaut 7 par défaut, un sommeil NON renseigné offrait +5 gratuits.
+    func testSommeilNonRenseigneNeDonnePasDeBonusGratuit() {
+        var renseigne = makeMarc()
+        renseigne.sleepHours = "7.5"        // palier optimal
+        var absent = makeMarc()
+        absent.sleepHours = ""              // rien de déclaré
+        absent.sleepDuration = ""
+
+        let avec = NutrientEngine.wellnessScore(profile: renseigne)
+        let sans = NutrientEngine.wellnessScore(profile: absent)
+
+        XCTAssertGreaterThan(
+            avec, sans,
+            "Déclarer un bon sommeil doit rapporter plus que ne rien déclarer."
+        )
+    }
 }

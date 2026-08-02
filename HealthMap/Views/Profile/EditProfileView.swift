@@ -610,6 +610,22 @@ struct EditProfileView: View {
 
     // MARK: - Field Definitions
     /// Alignée sur le questionnaire Home.jsx web (CLAUDE.md §6).
+    /// Les options d'un champ viennent du questionnaire, jamais d'une liste
+    /// recopiée ici.
+    ///
+    /// Historique : ces listes étaient écrites en dur et avaient divergé.
+    /// L'écran écrivait par exemple `unintentional_loss` là où le
+    /// questionnaire et `RedFlagDetector` attendent `losing_unintentionally`
+    /// — modifier sa tendance de poids depuis le profil désactivait donc en
+    /// silence l'alerte de perte de poids involontaire. Même dérive sur
+    /// `stressLevel`, `wakeFeeling`, `waterIntake`, `alcohol`, `dietType`,
+    /// `skinType`, `symptoms`, `medications` et `digestiveConditions` : les
+    /// moteurs ne reconnaissaient pas la valeur et retombaient sur 0.
+    /// Corrigé le 2 août 2026, verrouillé par `EditProfileParityTests`.
+    private func options(_ questionId: String) -> [(String, String)] {
+        QuestionnaireSection.optionPairs(id: questionId)
+    }
+
     /// Options : mirror exact des select/picker du questionnaire pour
     /// que les scores health.js calculent identiquement.
     private func fieldsForSection(_ section: EditSection) -> [EditableField] {
@@ -618,54 +634,33 @@ struct EditProfileView: View {
             return [
                 EditableField(id: "firstName", label: "Prénom", emoji: "👤", kind: .text(placeholder: "Ton prénom")),
                 EditableField(id: "age", label: "Âge", emoji: "🎂", kind: .number(unit: "ans", min: 10, max: 110)),
-                EditableField(id: "gender", label: "Genre", emoji: "⚧", kind: .pickerSingle(options: [
-                    ("homme", "Homme"), ("femme", "Femme"),
-                ])),
+                EditableField(id: "gender", label: "Genre", emoji: "⚧", kind: .pickerSingle(options: options("gender"))),
                 EditableField(id: "height", label: "Taille", emoji: "📏", kind: .number(unit: "cm", min: 120, max: 230)),
                 EditableField(id: "weight", label: "Poids", emoji: "⚖️", kind: .number(unit: "kg", min: 30, max: 250)),
-                EditableField(id: "weightTrend", label: "Tendance poids", emoji: "📈", kind: .pickerSingle(options: [
-                    ("stable", "Stable"), ("gain", "Prise"), ("loss", "Perte"), ("unintentional_loss", "Perte non-voulue"),
-                ])),
+                EditableField(id: "weightTrend", label: "Tendance poids", emoji: "📈", kind: .pickerSingle(options: options("weightTrend"))),
             ]
         case .modeDeVie:
             return [
-                EditableField(id: "indoorWork", label: "Travail à l'intérieur", emoji: "🏢", kind: .pickerSingle(options: [
-                    ("yes", "Oui"), ("no", "Non"),
-                ])),
-                EditableField(id: "sunExposure", label: "Exposition soleil", emoji: "☀️", kind: .pickerSingle(options: [
-                    ("none", "Aucune"), ("very_little", "Très peu"), ("some", "Un peu"), ("moderate", "Modérée"), ("plenty", "Beaucoup"),
-                ])),
-                EditableField(id: "skinType", label: "Type de peau", emoji: "🖐️", kind: .pickerSingle(options: [
-                    ("very_fair", "Très claire"), ("fair", "Claire"), ("medium", "Mate"), ("dark", "Foncée"), ("very_dark", "Très foncée"),
-                ])),
-                EditableField(id: "strengthTraining", label: "Activité physique", emoji: "🏋️", kind: .pickerSingle(options: [
-                    ("none", "Aucune"), ("light", "Légère"), ("moderate", "Modérée"), ("regular", "Régulière"), ("intense", "Intense"),
-                ])),
+                EditableField(id: "indoorWork", label: "Travail à l'intérieur", emoji: "🏢", kind: .pickerSingle(options: options("indoorWork"))),
+                EditableField(id: "sunExposure", label: "Exposition soleil", emoji: "☀️", kind: .pickerSingle(options: options("sunExposure"))),
+                EditableField(id: "skinType", label: "Type de peau", emoji: "🖐️", kind: .pickerSingle(options: options("skinType"))),
+                EditableField(id: "strengthTraining", label: "Activité physique", emoji: "🏋️", kind: .pickerSingle(options: options("strengthTraining"))),
             ]
         case .sante:
             return [
-                EditableField(id: "stressLevel", label: "Niveau de stress", emoji: "🧘", kind: .pickerSingle(options: [
-                    ("low", "Faible"), ("moderate", "Modéré"), ("high", "Élevé"), ("very_high", "Très élevé"),
-                ])),
-                EditableField(id: "sleepHours", label: "Heures de sommeil", emoji: "😴", kind: .number(unit: "h", min: 3, max: 12)),
-                EditableField(id: "wakeFeeling", label: "Réveil", emoji: "🌅", kind: .pickerSingle(options: [
-                    ("rested", "Reposé"), ("ok", "Correct"), ("tired", "Fatigué"), ("exhausted", "Épuisé"),
-                ])),
-                EditableField(id: "caffeineIntake", label: "Caféine", emoji: "☕", kind: .pickerSingle(options: [
-                    ("none", "Aucune"), ("light", "Légère"), ("moderate", "Modérée"), ("heavy", "Forte"),
-                ])),
-                EditableField(id: "waterIntake", label: "Eau", emoji: "💧", kind: .pickerSingle(options: [
-                    ("low", "< 1L"), ("medium", "1-2L"), ("high", "> 2L"),
-                ])),
-                EditableField(id: "alcohol", label: "Alcool", emoji: "🍷", kind: .pickerSingle(options: [
-                    ("none", "Aucun"), ("occasional", "Occasionnel"), ("weekly", "Hebdomadaire"), ("daily", "Quotidien"),
-                ])),
+                EditableField(id: "stressLevel", label: "Niveau de stress", emoji: "🧘", kind: .pickerSingle(options: options("stressLevel"))),
+                // Le sommeil est un choix, pas un nombre libre : les moteurs
+                // comparent à des paliers ("4", "5.5", "6.5"…). Saisir « 7 »
+                // ne correspondait à aucun palier et annulait le modificateur.
+                EditableField(id: "sleepHours", label: "Heures de sommeil", emoji: "😴", kind: .pickerSingle(options: options("sleepHours"))),
+                EditableField(id: "wakeFeeling", label: "Réveil", emoji: "🌅", kind: .pickerSingle(options: options("wakeFeeling"))),
+                EditableField(id: "caffeineIntake", label: "Caféine", emoji: "☕", kind: .pickerSingle(options: options("caffeineIntake"))),
+                EditableField(id: "waterIntake", label: "Eau", emoji: "💧", kind: .pickerSingle(options: options("waterIntake"))),
+                EditableField(id: "alcohol", label: "Alcool", emoji: "🍷", kind: .pickerSingle(options: options("alcohol"))),
             ]
         case .nutrition:
             return [
-                EditableField(id: "dietType", label: "Régime", emoji: "🍽️", kind: .pickerSingle(options: [
-                    ("omnivore", "Omnivore"), ("flexitarien", "Flexitarien"), ("vegetarien", "Végétarien"), ("vegan", "Vegan"), ("pescetarien", "Pescétarien"),
-                ])),
+                EditableField(id: "dietType", label: "Régime", emoji: "🍽️", kind: .pickerSingle(options: options("dietType"))),
                 EditableField(id: "vegetableServings", label: "Légumes/semaine", emoji: "🥦", kind: .number(unit: "portions", min: 0, max: 30)),
                 EditableField(id: "fruitServings", label: "Fruits/semaine", emoji: "🍎", kind: .number(unit: "portions", min: 0, max: 30)),
                 EditableField(id: "fattyFish", label: "Poisson gras/semaine", emoji: "🐟", kind: .number(unit: "portions", min: 0, max: 10)),
@@ -675,36 +670,12 @@ struct EditProfileView: View {
             ]
         case .symptomes:
             return [
-                EditableField(id: "symptoms", label: "Symptômes ressentis", emoji: "🩺", kind: .pickerMulti(options: [
-                    ("fatigue", "Fatigue"),
-                    ("brain_fog", "Brouillard mental"),
-                    ("hair_loss", "Chute de cheveux"),
-                    ("brittle_nails", "Ongles cassants"),
-                    ("muscle_cramps", "Crampes musculaires"),
-                    ("tingling", "Fourmillements"),
-                    ("dry_skin", "Peau sèche"),
-                    ("mood_low", "Humeur basse"),
-                    ("sleep_issues", "Troubles du sommeil"),
-                    ("digestive_issues", "Troubles digestifs"),
-                ])),
+                EditableField(id: "symptoms", label: "Symptômes ressentis", emoji: "🩺", kind: .pickerMulti(options: options("symptoms"))),
             ]
         case .medical:
             return [
-                EditableField(id: "medications", label: "Médicaments", emoji: "💊", kind: .pickerMulti(options: [
-                    ("ppi", "IPP / anti-acides"),
-                    ("metformin", "Metformine"),
-                    ("oral_contraceptive", "Contraception orale"),
-                    ("antibiotics_recent", "Antibiotiques récents"),
-                    ("statins", "Statines"),
-                    ("antidepressants", "Antidépresseurs"),
-                ])),
-                EditableField(id: "digestiveConditions", label: "Conditions digestives", emoji: "🫁", kind: .pickerMulti(options: [
-                    ("celiac", "Maladie cœliaque"),
-                    ("crohns", "Crohn / MICI"),
-                    ("ibs", "Côlon irritable"),
-                    ("acid_reflux", "Reflux acide"),
-                    ("sibo", "SIBO"),
-                ])),
+                EditableField(id: "medications", label: "Médicaments", emoji: "💊", kind: .pickerMulti(options: options("medications"))),
+                EditableField(id: "digestiveConditions", label: "Conditions digestives", emoji: "🫁", kind: .pickerMulti(options: options("digestiveConditions"))),
             ]
         }
     }

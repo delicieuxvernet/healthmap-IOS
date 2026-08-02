@@ -86,11 +86,21 @@ enum NutrientEngine {
         score += ["none": 2, "light": 0, "moderate": -2, "heavy": -5][p.caffeineIntake] ?? 0
         score += ["none": 3, "short": 1, "moderate": -1, "long": -3, "very_long": -5][p.screenBeforeBed] ?? 0
 
-        let sd = p.sleepHoursDouble
-        if sd >= 7 && sd <= 9 { score += 5 } else if sd >= 6 { score += 2 } else if sd > 0 && sd < 6 { score -= 5 }
+        // `sleepDuration` (clé v6) n'est scorée QUE si `sleepHours` est vide,
+        // sinon le sommeil compte deux fois : la table ci-dessus donne déjà
+        // +5 pour « 7.5 », et ce bonus en rajoutait 5. Pire, `sleepHoursDouble`
+        // vaut 7 par défaut, donc un sommeil NON renseigné offrait +5 gratuits.
+        // Garde identique à HealthCalculator (mirror health.js:148-154).
+        if p.sleepHours.isEmpty {
+            let sd = p.sleepHoursDouble
+            if sd >= 7 && sd <= 9 { score += 5 } else if sd >= 6 { score += 2 } else if sd > 0 && sd < 6 { score -= 5 }
+        }
 
         score += ["never": 5, "rarely": 2, "sometimes": 0, "often": -5, "daily": -8][p.ultraProcessedFrequency] ?? 0
-        score += ["one": -5, "two": -2, "three": 3, "four_plus": 2, "irregular": -4][p.mealFrequency] ?? 0
+        // Même garde : `mealFrequency` est la clé v6 de `mealsPerDay`.
+        if p.mealsPerDay.isEmpty {
+            score += ["one": -5, "two": -2, "three": 3, "four_plus": 2, "irregular": -4][p.mealFrequency] ?? 0
+        }
 
         // Diversité alimentaire — dérivée du caddie (8 groupes)
         let diversity = diversityGroupCount(p)
@@ -246,7 +256,12 @@ enum NutrientEngine {
         if p.bloating == "yes" { scores["zinc", default: 70] -= 3 }
 
         // ═══════ IODINE ═══════ (sel iodé = question conservée)
-        if p.iodizedSalt == "no" || p.iodizedSalt.isEmpty {
+        // Non renseigné = neutre, PAS une pénalité : `iodizedSalt` est une
+        // question du parcours Complet, jamais posée en Express. La traiter
+        // comme « no » retirait 12 points d'iode à tout utilisateur Express
+        // pour une question qu'il n'a jamais vue. Correctif du 2026-07-05
+        // appliqué à HealthCalculator, jamais répercuté ici jusqu'au 2 août.
+        if p.iodizedSalt == "no" {
             scores["iodine", default: 70] -= 12
         } else if p.iodizedSalt == "yes" && p.saltLevel == "none" {
             scores["iodine", default: 70] -= 8
