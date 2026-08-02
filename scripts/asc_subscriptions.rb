@@ -695,6 +695,63 @@ if MODE == "attach-video"
   exit 0
 end
 
+# ── MODE trim-monthly : retire le Mensuel du brouillon de soumission ────────
+# Le paywall (Annuel + shortPlan hebdo) n'affiche JAMAIS le Mensuel : un abo
+# soumis mais introuvable dans l'app = refus 2.1(b). Le GET simple des items ne
+# révèle pas leurs relations ; on sonde donc les liens de relation un par un
+# (/relationships/<nom>) pour identifier l'item du Mensuel, puis on le DELETE.
+if MODE == "trim-monthly"
+  target_pid = ENV["TRIM_PRODUCT"].to_s.empty? ? "healthmap_monthly" : ENV["TRIM_PRODUCT"]
+
+  # id ASC de l'abonnement visé
+  target_sub_id = nil
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      target_sub_id = s["id"] if s.dig("attributes", "productId") == target_pid
+    end
+  end
+  abort_with("subscriptions", 0, "#{target_pid} introuvable") unless target_sub_id
+  puts "Abonnement visé : #{target_pid} → #{target_sub_id}"
+
+  staged = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+    .select { |s| s.dig("attributes", "state") == "READY_FOR_REVIEW" }
+    .map { |s| [s, get_all("/v1/reviewSubmissions/#{s["id"]}/items?limit=50")] }
+    .find { |_, items| items.size.positive? }
+  abort_with("reviewSubmissions", 0, "aucun brouillon avec items") unless staged
+  submission, items = staged
+  puts "Brouillon #{submission["id"]} : #{items.size} élément(s)"
+
+  rel_names = %w[subscription subscriptionGroup appStoreVersion appEvent
+                 appCustomProductPageVersion appStoreVersionExperiment]
+  target_item = nil
+  items.each do |item|
+    found = nil
+    rel_names.each do |rel|
+      code, body = req(:get, "/v1/reviewSubmissionItems/#{item["id"]}/relationships/#{rel}")
+      next unless code == 200 && body["data"]
+      found = { rel: rel, type: body.dig("data", "type"), id: body.dig("data", "id") }
+      break
+    end
+    label = found ? "#{found[:rel]}=#{found[:type]}/#{found[:id]}" : "relation non résolue"
+    puts "  · item #{item["id"]} → #{label}"
+    target_item = item if found && found[:id] == target_sub_id
+  end
+
+  unless target_item
+    puts "\n⛔ Item du #{target_pid} NON identifié — rien supprimé. Retrait à faire dans l'UI ASC."
+    exit 1
+  end
+
+  ok, = write("suppression de l'item #{target_pid} du brouillon", :delete,
+    "/v1/reviewSubmissionItems/#{target_item["id"]}", nil)
+  exit 1 unless ok
+
+  rest = get_all("/v1/reviewSubmissions/#{submission["id"]}/items?limit=50")
+  puts "\n===== BROUILLON APRÈS RETRAIT ====="
+  puts "#{rest.size} élément(s) restant(s) (attendu : version + groupe + hebdo + annuel = 4)"
+  exit rest.size == 4 ? 0 : 1
+end
+
 # ── MODE offers : codes promo (NAIA = 3 mois offerts / mensuel, LANCEMENT50 = -50% 1re année / annuel) ──
 if MODE == "offers"
   groups = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
