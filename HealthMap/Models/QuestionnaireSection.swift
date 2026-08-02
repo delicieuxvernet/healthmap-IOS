@@ -44,13 +44,39 @@ enum QuestionnaireSection: Int, CaseIterable, Identifiable {
         }
     }
 
-    /// Express pathway keys (21 questions)
+    /// Toutes les questions, toutes sections confondues.
+    static var allQuestions: [Question] { allCases.flatMap(\.questions) }
+
+    /// La question qui alimente ce champ de profil, s'il en existe une.
+    static func question(id: String) -> Question? {
+        allQuestions.first { $0.id == id }
+    }
+
+    /// Les options d'une question, au format `(valeur, libellé)`.
+    ///
+    /// C'est LA source de vérité des valeurs stockées : les moteurs de calcul
+    /// (`HealthCalculator`, `NutrientEngine`, `RedFlagDetector`, `TeaserEngine`)
+    /// comparent à ces chaînes exactes. Tout écran qui laisse modifier un champ
+    /// de profil doit lire cette liste plutôt que recopier la sienne — une
+    /// liste recopiée finit par diverger, et le moteur retombe alors
+    /// silencieusement sur sa valeur par défaut.
+    static func optionPairs(id: String) -> [(String, String)] {
+        question(id: id)?.options?.map { ($0.id, $0.label) } ?? []
+    }
+
+    /// Clés du parcours Express — 24 questions. (Le commentaire annonçait 21,
+    /// un décompte jamais remis à jour ; le chiffre n'est pas affiché à
+    /// l'utilisateur, `expressCount` ci-dessous évite qu'il redevienne faux.)
     static let expressKeys: Set<String> = [
         "symptoms", "goals", "firstName", "age", "gender", "height", "weight", "weightTrend",
         "indoorWork", "sunExposure", "strengthTraining", "skinType",
         "stressLevel", "sleepHours", "wakeFeeling", "screenBeforeBed", "caffeineIntake", "waterIntake", "smoking", "alcohol", "bloating",
         "dietType", "groceries", "antibiotics",
     ]
+
+    /// Nombre de questions du parcours Express, calculé et non recopié.
+    /// À utiliser partout où le chiffre est annoncé.
+    static var expressCount: Int { expressKeys.count }
 }
 
 // MARK: - Question Model
@@ -129,6 +155,12 @@ extension QuestionnaireSection {
                 .init("low_mood", "Baisse de moral", emoji: "😔"),
                 .init("low_motivation", "Manque de motivation", emoji: "🪫"),
                 .init("skin_breakouts", "Poussees d'acne", emoji: "😬"),
+                // Manquait cote iOS alors que RedFlagDetector le teste depuis
+                // toujours : l'alerte la plus urgente de l'app (urgency
+                // .immediate) ne pouvait donc JAMAIS se declencher. Present
+                // cote web (Home.jsx), retabli ici le 2 aout 2026 au nom de la
+                // parite avec health.js.
+                .init("digestive_bleeding", "Selles noires ou sang dans les selles", emoji: "🩸"),
             ]
         ),
         Question(
