@@ -92,7 +92,10 @@ enum NutrientEngine {
         // vaut 7 par défaut, donc un sommeil NON renseigné offrait +5 gratuits.
         // Garde identique à HealthCalculator (mirror health.js:148-154).
         if p.sleepHours.isEmpty {
-            let sd = p.sleepHoursDouble
+            // `Double(sleepDuration) ?? 0` et NON `sleepHoursDouble`, qui
+            // retourne 7 par défaut : un sommeil jamais déclaré décrochait
+            // alors le bonus « 7 à 9 h » sans que l'utilisateur ait rien dit.
+            let sd = Double(p.sleepDuration) ?? 0
             if sd >= 7 && sd <= 9 { score += 5 } else if sd >= 6 { score += 2 } else if sd > 0 && sd < 6 { score -= 5 }
         }
 
