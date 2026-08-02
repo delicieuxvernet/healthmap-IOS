@@ -16,13 +16,13 @@ import Supabase
 /// isolées — et les tests peuvent les appeler directement.
 enum VoiceTranscript {
     /// Longueur maximale acceptée par l'edge function EN LIGNE — ~3 minutes de
-    /// parole. Aligné sur `MAX_TRANSCRIPT_CHARS` de `parse-meal-voice`, déployée
-    /// en v6 le 29 juil. 2026 : au-delà, le serveur tronque au lieu de répondre
-    /// 400 (l'ancienne limite de 1 200 caractères, ~1 min, était la cause n°1
-    /// des échecs signalés sur les dictées longues).
-    ///
-    /// On coupe quand même côté client : c'est ce qui garantit qu'une coupure se
-    /// fait sur un mot entier, et non au milieu d'« omelette ».
+    /// parole. Aligné sur `MAX_TRANSCRIPT_CHARS = 4000` de `parse-meal-voice`
+    /// (relevé de 1200 à 4000 le 2 août 2026 ; avant, toute dictée > ~1 min
+    /// recevait un 400 sec et échouait en boucle). Le serveur ne tronque PAS :
+    /// au-delà de sa borne il répond 400. C'est donc la coupe client ci-dessous
+    /// qui garantit qu'on ne dépasse jamais — et qu'une coupure tombe sur un
+    /// mot entier, pas au milieu d'« omelette ».
+    /// ⚠️ Les deux bornes doivent rester égales : changer l'une = changer l'autre.
     static let maxChars = 4000
 
     /// Coupe sur une frontière de mot — couper en plein milieu d'« omelette »
@@ -55,10 +55,15 @@ final class VoiceMealService {
         let totaux: Totaux
         let complet: Bool
         let nonAlimentaire: Bool
+        /// Nombre d'aliments extraits AU-DELÀ du plafond serveur (25) et donc
+        /// non analysés. `nil` sur les anciennes versions de la fonction.
+        /// > 0 : l'UI doit le dire, sinon la coupe est silencieuse.
+        let alimentsIgnores: Int?
 
         enum CodingKeys: String, CodingKey {
             case transcript, repas, aliments, totaux, complet
             case nonAlimentaire = "non_alimentaire"
+            case alimentsIgnores = "aliments_ignores"
         }
     }
 

@@ -39,6 +39,9 @@ struct VoiceMealSheet: View {
     @State private var slot: MealJournalService.MealSlot = .lunch
     @State private var errorMessage: String?
     @State private var isSaving = false
+    /// Aliments extraits au-delà du plafond serveur, donc non analysés.
+    /// La coupe ne doit JAMAIS être silencieuse (règle du 2 août 2026).
+    @State private var alimentsIgnoresServeur = 0
 
     /// Geste « maintenir pour parler » (choix produit du 27 juillet, façon
     /// Instagram / Snapchat) : l'enregistrement ne démarre PLUS tout seul à
@@ -286,6 +289,16 @@ struct VoiceMealSheet: View {
                     )
                 }
 
+                if alimentsIgnoresServeur > 0 {
+                    bandeau(
+                        alimentsIgnoresServeur == 1
+                        ? "Ta dictée était très riche : 1 aliment n'a pas pu être analysé. Redicte-le dans un second repas."
+                        : "Ta dictée était très riche : \(alimentsIgnoresServeur) aliments n'ont pas pu être analysés. Redicte-les dans un second repas.",
+                        couleur: Kiwio.ambre,
+                        fond: Kiwio.ambreFond
+                    )
+                }
+
                 totalBlock
                 ctaBlock
             }
@@ -507,6 +520,7 @@ struct VoiceMealSheet: View {
                 item.grammes.map { (item.index, $0) }
             })
             slot = VoiceMealService.slot(fromServeur: analysis.repas)
+            alimentsIgnoresServeur = analysis.alimentsIgnores ?? 0
             phase = .results
             // On ouvre d'emblée la première question à laquelle il faut répondre.
             deployee = prochainManquant()
@@ -587,6 +601,16 @@ struct VoiceMealSheet: View {
 
         do {
             try await journal.insertFoods(userId: userId, entries: entries, slot: slot)
+
+            // Parité avec le scan photo (MealScanViewModel) : un repas dicté est
+            // un repas comme un autre. Avant le 2 août 2026, la voix ne postait
+            // ni notification (Dashboard/Suivi/Plan figés jusqu'au prochain
+            // onAppear) ni gamification/analytics (la récolte ignorait la dictée).
+            GamificationService.shared.recordCheckin()
+            AnalyticsService.shared.track(.mealScanned)
+            GamificationService.shared.unlockMealScanned()
+            NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
+
             onAdded(entries.count, totaux.kcal)
             dismiss()
         } catch {

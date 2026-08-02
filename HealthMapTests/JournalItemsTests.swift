@@ -166,10 +166,12 @@ final class JournalItemsTests: XCTestCase {
         // item doit laisser 80, pas 100 − 80 = 20).
         let it = { S.FoodEntry(name: "X", macros: .init(),
                                micros: [S.MicroPct(id: "vitD", pctRDA: 80)]) }
+        // vitD : RDA canonique = 1000 UI (miroir Edge ciqual.ts, corrigé le
+        // 2 août 2026 — l'ancienne valeur 15 µg divisait l'amount par ~66).
         let both = S.aggregatesFromItems([it(), it()])
-        XCTAssertEqual(both.micros, [S.MicroPct(id: "vitD", pctRDA: 100, amount: 15, unit: "")])
+        XCTAssertEqual(both.micros, [S.MicroPct(id: "vitD", pctRDA: 100, amount: 1000, unit: "")])
         let one = S.aggregatesFromItems([it()])
-        XCTAssertEqual(one.micros, [S.MicroPct(id: "vitD", pctRDA: 80, amount: 12, unit: "")])
+        XCTAssertEqual(one.micros, [S.MicroPct(id: "vitD", pctRDA: 80, amount: 800, unit: "")])
     }
 
     func testAggregatesFromItems_orderZerosAndUnknownIds() {

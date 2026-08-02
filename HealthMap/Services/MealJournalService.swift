@@ -472,11 +472,13 @@ final class MealJournalService {
 
     // MARK: - Édition par aliment (suppression d'un item)
 
-    /// RDA canoniques — MIROIR EXACT de la table `RDA` de l'Edge
-    /// `analyze-meal-photo/index.ts` (sert à dériver `amount` depuis le
+    /// RDA canoniques — MIROIR EXACT de `NUTRIENTS_RDA` de l'Edge
+    /// `analyze-meal-photo/ciqual.ts` (sert à dériver `amount` depuis le
     /// pctRDA). Ne JAMAIS modifier sans changer l'Edge en même temps.
+    /// ⚠️ vitD est en UI (1000), PAS en µg : l'ancienne valeur 15 (µg)
+    /// divisait par ~66 l'amount vitD à chaque édition d'un repas (2 août 2026).
     static let canonRDA: [String: Double] = [
-        "vitD": 15, "vitB12": 2.4, "iron": 18, "magnesium": 400, "omega3": 1.6,
+        "vitD": 1000, "vitB12": 2.4, "iron": 18, "magnesium": 400, "omega3": 1.6,
         "vitC": 90, "calcium": 1000, "zinc": 11, "iodine": 150, "fiber": 30,
     ]
 
