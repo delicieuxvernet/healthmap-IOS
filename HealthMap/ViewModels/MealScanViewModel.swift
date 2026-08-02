@@ -262,6 +262,11 @@ final class MealScanViewModel: ObservableObject {
     private struct MealAnalyzeRequest: Encodable {
         let image: String
         let deficiencies: [String]
+        /// Scores NAR déterministes (HealthCalculator) : SOURCE de la
+        /// personnalisation serveur (couverture, besoins, manques, perfect_mix).
+        /// Sans eux le serveur retombe sur `ai_analysis.scores`, qui peut
+        /// manquer, et le scan devient impersonnel en silence (2 août 2026).
+        let scores: [String: Int]
         /// "ios" -> active le quota journalier selon le tier côté serveur.
         let client: String
         /// "v2" -> opt-in contrat v2 : la fonction (version 10+) ajoute le
@@ -339,14 +344,16 @@ final class MealScanViewModel: ObservableObject {
             // 2. Base64 encode (no "data:" prefix)
             let base64String = compressedData.base64EncodedString()
 
-            // 3. Gather user deficiencies from DashboardViewModel if available
-            // We pass nutrient IDs of current deficiencies so the AI can personalise advice
-            let userDeficiencies = await resolveUserDeficiencies()
+            // 3. Scores NAR locaux (déterministes) : le serveur personnalise
+            // tout le scan avec. Les deficiencies en sont dérivées (< 60).
+            let userScores = await resolveUserScores()
+            let userDeficiencies = userScores.filter { $0.value < 60 }.map { $0.key }
 
             // 4. Call Edge Function with 130s timeout
             let requestBody = MealAnalyzeRequest(
                 image: base64String,
                 deficiencies: userDeficiencies,
+                scores: userScores,
                 client: "ios",
                 contract: "v2"
             )
@@ -590,26 +597,26 @@ final class MealScanViewModel: ObservableObject {
         }
     }
 
-    /// Resolve user deficiencies by recomputing local nutrient scores from the saved profile.
-    /// Returns nutrient IDs with score < 60 (matches web deficiency threshold). If unavailable,
-    /// returns [] and the Edge Function still works without personalised deficiency context.
-    private func resolveUserDeficiencies() async -> [String] {
+    /// Scores NAR déterministes recalculés depuis le profil sauvegardé.
+    /// Envoyés ENTIERS au serveur (personnalisation du scan) ; les deficiencies
+    /// en sont dérivées côté appelant (< 60, même seuil que le serveur).
+    /// Si indisponibles : [:] — l'Edge Function retombe sur ai_analysis.scores.
+    private func resolveUserScores() async -> [String: Int] {
         do {
-            guard let session = await AuthService.shared.currentSession else { return [] }
+            guard let session = await AuthService.shared.currentSession else { return [:] }
             let userId = session.user.id.uuidString
             guard let profileRow = try await DatabaseService.shared.loadProfile(userId: userId),
                   let questionnaire = profileRow.questionnaireData,
                   questionnaire.completed else {
-                return []
+                return [:]
             }
-            // Deterministic local scores (no network). Filter the ones below the deficiency threshold.
-            let scores = HealthCalculator.analyzeNutrientScores(profile: questionnaire)
-            return scores.filter { $0.value < 60 }.map { $0.key }
+            // Deterministic local scores (no network).
+            return HealthCalculator.analyzeNutrientScores(profile: questionnaire)
         } catch {
-            // Best-effort: if we can't compute deficiencies, proceed without them
-            AppLogger.database.warning("Could not load deficiencies: \(error.localizedDescription, privacy: .public)")
+            // Best-effort: if we can't compute scores, proceed without them
+            AppLogger.database.warning("Could not load scores: \(error.localizedDescription, privacy: .public)")
         }
-        return []
+        return [:]
     }
 
     // MARK: - Reset

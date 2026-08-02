@@ -148,18 +148,12 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             return nil
         }
 
-        // 5. Cache to Supabase (non-blocking)
-        var toCache = analysis
-        if toCache.meta == nil { toCache.meta = AnalysisMeta() }
-        toCache.meta?.profileHash = currentHash
-        toCache.meta?.schemaVersion = schemaVersion
-        Task {
-            do {
-                try await DatabaseService.shared.saveAIAnalysis(userId: userId, analysis: toCache)
-            } catch {
-                AppLogger.database.notice("AI analysis cache save failed: \(error.localizedDescription, privacy: .public)")
-            }
-        }
+        // 5. PAS de re-sauvegarde côté client. L'Edge Function persiste déjà
+        // `ai_analysis` (avec `meta.profile_hash` ET le champ `scores` qu'elle
+        // y ajoute). `AIAnalysisResponse` ne décode pas `scores` : ré-écrire la
+        // colonne ici EFFAÇAIT ce champ, et le scan photo perdait toute sa
+        // personnalisation en silence (couverture, besoins, manques vides).
+        // Incident compris le 2 août 2026, ne jamais réintroduire cet UPDATE.
 
         // 6. Merge with canonical
         return mergeWithCanonical(aiData: analysis, localScores: localScores, healthScore: healthScore, redFlags: redFlags)
@@ -311,20 +305,13 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             throw AIAnalysisError.invalidResponse
         }
 
-        // 3. Cache DB non bloquant — clé distincte du v7 (ai_analysis_v2).
-        // Si la colonne n'existe pas encore côté DB, l'échec est loggé en
-        // notice et n'affecte pas le retour.
+        // 3. PAS de re-sauvegarde côté client (même règle que le v7). L'Edge
+        // persiste déjà `ai_analysis_v2` avec `meta.profile_hash`. Ré-écrire la
+        // colonne ici EFFAÇAIT les arbitrages Q2 que validate-hypotheses y
+        // merge par nutriment (collision documentée le 2 août 2026).
         var toCache = analysis
         if toCache.meta == nil { toCache.meta = MetaV2() }
         toCache.meta?.profileHash = profileHash
-        Task {
-            do {
-                try await DatabaseService.shared.saveAIAnalysisV2(userId: userId, analysis: toCache)
-            } catch {
-                AppLogger.database.notice("Bilan v2 cache save failed: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-
         return toCache
     }
 
