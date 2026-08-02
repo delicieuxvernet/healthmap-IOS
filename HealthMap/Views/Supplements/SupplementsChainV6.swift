@@ -1,20 +1,24 @@
 import SwiftUI
 
-// MARK: - Compléments « v6 » — la chaîne apport → recommandation
+// MARK: - Compléments « v7 » — une carte repliée répond, le détail attend le tap
 //
-// Refonte de l'onglet Compléments (maquette « Complements - liens autonome »).
-// Le problème réglé : l'ancienne page était plate — aucun lien visible entre le
-// bilan et le complément, et l'acte d'achat était mis en avant alors qu'on ne
-// gagne rien dessus.
+// Évolution du « v6 » (chaînes toutes dépliées) : la page cumulait ~35 blocs
+// d'information et 7 cartes colorées avant le premier scroll. Personne n'avait
+// rien demandé encore. Règle « v7 » : divulgation progressive.
 //
 // HIÉRARCHIE IMPOSÉE, dans cet ordre — c'est la règle qui arbitre tout :
-//   1. le nutriment concerné (nom + statut + %) — SEULE zone colorée ;
-//   2. le pourquoi / le comment — carte bleue, l'élément le plus visible ;
-//   3. les précautions / interactions — carte ambre, juste après ;
+//   1. la carte REPLIÉE répond à « qu'est-ce que je prends ? » :
+//      nutriment + statut + produit, dose, moment + prix. Rien d'autre.
+//   2. le tap déplie : le pourquoi (carte bleue) puis les précautions (ambre).
+//      UNE seule carte ouverte à la fois ; la première s'ouvre seule au premier
+//      affichage, sinon personne ne découvre que ça s'ouvre.
+//   3. la synthèse « En un coup d'œil » (gélules / assiette / total mensuel)
+//      ouvre la page : elle répond en 2 secondes avant toute lecture.
 //   (hors hiérarchie) l'ajout au panier — ligne texte discrète, jamais un bouton.
 //
-// Les connecteurs (rail pointillé, flèche) sont GRIS : ils portent le lien, pas
-// une alerte. Seule la pastille du nutriment et son pill de statut sont colorés.
+// La couleur reste rare : page repliée = pastilles nutriment + pills de statut,
+// et c'est tout. Le rail pointillé du v6 a disparu : la ligne de tête de la
+// carte repliée porte déjà le lien bilan → recommandation.
 
 // MARK: - Voie choisie (un seul sélecteur, figé, pilote toute la page)
 enum ComplementsVoie: String, CaseIterable, Identifiable {
@@ -52,11 +56,6 @@ enum ComplementsChainPalette {
     static let careStroke = Color(hex: "FF9500").opacity(0.30)
     static let careAccent = Color(hex: "FF9500")
     static let careInk = Color(hex: "8A4B00")
-
-    /// Connecteurs volontairement neutres (le lien n'est pas une alerte).
-    static let rail = Color.kiwiCharcoal.opacity(0.18)
-    static let arrowBg = Color(hex: "F4F1EA")
-    static let arrowInk = Color(hex: "9CA3AF")
 }
 
 // MARK: - Explication (alimente le bottom sheet)
@@ -122,8 +121,10 @@ struct ComplementChain: Identifiable {
     }
 }
 
-// MARK: - Bloc d'engagement (transparence) — volontairement gros et visible
-/// Argument de confiance : à ne pas réduire à une petite ligne grise.
+// MARK: - Bloc d'engagement (transparence) — gros à la PREMIÈRE visite seulement
+/// Argument de confiance : il mérite un vrai bloc la première fois qu'on ouvre
+/// l'onglet. Ensuite il a été lu, et il coûtait un écran à chaque visite : les
+/// visites suivantes affichent `ComplementsEngagementLine` en pied de page.
 struct ComplementsEngagementCard: View {
     var body: some View {
         HStack(spacing: 13) {
@@ -157,6 +158,28 @@ struct ComplementsEngagementCard: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color.kiwiGreenSoft)
         )
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Engagement, version pied de page (visites suivantes)
+/// La même promesse que `ComplementsEngagementCard`, une fois qu'elle a été lue :
+/// une ligne posée à côté du disclaimer, plus un bloc en tête de page.
+struct ComplementsEngagementLine: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.kiwiGreenInk)
+                .padding(.top, 1)
+                .accessibilityHidden(true)
+            Text("Kiwio ne gagne rien sur ces compléments. Aucune marque partenaire, aucune commission.")
+                .font(.system(size: 11.5, weight: .medium))
+                .lineSpacing(2)
+                .foregroundStyle(Color.healthMapSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 }
@@ -412,101 +435,97 @@ struct ChainCartLine: View {
     }
 }
 
-// MARK: - Le bloc « chaîne » : source colorée → rail → flèche → carte blanche
-struct ChainRow<Content: View>: View {
+// MARK: - La carte repliable : la ligne de tête répond, le tap déplie
+/// La ligne de tête est la réponse à « qu'est-ce que je prends ? » : nutriment
+/// + statut, produit / dose / moment, prix. Le contenu `detail` (pourquoi,
+/// précautions, panier) n'existe à l'écran que si la carte est ouverte.
+struct ChainCollapsibleCard<Detail: View>: View {
     let chain: ComplementChain
-    @ViewBuilder let card: () -> Content
+    /// « Bisglycinate · 14 mg, le soir au dîner » — ou pourquoi pas de gélule.
+    let sousTitre: String
+    let prixLabel: String
+    let isOpen: Bool
+    let onToggle: () -> Void
+    @ViewBuilder let detail: () -> Detail
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            // 1. LA SOURCE — l'apport détecté au bilan, seule zone colorée.
-            HStack(spacing: 9) {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(chain.tint.opacity(0.12))
-                    .frame(width: 32, height: 32)
-                    .overlay(
-                        Image(systemName: chain.symbol)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(chain.tint)
-                    )
-                    .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: onToggle) {
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(chain.tint.opacity(0.12))
+                        .frame(width: 34, height: 34)
+                        .overlay(
+                            Image(systemName: chain.symbol)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(chain.tint)
+                        )
+                        .accessibilityHidden(true)
 
-                Text(chain.nom)
-                    .font(.system(size: 13.5, weight: .heavy))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                    .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 7) {
+                            Text(chain.nom)
+                                .font(.system(size: 13.5, weight: .heavy))
+                                .foregroundStyle(Color.kiwiCharcoal)
+                                .lineLimit(1)
 
-                Text(chain.statutLabel)
-                    .font(.system(size: 10, weight: .heavy))
-                    .foregroundStyle(chain.statut.inkColor)
-                    // Jamais sur deux lignes, mais jamais rigide non plus : un
-                    // `fixedSize` ici pouvait pousser la ligne au-delà de la
-                    // largeur de l'écran et déclencher le rebond horizontal.
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                    .layoutPriority(1)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule().fill(chain.statut.color.opacity(0.14))
-                    )
+                            Text(chain.statutLabel)
+                                .font(.system(size: 10, weight: .heavy))
+                                .foregroundStyle(chain.statut.inkColor)
+                                // Jamais sur deux lignes, mais jamais rigide non
+                                // plus : un `fixedSize` ici pouvait pousser la
+                                // ligne hors écran (rebond horizontal).
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                                .layoutPriority(1)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule().fill(chain.statut.color.opacity(0.14))
+                                )
 
-                Spacer(minLength: 0)
-            }
-            .accessibilityElement(children: .combine)
+                            Spacer(minLength: 0)
+                        }
 
-            // 2. LE LIEN VISUEL — rail pointillé neutre + flèche à la jonction.
-            HStack(alignment: .top, spacing: 8) {
-                ChainRail()
-                    .frame(width: 32)
-                    .accessibilityHidden(true)
-
-                card()
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 13)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .kiwiCard(radius: 16)
-                    .overlay(alignment: .topLeading) {
-                        ChainArrow()
-                            .offset(x: -13, y: 16)
-                            .accessibilityHidden(true)
+                        Text(sousTitre)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .lineSpacing(2)
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text(prixLabel)
+                        .font(.system(size: 12, weight: .bold).monospacedDigit())
+                        .foregroundStyle(Color.healthMapMuted)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.healthMapMuted)
+                        .rotationEffect(.degrees(isOpen ? 90 : 0))
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.healthMapPressed)
+            .accessibilityLabel("\(chain.nom), \(chain.statutLabel). \(sousTitre)")
+            .accessibilityValue(isOpen ? "déplié" : "replié")
+            .accessibilityHint(isOpen ? "Replie le détail" : "Déplie le pourquoi et les précautions")
+
+            if isOpen {
+                detail()
+                    .padding(.top, 11)
             }
         }
-    }
-}
-
-/// Rail pointillé vertical, gris. Porte le lien bilan → recommandation.
-/// Tracé natif : la première version empilait 40 rectangles masqués, soit 120
-/// vues pour trois chaînes, et laissait planer un doute sur la largeur
-/// réellement demandée. Un `StrokeStyle(dash:)` fait la même chose.
-private struct ChainRail: View {
-    var body: some View {
-        GeometryReader { geo in
-            Path { chemin in
-                chemin.move(to: CGPoint(x: geo.size.width / 2, y: 0))
-                chemin.addLine(to: CGPoint(x: geo.size.width / 2, y: geo.size.height))
-            }
-            .stroke(
-                ComplementsChainPalette.rail,
-                style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [5, 4])
-            )
-        }
-    }
-}
-
-/// Flèche grise en cercle, posée sur le bord gauche de la carte.
-private struct ChainArrow: View {
-    var body: some View {
-        Circle()
-            .fill(ComplementsChainPalette.arrowBg)
-            .frame(width: 22, height: 22)
-            .overlay(Circle().stroke(Color.kiwiCharcoal.opacity(0.08), lineWidth: 1))
-            .overlay(
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(ComplementsChainPalette.arrowInk)
-            )
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .kiwiCard(radius: 16)
     }
 }
 
@@ -572,36 +591,56 @@ struct ComplementsVoieSwitch: View {
     }
 }
 
-// MARK: - Budget mensuel (mode compléments)
-struct ComplementsBudgetCard: View {
+// MARK: - Synthèse « En un coup d'œil » (mode compléments, en tête de page)
+/// Remplace l'ancienne carte budget de pied de page : la réponse en 2 secondes
+/// AVANT toute lecture — combien de gélules, combien par l'assiette, quel total
+/// mensuel. Le total suit le panier ; le sélecteur de qualité vit ici aussi.
+struct ComplementsSummaryCard: View {
     @Binding var premium: Bool
-    let count: Int
+    /// Chaînes avec un produit chiffrable.
+    let gelules: Int
+    /// Chaînes couvertes par l'assiette (sans produit).
+    let assiette: Int
     let totalLabel: String
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var countLabel: String {
-        switch count {
-        case 0: return "aucun complément"
-        case 1: return "1 complément"
-        default: return "\(count) compléments"
+        let gelulesLabel = "\(gelules) gélule\(gelules > 1 ? "s" : "")"
+        let assietteLabel = "\(assiette) par l'assiette"
+        switch (gelules, assiette) {
+        case (0, 0): return "Rien à ajouter"
+        case (0, _): return "Tout par l'assiette"
+        case (_, 0): return gelulesLabel
+        default: return "\(gelulesLabel) + \(assietteLabel)"
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "list.bullet.rectangle.portrait")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.kiwiGreenInk)
-                    .accessibilityHidden(true)
-                Text("Ton budget mensuel")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.kiwiGreenInk)
-                Spacer(minLength: 8)
-                Text(countLabel)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.healthMapMuted)
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("En un coup d'œil")
+                        .font(.system(size: 13, weight: .heavy))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    Text(countLabel)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(totalLabel)
+                        .font(.system(size: 24, weight: .heavy, design: .rounded).monospacedDigit())
+                        .tracking(-1)
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    Text("€/mois")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.healthMapMuted)
+                        .lineLimit(1)
+                }
+                .layoutPriority(1)
             }
 
             // Qualité : formes simples vs formes chélatées.
@@ -616,31 +655,15 @@ struct ComplementsBudgetCard: View {
             )
             .padding(.top, 11)
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(premium ? "Les formes que ton corps absorbe le mieux."
-                             : "Des formes plus simples, un peu moins bien absorbées.")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .lineSpacing(2)
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 8)
-
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text(totalLabel)
-                        .font(.system(size: 24, weight: .heavy, design: .rounded).monospacedDigit())
-                        .tracking(-1)
-                        .foregroundStyle(Color.kiwiCharcoal)
-                    Text("€/mois")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.healthMapMuted)
-                        .lineLimit(1)
-                }
-                .layoutPriority(1)
-            }
-            .padding(.top, 13)
+            Text(premium ? "Les formes que ton corps absorbe le mieux."
+                         : "Des formes plus simples, un peu moins bien absorbées.")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Color.healthMapMuted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
         .kiwiCard(radius: 16)
     }
