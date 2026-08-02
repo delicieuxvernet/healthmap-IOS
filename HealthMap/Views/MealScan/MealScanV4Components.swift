@@ -203,7 +203,16 @@ struct FoodTileV4: View {
                     .foregroundStyle(food.status == .neutral ? Color.healthMapSecondary : Color.kiwiCharcoal)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                badge
+                // Lot 3 — quantités réelles des 2 meilleurs apports (le % seul
+                // cachait la mesure ; la fiche détail garde le reste).
+                if let amounts = amountsLine {
+                    Text(amounts)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(Color.healthMapMuted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                if food.isUltraProcessed { ultraBadge } else { badge }
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -234,6 +243,30 @@ struct FoodTileV4: View {
                     .foregroundStyle(color)
             }
         }
+    }
+
+    /// Lot 3 : « nutriment quantité unité » pour les 2 meilleurs apports.
+    private var amountsLine: String? {
+        let riches = (food.contributions + food.topNutrients)
+            .filter { ($0.amount ?? 0) > 0 && !($0.unit ?? "").isEmpty }
+        guard !riches.isEmpty else { return nil }
+        return riches.prefix(2)
+            .map { "\($0.label) \(FoodDetailSheetV4.amountText($0.amount ?? 0)) \($0.unit ?? "")" }
+            .joined(separator: " · ")
+    }
+
+    /// Lot 3 : NOVA 4 — l'info pénalise le score, elle doit se voir. Remplace
+    /// le badge de statut (choix assumé : sur une petite tuile, l'alerte prime).
+    private var ultraBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 10, weight: .bold))
+            Text("ultra-transformé").font(.system(size: 11, weight: .bold))
+        }
+        .foregroundStyle(BilanV7.alertInk)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(BilanV7.statusFill.opacity(0.10)))
     }
 
     @ViewBuilder
@@ -514,11 +547,19 @@ struct FoodDetailSheetV4: View {
                         .foregroundStyle(Color.kiwiGreen)
                 }
             }
-            Text(food.name)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(Color.kiwiCharcoal)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(food.name)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                // Lot 3 — transparence : confiance de détection + NOVA 4.
+                if let sousTitre = transparencyLine {
+                    Text(sousTitre)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(food.isUltraProcessed ? BilanV7.alertInk : Color.healthMapMuted)
+                }
+            }
             Spacer(minLength: 0)
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
@@ -532,8 +573,30 @@ struct FoodDetailSheetV4: View {
         }
     }
 
+    /// « Reconnu à N % · ultra-transformé » — n'affiche que ce qui est présent.
+    private var transparencyLine: String? {
+        var parts: [String] = []
+        if let conf = food.confidence, conf > 0 {
+            parts.append("reconnu à \(Int((conf * 100).rounded())) %")
+        }
+        if food.isUltraProcessed { parts.append("ultra-transformé") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private func label(_ c: MealScanViewModel.FoodContribution) -> String {
-        NutrientData.definition(for: c.nutrientId)?.label ?? (c.label.isEmpty ? c.nutrientId : c.label)
+        let base = NutrientData.definition(for: c.nutrientId)?.label ?? (c.label.isEmpty ? c.nutrientId : c.label)
+        // Lot 3 : quantité réelle à côté du nom (le % seul cachait la mesure).
+        if let amount = c.amount, amount > 0, let unit = c.unit, !unit.isEmpty {
+            return "\(base) · \(Self.amountText(amount)) \(unit)"
+        }
+        return base
+    }
+
+    /// 4,2 → "4,2" ; 480 → "480" (virgule française, pas de décimale inutile).
+    static func amountText(_ v: Double) -> String {
+        v >= 100 || v == v.rounded()
+            ? String(Int(v.rounded()))
+            : String(format: "%.1f", v).replacingOccurrences(of: ".", with: ",")
     }
 
     private func gram(_ v: Double) -> String { String(format: "%.0f", v) }

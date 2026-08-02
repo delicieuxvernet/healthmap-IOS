@@ -78,6 +78,13 @@ final class MealScanViewModel: ObservableObject {
         /// nil si le serveur ne l'a pas renvoyé — l'écran scan validé reste
         /// entièrement fonctionnel sans lui.
         var scanV2: ScanV2? = nil
+        /// Score déterministe du repas (0-100, `meal_scans.meal_score`).
+        /// Calculé côté serveur (score.ts) et stocké depuis toujours — affiché
+        /// depuis le Lot 3 (2 août 2026, il ne l'était jamais).
+        var mealScore: Int? = nil
+        /// Raisons du score (`score_breakdown.reasons`), rédigées en français
+        /// par le serveur, préfixées "+N " (gain) ou "-N " (malus).
+        var scoreReasons: [String] = []
     }
 
     struct MacroNutrients {
@@ -95,6 +102,10 @@ final class MealScanViewModel: ObservableObject {
         var emoji: String
         var pctRDA: Int
         var isDeficiency: Bool
+        /// Quantité réelle (Lot 3 — transparence) : le serveur l'envoie depuis
+        /// toujours, l'UI n'affichait que des %.
+        var amount: Double? = nil
+        var unit: String? = nil
     }
 
     /// Un aliment principal détecté dans le plat + ce qu'il apporte aux besoins
@@ -109,6 +120,13 @@ final class MealScanViewModel: ObservableObject {
         /// Forces nutritionnelles réelles de l'aliment (vitamines/minéraux où il
         /// est riche, même hors besoins) — section premium du détail.
         var topNutrients: [FoodContribution]
+        /// Confiance de détection du modèle vision (0-1). Lot 3 : affichée dans
+        /// la fiche détail pour la transparence (« reconnu à N % »).
+        var confidence: Double? = nil
+        /// Classe NOVA CIQUAL (4 = ultra-transformé, pénalise le meal_score).
+        var novaClass: Int? = nil
+
+        var isUltraProcessed: Bool { (novaClass ?? 1) >= 4 }
 
         /// Système couleur validé : vert = couvre un besoin (apport ≥ 40 %),
         /// ambre = apport à renforcer (15–39 %), neutre = n'aide aucun besoin
@@ -137,6 +155,9 @@ final class MealScanViewModel: ObservableObject {
         var nutrientId: String
         var label: String
         var pctRDA: Int
+        /// Quantité réelle pour la portion vue (Lot 3 — transparence).
+        var amount: Double? = nil
+        var unit: String? = nil
     }
 
     enum FoodStatus {
@@ -191,6 +212,7 @@ final class MealScanViewModel: ObservableObject {
         let macros: EdgeMacros?
         let micros: [EdgeMicro]?
         let mealScore: Int?
+        let scoreBreakdown: EdgeScoreBreakdown?
         let perfectMix: EdgePerfectMix?
 
         enum CodingKeys: String, CodingKey {
@@ -198,8 +220,16 @@ final class MealScanViewModel: ObservableObject {
             case detectedFoods = "detected_foods"
             case macros, micros
             case mealScore = "meal_score"
+            case scoreBreakdown = "score_breakdown"
             case perfectMix = "perfect_mix"
         }
+    }
+
+    /// Décomposition du score (score.ts) — seuls `total` et `reasons` servent
+    /// à l'UI ; les autres champs de la colonne sont ignorés volontairement.
+    private struct EdgeScoreBreakdown: Decodable {
+        let total: Int?
+        let reasons: [String]?
     }
 
     private struct EdgeDetectedFood: Decodable {
@@ -207,12 +237,17 @@ final class MealScanViewModel: ObservableObject {
         let portionG: Double?
         let micros: [EdgeMicro]?
         let macros: EdgeFoodMacros?   // macros de CET aliment (kcal + prot/carbs/fat/fiber)
+        /// Confiance vision 0-1 + classe NOVA (Lot 3 — transparence).
+        let confidence: Double?
+        let novaClass: Int?
 
         enum CodingKeys: String, CodingKey {
             case nameFr = "name_fr"
             case portionG = "portion_g"
             case micros
             case macros
+            case confidence
+            case novaClass = "nova_class"
         }
     }
 
@@ -412,7 +447,9 @@ final class MealScanViewModel: ObservableObject {
                     label: def.label,
                     emoji: def.emoji,
                     pctRDA: m.pctRDA ?? 0,
-                    isDeficiency: userDeficiencies.contains(nid)
+                    isDeficiency: userDeficiencies.contains(nid),
+                    amount: m.amount,
+                    unit: m.unit
                 )
             }
 
@@ -432,7 +469,7 @@ final class MealScanViewModel: ObservableObject {
                 guard let name = f.nameFr, !name.isEmpty else { return nil }
                 let perFood: [FoodContribution] = (f.micros ?? []).compactMap { n in
                     guard let nid = n.id, !nid.isEmpty, let def = NutrientData.definition(for: nid), (n.pctRDA ?? 0) > 0 else { return nil }
-                    return FoodContribution(nutrientId: nid, label: def.label, pctRDA: n.pctRDA ?? 0)
+                    return FoodContribution(nutrientId: nid, label: def.label, pctRDA: n.pctRDA ?? 0, amount: n.amount, unit: n.unit)
                 }
                 let contributions = perFood.filter { userDeficiencies.contains($0.nutrientId) }.sorted { $0.pctRDA > $1.pctRDA }
                 let tops = perFood.filter { !userDeficiencies.contains($0.nutrientId) }.sorted { $0.pctRDA > $1.pctRDA }
@@ -443,7 +480,8 @@ final class MealScanViewModel: ObservableObject {
                     fats: f.macros?.fats ?? 0,
                     fiber: f.macros?.fiber ?? 0
                 )
-                return DetectedFood(name: name, emoji: "", contributions: contributions, macros: fm, topNutrients: tops)
+                return DetectedFood(name: name, emoji: "", contributions: contributions, macros: fm, topNutrients: tops,
+                                    confidence: f.confidence, novaClass: f.novaClass)
             }
 
             let detectedNames: [String] = (scan?.detectedFoods ?? []).compactMap { f in
@@ -459,7 +497,9 @@ final class MealScanViewModel: ObservableObject {
                 advice: advice,
                 warnings: [],
                 userNeeds: userDeficiencies,
-                scanV2: response.scanV2
+                scanV2: response.scanV2,
+                mealScore: scan?.mealScore ?? scan?.scoreBreakdown?.total,
+                scoreReasons: scan?.scoreBreakdown?.reasons ?? []
             )
 
             // 7. Record gamification checkin + analytics
