@@ -884,17 +884,24 @@ struct Waveform: View {
     /// Niveau instantané 0…1 publié par SpeechCaptureService.
     let level: Float
     let active: Bool
+    /// Nombre de barres : 44 dans la feuille vocale (pleine largeur), moins
+    /// dans la bulle de l'accueil Scan où la place est comptée.
+    let nbBarres: Int
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Historique glissant : la barre la plus à droite est l'instant présent,
     /// les autres défilent vers la gauche — d'où l'effet de « trace sonore ».
-    /// 44 barres, comme le design. Valeur littérale ici : l'initialiseur d'une
-    /// propriété stockée ne peut pas lire une constante statique du même type.
-    @State private var historique: [CGFloat] = Array(repeating: 0, count: 44)
+    @State private var historique: [CGFloat]
 
-    private static let nbBarres = 44
     private static let hauteurMin: CGFloat = 3
     private static let hauteurMax: CGFloat = 26
+
+    init(level: Float, active: Bool, nbBarres: Int = 44) {
+        self.level = level
+        self.active = active
+        self.nbBarres = nbBarres
+        _historique = State(initialValue: Array(repeating: 0, count: nbBarres))
+    }
 
     var body: some View {
         HStack(spacing: 2) {
@@ -916,7 +923,7 @@ struct Waveform: View {
             historique.append(CGFloat(max(0, min(1, nouveau))))
         }
         .onChange(of: active) { _, estActif in
-            if !estActif { historique = Array(repeating: 0, count: Self.nbBarres) }
+            if !estActif { historique = Array(repeating: 0, count: nbBarres) }
         }
         .accessibilityHidden(true)
     }
