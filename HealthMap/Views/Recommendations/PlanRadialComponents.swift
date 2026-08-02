@@ -39,13 +39,17 @@ struct PlanRadialScreen: View {
     /// Change d'identité pour rejouer l'entrée de la carte à chaque visite.
     @State private var replayToken = 0
 
+    /// Ids uniques, 6 nœuds max — l'invariant de la couronne, tenu ici quelle
+    /// que soit la source qui alimente l'écran (flux v7 ou contrat v2).
+    private var displayTopics: [PlanTopic] { topics.radialDisplayList }
+
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Ton plan")
                     .font(.system(size: 28, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.kiwiCharcoal)
-                Text(topics.isEmpty ? "Ton plan s'écrit au fil de tes bilans" : "Appuie sur ce que tu veux régler")
+                Text(displayTopics.isEmpty ? "Ton plan s'écrit au fil de tes bilans" : "Appuie sur ce que tu veux régler")
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(Color.healthMapSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -53,10 +57,10 @@ struct PlanRadialScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 22)
 
-            if topics.isEmpty {
+            if displayTopics.isEmpty {
                 emptyState
             } else {
-                PlanRadialMap(topics: topics) { topic in
+                PlanRadialMap(topics: displayTopics) { topic in
                     activeTopic = topic
                 }
                 .id(replayToken)
