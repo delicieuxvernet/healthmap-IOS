@@ -689,18 +689,18 @@ struct EditProfileView: View {
         case "gender": return p.gender == .homme ? "Homme" : "Femme"
         case "height": return p.height.isEmpty ? "-" : "\(p.height) cm"
         case "weight": return p.weight.isEmpty ? "-" : "\(p.weight) kg"
-        case "weightTrend": return p.weightTrend.isEmpty ? "-" : friendlyLabel(p.weightTrend)
+        case "weightTrend": return friendlyLabel("weightTrend", p.weightTrend)
         case "indoorWork": return p.indoorWork == "yes" ? "Oui" : (p.indoorWork == "no" ? "Non" : "-")
-        case "sunExposure": return friendlyLabel(p.sunExposure)
-        case "skinType": return friendlyLabel(p.skinType)
-        case "strengthTraining": return friendlyLabel(p.strengthTraining)
-        case "stressLevel": return friendlyLabel(p.stressLevel)
-        case "sleepHours": return p.sleepHours.isEmpty ? "-" : "\(p.sleepHours)h"
-        case "wakeFeeling": return friendlyLabel(p.wakeFeeling)
-        case "caffeineIntake": return friendlyLabel(p.caffeineIntake)
-        case "waterIntake": return friendlyLabel(p.waterIntake)
-        case "alcohol": return friendlyLabel(p.alcohol)
-        case "dietType": return friendlyLabel(p.dietType)
+        case "sunExposure": return friendlyLabel("sunExposure", p.sunExposure)
+        case "skinType": return friendlyLabel("skinType", p.skinType)
+        case "strengthTraining": return friendlyLabel("strengthTraining", p.strengthTraining)
+        case "stressLevel": return friendlyLabel("stressLevel", p.stressLevel)
+        case "sleepHours": return friendlyLabel("sleepHours", p.sleepHours)
+        case "wakeFeeling": return friendlyLabel("wakeFeeling", p.wakeFeeling)
+        case "caffeineIntake": return friendlyLabel("caffeineIntake", p.caffeineIntake)
+        case "waterIntake": return friendlyLabel("waterIntake", p.waterIntake)
+        case "alcohol": return friendlyLabel("alcohol", p.alcohol)
+        case "dietType": return friendlyLabel("dietType", p.dietType)
         case "vegetableServings": return p.vegetableServings.isEmpty ? "-" : p.vegetableServings
         case "fruitServings": return p.fruitServings.isEmpty ? "-" : p.fruitServings
         case "fattyFish": return p.fattyFish.isEmpty ? "-" : p.fattyFish
@@ -714,29 +714,14 @@ struct EditProfileView: View {
         }
     }
 
-    /// Mappe un value technique (stored) vers le label humain affiché.
-    /// Cohérent avec les options des pickers définis dans `fieldsForSection`.
-    private func friendlyLabel(_ value: String) -> String {
-        let map: [String: String] = [
-            // weightTrend
-            "stable": "Stable", "gain": "Prise", "loss": "Perte", "unintentional_loss": "Perte non-voulue",
-            // sunExposure
-            "none": "Aucune", "very_little": "Très peu", "some": "Un peu", "moderate": "Modérée", "plenty": "Beaucoup",
-            // skinType
-            "very_fair": "Très claire", "fair": "Claire", "medium": "Mate", "dark": "Foncée", "very_dark": "Très foncée",
-            // strengthTraining / stressLevel
-            "light": "Légère", "regular": "Régulière", "intense": "Intense",
-            "low": "Faible", "high": "Élevé", "very_high": "Très élevé",
-            // wakeFeeling
-            "rested": "Reposé", "ok": "Correct", "tired": "Fatigué", "exhausted": "Épuisé",
-            // caffeineIntake / waterIntake / alcohol
-            "heavy": "Forte", "medium": "1-2L", "occasional": "Occasionnel", "weekly": "Hebdomadaire", "daily": "Quotidien",
-            // dietType
-            "omnivore": "Omnivore", "flexitarien": "Flexitarien", "vegetarien": "Végétarien",
-            "vegan": "Vegan", "pescetarien": "Pescétarien",
-        ]
-        if value.isEmpty { return "-" }
-        return map[value] ?? value
+    /// Le libellé humain vient du questionnaire (même source que les options des
+    /// pickers) : une table recopiée diverge dès que les options bougent. La
+    /// précédente affichait les valeurs techniques post-A3, et son doublon de
+    /// clé « medium » faisait trapper Dictionary.init au dépliage d'une section
+    /// (crash « Modifier mon profil », présent depuis mai en Release).
+    private func friendlyLabel(_ fieldId: String, _ value: String) -> String {
+        guard !value.isEmpty else { return "-" }
+        return QuestionnaireSection.optionPairs(id: fieldId).first { $0.0 == value }?.1 ?? value
     }
 }
 

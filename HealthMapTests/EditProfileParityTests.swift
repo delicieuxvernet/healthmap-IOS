@@ -84,4 +84,28 @@ final class EditProfileParityTests: XCTestCase {
         XCTAssertEqual(QuestionnaireSection.expressCount, QuestionnaireSection.expressKeys.count)
         XCTAssertGreaterThan(QuestionnaireSection.expressCount, 0)
     }
+
+    /// Le libellé affiché dans « Modifier mon profil » vient d'`optionPairs`
+    /// (plus de table recopiée : la précédente avait une clé « medium » en
+    /// double qui faisait trapper Dictionary.init au dépliage d'une section,
+    /// et affichait des valeurs techniques brutes). Chaque option doit donc
+    /// porter un libellé humain, distinct de sa valeur technique.
+    func testChaqueOptionAUnLibelleHumain() {
+        for champ in champsEditables {
+            for (valeur, libelle) in QuestionnaireSection.optionPairs(id: champ) {
+                XCTAssertFalse(
+                    libelle.isEmpty,
+                    "L'option « \(valeur) » de « \(champ) » n'a pas de libellé : "
+                    + "l'écran d'édition afficherait une ligne vide."
+                )
+                if valeur.contains("_") {
+                    XCTAssertNotEqual(
+                        libelle, valeur,
+                        "L'option « \(valeur) » de « \(champ) » serait affichée telle "
+                        + "quelle (chaîne technique) dans « Modifier mon profil »."
+                    )
+                }
+            }
+        }
+    }
 }
