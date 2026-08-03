@@ -234,7 +234,86 @@ final class PlanRadialLayoutTests: XCTestCase {
         XCTAssertEqual(topics.map(\.id), ["s1", "s2", "s3", "o1", "o2", "o3"])
     }
 
-    // MARK: - 5. Icônes partagées avec le Bilan
+    // MARK: - 5. Vue « Apports » — invariant 3-6 et sources canoniques
+
+    /// Beaucoup d'apports faibles → plafond à 6 nœuds, les scores les plus bas
+    /// d'abord (l'ordre de priorité de la couronne).
+    func testApportTopicsCapAtSixAndSortAscending() {
+        let scores = ["vitD": 20, "vitB12": 35, "iron": 40, "magnesium": 45,
+                      "omega3": 50, "vitC": 55, "calcium": 60, "zinc": 65]
+        let topics = planTopicsFromApports(scores.map { Self.makeNutrient(id: $0.key, score: $0.value) })
+
+        XCTAssertEqual(topics.count, 6)
+        XCTAssertEqual(topics.map(\.id), ["app_vitD", "app_vitB12", "app_iron",
+                                          "app_magnesium", "app_omega3", "app_vitC"])
+        XCTAssertTrue(topics.allSatisfy { $0.kind == .apport })
+    }
+
+    /// Moins de 3 apports faibles → on complète avec les suivants par ordre de
+    /// score croissant, pour tenir le plancher de 3 nœuds.
+    func testApportTopicsFillUpToThreeWhenFewAreWeak() {
+        let nutrients = [
+            Self.makeNutrient(id: "iron", score: 55),
+            Self.makeNutrient(id: "vitD", score: 82),
+            Self.makeNutrient(id: "zinc", score: 75),
+            Self.makeNutrient(id: "fiber", score: 90),
+        ]
+        let topics = planTopicsFromApports(nutrients)
+
+        XCTAssertEqual(topics.map(\.id), ["app_iron", "app_zinc", "app_vitD"])
+    }
+
+    /// Libellé, emoji et valeur du bilan viennent du catalogue canonique —
+    /// jamais de la réponse IA (qui peut renvoyer « iron » ou « ? »).
+    func testApportTopicsUseCanonicalLabelAndEmoji() {
+        let corrupted = EnrichedNutrient(
+            id: "iron", label: "iron", emoji: "?", color: "#000000",
+            score: 32, status: "deficient"
+        )
+        let topics = planTopicsFromApports([corrupted,
+                                            Self.makeNutrient(id: "vitD", score: 50),
+                                            Self.makeNutrient(id: "vitB12", score: 55)])
+
+        guard let fer = topics.first else { return XCTFail("Aucun nœud construit") }
+        XCTAssertEqual(fer.name, "Fer")
+        XCTAssertEqual(fer.emojiBadge, "🩸")
+        XCTAssertEqual(fer.kicker, "APPORT À RENFORCER")
+        XCTAssertEqual(fer.evidence, [PlanEvidence(label: "Fer", score: 32)])
+        XCTAssertTrue(fer.radialCause.contains("Fer à 32"), fer.radialCause)
+    }
+
+    /// Un id hors catalogue ne produit jamais de nœud (pas de libellé défendable).
+    func testApportTopicsIgnoreUnknownIds() {
+        let topics = planTopicsFromApports([
+            Self.makeNutrient(id: "creatine", score: 10),
+            Self.makeNutrient(id: "iron", score: 50),
+            Self.makeNutrient(id: "vitD", score: 55),
+            Self.makeNutrient(id: "zinc", score: 58),
+        ])
+        XCTAssertEqual(topics.map(\.id), ["app_iron", "app_vitD", "app_zinc"])
+    }
+
+    /// Le hack et la synergie de l'analyse alimentent le levier « habitudes »
+    /// de la pop-up quand ils existent.
+    func testApportTopicsFeedHabitsFromHackAndSynergie() {
+        var n = Self.makeNutrient(id: "magnesium", score: 40)
+        n.hack = "Une poignée d'amandes au goûter."
+        n.synergie = "La vitamine B6 aide son absorption."
+        let topic = planTopicsFromApports([n, Self.makeNutrient(id: "iron", score: 50),
+                                           Self.makeNutrient(id: "vitD", score: 55)]).first
+
+        XCTAssertEqual(topic?.radialHabitudes.count, 2)
+        XCTAssertTrue(topic?.radialHabitudes.first?.contains("amandes") == true)
+    }
+
+    private static func makeNutrient(id: String, score: Int) -> EnrichedNutrient {
+        EnrichedNutrient(
+            id: id, label: id, emoji: "❓", color: "#007AFF",
+            score: score, status: NutrientStatus(score: score).rawValue
+        )
+    }
+
+    // MARK: - 6. Icônes partagées avec le Bilan
 
     func testNodeIconsCoverTheDeclaredFamilies() {
         XCTAssertEqual(PlanNodeIcon.symptome("Fatigue persistante"), "battery.25")

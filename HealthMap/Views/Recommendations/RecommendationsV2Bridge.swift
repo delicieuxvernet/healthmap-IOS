@@ -119,7 +119,25 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
 struct RecommendationsV2ContentView: View {
     let topics: [PlanTopic]
 
+    /// Le VM du Dashboard porte les scores LOCAUX des nutriments — la vue
+    /// « Apports » reste donc disponible même quand le flux v7 manque.
+    @EnvironmentObject var dashboardVM: DashboardViewModel
+    /// Même clé que le flux v7 (RecommendationsContentView) : un seul choix
+    /// mémorisé, quel que soit le flux qui alimente l'écran.
+    @AppStorage("planVueChoisie") private var planVueRaw: String = PlanVue.objectifs.rawValue
+
+    private var planVue: Binding<PlanVue> {
+        Binding(
+            get: { PlanVue(rawValue: planVueRaw) ?? .objectifs },
+            set: { planVueRaw = $0.rawValue }
+        )
+    }
+
     var body: some View {
-        PlanRadialScreen(topics: topics, focus: nil)
+        PlanRadialScreen(
+            topics: planVue.wrappedValue == .apports ? planTopicsFromApports(dashboardVM.nutrients) : topics,
+            focus: nil,
+            vue: planVue
+        )
     }
 }
