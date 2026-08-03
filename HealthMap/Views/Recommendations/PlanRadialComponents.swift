@@ -681,7 +681,8 @@ struct PlanSolutionsSheetV7: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 22)
-            .padding(.top, 6)
+            // Marge haute commune aux fiches en bottom sheet (cf. ApportV2DetailSheet).
+            .padding(.top, Theme.spacingLG)
             .padding(.bottom, 26)
         }
         .scrollIndicators(.hidden)
