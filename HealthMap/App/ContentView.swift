@@ -397,7 +397,11 @@ struct MainTabView: View {
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
-            .clipped()
+            // Pas de `.clipped()` ici : il rognait les fonds `ignoresSafeArea`
+            // des onglets à la ligne de la barre d'état (bande blanche « hors
+            // de l'app » en haut de chaque onglet). Rien à rogner par ailleurs :
+            // les onglets non sélectionnés sont invisibles (opacity 0) et les
+            // décalages horizontaux sortent de l'écran.
             .animation(reduceMotion ? .none : .easeOut(duration: 0.28), value: selectedTab)
         }
         // Les cinq onglets restent montés : `onAppear` ne se déclenche qu'une
@@ -881,8 +885,13 @@ struct ProfileView: View {
                                 Image(systemName: "square.and.arrow.up")
                                     .foregroundStyle(Color.healthMapBlue)
                             }
-                            Text("Exporter mes données")
-                                .foregroundStyle(Color.healthMapBlue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Exporter mes données")
+                                    .foregroundStyle(Color.healthMapBlue)
+                                Text("Pour les confier à une IA, les archiver ou les réutiliser ailleurs")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.healthMapSecondary)
+                            }
                         }
                     }
                     .disabled(isExportingData)
