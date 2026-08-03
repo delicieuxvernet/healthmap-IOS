@@ -239,10 +239,14 @@ struct ComplementsRituelStrip: View {
                 .layoutPriority(1)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        // Dé-carté (v7) : bloc non interactif dans son ensemble (seules les
+        // pastilles se cochent), la carte blanche laissait croire à une carte
+        // d'apport — le contenu se pose directement sur le fond. L'alignement
+        // horizontal suit le header de page (padding 2), plus le retrait
+        // interne d'une carte.
+        .padding(.horizontal, 2)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity)
-        .kiwiCard(radius: 14)
     }
 
     private var ring: some View {
@@ -568,13 +572,13 @@ struct ComplementsVoieSwitch: View {
             }
         }
         .padding(3)
+        // Verre dépoli (v7) : plus de voile crème quasi opaque par-dessus le
+        // matériau — le contenu défile dessous en transparence floutée. Le
+        // flou du matériau garde le texte lisible (couleurs inchangées, et le
+        // segment actif reste sur pastille blanche opaque).
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(hex: "F0ECE3").opacity(0.82))
-                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -665,7 +669,16 @@ struct ComplementsSummaryCard: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
-        .kiwiCard(radius: 16)
+        // Dé-carté (v7) : le budget n'est pas une carte d'apport — un simple
+        // pointillé discret (teinte kiwi à faible opacité) le délimite, sans
+        // bloc blanc. Le blanc reste réservé aux cartes dépliables.
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(
+                    Color.kiwiGreen.opacity(0.35),
+                    style: StrokeStyle(lineWidth: 1, dash: [5, 4])
+                )
+        )
     }
 
     private func qualitySegment(title: String, active: Bool, action: @escaping () -> Void) -> some View {
