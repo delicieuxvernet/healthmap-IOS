@@ -12,7 +12,7 @@ on:
         required: true
         default: audit
         type: choice
-        options: [audit, apply, app-audit, deep-audit, fix-subs, apply-app, offers, screenshots, submit, fix-meta, attach-video, trim-monthly]
+        options: [audit, apply, app-audit, deep-audit, fix-subs, apply-app, offers, screenshots, submit, fix-meta, attach-video, trim-monthly, cancel-submission]
       display_type:
         description: "screenshots : type d'écran Apple (APP_IPHONE_67 = 1290x2796)"
         required: false
@@ -30,6 +30,11 @@ on:
         type: boolean
       exclude_products:
         description: "submit : productIds à NE PAS soumettre, séparés par des virgules (ex. healthmap_monthly — abo non affiché par le paywall)"
+        required: false
+        default: ""
+        type: string
+      submission_id:
+        description: "cancel-submission : id de la reviewSubmission à annuler"
         required: false
         default: ""
         type: string
@@ -97,4 +102,5 @@ jobs:
           MODE: ${{ inputs.mode }}
           STAGE_ONLY: ${{ inputs.stage_only && '1' || '0' }}
           EXCLUDE_PRODUCTS: ${{ inputs.exclude_products }}
+          SUBMISSION_ID: ${{ inputs.submission_id }}
         run: ruby scripts/asc_subscriptions.rb

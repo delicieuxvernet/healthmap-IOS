@@ -701,6 +701,26 @@ if MODE == "attach-video"
   exit 0
 end
 
+# ── MODE cancel-submission : retire une soumission de la file de review ─────
+# Incident du 3 août : apply-app (re-rattachement de build) ÉJECTE la version
+# du brouillon assemblé et le vide en cascade ; le mode submit a alors envoyé
+# une soumission version-seule (le schéma exact du refus 2.1(b) du 24/07).
+# Ce mode annule proprement une soumission envoyée par erreur (l'UI appelle ça
+# « Remove from review »). SUBMISSION_ID requis.
+if MODE == "cancel-submission"
+  sub_id = ENV["SUBMISSION_ID"].to_s
+  abort_with("cancel-submission", 0, "SUBMISSION_ID manquant") if sub_id.empty?
+  code, before = req(:get, "/v1/reviewSubmissions/#{sub_id}")
+  abort_with("reviewSubmissions", code, before) unless code == 200
+  puts "Soumission #{sub_id} : état=#{before.dig("data", "attributes", "state")}"
+  ok, = write("annulation de la soumission", :patch, "/v1/reviewSubmissions/#{sub_id}",
+    { data: { type: "reviewSubmissions", id: sub_id, attributes: { canceled: true } } })
+  exit 1 unless ok
+  code, after = req(:get, "/v1/reviewSubmissions/#{sub_id}")
+  puts "État après : #{code == 200 ? after.dig("data", "attributes", "state") : "HTTP #{code}"}"
+  exit 0
+end
+
 # ── MODE trim-monthly : retire le Mensuel du brouillon de soumission ────────
 # Le paywall (Annuel + shortPlan hebdo) n'affiche JAMAIS le Mensuel : un abo
 # soumis mais introuvable dans l'app = refus 2.1(b). Le GET simple des items ne
