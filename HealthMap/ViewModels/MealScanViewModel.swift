@@ -312,11 +312,17 @@ final class MealScanViewModel: ObservableObject {
     // MARK: - Image Compression
 
     /// Resize and compress a UIImage for upload.
-    /// - Max 1024px on longest side (preserving aspect ratio)
-    /// - Progressive JPEG quality: 0.8 -> 0.6 -> 0.4 until <= 2MB
+    /// - Max 1568 px on longest side : c'est le plafond au-delà duquel l'API
+    ///   vision redimensionne elle-même — en dessous on jette du détail utile
+    ///   (truite vs cabillaud, haricots vs petits pois) pour rien.
+    /// - format.scale = 1 obligatoire : sans lui, UIGraphicsImageRenderer rend
+    ///   à l'échelle de l'écran (2-3×) — l'ancien code croyait envoyer 1024 px
+    ///   et envoyait ~3072 px, qui dépassaient 2 Mo et déclenchaient la chute
+    ///   de qualité JPEG jusqu'à 0.4, détruisant les indices d'espèce.
+    /// - Qualité plancher 0.7 : le serveur accepte 5 Mo, inutile de massacrer.
     /// - Returns compressed Data or nil on failure
     func compressImage(_ image: UIImage) -> Data? {
-        let maxDimension: CGFloat = 1024
+        let maxDimension: CGFloat = 1568
         let size = image.size
 
         // Resize if needed
@@ -324,7 +330,9 @@ final class MealScanViewModel: ObservableObject {
         if max(size.width, size.height) > maxDimension {
             let scale = maxDimension / max(size.width, size.height)
             let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-            let renderer = UIGraphicsImageRenderer(size: newSize)
+            let format = UIGraphicsImageRendererFormat.default()
+            format.scale = 1
+            let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
             resizedImage = renderer.image { _ in
                 image.draw(in: CGRect(origin: .zero, size: newSize))
             }
@@ -332,18 +340,18 @@ final class MealScanViewModel: ObservableObject {
             resizedImage = image
         }
 
-        // Progressive JPEG compression: try decreasing quality until <= 2MB
-        let maxBytes = 2 * 1024 * 1024 // 2MB
-        for quality: CGFloat in [0.8, 0.6, 0.4] {
+        // Progressive JPEG compression (limite serveur : 5 Mo, marge gardée)
+        let maxBytes = Int(3.5 * 1024 * 1024)
+        for quality: CGFloat in [0.9, 0.8, 0.7] {
             if let data = resizedImage.jpegData(compressionQuality: quality) {
-                if data.count <= maxBytes || quality == 0.4 {
+                if data.count <= maxBytes || quality == 0.7 {
                     return data
                 }
             }
         }
 
-        // Fallback at lowest quality
-        return resizedImage.jpegData(compressionQuality: 0.3)
+        // Fallback — même plancher : en dessous, l'image ment au modèle
+        return resizedImage.jpegData(compressionQuality: 0.7)
     }
 
     // MARK: - Analyze Photo

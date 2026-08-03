@@ -39,8 +39,11 @@ struct CameraPicker: UIViewControllerRepresentable {
             _ picker: UIImagePickerController,
             didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
         ) {
+            // q0.95 : ce JPEG n'est qu'un transport vers compressImage(), qui
+            // ré-encode derrière — compresser fort ici cumulait deux pertes
+            // successives sur les détails qui distinguent les espèces.
             if let image = info[.originalImage] as? UIImage,
-               let data = image.jpegData(compressionQuality: 0.85) {
+               let data = image.jpegData(compressionQuality: 0.95) {
                 parent.onCapture(data)
             }
             parent.dismiss()
