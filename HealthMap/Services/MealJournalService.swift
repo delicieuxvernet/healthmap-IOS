@@ -784,7 +784,8 @@ final class MealJournalService {
     private static let iso = ISO8601DateFormatter()
 
     /// `consumed_at` peut arriver avec ou sans fraction de seconde selon la source.
-    private static func parseTimestamp(_ s: String) -> Date? {
+    /// Interne (pas `private`) : testé directement avec les formats réels PostgREST.
+    static func parseTimestamp(_ s: String) -> Date? {
         let withFraction = ISO8601DateFormatter()
         withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return withFraction.date(from: s) ?? ISO8601DateFormatter().date(from: s)
