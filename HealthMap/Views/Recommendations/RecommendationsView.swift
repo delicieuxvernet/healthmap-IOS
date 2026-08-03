@@ -100,12 +100,28 @@ struct RecommendationsContentView: View {
     /// « Focus de la semaine » sous la carte. Chargé une fois via `.task`.
     @StateObject private var journalVM = MealJournalViewModel()
 
+    /// Choix de vue mémorisé : l'onglet retombe sur la dernière vue utilisée.
+    /// Même clé que le repli v2 (RecommendationsV2ContentView) — un seul choix,
+    /// quel que soit le flux qui alimente l'écran.
+    @AppStorage("planVueChoisie") private var planVueRaw: String = PlanVue.objectifs.rawValue
+
     init(analysis: MergedAnalysis) {
         _vm = StateObject(wrappedValue: RecommendationsViewModel(analysis: analysis))
     }
 
+    private var planVue: Binding<PlanVue> {
+        Binding(
+            get: { PlanVue(rawValue: planVueRaw) ?? .objectifs },
+            set: { planVueRaw = $0.rawValue }
+        )
+    }
+
     var body: some View {
-        PlanRadialScreen(topics: topics, focus: planFocus)
+        PlanRadialScreen(
+            topics: planVue.wrappedValue == .apports ? apportTopics : topics,
+            focus: planFocus,
+            vue: planVue
+        )
             .onReceive(dashboardVM.$aiAnalysis) { newAnalysis in
                 if let newAnalysis {
                     vm.updateAnalysis(newAnalysis)
@@ -140,6 +156,15 @@ struct RecommendationsContentView: View {
         let week = WeekScoreEngine.currentWeekInterval(containing: Date())
         let weekMeals = journalVM.fortnight.filter { week.contains($0.consumedAt) }
         return SuiviEngineV4.planFocus(coverage: coverage, weekMeals: weekMeals)
+    }
+
+    // MARK: - Vue « Apports » (un nœud par apport à renforcer)
+    /// Même couronne, autre lecture : les apports à renforcer, scores les plus
+    /// bas d'abord (invariant 3-6 tenu par `planTopicsFromApports`). Source :
+    /// les nutriments du bilan via le VM du Dashboard (analyse si disponible,
+    /// sinon scores locaux) — labels/emojis/couleurs canoniques garantis.
+    private var apportTopics: [PlanTopic] {
+        planTopicsFromApports(dashboardVM.nutrients)
     }
 
     // MARK: - Construction des topics (symptômes + objectifs)

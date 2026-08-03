@@ -18,6 +18,91 @@ import SwiftUI
 // est dérivé de la même analyse, tronqué au format court de la maquette
 // (1 phrase de cause, 3 leviers × 2 puces de 12 mots max).
 
+// MARK: - Choix de vue (objectifs/symptômes ↔ apports)
+
+/// Les deux lectures de la MÊME couronne : par objectifs et symptômes (la vue
+/// historique, par défaut) ou par apports à renforcer. Le choix est mémorisé
+/// (`@AppStorage`, cf. RecommendationsView) pour retomber sur la dernière vue.
+enum PlanVue: String, CaseIterable, Identifiable {
+    case objectifs
+    case apports
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .objectifs: return "Objectifs et symptômes"
+        case .apports: return "Apports"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .objectifs: return "target"
+        case .apports: return "leaf.fill"
+        }
+    }
+}
+
+/// Sélecteur à deux options en tête de l'onglet. Reprend TRAIT POUR TRAIT le
+/// patron du sélecteur maison de l'onglet Compléments (`ComplementsVoieSwitch`,
+/// SupplementsChainV6.swift) : mêmes fonts, mêmes rayons, même fond, même
+/// animation — seul le positionnement change (en haut de page, pas flottant
+/// au-dessus de la tab bar). Aucune invention visuelle.
+struct PlanVueSwitch: View {
+    @Binding var vue: PlanVue
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(PlanVue.allCases) { item in
+                let active = vue == item
+                Button {
+                    guard !active else { return }
+                    HapticService.shared.selection()
+                    withAnimation(reduceMotion ? .none : .easeOut(duration: 0.18)) {
+                        vue = item
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: item.icon)
+                            .font(.system(size: 14, weight: .semibold))
+                        Text(item.label)
+                            .font(.system(size: 13, weight: .bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                    .foregroundStyle(active ? Color.kiwiCharcoal : Color.healthMapSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(active ? Color.white : .clear)
+                            .shadow(color: active ? Color.kiwiCharcoal.opacity(0.12) : .clear,
+                                    radius: 3, x: 0, y: 1)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.healthMapPressed)
+                .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+        .padding(3)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(hex: "F0ECE3").opacity(0.82))
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1)
+        )
+        .accessibilityLabel("Vue choisie")
+    }
+}
+
 // MARK: - L'écran Plan (hauteur fixe, aucun scroll)
 
 /// Assemble l'écran : titre, carte radiale, légende, focus de la semaine. Les
@@ -32,6 +117,9 @@ struct PlanRadialScreen: View {
     /// Focus de la semaine (moteur déterministe). `nil` → la ligne n'est pas
     /// affichée : on ne montre jamais un progrès qu'on n'a pas calculé.
     let focus: SuiviEngineV4.PlanFocus?
+    /// Sélecteur de vue (objectifs/symptômes ↔ apports). `nil` → l'écran
+    /// n'offre qu'une lecture et le sélecteur n'est pas rendu.
+    var vue: Binding<PlanVue>? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var activeTopic: PlanTopic?
@@ -57,19 +145,32 @@ struct PlanRadialScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 22)
 
+            // Le sélecteur de vue, sous le titre — même patron visuel que le
+            // sélecteur de voie des Compléments (cf. PlanVueSwitch).
+            if let vue {
+                PlanVueSwitch(vue: vue)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+            }
+
             if displayTopics.isEmpty {
                 emptyState
             } else {
                 PlanRadialMap(topics: displayTopics) { topic in
                     activeTopic = topic
                 }
-                .id(replayToken)
+                .id(mapIdentity)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 20)
                 .padding(.top, 6)
 
-                PlanRadialLegend()
-                    .frame(maxWidth: .infinity)
+                // La légende explique le code couleur symptôme/objectif : en
+                // vue « Apports », les cerclages portent la couleur canonique
+                // de chaque nutriment — elle n'aurait rien à expliquer.
+                if displayTopics.contains(where: { $0.kind != .apport }) {
+                    PlanRadialLegend()
+                        .frame(maxWidth: .infinity)
+                }
             }
 
             if let focus {
@@ -109,6 +210,13 @@ struct PlanRadialScreen: View {
                 )
             }
         }
+    }
+
+    /// Identité de la carte : rejoue la MÊME chorégraphie d'entrée à chaque
+    /// visite de l'onglet (replayToken) ET à chaque bascule de vue — changer
+    /// de lecture sans rejouer l'entrée ferait « sauter » les bulles en place.
+    private var mapIdentity: String {
+        "\(replayToken)|\(vue?.wrappedValue.rawValue ?? "")"
     }
 
     /// La ligne de focus monte en dernier (0,9 s), après les bulles.
@@ -467,9 +575,16 @@ private struct PlanRadialNodeView: View {
                             )
                         )
                         .shadow(color: Color.kiwiCharcoal.opacity(0.09), radius: 12, x: 0, y: 3)
-                    Image(systemName: topic.radialSymbol)
-                        .font(.system(size: layout.nodeDiameter * 0.41, weight: .regular))
-                        .foregroundStyle(topic.radialRing)
+                    // Vue « Apports » : l'emoji canonique du nutriment remplace
+                    // le SF Symbol — même disque, même taille de glyphe.
+                    if let emoji = topic.emojiBadge {
+                        Text(emoji)
+                            .font(.system(size: layout.nodeDiameter * 0.38))
+                    } else {
+                        Image(systemName: topic.radialSymbol)
+                            .font(.system(size: layout.nodeDiameter * 0.41, weight: .regular))
+                            .foregroundStyle(topic.radialRing)
+                    }
                 }
                 .frame(width: layout.nodeDiameter, height: layout.nodeDiameter)
 
@@ -708,9 +823,16 @@ struct PlanSolutionsSheetV7: View {
                 RoundedRectangle(cornerRadius: 15, style: .continuous)
                     .fill(topic.tint)
                     .frame(width: 46, height: 46)
-                Image(systemName: topic.radialSymbol)
-                    .font(.system(size: 23))
-                    .foregroundStyle(topic.accent)
+                // Un apport garde son emoji canonique jusque dans la pop-up —
+                // le même repère visuel que sa bulle et que le Bilan.
+                if let emoji = topic.emojiBadge {
+                    Text(emoji)
+                        .font(.system(size: 24))
+                } else {
+                    Image(systemName: topic.radialSymbol)
+                        .font(.system(size: 23))
+                        .foregroundStyle(topic.accent)
+                }
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(topic.kicker)
@@ -850,15 +972,25 @@ private struct PlanLevierCard: View {
 extension PlanTopic {
 
     /// Couleur du cerclage et de l'icône du nœud. Décoratif : le vert vif de la
-    /// marque pour un objectif, le bleu pour un symptôme. Les TEXTES accentués
+    /// marque pour un objectif, le bleu pour un symptôme, la couleur canonique
+    /// du nutriment pour un apport (palette nutriments). Les TEXTES accentués
     /// utilisent `accent` (vert encre) — contraste AA sur fond crème.
     var radialRing: Color {
-        kind == .symptome ? Color(hex: "2F6FE0") : Color.kiwiGreen
+        switch kind {
+        case .symptome: return Color(hex: "2F6FE0")
+        case .objectif: return Color.kiwiGreen
+        case .apport: return apportColor ?? Color.kiwiGreen
+        }
     }
 
-    /// Icône du nœud, dérivée du libellé.
+    /// Icône du nœud, dérivée du libellé. Un apport porte son emoji canonique
+    /// (`emojiBadge`) ; ce symbole n'est que le repli s'il venait à manquer.
     var radialSymbol: String {
-        kind == .symptome ? PlanNodeIcon.symptome(name) : PlanNodeIcon.objectif(name)
+        switch kind {
+        case .symptome: return PlanNodeIcon.symptome(name)
+        case .objectif: return PlanNodeIcon.objectif(name)
+        case .apport: return "leaf.fill"
+        }
     }
 
     /// La cause, en une phrase : les vraies valeurs du bilan d'abord (jamais un

@@ -20,7 +20,7 @@ struct PlanEvidence: Hashable {
 }
 
 struct PlanTopic: Identifiable {
-    enum Kind { case symptome, objectif }
+    enum Kind { case symptome, objectif, apport }
 
     let id: String
     let kind: Kind
@@ -37,13 +37,33 @@ struct PlanTopic: Identifiable {
     /// Délai d'effet renvoyé par l'analyse. `nil` → on n'affiche rien plutôt que
     /// d'annoncer une échéance que la donnée ne porte pas.
     var delai: String? = nil
+    /// Emoji canonique du nutriment (vue « Apports » uniquement) — toujours
+    /// depuis NutrientData, jamais depuis l'IA. `nil` → le nœud garde son
+    /// SF Symbol (vue objectifs/symptômes, inchangée).
+    var emojiBadge: String? = nil
+    /// Couleur canonique du nutriment (palette nutriments) — décor du cerclage
+    /// et du fond d'icône en vue « Apports ». `nil` hors de cette vue.
+    var apportColor: Color? = nil
 
-    var kicker: String { kind == .symptome ? "SYMPTÔME" : "OBJECTIF" }
-    /// Accent des TEXTES : bleu pour un symptôme, vert encre pour un objectif.
-    /// Le vert vif de la marque est réservé au décor (cf. `radialRing`) — il ne
-    /// tient pas le contraste AA en petit texte sur crème.
+    var kicker: String {
+        switch kind {
+        case .symptome: return "SYMPTÔME"
+        case .objectif: return "OBJECTIF"
+        case .apport: return "APPORT À RENFORCER"
+        }
+    }
+    /// Accent des TEXTES : bleu pour un symptôme, vert encre pour un objectif
+    /// ET pour un apport. La couleur du nutriment est réservée au décor
+    /// (cf. `radialRing`) — elle ne tient pas le contraste AA en petit texte
+    /// sur crème. Le vert vif de la marque non plus.
     var accent: Color { kind == .symptome ? Color(hex: "2F6FE0") : Color.kiwiGreenInk }
-    var tint: Color { kind == .symptome ? Color(hex: "EAF0FB") : Color.kiwiGreenSoft }
+    var tint: Color {
+        switch kind {
+        case .symptome: return Color(hex: "EAF0FB")
+        case .objectif: return Color.kiwiGreenSoft
+        case .apport: return (apportColor ?? Color.kiwiGreen).opacity(0.14)
+        }
+    }
     /// Nombre total de solutions disponibles pour ce bloc.
     var solutionsCount: Int { nutrition.count + habitudes.count + complements.count }
 }
@@ -83,6 +103,111 @@ struct PlanSupplementSolution: Identifiable {
     let note: String
     let tag: String           // « Prioritaire » / « Si besoin »
     let strong: Bool          // priorité haute -> teinte verte, sinon neutre
+}
+
+// MARK: - Vue « Apports » — un nœud par apport à renforcer
+
+/// Construit les topics de la vue « Apports » : la MÊME couronne radiale, mais
+/// un nœud par apport à renforcer, trié par priorité (scores les plus bas
+/// d'abord). Libellé/emoji/couleur : TOUJOURS le catalogue canonique
+/// (NutrientData + palette nutriments), jamais la réponse IA.
+///
+/// Invariant 3-6 tenu ICI : les apports sous 70 (le seuil « à renforcer » du
+/// Bilan, cf. DashboardViewModel.deficiencies) d'abord, plafonnés à 6 ; s'ils
+/// sont moins de 3, on complète avec les apports suivants par ordre de score
+/// croissant. `radialDisplayList` reste le garde-fou final en aval.
+func planTopicsFromApports(_ nutrients: [EnrichedNutrient]) -> [PlanTopic] {
+    // Tri croissant : le plus faible d'abord. Ids canoniques uniquement — un id
+    // inconnu ne peut pas produire de nœud (pas de libellé/emoji défendables).
+    var seen = Set<String>()
+    let sorted = nutrients
+        .filter { NutrientData.validIDs.contains($0.id) && seen.insert($0.id).inserted }
+        .sorted { $0.score < $1.score }
+    guard !sorted.isEmpty else { return [] }
+
+    let weakCount = sorted.filter { $0.score < 70 }.count
+    let count = Swift.min(Swift.max(weakCount, 3), 6)
+    // `weak` est un préfixe de `sorted` (tri croissant) : prendre les `count`
+    // premiers = tous les apports faibles (max 6), complétés au besoin par les
+    // suivants les moins bien couverts.
+    return sorted.prefix(count).compactMap(planApportTopic)
+}
+
+/// Un nœud « apport » : mêmes composants et même pop-up que la vue objectifs,
+/// alimentés par les données déjà disponibles pour CE nutriment (sources
+/// d'aliments du catalogue, hack/synergie/solution de l'analyse quand ils
+/// existent — jamais de dosage inventé).
+private func planApportTopic(_ n: EnrichedNutrient) -> PlanTopic? {
+    guard let def = NutrientData.definition(for: n.id) else { return nil }
+
+    // Explication de l'analyse quand elle existe (une phrase suffira à la
+    // pop-up) ; sinon rien — la cause citera déjà le score réel.
+    let intro = [n.pourquoiCeScore, n.verdict, n.mecanisme]
+        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .first { !$0.isEmpty } ?? ""
+
+    // « Par la nutrition » : les sources concrètes du catalogue — mêmes repères
+    // bornés que le builder de la vue objectifs (le dosage précis vit ailleurs).
+    let quand = n.solution?.quand?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let nutrition = Fluent3D.foodSources(for: n.id).prefix(3).map { food in
+        PlanNutritionSolution(
+            asset: food.asset,
+            label: food.label,
+            note: "Riche en \(def.label.lowercased())",
+            qty: "1 portion par jour",
+            moment: quand.isEmpty ? "Au repas principal" : quand,
+            cuisson: "Cuisson douce pour préserver les apports",
+            astuce: n.synergie?.isEmpty == false ? n.synergie! : "À associer à une source de vitamine C"
+        )
+    }
+
+    // « Par les habitudes » : le hack et la synergie de l'analyse d'abord ;
+    // à défaut, les repères génériques déjà posés par la vue objectifs.
+    var habitudes: [PlanHabitSolution] = []
+    if let hack = n.hack?.trimmingCharacters(in: .whitespacesAndNewlines), !hack.isEmpty {
+        habitudes.append(PlanHabitSolution(symbol: "lightbulb.fill", text: "Le bon geste", note: hack))
+    }
+    if let synergie = n.synergie?.trimmingCharacters(in: .whitespacesAndNewlines), !synergie.isEmpty {
+        habitudes.append(PlanHabitSolution(symbol: "arrow.triangle.merge", text: "La bonne association", note: synergie))
+    }
+    if habitudes.isEmpty {
+        habitudes = [
+            PlanHabitSolution(symbol: "sun.max.fill", text: "Un peu de lumière le matin",
+                              note: "10 min dehors réveillent ton horloge interne"),
+            PlanHabitSolution(symbol: "bed.double.fill", text: "Un sommeil régulier",
+                              note: "Couche-toi à heure fixe pour mieux récupérer")
+        ]
+        if n.id == "iron" {
+            habitudes[0] = PlanHabitSolution(symbol: "cup.and.saucer.fill", text: "Décale thé et café",
+                                             note: "Loin des repas riches en fer pour mieux l'absorber")
+        }
+    }
+
+    // « Par les compléments » : même règle de priorité que la vue objectifs
+    // (score < 45 → prioritaire). Le détail timing/dose vit sur l'onglet dédié.
+    let strong = n.score < 45
+    let complements = [PlanSupplementSolution(
+        name: def.label,
+        note: n.solution?.dosage?.isEmpty == false ? n.solution!.dosage! : "À envisager si l'alimentation ne suffit pas",
+        tag: strong ? "Prioritaire" : "Si besoin",
+        strong: strong
+    )]
+
+    return PlanTopic(
+        id: "app_\(n.id)",
+        kind: .apport,
+        name: def.label,
+        intro: intro,
+        ritual: [],
+        nutrition: Array(nutrition),
+        habitudes: habitudes,
+        complements: complements,
+        // La vraie valeur du bilan, citée telle quelle par la pop-up.
+        evidence: [PlanEvidence(label: def.label, score: n.score)],
+        delai: n.solution?.delai,
+        emojiBadge: def.emoji,
+        apportColor: Color.nutrientColor(for: n.id)
+    )
 }
 
 extension Array where Element == PlanTopic {
