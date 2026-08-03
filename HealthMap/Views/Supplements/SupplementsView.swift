@@ -216,10 +216,8 @@ struct SupplementsView: View {
             // La MÊME fiche que depuis le Bilan : quels aliments couvrent cet
             // apport, en quelle quantité, à quel moment.
             .sheet(item: $assietteNutrient) { nutrient in
-                NutrientDetailSheet(
-                    nutrient: nutrient,
-                    isPremium: SubscriptionService.shared.isPremium
-                )
+                // Premium : la fiche observe elle-même SubscriptionService.
+                NutrientDetailSheet(nutrient: nutrient)
             }
         }
     }
