@@ -29,6 +29,9 @@ struct RecommendationsView: View {
             ZStack {
                 // Fond crème chaud du langage v4.
                 Color.kiwiCream.ignoresSafeArea()
+                // Lavis Plan : indigo, la projection long terme (fin du
+                // dégradé de marque).
+                TabWashBackground(tint: .accentIndigo)
 
                 if let analysis = dashboardVM.aiAnalysis {
                     // Arrivée en fondu d'un bloc, pas en cascade : la carte
