@@ -229,6 +229,9 @@ struct MealScanView: View {
     private var normalScaffold: some View {
         ZStack {
             Color.kiwiCream.ignoresSafeArea()
+            // Lavis Scanner : orange, la chaleur de l'assiette (couleur des
+            // lipides du scan).
+            TabWashBackground(tint: .macroFat)
             ScrollView {
                 scanHome
                     // Épingle la largeur du contenu à celle du conteneur : empêche

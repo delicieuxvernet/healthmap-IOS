@@ -166,6 +166,8 @@ struct SupplementsView: View {
         NavigationStack {
             ZStack {
                 WarmBackground()
+                // Lavis Compléments : vert kiwi (décision fondateur).
+                TabWashBackground(tint: .kiwiGreen)
 
                 if hasContent {
                     mainContent

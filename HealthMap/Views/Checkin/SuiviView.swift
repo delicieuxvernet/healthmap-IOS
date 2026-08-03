@@ -65,6 +65,8 @@ struct SuiviView: View {
         NavigationStack {
             ZStack {
                 WarmBackground()
+                // Lavis Suivi : or, le rythme des jours (matin / midi / soir).
+                TabWashBackground(tint: .macroCarb)
 
                 ScrollView {
                     VStack(spacing: 14) {

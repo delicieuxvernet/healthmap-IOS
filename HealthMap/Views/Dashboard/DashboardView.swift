@@ -40,6 +40,8 @@ struct DashboardView: View {
         NavigationStack {
             ZStack {
                 WarmBackground()
+                // Lavis Bilan : bleu, l'accent historique de l'analyse.
+                TabWashBackground(tint: .healthMapBlue)
                 content
             }
             .kiwiTabBarBottomInset()
