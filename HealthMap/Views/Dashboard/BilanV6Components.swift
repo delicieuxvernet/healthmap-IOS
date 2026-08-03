@@ -133,7 +133,9 @@ struct ApportV2DetailSheet: View {
                 .padding(.top, 22)
             }
             .padding(.horizontal, 22)
-            .padding(.top, 8)
+            // Marge haute commune aux fiches en bottom sheet : l'en-tête doit
+            // respirer sous la poignée (retour fondateur, 3 août 2026).
+            .padding(.top, Theme.spacingLG)
             .padding(.bottom, 30)
         }
         .background(Color.kiwiCream)

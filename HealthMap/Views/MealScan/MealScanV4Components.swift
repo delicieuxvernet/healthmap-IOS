@@ -523,7 +523,8 @@ struct FoodDetailSheetV4: View {
                 }
             }
             .padding(.horizontal, 22)
-            .padding(.top, 8)
+            // Marge haute commune aux fiches en bottom sheet (cf. ApportV2DetailSheet).
+            .padding(.top, Theme.spacingLG)
             .padding(.bottom, 30)
         }
         .background(Color.kiwiCream)
