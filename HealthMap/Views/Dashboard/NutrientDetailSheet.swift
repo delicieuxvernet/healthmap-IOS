@@ -10,15 +10,15 @@ import SwiftUI
 //   4. Le déclic : comparaison en citation discrète (après l'action)
 //   5. Repliables fermés : mécanisme / symptômes (UN composant réutilisé)
 //   6. Recherche approfondie (validate-hypotheses + web, à la demande)
-//   7. Hack + synergie : premium via BlurredSection partagée (loi 11)
+//   7. Hack + synergie : premium via GatedOverlay + UnlockDoor partagés (loi 11)
 struct NutrientDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     let nutrient: EnrichedNutrient
-    /// Conservé pour les call-sites ; le gating premium est délégué à la
-    /// BlurredSection partagée (SubscriptionService = source unique — loi 11,
-    /// politique premium identique partout).
-    let isPremium: Bool
+    /// Source unique premium (loi 11, politique identique partout), OBSERVÉE :
+    /// un achat depuis la fiche défloute le contenu en direct, sans réouverture
+    /// (l'ancien snapshot `let isPremium` figeait l'état à l'ouverture).
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     /// État de la « Recherche approfondie » (validate-hypotheses + web).
     @State private var deepState: DeepSearchState = .idle
@@ -362,8 +362,8 @@ struct NutrientDetailSheet: View {
 
     // MARK: - 6. Hack + synergie (bloc 6)
     // Sources : nutrient.hack / nutrient.synergie — LA case premium floutée
-    // de la fiche (loi 11), via la BlurredSection PARTAGÉE (politique premium
-    // identique partout). Textes bornés 3 lignes même floutés. Rien de
+    // de la fiche (loi 11), via GatedOverlay + UnlockDoor PARTAGÉS (politique
+    // premium identique partout). Textes bornés 3 lignes même floutés. Rien de
     // disponible → pas de case (jamais de coquille vide).
     private var premiumSection: AnyView? {
         let hack = nutrient.hack?.isEmpty == false ? nutrient.hack : nil
@@ -389,7 +389,7 @@ struct NutrientDetailSheet: View {
         .padding(Theme.spacingMD)
         .frame(maxWidth: .infinity, alignment: .leading)
 
-        if isPremium {
+        if subscriptionService.isPremium {
             return AnyView(rows.cardStyle())
         }
 
@@ -712,7 +712,6 @@ private struct FicheCollapsible<Content: View>: View {
             hack: "Associe ta D3 à ton petit-déjeuner pour améliorer son absorption.",
             synergie: "Le magnésium aide ton corps à activer la vitamine D.",
             pourquoiCeScore: "Ton score reflète le peu de soleil et l\u{2019}absence de poisson gras dans tes réponses."
-        ),
-        isPremium: false
+        )
     )
 }

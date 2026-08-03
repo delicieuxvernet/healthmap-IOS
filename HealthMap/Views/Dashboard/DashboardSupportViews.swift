@@ -82,7 +82,6 @@ struct AnalysisErrorRetryView: View {
 struct AllNutrientsSheet: View {
     @Environment(\.dismiss) private var dismiss
     let nutrients: [EnrichedNutrient]
-    let isPremium: Bool
 
     @State private var selectedNutrient: EnrichedNutrient?
 
@@ -149,7 +148,8 @@ struct AllNutrientsSheet: View {
             }
         }
         .sheet(item: $selectedNutrient) { nutrient in
-            NutrientDetailSheet(nutrient: nutrient, isPremium: isPremium)
+            // Premium : la fiche observe elle-même SubscriptionService.
+            NutrientDetailSheet(nutrient: nutrient)
                 .healthMapSheet(.large)
         }
     }

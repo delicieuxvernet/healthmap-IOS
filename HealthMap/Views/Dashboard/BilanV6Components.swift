@@ -62,6 +62,9 @@ struct ApportV2DetailSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Source unique premium (loi 11), OBSERVÉE : un achat depuis la fiche
+    /// défloute les sections gatées en direct, sans réouverture.
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var animatedPct: CGFloat = 0
 
     private var pct: Int { min(100, max(0, apport.pctBesoin ?? 0)) }
@@ -92,54 +95,24 @@ struct ApportV2DetailSheet: View {
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if !aliments.isEmpty {
-                    Text("Où le trouver")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.kiwiCharcoal)
-                        .padding(.top, 20)
-                        .padding(.bottom, 12)
-                    HStack(spacing: 10) {
-                        ForEach(Array(aliments.prefix(3).enumerated()), id: \.offset) { _, aliment in
-                            VStack(spacing: 8) {
-                                SafeFluent3DIcon(name: aliment.icone, size: 40)
-                                Text(aliment.nom ?? "")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Color.kiwiCharcoal)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
+                // « Où le trouver » + « Interaction à connaître » = le
+                // COMMENT, réservé au premium. Le teasing garde net le quoi
+                // et le pourquoi (anneau, statut, « Pourquoi ») ; ces deux
+                // sections passent sous le même patron que la fiche nutriment
+                // (GatedOverlay teaser + porte verte), une seule porte.
+                if subscriptionService.isPremium {
+                    ouLeTrouverSection
+                    interactionSection
+                } else if hasGatedContent {
+                    VStack(spacing: Theme.spacingSM) {
+                        GatedOverlay(intensity: .teaser) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ouLeTrouverSection
+                                interactionSection
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .padding(.horizontal, 8)
-                            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.healthMapCard))
-                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1))
                         }
+                        UnlockDoor(icon: "lock.fill", title: doorTitle, subtitle: doorSubtitle, zone: "fiche_apport_bilan")
                     }
-                }
-
-                if (apport.tipBold?.isEmpty == false) || (apport.tipRest?.isEmpty == false) {
-                    HStack(alignment: .top, spacing: 11) {
-                        Image(systemName: "lightbulb.fill")
-                            .font(.system(size: 17))
-                            .foregroundStyle(Color.healthMapBlue)
-                            .padding(.top, 1)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("INTERACTION À CONNAÎTRE")
-                                .font(.system(size: 10, weight: .bold))
-                                .tracking(0.5)
-                                .foregroundStyle(Color.healthMapBlue)
-                            tipText
-                                .foregroundStyle(Color.kiwiCharcoal)
-                                .lineSpacing(3)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.healthMapBlueLight))
-                    .padding(.top, 18)
                 }
 
                 Button {
@@ -174,6 +147,93 @@ struct ApportV2DetailSheet: View {
             } else {
                 withAnimation(.easeOut(duration: 1.0).delay(0.15)) { animatedPct = target }
             }
+        }
+    }
+
+    // MARK: Sections gatées (premium) — « Où le trouver » / « Interaction »
+
+    /// Le tip existe-t-il ? (même condition qu'avant le gating)
+    private var hasTip: Bool {
+        (apport.tipBold?.isEmpty == false) || (apport.tipRest?.isEmpty == false)
+    }
+
+    /// Au moins une des deux sections premium a du contenu réel — sinon ni
+    /// flou ni porte (jamais de coquille vide).
+    private var hasGatedContent: Bool {
+        !aliments.isEmpty || hasTip
+    }
+
+    /// Wording de la porte : toujours un bénéfice spécifique à l'apport,
+    /// jamais un « Passe Premium » générique (même convention que la fiche
+    /// nutriment : « Débloque le hack B12 »).
+    private var doorTitle: String {
+        aliments.isEmpty
+            ? "Débloque l'interaction \(apport.nom ?? "de cet apport")"
+            : "Débloque les aliments \(apport.nom ?? "ciblés")"
+    }
+
+    private var doorSubtitle: String {
+        if !aliments.isEmpty && hasTip {
+            return "Où le trouver + l'interaction à connaître"
+        }
+        return aliments.isEmpty
+            ? "L'interaction à connaître avec tes habitudes"
+            : "Les aliments qui couvrent ce besoin"
+    }
+
+    @ViewBuilder
+    private var ouLeTrouverSection: some View {
+        if !aliments.isEmpty {
+            Text("Où le trouver")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color.kiwiCharcoal)
+                .padding(.top, 20)
+                .padding(.bottom, 12)
+            HStack(spacing: 10) {
+                ForEach(Array(aliments.prefix(3).enumerated()), id: \.offset) { _, aliment in
+                    VStack(spacing: 8) {
+                        SafeFluent3DIcon(name: aliment.icone, size: 40)
+                        Text(aliment.nom ?? "")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Color.kiwiCharcoal)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 8)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.healthMapCard))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var interactionSection: some View {
+        if hasTip {
+            HStack(alignment: .top, spacing: 11) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 17))
+                    .foregroundStyle(Color.healthMapBlue)
+                    .padding(.top, 1)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("INTERACTION À CONNAÎTRE")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(Color.healthMapBlue)
+                    tipText
+                        .foregroundStyle(Color.kiwiCharcoal)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.healthMapBlueLight))
+            .padding(.top, 18)
         }
     }
 
