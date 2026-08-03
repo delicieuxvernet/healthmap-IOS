@@ -599,9 +599,15 @@ if MODE == "apply-app"
       icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports
       weight, steps and sleep). The Scanner tab also reads active energy (kcal).
 
+      A screen recording captured on a physical iPhone is attached to this
+      section: it begins on the Home Screen, launches the app, signs in with
+      the demo account, walks through the core features, opens the paywall and
+      completes a successful sandbox purchase.
+
       Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
       Privacy Policy: https://healthmap.fr/privacy
-      (Both are also tappable at the bottom of the paywall in-app.)
+      (Both are also tappable at the bottom of the paywall in-app. The EULA
+      link is also included in the App Description, per 3.1.2(c).)
     NOTES
   }
   review_attrs.delete(:contactPhone) if review_attrs[:contactPhone].empty?
@@ -1354,9 +1360,15 @@ if MODE == "fix-meta"
     icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports
     weight, steps and sleep). The Scanner tab also reads active energy (kcal).
 
+    A screen recording captured on a physical iPhone is attached to this
+    section: it begins on the Home Screen, launches the app, signs in with
+    the demo account, walks through the core features, opens the paywall and
+    completes a successful sandbox purchase.
+
     Terms of Use (EULA): #{terms_url}
     Privacy Policy: #{privacy_url}
-    (Both are also tappable at the bottom of the paywall in-app.)
+    (Both are also tappable at the bottom of the paywall in-app. The EULA
+    link is also included in the App Description, per 3.1.2(c).)
   NOTES
   code, rd = req(:get, "/v1/appStoreVersions/#{version_id}/appStoreReviewDetail")
   if code == 200 && rd["data"]
