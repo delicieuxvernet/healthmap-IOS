@@ -457,8 +457,15 @@ final class MealJournalService {
             .execute()
             .value
 
-        return rows.map { r in
-            let date = Self.parseTimestamp(r.consumedAt) ?? from
+        return rows.compactMap { r -> MealRecord? in
+            // Un timestamp illisible ne doit JAMAIS rabattre le repas sur le
+            // début de la fenêtre : rangé sur le mauvais jour, il polluait le
+            // journal et cassait « 3 jours d'affilée » du Suivi. On écarte la
+            // ligne en le disant — jamais un repas posé sur un jour inventé.
+            guard let date = Self.parseTimestamp(r.consumedAt) else {
+                AppLogger.database.warning("Journal: consumed_at illisible, ligne écartée (\(r.consumedAt, privacy: .public))")
+                return nil
+            }
             let slot = MealSlot(rawValue: r.mealType ?? "") ?? MealSlot.from(date: date, calendar: calendar)
             let items = (r.detectedFoods ?? []).filter { !$0.name.isEmpty }
             return MealRecord(id: r.id,
@@ -782,12 +789,34 @@ final class MealJournalService {
     // MARK: - Helpers
 
     private static let iso = ISO8601DateFormatter()
+    private static let isoFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 
-    /// `consumed_at` peut arriver avec ou sans fraction de seconde selon la source.
-    /// Interne (pas `private`) : testé directement avec les formats réels PostgREST.
+    /// `consumed_at` arrive au format PostgREST, avec une fraction de seconde
+    /// ABSENTE (ligne iOS), en millisecondes (ligne Edge), TRONQUÉE de ses
+    /// zéros finaux (« .71 » — comportement Postgres, observé en prod) ou en
+    /// microsecondes (« .717013 » — écriture/édition SQL ou web).
+    /// ISO8601DateFormatter ne lit que 0 ou 3 chiffres : on normalise la
+    /// fraction à 3 chiffres avant de re-tenter, plutôt que de perdre le repas.
+    /// Interne (pas `private`) : testé directement avec les chaînes réelles.
     static func parseTimestamp(_ s: String) -> Date? {
-        let withFraction = ISO8601DateFormatter()
-        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return withFraction.date(from: s) ?? ISO8601DateFormatter().date(from: s)
+        isoFraction.date(from: s)
+            ?? iso.date(from: s)
+            ?? isoFraction.date(from: normalizedFraction(s))
+    }
+
+    /// Ramène la fraction de seconde à EXACTEMENT 3 chiffres (complète ou
+    /// tronque), sans toucher au reste de la chaîne. Pure — testable.
+    private static func normalizedFraction(_ s: String) -> String {
+        guard let dot = s.firstIndex(of: ".") else { return s }
+        let debut = s.index(after: dot)
+        var fin = debut
+        while fin < s.endIndex, s[fin].isNumber { fin = s.index(after: fin) }
+        guard fin > debut else { return s }
+        let trois = String((String(s[debut..<fin]) + "000").prefix(3))
+        return String(s[..<debut]) + trois + String(s[fin...])
     }
 }

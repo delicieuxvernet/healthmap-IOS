@@ -124,7 +124,9 @@ final class SuiviCourbesReellesTests: XCTestCase {
     }
     private func nettoyerClefsSuivi() {
         let cal = Calendar.current
-        for k in 0..<10 {
+        // 90 jours = fenêtre de `earliestCheckinDay` : aucun résidu d'un run
+        // précédent ne doit pouvoir déplacer l'ancre du suivi.
+        for k in 0..<90 {
             if let jour = cal.date(byAdding: .day, value: -k, to: Date()) {
                 UserDefaults.standard.removeObject(forKey: clefCheckin(jour))
                 let f = DateFormatter()

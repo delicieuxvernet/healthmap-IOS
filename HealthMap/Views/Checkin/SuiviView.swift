@@ -115,6 +115,10 @@ struct SuiviView: View {
                         onFinish: { feels, energy in
                             SuiviCheckinStore.saveToday(symptomFeels: feels, energyFeel: energy)
                             gamification.recordCheckin()
+                            // saveToday a pu démarrer le suivi (1er check-in) :
+                            // on relit l'état pour que les courbes basculent
+                            // en réel dès cette réponse, sans autre geste.
+                            isTracking = SuiviTrackingStore.isStarted()
                             checkinTick += 1
                             HapticService.shared.success()
                         },
@@ -129,6 +133,10 @@ struct SuiviView: View {
                 }
             }
             .task {
+                // Migration : des check-ins existent mais le suivi n'a jamais
+                // été « démarré » (bandeau jamais tapé) → on le démarre, ancré
+                // au premier check-in. Les réponses déjà données comptent.
+                SuiviTrackingStore.startFromExistingCheckinsIfNeeded()
                 isTracking = SuiviTrackingStore.isStarted()
                 // Suivi déjà démarré → on (re)planifie les rappels en silence
                 // (idempotent, sans redemander la permission). Couvre ceux qui
@@ -1471,6 +1479,9 @@ enum SuiviCheckinStore {
         if let energyFeel { dict[energyFeelKey] = energyFeel }
         UserDefaults.standard.set(dict, forKey: checkinKey(dayString()))
         UserDefaults.standard.set(true, forKey: promptedKey(dayString()))
+        // Répondre au pop-up vaut démarrage du suivi : la promesse « ça met
+        // tes courbes à jour » ne dépend plus du bandeau « Commencer mon suivi ».
+        SuiviTrackingStore.startFromExistingCheckinsIfNeeded()
     }
 
     /// « Plus tard » : ne réenregistre rien mais évite de re-présenter le pop-up

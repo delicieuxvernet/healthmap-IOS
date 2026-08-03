@@ -39,8 +39,17 @@ final class MealJournalViewModel: ObservableObject {
         }
         isLoading = true
         do {
+            let cal = Calendar.current
             let week = WeekScoreEngine.currentWeekInterval(containing: Date())
-            let from = Calendar.current.date(byAdding: .day, value: -7, to: week.start) ?? week.start
+            // Fenêtre = union de DEUX besoins : la semaine précédente (score
+            // hebdo du Bilan) ET 14 jours glissants pleins (axe + seuil
+            // « 3 jours d'affilée » du Suivi). Avant : `week.start − 7` seul —
+            // en début de semaine l'axe de 14 jours regardait des jours jamais
+            // chargés, une série de jours scannés pouvait « disparaître » le
+            // lundi et refermer les vraies courbes.
+            let solSemaine = cal.date(byAdding: .day, value: -7, to: week.start) ?? week.start
+            let solAxe = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: Date())) ?? solSemaine
+            let from = min(solSemaine, solAxe)
             let all = try await service.loadRange(userId: userId, from: from, to: week.end)
             fortnight = all
             meals = all.filter { Calendar.current.isDateInToday($0.consumedAt) }
@@ -239,14 +248,16 @@ final class MealJournalViewModel: ObservableObject {
     // MARK: - Navigation jour par jour (bornée à la fenêtre `fortnight`)
 
     /// Jour le plus ancien navigable = le SOL RÉEL de la fenêtre chargée par
-    /// `load()` : `week.start − 7 j` (lundi de la semaine précédente). Aligné sur
-    /// la même source que le chargement, pour ne jamais proposer un jour passé
-    /// « vide » alors que ses repas existent en base mais hors de la requête.
+    /// `load()` : min(lundi précédent − 7 j hebdo, 14 jours glissants). Aligné
+    /// sur la même source que le chargement, pour ne jamais proposer un jour
+    /// passé « vide » alors que ses repas existent en base mais hors requête.
     private var earliestDay: Date {
         let cal = Calendar.current
         let weekStart = WeekScoreEngine.currentWeekInterval(containing: Date()).start
-        return cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: weekStart))
+        let solSemaine = cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: weekStart))
             ?? cal.startOfDay(for: Date())
+        let solAxe = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: Date())) ?? solSemaine
+        return min(solSemaine, solAxe)
     }
 
     /// Peut-on avancer d'un jour ? Faux si on est déjà sur aujourd'hui (pas de futur).

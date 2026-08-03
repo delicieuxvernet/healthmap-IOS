@@ -736,6 +736,24 @@ enum SuiviCheckinHistory {
         return out
     }
 
+    /// Jour (début de journée locale) du PREMIER check-in enregistré dans les
+    /// `days` derniers jours — nil si aucun. Sert d'ancre au démarrage
+    /// automatique du suivi : les réponses déjà données comptent, on ne les
+    /// jette jamais.
+    static func earliestCheckinDay(days: Int = 90, now: Date = Date(), calendar: Calendar = .current) -> Date? {
+        for k in stride(from: days - 1, through: 0, by: -1) {
+            guard let d = calendar.date(byAdding: .day, value: -k, to: now),
+                  let dict = UserDefaults.standard.dictionary(forKey: dayKey(dayString(d))) as? [String: Int]
+            else { continue }
+            // Même règle que `SuiviCheckinStore.hasAnsweredToday` : au moins
+            // une clé par symptôme (`feel_<id>`), ou l'ancienne clé unique.
+            if dict.keys.contains(where: { $0.hasPrefix("feel_") }) || dict[feelKey] != nil {
+                return calendar.startOfDay(for: d)
+            }
+        }
+        return nil
+    }
+
     /// Ressentis de CHAQUE jour ayant un check-in, du début du suivi (`start`,
     /// ramené à son début de journée) jusqu'à aujourd'hui — du plus ANCIEN au
     /// plus récent. Un jour sans check-in est simplement absent : la série ne
@@ -789,6 +807,17 @@ enum SuiviTrackingStore {
         guard !isStarted() else { return }
         let startOfDay = calendar.startOfDay(for: now)
         UserDefaults.standard.set(startOfDay.timeIntervalSince1970, forKey: key)
+    }
+
+    /// Démarre le suivi TOUT SEUL dès qu'au moins un check-in existe, ancré au
+    /// PREMIER check-in enregistré (idempotent). C'est la promesse du pop-up
+    /// (« ça met tes courbes à jour ») : répondre suffit, le bandeau
+    /// « Commencer mon suivi » n'est plus un préalable — et les réponses déjà
+    /// données ne sont jamais perdues.
+    static func startFromExistingCheckinsIfNeeded(now: Date = Date(), calendar: Calendar = .current) {
+        guard !isStarted() else { return }
+        guard let premier = SuiviCheckinHistory.earliestCheckinDay(now: now, calendar: calendar) else { return }
+        UserDefaults.standard.set(premier.timeIntervalSince1970, forKey: key)
     }
 }
 
