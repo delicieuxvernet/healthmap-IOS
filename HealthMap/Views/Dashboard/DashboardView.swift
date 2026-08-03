@@ -31,6 +31,7 @@ struct DashboardView: View {
     @StateObject private var journal = MealJournalViewModel()
 
     @State private var selectedApport: ApportV2?
+    @State private var selectedAttention: InteractionV2?
     @State private var showPaywall = false
     @State private var showTrophies = false
     @State private var showScoreDetail = false
@@ -79,6 +80,15 @@ struct DashboardView: View {
                     selectedApport = nil
                     openTab(.plan)
                 }
+            }
+            // Pop-up détail d'un point d'attention (maquette V2a) : le tap
+            // ouvre une sheet limpide au lieu de basculer sèchement vers Plan.
+            .sheet(item: $selectedAttention) { interaction in
+                AttentionDetailSheet(interaction: interaction) {
+                    selectedAttention = nil
+                    openTab(.plan)
+                }
+                .healthMapSheet()
             }
             // Trophées de la récolte (feuille existante, alimentée par la série).
             .sheet(isPresented: $showTrophies) {
@@ -168,8 +178,8 @@ struct DashboardView: View {
 
                 // Z3b · Points d'attention (interactions du contrat)
                 if !attentionItems.isEmpty {
-                    BilanV7AttentionCard(items: attentionItems) { _ in
-                        openTab(.plan)
+                    BilanV7AttentionCard(items: attentionItems) { item in
+                        selectedAttention = item
                     }
                     .staggeredAppear(index: 3)
                 }
