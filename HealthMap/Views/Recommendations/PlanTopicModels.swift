@@ -26,6 +26,11 @@ struct PlanTopic: Identifiable {
     let kind: Kind
     let name: String          // « Ongles cassants » / « Plus d'énergie »
     let intro: String         // cause / explication (texte IA borné)
+    /// Reformulation NON actionnable de l'intro, à afficher en GRATUIT quand
+    /// `intro` décrit un geste (levier d'objectif, tipBold/tipRest du contrat
+    /// v2). `nil` = l'intro nomme déjà le problème (causes), même texte pour
+    /// tous. Le principe : le gratuit nomme le problème, jamais la solution.
+    var introTeasing: String? = nil
     let ritual: [PlanRitualStep]
     let nutrition: [PlanNutritionSolution]
     let habitudes: [PlanHabitSolution]

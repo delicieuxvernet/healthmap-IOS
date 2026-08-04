@@ -717,7 +717,9 @@ struct PlanSolutionsSheetV7: View {
 
                 // La cause, en une phrase — avec les vraies valeurs du bilan.
                 // Rien à dire honnêtement → on n'écrit pas d'amorce vide.
-                let cause = topic.radialCause
+                // Gratuit : si l'intro d'origine est un levier actionnable,
+                // la variante teasing (nomme le problème) la remplace.
+                let cause = subscriptionService.isPremium ? topic.radialCause : topic.radialCauseFree
                 if !cause.isEmpty {
                     (Text("Ce qu'on voit : ").font(.system(size: 13, weight: .heavy))
                         + Text(cause).font(.system(size: 13, weight: .medium)))
@@ -996,7 +998,18 @@ extension PlanTopic {
     /// La cause, en une phrase : les vraies valeurs du bilan d'abord (jamais un
     /// chiffre inventé), puis la première phrase de l'explication de l'analyse.
     var radialCause: String {
-        let sentence = PlanTopicText.firstSentence(intro)
+        assembledCause(from: intro)
+    }
+
+    /// Variante GRATUITE de la cause : quand l'intro d'origine décrit un geste
+    /// (`introTeasing` non nil), sa reformulation nomme le problème à la place —
+    /// les vraies valeurs du bilan restent citées, le levier reste premium.
+    var radialCauseFree: String {
+        assembledCause(from: introTeasing ?? intro)
+    }
+
+    private func assembledCause(from text: String) -> String {
+        let sentence = PlanTopicText.firstSentence(text)
         guard !scoreEvidence.isEmpty else { return sentence }
         return sentence.isEmpty ? scoreEvidence : "\(scoreEvidence). \(sentence)"
     }
