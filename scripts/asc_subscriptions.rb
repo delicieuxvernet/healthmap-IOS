@@ -757,6 +757,27 @@ if MODE == "stage-version"
   exit 0
 end
 
+# ── MODE send-submission : envoie UN dossier tel quel, par id ───────────────
+# Outrepasse le garde-fou de complétude du mode submit — DÉCISION EXPLICITE du
+# fondateur (4 août : « envoie en l'état », version seule, abonnements
+# inattachables par API). SUBMISSION_ID requis.
+if MODE == "send-submission"
+  sub_id = ENV["SUBMISSION_ID"].to_s
+  abort_with("send-submission", 0, "SUBMISSION_ID manquant") if sub_id.empty?
+  code, before = req(:get, "/v1/reviewSubmissions/#{sub_id}")
+  abort_with("reviewSubmissions", code, before) unless code == 200
+  state = before.dig("data", "attributes", "state")
+  items = get_all("/v1/reviewSubmissions/#{sub_id}/items?limit=50")
+  puts "Dossier #{sub_id} : état=#{state}, #{items.size} élément(s)"
+  abort_with("send-submission", 0, "état non envoyable : #{state}") unless state == "READY_FOR_REVIEW"
+  ok, = write("ENVOI du dossier à Apple (submitted=true)", :patch, "/v1/reviewSubmissions/#{sub_id}",
+    { data: { type: "reviewSubmissions", id: sub_id, attributes: { submitted: true } } })
+  exit 1 unless ok
+  code, after = req(:get, "/v1/reviewSubmissions/#{sub_id}")
+  puts "État après : #{after.dig("data", "attributes", "state")} · soumis le #{after.dig("data", "attributes", "submittedDate")}"
+  exit 0
+end
+
 # ── MODE stage-subs : tente d'attacher groupe + abonnements au dossier ──────
 # Dernière voie API : créer une subscriptionGroupSubmission (l'objet que l'UI
 # fabrique — item type 19 des dossiers observés), puis les subscriptionSubmissions.
