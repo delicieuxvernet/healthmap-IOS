@@ -39,13 +39,16 @@ struct AttentionDetailSheet: View {
     }
 
     /// Teasing en clair : phrase du catalogue, sinon phrase générique qui
-    /// nomme le nutriment quand il est reconnu, jamais l'habitude.
+    /// nomme le(s) nutriment(s) reconnus, jamais l'habitude ni le geste.
+    /// Même chaîne déterministe que le titre gratuit de la carte du Bilan
+    /// (`AttentionMechanismCatalog.freeTitle`) — la carte et le pop-up
+    /// racontent le même problème. Seul le repli neutre diffère : le header
+    /// dit déjà « Détecté dans tes réponses », on ne le répète pas.
     private var teasing: String {
-        if let mechanism { return mechanism.teasing }
-        if let nutrient {
-            return "Une de tes habitudes du quotidien influence directement ton apport en \(nutrient.label.lowercased())."
-        }
-        return "Une de tes habitudes du quotidien influence directement tes apports."
+        AttentionMechanismCatalog.freeTitle(
+            for: interaction,
+            neutral: "Une de tes habitudes du quotidien influence directement tes apports."
+        )
     }
 
     var body: some View {

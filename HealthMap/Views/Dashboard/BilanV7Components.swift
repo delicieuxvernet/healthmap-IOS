@@ -458,6 +458,11 @@ struct BilanV7ApportsCard: View {
 // MARK: - Z3b · Points d'attention
 struct BilanV7AttentionCard: View {
     let items: [InteractionV2]
+    /// Le titre IA (`tipBold`) est un GESTE actionnable (« Ne prends pas fer
+    /// et calcium ensemble ») : c'est ce que la porte du pop-up vend. En
+    /// gratuit, la carte nomme donc le PROBLÈME (teasing déterministe du
+    /// catalogue), jamais la solution — le titre IA reste réservé au premium.
+    let isPremium: Bool
     let onTap: (InteractionV2) -> Void
 
     /// Icône du contrat (id NU) → SF Symbol de la maquette.
@@ -469,6 +474,25 @@ struct BilanV7AttentionCard: View {
         case "fish":                     return "fish"
         default:                         return "exclamationmark.triangle"
         }
+    }
+
+    /// Titre de la ligne : IA en premium, teasing « problème » en gratuit.
+    private func title(for item: InteractionV2) -> String? {
+        if isPremium {
+            guard let bold = item.tipBold, !bold.isEmpty else { return nil }
+            return bold
+        }
+        return AttentionMechanismCatalog.freeTitle(for: item)
+    }
+
+    /// Sous-titre : détail IA en premium ; en gratuit, une provenance neutre
+    /// (le détail IA peut lui aussi porter le geste — jamais en clair).
+    private func detail(for item: InteractionV2) -> String? {
+        if isPremium {
+            guard let rest = item.tipRest, !rest.isEmpty else { return nil }
+            return rest
+        }
+        return "Détecté dans tes réponses"
     }
 
     var body: some View {
@@ -498,13 +522,13 @@ struct BilanV7AttentionCard: View {
                             .accessibilityHidden(true)
 
                         VStack(alignment: .leading, spacing: 1) {
-                            if let title = item.tipBold, !title.isEmpty {
+                            if let title = title(for: item) {
                                 Text(title)
                                     .font(.system(size: 13.5, weight: .bold))
                                     .foregroundStyle(BilanV7.ink)
                                     .multilineTextAlignment(.leading)
                             }
-                            if let detail = item.tipRest, !detail.isEmpty {
+                            if let detail = detail(for: item) {
                                 Text(detail)
                                     .font(.system(size: 11.5, weight: .medium))
                                     .foregroundStyle(BilanV7.secondary)
@@ -540,7 +564,9 @@ struct BilanV7AttentionCard: View {
 // MARK: - Z4 · Tes symptômes suivis
 /// Ligne prête à afficher : le verdict vient de `SuiviEngineV4` (mêmes courbes
 /// que l'onglet Suivi). `showsTrend` est faux tant que le suivi n'a pas démarré
-/// — on n'affiche jamais une tendance qui serait un simple exemple.
+/// (on n'affiche jamais une tendance qui serait un simple exemple) ET en
+/// gratuit : le verdict d'évolution est la trajectoire, réservée au premium —
+/// la ligne nomme alors le symptôme, sans son évolution.
 struct BilanV7SymptomRow: Identifiable {
     let id: String
     let nom: String
