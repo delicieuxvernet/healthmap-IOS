@@ -757,6 +757,39 @@ if MODE == "stage-version"
   exit 0
 end
 
+# ── MODE stage-subs : tente d'attacher groupe + abonnements au dossier ──────
+# Dernière voie API : créer une subscriptionGroupSubmission (l'objet que l'UI
+# fabrique — item type 19 des dossiers observés), puis les subscriptionSubmissions.
+# Sans envoi : l'état du brouillon est relu à la fin.
+if MODE == "stage-subs"
+  group = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").first
+  abort_with("subscriptionGroups", 0, "aucun groupe") unless group
+  puts "Groupe : #{group.dig("attributes", "referenceName")} (#{group["id"]})"
+
+  ok, resp = write("subscriptionGroupSubmission (groupe → dossier)", :post, "/v1/subscriptionGroupSubmissions",
+    { data: { type: "subscriptionGroupSubmissions",
+              relationships: { subscriptionGroup: { data: { type: "subscriptionGroups", id: group["id"] } } } } })
+  puts "  → #{ok ? "créée" : "refusée"}"
+
+  excluded = ENV["EXCLUDE_PRODUCTS"].to_s.split(",").map(&:strip)
+  get_all("/v1/subscriptionGroups/#{group["id"]}/subscriptions?limit=50").each do |s|
+    pid = s.dig("attributes", "productId")
+    next if excluded.include?(pid)
+    next unless %w[READY_TO_SUBMIT REJECTED DEVELOPER_ACTION_NEEDED].include?(s.dig("attributes", "state"))
+    write("subscriptionSubmission #{pid}", :post, "/v1/subscriptionSubmissions",
+      { data: { type: "subscriptionSubmissions",
+                relationships: { subscription: { data: { type: "subscriptions", id: s["id"] } } } } })
+  end
+
+  get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+    .select { |s| s.dig("attributes", "state") == "READY_FOR_REVIEW" }
+    .each do |s|
+      items = get_all("/v1/reviewSubmissions/#{s["id"]}/items?limit=50")
+      puts "Brouillon #{s["id"]} : #{items.size} élément(s)"
+    end
+  exit 0
+end
+
 # ── MODE trim-monthly : retire le Mensuel du brouillon de soumission ────────
 # Le paywall (Annuel + shortPlan hebdo) n'affiche JAMAIS le Mensuel : un abo
 # soumis mais introuvable dans l'app = refus 2.1(b). Le GET simple des items ne
