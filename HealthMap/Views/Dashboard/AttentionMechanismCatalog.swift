@@ -53,6 +53,13 @@ enum AttentionMechanismCatalog {
     /// la chip et un teasing nommant le nutriment même hors catalogue).
     /// `nil` si aucun nutriment du catalogue n'est reconnaissable.
     static func inferredNutrientId(from interaction: InteractionV2) -> String? {
+        inferredNutrientIds(from: interaction).first
+    }
+
+    /// TOUS les nutriments reconnus dans le texte de l'interaction, dans
+    /// l'ordre stable des sondes (déterministe). Sert au teasing générique
+    /// « X et y : deux de tes apports se gênent ».
+    static func inferredNutrientIds(from interaction: InteractionV2) -> [String] {
         let text = normalized(searchText(of: interaction))
         let probes: [(pattern: String, id: String)] = [
             ("b12", "vitB12"),
@@ -66,7 +73,43 @@ enum AttentionMechanismCatalog {
             ("\\biode", "iodine"),
             ("\\bfibre", "fiber"),
         ]
-        return probes.first { contains(text, $0.pattern) }?.id
+        return probes.filter { contains(text, $0.pattern) }.map(\.id)
+    }
+
+    // MARK: - Titre « gratuit » d'un point d'attention
+
+    /// Libellé neutre par défaut quand rien n'est reconnaissable.
+    static let neutralFreeTitle = "Un point d'attention détecté dans tes réponses"
+
+    /// Titre affichable en GRATUIT : nomme le PROBLÈME (le nutriment, la
+    /// gêne), jamais le geste correcteur — le titre IA (`tipBold`) est un
+    /// conseil actionnable réservé au premium. Chaîne déterministe :
+    ///   1. teasing du catalogue quand l'interaction y matche ;
+    ///   2. sinon, 2 nutriments reconnus → « Fer et calcium : deux de tes
+    ///      apports se gênent » ;
+    ///   3. sinon, 1 nutriment reconnu → la même phrase générique que le
+    ///      pop-up (« Une de tes habitudes… ton apport en fer ») ;
+    ///   4. sinon → `neutral` (libellé neutre, surchargé par le pop-up).
+    static func freeTitle(for interaction: InteractionV2,
+                          neutral: String = neutralFreeTitle) -> String {
+        if let mechanism = entry(for: interaction) { return mechanism.teasing }
+
+        let labels = inferredNutrientIds(from: interaction)
+            .compactMap { NutrientData.definition(for: $0)?.label }
+        if labels.count >= 2 {
+            return "\(labels[0]) et \(lowercasedFirst(labels[1])) : deux de tes apports se gênent"
+        }
+        if let label = labels.first {
+            return "Une de tes habitudes du quotidien influence directement ton apport en \(lowercasedFirst(label))."
+        }
+        return neutral
+    }
+
+    /// « Vitamine B12 » → « vitamine B12 » (seule l'initiale passe en
+    /// minuscule — un .lowercased() global écraserait « B12 » en « b12 »).
+    private static func lowercasedFirst(_ label: String) -> String {
+        guard let first = label.first else { return label }
+        return first.lowercased() + label.dropFirst()
     }
 
     // MARK: - Reconnaissance (texte normalisé, mots-clés en ET de OU)

@@ -6,11 +6,15 @@ import SwiftUI
 //   1. HERO : grande jauge centrée du score (la VALEUR domine) + emoji/nom +
 //      état FR (HealthScale) + verdict. Couleur = échelle score (lois 3 & 13).
 //   2. « Pourquoi ce score » : pourquoiCeScore + signals en chips + fiabilité
-//   3. « Ta solution » (carte teintée verte douce) — AGIR
+//   3. « Ta solution » (carte teintée verte douce) — AGIR. Premium : nette
+//      ici ; gratuit : elle descend dans la case gatée du bloc 7 (le geste
+//      ne s'affiche jamais en clair — principe « le gratuit nomme le
+//      problème, jamais la solution »)
 //   4. Le déclic : comparaison en citation discrète (après l'action)
 //   5. Repliables fermés : mécanisme / symptômes (UN composant réutilisé)
 //   6. Recherche approfondie (validate-hypotheses + web, à la demande)
-//   7. Hack + synergie : premium via GatedOverlay + UnlockDoor partagés (loi 11)
+//   7. Hack + synergie (+ solution en gratuit) : premium via GatedOverlay +
+//      UnlockDoor partagés (loi 11)
 struct NutrientDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -42,8 +46,12 @@ struct NutrientDetailSheet: View {
                         pourquoiSection
                     }
 
-                    // 3. « Ta solution » — AGIR
-                    if let solution = nutrient.solution, hasSolutionContent(solution) {
+                    // 3. « Ta solution » — AGIR. Le geste (action, dosage,
+                    // moment) est l'ordonnance : net en premium uniquement.
+                    // En gratuit, la carte rejoint la case gatée du bloc 7
+                    // (un seul voile, une seule porte) — jamais en clair.
+                    if subscriptionService.isPremium,
+                       let solution = nutrient.solution, hasSolutionContent(solution) {
                         solutionCard(solution)
                     }
 
@@ -368,7 +376,12 @@ struct NutrientDetailSheet: View {
     private var premiumSection: AnyView? {
         let hack = nutrient.hack?.isEmpty == false ? nutrient.hack : nil
         let synergie = nutrient.synergie?.isEmpty == false ? nutrient.synergie : nil
-        guard hack != nil || synergie != nil else { return nil }
+        // En gratuit, « Ta solution » (bloc 3) rejoint cette case : un seul
+        // voile, une seule porte pour toute l'ordonnance de la fiche.
+        let solution = subscriptionService.isPremium
+            ? nil
+            : nutrient.solution.flatMap { hasSolutionContent($0) ? $0 : nil }
+        guard hack != nil || synergie != nil || solution != nil else { return nil }
 
         // Famille 1 (fiche apport) : le hack + la synergie sont l'ordonnance —
         // floutés en teaser (6px) sous une porte verte au bénéfice spécifique.
@@ -390,19 +403,38 @@ struct NutrientDetailSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
 
         if subscriptionService.isPremium {
+            // (solution est nil en premium : la garde d'entrée vaut hack/synergie)
             return AnyView(rows.cardStyle())
         }
 
-        let doorTitle = hack != nil
-            ? "Débloque le hack \(nutrient.label)"
-            : "Débloque la synergie \(nutrient.label)"
-        let doorSubtitle = (hack != nil && synergie != nil)
-            ? "L'astuce d'absorption + la synergie entre nutriments"
-            : (hack != nil ? "L'astuce d'absorption qui change tout" : "La synergie entre tes nutriments")
+        let gatedContent = VStack(spacing: Theme.spacingSM) {
+            if let solution {
+                solutionCard(solution)
+            }
+            if hack != nil || synergie != nil {
+                rows.cardStyle()
+            }
+        }
+
+        let doorTitle = solution != nil
+            ? "Débloque ta solution \(nutrient.label)"
+            : (hack != nil
+                ? "Débloque le hack \(nutrient.label)"
+                : "Débloque la synergie \(nutrient.label)")
+        let doorSubtitle: String
+        if solution != nil && (hack != nil || synergie != nil) {
+            doorSubtitle = "Le geste précis + l'astuce d'absorption"
+        } else if solution != nil {
+            doorSubtitle = "Le geste précis, la dose et le bon moment"
+        } else if hack != nil && synergie != nil {
+            doorSubtitle = "L'astuce d'absorption + la synergie entre nutriments"
+        } else {
+            doorSubtitle = hack != nil ? "L'astuce d'absorption qui change tout" : "La synergie entre tes nutriments"
+        }
 
         return AnyView(
             VStack(spacing: Theme.spacingSM) {
-                GatedOverlay(intensity: .teaser) { rows }
+                GatedOverlay(intensity: .teaser) { gatedContent }
                 UnlockDoor(icon: "lock.fill", title: doorTitle, subtitle: doorSubtitle, zone: "fiche_apport")
             }
         )

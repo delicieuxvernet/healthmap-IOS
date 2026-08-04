@@ -212,6 +212,8 @@ struct RecommendationsContentView: View {
 
         // OBJECTIFS — titre = le NOM de l'objectif (ex. « Plus d'énergie »),
         // jamais une phrase d'action longue. L'explication passe en intro.
+        // Le levier est un GESTE (ordonnance) : en gratuit, la pop-up affiche
+        // la reformulation neutre (`introTeasing`), jamais le levier en clair.
         for o in vm.objectifsAnalyse.prefix(3) {
             guard let name = o.objectif, !name.isEmpty else { continue }
             let levierText = (o.leviers ?? []).first
@@ -221,6 +223,7 @@ struct RecommendationsContentView: View {
                 name: prettify(name),
                 intro: levierText.map { "Ton levier principal\u{202F}: \($0)." }
                     ?? "Voici comment t'en rapprocher au quotidien.",
+                introTeasing: levierText != nil ? "Voici comment t'en rapprocher au quotidien." : nil,
                 focus: focus(matching: ((o.leviers ?? []) + (o.freins ?? [])).joined(separator: " "), fallbackToDeficiencies: false)
             ))
         }
@@ -230,12 +233,13 @@ struct RecommendationsContentView: View {
 
     /// Assemble un PlanTopic à partir des apports DÉJÀ attribués à ce nœud
     /// (distincts des autres nœuds — voir `topics`).
-    private func makeTopic(id: String, kind: PlanTopic.Kind, name: String, intro: String, focus: [EnrichedNutrient]) -> PlanTopic {
+    private func makeTopic(id: String, kind: PlanTopic.Kind, name: String, intro: String, introTeasing: String? = nil, focus: [EnrichedNutrient]) -> PlanTopic {
         PlanTopic(
             id: id,
             kind: kind,
             name: name,
             intro: intro,
+            introTeasing: introTeasing,
             ritual: ritual(for: focus, kind: kind),
             nutrition: nutritionSolutions(for: focus),
             habitudes: habits(for: focus, kind: kind, objectifName: name),

@@ -178,9 +178,14 @@ struct DashboardView: View {
                     .staggeredAppear(index: 2)
                 }
 
-                // Z3b · Points d'attention (interactions du contrat)
+                // Z3b · Points d'attention (interactions du contrat).
+                // isPremium : en gratuit la carte nomme le problème (teasing
+                // déterministe), le titre-solution IA reste premium.
                 if !attentionItems.isEmpty {
-                    BilanV7AttentionCard(items: attentionItems) { item in
+                    BilanV7AttentionCard(
+                        items: attentionItems,
+                        isPremium: subscriptionService.isPremium
+                    ) { item in
                         selectedAttention = item
                     }
                     .staggeredAppear(index: 3)
@@ -293,6 +298,10 @@ struct DashboardView: View {
     /// La tendance n'est affichée QUE si le suivi a réellement démarré :
     /// sinon `SuiviEngineV4` renvoie une courbe d'exemple, qu'on ne présente
     /// jamais comme une évolution vécue.
+    /// ET que l'utilisateur est premium : le verdict d'évolution (« en
+    /// amélioration ») est la trajectoire — exactement ce que les portes
+    /// `suivi_symptomes` / `historique_score` vendent. En gratuit, la ligne
+    /// nomme le symptôme (le problème), jamais son évolution.
     private func symptomRows(_ v2: AIAnalysisV2) -> [BilanV7SymptomRow] {
         let symptomes = v2.bilan?.symptomes ?? []
         guard !symptomes.isEmpty else { return [] }
@@ -316,7 +325,7 @@ struct DashboardView: View {
                 nom: capitalizedFirst(evolution.nom),
                 verdict: evolution.verdict,
                 improving: evolution.improving,
-                showsTrend: !evolution.isExample
+                showsTrend: !evolution.isExample && subscriptionService.isPremium
             )
         }
     }

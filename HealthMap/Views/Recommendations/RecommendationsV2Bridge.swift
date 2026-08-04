@@ -40,15 +40,22 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
         let kind: PlanTopic.Kind = section.type == "objectif" ? .objectif : .symptome
 
         // Intro = explication (tipBold + tipRest), sinon les causes listées.
+        // tipBold/tipRest du contrat sont des GESTES (« Décale ton café… ») :
+        // quand ils font l'intro, `introTeasing` porte la version gratuite
+        // (les causes — le problème — ou un libellé neutre), jamais le geste.
         let bold = section.tipBold?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let rest = section.tipRest?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let joined = [bold, rest].filter { !$0.isEmpty }.joined(separator: " ")
+        let causes = (section.causes ?? []).compactMap { $0.label }.filter { !$0.isEmpty }
+        let causesIntro = causes.isEmpty ? "Ton plan personnalisé pour ce point." : causes.joined(separator: ", ")
         let intro: String
+        let introTeasing: String?
         if !joined.isEmpty {
             intro = joined
+            introTeasing = causesIntro
         } else {
-            let causes = (section.causes ?? []).compactMap { $0.label }.filter { !$0.isEmpty }
-            intro = causes.isEmpty ? "Ton plan personnalisé pour ce point." : causes.joined(separator: ", ")
+            intro = causesIntro
+            introTeasing = nil
         }
 
         // Rituel matin / midi / soir.
@@ -98,6 +105,7 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
             kind: kind,
             name: titre,
             intro: intro,
+            introTeasing: introTeasing,
             ritual: ritual,
             nutrition: nutrition,
             habitudes: habitudes,

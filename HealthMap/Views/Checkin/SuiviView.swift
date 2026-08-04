@@ -77,7 +77,8 @@ struct SuiviView: View {
                         symptomCarousel.kiwiEntrance(4)
                         SuiviNeedsCard(delta: stats.besoinsDuJourDeltaPct,
                                        stepsToday: stepsToday,
-                                       tips: weeklyTips)
+                                       tips: weeklyTips,
+                                       isPremium: subscriptionService.isPremium)
                             .kiwiEntrance(5)
                         SuiviPaliersCard(paliers: paliers).kiwiEntrance(6)
                     }
@@ -613,9 +614,12 @@ private struct SuiviStartBanner: View {
 private struct SuiviSymptomPage: View {
     let evolution: SuiviEngineV4.SymptomEvolution
     let reduceMotion: Bool
-    /// Famille 2 du handoff Premium : le verdict du jour reste NET, seule la
-    /// trajectoire dans le temps est gatée. On ne floute jamais une courbe
-    /// d'EXEMPLE (le suivi n'a pas démarré) : ce serait cacher une démo.
+    /// Famille 2 du handoff Premium : en gratuit, la trajectoire ENTIÈRE est
+    /// gatée — courbe floutée ET verdict d'évolution neutralisé (pastille
+    /// « Tendance », insight sans sens). Le verdict net au-dessus de la courbe
+    /// floutée donnait gratuitement ce que la porte vend (fuite corrigée le
+    /// 4 août 2026). On ne floute jamais une courbe d'EXEMPLE (le suivi n'a
+    /// pas démarré) : ce serait cacher une démo.
     var locked: Bool = false
 
     private var chartLocked: Bool { locked && !evolution.isExample }
@@ -627,26 +631,30 @@ private struct SuiviSymptomPage: View {
     /// Mode réel mais aucun check-in encore : la courbe « démarre » (jour 0).
     private var isDayZero: Bool { !evolution.isExample && realPointCount < 2 }
 
-    // La pastille change selon l'état : Exemple / Jour 0 / verdict réel.
+    // La pastille change selon l'état : Exemple / Jour 0 / gatée / verdict réel.
+    // Gatée (gratuit, vrai suivi) : le verdict d'évolution EST la trajectoire
+    // que la porte `suivi_symptomes` vend — la pastille reste neutre, sans sens.
     private var pillText: String {
         if evolution.isExample { return "Exemple" }
         if isDayZero { return "Jour 0" }
+        if chartLocked { return "Tendance" }
         return evolution.verdict
     }
     private var pillColor: Color {
-        if evolution.isExample { return Color(hex: "5F5E5A") }
+        if evolution.isExample || chartLocked { return Color(hex: "5F5E5A") }
         if isDayZero { return Color.kiwiGreenInk }
         return evolution.improving ? Color.kiwiGreenInk : Color(hex: "D9820A")
     }
     private var pillBg: Color {
-        if evolution.isExample { return Color(hex: "F1EFE8") }
+        if evolution.isExample || chartLocked { return Color(hex: "F1EFE8") }
         if isDayZero { return Color.kiwiGreenSoft }
         return evolution.improving ? Color.kiwiGreenSoft : Color(hex: "FDECD6")
     }
-    /// Icône de pastille : neutre en exemple / jour 0, flèche de sens en réel.
+    /// Icône de pastille : neutre en exemple / jour 0 / gaté, flèche de sens en réel.
     private var pillIcon: String? {
         if evolution.isExample { return "sparkles" }
         if isDayZero { return "circle.dashed" }
+        if chartLocked { return "lock.fill" }
         guard evolution.verdict != "Stable" else { return "equal" }
         // La flèche suit le SENS RÉEL de la courbe (baisse d'un problème = flèche
         // vers le bas), indépendamment du fait que ce soit une bonne nouvelle.
@@ -663,6 +671,12 @@ private struct SuiviSymptomPage: View {
         }
         if isDayZero {
             return "Ton suivi de \(nom) démarre, tes réponses vont le dessiner."
+        }
+        // Gratuit : on nomme le suivi (le problème), jamais son évolution —
+        // le verdict (« s'améliore ») restait net au-dessus de la courbe
+        // floutée et donnait gratuitement ce que la porte vend.
+        if chartLocked {
+            return "Ton suivi de \(nom) se dessine, check-in après check-in."
         }
         switch evolution.verdict {
         case "En amélioration": return "Ton suivi de \(nom) s'améliore depuis ton arrivée."
@@ -881,10 +895,16 @@ private struct SuiviPosedChart: View {
 /// besoins du jour (delta > 0, sinon le bandeau est masqué — jamais de valeur
 /// factice), suivi de « Pour faire mieux la semaine prochaine » : 2 conseils
 /// concrets tirés des 2 apports les plus bas.
+///
+/// Premium : les conseils sont des GESTES (« Ajoute une source de fer… ») —
+/// l'ordonnance. En gratuit, la carte nomme le PROBLÈME (l'apport qui a
+/// manqué), sans impératif ni aliment-solution : même principe que les
+/// points d'attention du Bilan.
 private struct SuiviNeedsCard: View {
     let delta: Int
     let stepsToday: Int?
     let tips: [SuiviEngineV4.WeeklyTip]
+    let isPremium: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -913,7 +933,7 @@ private struct SuiviNeedsCard: View {
                     .frame(height: 1)
                     .padding(.top, 14)
 
-                Text("POUR FAIRE MIEUX LA SEMAINE PROCHAINE")
+                Text(isPremium ? "POUR FAIRE MIEUX LA SEMAINE PROCHAINE" : "CE QUI A MANQUÉ CETTE SEMAINE")
                     .font(.system(size: 10, weight: .heavy))
                     .tracking(0.5)
                     .foregroundStyle(Color(hex: "2F6FE0"))
@@ -995,13 +1015,32 @@ private struct SuiviNeedsCard: View {
 
     private func tipRow(_ tip: SuiviEngineV4.WeeklyTip) -> some View {
         HStack(alignment: .top, spacing: 11) {
-            Fluent3DIcon(name: SuiviTipIcon.asset(for: tip.id), size: 30)
-            Text(tip.text)
+            // Gratuit : l'emoji canonique du nutriment (le problème), pas
+            // l'illustration d'un aliment-solution (l'icône « lait » à côté
+            // du calcium raconterait déjà le geste).
+            if isPremium {
+                Fluent3DIcon(name: SuiviTipIcon.asset(for: tip.id), size: 30)
+            } else {
+                Text(NutrientData.definition(for: tip.id)?.emoji ?? "🥝")
+                    .font(.system(size: 22))
+                    .frame(width: 30, height: 30)
+                    .accessibilityHidden(true)
+            }
+            Text(isPremium ? tip.text : freeText(tip))
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(Color(hex: "3a3833"))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
+    }
+
+    /// Version gratuite d'un conseil : nomme l'apport resté bas ces 7 jours
+    /// (déterministe, catalogue canonique) — le geste reste premium.
+    private func freeText(_ tip: SuiviEngineV4.WeeklyTip) -> String {
+        guard let label = NutrientData.definition(for: tip.id)?.label else {
+            return "Un de tes apports a manqué ces 7 jours."
+        }
+        return "Ton apport en \(label.lowercased()) a manqué ces 7 jours."
     }
 }
 
