@@ -721,6 +721,42 @@ if MODE == "cancel-submission"
   exit 0
 end
 
+# ── MODE stage-version : remet la version dans un brouillon SANS envoyer ────
+# Après l'annulation du 3 août, le dossier doit être ré-assemblé. L'API sait
+# ajouter la VERSION à un brouillon (les abonnements, eux, ne passent que par
+# l'UI pour une première soumission). Ce mode s'arrête là — AUCUN envoi, AUCUN
+# rattachement de build (leçon : apply-app vide le dossier).
+if MODE == "stage-version"
+  version_id, vattrs = find_editable_version(app_id)
+  abort_with("appStoreVersions", 0, "aucune version éditable (1.0) trouvée") unless version_id
+  puts "Version : #{vattrs["versionString"]} état=#{vattrs["appStoreState"]} (#{version_id})"
+
+  subs_list = get_all("/v1/apps/#{app_id}/reviewSubmissions?limit=50")
+  draft = subs_list.find { |s| s.dig("attributes", "state") == "READY_FOR_REVIEW" }
+  if draft
+    puts "Brouillon réutilisé : #{draft["id"]}"
+  else
+    ok, resp = write("création du brouillon", :post, "/v1/reviewSubmissions",
+      { data: { type: "reviewSubmissions",
+                attributes: { platform: "IOS" },
+                relationships: { app: { data: { type: "apps", id: app_id } } } } })
+    exit 1 unless ok
+    draft = resp["data"]
+  end
+
+  ok, = write("ajout de la version au brouillon", :post, "/v1/reviewSubmissionItems",
+    { data: { type: "reviewSubmissionItems",
+              relationships: {
+                reviewSubmission: { data: { type: "reviewSubmissions", id: draft["id"] } },
+                appStoreVersion: { data: { type: "appStoreVersions", id: version_id } } } } })
+  puts "(la version était peut-être déjà dans un dossier)" unless ok
+
+  items = get_all("/v1/reviewSubmissions/#{draft["id"]}/items?limit=50")
+  puts "\nBrouillon #{draft["id"]} : #{items.size} élément(s)."
+  puts "PROCHAINE ÉTAPE (UI, unique impossible par API) : ajouter les abonnements Hebdo + Annuel au dossier."
+  exit 0
+end
+
 # ── MODE trim-monthly : retire le Mensuel du brouillon de soumission ────────
 # Le paywall (Annuel + shortPlan hebdo) n'affiche JAMAIS le Mensuel : un abo
 # soumis mais introuvable dans l'app = refus 2.1(b). Le GET simple des items ne
