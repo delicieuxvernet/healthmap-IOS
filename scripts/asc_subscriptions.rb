@@ -757,6 +757,37 @@ if MODE == "stage-version"
   exit 0
 end
 
+# ── MODE set-availability : rend l'app disponible dans tous les territoires ─
+# Post-approbation du 7 août : « Cette app a été retirée de la vente » — la
+# disponibilité de l'APP (distincte de celle des abonnements) n'avait jamais
+# été configurée. POST /v2/appAvailabilities avec la liste complète des
+# territoires (patron included + placeholders, comme appPriceSchedules).
+if MODE == "set-availability"
+  territories = get_all("/v1/territories?limit=200").map { |t| t["id"] }
+  abort_with("territories", 0, "liste vide") if territories.empty?
+  puts "#{territories.size} territoires App Store"
+
+  refs = territories.each_with_index.map { |_, i| "${t#{i}}" }
+  included = territories.each_with_index.map do |terr, i|
+    { type: "territoryAvailabilities", id: "${t#{i}}",
+      attributes: { available: true },
+      relationships: { territory: { data: { type: "territories", id: terr } } } }
+  end
+  ok, resp = write("disponibilité de l'app (#{territories.size} territoires)", :post, "/v2/appAvailabilities",
+    { data: { type: "appAvailabilities",
+              attributes: { availableInNewTerritories: true },
+              relationships: {
+                app: { data: { type: "apps", id: app_id } },
+                territoryAvailabilities: { data: refs.map { |r| { type: "territoryAvailabilities", id: r } } } } },
+      included: included })
+  exit 1 unless ok
+
+  code, check = req(:get, "/v2/appAvailabilities/#{app_id}/territoryAvailabilities?limit=200&filter[available]=true")
+  n = code == 200 ? (check["data"] || []).size : "?"
+  puts "Territoires disponibles après écriture : #{n} (HTTP #{code})"
+  exit 0
+end
+
 # ── MODE send-submission : envoie UN dossier tel quel, par id ───────────────
 # Outrepasse le garde-fou de complétude du mode submit — DÉCISION EXPLICITE du
 # fondateur (4 août : « envoie en l'état », version seule, abonnements
