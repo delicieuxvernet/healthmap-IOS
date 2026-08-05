@@ -1,32 +1,34 @@
 // supabase/functions/verify-receipt/index.ts
-// Supabase Edge Function — StoreKit 2 receipt cross-validation
+// Supabase Edge Function v5 — 2026-08-07 : réconciliation ACTIVE via RevenueCat.
 //
-// Called by ReceiptValidationService.swift after purchases and periodically.
-// Compares the client's active StoreKit 2 product IDs against the server-side
-// subscription state (profiles.tier) and corrects mismatches.
+// Historique :
+//   v4 (2026-06-14) : read-only — la faille d'auto-promotion (product ids
+//   auto-déclarés, pas de validation JWS Apple) était colmatée en n'écrivant
+//   plus jamais le tier. Mais plus RIEN ne l'écrivait : le webhook RevenueCat
+//   est resté sans secret (401 systématique) jusqu'au 7 août — un abonné payant
+//   restait `free` côté serveur (quotas gratuits, 3 scans/j au lieu de 30).
 //
-// Auth model (since 20 Apr 2026 Clerk migration):
-//   - Client (iOS) sends `Authorization: Bearer <Clerk JWT>` (template "supabase")
-//   - We verify the JWT signature against Clerk JWKS
-//   - We extract `sub` (Clerk user id, e.g. "user_xxx...")
-//   - We map clerk_id → profiles.id (UUID) via service-role client
-//   - The `user_id` field in the body is IGNORED (defense against forged bodies)
+//   v5 : le tier est réconcilié contre les SERVEURS RevenueCat (source de
+//   confiance : RC a lui-même validé le receipt auprès d'Apple). Zéro confiance
+//   au body client. Montée ET descente de tier (en l'absence d'événement
+//   webhook, c'est l'unique chemin de retour à free après expiration).
 //
-// TODO P1: validate Apple JWS signature on receipts (StoreKit 2) — currently relies on Clerk JWT only.
-//          Until then, premium tier corrections rely on (a) authenticated Clerk user
-//          and (b) RevenueCat webhooks as primary source of truth. Consider sending
-//          the `signedTransaction` JWS from iOS and verifying against Apple's
-//          public keys (https://developer.apple.com/documentation/appstoreservernotifications/jwstransactiondecodedpayload).
-//
-// Deploy: supabase functions deploy verify-receipt --project-ref ftwfxdfkghkemnpwtzlu
+// Auth (inchangée, v4) : Supabase Auth d'abord (iOS), Clerk JWKS en repli (web).
+// Le body est ignoré pour toute décision ; `user_id` n'est jamais lu.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jwtVerify, createRemoteJWKSet } from "https://esm.sh/jose@5";
+import { rcCandidateIds, shouldWriteTier, targetTier } from "./logic.ts";
 
-// CORS allowlist — iOS native does NOT send an Origin header, so requests
-// without Origin pass through. If Origin is present and not in this allowlist,
-// we reject with 403 (browser-originated cross-site requests).
+const CLERK_ISSUER = "https://clerk.healthmap.fr";
+const CLERK_AUDIENCE = "authenticated";
+const CLERK_JWKS_URL = `${CLERK_ISSUER}/.well-known/jwks.json`;
+const clerkJWKS = createRemoteJWKSet(new URL(CLERK_JWKS_URL));
+
+// Clé PUBLIQUE SDK RevenueCat (appl_) : suffisante pour lire un subscriber.
+const RC_API_KEY = Deno.env.get("REVENUECAT_API_KEY") ?? "";
+
 const ALLOWED_ORIGINS = new Set<string>([
   "https://www.healthmap.fr",
   "https://healthmap.fr",
@@ -44,176 +46,148 @@ function buildCorsHeaders(origin: string | null): Record<string, string> {
   return headers;
 }
 
-// Product IDs that grant premium access (must match App Store Connect)
-const PREMIUM_PRODUCT_IDS = new Set([
-  "fr.healthmap.premium.monthly",
-  "fr.healthmap.premium.annual",
-  "fr.healthmap.premium.lifetime",
-]);
-
-// Clerk JWKS — cached by `jose` across invocations (warm Edge instances).
-const CLERK_JWKS_URL = "https://clerk.healthmap.fr/.well-known/jwks.json";
-const clerkJWKS = createRemoteJWKSet(new URL(CLERK_JWKS_URL));
-
-/**
- * SHA-256 → first 8 hex chars. Used to redact UUIDs in logs (PII).
- */
 async function hashIdForLog(id: string): Promise<string> {
   const data = new TextEncoder().encode(id);
   const digest = await crypto.subtle.digest("SHA-256", data);
-  const hex = Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const hex = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
   return hex.slice(0, 8);
 }
 
-/**
- * Verify the Clerk JWT and return its `sub` (Clerk user id, e.g. "user_xxx...").
- * Throws on missing/invalid/expired token.
- */
-async function verifyClerkJWT(authHeader: string | null): Promise<string> {
-  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
-    throw new Error("missing_authorization_header");
-  }
+class AuthError extends Error {
+  status: number;
+  constructor(message: string, status = 401) { super(message); this.name = "AuthError"; this.status = status; }
+}
+
+// deno-lint-ignore no-explicit-any
+async function verifyAuthAndResolveProfile(authHeader: string | null, admin: any) {
+  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) throw new AuthError("missing_bearer_token");
   const token = authHeader.slice(7).trim();
-  if (!token) {
-    throw new Error("empty_bearer_token");
+  if (!token) throw new AuthError("empty_bearer_token");
+
+  // Chemin A : Supabase Auth (iOS, depuis 2026-06-08)
+  try {
+    const { data, error } = await admin.auth.getUser(token);
+    if (!error && data?.user?.id) {
+      const authUserId = data.user.id as string;
+      const { data: profile, error: pErr } = await admin
+        .from("profiles")
+        .select("id, email, auth_user_id, clerk_id, stripe_customer_id, stripe_subscription_id, tier")
+        .eq("auth_user_id", authUserId)
+        .maybeSingle();
+      if (!pErr && profile) {
+        return { profileId: profile.id as string, authUserId, linkage: profile, authMethod: "supabase" as const };
+      }
+    }
+  } catch (err) {
+    console.warn("supabase auth path threw:", String(err));
   }
-  const { payload } = await jwtVerify(token, clerkJWKS, {
-    // Clerk's "supabase" JWT template uses standard `sub` (Clerk user id).
-    // We don't pin issuer/audience here because the template is configurable;
-    // signature validity against the Clerk JWKS is the security boundary.
-  });
-  if (typeof payload.sub !== "string" || payload.sub.length === 0) {
-    throw new Error("jwt_missing_sub");
+
+  // Chemin B : Clerk JWKS (web)
+  try {
+    const result = await jwtVerify(token, clerkJWKS, { issuer: CLERK_ISSUER, audience: CLERK_AUDIENCE });
+    const payload = result.payload as Record<string, unknown>;
+    const clerkId = typeof payload.sub === "string" ? payload.sub : "";
+    if (!clerkId) throw new AuthError("jwt_missing_sub");
+    const { data: profile, error } = await admin
+      .from("profiles")
+      .select("id, email, auth_user_id, clerk_id, stripe_customer_id, stripe_subscription_id, tier")
+      .eq("clerk_id", clerkId)
+      .maybeSingle();
+    if (error) throw new AuthError("profile_lookup_failed", 500);
+    if (!profile) throw new AuthError("unauthorized");
+    return { profileId: profile.id as string, authUserId: profile.auth_user_id as string | null, linkage: profile, authMethod: "clerk" as const };
+  } catch (err) {
+    if (err instanceof AuthError) throw err;
+    throw new AuthError("unauthorized");
   }
-  return payload.sub;
+}
+
+/** Lit l'entitlement « premium » RevenueCat sous le premier app_user_id qui en
+ *  porte un. iOS identifie avec `session.user.id.uuidString` (MAJUSCULES) ; les
+ *  candidats couvrent aussi la casse basse et le profileId (historique). NB :
+ *  GET subscribers/{id} crée un subscriber vierge si inconnu — sans effet de
+ *  bord gênant (aucun achat attaché), la lecture reste fiable. */
+async function fetchRcPremium(candidates: string[]): Promise<{ ent: { expires_date: string | null; product_identifier?: string } | undefined; degraded: boolean }> {
+  if (!RC_API_KEY) return { ent: undefined, degraded: true };
+  let degraded = false;
+  for (const id of candidates) {
+    try {
+      const r = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(id)}`, {
+        headers: { Authorization: `Bearer ${RC_API_KEY}`, "X-Platform": "ios" },
+      });
+      if (!r.ok) { degraded = true; continue; }
+      const body = await r.json();
+      const ent = body?.subscriber?.entitlements?.premium;
+      if (ent) return { ent, degraded: false };
+    } catch (err) {
+      console.warn("revenuecat fetch failed:", String(err));
+      degraded = true;
+    }
+  }
+  return { ent: undefined, degraded };
 }
 
 serve(async (req: Request) => {
   const origin = req.headers.get("origin");
   const corsHeaders = buildCorsHeaders(origin);
 
-  // Reject browser cross-site requests with disallowed Origin.
-  // iOS native clients send no Origin header and pass through.
   if (origin && !ALLOWED_ORIGINS.has(origin)) {
-    return new Response(
-      JSON.stringify({ error: "Origin not allowed" }),
-      { status: 403, headers: { "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Origin not allowed" }), { status: 403, headers: { "Content-Type": "application/json" } });
   }
-
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // 1. Verify Clerk JWT and extract `sub` (Clerk user id)
-    let clerkUserId: string;
-    try {
-      clerkUserId = await verifyClerkJWT(req.headers.get("authorization"));
-    } catch (authErr) {
-      console.warn("verify-receipt auth failure:", String(authErr));
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // 2. Parse body — IGNORE any user_id field (defense against forgery)
-    const body = await req.json().catch(() => ({} as Record<string, unknown>));
-    const active_product_ids = Array.isArray(body?.active_product_ids)
-      ? (body.active_product_ids as unknown[]).filter((x): x is string => typeof x === "string")
-      : [];
-    // Note: body.user_id is intentionally ignored. The authenticated Clerk
-    // identity is the only trusted source.
-
-    // 3. Initialize Supabase admin client (service-role)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 4. Map Clerk user id → profiles.id (UUID) via clerk_id column
-    const { data: profileByClerk, error: clerkLookupError } = await supabase
-      .from("profiles")
-      .select("id, tier")
-      .eq("clerk_id", clerkUserId)
-      .maybeSingle();
+    let resolved: Awaited<ReturnType<typeof verifyAuthAndResolveProfile>>;
+    try {
+      resolved = await verifyAuthAndResolveProfile(req.headers.get("authorization"), supabase);
+    } catch (authErr) {
+      console.warn("verify-receipt auth failure:", String(authErr));
+      const status = authErr instanceof AuthError ? authErr.status : 401;
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
-    if (clerkLookupError) {
-      console.error("verify-receipt clerk_id lookup error:", clerkLookupError.message);
+    // Body consommé mais JAMAIS utilisé pour décider (compat client v4).
+    await req.json().catch(() => ({}));
+
+    const serverTier = (resolved.linkage?.tier as string) || "free";
+    const hasStripe = Boolean(resolved.linkage?.stripe_subscription_id);
+    const profileHash = await hashIdForLog(resolved.profileId);
+
+    const { ent, degraded } = await fetchRcPremium(rcCandidateIds(resolved.authUserId, resolved.profileId));
+    if (degraded && !ent) {
+      // RevenueCat injoignable : on ne décide rien, l'app garde le tier actuel.
       return new Response(
-        JSON.stringify({ error: "Profile lookup failed" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    if (!profileByClerk) {
-      // No profile row matches this Clerk user — treat as unauthorized rather
-      // than 404, to avoid leaking existence info.
-      console.warn(`verify-receipt: no profile for clerk_id (hash=${await hashIdForLog(clerkUserId)})`);
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ valid: true, tier: serverTier, corrected: false, degraded: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const profileUUID: string = profileByClerk.id;
-    const profileHash = await hashIdForLog(profileUUID);
-
-    // 5. Check if any active product ID grants premium
-    const hasPremiumProduct = active_product_ids.some(
-      (id: string) => PREMIUM_PRODUCT_IDS.has(id)
-    );
-
-    // Without Apple JWS validation, premium product IDs from the client are
-    // self-asserted. Log a warning so this is auditable until P1 lands.
-    if (hasPremiumProduct) {
-      console.warn(
-        `verify-receipt: premium product asserted without Apple JWS validation ` +
-        `(profile=${profileHash}, products=${active_product_ids.join(",")})`
-      );
-    }
-
-    const serverTier: string = profileByClerk.tier || "free";
-    const expectedTier = hasPremiumProduct ? "premium" : "free";
+    const target = targetTier(ent, new Date());
     let corrected = false;
-
-    // Idempotent correction: client has premium receipt but server says free.
-    // Re-call with same receipt → tier already premium → no update, corrected=false.
-    if (hasPremiumProduct && serverTier === "free") {
-      const { error: updateError } = await supabase
+    if (shouldWriteTier(serverTier, target, hasStripe)) {
+      const { error: upErr } = await supabase
         .from("profiles")
-        .update({ tier: "premium", updated_at: new Date().toISOString() })
-        .eq("id", profileUUID);
-
-      if (!updateError) {
-        corrected = true;
-        console.log(`Tier corrected to premium for profile=${profileHash}`);
+        .update({ tier: target, subscription_status: target === "free" ? "expired" : "active" })
+        .eq("id", resolved.profileId);
+      if (upErr) {
+        console.error(`verify-receipt: tier update failed (${serverTier} -> ${target}) profile=${profileHash}: ${upErr.message}`);
       } else {
-        console.error(`Tier update failed for profile=${profileHash}:`, updateError.message);
+        corrected = true;
+        console.log(`verify-receipt: tier ${serverTier} -> ${target} (RevenueCat) profile=${profileHash}`);
       }
     }
 
-    // No auto-downgrade — RevenueCat webhooks handle subscription expiry.
-    // This branch only logs for monitoring.
-    if (!hasPremiumProduct && serverTier === "premium") {
-      console.warn(`Possible tier mismatch for profile=${profileHash}: server=premium, client has no premium products`);
-    }
-
     return new Response(
-      JSON.stringify({
-        valid: true,
-        tier: corrected ? expectedTier : serverTier,
-        corrected,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ valid: true, tier: corrected ? target : serverTier, corrected }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     console.error("verify-receipt error:", err);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Internal server error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
