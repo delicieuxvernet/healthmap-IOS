@@ -763,29 +763,32 @@ end
 # été configurée. POST /v2/appAvailabilities avec la liste complète des
 # territoires (patron included + placeholders, comme appPriceSchedules).
 if MODE == "set-availability"
-  territories = get_all("/v1/territories?limit=200").map { |t| t["id"] }
-  abort_with("territories", 0, "liste vide") if territories.empty?
-  puts "#{territories.size} territoires App Store"
+  # Une appAvailability existe déjà (409 à la création) : on PATCHe donc les
+  # territoryAvailabilities existantes une à une vers available=true.
+  tas = get_all("/v2/appAvailabilities/#{app_id}/territoryAvailabilities?limit=200&include=territory")
+  abort_with("territoryAvailabilities", 0, "liste vide") if tas.empty?
+  deja = tas.count { |t| t.dig("attributes", "available") }
+  puts "#{tas.size} territoires trouvés, #{deja} déjà disponibles"
 
-  refs = territories.each_with_index.map { |_, i| "${t#{i}}" }
-  included = territories.each_with_index.map do |terr, i|
-    { type: "territoryAvailabilities", id: "${t#{i}}",
-      attributes: { available: true },
-      relationships: { territory: { data: { type: "territories", id: terr } } } }
+  ok_n = 0
+  ko = []
+  tas.each do |ta|
+    next if ta.dig("attributes", "available")
+    code, resp = req(:patch, "/v2/territoryAvailabilities/#{ta["id"]}",
+      { data: { type: "territoryAvailabilities", id: ta["id"], attributes: { available: true } } })
+    if (200..299).cover?(code)
+      ok_n += 1
+    else
+      ko << "#{ta["id"][0, 8]}… HTTP #{code} #{resp.dig("errors", 0, "detail").to_s[0, 80]}"
+    end
   end
-  ok, resp = write("disponibilité de l'app (#{territories.size} territoires)", :post, "/v2/appAvailabilities",
-    { data: { type: "appAvailabilities",
-              attributes: { availableInNewTerritories: true },
-              relationships: {
-                app: { data: { type: "apps", id: app_id } },
-                territoryAvailabilities: { data: refs.map { |r| { type: "territoryAvailabilities", id: r } } } } },
-      included: included })
-  exit 1 unless ok
+  puts "Activés : #{ok_n} · échecs : #{ko.size}"
+  ko.first(5).each { |k| puts "  ÉCHEC #{k}" }
 
-  code, check = req(:get, "/v2/appAvailabilities/#{app_id}/territoryAvailabilities?limit=200&filter[available]=true")
-  n = code == 200 ? (check["data"] || []).size : "?"
-  puts "Territoires disponibles après écriture : #{n} (HTTP #{code})"
-  exit 0
+  check = get_all("/v2/appAvailabilities/#{app_id}/territoryAvailabilities?limit=200")
+  dispo = check.count { |t| t.dig("attributes", "available") }
+  puts "Territoires disponibles après écriture : #{dispo}/#{check.size}"
+  exit dispo.positive? ? 0 : 1
 end
 
 # ── MODE send-submission : envoie UN dossier tel quel, par id ───────────────
