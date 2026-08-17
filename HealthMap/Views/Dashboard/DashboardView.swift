@@ -547,7 +547,7 @@ private struct BilanInvitationView: View {
                 .foregroundStyle(Color.healthMapText)
                 .multilineTextAlignment(.center)
 
-            Text("Quelques questions sur ton quotidien et ton assiette, et Kiwio te dit quels apports renforcer — avec un plan sur mesure.")
+            Text("Quelques questions sur ton quotidien et ton assiette : Kiwio te dit quels apports renforcer, avec un plan sur mesure.")
                 .font(Theme.bodyFont)
                 .foregroundStyle(Color.healthMapSecondary)
                 .multilineTextAlignment(.center)
@@ -578,7 +578,7 @@ private struct BilanInvitationView: View {
             .buttonStyle(.healthMapPressed)
             .padding(.horizontal, Theme.spacingLG)
 
-            Text("Environ 5 minutes — reprends où tu en étais à tout moment")
+            Text("Environ 5 minutes. Reprends où tu en étais à tout moment")
                 .font(Theme.captionFont)
                 .foregroundStyle(Color.healthMapMuted)
                 .multilineTextAlignment(.center)
