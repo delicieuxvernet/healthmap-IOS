@@ -60,6 +60,13 @@ enum AnalyticsEvent: String {
     case mealScanned = "meal_scanned"
     case productScanned = "product_scanned"
 
+    // Découverte (entrée libre — funnel d'activation V12f).
+    // « bilan complété » reste `questionnaire_completed` (déjà émis par
+    // QuestionnaireViewModel à la soumission) — pas de doublon ici.
+    case decouverteArriveeDashboard = "decouverte_arrivee_dashboard"
+    case decouverteCtaBilan = "decouverte_cta_bilan"
+    case decouvertePremierScan = "decouverte_premier_scan"
+
     // Export & Share
     case pdfExported = "pdf_exported"
     case dataExported = "data_exported"

@@ -218,6 +218,11 @@ struct DashboardView: View {
             .containerRelativeFrame(.horizontal)
         }
         .task { await journal.load() }
+        // Funnel découverte (V12f) : 1er affichage du dashboard sans bilan —
+        // one-shot, dédupliqué par DecouverteFunnel (UserDefaults).
+        .onAppear {
+            DecouverteFunnel.arriveeDashboard(bilanComplete: viewModel.bilanComplete)
+        }
     }
 
     // MARK: - Main Content (langage v7)

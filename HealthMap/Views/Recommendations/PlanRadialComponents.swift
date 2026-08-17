@@ -221,6 +221,7 @@ struct PlanRadialScreen: View {
                 BilanDoorButton(
                     title: BilanDoorButton.Libelle.plan,
                     accessibilityText: "Construire mon plan, faire le bilan en 3 minutes",
+                    zone: .plan,
                     action: decouverte
                 )
                 .padding(.horizontal, 20)

@@ -938,6 +938,7 @@ struct BilanV7ApportsTeaserCard: View {
             BilanDoorButton(
                 title: BilanDoorButton.Libelle.bilanApports,
                 accessibilityText: "Voir mes apports, faire le bilan en 3 minutes",
+                zone: .bilanApports,
                 action: onStart
             )
             .padding(.top, 14)
