@@ -668,7 +668,7 @@ final class MealScanViewModel: ObservableObject {
                 scanDailyLimit = limit
                 UserDefaults.standard.set(limit, forKey: "hm_scan_daily_limit")
             }
-            errorMessage = "Tu as utilisé tes \(limit) scans du jour — ça se recharge demain."
+            errorMessage = "Tu as utilisé tes \(limit) scans du jour. Ça se recharge demain."
         } else {
             quotaExhausted = true
             errorMessage = nil

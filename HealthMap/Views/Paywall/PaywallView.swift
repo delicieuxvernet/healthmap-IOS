@@ -584,7 +584,7 @@ struct PaywallView: View {
                 AnalyticsService.shared.track(.subscriptionStarted, properties: [
                     "package": plan.id,
                 ])
-                alertMessage = "Achat confirmé — la synchronisation se termine, tes avantages s’activent dans quelques instants."
+                alertMessage = "Achat confirmé. La synchronisation se termine, tes avantages s’activent dans quelques instants."
                 showAlert = true
             case .cancelled:
                 AnalyticsService.shared.track(.paywallDismissed, properties: [
@@ -600,7 +600,7 @@ struct PaywallView: View {
                     "source": source,
                     "outcome": "purchase_deferred",
                 ])
-                alertMessage = "Achat en attente d’approbation — l’accès s’activera automatiquement."
+                alertMessage = "Achat en attente d’approbation. L’accès s’activera automatiquement."
                 showAlert = true
             case .entitlementPending:
                 // Le service résout toujours cet état intermédiaire en
