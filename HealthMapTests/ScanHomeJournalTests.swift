@@ -92,15 +92,18 @@ final class ScanHomeJournalTests: XCTestCase {
     }
 
     func testGoPrev_clampsToLoadedWindow() {
-        // La borne basse doit être le SOL RÉEL de la fenêtre chargée par load()
-        // (semaine courante − 7 j), pas un −13 j en dur — sinon on proposerait des
-        // jours passés « vides » dont les repas existent en base mais hors requête.
+        // La borne basse doit être le SOL RÉEL de la fenêtre chargée par load(),
+        // DÉRIVÉ de la même règle que lui (jamais une date en dur) : union des
+        // deux besoins, min(lundi précédent − 7 j hebdo, 14 jours glissants).
+        // Sinon on proposerait des jours passés « vides » dont les repas
+        // existent en base mais hors requête — ou l'inverse.
         let cal = Calendar.current
         let vm = MealJournalViewModel()
         for _ in 0..<20 { vm.goPrevDay() }
         let weekStart = WeekScoreEngine.currentWeekInterval(containing: Date()).start
-        let floor = cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: weekStart))!
-        XCTAssertEqual(vm.selectedDay, floor)
+        let solSemaine = cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: weekStart))!
+        let solAxe = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: Date()))!
+        XCTAssertEqual(vm.selectedDay, min(solSemaine, solAxe))
         XCTAssertTrue(vm.canGoNext)
     }
 
