@@ -932,33 +932,15 @@ struct BilanV7ApportsTeaserCard: View {
                     .padding(.top, index == 0 ? 10 : 0)
             }
 
-            // UN CTA géant pour toute la zone — style du bouton primaire du
-            // questionnaire (aplat kiwi, coins continus, ombre verte douce).
-            // Aucun style nouveau.
-            Button {
-                HapticService.shared.primary()
-                onStart()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 16, weight: .semibold))
-                        .accessibilityHidden(true)
-                    // Séparateur médian (pas de tiret cadratin en incise —
-                    // décision typo du 1er août, TypographieTests) : même
-                    // idiome que « · Esteban » sur cet écran.
-                    Text("Voir MES apports · bilan 3 min")
-                }
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(Color.kiwiGreen)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: Color.kiwiGreen.opacity(0.28), radius: 12, x: 0, y: 6)
-            }
-            .buttonStyle(.healthMapPressed)
+            // UN CTA géant pour toute la zone — le bouton porte partagé
+            // (`BilanDoorButton`, extrait de cette carte en V12c) : style du
+            // bouton primaire du questionnaire, aucun style nouveau.
+            BilanDoorButton(
+                title: BilanDoorButton.Libelle.bilanApports,
+                accessibilityText: "Voir mes apports, faire le bilan en 3 minutes",
+                action: onStart
+            )
             .padding(.top, 14)
-            .accessibilityLabel("Voir mes apports, faire le bilan en 3 minutes")
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
