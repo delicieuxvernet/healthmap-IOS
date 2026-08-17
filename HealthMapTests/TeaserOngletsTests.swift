@@ -116,6 +116,40 @@ final class TeaserOngletsTests: XCTestCase {
         XCTAssertEqual(ai.fullAnalysisCallCount, 0)
         XCTAssertEqual(ai.bilanV2CallCount, 0)
     }
+
+    // MARK: - Onglet Compléments
+
+    /// Compléments sans bilan : la carte d'exemple est canonique (Fer, B12,
+    /// Magnésium du catalogue, sous-titre générique SANS le moindre chiffre),
+    /// la porte est là, et aucun appel IA ne part.
+    func testComplements_sansBilan_carteExempleEtCTASansAppelIA() async {
+        let ai = MockTeaserAIAnalysisService()
+        let vm = makeVMSansBilan(aiAnalysis: ai)
+        XCTAssertFalse(vm.bilanComplete)
+
+        // Les exemples : ids canoniques, libellés du catalogue.
+        XCTAssertEqual(ComplementsTeaserCard.exempleIds, ["iron", "vitB12", "magnesium"])
+        for id in ComplementsTeaserCard.exempleIds {
+            XCTAssertTrue(NutrientData.validIDs.contains(id), "\(id) doit être canonique")
+            XCTAssertNotNil(NutrientData.definition(for: id))
+        }
+
+        // AUCUN dosage chiffré inventé : le sous-titre générique n'a pas un chiffre.
+        XCTAssertNil(ComplementsTeaserCard.sousTitreExemple.rangeOfCharacter(from: .decimalDigits),
+                     "Aucun dosage chiffré dans un exemple")
+        XCTAssertFalse(ComplementsTeaserCard.sousTitreExemple.contains("\u{2014}"))
+
+        // La porte : CTA présent, sans tiret cadratin.
+        XCTAssertFalse(BilanDoorButton.Libelle.complements.isEmpty)
+        XCTAssertFalse(BilanDoorButton.Libelle.complements.contains("\u{2014}"))
+
+        // Sans bilan : aucun score local (le moteur de suggestions n'a rien à
+        // mouliner) et aucun appel IA.
+        XCTAssertTrue(vm.nutrientScores.isEmpty)
+        await vm.triggerAnalysis()
+        XCTAssertEqual(ai.fullAnalysisCallCount, 0)
+        XCTAssertEqual(ai.bilanV2CallCount, 0)
+    }
 }
 
 // MARK: - Mocks minimaux (privés à ce fichier)

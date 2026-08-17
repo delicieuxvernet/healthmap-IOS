@@ -533,6 +533,82 @@ struct ChainCollapsibleCard<Detail: View>: View {
     }
 }
 
+// MARK: - Mode découverte (V12c) — la chaîne d'exemple avant le bilan
+
+/// À l'emplacement des chaînes d'apports quand le bilan n'est pas fait : UNE
+/// carte au design de la ligne de tête des cartes repliées (même tuile
+/// d'icône, mêmes fontes, même carte kiwi), avec 3 exemples représentatifs au
+/// libellé générique — AUCUN dosage chiffré, la donnée n'existe pas encore —
+/// puis la porte vers le bilan (`BilanDoorButton`, la même que sur le Bilan,
+/// le Plan et le Suivi).
+struct ComplementsTeaserCard: View {
+    /// Ids d'exemple — catalogue canonique uniquement (testés hors UI).
+    static let exempleIds = ["iron", "vitB12", "magnesium"]
+    /// Sous-titre générique de chaque exemple : la promesse, jamais un chiffre.
+    static let sousTitreExemple = "Dose et moment personnalisés après ton bilan"
+
+    /// Lance (ou reprend) le bilan — `DashboardViewModel.demarrerBilan()`.
+    let onStart: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Self.exempleIds, id: \.self) { id in
+                if let def = NutrientData.definition(for: id) {
+                    row(id: id, label: def.label)
+                }
+            }
+
+            BilanDoorButton(
+                title: BilanDoorButton.Libelle.complements,
+                accessibilityText: "Voir mes compléments, faire le bilan en 3 minutes",
+                action: onStart
+            )
+            .padding(.top, 12)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .kiwiCard(radius: 16)
+    }
+
+    /// La ligne de tête d'une chaîne, aux données absentes près : tuile
+    /// d'icône + nom (mêmes cotes que `ChainCollapsibleCard`) et le libellé
+    /// générique en sous-titre. Ni pastille de statut, ni prix, ni chevron :
+    /// ces emplacements portent des données qu'on n'a pas encore.
+    private func row(id: String, label: String) -> some View {
+        let tint = Color.nutrientColor(for: id)
+        return HStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(tint.opacity(0.12))
+                .frame(width: 34, height: 34)
+                .overlay(
+                    Image(systemName: Fluent3D.symbol(for: id))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(tint)
+                )
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 13.5, weight: .heavy))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                    .lineLimit(1)
+                Text(Self.sousTitreExemple)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .lineSpacing(2)
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(minHeight: 44)
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label), exemple. \(Self.sousTitreExemple).")
+    }
+}
+
 // MARK: - Sélecteur de voie — figé au-dessus de la tab bar
 /// Présent UNE seule fois et atteignable pendant tout le scroll : la bascule
 /// pilote TOUTE la page, pas une carte.
