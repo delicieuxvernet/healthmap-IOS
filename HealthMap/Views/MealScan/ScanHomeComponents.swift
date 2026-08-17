@@ -355,6 +355,9 @@ struct ScanMicrosJourCard: View {
     /// (id du nutriment, part du besoin couverte aujourd'hui 0-100).
     let items: [(id: String, pct: Int)]
     let headline: String
+    /// Découverte (V12e) : sans bilan, les % listés rapportent la journée aux
+    /// références d'un adulte moyen — la mention le précise sous la liste.
+    var reperesGeneriques: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -373,6 +376,9 @@ struct ScanMicrosJourCard: View {
                     ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                         row(item)
                     }
+                }
+                if reperesGeneriques {
+                    ReperesGeneriquesMention()
                 }
             }
         }
