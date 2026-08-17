@@ -572,24 +572,37 @@ struct PaywallView: View {
                     "package": plan.id,
                 ])
                 showPurchaseSuccess = true
+            case .activatedSyncPending:
+                // Achat ABOUTI, confirmation RevenueCat pas encore lisible
+                // (réseau) : l'accès est déjà accordé par le service. Jamais
+                // présenté comme un échec, jamais de détour par « Restaurer »
+                // (promesse V10 #3).
+                AnalyticsService.shared.track(.paywallConverted, properties: [
+                    "source": source,
+                    "package": plan.id,
+                ])
+                AnalyticsService.shared.track(.subscriptionStarted, properties: [
+                    "package": plan.id,
+                ])
+                alertMessage = "Achat confirmé — la synchronisation se termine, tes avantages s’activent dans quelques instants."
+                showAlert = true
             case .cancelled:
                 AnalyticsService.shared.track(.paywallDismissed, properties: [
                     "source": source,
                     "outcome": "purchase_cancelled",
                 ])
             case .entitlementPending:
-                // Le service transforme cet état en erreur après une seconde
-                // lecture RevenueCat ; ce cas reste défensif.
+                // Le service résout toujours cet état intermédiaire en
+                // .activated / .activatedSyncPending ; ce cas reste défensif.
                 alertMessage = "Ton achat est en cours d’activation. Réessaie dans un instant."
                 showAlert = true
             }
         } catch {
+            // Seul un échec AVANT transaction arrive ici (paiement refusé,
+            // StoreKit indisponible…) : aucun achat n'a eu lieu, le message
+            // d'échec est honnête. Un achat abouti ne throw jamais (V10 #3).
             AppLogger.subscription.report(error, context: "paywall/purchase")
-            if error is SubscriptionPurchaseError {
-                alertMessage = "Ton achat est confirmé, mais l’accès Premium est encore en cours d’activation. Patiente quelques secondes puis utilise « Restaurer mes achats »."
-            } else {
-                alertMessage = "L’achat n’a pas abouti. Réessaie dans un instant."
-            }
+            alertMessage = "L’achat n’a pas abouti. Réessaie dans un instant."
             showAlert = true
         }
     }

@@ -5,22 +5,19 @@ import SwiftUI
 enum PurchaseOutcome: Equatable {
     case cancelled
     case activated
+    /// Achat ABOUTI (transaction StoreKit confirmée) mais confirmation
+    /// RevenueCat pas encore lisible (réseau, propagation). L'accès est
+    /// considéré actif d'après le résultat d'achat — l'UI dit au pire
+    /// « Achat confirmé — la synchronisation se termine… », JAMAIS un
+    /// échec (promesse V10 #3).
+    case activatedSyncPending
+    /// État intermédiaire interne (avant relecture) — `finish` ne le
+    /// retourne jamais tel quel.
     case entitlementPending
 
     static func resolve(userCancelled: Bool, entitlementIsActive: Bool) -> PurchaseOutcome {
         if userCancelled { return .cancelled }
         return entitlementIsActive ? .activated : .entitlementPending
-    }
-}
-
-enum SubscriptionPurchaseError: LocalizedError {
-    case entitlementNotActivated
-
-    var errorDescription: String? {
-        switch self {
-        case .entitlementNotActivated:
-            return "L’achat a été confirmé, mais l’accès Premium n’est pas encore actif."
-        }
     }
 }
 
@@ -97,18 +94,21 @@ final class SubscriptionService: ObservableObject {
 
     // MARK: - Purchase
     func purchase(package: Package) async throws -> PurchaseOutcome {
-        try await finish(result: await Purchases.shared.purchase(package: package))
+        await finish(result: try await Purchases.shared.purchase(package: package))
     }
 
     /// Achat d'un produit chargé hors offering (repli `directProducts`).
     /// Passe par RevenueCat comme l'achat par package : l'entitlement « premium »
     /// est donc suivi à l'identique.
     func purchase(product: StoreProduct) async throws -> PurchaseOutcome {
-        try await finish(result: await Purchases.shared.purchase(product: product))
+        await finish(result: try await Purchases.shared.purchase(product: product))
     }
 
     /// Suite commune aux deux chemins d'achat (entitlement, reprise, vérification).
-    private func finish(result: PurchaseResultData) async throws -> PurchaseOutcome {
+    /// Ne THROW jamais : dès qu'un `PurchaseResultData` existe, l'achat a
+    /// abouti — une relecture RevenueCat qui échoue (réseau) n'est pas un
+    /// achat raté et ne doit JAMAIS s'afficher comme tel (promesse V10 #3).
+    private func finish(result: PurchaseResultData) async -> PurchaseOutcome {
         customerInfo = result.customerInfo
         isPremium = result.customerInfo.entitlements["premium"]?.isActive == true
 
@@ -118,26 +118,38 @@ final class SubscriptionService: ObservableObject {
         )
 
         // RevenueCat peut confirmer la transaction quelques instants avant de
-        // rafraîchir l'entitlement. Une seconde lecture évite de laisser l’utilisateur
-        // dans un faux état d'échec, sans jamais accorder l'accès côté client.
+        // rafraîchir l'entitlement : 2 relectures espacées, cache contourné
+        // (`.fetchCurrent`, la politique la plus fraîche du SDK), en `try?` —
+        // un échec de lecture ne remonte jamais comme échec d'achat.
         if outcome == .entitlementPending {
-            let refreshed = try await Purchases.shared.customerInfo()
-            customerInfo = refreshed
-            isPremium = refreshed.entitlements["premium"]?.isActive == true
-            outcome = PurchaseOutcome.resolve(
-                userCancelled: false,
-                entitlementIsActive: isPremium
-            )
+            for attempt in 1...2 {
+                if attempt > 1 {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                }
+                guard let refreshed = try? await Purchases.shared.customerInfo(fetchPolicy: .fetchCurrent) else {
+                    continue
+                }
+                customerInfo = refreshed
+                isPremium = refreshed.entitlements["premium"]?.isActive == true
+                if isPremium {
+                    outcome = .activated
+                    break
+                }
+            }
         }
 
-        guard outcome != .entitlementPending else {
-            throw SubscriptionPurchaseError.entitlementNotActivated
+        // Toujours pas de confirmation lisible ? L'achat, lui, a réussi : le
+        // résultat d'achat fait foi, l'accès est accordé. Le webhook RevenueCat
+        // + verify-receipt corrigeront côté serveur si besoin.
+        if outcome == .entitlementPending {
+            isPremium = true
+            outcome = .activatedSyncPending
         }
 
         // Post-purchase StoreKit 2 verification (non-blocking). `force: true` :
         // c'est LE moment où le serveur doit recouper l'achat — sans lui, une
         // vérification périodique < 24 h rendait cet appel no-op (V10 #2).
-        if outcome == .activated {
+        if outcome == .activated || outcome == .activatedSyncPending {
             let userId = result.customerInfo.originalAppUserId
             Task {
                 await ReceiptValidationService.shared.verifyCurrentEntitlements(userId: userId, force: true)
