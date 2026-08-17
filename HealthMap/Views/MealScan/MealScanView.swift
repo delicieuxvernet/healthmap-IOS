@@ -265,7 +265,9 @@ struct MealScanView: View {
                     )
                 }
                 Spacer()
-                if !subscriptionService.isPremium, let remaining = viewModel.scansRemaining {
+                // `premiumVisible` : le compteur (et sa porte paywall au tap)
+                // n'apparaît qu'une fois le bilan fait — décision fondateur V12a.
+                if dashboardVM.premiumVisible, let remaining = viewModel.scansRemaining {
                     freeScanCounter(remaining)
                 }
             }
@@ -350,7 +352,21 @@ struct MealScanView: View {
             await journal.load()
             // Énergie active du jour (Apple Santé) pour la « dépense » de la jauge —
             // présente la feuille d'autorisation la 1re fois, sinon lecture directe.
-            activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal()
+            // Entrée libre (V12a) : les 5 onglets montent dès le lancement — sans
+            // bilan, on NE présente PAS la feuille HealthKit à froid (première
+            // session), on attend que le Scan soit réellement visible (onReceive).
+            if dashboardVM.bilanComplete {
+                activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal()
+            }
+        }
+        // Sans bilan, la feuille HealthKit n'est présentée qu'au moment où
+        // l'utilisateur ARRIVE sur l'onglet Scan (contexte : la jauge est sous
+        // ses yeux). Les appels suivants sont silencieux (iOS ne re-présente
+        // jamais la feuille d'autorisation).
+        .onReceive(NotificationCenter.default.publisher(for: .healthmapTabDidChange)) { note in
+            guard activeEnergyToday == nil,
+                  note.object as? String == NavCardDestination.scanner.rawValue else { return }
+            Task { activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal() }
         }
         .onChange(of: viewModel.quotaExhausted) { _, exhausted in
             if exhausted {
@@ -1421,7 +1437,9 @@ struct MealScanView: View {
     // Le total et le restant sont lus depuis le quota journalier du serveur.
     @ViewBuilder
     private var premiumScanBanner: some View {
-        if !subscriptionService.isPremium,
+        // `premiumVisible` : compteur métré / mur de quota masqués tant que
+        // le bilan n'est pas fait (aucune porte premium avant — V12a).
+        if dashboardVM.premiumVisible,
            let remaining = viewModel.scansRemaining {
             let quota = ScanQuotaPresentation(
                 remaining: remaining,

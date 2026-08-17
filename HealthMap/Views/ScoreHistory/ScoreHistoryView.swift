@@ -9,12 +9,15 @@ struct ScoreHistoryView: View {
     @State private var history: [ScoreSnapshot] = []
     @State private var isLoading = true
     @State private var scoreDeltaInfo: (delta: Int, weeks: Int, text: String)?
+    // Observé pour re-rendre l'écran quand `isPremium` bascule (achat depuis
+    // la porte) : `premiumVisible` est alors réévalué immédiatement.
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     /// Famille 2 (verrouillé) : le dernier delta reste net (le présent), la
     /// trajectoire (courbe + tableau) est l'ordonnance. Rien à gater tant qu'il
-    /// n'y a pas d'historique traçable.
-    private var gateTrajectory: Bool { !subscriptionService.isPremium && history.count >= 2 }
+    /// n'y a pas d'historique traçable — ni tant que le bilan n'est pas fait
+    /// (`premiumVisible`, décision fondateur V12a).
+    private var gateTrajectory: Bool { dashboardVM.premiumVisible && history.count >= 2 }
 
     var body: some View {
         ZStack {

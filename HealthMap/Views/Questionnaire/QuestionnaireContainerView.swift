@@ -387,7 +387,52 @@ struct QuestionnaireContainerView: View {
     }
 
     // MARK: - Bottom Button
+
+    /// Vrai sur l'écran d'accueil du questionnaire (toute première question,
+    /// hors intro/carrefour) tant que le bilan n'est pas fait : c'est là que
+    /// vit « Explorer d'abord » (entrée libre V12a) — la capture est inversée,
+    /// le questionnaire propose une sortie au lieu de l'imposer.
+    private var showsExplorerDabord: Bool {
+        introSection == nil && activeGate == nil
+            && viewModel.isFirstQuestion && !dashboardVM.bilanComplete
+    }
+
     private var bottomBar: some View {
+        VStack(spacing: 0) {
+            primaryButton
+
+            if showsExplorerDabord {
+                // Bouton secondaire sobre (tokens existants) : mène aux onglets
+                // sans rien perdre — le draft est sauvegardé en continu.
+                Button {
+                    HapticService.shared.tap()
+                    dashboardVM.questionnaireOuvert = false
+                } label: {
+                    Text("Explorer d'abord")
+                        .font(Theme.subheadlineFont)
+                        .foregroundStyle(Color.healthMapSecondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.healthMapPressed)
+                .accessibilityHint("Découvre l'app d'abord, ton bilan t'attendra ici.")
+            }
+        }
+        .padding(.horizontal, Theme.spacingLG)
+        .padding(.top, Theme.spacingSM)
+        .padding(.bottom, Theme.spacingSM)
+        .alert("Erreur", isPresented: $showSubmitError) {
+            Button("Reessayer") {
+                Task { await viewModel.submitQuestionnaire() }
+            }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text(viewModel.errorMessage ?? "Erreur lors de la sauvegarde.")
+        }
+    }
+
+    private var primaryButton: some View {
         Button {
             if introSection != nil {
                 dismissIntro()
@@ -429,17 +474,6 @@ struct QuestionnaireContainerView: View {
         }
         .buttonStyle(.healthMapPressed)
         .disabled(viewModel.isSubmitting || isBlockedOnSingleChoice)
-        .padding(.horizontal, Theme.spacingLG)
-        .padding(.top, Theme.spacingSM)
-        .padding(.bottom, Theme.spacingSM)
-        .alert("Erreur", isPresented: $showSubmitError) {
-            Button("Reessayer") {
-                Task { await viewModel.submitQuestionnaire() }
-            }
-            Button("Annuler", role: .cancel) { }
-        } message: {
-            Text(viewModel.errorMessage ?? "Erreur lors de la sauvegarde.")
-        }
     }
 
     /// Soumission → bascule directe sur le Bilan (plus de célébration).
@@ -458,9 +492,14 @@ struct QuestionnaireContainerView: View {
                 // computeLocalScores AVANT de basculer : garantit un healthScore
                 // calculé (≠ 0) dès l'affichage du Bilan. Cf. bug TestFlight 28.
                 dashboardVM.computeLocalScores()
-                // Bascule immédiate vers l'onglet Bilan : il affiche l'écran de
-                // chargement honnête (« 2-3 min ») jusqu'à ce que l'analyse arrive.
+                // Flip immédiat du flag (point d'observation `bilanComplete`) :
+                // toutes les vues qui l'observent basculent sans relance.
                 dashboardVM.hasCompletedQuestionnaire = true
+                // Entrée libre (V12a) : le questionnaire vit dans une feuille —
+                // on la referme, l'utilisateur retrouve son onglet d'origine.
+                // La gate de 1re analyse (AnalysisGateView) couvre ensuite
+                // l'app le temps que le bilan arrive, comme avant.
+                dashboardVM.questionnaireOuvert = false
                 Task { await dashboardVM.triggerAnalysis() }
             } else if viewModel.errorMessage != nil {
                 HapticService.shared.error()
