@@ -125,17 +125,20 @@ final class DashboardViewModelTests: XCTestCase {
     /// bypassing loadProfile() which requires Supabase auth.
     /// `subscription` / `aiAnalysis` sont injectables pour les tests
     /// d'entrée libre (premiumVisible, invariant generate-analysis).
+    /// Défauts `nil` construits DANS le corps (MainActor) : un défaut
+    /// d'argument s'évalue en contexte nonisolated → le mock @MainActor
+    /// n'y est pas constructible (erreur CI Xcode 26).
     private func makeVM(
         profile: UserProfile,
-        subscription: MockSubscriptionService = MockSubscriptionService(),
-        aiAnalysis: MockAIAnalysisService = MockAIAnalysisService()
+        subscription: MockSubscriptionService? = nil,
+        aiAnalysis: MockAIAnalysisService? = nil
     ) -> DashboardViewModel {
         let vm = DashboardViewModel(
             auth: MockAuthService(),
             database: MockDatabaseService(),
-            subscription: subscription,
+            subscription: subscription ?? MockSubscriptionService(),
             analytics: MockAnalyticsService(),
-            aiAnalysis: aiAnalysis,
+            aiAnalysis: aiAnalysis ?? MockAIAnalysisService(),
             gamification: GamificationService.shared
         )
         vm.profile = profile
