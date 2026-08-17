@@ -591,6 +591,17 @@ struct PaywallView: View {
                     "source": source,
                     "outcome": "purchase_cancelled",
                 ])
+            case .deferred:
+                // Ask to Buy (approbation parentale) ou validation bancaire :
+                // l'achat attend une approbation EXTERNE. Ni un échec, ni un
+                // détour par « Restaurer » — l'accès s'activera tout seul à
+                // l'approbation (push delegate RevenueCat), promesse V10 #5.
+                AnalyticsService.shared.track(.paywallDismissed, properties: [
+                    "source": source,
+                    "outcome": "purchase_deferred",
+                ])
+                alertMessage = "Achat en attente d’approbation — l’accès s’activera automatiquement."
+                showAlert = true
             case .entitlementPending:
                 // Le service résout toujours cet état intermédiaire en
                 // .activated / .activatedSyncPending ; ce cas reste défensif.

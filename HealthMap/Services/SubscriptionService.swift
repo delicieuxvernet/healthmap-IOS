@@ -11,6 +11,11 @@ enum PurchaseOutcome: Equatable {
     /// « Achat confirmé — la synchronisation se termine… », JAMAIS un
     /// échec (promesse V10 #3).
     case activatedSyncPending
+    /// Achat DIFFÉRÉ (Ask to Buy — approbation parentale — ou validation
+    /// bancaire SCA) : la transaction attend une approbation externe.
+    /// Ni un échec, ni un cas « Restaurer » : l'accès s'activera tout seul
+    /// à l'approbation, via le push delegate RevenueCat (promesse V10 #5).
+    case deferred
     /// État intermédiaire interne (avant relecture) — `finish` ne le
     /// retourne jamais tel quel.
     case entitlementPending
@@ -180,14 +185,30 @@ final class SubscriptionService: ObservableObject {
 
     // MARK: - Purchase
     func purchase(package: Package) async throws -> PurchaseOutcome {
-        await finish(result: try await Purchases.shared.purchase(package: package))
+        do {
+            return await finish(result: try await Purchases.shared.purchase(package: package))
+        } catch let error where Self.isPurchaseDeferred(error) {
+            return .deferred
+        }
     }
 
     /// Achat d'un produit chargé hors offering (repli `directProducts`).
     /// Passe par RevenueCat comme l'achat par package : l'entitlement « premium »
     /// est donc suivi à l'identique.
     func purchase(product: StoreProduct) async throws -> PurchaseOutcome {
-        await finish(result: try await Purchases.shared.purchase(product: product))
+        do {
+            return await finish(result: try await Purchases.shared.purchase(product: product))
+        } catch let error where Self.isPurchaseDeferred(error) {
+            return .deferred
+        }
+    }
+
+    /// Ask to Buy / SCA : StoreKit met la transaction en attente d'approbation
+    /// et RevenueCat le signale par `paymentPendingError`. Ce n'est PAS un
+    /// échec d'achat — sans cette détection, l'utilisateur lisait un message
+    /// d'erreur parlant de « Restaurer », faux sur toute la ligne (V10 #5).
+    nonisolated static func isPurchaseDeferred(_ error: Error) -> Bool {
+        (error as? ErrorCode) == .paymentPendingError
     }
 
     /// Suite commune aux deux chemins d'achat (entitlement, reprise, vérification).

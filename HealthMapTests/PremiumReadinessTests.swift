@@ -1,7 +1,20 @@
+import RevenueCat
 import XCTest
 @testable import HealthMap
 
 final class PremiumReadinessTests: XCTestCase {
+
+    // MARK: - Achat différé (Ask to Buy / SCA, V10 #5)
+
+    func testDeferredPurchaseErrorIsRecognized() {
+        XCTAssertTrue(SubscriptionService.isPurchaseDeferred(ErrorCode.paymentPendingError))
+    }
+
+    func testOtherErrorsAreNotTreatedAsDeferred() {
+        XCTAssertFalse(SubscriptionService.isPurchaseDeferred(ErrorCode.networkError))
+        XCTAssertFalse(SubscriptionService.isPurchaseDeferred(ErrorCode.purchaseCancelledError))
+        XCTAssertFalse(SubscriptionService.isPurchaseDeferred(URLError(.notConnectedToInternet)))
+    }
 
     func testPurchaseOutcomeRequiresActiveEntitlement() {
         XCTAssertEqual(
