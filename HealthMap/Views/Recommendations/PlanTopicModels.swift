@@ -230,3 +230,50 @@ extension Array where Element == PlanTopic {
         return out
     }
 }
+
+// MARK: - Mode découverte (V12c) — la couronne d'exemple avant le bilan
+
+/// Les nœuds d'EXEMPLE de la couronne quand le bilan n'est pas fait : des cas
+/// génériques représentatifs, libellés UNIQUEMENT depuis les données canoniques
+/// (options du questionnaire pour symptôme/objectif, catalogue NutrientData
+/// pour les apports) — jamais inventés, jamais personnalisés. Les solutions
+/// restent vides : en découverte la pop-up ne s'ouvre pas, tout tap mène au
+/// bilan (cf. `PlanRadialScreen.decouverte`).
+func planTopicsDecouverte() -> [PlanTopic] {
+    var topics: [PlanTopic] = []
+
+    // Un symptôme et un objectif types, aux libellés exacts du questionnaire.
+    if let fatigue = planDecouverteLabel(question: "symptoms", option: "fatigue_chronic") {
+        topics.append(planDecouverteTopic(id: "dec_sym_fatigue", kind: .symptome, name: fatigue))
+    }
+    if let sommeil = planDecouverteLabel(question: "goals", option: "sleep") {
+        topics.append(planDecouverteTopic(id: "dec_obj_sommeil", kind: .objectif, name: sommeil))
+    }
+
+    // Trois apports types, au catalogue canonique (libellé + emoji + couleur).
+    for id in ["vitD", "iron", "magnesium"] {
+        guard let def = NutrientData.definition(for: id) else { continue }
+        topics.append(PlanTopic(
+            id: "dec_app_\(id)",
+            kind: .apport,
+            name: def.label,
+            intro: "",
+            ritual: [], nutrition: [], habitudes: [], complements: [],
+            emojiBadge: def.emoji,
+            apportColor: Color.nutrientColor(for: id)
+        ))
+    }
+
+    return topics
+}
+
+/// Libellé canonique d'une option du questionnaire — LA source de vérité des
+/// libellés symptôme/objectif (cf. QuestionnaireSection).
+private func planDecouverteLabel(question: String, option: String) -> String? {
+    QuestionnaireSection.question(id: question)?.options?.first { $0.id == option }?.label
+}
+
+private func planDecouverteTopic(id: String, kind: PlanTopic.Kind, name: String) -> PlanTopic {
+    PlanTopic(id: id, kind: kind, name: name, intro: "",
+              ritual: [], nutrition: [], habitudes: [], complements: [])
+}

@@ -169,7 +169,12 @@ struct SupplementsView: View {
                 // Lavis Compléments : vert kiwi (décision fondateur).
                 TabWashBackground(tint: .kiwiGreen)
 
-                if hasContent {
+                if !dashboardVM.bilanComplete {
+                    // Mode découverte (V12c) : pas de bilan → la liste serait
+                    // vide. À l'emplacement des chaînes : la carte d'exemple
+                    // + la porte bilan. Rituel masqué (aucune donnée).
+                    discoveryContent
+                } else if hasContent {
                     mainContent
                 } else if dashboardVM.isLoadingAnalysis {
                     VStack(spacing: 16) {
@@ -186,7 +191,10 @@ struct SupplementsView: View {
             .onAppear {
                 refreshRituel()
                 seedDefaults()
-                if !engagementSeen {
+                // L'engagement transparence ne se « consomme » qu'une fois
+                // réellement montré : en découverte (pas de bilan), le bloc
+                // n'est pas rendu — on ne brûle pas sa première visite.
+                if dashboardVM.bilanComplete, !engagementSeen {
                     engagementSeen = true
                     engagementEnGrand = true
                 }
@@ -222,6 +230,32 @@ struct SupplementsView: View {
                 NutrientDetailSheet(nutrient: nutrient)
             }
         }
+    }
+
+    // MARK: - Mode découverte (V12c — pas encore de bilan)
+
+    /// L'onglet garde son en-tête et l'emplacement des chaînes ; à la place
+    /// des cartes d'apports : la carte d'exemple (`ComplementsTeaserCard`) et
+    /// la porte bilan. Ni sélecteur de voie, ni synthèse, ni rituel, ni
+    /// engagement : tout ça n'existe qu'adossé à de vraies données. La
+    /// mention « ne remplace pas l'avis d'un médecin » reste, elle, posée.
+    private var discoveryContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                header.kiwiEntrance(0)
+                chainHeader.padding(.top, 20).kiwiEntrance(1)
+                ComplementsTeaserCard { dashboardVM.demarrerBilan() }
+                    .padding(.top, 12)
+                    .kiwiEntrance(2)
+                infoCard.padding(.top, 18)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 4)
+            .padding(.bottom, 16)
+            // Même verrou anti-dérive horizontale que mainContent.
+            .containerRelativeFrame(.horizontal, alignment: .leading)
+        }
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
     }
 
     // MARK: - Contenu principal

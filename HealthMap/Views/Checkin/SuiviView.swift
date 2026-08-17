@@ -75,6 +75,21 @@ struct SuiviView: View {
                         macroCarousel.kiwiEntrance(2)
                         microCarousel.kiwiEntrance(3)
                         symptomCarousel.kiwiEntrance(4)
+
+                        // Découverte (V12c) : sous les carrousels d'exemple,
+                        // la porte vers le bilan — la même que sur le Bilan et
+                        // le Plan (BilanDoorButton). Uniquement sans bilan ;
+                        // l'onglet ne déclenche par ailleurs AUCUN appel IA
+                        // (moteurs déterministes, cf. en-tête du fichier).
+                        if !dashboardVM.bilanComplete {
+                            BilanDoorButton(
+                                title: BilanDoorButton.Libelle.suivi,
+                                accessibilityText: "Suivre mes vrais chiffres, faire le bilan en 3 minutes"
+                            ) {
+                                dashboardVM.demarrerBilan()
+                            }
+                            .kiwiEntrance(5)
+                        }
                         SuiviNeedsCard(delta: stats.besoinsDuJourDeltaPct,
                                        stepsToday: stepsToday,
                                        tips: weeklyTips,

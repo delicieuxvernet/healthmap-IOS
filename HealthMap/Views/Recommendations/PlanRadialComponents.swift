@@ -120,6 +120,12 @@ struct PlanRadialScreen: View {
     /// Sélecteur de vue (objectifs/symptômes ↔ apports). `nil` → l'écran
     /// n'offre qu'une lecture et le sélecteur n'est pas rendu.
     var vue: Binding<PlanVue>? = nil
+    /// Mode découverte (V12c) : renseigné quand le bilan n'est pas fait.
+    /// Les bulles sont des exemples estompés, le moyeu affiche « Ton plan
+    /// t'attend », et la pop-up de solutions ne s'ouvre JAMAIS — tout tap sur
+    /// la couronne (comme le bouton porte posé sous elle) appelle ce closure,
+    /// qui lance le bilan (`DashboardViewModel.demarrerBilan()`).
+    var decouverte: (() -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var activeTopic: PlanTopic?
@@ -156,13 +162,34 @@ struct PlanRadialScreen: View {
             if displayTopics.isEmpty {
                 emptyState
             } else {
-                PlanRadialMap(topics: displayTopics) { topic in
-                    activeTopic = topic
+                PlanRadialMap(topics: displayTopics, exemple: decouverte != nil) { topic in
+                    // Découverte : jamais la pop-up de solutions — le bilan.
+                    if let decouverte {
+                        decouverte()
+                    } else {
+                        activeTopic = topic
+                    }
                 }
                 .id(mapIdentity)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 20)
                 .padding(.top, 6)
+                // Découverte : TAP n'importe où sur la couronne (bulles,
+                // flèches, moyeu, vide) → le bilan. Le voile intercepte tout ;
+                // les bulles sont masquées de VoiceOver par la carte (exemple)
+                // et ce voile devient l'unique élément actionnable.
+                .overlay {
+                    if let decouverte {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                HapticService.shared.primary()
+                                decouverte()
+                            }
+                            .accessibilityLabel("Exemples de plan. Construire mon plan, faire le bilan en 3 minutes")
+                            .accessibilityAddTraits(.isButton)
+                    }
+                }
 
                 // La légende explique le code couleur symptôme/objectif : en
                 // vue « Apports », les cerclages portent la couleur canonique
@@ -181,6 +208,21 @@ struct PlanRadialScreen: View {
                         object: NavCardDestination.suivi.rawValue
                     )
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .opacity(focusIn ? 1 : 0)
+                .offset(y: focusIn ? 0 : 10)
+            }
+
+            // Découverte (V12c) : la porte bilan occupe l'emplacement de la
+            // ligne de focus (jamais les deux : sans bilan, `focus` est nil)
+            // — même entrée chorégraphiée que la ligne qu'elle remplace.
+            if let decouverte {
+                BilanDoorButton(
+                    title: BilanDoorButton.Libelle.plan,
+                    accessibilityText: "Construire mon plan, faire le bilan en 3 minutes",
+                    action: decouverte
+                )
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .opacity(focusIn ? 1 : 0)
@@ -446,6 +488,11 @@ private struct PlanRadialArrowHead: Shape {
 
 struct PlanRadialMap: View {
     let topics: [PlanTopic]
+    /// Mode découverte (V12c) : les bulles sont des EXEMPLES — estompées du
+    /// même fondu que les courbes d'exemple du Suivi, moyeu « Ton plan
+    /// t'attend », bulles masquées de VoiceOver (le voile de la couronne est
+    /// l'unique élément actionnable, cf. PlanRadialScreen).
+    var exemple: Bool = false
     let onSelect: (PlanTopic) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -454,6 +501,10 @@ struct PlanRadialMap: View {
 
     private static let arrowColor = Color.kiwiCharcoal.opacity(0.22)
     private static let headColor = Color.kiwiCharcoal.opacity(0.28)
+    /// Fondu des bulles d'exemple : LA valeur de l'état « exemple » déjà posée
+    /// ailleurs (courbe « toi » d'exemple du Suivi, SuiviSymptomChart) — pas
+    /// une nouvelle opacité inventée.
+    private static let exempleFade: Double = 0.42
 
     var body: some View {
         GeometryReader { geo in
@@ -480,7 +531,8 @@ struct PlanRadialMap: View {
                 hub(layout: layout)
                     .position(layout.center)
 
-                // 3. Les nœuds.
+                // 3. Les nœuds. En exemple : estompés (fondu canonique) et
+                // masqués de VoiceOver — le voile de la couronne parle seul.
                 ForEach(Array(topics.enumerated()), id: \.element.id) { index, topic in
                     PlanRadialNodeView(topic: topic, layout: layout) {
                         HapticService.shared.tap()
@@ -488,8 +540,9 @@ struct PlanRadialMap: View {
                     }
                     .position(layout.position(index))
                     .scaleEffect(appeared ? 1 : 0.4)
-                    .opacity(appeared ? 1 : 0)
+                    .opacity(appeared ? (exemple ? Self.exempleFade : 1) : 0)
                     .animation(nodeAnimation(index), value: appeared)
+                    .accessibilityHidden(exemple)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -526,18 +579,34 @@ struct PlanRadialMap: View {
 
             VStack(spacing: 1) {
                 Fluent3DIcon(name: "fluent_kiwi", size: d * 0.41)
-                Text("\(topics.count)")
-                    .font(.system(size: d * 0.13, weight: .heavy, design: .monospaced))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                    .padding(.top, 2)
-                Text("à travailler")
-                    .font(.system(size: max(9, d * 0.078), weight: .bold))
-                    .foregroundStyle(Color(hex: "6B7280"))
+                if exemple {
+                    // Découverte : pas de compteur (rien n'est mesuré) — la
+                    // promesse, dans le style du libellé existant du moyeu.
+                    Text("Ton plan t'attend")
+                        .font(.system(size: max(9, d * 0.078), weight: .bold))
+                        .foregroundStyle(Color(hex: "6B7280"))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .frame(width: d * 0.86)
+                        .padding(.top, 2)
+                } else {
+                    Text("\(topics.count)")
+                        .font(.system(size: d * 0.13, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                        .padding(.top, 2)
+                    Text("à travailler")
+                        .font(.system(size: max(9, d * 0.078), weight: .bold))
+                        .foregroundStyle(Color(hex: "6B7280"))
+                }
             }
         }
         .frame(width: d, height: d)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(topics.count) points à travailler")
+        // Découverte : le moyeu se tait, le voile de la couronne porte tout
+        // (« Exemples de plan. Construire mon plan… »).
+        .accessibilityHidden(exemple)
     }
 
     // MARK: Chorégraphie d'entrée
