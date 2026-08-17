@@ -343,43 +343,25 @@ struct MainTabView: View {
         return aGauche ? -largeur * 0.35 : largeur
     }
 
-    /// Contenu d'un onglet — mêmes écrans et mêmes garde-fous qu'avant
-    /// (verrouillage tant que le bilan n'est pas complété).
+    /// Contenu d'un onglet. Entrée libre (V12a) : plus AUCUN verrou — les cinq
+    /// onglets s'ouvrent sans questionnaire. Chaque écran porte son propre état
+    /// vide sûr (le Bilan invite à faire le bilan, le Suivi montre ses courbes
+    /// d'exemple, le Plan et les Compléments leur état vide existant) et aucun
+    /// ViewModel ne déclenche `generate-analysis` sans `profile.completed`.
+    /// Le questionnaire, lui, se présente en feuille via `demarrerBilan()`.
     @ViewBuilder
     private func tabContent(_ tab: Tab) -> some View {
         switch tab {
         case .bilan:
-            if dashboardVM.hasCompletedQuestionnaire {
-                DashboardView().environmentObject(dashboardVM)
-            } else {
-                QuestionnaireContainerView()
-                    .environmentObject(questionnaireVM)
-                    .environmentObject(dashboardVM)
-            }
+            DashboardView().environmentObject(dashboardVM)
         case .suivi:
-            if dashboardVM.hasCompletedQuestionnaire {
-                SuiviView().environmentObject(dashboardVM)
-            } else {
-                LockedFeatureView(title: "Suivi", message: "Complète ton bilan pour accéder au suivi quotidien.")
-            }
+            SuiviView().environmentObject(dashboardVM)
         case .scanner:
-            if dashboardVM.hasCompletedQuestionnaire {
-                MealScanView().environmentObject(dashboardVM)
-            } else {
-                LockedFeatureView(title: "Scanner", message: "Complète ton bilan pour scanner tes repas.")
-            }
+            MealScanView().environmentObject(dashboardVM)
         case .plan:
-            if dashboardVM.hasCompletedQuestionnaire {
-                RecommendationsView().environmentObject(dashboardVM)
-            } else {
-                LockedFeatureView(title: "Mon Plan", message: "Complète ton bilan pour accéder à ton plan personnalisé.")
-            }
+            RecommendationsView().environmentObject(dashboardVM)
         case .complements:
-            if dashboardVM.hasCompletedQuestionnaire {
-                SupplementsView().environmentObject(dashboardVM)
-            } else {
-                LockedFeatureView(title: "Mes compléments", message: "Complète ton bilan pour voir tes compléments.")
-            }
+            SupplementsView().environmentObject(dashboardVM)
         }
     }
 
@@ -422,17 +404,15 @@ struct MainTabView: View {
         // espacement. La réservation reste dans chaque écran, la barre se
         // contente de se dessiner par-dessus.
         .overlay(alignment: .bottom) {
-            // La barre flottante n'apparaît qu'une fois le bilan complété.
-            // Pendant le questionnaire (onglet Bilan = QuestionnaireContainerView),
-            // elle est masquée : sinon elle chevauche le bouton « Continuer » et
-            // laisse miroiter des onglets verrouillés. EmptyView sinon → l'inset
-            // ne réserve aucune hauteur, le questionnaire occupe tout l'écran.
-            if dashboardVM.hasCompletedQuestionnaire {
-                // v7 : la barre dessine elle-même son fond translucide pleine
-                // largeur + sa hairline ; aucun encart ici, sinon le bouton
-                // Scan surélevé se retrouverait rogné.
-                KiwiFloatingTabBar(selected: $selectedTab)
-            }
+            // Entrée libre (V12a) : la barre flottante est TOUJOURS visible —
+            // les onglets s'ouvrent sans questionnaire. Le questionnaire ne
+            // vit plus dans l'onglet Bilan mais dans une feuille plein écran
+            // (voir la .sheet `questionnaireOuvert` plus bas), donc plus de
+            // chevauchement possible avec son bouton « Continuer ».
+            // v7 : la barre dessine elle-même son fond translucide pleine
+            // largeur + sa hairline ; aucun encart ici, sinon le bouton
+            // Scan surélevé se retrouverait rogné.
+            KiwiFloatingTabBar(selected: $selectedTab)
         }
         // Overlay de célébrations gamification (« Badge débloqué / Niveau
         // supérieur ») retiré le 28 juin 2026 : feedback jugé « cheap ».
@@ -480,6 +460,18 @@ struct MainTabView: View {
             ProfileView()
                 .environmentObject(dashboardVM)
                 .environmentObject(authViewModel)
+        }
+        // Entrée libre (V12a) : le questionnaire se lance/reprend depuis
+        // n'importe quel onglet via `dashboardVM.demarrerBilan()`. Feuille
+        // plein écran (même style que l'édition du profil) : le glissement
+        // vers le bas permet de sortir à tout moment — le draft est sauvegardé
+        // en continu par QuestionnaireViewModel, la reprise se fait à la
+        // question en cours. À la fermeture, l'onglet d'origine est intact.
+        .sheet(isPresented: $dashboardVM.questionnaireOuvert) {
+            QuestionnaireContainerView()
+                .environmentObject(questionnaireVM)
+                .environmentObject(dashboardVM)
+                .healthMapFullSheet()
         }
         .overlay {
             if showTabTour {
@@ -559,8 +551,9 @@ struct MainTabView: View {
     /// rouvre pas Kiwio pour relire son bilan, on le rouvre pour compter un
     /// repas et voir ses macros et micronutriments.
     ///
-    /// Sans questionnaire terminé, rien à choisir : les autres onglets sont
-    /// verrouillés, l'app reste sur le Bilan (qui porte le questionnaire).
+    /// Sans questionnaire terminé, on reste sur le Bilan (défaut) : c'est lui
+    /// qui porte l'invitation à faire le bilan (entrée libre V12a) — les
+    /// autres onglets restent librement accessibles par la barre.
     private func choisirOngletDArrivee() {
         guard dashboardVM.hasCompletedQuestionnaire else { return }
         // Bilan reçu aujourd'hui → on y retourne. Jamais horodaté (compte
@@ -622,30 +615,6 @@ private struct AnalysisGateView: View {
             } else {
                 FullAnalysisLoadingView()
             }
-        }
-    }
-}
-
-// MARK: - Locked Feature Placeholder
-struct LockedFeatureView: View {
-    let title: String
-    let message: String
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Color.healthMapMuted)
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.healthMapBackground)
-            .navigationTitle(title)
         }
     }
 }
@@ -730,7 +699,9 @@ struct ProfileView: View {
                             }
                         }
                         .accessibilityHint("Ouvre la gestion de ton abonnement (modifier ou annuler) dans les réglages Apple.")
-                    } else {
+                    } else if dashboardVM.bilanComplete {
+                        // Entrée libre (V12a) : la porte premium n'apparaît
+                        // qu'une fois le bilan fait (décision fondateur).
                         Button {
                             showPaywall = true
                         } label: {

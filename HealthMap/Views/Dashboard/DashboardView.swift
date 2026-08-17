@@ -134,7 +134,12 @@ struct DashboardView: View {
                 }
             }
         } else {
-            DashboardSkeletonView()
+            // Entrée libre (V12a) : pas encore de bilan → invitation à le
+            // faire (plus un squelette qui « charge » à vide). Le teaser
+            // visuel viendra en V12b/c — ici, composants existants seulement.
+            BilanInvitationView {
+                viewModel.demarrerBilan()
+            }
         }
     }
 
@@ -146,10 +151,11 @@ struct DashboardView: View {
                     RedFlagsCardView(flags: immediateRedFlags)
                 }
 
-                // Z1 · En-tête + pill Premium
+                // Z1 · En-tête + pill Premium (masquée tant que le bilan
+                // n'est pas fait — `premiumVisible`, décision fondateur V12a)
                 BilanV7Header(
                     date: Date(),
-                    showsPremiumPill: !subscriptionService.isPremium
+                    showsPremiumPill: viewModel.premiumVisible
                 ) {
                     HapticService.shared.tap()
                     showPaywall = true
@@ -217,8 +223,9 @@ struct DashboardView: View {
                         .staggeredAppear(index: 6)
                 }
 
-                // Z7 · Kiwio Premium (non-premium uniquement)
-                if !subscriptionService.isPremium {
+                // Z7 · Kiwio Premium (non-premium uniquement, et jamais
+                // avant le bilan — `premiumVisible`)
+                if viewModel.premiumVisible {
                     BilanV7PremiumCard {
                         HapticService.shared.tap()
                         showPaywall = true
@@ -515,6 +522,70 @@ struct FullAnalysisLoadingView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Invitation au bilan (entrée libre V12a)
+/// État « pas encore de bilan » de l'onglet Bilan : une invitation, pas un
+/// verrou ni un squelette de chargement. Placeholder volontairement minimal
+/// (composants et tokens existants uniquement — mascotte, CTA kiwi identique
+/// au bouton du questionnaire) : le teaser visuel arrive en V12b/c.
+private struct BilanInvitationView: View {
+    /// Lance (ou reprend) le questionnaire — branché sur
+    /// `DashboardViewModel.demarrerBilan()`.
+    let onStart: () -> Void
+
+    var body: some View {
+        VStack(spacing: Theme.spacingLG) {
+            Spacer()
+
+            MascotView(mood: .happy, size: 120)
+
+            Text("Ton bilan t'attend")
+                .font(Theme.titleFont)
+                .brandTitleKerning()
+                .foregroundStyle(Color.healthMapText)
+                .multilineTextAlignment(.center)
+
+            Text("Quelques questions sur ton quotidien et ton assiette : Kiwio te dit quels apports renforcer, avec un plan sur mesure.")
+                .font(Theme.bodyFont)
+                .foregroundStyle(Color.healthMapSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Theme.spacingXL)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer()
+
+            // CTA identique au bouton primaire du questionnaire (aplat vert
+            // kiwi, coins continus, ombre discrète) — aucun style nouveau.
+            Button {
+                HapticService.shared.primary()
+                onStart()
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Faire mon bilan")
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(Color.kiwiGreen)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: Color.kiwiGreen.opacity(0.28), radius: 12, x: 0, y: 6)
+            }
+            .buttonStyle(.healthMapPressed)
+            .padding(.horizontal, Theme.spacingLG)
+
+            Text("Environ 5 minutes. Reprends où tu en étais à tout moment")
+                .font(Theme.captionFont)
+                .foregroundStyle(Color.healthMapMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Theme.spacingXL)
+                .padding(.bottom, Theme.spacingLG)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

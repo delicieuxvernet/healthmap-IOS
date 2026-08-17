@@ -123,13 +123,22 @@ final class DashboardViewModelTests: XCTestCase {
 
     /// Creates a DashboardViewModel with the profile pre-injected,
     /// bypassing loadProfile() which requires Supabase auth.
-    private func makeVM(profile: UserProfile) -> DashboardViewModel {
+    /// `subscription` / `aiAnalysis` sont injectables pour les tests
+    /// d'entrée libre (premiumVisible, invariant generate-analysis).
+    /// Défauts `nil` construits DANS le corps (MainActor) : un défaut
+    /// d'argument s'évalue en contexte nonisolated → le mock @MainActor
+    /// n'y est pas constructible (erreur CI Xcode 26).
+    private func makeVM(
+        profile: UserProfile,
+        subscription: MockSubscriptionService? = nil,
+        aiAnalysis: MockAIAnalysisService? = nil
+    ) -> DashboardViewModel {
         let vm = DashboardViewModel(
             auth: MockAuthService(),
             database: MockDatabaseService(),
-            subscription: MockSubscriptionService(),
+            subscription: subscription ?? MockSubscriptionService(),
             analytics: MockAnalyticsService(),
-            aiAnalysis: MockAIAnalysisService(),
+            aiAnalysis: aiAnalysis ?? MockAIAnalysisService(),
             gamification: GamificationService.shared
         )
         vm.profile = profile
@@ -352,6 +361,66 @@ final class DashboardViewModelTests: XCTestCase {
         // isLoadingAnalysis starts as false (loading is triggered by loadProfile)
         XCTAssertFalse(vm.isLoadingAnalysis, "Initial state should not be loading analysis")
     }
+
+    // MARK: - Entrée libre (V12a) — invariants
+
+    /// Invariant serveur : `questionnaire_data` absent/incomplet ne doit JAMAIS
+    /// coûter un appel `generate-analysis` (ni v7 ni bilan v2) — gaspillage de
+    /// quota + 400 garanti côté Edge Function.
+    func testTriggerAnalysis_sansQuestionnaireComplete_nAppellePasLIA() async {
+        let aiMock = MockAIAnalysisService()
+        // `.empty` → completed == false (le cas « compte créé, pas de bilan »).
+        let vm = makeVM(profile: .empty, aiAnalysis: aiMock)
+
+        await vm.triggerAnalysis()
+
+        XCTAssertEqual(aiMock.fullAnalysisCallCount, 0,
+                       "generate-analysis (v7) ne doit pas partir sans questionnaire complété")
+        XCTAssertEqual(aiMock.bilanV2CallCount, 0,
+                       "generate-analysis (bilan v2) ne doit pas partir sans questionnaire complété")
+        XCTAssertFalse(vm.isLoadingAnalysis, "Aucun chargement ne doit démarrer")
+        XCTAssertFalse(vm.isLoadingAnalysisV2, "Aucun chargement v2 ne doit démarrer")
+    }
+
+    /// `bilanComplete` est l'alias d'observation de `hasCompletedQuestionnaire`.
+    func testBilanComplete_suitHasCompletedQuestionnaire() {
+        let vm = makeVM(profile: .empty)
+        XCTAssertFalse(vm.bilanComplete)
+
+        vm.hasCompletedQuestionnaire = true
+        XCTAssertTrue(vm.bilanComplete, "bilanComplete doit basculer immédiatement, sans relance")
+    }
+
+    /// Décision fondateur : aucune porte premium tant que le bilan n'est pas
+    /// fait — même pour un utilisateur gratuit.
+    func testPremiumVisible_fauxSansBilan_memePourUnGratuit() {
+        let vm = makeVM(profile: .empty) // gratuit (mock isPremium = false)
+        XCTAssertFalse(vm.premiumVisible, "premiumVisible doit être faux si !bilanComplete")
+    }
+
+    /// Bilan fait + utilisateur gratuit → les portes premium s'affichent.
+    func testPremiumVisible_vraiAvecBilanPourUnGratuit() {
+        let vm = makeVM(profile: makeProfileThomas())
+        XCTAssertTrue(vm.bilanComplete)
+        XCTAssertTrue(vm.premiumVisible)
+    }
+
+    /// Un abonné ne voit jamais de porte premium, bilan fait ou non.
+    func testPremiumVisible_fauxPourUnAbonne() {
+        let sub = MockSubscriptionService()
+        sub.isPremium = true
+        let vm = makeVM(profile: makeProfileThomas(), subscription: sub)
+        XCTAssertFalse(vm.premiumVisible)
+    }
+
+    /// `demarrerBilan()` ouvre la feuille questionnaire (observable par la racine).
+    func testDemarrerBilan_ouvreLaFeuilleQuestionnaire() {
+        let vm = makeVM(profile: .empty)
+        XCTAssertFalse(vm.questionnaireOuvert)
+
+        vm.demarrerBilan()
+        XCTAssertTrue(vm.questionnaireOuvert)
+    }
 }
 
 // MARK: - Minimal Mocks for DashboardViewModel Dependencies
@@ -367,9 +436,18 @@ private final class MockSubscriptionService: SubscriptionServiceProtocol {
 }
 
 /// Minimal mock for AIAnalysisServiceProtocol used by DashboardViewModel.
+/// Compte les appels : l'invariant « aucun appel generate-analysis sans
+/// questionnaire complété » (entrée libre V12a) s'assert dessus.
 private final class MockAIAnalysisService: AIAnalysisServiceProtocol {
-    func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis? { nil }
+    private(set) var fullAnalysisCallCount = 0
+    private(set) var bilanV2CallCount = 0
+
+    func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis? {
+        fullAnalysisCallCount += 1
+        return nil
+    }
     func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2 {
-        AIAnalysisV2(contract: "v2")
+        bilanV2CallCount += 1
+        return AIAnalysisV2(contract: "v2")
     }
 }

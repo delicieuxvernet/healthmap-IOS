@@ -229,7 +229,9 @@ struct SuiviView: View {
                     tint: Color(hex: "C9A227"),
                     pageTitles: ids.map { NutrientData.definition(for: $0)?.label ?? $0 },
                     pageHeight: 168,
-                    isLocked: !subscriptionService.isPremium
+                    // `premiumVisible` : verrou (et porte) seulement une fois
+                    // le bilan fait — avant, les courbes sont des exemples.
+                    isLocked: dashboardVM.premiumVisible
                 ) { i in
                     let id = ids[i]
                     let series = showExample
@@ -246,7 +248,7 @@ struct SuiviView: View {
                     }
                 }
 
-                if !subscriptionService.isPremium {
+                if dashboardVM.premiumVisible {
                     UnlockDoor(
                         icon: "chart.xyaxis.line",
                         title: "Débloque la tendance de tes apports",
@@ -305,12 +307,12 @@ struct SuiviView: View {
                 ) { i in
                     SuiviSymptomPage(evolution: evolutions[i],
                                      reduceMotion: reduceMotion,
-                                     locked: !subscriptionService.isPremium)
+                                     locked: dashboardVM.premiumVisible)
                 }
 
                 // Porte affichée seulement s'il y a une VRAIE trajectoire à
                 // débloquer (en mode exemple, la courbe est déjà visible).
-                if !subscriptionService.isPremium, evolutions.contains(where: { !$0.isExample }) {
+                if dashboardVM.premiumVisible, evolutions.contains(where: { !$0.isExample }) {
                     UnlockDoor(
                         icon: "chart.xyaxis.line",
                         title: "Vois l'évolution de tes symptômes",

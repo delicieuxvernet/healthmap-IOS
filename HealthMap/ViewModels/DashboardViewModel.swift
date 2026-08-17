@@ -24,6 +24,10 @@ final class DashboardViewModel: ObservableObject {
     /// clignoter le questionnaire (ou les onglets verrouillés) une fraction de
     /// seconde avant de basculer sur le Dashboard (« écrans faux » au réveil).
     @Published var didFinishInitialLoad = false
+    /// Questionnaire présenté par-dessus les onglets (feuille plein écran de
+    /// MainTabView). Piloté par `demarrerBilan()` ; remis à false à la
+    /// fermeture (« Explorer d'abord », glissement, ou fin du questionnaire).
+    @Published var questionnaireOuvert = false
     @Published var errorMessage: String?
     /// Erreur dédiée au bilan v2 (écran de chargement/gate onboarding).
     /// Distincte de `errorMessage` (v7, autre bandeau) pour ne pas faire
@@ -41,6 +45,28 @@ final class DashboardViewModel: ObservableObject {
     private let analyticsService: AnalyticsServiceProtocol
     private let aiAnalysisService: AIAnalysisServiceProtocol
     let gamificationService: GamificationService
+
+    // MARK: - Entrée libre (V12a)
+
+    /// Bilan complété — point d'observation UNIQUE pour toutes les vues.
+    /// Source : `questionnaire_data.completed` du profil, portée par le
+    /// @Published `hasCompletedQuestionnaire` (mis à jour immédiatement à la
+    /// soumission du questionnaire, sans relance de l'app). Alias sémantique :
+    /// le nouveau code lit `bilanComplete`, l'existant reste inchangé.
+    var bilanComplete: Bool { hasCompletedQuestionnaire }
+
+    /// Décision fondateur (V12a) : aucune porte premium tant que le bilan
+    /// n'est pas fait. Toutes les cartes / pills / portes paywall se
+    /// conditionnent ici plutôt que sur `!isPremium` copié partout.
+    var premiumVisible: Bool { bilanComplete && !subscriptionService.isPremium }
+
+    /// Lance (ou reprend) le bilan depuis n'importe quel onglet. Le draft du
+    /// questionnaire est restauré par QuestionnaireViewModel — la reprise se
+    /// fait à la question en cours. À la fermeture de la feuille,
+    /// l'utilisateur retrouve l'onglet d'où il est parti.
+    func demarrerBilan() {
+        questionnaireOuvert = true
+    }
 
     // MARK: - Computed (PhysicalMetrics)
 
