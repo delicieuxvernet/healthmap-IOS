@@ -27,12 +27,13 @@ struct TeaserStat {
     /// Source publique, affichée en petit (« Esteban », « INCA3 »).
     let source: String
 
-    /// Phrase complète pour VoiceOver.
+    /// Phrase complète pour VoiceOver (ponctuation prononçable uniquement,
+    /// jamais de tiret cadratin — même doctrine que TypographieTests).
     var accessibilite: String {
         if let fraction {
-            return "\(fraction) : \(texte) — source \(source)"
+            return "\(fraction) : \(texte), source \(source)"
         }
-        return "\(texte) — source \(source)"
+        return "\(texte), source \(source)"
     }
 }
 

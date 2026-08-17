@@ -943,7 +943,10 @@ struct BilanV7ApportsTeaserCard: View {
                     Image(systemName: "sparkles")
                         .font(.system(size: 16, weight: .semibold))
                         .accessibilityHidden(true)
-                    Text("Voir MES apports — bilan 3 min")
+                    // Séparateur médian (pas de tiret cadratin en incise —
+                    // décision typo du 1er août, TypographieTests) : même
+                    // idiome que « · Esteban » sur cet écran.
+                    Text("Voir MES apports · bilan 3 min")
                 }
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
@@ -955,7 +958,7 @@ struct BilanV7ApportsTeaserCard: View {
             }
             .buttonStyle(.healthMapPressed)
             .padding(.top, 14)
-            .accessibilityLabel("Voir mes apports — faire le bilan, 3 minutes")
+            .accessibilityLabel("Voir mes apports, faire le bilan en 3 minutes")
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1066,7 +1069,7 @@ struct BilanV7AttentionTeaserCard: View {
             }
             .buttonStyle(BilanV7PressStyle())
             .padding(.top, 6)
-            .accessibilityLabel("Détecter mes interactions — faire le bilan")
+            .accessibilityLabel("Détecter mes interactions, faire le bilan")
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
