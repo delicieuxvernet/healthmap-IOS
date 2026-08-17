@@ -96,11 +96,23 @@ struct HealthMapApp: App {
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
-                        // Re-verify entitlements every 24h when foregrounded
                         Task { @MainActor in
+                            // L'état premium d'abord (filet hors-ligne V10 #4) :
+                            // un abonnement pris, renouvelé ou expiré pendant que
+                            // l'app dormait se reflète dès le retour au premier plan.
+                            await SubscriptionService.shared.checkPremiumStatus()
+                            // Re-verify entitlements every 24h when foregrounded
                             guard let session = await AuthService.shared.currentSession else { return }
                             await ReceiptValidationService.shared.verifyIfNeeded(userId: session.user.id.uuidString)
                         }
+                    }
+                }
+                // Retour du réseau : rafraîchit l'état premium initialisé depuis
+                // le cache hors-ligne (V10 #4). `onReceive` SwiftUI : l'abonnement
+                // suit la vie de la vue — aucun observer manuel à nettoyer.
+                .onReceive(NotificationCenter.default.publisher(for: .healthmapDidReconnect)) { _ in
+                    Task { @MainActor in
+                        await SubscriptionService.shared.checkPremiumStatus()
                     }
                 }
         }

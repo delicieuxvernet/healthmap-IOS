@@ -63,4 +63,62 @@ final class PremiumReadinessTests: XCTestCase {
         XCTAssertFalse(ScanQuotaUI.gateEnabled(bilanComplete: false, isPremium: false))
         XCTAssertFalse(ScanQuotaUI.gateEnabled(bilanComplete: false, isPremium: true))
     }
+
+    // MARK: - Filet hors-ligne : persistance + grâce (PremiumSnapshot, V10 #4)
+
+    func testSnapshotGrantsAccessWhileSubscriptionRuns() {
+        let active = PremiumSnapshot(isPremium: true, expirationDate: Date().addingTimeInterval(3600))
+        XCTAssertTrue(active.grantsAccess())
+    }
+
+    func testSnapshotWithoutExpirationTrustsLastKnownState() {
+        // Achat optimiste ou donnée absente : le dernier mot connu fait foi.
+        XCTAssertTrue(PremiumSnapshot(isPremium: true, expirationDate: nil).grantsAccess())
+        XCTAssertFalse(PremiumSnapshot(isPremium: false, expirationDate: nil).grantsAccess())
+    }
+
+    func testSnapshotGraceCoversThreeDaysAfterExpiration() {
+        let now = Date()
+        let day: TimeInterval = 24 * 60 * 60
+        // Expiré depuis 2 jours : encore couvert (retard de facturation, avion).
+        XCTAssertTrue(
+            PremiumSnapshot(isPremium: true, expirationDate: now.addingTimeInterval(-2 * day))
+                .grantsAccess(now: now)
+        )
+        // Expiré depuis 4 jours : la grâce est finie.
+        XCTAssertFalse(
+            PremiumSnapshot(isPremium: true, expirationDate: now.addingTimeInterval(-4 * day))
+                .grantsAccess(now: now)
+        )
+        // Plus signalé actif mais expiration récente : la grâce couvre aussi.
+        XCTAssertTrue(
+            PremiumSnapshot(isPremium: false, expirationDate: now.addingTimeInterval(-1 * day))
+                .grantsAccess(now: now)
+        )
+        // Plus actif avec une date FUTURE (révocation, remboursement) : refusé.
+        XCTAssertFalse(
+            PremiumSnapshot(isPremium: false, expirationDate: now.addingTimeInterval(day))
+                .grantsAccess(now: now)
+        )
+    }
+
+    func testSnapshotRoundTripsThroughUserDefaults() throws {
+        let suiteName = "PremiumSnapshotTests"
+        let suite = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        suite.removePersistentDomain(forName: suiteName)
+        defer { suite.removePersistentDomain(forName: suiteName) }
+
+        let expiration = Date(timeIntervalSince1970: 1_900_000_000)
+        PremiumSnapshot(isPremium: true, expirationDate: expiration).save(to: suite)
+        let loaded = PremiumSnapshot.load(from: suite)
+        XCTAssertTrue(loaded.isPremium)
+        XCTAssertEqual(loaded.expirationDate, expiration)
+
+        // Un reset (sign out) efface l'expiration : le cache d'un utilisateur
+        // ne doit jamais couvrir le suivant.
+        PremiumSnapshot(isPremium: false, expirationDate: nil).save(to: suite)
+        let cleared = PremiumSnapshot.load(from: suite)
+        XCTAssertFalse(cleared.isPremium)
+        XCTAssertNil(cleared.expirationDate)
+    }
 }

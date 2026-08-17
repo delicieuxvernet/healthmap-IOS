@@ -21,14 +21,67 @@ enum PurchaseOutcome: Equatable {
     }
 }
 
+// MARK: - Filet hors-ligne (promesse V10 #4)
+/// Dernier état premium CONNU, persisté à chaque mise à jour fraîche : au
+/// cold start sans réseau, un abonné reste traité en abonné (grâce de 3 jours
+/// après expiration — retards de facturation, avion, réseau coupé).
+struct PremiumSnapshot: Equatable {
+    static let premiumKey = "healthmap_premium_cached"
+    static let expirationKey = "healthmap_premium_expiration"
+    /// 3 jours — même valeur que la grâce historique d'`isPremiumWithGrace`.
+    static let gracePeriod: TimeInterval = 3 * 24 * 60 * 60
+
+    let isPremium: Bool
+    let expirationDate: Date?
+
+    /// L'accès est-il couvert par ce dernier état connu ?
+    func grantsAccess(now: Date = Date()) -> Bool {
+        if isPremium {
+            // Sans date d'expiration connue, le dernier mot du serveur fait foi.
+            guard let expirationDate else { return true }
+            return now.timeIntervalSince(expirationDate) < Self.gracePeriod
+        }
+        // Plus signalé actif : la grâce ne couvre qu'une expiration RÉCENTE
+        // (< 3 j) — jamais une date future incohérente (révocation, remboursement).
+        guard let expirationDate else { return false }
+        let sinceExpiration = now.timeIntervalSince(expirationDate)
+        return sinceExpiration >= 0 && sinceExpiration < Self.gracePeriod
+    }
+
+    func save(to defaults: UserDefaults = .standard) {
+        defaults.set(isPremium, forKey: Self.premiumKey)
+        if let expirationDate {
+            defaults.set(expirationDate, forKey: Self.expirationKey)
+        } else {
+            defaults.removeObject(forKey: Self.expirationKey)
+        }
+    }
+
+    static func load(from defaults: UserDefaults = .standard) -> PremiumSnapshot {
+        PremiumSnapshot(
+            isPremium: defaults.bool(forKey: premiumKey),
+            expirationDate: defaults.object(forKey: expirationKey) as? Date
+        )
+    }
+}
+
 // MARK: - Subscription Service (RevenueCat)
 @MainActor
 final class SubscriptionService: ObservableObject {
     static let shared = SubscriptionService()
 
+    /// Identifiant de l'entitlement RevenueCat.
+    nonisolated static let entitlementId = "premium"
+
     @Published var isPremium = false
     @Published var offerings: Offerings?
     @Published var customerInfo: CustomerInfo?
+
+    /// Anti-course (V10 #4) : incrémentée à chaque écriture FRAÎCHE de l'état
+    /// premium (achat, restore, push delegate, reset). Une lecture réseau
+    /// lancée avant une écriture plus récente est jetée à son retour — un
+    /// `true` frais n'est jamais écrasé par une réponse ancienne.
+    private var premiumGeneration = 0
 
     /// Repli : produits lus DIRECTEMENT depuis StoreKit par identifiant, quand
     /// l'offering RevenueCat ne renvoie rien d'exploitable (offering « current »
@@ -49,17 +102,50 @@ final class SubscriptionService: ObservableObject {
     ]
 
     private init() {
+        // Filet hors-ligne (V10 #4) : au cold start, l'état premium repart du
+        // dernier état CONNU via `isPremiumWithGrace` (cache persisté, grâce
+        // de 3 j après expiration) au lieu de false — un abonné en avion reste
+        // un abonné jusqu'à preuve réseau du contraire. `checkPremiumStatus`
+        // (lancement, retour au premier plan, reconnexion) rafraîchit ensuite.
+        isPremium = isPremiumWithGrace
+
         // Listen to customer info changes
         Purchases.shared.delegate = HMPurchasesDelegate.shared
     }
 
+    // MARK: - Fresh state writes
+
+    /// Écriture FRAÎCHE de l'état premium (achat, restore, push delegate,
+    /// reset, lecture réseau aboutie). Incrémente la génération anti-course
+    /// et persiste le filet hors-ligne.
+    /// - Parameter isPremiumOverride: chemin optimiste post-achat (V10 #3) —
+    ///   l'achat fait foi même sans confirmation lisible. Dans ce cas aucune
+    ///   date d'expiration fiable n'existe : on n'en persiste pas plutôt
+    ///   qu'une périmée.
+    fileprivate func applyFresh(customerInfo info: CustomerInfo?, isPremiumOverride: Bool? = nil) {
+        premiumGeneration += 1
+        customerInfo = info
+        let entitlement = info?.entitlements[Self.entitlementId]
+        isPremium = isPremiumOverride ?? (entitlement?.isActive == true)
+        PremiumSnapshot(
+            isPremium: isPremium,
+            expirationDate: isPremiumOverride == nil ? entitlement?.expirationDate : nil
+        ).save()
+    }
+
     // MARK: - Check Premium Status
     func checkPremiumStatus() async {
+        let generation = premiumGeneration
         do {
             let info = try await Purchases.shared.customerInfo()
-            customerInfo = info
-            isPremium = info.entitlements["premium"]?.isActive == true
+            // Anti-course (V10 #4) : une écriture plus fraîche (achat, push
+            // delegate…) est passée pendant la lecture réseau — cette réponse
+            // est périmée, on la jette.
+            guard generation == premiumGeneration else { return }
+            applyFresh(customerInfo: info)
         } catch {
+            // Hors-ligne : on GARDE l'état courant (initialisé du cache au
+            // cold start) — un échec de lecture ne dégrade jamais un abonné.
             AppLogger.subscription.report(error, context: "checkPremiumStatus")
         }
     }
@@ -109,8 +195,7 @@ final class SubscriptionService: ObservableObject {
     /// abouti — une relecture RevenueCat qui échoue (réseau) n'est pas un
     /// achat raté et ne doit JAMAIS s'afficher comme tel (promesse V10 #3).
     private func finish(result: PurchaseResultData) async -> PurchaseOutcome {
-        customerInfo = result.customerInfo
-        isPremium = result.customerInfo.entitlements["premium"]?.isActive == true
+        applyFresh(customerInfo: result.customerInfo)
 
         var outcome = PurchaseOutcome.resolve(
             userCancelled: result.userCancelled,
@@ -129,8 +214,7 @@ final class SubscriptionService: ObservableObject {
                 guard let refreshed = try? await Purchases.shared.customerInfo(fetchPolicy: .fetchCurrent) else {
                     continue
                 }
-                customerInfo = refreshed
-                isPremium = refreshed.entitlements["premium"]?.isActive == true
+                applyFresh(customerInfo: refreshed)
                 if isPremium {
                     outcome = .activated
                     break
@@ -142,7 +226,7 @@ final class SubscriptionService: ObservableObject {
         // résultat d'achat fait foi, l'accès est accordé. Le webhook RevenueCat
         // + verify-receipt corrigeront côté serveur si besoin.
         if outcome == .entitlementPending {
-            isPremium = true
+            applyFresh(customerInfo: customerInfo, isPremiumOverride: true)
             outcome = .activatedSyncPending
         }
 
@@ -162,41 +246,39 @@ final class SubscriptionService: ObservableObject {
     // MARK: - Restore Purchases
     func restorePurchases() async throws {
         let info = try await Purchases.shared.restorePurchases()
-        customerInfo = info
-        isPremium = info.entitlements["premium"]?.isActive == true
+        applyFresh(customerInfo: info)
     }
 
     // MARK: - Grace Period
-    /// Returns true if the user has an active premium entitlement OR if
-    /// the entitlement expired less than 3 days ago (grace period).
-    /// This prevents users from losing access immediately due to payment
-    /// processing delays or temporary billing issues.
+    /// Accès premium avec filet : entitlement actif, OU dernier état connu
+    /// (RevenueCat en mémoire, sinon cache disque `PremiumSnapshot`) encore
+    /// couvert par la grâce de 3 jours. Consultée au cold start pour
+    /// initialiser `isPremium` (V10 #4) — un retard de facturation ou une
+    /// absence de réseau ne dégrade pas un abonné.
     var isPremiumWithGrace: Bool {
         if isPremium { return true }
-
-        // Check for grace period: entitlement expired within last 3 days
-        guard let entitlement = customerInfo?.entitlements["premium"],
-              let expirationDate = entitlement.expirationDate else {
-            return false
+        if let entitlement = customerInfo?.entitlements[Self.entitlementId] {
+            return PremiumSnapshot(
+                isPremium: entitlement.isActive,
+                expirationDate: entitlement.expirationDate
+            ).grantsAccess()
         }
-
-        let gracePeriod: TimeInterval = 3 * 24 * 60 * 60 // 3 days
-        return Date().timeIntervalSince(expirationDate) < gracePeriod
+        return PremiumSnapshot.load().grantsAccess()
     }
 
     // MARK: - Reset (for sign out)
     /// Clears the in-memory premium status and logs out of RevenueCat so
     /// the next user starts with a clean subscription state. Without this,
     /// User B would briefly see User A's premium entitlements after sign-out.
+    /// Le filet hors-ligne est purgé aussi (`applyFresh(nil)`) — le cache
+    /// d'un utilisateur ne doit jamais couvrir le suivant.
     func reset() async {
-        isPremium = false
-        customerInfo = nil
+        applyFresh(customerInfo: nil)
         offerings = nil
         do {
             // RevenueCat logOut resets to an anonymous user.
             let info = try await Purchases.shared.logOut()
-            customerInfo = info
-            isPremium = info.entitlements["premium"]?.isActive == true
+            applyFresh(customerInfo: info)
         } catch {
             AppLogger.subscription.report(error, context: "reset/logOut")
         }
@@ -206,8 +288,7 @@ final class SubscriptionService: ObservableObject {
     func identify(userId: String) async {
         do {
             let (info, _) = try await Purchases.shared.logIn(userId)
-            customerInfo = info
-            isPremium = info.entitlements["premium"]?.isActive == true
+            applyFresh(customerInfo: info)
         } catch {
             AppLogger.subscription.report(error, context: "identify")
         }
@@ -223,10 +304,10 @@ private class HMPurchasesDelegate: NSObject, PurchasesDelegate {
         // strict-concurrency does not flag a cross-actor reference: the closure
         // body itself is `@MainActor`, so `SubscriptionService.shared` (a
         // `@MainActor` property) is reachable without any nonisolated hop.
+        // Push RevenueCat = source fraîche : passe par `applyFresh` (génération
+        // anti-course + persistance du filet hors-ligne, V10 #4).
         Task { @MainActor in
-            let service = SubscriptionService.shared
-            service.customerInfo = customerInfo
-            service.isPremium = customerInfo.entitlements["premium"]?.isActive == true
+            SubscriptionService.shared.applyFresh(customerInfo: customerInfo)
         }
     }
 }
