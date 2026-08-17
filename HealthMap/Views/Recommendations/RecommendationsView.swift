@@ -33,7 +33,17 @@ struct RecommendationsView: View {
                 // dégradé de marque).
                 TabWashBackground(tint: .accentIndigo)
 
-                if let analysis = dashboardVM.aiAnalysis {
+                if !dashboardVM.bilanComplete {
+                    // Mode découverte (V12c) : la MÊME couronne, en exemples
+                    // génériques canoniques — tout tap mène au bilan, la
+                    // pop-up de solutions n'existe pas ici.
+                    PlanRadialScreen(
+                        topics: planTopicsDecouverte(),
+                        focus: nil,
+                        decouverte: { dashboardVM.demarrerBilan() }
+                    )
+                    .kiwiEntrance()
+                } else if let analysis = dashboardVM.aiAnalysis {
                     // Arrivée en fondu d'un bloc, pas en cascade : la carte
                     // radiale est un tout, la décomposer la ferait clignoter.
                     RecommendationsContentView(analysis: analysis).kiwiEntrance()
@@ -67,6 +77,10 @@ struct RecommendationsView: View {
             // n'ait été déclenchée (ni v7 ni v2), on lance (garde de ré-entrance
             // dans le VM). N'écrase rien si une analyse est déjà là / en cours.
             .task {
+                // Découverte (V12c) : sans bilan, AUCUN appel IA depuis cet
+                // onglet — la garde du VM tient déjà l'invariant (V12a), on
+                // ne déclenche même pas.
+                guard dashboardVM.bilanComplete else { return }
                 if dashboardVM.aiAnalysis == nil, dashboardVM.analysisV2 == nil,
                    !dashboardVM.isLoadingAnalysis, !dashboardVM.isLoadingAnalysisV2 {
                     await dashboardVM.triggerAnalysis()
