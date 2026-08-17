@@ -16,6 +16,35 @@ struct ScanQuotaPresentation: Equatable {
     }
 }
 
+/// Matrice bilan × premium — qui voit QUOI autour du quota de scans (V10) :
+///
+/// ```
+///                      | bilan non fait | bilan fait
+///  gratuit — compteur  |     rien       | oui (x/3)
+///  gratuit — porte     |     rien       | oui (mur + tap pastille → paywall)
+///  premium — compteur  |     rien       | oui (x/30)
+///  premium — porte     |     rien       | JAMAIS
+/// ```
+///
+/// « Compteur » = information neutre (pastille header, `QuotaMeter`).
+/// « Porte » = incitation paywall (`QuotaWall`, tap de la pastille épuisée).
+/// Avant le bilan, aucune trace premium à l'écran (décision fondateur V12a —
+/// `premiumVisible`) ; un abonné n'est jamais confronté à une porte : à bout
+/// de quota il lit un message honnête « ça se recharge demain » (V10 #1).
+enum ScanQuotaUI {
+    /// Le compteur (pastille + QuotaMeter) s'affiche dès que le bilan est fait
+    /// ET que le serveur a communiqué un quota — premium inclus.
+    static func meterVisible(bilanComplete: Bool, remaining: Int?) -> Bool {
+        bilanComplete && remaining != nil
+    }
+
+    /// La porte paywall (mur de quota, tap de la pastille épuisée) n'existe
+    /// que pour un non-premium ayant fait son bilan (= `premiumVisible`).
+    static func gateEnabled(bilanComplete: Bool, isPremium: Bool) -> Bool {
+        bilanComplete && !isPremium
+    }
+}
+
 @MainActor
 final class MealScanViewModel: ObservableObject {
 
@@ -28,8 +57,9 @@ final class MealScanViewModel: ObservableObject {
     @Published var searchResults: [MealJournalService.FoodHit] = []
     @Published var isSearching = false
     @Published var selectedTab: MealScanTab = .analyze
-    /// Scans gratuits restants aujourd’hui, renvoyés par la fonction ; nil si
-    /// inconnu / premium. Le cache n’est réutilisé que le jour où il a été reçu.
+    /// Scans restants aujourd’hui, renvoyés par la fonction pour TOUS les
+    /// tiers (gratuit 3/j, premium 30/j) ; nil tant que le serveur n’a rien
+    /// dit. Le cache n’est réutilisé que le jour où il a été reçu.
     @Published var scansRemaining: Int?
     @Published var scanDailyLimit: Int?
     /// Passe à true quand le quota gratuit est épuisé → la vue ouvre le paywall.
@@ -544,7 +574,7 @@ final class MealScanViewModel: ObservableObject {
             case .imageTooLarge:
                 errorMessage = "Image trop volumineuse (> 5 Mo). Essaie avec une photo plus legere."
             case .rateLimited:
-                errorMessage = "Trop de requetes. Attends quelques secondes avant de reessayer."
+                handleDailyQuotaReached()
             case .notAnalyzable:
                 errorMessage = "Cette image ne semble pas contenir un repas. Essaie avec une photo d'assiette."
             case .serverError(let msg):
@@ -554,15 +584,7 @@ final class MealScanViewModel: ObservableObject {
             // Handle HTTP / Supabase errors by inspecting the error description
             let desc = String(describing: error).lowercased()
             if desc.contains("429") || desc.contains("quota") || desc.contains("rate") {
-                // Pour un compte Free, un 429 correspond au quota journalier.
-                // Pour Premium, le serveur conserve un plafond anti-abus plus élevé.
-                if SubscriptionService.shared.isPremium {
-                    errorMessage = "Trop de requetes. Attends quelques secondes avant de reessayer."
-                } else {
-                    updateScansRemaining(0)
-                    quotaExhausted = true
-                    errorMessage = nil
-                }
+                handleDailyQuotaReached()
             } else if desc.contains("413") || desc.contains("too large") || desc.contains("payload") {
                 errorMessage = "Image trop volumineuse (> 5 Mo). Essaie avec une photo plus legere."
             } else if desc.contains("timeout") || desc.contains("timed out") {
@@ -628,7 +650,32 @@ final class MealScanViewModel: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Met à jour + met en cache le compteur de scans gratuits restants.
+    /// Quota journalier atteint (HTTP 429 de la fonction scan).
+    /// Matrice compteur × porte : voir `ScanQuotaUI` en tête de fichier.
+    /// - Gratuit : porte → le paywall s'ouvre (`quotaExhausted`).
+    /// - Premium : AUCUNE porte — un abonné à bout de ses 30 scans lit la
+    ///   vérité (« ça se recharge demain »), pas « attends quelques secondes »
+    ///   (promesse client V10 #1 : le vrai délai est de 24 h, pas de quelques
+    ///   secondes, et il n'y a rien à lui vendre).
+    private func handleDailyQuotaReached() {
+        updateScansRemaining(0)
+        if SubscriptionService.shared.isPremium {
+            // Le cache de limite peut dater du tier gratuit (3/j) si l'upgrade
+            // vient d'avoir lieu — on ne descend jamais sous le plafond premium
+            // (30/j) pour ne pas re-mentir à un abonné.
+            let limit = max(scanDailyLimit ?? 30, 30)
+            if scanDailyLimit != limit {
+                scanDailyLimit = limit
+                UserDefaults.standard.set(limit, forKey: "hm_scan_daily_limit")
+            }
+            errorMessage = "Tu as utilisé tes \(limit) scans du jour. Ça se recharge demain."
+        } else {
+            quotaExhausted = true
+            errorMessage = nil
+        }
+    }
+
+    /// Met à jour + met en cache le compteur de scans restants.
     private func updateScansRemaining(_ value: Int?) {
         guard let value else { return }
         scansRemaining = value

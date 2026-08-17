@@ -44,6 +44,38 @@ final class ReceiptValidationTests: XCTestCase {
         await ReceiptValidationService.shared.verifyCurrentEntitlements(userId: "test-user")
     }
 
+    // MARK: - Debounce force (promesse V10 #2)
+    // La décision de debounce est extraite dans `shouldVerify` (pure) pour être
+    // testable : `force: true` la court-circuite entièrement (chemin post-achat).
+    // Pas d'appel réel `verifyCurrentEntitlements(force: true)` ici : il
+    // traverserait `Transaction.currentEntitlements`, qui PEND sur le
+    // simulateur CI sans App Store (incident du 10 juin 2026, cf. setUp) —
+    // `force` court-circuite précisément la garde qui protège ce test.
+
+    func testShouldVerifyWhenNeverVerified() {
+        XCTAssertTrue(ReceiptValidationService.shouldVerify(lastVerification: nil, now: Date()))
+    }
+
+    func testShouldNotVerifyAgainWithin24Hours() {
+        let now = Date()
+        XCTAssertFalse(ReceiptValidationService.shouldVerify(
+            lastVerification: now.addingTimeInterval(-60 * 60),
+            now: now
+        ))
+        XCTAssertFalse(ReceiptValidationService.shouldVerify(
+            lastVerification: now.addingTimeInterval(-23 * 60 * 60),
+            now: now
+        ))
+    }
+
+    func testShouldVerifyAfter24Hours() {
+        let now = Date()
+        XCTAssertTrue(ReceiptValidationService.shouldVerify(
+            lastVerification: now.addingTimeInterval(-25 * 60 * 60),
+            now: now
+        ))
+    }
+
     // MARK: - AppTransaction
     // Pas de smoke test sur `verifyAppTransaction()` : `AppTransaction.shared`
     // exige un App Store daemon absent du simulateur CI — l'appel réel PEND

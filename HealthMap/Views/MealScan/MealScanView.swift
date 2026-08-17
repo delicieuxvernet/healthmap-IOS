@@ -265,10 +265,21 @@ struct MealScanView: View {
                     )
                 }
                 Spacer()
-                // `premiumVisible` : le compteur (et sa porte paywall au tap)
-                // n'apparaît qu'une fois le bilan fait — décision fondateur V12a.
-                if dashboardVM.premiumVisible, let remaining = viewModel.scansRemaining {
-                    freeScanCounter(remaining)
+                // COMPTEUR (info neutre) dès le bilan fait, premium inclus
+                // (x/30) ; la PORTE (tap pastille épuisée → paywall) reste
+                // réservée au non-premium. Matrice complète : `ScanQuotaUI`
+                // (MealScanViewModel.swift).
+                if ScanQuotaUI.meterVisible(
+                    bilanComplete: dashboardVM.bilanComplete,
+                    remaining: viewModel.scansRemaining
+                ), let remaining = viewModel.scansRemaining {
+                    scanCounterPill(
+                        remaining,
+                        gated: ScanQuotaUI.gateEnabled(
+                            bilanComplete: dashboardVM.bilanComplete,
+                            isPremium: subscriptionService.isPremium
+                        )
+                    )
                 }
             }
             .padding(.horizontal, Theme.spacingLG)
@@ -940,11 +951,15 @@ struct MealScanView: View {
     }
 
     // MARK: - Compteur de scans gratuits (badge compact du header)
-    private func freeScanCounter(_ remaining: Int) -> some View {
+    /// Pastille compteur du header. `gated` = la pastille est AUSSI une porte
+    /// paywall quand le quota est épuisé (non-premium uniquement — matrice
+    /// `ScanQuotaUI`). Pour un abonné elle reste purement informative : tap
+    /// inerte, aucune mention premium, « ça se recharge demain ».
+    private func scanCounterPill(_ remaining: Int, gated: Bool) -> some View {
         let ok = remaining > 0
         let plural = remaining > 1 ? "s" : ""
         return HStack(spacing: 5) {
-            Image(systemName: ok ? "bolt.fill" : "lock.fill")
+            Image(systemName: ok ? "bolt.fill" : (gated ? "lock.fill" : "hourglass"))
                 .font(.system(size: 10))
             Text(ok ? "\(remaining) scan\(plural)" : "Épuisés")
                 .font(.system(size: 12, weight: .semibold))
@@ -954,11 +969,15 @@ struct MealScanView: View {
         .padding(.vertical, 6)
         .background((ok ? Color.kiwiGreen : Color.scoreLow).opacity(0.10))
         .clipShape(Capsule())
-        .onTapGesture { if !ok { showPaywall = true } }
+        .onTapGesture { if !ok && gated { showPaywall = true } }
         .accessibilityLabel(ok
-            ? "\(remaining) scan\(plural) photo gratuit\(plural) restant\(plural) aujourd'hui"
-            : "Scans gratuits épuisés")
-        .accessibilityHint(ok ? "" : "Passer en Premium pour débloquer jusqu’à 30 scans par jour")
+            ? "\(remaining) scan\(plural) restant\(plural) aujourd'hui"
+            : "Scans du jour épuisés")
+        .accessibilityHint(ok
+            ? ""
+            : (gated
+                ? "Passer en Premium pour débloquer jusqu’à 30 scans par jour"
+                : "Ça se recharge demain"))
     }
 
     // MARK: - Capture Zone
@@ -1437,15 +1456,23 @@ struct MealScanView: View {
     // Le total et le restant sont lus depuis le quota journalier du serveur.
     @ViewBuilder
     private var premiumScanBanner: some View {
-        // `premiumVisible` : compteur métré / mur de quota masqués tant que
-        // le bilan n'est pas fait (aucune porte premium avant — V12a).
-        if dashboardVM.premiumVisible,
-           let remaining = viewModel.scansRemaining {
+        // Matrice compteur × porte (`ScanQuotaUI`, MealScanViewModel.swift) :
+        // le COMPTEUR (QuotaMeter) s'affiche dès le bilan fait, premium inclus
+        // (x/30) ; la PORTE (QuotaWall → paywall) est réservée au non-premium.
+        // Un abonné à 0 garde son compteur plein — jamais de mur à lui vendre.
+        if ScanQuotaUI.meterVisible(
+            bilanComplete: dashboardVM.bilanComplete,
+            remaining: viewModel.scansRemaining
+        ), let remaining = viewModel.scansRemaining {
             let quota = ScanQuotaPresentation(
                 remaining: remaining,
                 dailyLimit: viewModel.scanDailyLimit
             )
-            if quota.remaining == 0 {
+            let gated = ScanQuotaUI.gateEnabled(
+                bilanComplete: dashboardVM.bilanComplete,
+                isPremium: subscriptionService.isPremium
+            )
+            if quota.remaining == 0 && gated {
                 QuotaWall(
                     message: "Tes scans gratuits du jour sont utilisés. Premium en débloque jusqu’à 30 par jour.",
                     unlockTitle: "Débloquer 30 scans par jour",
