@@ -77,6 +77,45 @@ final class TeaserOngletsTests: XCTestCase {
         XCTAssertEqual(ai.fullAnalysisCallCount, 0, "generate-analysis (v7) ne doit pas partir")
         XCTAssertEqual(ai.bilanV2CallCount, 0, "generate-analysis (bilan v2) ne doit pas partir")
     }
+
+    // MARK: - Onglet Suivi
+
+    /// Suivi sans bilan : l'onglet s'affiche proprement en mode exemple (les
+    /// moteurs déterministes fournissent des courbes, aucun symptôme déclaré →
+    /// carte d'invitation, jamais de crash), la porte est là, et aucun appel
+    /// IA ne part (l'onglet n'en fait aucun ; la garde du VM couvre le reste).
+    func testSuivi_sansBilan_modeExempleEtCTASansAppelIA() async {
+        let ai = MockTeaserAIAnalysisService()
+        let vm = makeVMSansBilan(aiAnalysis: ai)
+        XCTAssertFalse(vm.bilanComplete)
+
+        // La porte bilan a le droit de s'afficher (condition de SuiviView).
+        XCTAssertFalse(BilanDoorButton.Libelle.suivi.isEmpty)
+        XCTAssertFalse(BilanDoorButton.Libelle.suivi.contains("\u{2014}"))
+
+        // Les carrousels d'exemple ont TOUJOURS de quoi dessiner (macros +
+        // micros), même sans aucun scan ni bilan.
+        for kind in SuiviEngineV4.MacroKind.allCases {
+            XCTAssertFalse(SuiviEngineV4.exampleMacroSeries(kind).isEmpty,
+                           "Courbe d'exemple attendue pour \(kind.rawValue)")
+        }
+        XCTAssertFalse(SuiviEngineV4.exampleMicroSeries().isEmpty)
+
+        // Sans bilan v2, aucun symptôme déclaré : la section retombe sur son
+        // état d'invitation, sans inventer de courbe personnelle.
+        let evolutions = SuiviEngineV4.symptomEvolutions(
+            symptomes: nil, feelingsById: [:], isTracking: false
+        )
+        XCTAssertTrue(evolutions.isEmpty)
+
+        // Pas de porte premium par-dessus des exemples (décision V12a).
+        XCTAssertFalse(vm.premiumVisible)
+
+        // Aucun appel IA sans bilan.
+        await vm.triggerAnalysis()
+        XCTAssertEqual(ai.fullAnalysisCallCount, 0)
+        XCTAssertEqual(ai.bilanV2CallCount, 0)
+    }
 }
 
 // MARK: - Mocks minimaux (privés à ce fichier)
