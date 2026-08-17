@@ -849,6 +849,234 @@ struct BilanV7PremiumCard: View {
     }
 }
 
+// MARK: - Mode découverte (V12b — le dashboard tease avant le bilan)
+//
+// Sans bilan, l'onglet garde STRICTEMENT le design v7 : mêmes cartes, mêmes
+// emplacements. Seuls les emplacements de DONNÉES changent — stats France
+// sourcées (`TeaserStatsCatalog`) + un CTA questionnaire par zone à forte
+// valeur (principe validé fondateur 12-13 août : un bouton géant par zone,
+// jamais trois empilés — donc AUCUN bouton dans le hero).
+
+// MARK: - Z2 · Score (découverte) — l'anneau attend le bilan
+struct BilanV7ScoreTeaserCard: View {
+    var body: some View {
+        HStack(spacing: 14) {
+            // Anneau en pointillés : mêmes cotes que BilanV7ScoreRing
+            // (64 pt, trait 7), piste kiwi existante, « ? » au centre.
+            ZStack {
+                Circle()
+                    .stroke(Color.kiwiGreen.opacity(0.15), lineWidth: 7)
+                Circle()
+                    .stroke(
+                        Color.kiwiGreen.opacity(0.45),
+                        style: StrokeStyle(lineWidth: 7, lineCap: .round, dash: [2, 8])
+                    )
+                Text("?")
+                    .font(.system(size: 19, weight: .heavy, design: .rounded))
+                    .tracking(-0.8)
+                    .foregroundStyle(BilanV7.ink)
+            }
+            .frame(width: 64, height: 64)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Ton score t'attend")
+                    .font(.system(size: 15, weight: .heavy))
+                    .tracking(-0.3)
+                    .foregroundStyle(BilanV7.ink)
+                Text("\(NutrientData.all.count) apports calculés depuis TES réponses")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(BilanV7.secondary)
+                    .lineSpacing(1.5)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .bilanV7Card()
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Z3 · Apports (découverte) — la grille en stats France + CTA bilan
+struct BilanV7ApportsTeaserCard: View {
+    /// Lance (ou reprend) le bilan — `DashboardViewModel.demarrerBilan()`.
+    let onStart: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                BilanV7SectionLabel(icon: "target", text: "Tes apports à renforcer", color: BilanV7.amber)
+                Spacer()
+                // Slot compteur (« 3 sur 10 » dans le réel) : le total canonique.
+                Text("\(NutrientData.all.count) apports")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(BilanV7.soft)
+            }
+
+            // Slot phrase de priorité (« La B12 est ta priorité… » dans le réel).
+            Text("La France en chiffres, en attendant les tiens.")
+                .font(.system(size: 17, weight: .heavy))
+                .tracking(-0.35)
+                .lineSpacing(2)
+                .foregroundStyle(BilanV7.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 9)
+                .padding(.bottom, 4)
+
+            ForEach(Array(NutrientData.all.enumerated()), id: \.element.id) { index, def in
+                row(def)
+                    .padding(.top, index == 0 ? 10 : 0)
+            }
+
+            // UN CTA géant pour toute la zone — style du bouton primaire du
+            // questionnaire (aplat kiwi, coins continus, ombre verte douce).
+            // Aucun style nouveau.
+            Button {
+                HapticService.shared.primary()
+                onStart()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 16, weight: .semibold))
+                        .accessibilityHidden(true)
+                    // Séparateur médian (pas de tiret cadratin en incise —
+                    // décision typo du 1er août, TypographieTests) : même
+                    // idiome que « · Esteban » sur cet écran.
+                    Text("Voir MES apports · bilan 3 min")
+                }
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(Color.kiwiGreen)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: Color.kiwiGreen.opacity(0.28), radius: 12, x: 0, y: 6)
+            }
+            .buttonStyle(.healthMapPressed)
+            .padding(.top, 14)
+            .accessibilityLabel("Voir mes apports, faire le bilan en 3 minutes")
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .bilanV7Card()
+    }
+
+    @ViewBuilder
+    private func row(_ def: NutrientDefinition) -> some View {
+        let id = def.id.rawValue
+        let tint = Color.nutrientColor(for: id)
+        let stat = TeaserStatsCatalog.stat(for: id)
+
+        HStack(spacing: 11) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(tint.opacity(0.1))
+                .frame(width: 36, height: 36)
+                .overlay(
+                    Image(systemName: BilanV7Nutrient.icon(for: id))
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(tint)
+                )
+                .accessibilityHidden(true)
+
+            VStack(spacing: 6) {
+                HStack {
+                    Text(def.label)
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundStyle(BilanV7.ink)
+                    Spacer()
+                    // Slot « % de tes besoins » → la fraction France sourcée.
+                    if let fraction = stat.fraction {
+                        Text(fraction)
+                            .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(BilanV7.secondary)
+                    }
+                }
+                // Jauge vide (teinte neutre) : la donnée arrive avec le bilan.
+                BilanV7Bar(value: 0, color: BilanV7.statusNeutral)
+                Text("\(stat.texte) · \(stat.source)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(BilanV7.soft)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.vertical, 11)
+        .overlay(alignment: .top) {
+            Rectangle().fill(BilanV7.hairline).frame(height: 1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(def.label) : \(stat.accessibilite)")
+    }
+}
+
+// MARK: - Z4 · Points d'attention (découverte) — exemple générique + CTA
+struct BilanV7AttentionTeaserCard: View {
+    /// Lance (ou reprend) le bilan — `DashboardViewModel.demarrerBilan()`.
+    let onStart: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            BilanV7SectionLabel(
+                icon: "exclamationmark.triangle",
+                text: "Points d'attention",
+                color: BilanV7.alertInk
+            )
+
+            // Ligne d'exemple : accent ambre (c'est un exemple générique,
+            // pas une alerte détectée — jamais l'accent rouge du réel).
+            HStack(spacing: 11) {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(BilanV7.statusReinforce.opacity(0.12))
+                    .frame(width: 34, height: 34)
+                    .overlay(
+                        Image(systemName: "cup.and.saucer")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(BilanV7.statusReinforce)
+                    )
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Exemple : le café au repas peut freiner le fer.")
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundStyle(BilanV7.ink)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Et dans TES habitudes ?")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(BilanV7.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.top, 6)
+            .padding(.vertical, 12)
+
+            // Bouton fort de la carte (même patron que le CTA « Voir mes
+            // solutions » de la carte symptômes : 44 pt, kiwi, coins 12).
+            Button {
+                HapticService.shared.primary()
+                onStart()
+            } label: {
+                Text("Détecter MES interactions")
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Color.kiwiGreen, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(BilanV7PressStyle())
+            .padding(.top, 6)
+            .accessibilityLabel("Détecter mes interactions, faire le bilan")
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .bilanV7Card()
+    }
+}
+
 // MARK: - Sources scientifiques (pied de page — exigence App Review 1.4.1)
 /// Reprend le pied discret de la maquette en gardant les références cliquables
 /// (`ScientificSources`), condition de la revue App Store.
