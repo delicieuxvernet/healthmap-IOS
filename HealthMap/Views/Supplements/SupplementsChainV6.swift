@@ -561,6 +561,7 @@ struct ComplementsTeaserCard: View {
             BilanDoorButton(
                 title: BilanDoorButton.Libelle.complements,
                 accessibilityText: "Voir mes compléments, faire le bilan en 3 minutes",
+                zone: .complements,
                 action: onStart
             )
             .padding(.top, 12)

@@ -15,12 +15,16 @@ struct BilanDoorButton: View {
     /// Phrase VoiceOver (virgule, pas de séparateur médian — même décision
     /// typo que les CTA du Bilan).
     let accessibilityText: String
+    /// D'où cette porte est tapée — paramètre `zone` de l'événement
+    /// `decouverte_cta_bilan` (funnel V12f), émis à CHAQUE tap.
+    let zone: BilanDoorZone
     /// Lance (ou reprend) le bilan — `DashboardViewModel.demarrerBilan()`.
     let action: () -> Void
 
     var body: some View {
         Button {
             HapticService.shared.primary()
+            DecouverteFunnel.ctaBilan(zone: zone)
             action()
         } label: {
             HStack(spacing: 8) {
@@ -56,5 +60,24 @@ extension BilanDoorButton {
         static let suivi = "Suivre MES vrais chiffres · bilan 3 min"
         /// Compléments (sous les exemples de chaînes).
         static let complements = "Voir MES compléments · bilan 3 min"
+        /// Résultat de scan (V12e : sous les repères adulte moyen).
+        static let scan = "Personnaliser MES repères · bilan 3 min"
     }
+}
+
+// MARK: - Zones des portes (paramètre `zone` de `decouverte_cta_bilan`)
+/// Un cas par emplacement RÉEL d'une `BilanDoorButton` — le rawValue part tel
+/// quel en analytics (snake_case, jamais de donnée personnelle ; invariant
+/// DecouverteFunnelTests).
+enum BilanDoorZone: String, CaseIterable {
+    /// Onglet Bilan, carte apports en mode découverte (#217).
+    case bilanApports = "bilan_apports"
+    /// Onglet Plan, couronne radiale en mode découverte.
+    case plan
+    /// Onglet Suivi, sous les carrousels d'exemple.
+    case suivi
+    /// Onglet Compléments, sous les exemples de chaînes.
+    case complements
+    /// Écran de résultat d'un scan (V12e, seule porte de l'onglet Scan).
+    case scanResultat = "scan_resultat"
 }

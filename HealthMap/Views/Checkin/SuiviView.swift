@@ -84,7 +84,8 @@ struct SuiviView: View {
                         if !dashboardVM.bilanComplete {
                             BilanDoorButton(
                                 title: BilanDoorButton.Libelle.suivi,
-                                accessibilityText: "Suivre mes vrais chiffres, faire le bilan en 3 minutes"
+                                accessibilityText: "Suivre mes vrais chiffres, faire le bilan en 3 minutes",
+                                zone: .suivi
                             ) {
                                 dashboardVM.demarrerBilan()
                             }

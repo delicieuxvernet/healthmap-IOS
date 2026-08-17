@@ -544,6 +544,11 @@ final class MealScanViewModel: ObservableObject {
             GamificationService.shared.recordCheckin()
             AnalyticsService.shared.track(.mealScanned)
 
+            // Funnel découverte (V12f) : `userScores` vide = ce scan a tourné
+            // sans scores personnels (pas de bilan, cf. resolveUserScores) —
+            // exactement la condition des repères génériques (V12e). One-shot.
+            DecouverteFunnel.premierScan(sansBilan: userScores.isEmpty)
+
             // Unlock meal scanned badge
             GamificationService.shared.unlockMealScanned()
 

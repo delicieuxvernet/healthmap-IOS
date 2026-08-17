@@ -63,6 +63,10 @@ struct MealScanView: View {
     /// couperait l'enregistrement dans la foulée, pour rien.
     @State private var demarrageDictee: Task<Void, Never>?
     @State private var voiceConfirmation: String?
+    /// Découverte (V12e) : la porte bilan du résultat de scan doit d'abord
+    /// refermer le sheet résultat — ce drapeau fait ouvrir la feuille
+    /// questionnaire (racine) à la fermeture, jamais par-dessus le sheet.
+    @State private var bilanApresFermeture = false
     /// Apports quotidiens (score) des 7 derniers jours — courbe « apports vs besoins ».
     @State private var curve: [Int] = []
     /// Énergie active du jour (Apple Santé) → colonne « dépensées » de la jauge kcal.
@@ -147,7 +151,15 @@ struct MealScanView: View {
                     )
                 }
                 // Résultat du scan en bottom-sheet (contenu immersif inchangé).
-                .sheet(isPresented: resultBinding) {
+                // onDismiss : si la porte bilan du résultat a été tapée (V12e),
+                // la feuille questionnaire s'ouvre APRÈS la fermeture du sheet
+                // (elle est présentée par la racine MainTabView).
+                .sheet(isPresented: resultBinding, onDismiss: {
+                    if bilanApresFermeture {
+                        bilanApresFermeture = false
+                        dashboardVM.demarrerBilan()
+                    }
+                }) {
                     resultSheet
                 }
                 // Recherche d'aliment en bottom-sheet depuis la barre d'accueil.
@@ -347,7 +359,8 @@ struct MealScanView: View {
 
             ScanMicrosJourCard(
                 items: microItems,
-                headline: MealJournalViewModel.dayMicroHeadline(microItems, isToday: isTodaySelected)
+                headline: MealJournalViewModel.dayMicroHeadline(microItems, isToday: isTodaySelected),
+                reperesGeneriques: ReperesGeneriquesMention.estVisible(bilanComplete: dashboardVM.bilanComplete)
             )
             .padding(.horizontal, Theme.spacingLG)
 
@@ -1059,6 +1072,15 @@ struct MealScanView: View {
                     coverageHero(result)
                         .padding(.horizontal, Theme.spacingMD)
 
+                    // Découverte (V12e) : sans bilan, le serveur n'a aucun
+                    // score personnel — couverture, score du repas et % des
+                    // besoins reposent sur les références d'un adulte moyen.
+                    // On le dit ici, en petit, juste sous le héros.
+                    if ReperesGeneriquesMention.estVisible(bilanComplete: dashboardVM.bilanComplete) {
+                        ReperesGeneriquesMention()
+                            .padding(.horizontal, Theme.spacingLG)
+                    }
+
                     // Lot 3 (2 août 2026) : le meal_score était calculé/stocké
                     // depuis toujours et jamais affiché. Maquette validée.
                     if let score = result.mealScore {
@@ -1089,6 +1111,23 @@ struct MealScanView: View {
                     premiumScanBanner
 
                     if !result.warnings.isEmpty { warningsCard(result.warnings) }
+
+                    // Découverte (V12e) : LA porte bilan de l'onglet Scan —
+                    // uniquement ici, sur le résultat (pas sur l'accueil ni le
+                    // journal). Le résultat vit en sheet : on le referme
+                    // d'abord, la feuille questionnaire (racine, MainTabView)
+                    // s'ouvre à la fermeture (voir `resultBinding.onDismiss`).
+                    if ReperesGeneriquesMention.estVisible(bilanComplete: dashboardVM.bilanComplete) {
+                        BilanDoorButton(
+                            title: BilanDoorButton.Libelle.scan,
+                            accessibilityText: "Personnaliser mes repères, faire le bilan en 3 minutes",
+                            zone: .scanResultat
+                        ) {
+                            bilanApresFermeture = true
+                            viewModel.reset()
+                        }
+                        .padding(.horizontal, Theme.spacingLG)
+                    }
 
                     scanAgainButton
                 }
