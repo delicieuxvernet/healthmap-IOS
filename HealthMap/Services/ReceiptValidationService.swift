@@ -27,7 +27,7 @@ final class ReceiptValidationService {
         get { UserDefaults.standard.object(forKey: Self.lastVerificationKey) as? Date }
         set { UserDefaults.standard.set(newValue, forKey: Self.lastVerificationKey) }
     }
-    private static let verificationInterval: TimeInterval = 24 * 60 * 60
+    private nonisolated static let verificationInterval: TimeInterval = 24 * 60 * 60
 
     private init() {}
 
@@ -70,11 +70,15 @@ final class ReceiptValidationService {
 
     /// Scans current StoreKit 2 entitlements and optionally sends them to the
     /// server for cross-validation against `profiles.tier`. Called after each
-    /// purchase and periodically (every 24h).
-    func verifyCurrentEntitlements(userId: String) async {
-        // 24h debounce
-        if let last = lastVerification,
-           Date().timeIntervalSince(last) < Self.verificationInterval {
+    /// purchase (`force: true`) and periodically (every 24h).
+    ///
+    /// - Parameter force: bypasse le debounce 24h. Chemin post-achat UNIQUEMENT :
+    ///   juste après un paiement, la vérification serveur doit partir MAINTENANT —
+    ///   avant ce paramètre, une vérification périodique < 24 h rendait l'appel
+    ///   post-achat silencieusement no-op (promesse V10 #2).
+    func verifyCurrentEntitlements(userId: String, force: Bool = false) async {
+        // 24h debounce (sauf force)
+        if !force, !Self.shouldVerify(lastVerification: lastVerification, now: Date()) {
             return
         }
 
@@ -92,8 +96,6 @@ final class ReceiptValidationService {
             }
         }
 
-        lastVerification = Date()
-
         AppLogger.subscription.info("StoreKit 2 entitlements: \(activeProductIds, privacy: .public)")
         CrashReportingService.shared.breadcrumb(
             "entitlements verified: \(activeProductIds.count) active",
@@ -101,8 +103,20 @@ final class ReceiptValidationService {
             level: .info
         )
 
-        // Server-side verification via Edge Function
-        await serverSideVerify(userId: userId, activeProductIds: activeProductIds)
+        // Server-side verification via Edge Function.
+        // Timestamp écrit APRÈS succès seulement : un échec (réseau, serveur)
+        // laisse la prochaine occasion re-tenter, au lieu d'armer 24 h de
+        // silence sur une vérification qui n'a jamais eu lieu (V10 #2).
+        if await serverSideVerify(userId: userId, activeProductIds: activeProductIds) {
+            lastVerification = Date()
+        }
+    }
+
+    /// Décision de debounce, pure et testable : vérifier si jamais vérifié,
+    /// ou si la dernière vérification date de plus de 24 h.
+    nonisolated static func shouldVerify(lastVerification: Date?, now: Date) -> Bool {
+        guard let lastVerification else { return true }
+        return now.timeIntervalSince(lastVerification) >= verificationInterval
     }
 
     // MARK: - Server-Side Verification
@@ -112,7 +126,10 @@ final class ReceiptValidationService {
     ///
     /// If the server detects a mismatch (client claims premium but server says
     /// free), it corrects `profiles.tier` and we refresh SubscriptionService.
-    private func serverSideVerify(userId: String, activeProductIds: [String]) async {
+    /// - Returns: `true` si la vérification serveur a abouti (le debounce 24 h
+    ///   ne s'arme que dans ce cas), `false` sur échec réseau/serveur.
+    @discardableResult
+    private func serverSideVerify(userId: String, activeProductIds: [String]) async -> Bool {
         do {
             struct VerifyRequest: Encodable {
                 let userId: String
@@ -155,10 +172,12 @@ final class ReceiptValidationService {
                     "new_tier": response.tier,
                 ])
             }
+            return true
         } catch {
             // Non-fatal: server verification is defense-in-depth, not blocking.
             // RevenueCat remains the primary source of truth for entitlements.
             AppLogger.subscription.notice("Server-side receipt verification failed: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 

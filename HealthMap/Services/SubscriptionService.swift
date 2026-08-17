@@ -134,11 +134,13 @@ final class SubscriptionService: ObservableObject {
             throw SubscriptionPurchaseError.entitlementNotActivated
         }
 
-        // Post-purchase StoreKit 2 verification (non-blocking).
+        // Post-purchase StoreKit 2 verification (non-blocking). `force: true` :
+        // c'est LE moment où le serveur doit recouper l'achat — sans lui, une
+        // vérification périodique < 24 h rendait cet appel no-op (V10 #2).
         if outcome == .activated {
             let userId = result.customerInfo.originalAppUserId
             Task {
-                await ReceiptValidationService.shared.verifyCurrentEntitlements(userId: userId)
+                await ReceiptValidationService.shared.verifyCurrentEntitlements(userId: userId, force: true)
             }
         }
 
