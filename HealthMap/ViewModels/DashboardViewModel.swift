@@ -68,6 +68,26 @@ final class DashboardViewModel: ObservableObject {
         questionnaireOuvert = true
     }
 
+    // MARK: - État d'affichage de l'onglet Bilan (V12b)
+
+    /// Route du contenu de l'onglet Bilan — miroir EXACT du switch historique
+    /// de `DashboardView.content`, extrait ici pour être testable sans UI.
+    enum BilanAffichage {
+        /// Bilan v2 valide → le dashboard v7 avec les vraies données.
+        case bilan
+        /// Questionnaire complété, bilan pas encore là (chargement / erreur).
+        case attente
+        /// Pas encore de bilan → le dashboard v7 en mode découverte (teaser
+        /// in-situ V12b : stats France sourcées + CTA questionnaire).
+        case decouverte
+    }
+
+    var bilanAffichage: BilanAffichage {
+        if let v2 = analysisV2, v2.isValidV2 { return .bilan }
+        if profile.completed { return .attente }
+        return .decouverte
+    }
+
     // MARK: - Computed (PhysicalMetrics)
 
     var physicalMetrics: PhysicalMetrics {

@@ -421,6 +421,56 @@ final class DashboardViewModelTests: XCTestCase {
         vm.demarrerBilan()
         XCTAssertTrue(vm.questionnaireOuvert)
     }
+
+    // MARK: - Mode découverte (V12b)
+
+    /// Sans bilan, l'onglet route vers le teaser (mode découverte) et AUCUN
+    /// appel IA ne part — les emplacements de données affichent le catalogue
+    /// de stats France, pas une analyse.
+    func testBilanAffichage_sansBilan_decouverteSansAppelIA() async {
+        let aiMock = MockAIAnalysisService()
+        let vm = makeVM(profile: .empty, aiAnalysis: aiMock)
+
+        XCTAssertEqual(vm.bilanAffichage, .decouverte, "Sans bilan → teaser affiché")
+
+        await vm.triggerAnalysis()
+
+        XCTAssertEqual(vm.bilanAffichage, .decouverte, "Le teaser reste affiché")
+        XCTAssertEqual(aiMock.fullAnalysisCallCount, 0, "Aucun appel IA en mode découverte")
+        XCTAssertEqual(aiMock.bilanV2CallCount, 0, "Aucun appel bilan v2 en mode découverte")
+    }
+
+    /// Questionnaire complété mais bilan v2 pas encore là → gate d'attente
+    /// (chargement / erreur), jamais le teaser.
+    func testBilanAffichage_questionnaireComplete_attente() {
+        let vm = makeVM(profile: makeProfileThomas())
+        XCTAssertEqual(vm.bilanAffichage, .attente)
+    }
+
+    /// Réactivité V12b : à la complétion du bilan puis à l'arrivée d'un bilan
+    /// v2 valide, le dashboard passe aux vraies données sans relance.
+    func testBilanAffichage_basculeVersLesVraiesDonneesQuandLeBilanArrive() {
+        let vm = makeVM(profile: .empty)
+        XCTAssertEqual(vm.bilanAffichage, .decouverte)
+
+        vm.profile = makeProfileThomas()
+        vm.hasCompletedQuestionnaire = true
+        XCTAssertEqual(vm.bilanAffichage, .attente, "Bilan complété → attente de l'analyse")
+
+        vm.analysisV2 = AIAnalysisV2(
+            contract: "v2",
+            score: 72,
+            bilan: BilanV2(apports: [ApportV2(id: "iron", nom: "Fer", pctBesoin: 45)])
+        )
+        XCTAssertEqual(vm.bilanAffichage, .bilan, "Bilan v2 valide → vraies données, sans relance")
+    }
+
+    /// Un bilan v2 invalide (aucun apport) ne doit pas faire basculer l'écran.
+    func testBilanAffichage_bilanV2Invalide_resteEnAttente() {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.analysisV2 = AIAnalysisV2(contract: "v2")
+        XCTAssertEqual(vm.bilanAffichage, .attente)
+    }
 }
 
 // MARK: - Minimal Mocks for DashboardViewModel Dependencies

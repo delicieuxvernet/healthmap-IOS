@@ -104,12 +104,17 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Contenu (v7 si bilan v2 dispo, sinon flux chargement existant)
+    // MARK: - Contenu (v7 si bilan v2 dispo, sinon attente ou découverte)
+    // Route extraite dans `DashboardViewModel.bilanAffichage` (testable sans
+    // UI) — même logique que le switch historique.
     @ViewBuilder
     private var content: some View {
-        if let v2 = viewModel.analysisV2, v2.isValidV2 {
-            mainContent(v2)
-        } else if viewModel.profile.completed {
+        switch viewModel.bilanAffichage {
+        case .bilan:
+            if let v2 = viewModel.analysisV2 {
+                mainContent(v2)
+            }
+        case .attente:
             VStack(spacing: 0) {
                 if !immediateRedFlags.isEmpty {
                     RedFlagsCardView(flags: immediateRedFlags)
@@ -133,14 +138,86 @@ struct DashboardView: View {
                     FullAnalysisLoadingView()
                 }
             }
-        } else {
-            // Entrée libre (V12a) : pas encore de bilan → invitation à le
-            // faire (plus un squelette qui « charge » à vide). Le teaser
-            // visuel viendra en V12b/c — ici, composants existants seulement.
-            BilanInvitationView {
-                viewModel.demarrerBilan()
-            }
+        case .decouverte:
+            // Mode découverte (V12b) : le VRAI dashboard v7 en teaser in-situ
+            // — remplace l'écran d'invitation provisoire de V12a.
+            discoveryContent
         }
+    }
+
+    // MARK: - Mode découverte (V12b — pas encore de bilan)
+    /// Le dashboard v7 en mode teaser : structure, sections et cartes
+    /// STRICTEMENT identiques à `mainContent` ; seuls les emplacements de
+    /// données changent (stats France sourcées + un CTA bilan par zone à
+    /// forte valeur — Z3 apports et Z4 points d'attention). Les zones sans
+    /// donnée réelle (symptômes, repas vides) restent masquées comme dans le
+    /// dashboard réel ; la carte Premium Z7 et la pill restent masquées
+    /// (`premiumVisible`, décision V12a). À la complétion du bilan,
+    /// `bilanAffichage` bascule et le dashboard passe aux vraies données
+    /// sans relance.
+    private var discoveryContent: some View {
+        ScrollView {
+            VStack(spacing: BilanV7.cardGap) {
+                // Sécurité : même garde que mainContent (vide sans profil).
+                if !immediateRedFlags.isEmpty {
+                    RedFlagsCardView(flags: immediateRedFlags)
+                }
+
+                // Z1 · En-tête (pill Premium masquée avant le bilan)
+                BilanV7Header(
+                    date: Date(),
+                    showsPremiumPill: viewModel.premiumVisible
+                ) {
+                    HapticService.shared.tap()
+                    showPaywall = true
+                }
+                .staggeredAppear(index: 0)
+
+                // Z2 · Hero : l'anneau attend le bilan (aucun bouton ici —
+                // un CTA géant par zone, jamais trois empilés)
+                BilanV7ScoreTeaserCard()
+                    .staggeredAppear(index: 1)
+
+                // Z3 · Grille des apports en stats France + CTA bilan
+                BilanV7ApportsTeaserCard {
+                    viewModel.demarrerBilan()
+                }
+                .staggeredAppear(index: 2)
+
+                // Z4 · Points d'attention : exemple générique + CTA bilan
+                BilanV7AttentionTeaserCard {
+                    viewModel.demarrerBilan()
+                }
+                .staggeredAppear(index: 3)
+
+                // Z5 · Ta série — état existant (donnée réelle du journal,
+                // indépendante du bilan ; masquée en mode zen comme ailleurs)
+                if !gamification.isZenMode {
+                    BilanV7SerieCard(streak: gamification.currentStreak) {
+                        showTrophies = true
+                    }
+                    .staggeredAppear(index: 4)
+                }
+
+                // Z6 · Tes derniers repas — état vide existant (masquée si vide)
+                if !repasLines.isEmpty {
+                    BilanV7RepasCard(lines: repasLines)
+                        .staggeredAppear(index: 5)
+                }
+
+                // Z7 · Premium : jamais avant le bilan (`premiumVisible`, V12a)
+
+                // Sources scientifiques (App Store guideline 1.4.1)
+                BilanV7SourcesFooter()
+                    .padding(.top, 4)
+            }
+            .padding(.horizontal, BilanV7.gutter)
+            .padding(.top, Theme.spacingXS)
+            .padding(.bottom, Theme.spacingLG)
+            // Même verrou anti-dérive horizontale que mainContent.
+            .containerRelativeFrame(.horizontal)
+        }
+        .task { await journal.load() }
     }
 
     // MARK: - Main Content (langage v7)
@@ -522,70 +599,6 @@ struct FullAnalysisLoadingView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Invitation au bilan (entrée libre V12a)
-/// État « pas encore de bilan » de l'onglet Bilan : une invitation, pas un
-/// verrou ni un squelette de chargement. Placeholder volontairement minimal
-/// (composants et tokens existants uniquement — mascotte, CTA kiwi identique
-/// au bouton du questionnaire) : le teaser visuel arrive en V12b/c.
-private struct BilanInvitationView: View {
-    /// Lance (ou reprend) le questionnaire — branché sur
-    /// `DashboardViewModel.demarrerBilan()`.
-    let onStart: () -> Void
-
-    var body: some View {
-        VStack(spacing: Theme.spacingLG) {
-            Spacer()
-
-            MascotView(mood: .happy, size: 120)
-
-            Text("Ton bilan t'attend")
-                .font(Theme.titleFont)
-                .brandTitleKerning()
-                .foregroundStyle(Color.healthMapText)
-                .multilineTextAlignment(.center)
-
-            Text("Quelques questions sur ton quotidien et ton assiette : Kiwio te dit quels apports renforcer, avec un plan sur mesure.")
-                .font(Theme.bodyFont)
-                .foregroundStyle(Color.healthMapSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.spacingXL)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer()
-
-            // CTA identique au bouton primaire du questionnaire (aplat vert
-            // kiwi, coins continus, ombre discrète) — aucun style nouveau.
-            Button {
-                HapticService.shared.primary()
-                onStart()
-            } label: {
-                HStack(spacing: 6) {
-                    Text("Faire mon bilan")
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 15, weight: .semibold))
-                }
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(Color.kiwiGreen)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: Color.kiwiGreen.opacity(0.28), radius: 12, x: 0, y: 6)
-            }
-            .buttonStyle(.healthMapPressed)
-            .padding(.horizontal, Theme.spacingLG)
-
-            Text("Environ 5 minutes. Reprends où tu en étais à tout moment")
-                .font(Theme.captionFont)
-                .foregroundStyle(Color.healthMapMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.spacingXL)
-                .padding(.bottom, Theme.spacingLG)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
