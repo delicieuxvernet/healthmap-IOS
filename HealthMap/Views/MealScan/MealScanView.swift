@@ -1361,12 +1361,15 @@ struct MealScanView: View {
     // MARK: - « Tes besoins du jour » (Lot 3 — scan_v2.besoins rédigés serveur)
     private func besoinsScanSection(_ besoins: [BesoinScanV2]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            // 16/bold : la SEULE taille de titre de section de la feuille
-            // résultat (elle en portait trois : 17, 16 et 15). Le 17/heavy est
-            // désormais réservé aux conclusions.
+            // Charte, règle 1 : un titre de section n'est jamais neutre et
+            // jamais gros — 13/bold à l'encre de son domaine. Le 16/bold posé
+            // ici sortait en plus de l'échelle à 8 tailles, et se retrouvait
+            // PLUS GROS que les données qu'il annonce (% en 15, libellé en 13).
+            // Les six titres de cette feuille passent ensemble au patron du
+            // reste de l'onglet (`ScanCardHeader`).
             Text("Tes besoins du jour")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(Theme.sectionLabelFont)
+                .foregroundStyle(ScanDomaine.apports)
                 .padding(.horizontal, 4)
             VStack(spacing: 0) {
                 let visibles = Array(besoins.prefix(3))
@@ -1469,8 +1472,8 @@ struct MealScanView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Text("Ce que ton plat t'apporte")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .font(Theme.sectionLabelFont)
+                        .foregroundStyle(ScanDomaine.apports)
                     Spacer()
                     Text("Touche pour le détail")
                         .font(.system(size: 11.5, weight: .semibold))
@@ -1494,8 +1497,8 @@ struct MealScanView: View {
         if !shown.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Les aliments de ce repas")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(ScanDomaine.energie)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                     ForEach(shown) { food in
                         FoodTileV4(food: food) { selectedFood = food }

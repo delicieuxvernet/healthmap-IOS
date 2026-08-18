@@ -471,20 +471,28 @@ struct VoiceMealSheet: View {
         revelees = 0
         kcalAffiche = 0
         compteurActif = true
+        // Les aliments se posent ET le total monte EN MÊME TEMPS. Avant, le
+        // compteur ne démarrait qu'après les N × 250 ms de la pose : la ligne
+        // « Total du repas » affichait 0 kcal pendant 1 à 6 secondes, juste
+        // au-dessus de pastilles P/G/L qui montraient déjà les vraies valeurs
+        // et d'un bouton d'ajout qui annonçait déjà le vrai total. Trois
+        // chiffres du même bloc se contredisaient à l'écran.
         revelation = Task { @MainActor in
-            for _ in 0..<nombre {
-                try? await Task.sleep(nanoseconds: 250_000_000)
+            let intervalle: Double = 0.03            // 30 ms
+            let posePar: Double = 0.25               // un aliment toutes les 250 ms
+            let duree = max(Double(nombre) * posePar, 0.48)
+            let tics = max(1, Int((duree / intervalle).rounded()))
+            for tic in 1...tics {
+                try? await Task.sleep(nanoseconds: UInt64(intervalle * 1_000_000_000))
                 guard !Task.isCancelled else { return }
-                withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
-                    revelees += 1
+                let poses = min(nombre, Int(Double(tic) * intervalle / posePar))
+                if poses != revelees {
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+                        revelees = poses
+                    }
                 }
-            }
-            if cible > 0 {
-                let pas = 16
-                for i in 1...pas {
-                    try? await Task.sleep(nanoseconds: 30_000_000)
-                    guard !Task.isCancelled else { return }
-                    kcalAffiche = Int((Double(cible) * Double(i) / Double(pas)).rounded())
+                if cible > 0 {
+                    kcalAffiche = Int((Double(cible) * Double(tic) / Double(tics)).rounded())
                 }
             }
             guard !Task.isCancelled else { return }

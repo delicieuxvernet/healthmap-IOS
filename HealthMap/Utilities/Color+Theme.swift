@@ -58,10 +58,18 @@ extension Color {
             ? UIColor(red: 0xAE/255, green: 0xAE/255, blue: 0xB2/255, alpha: 1.0)
             : UIColor(red: 0x6B/255, green: 0x72/255, blue: 0x80/255, alpha: 1.0)
     })
+    // Le gris d'habillage. En clair, #9CA3AF ne tient que 2,54:1 sur carte
+    // blanche et 2,36:1 sur crème — or c'est la couleur de 17 des 22 usages de
+    // `Theme.chromeFont`, un corps de 10,5 pt VOLONTAIREMENT fixe (il ne suit
+    // pas Dynamic Type). Un texte qui ne grossit jamais ET qui passe sous
+    // 2,6:1 n'est rattrapé par rien. Il prend donc la valeur de
+    // `healthMapSecondary` : 4,83:1 sur blanc, 4,50:1 sur crème. Aucune teinte
+    // inventée — il n'existe pas de gris plus clair qui tienne le seuil.
+    // La variante sombre n'est pas concernée (l'app force `.light`).
     static let healthMapMuted = Color(uiColor: UIColor { trait in
         trait.userInterfaceStyle == .dark
             ? UIColor(red: 0x7A/255, green: 0x7A/255, blue: 0x80/255, alpha: 1.0)
-            : UIColor(red: 0x9C/255, green: 0xA3/255, blue: 0xAF/255, alpha: 1.0)
+            : UIColor(red: 0x6B/255, green: 0x72/255, blue: 0x80/255, alpha: 1.0)
     })
 
     // Score colors — tokens consommés par l'échelle unique HealthScale
