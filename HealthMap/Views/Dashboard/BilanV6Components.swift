@@ -84,14 +84,19 @@ struct ApportV2DetailSheet: View {
                 HStack { Spacer(); ring; Spacer() }
                     .padding(.top, 18)
 
+                // Titre de section : teinté par le statut de l'apport, et
+                // rangé SOUS son contenu (11.5 / bold, jamais l'encre neutre).
                 Text(whyTitle)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.subLabelFont)
+                    .textCase(.uppercase)
+                    .kerning(0.4)
+                    .foregroundStyle(statut.inkColor)
                     .padding(.top, 16)
                     .padding(.bottom, 6)
+                // L'explication : c'est le contenu, donc le pic de son bloc.
                 Text(apport.why ?? "Tes assiettes récentes en apportent peu. Un apport régulier cette semaine t'aidera à mieux couvrir ce besoin.")
-                    .font(.system(size: 13.5, weight: .medium))
-                    .foregroundStyle(Color.kiwiCharcoal.opacity(0.85))
+                    .font(Theme.insightFont)
+                    .foregroundStyle(Color.kiwiCharcoal)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -118,16 +123,18 @@ struct ApportV2DetailSheet: View {
                 Button {
                     onSeePlan()
                 } label: {
+                    // CTA primaire de la charte : 15 / semibold, hauteur 48,
+                    // sans ombre. Un CTA n'est jamais plus lourd que ce qu'il
+                    // sert (ici : l'explication, à 15 / semibold elle aussi).
                     HStack(spacing: 8) {
                         Text("Voir mon plan détaillé")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(Theme.ctaFont)
                         Image(systemName: "arrow.right")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                     }
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiGreen))
-                    .shadow(color: Color.kiwiGreen.opacity(0.34), radius: 12, x: 0, y: 8)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.kiwiGreen))
                 }
                 .buttonStyle(.healthMapPressed)
                 .padding(.top, 22)
@@ -187,8 +194,10 @@ struct ApportV2DetailSheet: View {
     private var ouLeTrouverSection: some View {
         if !aliments.isEmpty {
             Text("Où le trouver")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(Theme.subLabelFont)
+                .textCase(.uppercase)
+                .kerning(0.4)
+                .foregroundStyle(Color.kiwiInk)
                 .padding(.top, 20)
                 .padding(.bottom, 12)
             HStack(spacing: 10) {
@@ -222,8 +231,8 @@ struct ApportV2DetailSheet: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("INTERACTION À CONNAÎTRE")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.5)
+                        .font(Theme.subLabelFont)
+                        .tracking(0.4)
                         .foregroundStyle(Color.healthMapBlue)
                     tipText
                         .foregroundStyle(Color.kiwiCharcoal)
@@ -239,14 +248,17 @@ struct ApportV2DetailSheet: View {
         }
     }
 
+    /// L'interaction est la conclusion de son encart : elle passe devant son
+    /// propre titre de section (15 / heavy pour le geste, 15 / medium pour le
+    /// reste de la phrase).
     private var tipText: Text {
         var t = Text("")
         if let bold = apport.tipBold, !bold.isEmpty {
-            t = t + Text(bold).font(.system(size: 13, weight: .bold))
+            t = t + Text(bold).font(.system(.subheadline).weight(.heavy))
         }
         if let rest = apport.tipRest, !rest.isEmpty {
             let sep = (apport.tipBold?.isEmpty == false) ? " : " : ""
-            t = t + Text(sep + rest).font(.system(size: 13, weight: .medium))
+            t = t + Text(sep + rest).font(.system(.subheadline).weight(.medium))
         }
         return t
     }
@@ -264,7 +276,7 @@ struct ApportV2DetailSheet: View {
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(apport.nom ?? "Apport")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(Theme.sheetTitleFont)
                     .foregroundStyle(Color.kiwiCharcoal)
                 HStack(spacing: 5) {
                     Circle().fill(statut.inkColor).frame(width: 7, height: 7)
@@ -307,7 +319,7 @@ struct ApportV2DetailSheet: View {
                     .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(statut.inkColor)
                 Text("de ton besoin")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(Theme.chromeFont)
                     .foregroundStyle(Color.healthMapMuted)
             }
         }
