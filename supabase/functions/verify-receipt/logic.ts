@@ -2,11 +2,18 @@
 // Fonctions pures de la réconciliation tier ↔ RevenueCat (testables sans réseau).
 
 /** Mapping produit App Store → valeur de `profiles.tier` (contrainte CHECK :
- *  free / weekly / monthly / annual — mêmes valeurs que revenuecat-webhook). */
+ *  free / weekly / monthly / annual — mêmes valeurs que revenuecat-webhook).
+ *
+ *  Depuis le 18 août 2026, seuls l'hebdo et l'annuel sont vendus : le mensuel
+ *  a disparu du paywall et du catalogue chargé par l'app. Les entrées
+ *  « monthly » restent volontairement ici — on ne déclasse JAMAIS un abonné
+ *  existant : si un reçu mensuel se présentait un jour, il doit rester
+ *  reconnu comme premium plutôt que de retomber en `free`. */
 export function tierFromProduct(productId: string | null | undefined): string | null {
   if (!productId) return null;
   const p = productId.toLowerCase();
   if (p === "healthmap_weekly") return "weekly";
+  // Produit retiré de la vente le 18 août 2026, mapping conservé par sécurité.
   if (p === "healthmap_monthly") return "monthly";
   if (p === "healthmap_annual") return "annual";
   if (p.includes("annual") || p.includes("year")) return "annual";

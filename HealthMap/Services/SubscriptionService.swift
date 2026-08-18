@@ -100,9 +100,13 @@ final class SubscriptionService: ObservableObject {
     /// Identifiants App Store Connect des abonnements (source de vérité ASC).
     /// Utilisés UNIQUEMENT pour le repli ci-dessus ; les prix, durées et essais
     /// restent lus depuis StoreKit, jamais codés en dur.
+    ///
+    /// Décision du 18 août 2026 : seules DEUX formules sont vendues, l'hebdo et
+    /// l'annuel. Le mensuel (`healthmap_monthly`) n'a jamais été approuvé ni
+    /// vendu : le charger ici aurait exposé le paywall à proposer un produit
+    /// inachetable le jour où l'hebdo ne se chargerait pas.
     static let subscriptionProductIds = [
         "healthmap_weekly",
-        "healthmap_monthly",
         "healthmap_annual",
     ]
 
@@ -176,7 +180,7 @@ final class SubscriptionService: ObservableObject {
             AppLogger.subscription.report(error, context: "loadOfferings")
         }
 
-        // L'offering « current » couvre-t-elle bien les 3 formules ? Sinon on
+        // L'offering « current » couvre-t-elle bien les 2 formules ? Sinon on
         // complète depuis StoreKit : le paywall doit TOUJOURS pouvoir afficher
         // les abonnements actifs sur App Store Connect, quelle que soit la
         // configuration du tableau de bord RevenueCat.
