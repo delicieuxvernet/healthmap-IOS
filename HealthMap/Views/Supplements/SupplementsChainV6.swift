@@ -472,7 +472,7 @@ struct ChainCollapsibleCard<Detail: View>: View {
     /// Ce que la voix de synthèse lit : le kicker en minuscules (une capitale
     /// intégrale se fait parfois épeler), puis la réponse et sa précision.
     private var reponseParlee: String {
-        let entete = kicker.map { "\($0.localizedLowercase)\u{202F}: " } ?? ""
+        let entete = kicker.map { "\($0.lowercased())\u{202F}: " } ?? ""
         let suite = precision.map { ", \($0)" } ?? ""
         return entete + reponse + suite
     }
