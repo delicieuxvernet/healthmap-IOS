@@ -36,6 +36,10 @@ final class DashboardViewModel: ObservableObject {
     /// inversement (incident bilan indisponible, 4 juillet : la gate bloquait
     /// sur `aiAnalysis`/v7 alors que le bilan RÉELLEMENT affiché est v2).
     @Published var errorMessageV2: String?
+    /// L'utilisateur a demandé à explorer l'app pendant que le bilan se fait
+    /// attendre : la gate plein écran (`AnalysisGateView`) ne se rouvre plus de
+    /// la session. Le bilan continue d'arriver en tâche de fond.
+    @Published var gateContournee = false
 
     // MARK: - Injected Services
 
@@ -523,6 +527,18 @@ final class DashboardViewModel: ObservableObject {
                     ?? "Impossible de charger ton bilan pour le moment. Reessaie dans un instant."
             }
         }
+    }
+
+    /// Relance le SEUL bilan v2 — celui que l'écran affiche réellement.
+    ///
+    /// ⚠️ Ne PAS rebrancher le « Réessayer » de la gate sur `triggerAnalysis()` :
+    /// celui-ci commence par `guard !isLoadingAnalysis`, or les deux flux
+    /// partent ensemble et le v7 tient jusqu'à 185 s. Le v2 pouvant échouer en
+    /// deux secondes (429, circuit ouvert), le bouton restait un no-op
+    /// totalement silencieux pendant tout ce temps.
+    func retryBilanV2() async {
+        guard let session = await AuthService.shared.currentSession else { return }
+        await fetchBilanV2(userId: session.user.id.uuidString, forceRefresh: false)
     }
 
     // MARK: - Save Avatar Choice

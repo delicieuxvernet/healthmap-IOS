@@ -16,6 +16,11 @@ struct AnalysisErrorRetryView: View {
     let message: String
     let isRetrying: Bool
     let onRetry: () -> Void
+    /// Sortie de secours, quand cet écran est présenté en plein écran par la
+    /// gate de première analyse : sans elle, un échec enferme l'utilisateur
+    /// dans l'app. Absente sur la version affichée DANS l'onglet Bilan, où la
+    /// barre d'onglets fait déjà office de sortie.
+    var onExplorer: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: Theme.spacingLG) {
@@ -65,6 +70,17 @@ struct AnalysisErrorRetryView: View {
             }
             .disabled(isRetrying)
             .accessibilityHint("Relance le chargement de ton analyse nutritionnelle.")
+
+            if let onExplorer {
+                Button(action: onExplorer) {
+                    Text("Explorer l'app en attendant")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.healthMapBlue)
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, Theme.spacingLG)
+                }
+                .accessibilityHint("Ferme cet écran. Ton bilan continue de se préparer en arrière-plan.")
+            }
 
             Spacer()
         }

@@ -130,8 +130,8 @@ struct DashboardView: View {
                     // doit jamais bloquer l'affichage du vrai bilan v2.
                     AnalysisErrorRetryView(
                         message: errorMessageV2,
-                        isRetrying: false,
-                        onRetry: { Task { await viewModel.triggerAnalysis() } }
+                        isRetrying: viewModel.isLoadingAnalysisV2,
+                        onRetry: { Task { await viewModel.retryBilanV2() } }
                     )
                 } else {
                     // Analyse pas encore déclenchée (transition post-questionnaire).

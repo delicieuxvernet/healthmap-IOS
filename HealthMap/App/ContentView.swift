@@ -562,8 +562,15 @@ struct MainTabView: View {
         // déjà réussi en arrière-plan, forçant des "Réessayer" inutiles qui
         // épuisaient le quota gratuit partagé (v7+v2 comptent sur le même
         // endpoint côté serveur) sur le tout premier bilan d'un compte neuf.
+        // `gateContournee` : la seule porte de sortie. Sans elle, un échec du
+        // bilan enfermait l'utilisateur dans l'app — écran plein, aucun bouton
+        // de fermeture, aucun onglet accessible.
         .fullScreenCover(isPresented: Binding(
-            get: { dashboardVM.analysisV2 == nil && (dashboardVM.isLoadingAnalysisV2 || dashboardVM.errorMessageV2 != nil) },
+            get: {
+                !dashboardVM.gateContournee
+                    && dashboardVM.analysisV2 == nil
+                    && (dashboardVM.isLoadingAnalysisV2 || dashboardVM.errorMessageV2 != nil)
+            },
             set: { _ in }
         )) {
             AnalysisGateView()
@@ -651,8 +658,12 @@ private struct AnalysisGateView: View {
             if !dashboardVM.isLoadingAnalysisV2, let errorMessage = dashboardVM.errorMessageV2 {
                 AnalysisErrorRetryView(
                     message: errorMessage,
-                    isRetrying: false,
-                    onRetry: { Task { await dashboardVM.triggerAnalysis() } }
+                    isRetrying: dashboardVM.isLoadingAnalysisV2,
+                    onRetry: { Task { await dashboardVM.retryBilanV2() } },
+                    onExplorer: {
+                        dashboardVM.gateContournee = true
+                        Task { await dashboardVM.retryBilanV2() }
+                    }
                 )
             } else {
                 FullAnalysisLoadingView()
