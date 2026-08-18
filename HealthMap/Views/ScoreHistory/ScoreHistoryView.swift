@@ -72,7 +72,7 @@ struct ScoreHistoryView: View {
                 }
             }
         }
-        .navigationTitle("Evolution du score")
+        .navigationTitle("Évolution du score")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadHistory() }
     }
@@ -106,7 +106,7 @@ struct ScoreHistoryView: View {
     // MARK: - Chart
     private var chartSection: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            Text("Evolution")
+            Text("Évolution")
                 .font(Theme.captionBoldFont)
                 .foregroundStyle(Color.healthMapSecondary)
                 .padding(.horizontal, Theme.spacingLG)
@@ -156,11 +156,11 @@ struct ScoreHistoryView: View {
             // Mascotte kiwi en mode "réflexion" — humanise l'état vide
             MascotView(mood: .thinking, size: 72)
 
-            Text("Pas encore assez de donnees")
+            Text("Pas encore assez de données")
                 .font(Theme.headlineFont)
                 .foregroundStyle(Color.healthMapText)
 
-            Text("Complete tes suivis hebdomadaires pour voir l'evolution de ton score dans le temps.")
+            Text("Complète tes suivis hebdomadaires pour voir l'évolution de ton score dans le temps.")
                 .font(Theme.bodyFont)
                 .foregroundStyle(Color.healthMapSecondary)
                 .multilineTextAlignment(.center)

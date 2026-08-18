@@ -775,7 +775,9 @@ struct TaJourneeCard: View {
                 .opacity(active ? 1 : 0.4)
                 .grayscale(active ? 0 : 0.4)
             Text(slot.title)
-                .font(.system(size: 11.5, weight: active ? .bold : .bold))
+                // Le repas en cours (ou deja scanne) porte la graisse ; les
+                // autres restent lisibles sans reclamer l'attention.
+                .font(.system(size: 11.5, weight: active ? .bold : .medium))
                 .foregroundStyle(active ? Color.kiwiGreenInk : Color.healthMapMuted)
             Text(slot.isCurrent ? "ce repas" : (slot.done ? "scanné" : "à scanner"))
                 .font(.system(size: 9.5, weight: .bold))
