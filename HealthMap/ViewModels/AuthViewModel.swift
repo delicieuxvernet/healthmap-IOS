@@ -331,8 +331,14 @@ final class AuthViewModel: ObservableObject {
             // ce cas la session est inactive jusqu'au click magic link). On
             // n'affiche PLUS d'écran de saisie de code email — l'authStateChanges
             // est l'unique source de vérité du moment où l'user devient connecté.
-            try await AuthService.shared.signUp(email: email, password: password, firstName: firstName)
+            let sessionPosee = try await AuthService.shared.signUp(email: email, password: password, firstName: firstName)
             AnalyticsService.shared.track(.signUpCompleted, properties: ["method": "email"])
+            if !sessionPosee {
+                // « Confirm email » est actif côté Supabase : le compte existe,
+                // mais la session ne l'est pas. Sans ce message, le testeur
+                // voyait le spinner tourner, s'arrêter, et… rien.
+                errorMessage = "On t'a envoyé un mail de confirmation. Ouvre-le, clique sur le lien, puis reviens te connecter."
+            }
         } catch {
             errorMessage = Self.mapAuthError(error)
         }
@@ -553,23 +559,15 @@ final class AuthViewModel: ObservableObject {
 
             isProcessing = false
             return true
-        } catch HealthMapError.auth(.sessionExpired) where resetPasswordEmail != nil {
-            // A3 : la session Clerk de reset a expiré (app fermée trop longtemps,
-            // ou Clerk a recyclé l'objet signIn). Au lieu de jeter "Session
-            // expirée" et obliger l'user à recommencer depuis l'écran email,
-            // on relance discrètement l'étape 1 avec l'email mémorisé et on
-            // demande à l'user d'utiliser le NOUVEAU code (l'ancien ne marche
-            // plus de toute façon).
-            do {
-                try await AuthService.shared.resetPassword(email: resetPasswordEmail!)
-                errorMessage = "Le code précédent a expiré, un nouveau a été envoyé à \(resetPasswordEmail!). Saisis-le ci-dessous."
-            } catch {
-                errorMessage = "Le code a expiré et le renvoi a échoué. Recommence depuis l'écran email."
-                resetPasswordEmail = nil
-            }
-            isProcessing = false
-            return false
         } catch {
+            // ⚠️ Il y avait ici un rattrapage qui, sur `.sessionExpired`,
+            // renvoyait AUTOMATIQUEMENT un nouveau mail et affichait « Le code
+            // précédent a expiré, un nouveau a été envoyé ». Or l'étape 2
+            // levait `.sessionExpired` À CHAQUE FOIS (elle ne vérifiait pas le
+            // code) : chaque tentative déclenchait donc un mail de plus, sans
+            // jamais aboutir. Le rattrapage masquait le bug au lieu de le
+            // signaler. Un code faux dit maintenant qu'il est faux ; le renvoi
+            // reste possible, mais à la demande (bouton « Renvoyer le code »).
             errorMessage = Self.mapAuthError(error)
             isProcessing = false
             return false

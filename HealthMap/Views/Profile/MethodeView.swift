@@ -32,7 +32,7 @@ struct MethodeView: View {
                 .background(Color.healthMapBlue.opacity(0.12))
                 .clipShape(Circle())
 
-            Text("Comment ca marche ?")
+            Text("Comment ça marche ?")
                 .font(Theme.titleFont)
                 .foregroundStyle(Color.healthMapText)
                 .multilineTextAlignment(.center)
@@ -56,7 +56,7 @@ struct MethodeView: View {
                     number: 1,
                     title: "Questionnaire",
                     icon: "clipboard.fill",
-                    description: "Tu reponds a des questions sur ton alimentation, mode de vie et sante.",
+                    description: "Tu réponds à des questions sur ton alimentation, ton mode de vie et ta santé.",
                     color: .healthMapBlue,
                     isLast: false
                 )
@@ -72,7 +72,7 @@ struct MethodeView: View {
                     number: 3,
                     title: "Analyse IA",
                     icon: "brain",
-                    description: "Claude analyse ton profil et genere des recommandations personnalisees (temperature=0).",
+                    description: "L'IA analyse ton profil et génère des recommandations personnalisées (temperature=0).",
                     color: .accentIndigo,
                     isLast: false
                 )
@@ -143,7 +143,7 @@ struct MethodeView: View {
                 interactionCard(
                     emoji: "\u{2615}\u{1FA78}",
                     title: "Cafeine + Fer",
-                    description: "Les tannins du cafe bloquent l'absorption du fer jusqu'a 60%",
+                    description: "Les tannins du café bloquent l'absorption du fer jusqu'à 60 %",
                     source: "Morck et al., 1983"
                 )
                 interactionCard(
@@ -155,7 +155,7 @@ struct MethodeView: View {
                 interactionCard(
                     emoji: "\u{1F48A}\u{26A1}",
                     title: "Metformine + B12",
-                    description: "La metformine reduit l'absorption intestinale de la B12 de 30%",
+                    description: "La metformine réduit l'absorption intestinale de la B12 de 30 %",
                     source: "Aroda et al., JCEM 2016"
                 )
                 interactionCard(
@@ -220,7 +220,7 @@ struct MethodeView: View {
                     Image(systemName: "play.fill")
                         .font(.system(size: 12))
                         .foregroundStyle(Color.healthMapBlue)
-                    Text("Chaque nutriment demarre a 70/100")
+                    Text("Chaque nutriment démarre à 70/100")
                         .font(Theme.bodyFont)
                         .foregroundStyle(Color.healthMapText)
                 }
@@ -280,7 +280,7 @@ struct MethodeView: View {
             VStack(alignment: .leading, spacing: Theme.spacingSM) {
                 limitationRow(
                     icon: "stethoscope",
-                    text: "Kiwio ne remplace pas un avis medical"
+                    text: "Kiwio ne remplace pas un avis médical"
                 )
                 limitationRow(
                     icon: "chart.bar.xaxis",
@@ -288,7 +288,7 @@ struct MethodeView: View {
                 )
                 limitationRow(
                     icon: "person.badge.shield.checkmark",
-                    text: "Consulte un professionnel de sante pour toute decision medicale"
+                    text: "Consulte un professionnel de santé pour toute décision médicale"
                 )
             }
             .padding(Theme.cardPadding)

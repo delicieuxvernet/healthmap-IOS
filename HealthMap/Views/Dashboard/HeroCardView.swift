@@ -109,7 +109,7 @@ struct RedFlagsCardView: View {
 #Preview {
     VStack(spacing: 16) {
         RedFlagsCardView(flags: [
-            RedFlag(id: .veganNoB12, urgency: .soon, message: "Regime vege sans supplement B12"),
+            RedFlag(id: .veganNoB12, urgency: .soon, message: "Régime végé sans complément B12"),
         ])
     }
     .padding()

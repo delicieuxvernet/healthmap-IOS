@@ -767,6 +767,26 @@ struct ProfileView: View {
                         }
                     }
 
+                    // Code promo — visible AVANT le bilan, contrairement à la
+                    // porte Premium. Le paywall était son seul point d'entrée
+                    // dans toute l'app, et il n'apparaît qu'une fois le bilan
+                    // fait : un testeur qui reçoit un code au lancement n'avait
+                    // nulle part où le saisir. Ce n'est pas une porte premium —
+                    // aucune formule, aucun prix — donc V12a est respectée.
+                    if !subscriptionService.isPremium {
+                        Button {
+                            subscriptionService.presenterCodePromo()
+                        } label: {
+                            HStack {
+                                Image(systemName: "ticket")
+                                    .foregroundStyle(Color.healthMapBlue)
+                                Text("J'ai un code")
+                                    .foregroundStyle(Color.healthMapBlue)
+                            }
+                        }
+                        .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
+                    }
+
                     // Restore Purchases — visible regardless of `isPremium` so
                     // that an existing subscriber who reinstalls the app or
                     // signs in on a new device can always recover their

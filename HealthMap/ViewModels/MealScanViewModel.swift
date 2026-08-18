@@ -410,7 +410,7 @@ final class MealScanViewModel: ObservableObject {
             }
 
             guard let compressedData = compressImage(uiImage) else {
-                errorMessage = "Impossible de compresser l'image. Essaie avec une autre photo."
+                errorMessage = "Impossible de préparer l'image. Essaie avec une autre photo."
                 isAnalyzing = false
                 return
             }
@@ -418,7 +418,7 @@ final class MealScanViewModel: ObservableObject {
             // Check final size (reject if > 5MB after compression)
             let maxUploadBytes = 5 * 1024 * 1024
             guard compressedData.count <= maxUploadBytes else {
-                errorMessage = "Image trop volumineuse (> 5 Mo). Essaie avec une photo plus legere."
+                errorMessage = "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère."
                 isAnalyzing = false
                 return
             }
@@ -468,7 +468,12 @@ final class MealScanViewModel: ObservableObject {
                 if errorMsg.lowercased().contains("not a food") || errorMsg.lowercased().contains("not analyzable") {
                     errorMessage = "Cette image ne semble pas contenir un repas. Essaie avec une photo d'assiette."
                 } else {
-                    errorMessage = "Erreur d'analyse : \(errorMsg)"
+                    // Le texte brut de la fonction Deno n'est ni traduit ni
+                    // contrôlé : il pouvait afficher un identifiant technique
+                    // ou une phrase en anglais en plein écran. Il part au
+                    // journal, l'utilisateur lit une phrase française.
+                    AppLogger.analysis.warning("MealScan edge error: \(errorMsg, privacy: .public)")
+                    errorMessage = "L'analyse n'a pas abouti. Réessaie dans un instant."
                 }
                 isAnalyzing = false
                 return
@@ -584,15 +589,16 @@ final class MealScanViewModel: ObservableObject {
         } catch let error as MealScanError {
             switch error {
             case .timeout:
-                errorMessage = "L'analyse a pris trop de temps. Reessaie avec une photo plus simple."
+                errorMessage = "L'analyse a pris trop de temps. Réessaie avec une photo plus simple."
             case .imageTooLarge:
-                errorMessage = "Image trop volumineuse (> 5 Mo). Essaie avec une photo plus legere."
+                errorMessage = "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère."
             case .rateLimited:
                 handleDailyQuotaReached()
             case .notAnalyzable:
                 errorMessage = "Cette image ne semble pas contenir un repas. Essaie avec une photo d'assiette."
             case .serverError(let msg):
-                errorMessage = "Erreur serveur : \(msg)"
+                AppLogger.analysis.warning("MealScan server error: \(msg, privacy: .public)")
+                errorMessage = "L'analyse n'a pas abouti. Réessaie dans un instant."
             }
         } catch {
             // Handle HTTP / Supabase errors by inspecting the error description
@@ -600,11 +606,11 @@ final class MealScanViewModel: ObservableObject {
             if desc.contains("429") || desc.contains("quota") || desc.contains("rate") {
                 handleDailyQuotaReached()
             } else if desc.contains("413") || desc.contains("too large") || desc.contains("payload") {
-                errorMessage = "Image trop volumineuse (> 5 Mo). Essaie avec une photo plus legere."
+                errorMessage = "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère."
             } else if desc.contains("timeout") || desc.contains("timed out") {
-                errorMessage = "L'analyse a pris trop de temps. Reessaie avec une photo plus simple."
+                errorMessage = "L'analyse a pris trop de temps. Réessaie avec une photo plus simple."
             } else {
-                errorMessage = "Erreur lors de l'analyse. Verifie ta connexion et reessaie."
+                errorMessage = "L'analyse n'a pas abouti. Vérifie ta connexion et réessaie."
             }
             AppLogger.analysis.report(error, context: "MealScan analyzePhoto")
         }
@@ -698,8 +704,12 @@ final class MealScanViewModel: ObservableObject {
             }
             errorMessage = "Tu as utilisé tes \(limit) scans du jour. Ça se recharge demain."
         } else {
+            // Toujours DIRE ce qui se passe avant d'ouvrir une porte : le
+            // paywall surgissait sans un mot, parfois même sans que le testeur
+            // ait jamais vu de compteur (la pastille est conditionnée au bilan).
+            let limite = scanDailyLimit ?? 3
+            errorMessage = "Tes \(limite) scans du jour sont utilisés. Ça se recharge demain."
             quotaExhausted = true
-            errorMessage = nil
         }
     }
 

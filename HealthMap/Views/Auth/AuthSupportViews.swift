@@ -110,7 +110,7 @@ struct ForgotPasswordSheet: View {
                 .padding(.horizontal, Theme.spacingLG)
                 .padding(.bottom, Theme.spacingXL)
             }
-            .navigationTitle("Mot de passe oublie")
+            .navigationTitle("Mot de passe oublié")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -130,7 +130,7 @@ struct ForgotPasswordSheet: View {
 
     @ViewBuilder
     private var emailStep: some View {
-        Text("Entre ton adresse email pour recevoir un code de reinitialisation.")
+        Text("Entre ton adresse email pour recevoir un code de réinitialisation.")
             .font(Theme.bodyFont)
             .foregroundStyle(Color.healthMapSecondary)
             .multilineTextAlignment(.center)
@@ -183,7 +183,7 @@ struct ForgotPasswordSheet: View {
 
     @ViewBuilder
     private var codeStep: some View {
-        Text("Un code à 6 chiffres a ete envoye à \(email). Verifie tes mails (et les spams).")
+        Text("Un code à 6 chiffres vient de partir vers \(email). Regarde tes mails, et le dossier spam.")
             .font(Theme.bodyFont)
             .foregroundStyle(Color.healthMapSecondary)
             .multilineTextAlignment(.center)
@@ -253,7 +253,7 @@ struct ForgotPasswordSheet: View {
                 if authVM.isProcessing {
                     ProgressView().tint(.white)
                 } else {
-                    Text("Reinitialiser le mot de passe")
+                    Text("Réinitialiser le mot de passe")
                         .font(.system(size: 17, weight: .semibold))
                 }
             }
@@ -295,7 +295,7 @@ struct ForgotPasswordSheet: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(Color.scoreGood)
-            Text("Mot de passe reinitialise !")
+            Text("Mot de passe réinitialisé !")
                 .font(Theme.headlineFont)
             Text(authVM.isAuthenticated
                  ? "Connexion en cours…"
@@ -344,16 +344,16 @@ struct EmailCodeVerificationSheet: View {
                     .foregroundStyle(Color.healthMapBlue)
                     .padding(.top, Theme.spacingXL)
 
-                Text("Verifie ton email")
+                Text("Vérifie ton email")
                     .font(Theme.headlineFont)
 
-                Text("On t'a envoye un code a 6 chiffres sur \(email). Saisis-le ci-dessous pour finaliser ton compte.")
+                Text("On t'a envoyé un code à 6 chiffres sur \(email). Saisis-le ci-dessous pour finaliser ton compte.")
                     .font(Theme.bodyFont)
                     .foregroundStyle(Color.healthMapSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.spacingMD)
 
-                TextField("Code a 6 chiffres", text: $code)
+                TextField("Code à 6 chiffres", text: $code)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
                     .font(.system(size: 24, weight: .semibold, design: .rounded).monospacedDigit())
@@ -428,7 +428,7 @@ struct EmailCodeVerificationSheet: View {
                 Spacer()
             }
             .padding(.horizontal, Theme.spacingLG)
-            .navigationTitle("Verification email")
+            .navigationTitle("Vérification email")
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(true)
             .onAppear {

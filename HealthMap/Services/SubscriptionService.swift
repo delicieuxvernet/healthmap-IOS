@@ -138,6 +138,19 @@ final class SubscriptionService: ObservableObject {
         ).save()
     }
 
+    // MARK: - Code promo (offer code)
+
+    /// Ouvre la feuille système Apple de saisie d'un code, puis va CHERCHER
+    /// l'état d'abonnement : la feuille se referme sans notifier l'app, et rien
+    /// ne garantit un passage par `scenePhase == .active` au retour.
+    func presenterCodePromo() {
+        Purchases.shared.presentCodeRedemptionSheet()
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            await checkPremiumStatus()
+        }
+    }
+
     // MARK: - Check Premium Status
     func checkPremiumStatus() async {
         let generation = premiumGeneration

@@ -293,7 +293,7 @@ final class DashboardViewModel: ObservableObject {
                 self.profile.baselineNutrientScores = profileRow.baselineNutrientScores
             }
         } catch {
-            errorMessage = "Impossible de charger votre profil."
+            errorMessage = "Impossible de charger ton profil pour le moment."
             AppLogger.database.report(error, context: "Dashboard load profile")
         }
 
@@ -437,7 +437,7 @@ final class DashboardViewModel: ObservableObject {
                 // ce n'est PAS un succès. Les scores locaux restent affichés,
                 // mais le bandeau de retry doit apparaître — jamais d'état
                 // silencieux sans analyse ni erreur (incident TestFlight 28).
-                errorMessage = "L'analyse IA n'a pas pu etre generee. Tes scores restent disponibles, reessaie dans un instant."
+                errorMessage = "L'analyse n'a pas pu être générée. Tes scores restent disponibles, réessaie dans un instant."
                 analyticsService.track(.analysisFailed, properties: [
                     "error": "nil_analysis_after_validation",
                 ])
@@ -469,13 +469,13 @@ final class DashboardViewModel: ObservableObject {
                             self.nutrientScores = retried.scores
                             AppLogger.analysis.info("Loaded cached analysis as fallback after AI failure")
                         } else {
-                            errorMessage = "Impossible de charger ton analyse pour le moment. Verifie ta connexion puis reessaie."
+                            errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
                         }
                     } else {
-                        errorMessage = "Impossible de charger ton analyse pour le moment. Verifie ta connexion puis reessaie."
+                        errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
                     }
                 } catch {
-                    errorMessage = "Impossible de charger ton analyse pour le moment. Verifie ta connexion puis reessaie."
+                    errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
                     AppLogger.analysis.report(error, context: "Dashboard fallback cache load")
                 }
             }
@@ -524,7 +524,7 @@ final class DashboardViewModel: ObservableObject {
             // déjà affiché ne doit pas être remplacé par un bandeau d'erreur.
             if analysisV2 == nil {
                 errorMessageV2 = (error as? AIAnalysisError)?.errorDescription
-                    ?? "Impossible de charger ton bilan pour le moment. Reessaie dans un instant."
+                    ?? "Impossible de charger ton bilan pour le moment. Réessaie dans un instant."
             }
         }
     }

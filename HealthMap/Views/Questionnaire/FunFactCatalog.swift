@@ -72,14 +72,14 @@ enum FunFactCatalog {
     private static func ageFact(_ years: Int) -> String {
         switch years {
         case ..<18: return "En pleine croissance : ton corps a de grands besoins !"
-        case 18..<25: return "La vingtaine qui demarre, de l'energie a revendre !"
-        case 25..<30: return "Le moment ideal pour installer tes bons reflexes !"
+        case 18..<25: return "La vingtaine qui démarre, de l'énergie à revendre !"
+        case 25..<30: return "Le moment idéal pour installer tes bons réflexes !"
         case 30..<40: return "La trentaine, tu construis ton capital forme !"
-        case 40..<50: return "La quarantaine, experience et vitalite au rendez-vous !"
+        case 40..<50: return "La quarantaine, expérience et vitalité au rendez-vous !"
         case 50..<60: return "La cinquantaine, le bon moment pour chouchouter tes apports !"
-        case 60..<70: return "La soixantaine et une nouvelle liberte : autant la vivre en forme !"
+        case 60..<70: return "La soixantaine et une nouvelle liberté : autant la vivre en forme !"
         case 70..<85: return "Les bonnes habitudes comptent plus que jamais, et tu es au bon endroit !"
-        default: return "Quelle longevite, respect total !"
+        default: return "Quelle longévité, respect total !"
         }
     }
 }

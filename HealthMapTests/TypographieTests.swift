@@ -105,6 +105,91 @@ final class TypographieTests: XCTestCase {
         XCTAssertEqual(KiwiProse.lisible("7"), "7")
     }
 
+    // MARK: - Accents
+
+    /// Mots français qui N'EXISTENT PAS sans accent. Les rencontrer dans une
+    /// chaîne affichée, c'est la signature d'un texte tapé vite — et sur une
+    /// app santé française, le détail qui fait dire « bricolé ».
+    ///
+    /// Volontairement restreint aux mots qu'on a réellement trouvés dans le
+    /// dépôt : une liste plus large produirait des faux positifs (« the » dans
+    /// une chaîne anglaise, « cle » dans un identifiant…) et le garde-fou
+    /// finirait désactivé.
+    private static let motsSansAccent = [
+        // « envoye » seul est exclu : il attraperait le verbe « envoyer ».
+        "reessai", "reessaye", "verifie", "donnees", "generee", "genere",
+        "securite", "a ete envoye", "detecte", "personnalisee", "instantanement",
+        "decouvre", "preferences", "reinitialis", "caractere", "oublie",
+        "reveil", "soupconne", "energie", "sante", "medical", "regime",
+        "vegetarien", "reponses", "determinent", "succes", "regularite",
+    ]
+
+    /// Une chaîne ne compte comme AFFICHÉE que si elle ressemble à une phrase :
+    /// au moins trois mots et une majuscule ou une ponctuation. Un identifiant
+    /// (`vegetarien`, `energie`) n'est jamais concerné.
+    func testAucunMotFrancaisSansAccentDansLesTextesAffiches() throws {
+        var fichiers = try fichiersSwift(sous: "HealthMap/Views")
+        for horsVue in ["HealthMap/ViewModels/DashboardViewModel.swift",
+                        "HealthMap/ViewModels/MealScanViewModel.swift",
+                        "HealthMap/ViewModels/QuestionnaireViewModel.swift",
+                        "HealthMap/Services/ToastService.swift",
+                        "HealthMap/Models/QuestionnaireSection.swift"] {
+            let url = racine.appendingPathComponent(horsVue)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                XCTFail("Chemin surveillé introuvable : \(horsVue). Le test ne surveille plus rien.")
+                continue
+            }
+            fichiers.append(url)
+        }
+
+        var infractions: [String] = []
+
+        for url in fichiers {
+            let nom = url.lastPathComponent
+            guard let contenu = try? String(contentsOf: url, encoding: .utf8) else { continue }
+
+            for (index, ligne) in contenu.components(separatedBy: .newlines).enumerated() {
+                let nettoyee = ligne.trimmingCharacters(in: .whitespaces)
+                if nettoyee.hasPrefix("//") { continue }
+                if nettoyee.contains("logger.") || nettoyee.contains("privacy:")
+                    || nettoyee.contains("print(") || nettoyee.contains("systemName:")
+                    || nettoyee.contains("forKey") { continue }
+
+                for litteral in Self.litterauxDeChaine(dans: ligne) {
+                    guard Self.ressembleAUnePhrase(litteral) else { continue }
+                    let nu = litteral.lowercased()
+                    for mot in Self.motsSansAccent where nu.contains(mot) {
+                        infractions.append("\(nom):\(index + 1) — « \(mot) » dans « \(litteral) »")
+                        break
+                    }
+                }
+            }
+        }
+
+        XCTAssertTrue(
+            infractions.isEmpty,
+            """
+
+            Texte affiché sans accents. Kiwio parle français, avec les accents.
+            Si la chaîne n'est PAS affichée (identifiant, clé), sors-la d'un
+            littéral qui ressemble à une phrase.
+
+            """ + infractions.joined(separator: "\n")
+        )
+    }
+
+    /// Trois mots ou plus, et au moins une majuscule ou une ponctuation de
+    /// phrase : c'est du texte, pas une clé.
+    private static func ressembleAUnePhrase(_ texte: String) -> Bool {
+        guard texte.count >= 12 else { return false }
+        let mots = texte.split(separator: " ")
+        guard mots.count >= 3 else { return false }
+        let ponctuation = CharacterSet(charactersIn: ".,;:!?’'«»")
+        let aMajuscule = texte.contains { $0.isUppercase }
+        let aPonctuation = texte.rangeOfCharacter(from: ponctuation) != nil
+        return aMajuscule || aPonctuation
+    }
+
     // MARK: - Helpers
 
     /// Extrait les littéraux de chaîne d'une ligne Swift, contenu seul.

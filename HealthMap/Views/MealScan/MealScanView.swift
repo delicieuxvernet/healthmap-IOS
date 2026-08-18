@@ -445,10 +445,19 @@ struct MealScanView: View {
             Task { activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal() }
         }
         .onChange(of: viewModel.quotaExhausted) { _, exhausted in
-            if exhausted {
-                showPaywall = true
-                viewModel.quotaExhausted = false
-            }
+            guard exhausted else { return }
+            viewModel.quotaExhausted = false
+            // Ce chemin ne consultait PAS `bilanComplete`, contrairement à toute
+            // la matrice `ScanQuotaUI` : un testeur en découverte, qui n'a jamais
+            // vu de compteur (la pastille est elle aussi conditionnée au bilan),
+            // pouvait se prendre le paywall en pleine figure. Décision V12a :
+            // aucune porte premium tant que le bilan n'est pas fait. Le message
+            // posé par `handleDailyQuotaReached()` reste affiché dans tous les cas.
+            guard ScanQuotaUI.gateEnabled(
+                bilanComplete: dashboardVM.bilanComplete,
+                isPremium: subscriptionService.isPremium
+            ) else { return }
+            showPaywall = true
         }
     }
 

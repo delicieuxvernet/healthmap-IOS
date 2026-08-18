@@ -80,8 +80,8 @@ struct QuestionnaireContainerView: View {
     private var primaryButtonLabel: String {
         if introSection != nil { return "C'est parti" }
         if !viewModel.isLastQuestion { return "Continuer" }
-        if viewModel.isSubmitting { return "Envoi en cours..." }
-        if viewModel.errorMessage != nil { return "Reessayer" }
+        if viewModel.isSubmitting { return "Envoi en cours…" }
+        if viewModel.errorMessage != nil { return "Réessayer" }
         // Dernière question visible : s'il reste un bloc à approfondir, on
         // propose le carrefour (« Continuer ») ; sinon on termine.
         return viewModel.nextLockedGate != nil ? "Continuer" : "Terminer"
@@ -423,12 +423,12 @@ struct QuestionnaireContainerView: View {
         .padding(.top, Theme.spacingSM)
         .padding(.bottom, Theme.spacingSM)
         .alert("Erreur", isPresented: $showSubmitError) {
-            Button("Reessayer") {
+            Button("Réessayer") {
                 Task { await viewModel.submitQuestionnaire() }
             }
             Button("Annuler", role: .cancel) { }
         } message: {
-            Text(viewModel.errorMessage ?? "Erreur lors de la sauvegarde.")
+            Text(viewModel.errorMessage ?? "La sauvegarde a échoué. Réessaie dans un instant.")
         }
     }
 
