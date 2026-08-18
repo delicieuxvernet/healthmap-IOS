@@ -297,9 +297,12 @@ struct SupplementsView: View {
                 } else {
                     VStack(spacing: 10) {
                         ForEach(Array(chains.enumerated()), id: \.element.id) { index, chain in
+                            let tete = reponse(for: chain)
                             ChainCollapsibleCard(
                                 chain: chain,
-                                sousTitre: sousTitre(for: chain),
+                                kicker: tete.kicker,
+                                reponse: tete.reponse,
+                                precision: tete.precision,
                                 prixLabel: headPrice(for: chain),
                                 isOpen: openChainID == chain.id,
                                 onToggle: { toggleOpen(chain.id) }
@@ -341,11 +344,11 @@ struct SupplementsView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text("Compléments")
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
-                .tracking(-0.7)
+                .font(Theme.screenTitleFont)
+                .tracking(Theme.screenTitleTracking)
                 .foregroundStyle(Color.kiwiCharcoal)
             Text(subtitle)
-                .font(.system(size: 12.5, weight: .medium))
+                .font(Theme.dataSecondaryFont)
                 .foregroundStyle(Color.healthMapMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -363,13 +366,15 @@ struct SupplementsView: View {
     private var chainHeader: some View {
         HStack(spacing: 6) {
             Image(systemName: "arrow.triangle.branch")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.healthMapMuted)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.kiwiGreenInk)
                 .accessibilityHidden(true)
+            // Titre de section : couleur du domaine (le vert de l'onglet),
+            // jamais l'encre neutre, et rangé sous le contenu par sa taille.
             Text(voie == .complements ? "Tes apports → tes compléments"
                                       : "Tes apports → ton assiette")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color.healthMapMuted)
+                .font(Theme.sectionLabelFont)
+                .foregroundStyle(Color.kiwiGreenInk)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 2)
@@ -385,17 +390,23 @@ struct SupplementsView: View {
         }
     }
 
-    /// Le sous-titre de la carte repliée : la réponse, sans ouvrir.
-    private func sousTitre(for chain: ComplementChain) -> String {
+    /// La réponse de la carte repliée, éclatée en trois rôles au lieu d'une
+    /// seule phrase préfixée. Le kicker dit de quoi on parle, la ligne suivante
+    /// EST la réponse (l'aliment, le produit), la dernière la complète.
+    /// Avant la charte : « Dans l'assiette : lentilles » sur une seule ligne,
+    /// en 11,5 / medium / secondary — le préfixe mangeait la réponse.
+    private func reponse(for chain: ComplementChain) -> (kicker: String?, reponse: String, precision: String?) {
         switch voie {
         case .complements:
             guard let rec = chain.rec, let prod = product(for: rec) else {
-                return "Plutôt par l'assiette : ton écart est petit"
+                return ("PAS DE GÉLULE", "L'assiette suffit", "Ton écart est petit.")
             }
-            return "\(prod.name) · \(momentLabel(for: prod, chain: chain))"
+            return ("EN GÉLULE", prod.name, precisionLabel(for: prod))
         case .assiette:
-            guard let food = foodList(for: chain).first else { return "Par l'assiette" }
-            return "Dans l'assiette : \(food.label)"
+            guard let food = foodList(for: chain).first else {
+                return (nil, "Par l'assiette", nil)
+            }
+            return ("DANS L'ASSIETTE", food.label.capitalizedFirstLetter, nil)
         }
     }
 
@@ -457,11 +468,8 @@ struct SupplementsView: View {
         }
     }
 
-    /// « 1000 µg, le matin à jeun ». Sans produit, on explique pourquoi.
-    private func momentLabel(for product: SupplementProduct?, chain: ComplementChain) -> String {
-        guard let product else {
-            return "Ton écart est petit, l'assiette suffit"
-        }
+    /// « 1000 µg, le matin à jeun » : ce qui complète le produit, sous lui.
+    private func precisionLabel(for product: SupplementProduct) -> String {
         let dosage = product.dosage.trimmingCharacters(in: .whitespaces)
         let moment = momentPhrase(product.timing)
         guard !dosage.isEmpty else { return moment.capitalizedFirstLetter }
@@ -497,15 +505,16 @@ struct SupplementsView: View {
                 }
             }
 
-            // Les alternatives, en une ligne discrète.
+            // Les alternatives, en une ligne discrète : une alternative ne
+            // peut pas être plus grasse que le choix recommandé (charte).
             if foods.count > 1 {
                 HStack(spacing: 7) {
-                    SafeFluent3DIcon(name: foods[1].icon, size: 22)
+                    SafeFluent3DIcon(name: foods[1].icon, size: 20)
                         .accessibilityHidden(true)
                     Text("Aussi : " + foods.dropFirst().map(\.label).joined(separator: ", "))
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(.system(size: 11.5, weight: .medium))
                         .lineSpacing(2)
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.healthMapMuted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -608,7 +617,7 @@ struct SupplementsView: View {
             id: "\(chain.id)-food",
             kind: .why,
             kicker: "POURQUOI CET ALIMENT",
-            titre: food.label,
+            titre: food.label.capitalizedFirstLetter,
             resume: firstSentence(KiwiProse.lisible(why)),
             body: KiwiProse.lisible(why),
             practice: practiceText(for: chain)
@@ -718,8 +727,8 @@ struct SupplementsView: View {
                                     .foregroundStyle(Color.kiwiGreen)
                                     .accessibilityHidden(true)
                                 Text(block.0)
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(Color.kiwiCharcoal)
+                                    .font(Theme.sectionLabelFont)
+                                    .foregroundStyle(Color.kiwiGreenInk)
                                 Spacer()
                             }
                             ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
@@ -734,7 +743,7 @@ struct SupplementsView: View {
                                     }
                                     .accessibilityHidden(true)
                                     Text(entry.displayText)
-                                        .font(.system(size: 14, weight: .medium))
+                                        .font(Theme.insightFont)
                                         .foregroundStyle(Color.kiwiCharcoal)
                                     Spacer()
                                 }
@@ -758,7 +767,7 @@ struct SupplementsView: View {
                 .foregroundStyle(Color.healthMapMuted)
                 .accessibilityHidden(true)
             Text("Ces suggestions viennent de ton bilan. Elles ne remplacent pas l'avis d'un médecin.")
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(Color.healthMapMuted)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -780,10 +789,11 @@ struct SupplementsView: View {
             }
             .accessibilityHidden(true)
             Text("Rien à ajouter pour l'instant")
-                .font(.system(size: 18, weight: .bold))
+                .font(Theme.conclusionFont)
+                .tracking(Theme.conclusionTracking)
                 .foregroundStyle(Color.kiwiCharcoal)
             Text("Ton bilan ne fait ressortir aucun complément utile. Si tu viens de le remplir, laisse-lui un instant.")
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(.subheadline).weight(.medium))
                 .lineSpacing(3)
                 .foregroundStyle(Color.healthMapSecondary)
                 .multilineTextAlignment(.center)

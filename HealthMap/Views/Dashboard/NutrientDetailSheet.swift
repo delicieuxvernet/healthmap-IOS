@@ -161,14 +161,16 @@ struct NutrientDetailSheet: View {
 
     private var pourquoiSection: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            // Charte : le titre annonce, il ne rivalise pas. Il était à la
+            // même taille que l'explication qu'il introduit (delta 0).
             Text("Pourquoi ce score")
-                .font(Theme.captionBoldFont)
-                .foregroundStyle(Color.healthMapText)
+                .font(Theme.subLabelFont)
+                .foregroundStyle(Color.healthMapBlue)
 
             if let pourquoi = nutrient.pourquoiCeScore, !pourquoi.isEmpty {
                 Text(pourquoi)
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .font(Theme.insightFont)
+                    .foregroundStyle(Color.healthMapText)
                     .lineLimit(4)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
@@ -262,23 +264,28 @@ struct NutrientDetailSheet: View {
                     .accessibilityHidden(true)
 
                 Text("Ta solution")
-                    .font(Theme.captionBoldFont)
+                    .font(Theme.subLabelFont)
                     .foregroundStyle(Color.scoreExcellent)
             }
 
+            // Le geste : donnée-héros textuelle de la carte.
             if let action = solution.action, !action.isEmpty {
                 Text(action)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(Theme.heroTextFont)
+                    .tracking(Theme.conclusionTracking)
                     .foregroundStyle(Color.healthMapText)
                     .lineLimit(3)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            // La dose et le moment SONT l'ordonnance : elles étaient rendues
+            // en légende grise, deux tiers de la solution perdus en route.
+            // Une donnée-héros de ligne ne descend jamais sous 15 pt.
             if let dosage = solution.dosage, !dosage.isEmpty {
                 Text(dosage)
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .font(Theme.heroValueRowFont)
+                    .foregroundStyle(Color.healthMapText)
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
@@ -286,8 +293,8 @@ struct NutrientDetailSheet: View {
 
             if let quand = solution.quand, !quand.isEmpty {
                 Text(quand)
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .font(Theme.insightFont)
+                    .foregroundStyle(Color.healthMapText)
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
@@ -301,7 +308,7 @@ struct NutrientDetailSheet: View {
                         .accessibilityHidden(true)
 
                     Text("Effet attendu\u{202F}: \(delai)")
-                        .font(Theme.captionBoldFont)
+                        .font(Theme.subLabelFont)
                         .foregroundStyle(Color.scoreExcellent)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -450,9 +457,10 @@ struct NutrientDetailSheet: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                // Titre de section : couleur du domaine, jamais l'encre neutre.
                 Text(label)
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .font(Theme.subLabelFont)
+                    .foregroundStyle(tint)
 
                 Text(text)
                     .font(Theme.captionFont)
@@ -544,8 +552,8 @@ struct NutrientDetailSheet: View {
                     .foregroundStyle(Color.healthMapBlue)
                     .accessibilityHidden(true)
                 Text("Recherche approfondie")
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .font(Theme.subLabelFont)
+                    .foregroundStyle(Color.healthMapBlue)
                 Spacer()
                 if let n = result.meta?.webResults, n > 0 {
                     Text("\(n) sources")
@@ -591,8 +599,8 @@ struct NutrientDetailSheet: View {
                         .foregroundStyle(Color.healthMapBlue)
                         .accessibilityHidden(true)
                     Text("Sources scientifiques")
-                        .font(Theme.captionBoldFont)
-                        .foregroundStyle(Color.healthMapText)
+                        .font(Theme.subLabelFont)
+                        .foregroundStyle(Color.healthMapBlue)
                 }
                 ForEach(evidence.prefix(6)) { source in
                     sourceRow(source)
@@ -695,9 +703,10 @@ private struct FicheCollapsible<Content: View>: View {
                         .foregroundStyle(Color.healthMapBlue)
                         .accessibilityHidden(true)
 
+                    // Titre de section : teinté comme son icône, jamais neutre.
                     Text(title)
-                        .font(Theme.captionBoldFont)
-                        .foregroundStyle(Color.healthMapText)
+                        .font(Theme.subLabelFont)
+                        .foregroundStyle(Color.healthMapBlue)
 
                     Spacer()
 
