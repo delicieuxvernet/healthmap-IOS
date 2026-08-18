@@ -12,6 +12,11 @@ struct SuiviCarouselBlock<Content: View>: View {
     let title: String
     let systemIcon: String
     let tint: Color
+    /// Encre du titre de section (charte, règle 1 : un titre de section porte la
+    /// couleur de son domaine, jamais l'encre neutre). Certains aplats de domaine
+    /// sont trop clairs pour tenir 4.5:1 en texte sur la carte crème : on passe
+    /// alors ici la déclinaison foncée du même domaine. `nil` = le tint suffit.
+    var titleInk: Color? = nil
     let pageTitles: [String]
     let pageHeight: CGFloat
     var isLocked = false
@@ -22,18 +27,23 @@ struct SuiviCarouselBlock<Content: View>: View {
 
     private var count: Int { max(1, pageTitles.count) }
 
+    /// Encre effective du titre et de son icône.
+    private var ink: Color { titleInk ?? tint }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Titre de section : 13 / bold / couleur du domaine + icône 15
+            // semibold. Il annonce le bloc, il ne rivalise pas avec le nom de
+            // la courbe (17 / heavy) qui, lui, est la donnée.
             HStack(spacing: 8) {
                 Image(systemName: systemIcon)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(tint)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(ink)
                     .frame(width: 26, height: 26)
                     .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(tint.opacity(0.14)))
-                Text(title.uppercased())
-                    .font(.system(size: 11.5, weight: .heavy))
-                    .foregroundStyle(Color.healthMapMuted)
-                    .kerning(0.4)
+                Text(title)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(ink)
                 Spacer(minLength: 8)
                 if count > 1 {
                     arrow("chevron.left", delta: -1)
@@ -42,8 +52,9 @@ struct SuiviCarouselBlock<Content: View>: View {
             }
 
             HStack(alignment: .firstTextBaseline) {
+                // Donnée-héros textuelle du bloc : le nom de la courbe affichée.
                 Text(pageTitles.indices.contains(index) ? pageTitles[index] : "")
-                    .font(.system(size: 17, weight: .heavy))
+                    .font(Theme.heroTextFont)
                     .foregroundStyle(Color.kiwiCharcoal)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -207,18 +218,31 @@ struct SuiviCurveInsight: View {
             let arrow = delta > 0 ? "arrow.up.right" : (delta < 0 ? "arrow.down.right" : "equal")
             HStack(spacing: 6) {
                 Image(systemName: arrow)
-                    .font(.system(size: 11, weight: .heavy))
+                    .font(.system(size: 11.5, weight: .heavy))
                     .foregroundStyle(Color.healthMapSecondary)
+                // Ces deux nombres sont les SEULES mesures réelles de l'onglet :
+                // ce sont eux la donnée-héros, pas leurs préfixes. Ils passent
+                // donc en 15 / heavy / rounded / chiffres à chasse fixe (plancher
+                // de la règle 3), tandis que « il y a N j » redevient l'habillage
+                // qu'il a toujours été.
                 (Text("il y a \(s.gapDays) j : ")
-                 + Text("\(fmt(s.first)) \(unit)").fontWeight(.bold)
+                    .font(Theme.chromeFont)
+                    .foregroundStyle(Color.healthMapMuted)
+                 + Text("\(fmt(s.first)) \(unit)")
+                    .font(Theme.heroValueRowFont)
+                    .foregroundStyle(Color.kiwiCharcoal)
                  + Text(" · aujourd'hui : ")
-                 + Text("\(fmt(s.last)) \(unit)").fontWeight(.bold))
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(Color(hex: "6B6862"))
+                    .font(Theme.chromeFont)
+                    .foregroundStyle(Color.healthMapMuted)
+                 + Text("\(fmt(s.last)) \(unit)")
+                    .font(Theme.heroValueRowFont)
+                    .foregroundStyle(Color.kiwiCharcoal))
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 4)
+                // Verdict de la courbe : plus fort que l'habillage, plus discret
+                // que les valeurs qu'il résume.
                 Text("\(sign)\(fmt(delta)) \(unit)")
-                    .font(.system(size: 11, weight: .heavy))
+                    .font(.system(size: 13, weight: .heavy))
                     .foregroundStyle(delta == 0 ? Color.healthMapMuted : (delta > 0 ? Color.kiwiGreenInk : Color(hex: "C0392B")))
                     .padding(.horizontal, 9).padding(.vertical, 3)
                     .background(Capsule().fill(delta == 0 ? Color(hex: "F1ECE2") : (delta > 0 ? Color.kiwiGreenSoft : Color(hex: "FBE9E7"))))
@@ -227,10 +251,10 @@ struct SuiviCurveInsight: View {
         } else {
             HStack(spacing: 6) {
                 Image(systemName: "camera")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 11.5, weight: .bold))
                     .foregroundStyle(Color.healthMapMuted)
                 Text("Scanne un repas pour démarrer cette courbe.")
-                    .font(.system(size: 12.5))
+                    .font(Theme.dataSecondaryFont)
                     .foregroundStyle(Color.healthMapMuted)
             }
         }
@@ -245,11 +269,11 @@ struct SuiviExampleNote: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "sparkles")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 11.5, weight: .bold))
                 .foregroundStyle(Color.kiwiGreenInk)
             (Text("Exemple").fontWeight(.heavy)
              + Text(" : complète 3 jours d'affilée pour voir tes vraies courbes."))
-                .font(.system(size: 12.5))
+                .font(Theme.dataSecondaryFont)
                 .foregroundStyle(Color.healthMapSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
