@@ -3,7 +3,7 @@ import RevenueCat
 
 // MARK: - Paywall View (natif, maquette validée le 3 juillet 2026)
 // Remplace le template RevenueCatUI par défaut : deux cartes de formule
-// (annuelle mise en avant, mensuelle) pilotées par l'offering courante
+// (annuelle mise en avant, hebdomadaire) pilotées par l'offering courante
 // RevenueCat. Les prix et l'essai gratuit sont lus depuis StoreKit —
 // jamais codés en dur, ils suivent App Store Connect.
 /// Une formule affichable par le paywall : soit un package de l'offering
@@ -65,12 +65,13 @@ struct PaywallView: View {
     }
 
     private var annualPlan: PlanOption? { planOptions.first { $0.periodUnit == .year } }
-    private var monthlyPlan: PlanOption? { planOptions.first { $0.periodUnit == .month } }
     private var weeklyPlan: PlanOption? { planOptions.first { $0.periodUnit == .week } }
 
-    /// Formule courte mise en avant à côté de l'annuel : hebdo si présente,
-    /// sinon mensuelle (l'offering peut évoluer sans retoucher le paywall).
-    private var shortPlan: PlanOption? { weeklyPlan ?? monthlyPlan }
+    /// Formule courte mise en avant à côté de l'annuel : l'hebdo, et rien
+    /// d'autre. Depuis le 18 août 2026 seules deux formules sont vendues
+    /// (hebdo + annuel) ; si l'hebdo manque, mieux vaut n'afficher aucune
+    /// formule courte qu'un produit que personne ne peut acheter.
+    private var shortPlan: PlanOption? { weeklyPlan }
 
     var body: some View {
         ZStack {
@@ -233,18 +234,14 @@ struct PaywallView: View {
                     badge: annualBadge(annual)
                 )
             }
+            // Aucun repli si l'hebdo manque : la carte reste vide plutôt que de
+            // proposer une formule qui n'est pas en vente (le cas « plus aucune
+            // formule » est déjà couvert par l'état d'échec du paywall).
             if let weekly = weeklyPlan {
                 planCard(
                     plan: weekly,
                     title: "Hebdomadaire",
                     subtitle: shortSubtitle(weekly, unit: "sem"),
-                    badge: nil
-                )
-            } else if let monthly = monthlyPlan {
-                planCard(
-                    plan: monthly,
-                    title: "Mensuel",
-                    subtitle: shortSubtitle(monthly, unit: "mois"),
                     badge: nil
                 )
             }
@@ -464,7 +461,7 @@ struct PaywallView: View {
         return parts.joined(separator: " · ")
     }
 
-    /// Sous-titre d'une formule courte (hebdo ou mensuelle) : prix / unité + essai.
+    /// Sous-titre de la formule courte (hebdo) : prix / unité + essai.
     private func shortSubtitle(_ plan: PlanOption, unit: String) -> String {
         var parts = ["\(plan.localizedPriceString) / \(unit)"]
         if let trial = trialLabel(for: plan) {
@@ -474,13 +471,14 @@ struct PaywallView: View {
     }
 
     /// Badge de la carte annuelle : essai + économie vs 1 an de la formule courte
-    /// (hebdo ×52 ou mensuel ×12), calculée depuis les prix StoreKit (rien codé en dur).
+    /// (hebdo ×52), calculée depuis les prix StoreKit (rien codé en dur).
     private func annualBadge(_ annual: PlanOption) -> String? {
         var parts: [String] = []
         if let trial = trialLabel(for: annual) {
             parts.append("\(trial) gratuits")
         }
         if let short = shortPlan {
+            // `shortPlan` est l'hebdo par construction : 52 périodes par an.
             let periodsPerYear: Decimal = short.periodUnit == .week ? 52 : 12
             let yearAtShortRate = short.price * periodsPerYear
             if yearAtShortRate > 0 {
