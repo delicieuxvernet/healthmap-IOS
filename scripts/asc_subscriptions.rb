@@ -954,6 +954,57 @@ if MODE == "trim-monthly"
   exit rest.size == 4 ? 0 : 1
 end
 
+# ── MODE new-version : crée la prochaine version App Store + ses notes ──────
+# Une MISE À JOUR (1.0.1) se soumet seule : les abonnements déjà APPROVED n'ont
+# pas à repasser en review (contrairement à la 1.0, cf. l'épisode des 4 refus).
+# VERSION_STRING (défaut 1.0.1) · WHATS_NEW (défaut : les notes ci-dessous).
+if MODE == "new-version"
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.1" : ENV["VERSION_STRING"]
+
+  existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
+    .find { |v| v.dig("attributes", "versionString") == vs }
+  if existing
+    version_id = existing["id"]
+    puts "Version #{vs} déjà présente : #{version_id} (état=#{existing.dig("attributes", "appStoreState")})"
+  else
+    ok, resp = write("création de la version #{vs}", :post, "/v1/appStoreVersions",
+      { data: { type: "appStoreVersions",
+                attributes: { platform: "IOS", versionString: vs, releaseType: "MANUAL" },
+                relationships: { app: { data: { type: "apps", id: app_id } } } } })
+    exit 1 unless ok
+    version_id = resp.dig("data", "id")
+  end
+
+  notes = ENV["WHATS_NEW"].to_s.empty? ? <<~NOTES.strip : ENV["WHATS_NEW"]
+    Kiwio s'ouvre enfin sans détour.
+
+    Entrée libre : explore l'app, scanne et dicte tes repas avant même de faire ton bilan. Le bilan reste là quand tu veux, en 3 minutes.
+
+    Scan repas repensé : tes repas du jour sous la recherche, tes calories restantes et tes apports en un coup d'oeil, et un petit guide à ta première visite.
+
+    Dictée vocale : tes aliments apparaissent au fil de ta phrase.
+
+    Lecture plus claire partout : l'information qui compte saute aux yeux, dans tous les onglets.
+
+    Suivi : tes courbes affichent enfin tes vraies données dès trois jours de suivi.
+
+    Et de nombreuses corrections de stabilité et d'affichage.
+  NOTES
+
+  get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20").each do |l|
+    loc = l.dig("attributes", "locale")
+    write("notes de version #{loc}", :patch, "/v1/appStoreVersionLocalizations/#{l["id"]}",
+      { data: { type: "appStoreVersionLocalizations", id: l["id"], attributes: { whatsNew: notes } } })
+  end
+
+  code, v = req(:get, "/v1/appStoreVersions/#{version_id}")
+  puts "
+===== VERSION #{vs} ====="
+  puts JSON.pretty_generate(code == 200 ? v["data"]["attributes"] : v)
+  puts "PROCHAINE ÉTAPE : apply-app (build + infos review), puis stage-version + send-submission."
+  exit 0
+end
+
 # ── MODE tester-code : code promo « 1 semaine offerte » pour les testeurs ────
 # Demande fondateur (18 août) : un code partageable sur LinkedIn/aux amis, qui
 # ouvre le Premium 7 jours. Posé sur l'HEBDO (0,99 €/sem) et non sur l'annuel :
