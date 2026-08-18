@@ -4,13 +4,15 @@ import SwiftUI
 //
 // Ouvert au tap d'un point d'attention du Bilan (Z3b) — remplace l'ancienne
 // bascule sèche vers l'onglet Plan. Ordre de la maquette :
-//   1. header : pastille warning + « Point d'attention » + « Détecté dans tes
-//      réponses » + chip du nutriment concerné (couleur du nutriment)
-//   2. teasing TOUJOURS en clair : le QUOI est nommé, pas l'habitude
+//   1. header : pastille warning + kicker « Point d'attention » + « Détecté
+//      dans tes réponses » + chip du nutriment concerné (couleur du nutriment)
+//   2. teasing TOUJOURS en clair : le QUOI est nommé, pas l'habitude — c'est
+//      la CONCLUSION de la feuille, donc son plus gros texte (17 / heavy)
 //   3. schéma du mécanisme en 3 étapes (habitude → mécanisme → impact chiffré)
 //   4. carte « Ta solution » (fond kiwiTint, ampoule, phrase actionnable)
-//   5. gating : 3 + 4 sous UN SEUL GatedOverlay(.teaser) + UNE SEULE
-//      UnlockDoor (zone "point_attention") — patron ApportV2DetailSheet #207
+//   5. gating (variante B, 18 août 2026) : en gratuit, 2 + 3 + 4 deviennent UN
+//      écrin `PremiumTeaseCard` (zone "point_attention") — le teasing en est
+//      le titre, le mécanisme / la solution / l'effet n'y passent que floutés
 //   6. bouton secondaire « Voir dans mon plan » → bascule vers l'onglet Plan.
 //
 // Données 100 % déterministes : le schéma et la solution viennent du catalogue
@@ -56,29 +58,30 @@ struct AttentionDetailSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
 
-                // 2 · Teasing — reste net pour tout le monde.
-                Text(teasing)
-                    .font(.system(size: 14.5, weight: .semibold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 18)
-
-                // 3 + 4 · Le COMMENT (schéma + solution), réservé au premium :
-                // un seul voile, une seule porte (patron fiche apport #207).
                 if subscriptionService.isPremium {
+                    // 2 · Teasing = la CONCLUSION de la feuille : le plus gros
+                    // texte de la page (17 / heavy), jamais tronqué.
+                    Text(teasing)
+                        .font(Theme.conclusionFont)
+                        .tracking(Theme.conclusionTracking)
+                        .foregroundStyle(Color.kiwiCharcoal)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 18)
+
+                    // 3 + 4 · Le COMMENT (schéma + solution).
                     detailContent
                 } else {
-                    VStack(spacing: Theme.spacingSM) {
-                        GatedOverlay(intensity: .teaser) { detailContent }
-                        UnlockDoor(
-                            icon: "lock.fill",
-                            title: doorTitle,
-                            subtitle: doorSubtitle,
-                            zone: "point_attention"
-                        )
-                    }
-                    .padding(.top, 4)
+                    // Gratuit : le même problème, dans l'écrin premium. Le
+                    // titre de l'écrin EST le teasing (donc on ne le répète
+                    // pas au-dessus) ; le mécanisme, la solution et l'effet
+                    // n'apparaissent que floutés (variante B, 18 août 2026).
+                    PremiumTeaseCard(
+                        title: teasing,
+                        promises: teasePromises,
+                        zone: "point_attention"
+                    )
+                    .padding(.top, 18)
                 }
 
                 seePlanButton
@@ -106,11 +109,16 @@ struct AttentionDetailSheet: View {
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
+                // Libellé générique : il annonce, il ne rivalise pas. Il
+                // passe donc en kicker teinté (11.5 / bold) — la conclusion
+                // de la feuille est le teasing, pas ce mot-là.
                 Text("Point d'attention")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.subLabelFont)
+                    .textCase(.uppercase)
+                    .kerning(0.4)
+                    .foregroundStyle(BilanV7.alertInk)
                 Text("Détecté dans tes réponses")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(Theme.dataSecondaryFont)
                     .foregroundStyle(Color.healthMapSecondary)
                 if let nutrient {
                     Text(nutrient.label)
@@ -155,7 +163,7 @@ struct AttentionDetailSheet: View {
             // contrat fait l'explication et la solution. Jamais inventé.
             if let rest = interaction.tipRest, !rest.isEmpty {
                 Text(rest)
-                    .font(.system(size: 13.5, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.kiwiCharcoal.opacity(0.85))
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -221,12 +229,16 @@ struct AttentionDetailSheet: View {
                     .font(.system(size: 15))
                     .foregroundStyle(Color.kiwiInk)
                     .accessibilityHidden(true)
+                // Titre de section : teinté, et rangé SOUS son contenu.
                 Text("Ta solution")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(Theme.subLabelFont)
+                    .textCase(.uppercase)
+                    .kerning(0.4)
                     .foregroundStyle(Color.kiwiInk)
             }
+            // Le geste : c'est la réponse de la carte, donc son pic.
             Text(text)
-                .font(.system(size: 13.5, weight: .medium))
+                .font(Theme.insightFont)
                 .foregroundStyle(Color.kiwiCharcoal)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -236,19 +248,48 @@ struct AttentionDetailSheet: View {
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.kiwiTint))
     }
 
-    // MARK: - Porte (wording : bénéfice spécifique, jamais générique)
+    // MARK: - Promesses de l'écrin (contenu premium RÉEL, toujours flouté)
 
-    private var doorTitle: String {
-        if let nutrient {
-            return "Débloque le mécanisme \(nutrient.label.lowercased())"
+    /// Les trois promesses de l'analyse, chacune adossée à une vraie ligne du
+    /// contenu premium — jamais lisible en gratuit (flou, interaction coupée,
+    /// masquée à VoiceOver). Hors catalogue, on ne garde que les promesses
+    /// réellement alimentées : jamais de coquille vide, jamais de texte inventé.
+    private var teasePromises: [PremiumTeasePromise] {
+        if let mechanism {
+            return [
+                PremiumTeasePromise(
+                    id: "mecanisme",
+                    emoji: "🔍",
+                    label: "Le mécanisme",
+                    blurred: "\(mechanism.mechanism.line1) \(mechanism.mechanism.line2)"
+                ),
+                PremiumTeasePromise(
+                    id: "solution",
+                    emoji: "💡",
+                    label: "Ta solution",
+                    blurred: mechanism.solution
+                ),
+                PremiumTeasePromise(
+                    id: "effet",
+                    emoji: "📈",
+                    label: "L'effet",
+                    blurred: "\(mechanism.impact.line1) \(mechanism.impact.line2)"
+                ),
+            ]
         }
-        return "Débloque le mécanisme complet"
-    }
 
-    private var doorSubtitle: String {
-        mechanism != nil
-            ? "Le schéma complet + le geste qui change tout"
-            : "L'explication + le geste qui change tout"
+        var promises: [PremiumTeasePromise] = []
+        if let rest = interaction.tipRest, !rest.isEmpty {
+            promises.append(
+                PremiumTeasePromise(id: "mecanisme", emoji: "🔍", label: "Le mécanisme", blurred: rest)
+            )
+        }
+        if let bold = interaction.tipBold, !bold.isEmpty {
+            promises.append(
+                PremiumTeasePromise(id: "solution", emoji: "💡", label: "Ta solution", blurred: bold)
+            )
+        }
+        return promises
     }
 
     // MARK: - 6 · Bouton secondaire « Voir dans mon plan »
