@@ -40,8 +40,15 @@ struct RedFlagsCardView: View {
                             .kerning(0.3)
                             .textCase(.uppercase)
                             .foregroundStyle(tint)
+                        // Sécurité avant commerce : ce message est la
+                        // conclusion la plus forte de l'écran. Il passe donc
+                        // en 17 / heavy, au-dessus de la carte « Kiwio
+                        // Premium » (ramenée à 15 / semibold) qui le
+                        // dominait jusqu'ici.
                         Text(flag.message)
-                            .font(.system(size: 13.5, weight: .semibold))
+                            .font(Theme.conclusionFont)
+                            .tracking(Theme.conclusionTracking)
+                            .lineSpacing(2)
                             .foregroundStyle(BilanV7.ink)
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)

@@ -6,7 +6,8 @@ import SwiftUI
 // la planche `Premium - etats (HTML).html`. Trois composants réutilisables
 // appliqués aux 33 zones du quadrillage :
 //   • GatedOverlay(intensity:) { … }  → blur + voile + interaction coupée
-//   • UnlockDoor(…)                   → la « porte verte » (bénéfice spécifique)
+//   • UnlockDoor(…)                   → la porte (bénéfice spécifique)
+//   • PremiumTeaseCard(…)             → l'écrin « analyse personnelle » (var. B)
 //   • QuotaMeter / QuotaWall          → famille 5 (scans, vocal)
 //
 // Principe : le bilan est gratuit, l'ordonnance est Premium. On garde net
@@ -59,11 +60,196 @@ struct GatedOverlay<Content: View>: View {
     }
 }
 
-// MARK: - UnlockDoor — « la porte verte »
+// MARK: - Écrin « analyse personnelle » (teasing premium, variante B)
+//
+// Maquette validée le 18 août 2026. Le contenu premium ne se vend plus par un
+// cadenas gris : il se présente dans un écrin (dégradé violet vers rose pâle,
+// filet violet), avec un kicker, un badge, le PROBLÈME nommé en clair et les
+// promesses de l'analyse dont la vraie ligne de contenu reste FLOUTÉE.
+//
+// Règle de gating INCHANGÉE : le titre nomme le problème (catalogue
+// déterministe), jamais la solution ; les lignes de contenu premium sont
+// rendues illisibles (flou 4, interaction coupée, masquées à VoiceOver) —
+// même doctrine que `GatedOverlay`. Seule la présentation change.
+
+/// Une promesse de l'écrin : un libellé net (ce que le premium apporte) et sa
+/// vraie ligne de contenu, floutée. La silhouette prouve qu'il y a bien
+/// quelque chose derrière, sans jamais le livrer.
+struct PremiumTeasePromise: Identifiable {
+    let id: String
+    /// Emoji du libellé (« 🔍 »).
+    let emoji: String
+    /// Libellé net (« Le mécanisme »).
+    let label: String
+    /// Ligne réelle du contenu premium, rendue illisible.
+    let blurred: String
+}
+
+/// En-tête de l'écrin : kicker « 💎 ANALYSE PERSONNELLE » + badge « PREMIUM ».
+struct PremiumTeaseHeader: View {
+    var kicker: String = "ANALYSE PERSONNELLE"
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text("💎 \(kicker)")
+                .font(.system(size: 11, weight: .heavy))
+                .tracking(0.4)
+                .foregroundStyle(Color.premiumTeaseInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 4)
+            Text("PREMIUM")
+                .font(.system(size: 10, weight: .heavy))
+                .tracking(0.3)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(LinearGradient.premiumBadge, in: Capsule())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Analyse personnelle, réservée à Kiwio Premium")
+    }
+}
+
+/// Tuile de promesse : libellé net, deuxième ligne floutée.
+private struct PremiumTeaseTile: View {
+    let promise: PremiumTeasePromise
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(promise.emoji)
+                .font(.system(size: 13))
+                .accessibilityHidden(true)
+            Text(promise.label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.premiumTeaseInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            // Le vrai contenu premium, illisible : flou 4 pt, aucune
+            // interaction possible (donc ni sélection ni copie) et invisible
+            // pour VoiceOver. Le `clipShape` de la tuile coupe la bavure.
+            Text(promise.blurred)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(Color.premiumTeaseInk.opacity(0.75))
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(height: 26, alignment: .topLeading)
+                .blur(radius: 4)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(9)
+        .background(Color.white.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(promise.label), réservé à Kiwio Premium")
+    }
+}
+
+/// Bouton de l'écrin : aplat kiwi dégradé, sparkles, hauteur 48.
+private struct PremiumTeaseButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 15, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.system(size: 14.5, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .background(
+                LinearGradient(
+                    colors: [Color.kiwiGreen, Color.kiwiGreenInk],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .shadow(color: Color.kiwiGreen.opacity(0.26), radius: 10, x: 0, y: 5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel(title)
+    }
+}
+
+/// L'écrin complet : kicker + badge, titre-problème, promesses floutées, CTA.
+/// `title` DOIT nommer le problème (teasing déterministe du catalogue), jamais
+/// la solution — c'est exactement ce que la porte vend.
+struct PremiumTeaseCard: View {
+    let title: String
+    let promises: [PremiumTeasePromise]
+    var kicker: String = "ANALYSE PERSONNELLE"
+    var ctaTitle: String = "Débloquer mon analyse"
+    /// Identifiant de zone (tracking paywall contextualisé).
+    var zone: String = ""
+    /// Navigation custom ; si nil → présente `PaywallView`.
+    var onUnlock: (() -> Void)? = nil
+
+    @State private var showPaywall = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PremiumTeaseHeader(kicker: kicker)
+
+            Text(title)
+                .font(Theme.conclusionFont)
+                .tracking(Theme.conclusionTracking)
+                .lineSpacing(2)
+                .foregroundStyle(Color.premiumTeaseInk)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !promises.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(promises) { promise in
+                        PremiumTeaseTile(promise: promise)
+                    }
+                }
+            }
+
+            PremiumTeaseButton(title: ctaTitle) {
+                HapticService.shared.tap()
+                if let onUnlock {
+                    onUnlock()
+                } else {
+                    showPaywall = true
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LinearGradient.premiumTease)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.accentIndigo.opacity(0.3), lineWidth: 1)
+        )
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(source: zone.isEmpty ? "premium_gate" : zone)
+                .healthMapFullSheet()
+        }
+    }
+}
+
+// MARK: - UnlockDoor — « la porte »
 /// Affordance de déblocage récurrente. Wording TOUJOURS un bénéfice spécifique
 /// à la zone (« Débloque le hack B12 »), jamais un « Passe Premium » générique.
 /// Auto-présente le paywall (feuille plein écran) ; `zone` est transmis pour le
 /// tracking de conversion, `onUnlock` permet une navigation custom si besoin.
+///
+/// Présentation « variante B » (18 août 2026) : la porte pleine largeur porte
+/// l'écrin premium (dégradé violet, kicker, badge, CTA kiwi). La variante
+/// compacte reste l'ancien aplat kiwi : elle sert de bouton de mur de quota,
+/// pas d'écrin de teasing.
 struct UnlockDoor: View {
     let icon: String
     let title: String
@@ -100,36 +286,56 @@ struct UnlockDoor: View {
                 .background(Color.kiwiGreen, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                 .contentShape(Rectangle())
             } else {
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(Color.white.opacity(0.22))
-                            .frame(width: 30, height: 30)
-                        Image(systemName: icon)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(title)
-                            .font(.system(size: 13.5, weight: .heavy))
-                            .foregroundStyle(.white)
+                // Écrin premium : le bénéfice spécifique porte la conclusion
+                // (17 / heavy, encre violette), le CTA kiwi porte l'action.
+                VStack(alignment: .leading, spacing: 10) {
+                    PremiumTeaseHeader()
+
+                    Text(title)
+                        .font(Theme.conclusionFont)
+                        .tracking(Theme.conclusionTracking)
+                        .lineSpacing(2)
+                        .foregroundStyle(Color.premiumTeaseInk)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(Theme.dataSecondaryFont)
+                            .foregroundStyle(Color.premiumTeaseInk.opacity(0.75))
                             .multilineTextAlignment(.leading)
-                        if let subtitle, !subtitle.isEmpty {
-                            Text(subtitle)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.85))
-                                .multilineTextAlignment(.leading)
-                        }
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.7))
+
+                    HStack(spacing: 7) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("Débloquer mon analyse")
+                            .font(.system(size: 14.5, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.kiwiGreen, Color.kiwiGreenInk],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
+                    .shadow(color: Color.kiwiGreen.opacity(0.26), radius: 10, x: 0, y: 5)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .frame(minHeight: 44)
-                .background(Color.kiwiGreen, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(LinearGradient.premiumTease)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.accentIndigo.opacity(0.3), lineWidth: 1)
+                )
                 .contentShape(Rectangle())
             }
         }
@@ -276,6 +482,16 @@ struct QuotaWall: View {
             }
 
             UnlockDoor(icon: "lock.fill", title: "Débloque tes aliments & le hack B12", subtitle: "3 aliments ciblés + 1 astuce d'absorption", zone: "fiche_apport")
+
+            PremiumTeaseCard(
+                title: "Une de tes habitudes quotidiennes bloque l'absorption de ton fer.",
+                promises: [
+                    PremiumTeasePromise(id: "mecanisme", emoji: "🔍", label: "Le mécanisme", blurred: "Les tanins captent le fer"),
+                    PremiumTeasePromise(id: "solution", emoji: "💡", label: "Ta solution", blurred: "Décale ton café à 1 h après le repas."),
+                    PremiumTeasePromise(id: "effet", emoji: "📈", label: "L'effet", blurred: "Jusqu'à 60 % d'absorption en plus"),
+                ],
+                zone: "point_attention"
+            )
 
             QuotaMeter(used: 2, total: 3)
 
