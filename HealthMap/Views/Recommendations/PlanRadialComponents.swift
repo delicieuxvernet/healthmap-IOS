@@ -719,24 +719,31 @@ struct PlanFocusLineV7: View {
                         .foregroundStyle(Color.kiwiGreenInk)
                 }
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Ton focus de la semaine")
-                        .font(.system(size: 13, weight: .heavy))
+                VStack(alignment: .leading, spacing: 2) {
+                    // Le titre situe la ligne ; c'est la mission qui la porte.
+                    Text("TON FOCUS DE LA SEMAINE")
+                        .font(.system(size: 10.5, weight: .heavy))
+                        .kerning(0.5)
+                        .foregroundStyle(Color.kiwiGreenInk)
+                    Text(missionShort)
+                        .font(Theme.insightFont)
                         .foregroundStyle(Color.kiwiCharcoal)
-                    HStack(spacing: 0) {
-                        Text(missionShort + " : ")
-                            .font(.system(size: 11.5, weight: .medium))
-                            .foregroundStyle(Color(hex: "6B7280"))
-                            .lineLimit(1)
-                        Text("\(focus.done)/\(focus.total)")
-                            .font(.system(size: 11.5, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(Color.kiwiGreenInk)
-                        Text(" faits")
-                            .font(.system(size: 11.5, weight: .medium))
-                            .foregroundStyle(Color(hex: "6B7280"))
-                    }
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Le progrès réel, en chiffres : une donnée-héros de ligne ne
+                // descend jamais sous 15 pt.
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("\(focus.done)/\(focus.total)")
+                        .font(Theme.heroValueRowFont)
+                        .foregroundStyle(Color.kiwiGreenInk)
+                    Text("faits")
+                        .font(Theme.chromeFont)
+                        .foregroundStyle(Color.healthMapMuted)
+                }
+                .layoutPriority(1)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 16, weight: .semibold))
@@ -791,12 +798,22 @@ struct PlanSolutionsSheetV7: View {
                 // la variante teasing (nomme le problème) la remplace.
                 let cause = subscriptionService.isPremium ? topic.radialCause : topic.radialCauseFree
                 if !cause.isEmpty {
-                    (Text("Ce qu'on voit : ").font(.system(size: 13, weight: .heavy))
-                        + Text(cause).font(.system(size: 13, weight: .medium)))
-                        .foregroundStyle(Color(hex: "3a3833"))
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 13)
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Le label annonce, la preuve chiffrée conclut : c'est
+                        // elle le pic de la pop-up, jamais son étiquette.
+                        Text("CE QU'ON VOIT")
+                            .font(.system(size: 10.5, weight: .heavy))
+                            .kerning(0.5)
+                            .foregroundStyle(Color.healthMapMuted)
+                        Text(cause)
+                            .font(Theme.conclusionFont)
+                            .tracking(Theme.conclusionTracking)
+                            .foregroundStyle(Color.kiwiCharcoal)
+                            .lineSpacing(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 13)
                 }
 
                 // Les 3 leviers. Gratuit : la silhouette reste lisible sous le
@@ -840,10 +857,12 @@ struct PlanSolutionsSheetV7: View {
                     HapticService.shared.tap()
                     dismiss()
                 } label: {
+                    // Un bouton de sortie ne pèse pas plus que ce qu'il sert :
+                    // taille et hauteur du CTA de la charte, rien de plus.
                     Text("C'est noté")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(Theme.ctaFont)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .frame(maxWidth: .infinity, minHeight: 48)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .fill(Color.kiwiGreen)
@@ -912,7 +931,7 @@ struct PlanSolutionsSheetV7: View {
                     .kerning(0.3)
                     .foregroundStyle(topic.accent)
                 Text(topic.name)
-                    .font(.system(size: 19, weight: .heavy))
+                    .font(Theme.sheetTitleFont)
                     .foregroundStyle(Color.kiwiCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -953,7 +972,9 @@ struct PlanSolutionsSheetV7: View {
                 title: "Par les habitudes",
                 titleColor: amberInk,
                 bulletColor: amber,
-                lines: topic.radialHabitudes,
+                // Le geste est déjà la seule chose que porte une habitude :
+                // rien à ranger sous lui, il tient la ligne à lui seul.
+                lines: topic.radialHabitudes.map { PlanLevierLine(texte: $0) },
                 action: nil
             )
         }
@@ -963,8 +984,14 @@ struct PlanSolutionsSheetV7: View {
 
 // MARK: - Un levier (nutrition / compléments / habitudes)
 
-/// Une carte de levier : en-tête coloré + 2 puces courtes. Rendue vide quand la
+/// Une carte de levier : un kicker de catégorie + 2 puces. Rendue vide quand la
 /// source ne fournit rien pour ce levier — on ne pose pas de carte creuse.
+///
+/// Hiérarchie (charte du 17 août 2026) : « Par la nutrition » n'est qu'une
+/// CATÉGORIE, elle annonce en kicker discret ; ce sont les puces qui portent la
+/// réponse (« Lentilles ») et prennent donc la plus grande taille et l'encre la
+/// plus foncée de la carte. Avant, le rapport était inversé : le titre était
+/// 0,5 pt plus gros, deux crans plus gras et posé sur une tuile teintée.
 private struct PlanLevierCard: View {
     let symbol: String
     let tint: Color
@@ -972,7 +999,7 @@ private struct PlanLevierCard: View {
     let title: String
     let titleColor: Color
     let bulletColor: Color
-    let lines: [String]
+    let lines: [PlanLevierLine]
     /// Rend la carte tappable quand un chemin existe (Compléments).
     let action: (() -> Void)?
 
@@ -1005,8 +1032,10 @@ private struct PlanLevierCard: View {
                         .font(.system(size: 15))
                         .foregroundStyle(iconColor)
                 }
-                Text(title)
-                    .font(.system(size: 13, weight: .heavy))
+                // Kicker : la catégorie s'annonce, elle ne rivalise pas.
+                Text(title.uppercased())
+                    .font(.system(size: 10.5, weight: .heavy))
+                    .kerning(0.5)
                     .foregroundStyle(titleColor)
                 Spacer(minLength: 0)
                 if action != nil {
@@ -1021,21 +1050,58 @@ private struct PlanLevierCard: View {
                     Circle()
                         .fill(bulletColor)
                         .frame(width: 5, height: 5)
-                        .padding(.top, 6)
-                    Text(line)
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(Color(hex: "3a3833"))
-                        .lineSpacing(1)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 7) {
+                            // La réponse : plus grande taille, encre la plus
+                            // foncée de la carte.
+                            Text(line.texte)
+                                .font(Theme.insightFont)
+                                .foregroundStyle(Color.kiwiCharcoal)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let tag = line.tag {
+                                pastille(tag, strong: line.tagStrong)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        if !line.detail.isEmpty {
+                            Text(line.detail)
+                                .font(Theme.dataSecondaryFont)
+                                .foregroundStyle(Color.healthMapSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if !line.astuce.isEmpty {
+                            Text(line.astuce)
+                                .font(Theme.chromeFont)
+                                .foregroundStyle(Color.healthMapMuted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                     Spacer(minLength: 0)
                 }
-                .padding(.top, index == 0 ? 9 : 6)
+                .padding(.top, index == 0 ? 10 : 9)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 13)
         .frame(maxWidth: .infinity, alignment: .leading)
         .kiwiCard(radius: 15)
+    }
+
+    /// Pastille de priorité — même patron que les statuts de l'onglet
+    /// Compléments : capsule teintée à 14 %, encre du statut, jamais de fond
+    /// plein qui volerait la vedette à la donnée qu'elle qualifie.
+    private func pastille(_ texte: String, strong: Bool) -> some View {
+        let encre = strong ? iconColor : Color.healthMapSecondary
+        return Text(texte)
+            .font(.system(size: 10.5, weight: .heavy))
+            .foregroundStyle(encre)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .layoutPriority(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(encre.opacity(0.14)))
     }
 }
 
@@ -1092,17 +1158,32 @@ extension PlanTopic {
             .joined(separator: " · ")
     }
 
-    /// 2 puces « Par la nutrition ».
-    var radialNutrition: [String] {
+    /// 2 puces « Par la nutrition ». L'aliment tient la ligne ; les repères
+    /// déjà calculés par le builder (combien, quand, avec quoi l'associer) le
+    /// suivent au lieu d'être jetés — ils étaient calculés puis perdus.
+    /// `cuisson` reste hors puce : c'est la même phrase pour tous les aliments,
+    /// elle n'apprend rien (cf. rapport d'audit, cas 18).
+    var radialNutrition: [PlanLevierLine] {
         nutrition.prefix(2).map { food in
-            PlanTopicText.clip("\(food.label), \(food.moment.lowercased())")
+            PlanLevierLine(
+                texte: food.label,
+                detail: PlanTopicText.joined([food.qty, food.moment.lowercased()]),
+                astuce: PlanTopicText.clip(food.astuce)
+            )
         }
     }
 
-    /// 2 puces « Par les compléments ».
-    var radialComplements: [String] {
+    /// 2 puces « Par les compléments ». Le complément tient la ligne, son
+    /// dosage suit, et la priorité calculée au bilan (« Prioritaire » sous 45,
+    /// « Si besoin » au-dessus) s'affiche enfin en pastille.
+    var radialComplements: [PlanLevierLine] {
         complements.prefix(2).map { supplement in
-            PlanTopicText.clip("\(supplement.name) — \(supplement.note)")
+            PlanLevierLine(
+                texte: supplement.name,
+                detail: PlanTopicText.clip(supplement.note),
+                tag: supplement.tag.trimmingCharacters(in: .whitespaces).isEmpty ? nil : supplement.tag,
+                tagStrong: supplement.strong
+            )
         }
     }
 
@@ -1135,6 +1216,15 @@ enum PlanTopicText {
             if sentence.split(separator: " ").count >= 3 { return sentence }
         }
         return trimmed
+    }
+
+    /// Assemble des repères courts en une ligne, en ignorant ceux qui sont
+    /// vides : une puce ne porte jamais un séparateur suspendu.
+    static func joined(_ parts: [String], separator: String = " · ") -> String {
+        parts
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: separator)
     }
 
     /// Tronque à 12 mots — la règle de rédaction de la maquette. Si l'analyse
