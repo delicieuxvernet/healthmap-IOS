@@ -33,6 +33,11 @@ on:
         required: false
         default: ""
         type: string
+      release_type:
+        description: "apply-app : MANUAL (defaut) ou AFTER_APPROVAL (en ligne des l accord Apple)"
+        required: false
+        default: ""
+        type: string
       submission_id:
         description: "cancel-submission : id de la reviewSubmission à annuler"
         required: false
@@ -103,4 +108,5 @@ jobs:
           STAGE_ONLY: ${{ inputs.stage_only && '1' || '0' }}
           EXCLUDE_PRODUCTS: ${{ inputs.exclude_products }}
           SUBMISSION_ID: ${{ inputs.submission_id }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
         run: ruby scripts/asc_subscriptions.rb

@@ -558,10 +558,12 @@ if MODE == "apply-app"
   abort_with("appStoreVersions", 0, "aucune version éditable (1.0) trouvée") unless version_id
   puts "Version éditable : #{vattrs["versionString"]} état=#{vattrs["appStoreState"]} (#{version_id})"
 
-  # Sortie MANUELLE (choix Arthur) : l'app ne devient PAS publique automatiquement
-  # à l'approbation ; Arthur déclenche la mise en ligne. releaseType = MANUAL.
-  write("sortie manuelle (releaseType=MANUAL)", :patch, "/v1/appStoreVersions/#{version_id}",
-    { data: { type: "appStoreVersions", id: version_id, attributes: { releaseType: "MANUAL" } } })
+  # Mode de mise en ligne. MANUAL par défaut (Arthur déclenche la sortie).
+  # RELEASE_TYPE=AFTER_APPROVAL : l'app part en ligne dès l'accord d'Apple —
+  # choisi pour la 1.0.1 (18 août) pour qu'Arthur n'ait pas à guetter la nuit.
+  release_type = ENV["RELEASE_TYPE"].to_s.empty? ? "MANUAL" : ENV["RELEASE_TYPE"]
+  write("mise en ligne : releaseType=#{release_type}", :patch, "/v1/appStoreVersions/#{version_id}",
+    { data: { type: "appStoreVersions", id: version_id, attributes: { releaseType: release_type } } })
 
   # Infos App Review : contact + compte démo. ⚠️ audit-b UNIQUEMENT : c'est le
   # seul compte test avec une row auth.users côté Supabase Auth (le chemin
