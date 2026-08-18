@@ -51,7 +51,7 @@ struct AnalysisErrorRetryView: View {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 15, weight: .semibold))
                     }
-                    Text(isRetrying ? "Nouvel essai..." : "Reessayer")
+                    Text(isRetrying ? "Nouvel essai..." : "Réessayer")
                         .font(.system(size: 15, weight: .semibold))
                 }
                 .foregroundStyle(.white)
