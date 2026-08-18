@@ -31,6 +31,85 @@ enum Theme {
     static let captionFont: Font = .system(.caption)
     static let captionBoldFont: Font = .system(.caption).weight(.semibold)
 
+    // MARK: Polices de rôle (charte de hiérarchie de l'information, 17 août 2026)
+    //
+    // Les 6 polices ci-dessus décrivent une TAILLE ; celles-ci décrivent un
+    // RÔLE. Tout texte de l'app est l'un de ces rôles : titre, donnée-héros,
+    // conclusion, donnée secondaire / habillage, action. Le rôle choisit le
+    // token, le token choisit le style : c'est ce qui rend la hiérarchie
+    // vérifiable (`grep '.system(size:'` doit rester marginal dans les vues).
+    //
+    // Échelle cible, 8 tailles : 10.5 · 11.5 · 12 · 13 · 15 · 17 · 20 · 28.
+    // Six d'entre elles tombent exactement sur un text style iOS à la taille
+    // système par défaut (title 28, title3 20, body 17, subheadline 15,
+    // footnote 13, caption 12) : on les exprime donc en style relatif, ce qui
+    // conserve Dynamic Type comme les tokens historiques. Les deux plus
+    // petites (11.5 et 10.5) passent sous caption2 (11) : aucun text style ne
+    // les porte, elles sont donc déclarées en taille fixe.
+    //
+    // Le token ne porte QUE la police. La couleur (encre du domaine, encre du
+    // statut) et le tracking restent à la charge de l'appelant : voir les
+    // constantes de tracking plus bas et la grille rôle → style de
+    // `docs/DESIGN-SYSTEM.md`.
+
+    /// Titre d'écran : le nom de l'onglet, une fois par page.
+    /// 28 / heavy / rounded · encre neutre · `screenTitleTracking`.
+    static let screenTitleFont: Font = .system(.title, design: .rounded).weight(.heavy)
+
+    /// Titre de sheet : l'en-tête d'une feuille ouverte par un tap.
+    /// 20 / bold · `kiwiCharcoal`.
+    static let sheetTitleFont: Font = .system(.title3).weight(.bold)
+
+    /// Titre de section : il annonce, il ne rivalise jamais avec le contenu.
+    /// 13 / bold · COULEUR DU DOMAINE, jamais l'encre neutre (règle 1).
+    static let sectionLabelFont: Font = .system(.footnote).weight(.bold)
+
+    /// Sous-label discret : la précision qui accompagne un titre de section.
+    /// 11.5 / bold · encre pâle (`healthMapSecondary` ou `healthMapMuted`).
+    static let subLabelFont: Font = .system(size: 11.5, weight: .bold)
+
+    /// Conclusion : ce que les données veulent dire, le pic de sa carte.
+    /// 17 / heavy · encre la plus foncée · `conclusionTracking` · JAMAIS de
+    /// `lineLimit` (règle 2 : aucun texte de la carte ne doit la dépasser).
+    static let conclusionFont: Font = .system(.body).weight(.heavy)
+
+    /// Conclusion secondaire : le verdict d'une ligne, d'une courbe, d'un item.
+    /// 15 / semibold · encre foncée.
+    static let insightFont: Font = .system(.subheadline).weight(.semibold)
+
+    /// Donnée-héros chiffrée d'une carte : LE chiffre que la carte existe pour
+    /// montrer. 28 / bold / rounded / chiffres à chasse fixe · encre du statut.
+    static let heroValueFont: Font = .system(.title, design: .rounded)
+        .weight(.bold)
+        .monospacedDigit()
+
+    /// Donnée-héros chiffrée d'une ligne de liste. 15 / heavy / rounded /
+    /// chiffres à chasse fixe. Plancher absolu : une donnée-héros ne descend
+    /// jamais sous 15 pt (règle 3).
+    static let heroValueRowFont: Font = .system(.subheadline, design: .rounded)
+        .weight(.heavy)
+        .monospacedDigit()
+
+    /// Donnée-héros textuelle : l'aliment, le produit, le geste recommandé.
+    /// 17 / heavy · `kiwiCharcoal`. Elle porte la plus grande taille ET
+    /// l'encre la plus foncée de son bloc.
+    static let heroTextFont: Font = .system(.body).weight(.heavy)
+
+    /// Donnée secondaire : libellé, dose, quantité qui complète le héros sans
+    /// lui disputer la place. 12 / medium · `healthMapSecondary`.
+    static let dataSecondaryFont: Font = .system(.caption).weight(.medium)
+
+    /// Habillage : unité, date, mention, note de bas de carte.
+    /// 10.5 / medium · `healthMapMuted`. Jamais de fond coloré si la
+    /// donnée-héros du même bloc n'en porte pas.
+    static let chromeFont: Font = .system(size: 10.5, weight: .medium)
+
+    /// CTA primaire : un seul par carte, 15 / semibold, blanc sur `kiwiGreen`,
+    /// hauteur 48, sans ombre. Un CTA n'est jamais plus lourd que ce qu'il sert.
+    static let ctaFont: Font = .system(.subheadline).weight(.semibold)
+
+    // MARK: Fin des polices de rôle
+
     // Pill style
     static let pillPaddingH: CGFloat = 12
     static let pillPaddingV: CGFloat = 6
@@ -40,6 +119,10 @@ enum Theme {
     static let titleTracking: CGFloat = -0.5
     static let headlineTracking: CGFloat = -0.3
     static let bodyTracking: CGFloat = 0
+    // Tracking des polices de rôle (charte de hiérarchie) : le titre d'écran se
+    // resserre franchement, la conclusion juste assez pour tenir sur sa carte.
+    static let screenTitleTracking: CGFloat = -0.7
+    static let conclusionTracking: CGFloat = -0.35
 
     // Standardized opacities
     static let opacitySubtle: Double = 0.04
