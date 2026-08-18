@@ -44,6 +44,10 @@ struct MealScanView: View {
     /// ton repas » et se termine dans la feuille vocale, à qui on la passe.
     @StateObject private var speech = SpeechCaptureService()
     @State private var doigtSurMicro = false
+    /// Première dictée : les deux autorisations (micro + reconnaissance vocale)
+    /// se demandent AVANT le geste, jamais pendant — une alerte système annule
+    /// le toucher en cours et laisse la bulle d'enregistrement orpheline.
+    @State private var demandeAutorisationVocale = false
     @State private var dicteeEnCours = false
     @State private var dicteeTropCourte = false
     /// Glissé vers le haut pendant la dictée : l'enregistrement continue mains
@@ -191,6 +195,29 @@ struct MealScanView: View {
                     Button("OK", role: .cancel) {}
                 } message: {
                     Text(barcodeIntrouvable ?? "")
+                }
+                // Autorisations de la dictée : demandées ici, AVANT le geste.
+                // Présentées pendant l'appui, les alertes iOS annulent le
+                // toucher — le geste ne rend jamais sa fin et l'écran reste
+                // figé sur « Je t'écoute… ».
+                .alert("Dicter tes repas", isPresented: $demandeAutorisationVocale) {
+                    if SpeechCaptureService.autorisationsRefusees {
+                        Button("Ouvrir les Réglages") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        Button("Plus tard", role: .cancel) {}
+                    } else {
+                        Button("Continuer") {
+                            Task { _ = await speech.requestPermissions() }
+                        }
+                        Button("Plus tard", role: .cancel) {}
+                    }
+                } message: {
+                    Text(SpeechCaptureService.autorisationsRefusees
+                         ? "Le micro ou la reconnaissance vocale sont bloqués pour Kiwio. Réactive-les dans les Réglages pour dicter tes repas."
+                         : "Pour transformer ta voix en repas, Kiwio a besoin du micro et de la reconnaissance vocale. Rien ne quitte ton téléphone : l'audio est transcrit puis effacé.")
                 }
         }
     }
@@ -650,12 +677,33 @@ struct MealScanView: View {
                     // Quota (famille 5) : vérifié AVANT d'enregistrer — plutôt que
                     // de laisser parler pour échouer ensuite.
                     guard peutDicter else { return }
+                    // Autorisations manquantes : on n'enregistre RIEN et on
+                    // explique, plutôt que de faire surgir deux alertes iOS au
+                    // milieu du geste (elles annulent le toucher : plus de
+                    // `onEnded`, page bloquée jusqu'au garde-fou de 60 s).
+                    guard SpeechCaptureService.autorisationsAccordees else {
+                        doigtSurMicro = false
+                        demandeAutorisationVocale = true
+                        return
+                    }
                     HapticService.shared.primary()
                     demarrageDictee = Task {
                         try? await Task.sleep(nanoseconds: Self.delaiAvantEnregistrement)
                         guard !Task.isCancelled, doigtSurMicro else { return }
-                        dicteeEnCours = true
                         await speech.start()
+
+                        // La bulle ne s'affiche QU'UNE FOIS le micro ouvert :
+                        // doigt déjà relâché, micro refusé, session audio
+                        // occupée → on referme immédiatement au lieu de laisser
+                        // la bulle à l'écran pendant une minute.
+                        guard !Task.isCancelled, doigtSurMicro,
+                              speech.state == .listening else {
+                            speech.stop()
+                            dicteeEnCours = false
+                            doigtSurMicro = false
+                            return
+                        }
+                        dicteeEnCours = true
 
                         // Garde-fou : un geste peut être avalé et ne jamais
                         // rendre son `onEnded`. Sans ce plafond, le micro
@@ -712,7 +760,9 @@ struct MealScanView: View {
                 // (l'ancienne feuille d'écoute est supprimée) — on apprend le
                 // geste, comme WhatsApp : un indice bref, puis il s'efface.
                 guard dicteeEnCours else {
-                    afficherIndiceMaintien()
+                    // Sauf si l'alerte d'autorisation vient de s'ouvrir : elle
+                    // dit déjà ce qu'il faut faire.
+                    if !demandeAutorisationVocale { afficherIndiceMaintien() }
                     return
                 }
                 terminerDictee()
@@ -772,6 +822,10 @@ struct MealScanView: View {
         guard !dicteeEnCours else { return }
         guard peutDicter else {
             showPaywall = true
+            return
+        }
+        guard SpeechCaptureService.autorisationsAccordees else {
+            demandeAutorisationVocale = true
             return
         }
         dicteeTropCourte = false
