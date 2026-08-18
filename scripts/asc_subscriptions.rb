@@ -1198,7 +1198,11 @@ if MODE == "screenshots"
     set_id = resp["data"]["id"]
   end
 
-  files = Dir.glob(File.join(__dir__, "appstore_screens", "final_*.png")).sort
+  # SCREENS_DIR permet de basculer de jeu de captures sans toucher au script
+  # (appstore_screens = fiche 1.0 ; appstore_screens_v2 = nouveau design 1.0.1).
+  screens_dir = ENV["SCREENS_DIR"].to_s.empty? ? "appstore_screens" : ENV["SCREENS_DIR"]
+  files = Dir.glob(File.join(__dir__, screens_dir, "final_*.png")).sort
+  puts "Dossier de captures : #{screens_dir}"
   puts "#{files.size} captures à uploader :"
   ids = []
   files.each do |png|

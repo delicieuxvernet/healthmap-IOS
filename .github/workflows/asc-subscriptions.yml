@@ -33,6 +33,11 @@ on:
         required: false
         default: ""
         type: string
+      screens_dir:
+        description: "screenshots : dossier des captures (appstore_screens ou appstore_screens_v2)"
+        required: false
+        default: ""
+        type: string
       release_type:
         description: "apply-app : MANUAL (defaut) ou AFTER_APPROVAL (en ligne des l accord Apple)"
         required: false
@@ -109,4 +114,5 @@ jobs:
           EXCLUDE_PRODUCTS: ${{ inputs.exclude_products }}
           SUBMISSION_ID: ${{ inputs.submission_id }}
           RELEASE_TYPE: ${{ inputs.release_type }}
+          SCREENS_DIR: ${{ inputs.screens_dir }}
         run: ruby scripts/asc_subscriptions.rb
