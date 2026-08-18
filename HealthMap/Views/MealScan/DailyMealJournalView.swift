@@ -181,16 +181,19 @@ struct DailyMealJournalView: View {
                 let rest = target - consumed
                 HStack(alignment: .firstTextBaseline) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        // Même donnée que l'accueil Scan (kcal restantes) : même
+                        // style, désormais (elle s'écrivait 30/bold là-bas et
+                        // 28/semibold ici).
                         Text("\(abs(rest))")
-                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                            .font(Theme.heroValueFont)
                             .foregroundStyle(rest >= 0 ? Color.kiwiGreenInk : Color.scoreDeficient)
                         Text(rest >= 0 ? (estAujourdhui ? "kcal restantes" : "kcal sous l'objectif") : "kcal au-dessus")
-                            .font(.system(size: 13))
+                            .font(Theme.dataSecondaryFont)
                             .foregroundStyle(Color.healthMapSecondary)
                     }
                     Spacer()
                     Text("\(consumed) / \(target)")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(Theme.dataSecondaryFont.monospacedDigit())
                         .foregroundStyle(Color.healthMapSecondary)
                 }
                 GeometryReader { g in
@@ -204,10 +207,10 @@ struct DailyMealJournalView: View {
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(consumed)")
-                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                        .font(Theme.heroValueFont)
                         .foregroundStyle(Color.healthMapText)
                     Text(estAujourdhui ? "kcal aujourd'hui" : "kcal ce jour-là")
-                        .font(.system(size: 13))
+                        .font(Theme.dataSecondaryFont)
                         .foregroundStyle(Color.healthMapSecondary)
                 }
             }
@@ -258,13 +261,16 @@ struct DailyMealJournalView: View {
         let rows = vm.dayRows(in: slot)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
+                // Titre de section : même grammaire que `ScanCardHeader` sur
+                // l'accueil (13/bold à l'encre du domaine). L'onglet en portait
+                // deux, 16/bold ici et 15/semibold là.
                 Text(slot.emoji).font(.system(size: 15))
                 Text(slot.label)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(ScanDomaine.energie)
                 if !rows.isEmpty {
                     Text("\(vm.dayCalories(in: slot)) kcal")
-                        .font(.system(size: 12, design: .rounded))
+                        .font(Theme.dataSecondaryFont.monospacedDigit())
                         .foregroundStyle(Color.healthMapMuted)
                 }
                 Spacer()

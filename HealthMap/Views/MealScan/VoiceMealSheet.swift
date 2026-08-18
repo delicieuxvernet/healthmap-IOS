@@ -44,6 +44,22 @@ struct VoiceMealSheet: View {
     /// échec serveur sans redemander à l'utilisateur de reparler.
     @State private var dernierTranscript = ""
 
+    // MARK: Révélation des aliments (présentation uniquement)
+    //
+    // Ce que la dictée vient de produire mérite d'être VU arriver : les
+    // aliments se posent un par un (~0,25 s d'écart) et le total monte jusqu'à
+    // sa valeur. Aucune donnée n'est touchée — `items`, `grams` et `totaux`
+    // sont exactement ceux d'avant ; seul l'affichage est différé.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Nombre d'aliments déjà posés à l'écran pendant la révélation.
+    @State private var revelees = 0
+    /// Total affiché pendant la montée du compteur.
+    @State private var kcalAffiche = 0
+    /// Vrai tant que le compteur monte : après quoi c'est le vrai total qui
+    /// s'affiche, y compris quand l'utilisateur ajuste une quantité.
+    @State private var compteurActif = false
+    @State private var revelation: Task<Void, Never>?
+
     private let journal = MealJournalService.shared
 
     // Plus de phase « écoute » ici : depuis le 2 août 2026, l'enregistrement
@@ -68,7 +84,11 @@ struct VoiceMealSheet: View {
         .presentationDetents(hauteurs)
         .presentationDragIndicator(.visible)
         .task { await finishListening() }
-        .onDisappear { speech.reset() }
+        .onDisappear {
+            revelation?.cancel()
+            revelation = nil
+            speech.reset()
+        }
     }
 
     private var hauteurs: Set<PresentationDetent> {
@@ -101,7 +121,7 @@ struct VoiceMealSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Voici ce que j'ai compris")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(Theme.sheetTitleFont)
                     .foregroundStyle(Kiwio.encre)
                     .padding(.top, 18)
 
@@ -118,7 +138,7 @@ struct VoiceMealSheet: View {
                 .pickerStyle(.segmented)
                 .padding(.vertical, 4)
 
-                ForEach(visibleItems) { item in
+                ForEach(itemsAffiches) { item in
                     VoiceItemRow(
                         item: item,
                         grams: grams[item.index],
@@ -131,6 +151,7 @@ struct VoiceMealSheet: View {
                             if deployee == item.index { deployee = prochainManquant() }
                         }
                     )
+                    .transition(.opacity.combined(with: .offset(y: 10)))
                 }
 
                 if !estimatedNames.isEmpty {
@@ -171,13 +192,24 @@ struct VoiceMealSheet: View {
         }
     }
 
+    /// Avertissement de la feuille. Il porte une information que l'utilisateur
+    /// DOIT lire (une valeur estimée, un aliment non chiffré) : il ne peut pas
+    /// rester au plus petit corps de l'écran.
     private func bandeau(_ texte: String, couleur: Color, fond: Color) -> some View {
-        Text(texte)
-            .font(.caption)
-            .foregroundStyle(couleur)
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(fond, in: RoundedRectangle(cornerRadius: 10))
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .accessibilityHidden(true)
+            Text(texte)
+                .font(.system(size: 13, weight: .medium))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(couleur)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(fond, in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
     }
 
     private var totalBlock: some View {
@@ -187,7 +219,7 @@ struct VoiceMealSheet: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Kiwio.secondaire)
                 Spacer()
-                Text("\(totaux.kcal)")
+                Text("\(kcalTotalAffiche)")
                     .font(.kiwioMono(26, .bold))
                     .foregroundStyle(Kiwio.encre)
                 Text("kcal")
@@ -216,11 +248,25 @@ struct VoiceMealSheet: View {
         } else if let manquant = missingNames.first {
             // Bloquant tant qu'une quantité manque : on n'invente pas un grammage.
             // Un féculent varie du simple au triple selon la portion.
-            Text("Précise la quantité : \(manquant)")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Kiwio.discret)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .background(Kiwio.neutre, in: RoundedRectangle(cornerRadius: 14))
+            //
+            // Rendue en gris sur gris, cette instruction se lisait comme un
+            // bouton désactivé — donc comme un cul-de-sac. C'est une consigne :
+            // elle prend l'ambre de la question et un corps de conclusion.
+            HStack(spacing: 8) {
+                Image(systemName: "questionmark.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text("Précise la quantité : \(manquant)")
+                    .font(Theme.insightFont)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Kiwio.ambre)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            .background(Kiwio.ambreFond, in: RoundedRectangle(cornerRadius: 14))
+            .accessibilityElement(children: .combine)
         } else {
             Button {
                 Task { await save() }
@@ -322,6 +368,16 @@ struct VoiceMealSheet: View {
     private var visibleItems: [VoiceMealService.Item] {
         items.filter { !removed.contains($0.index) }
     }
+    /// Ce qui est POSÉ à l'écran à cet instant. Sous « Réduire les animations »,
+    /// c'est la liste entière, immédiatement.
+    private var itemsAffiches: [VoiceMealService.Item] {
+        reduceMotion ? visibleItems : Array(visibleItems.prefix(revelees))
+    }
+    /// Total affiché : la valeur qui monte pendant la révélation, la vraie
+    /// ensuite (et donc dès qu'une quantité est ajustée à la main).
+    private var kcalTotalAffiche: Int {
+        compteurActif ? kcalAffiche : totaux.kcal
+    }
     /// Enregistrable = on a un grammage ET de quoi le chiffrer : soit un aliment
     /// de la base, soit l'estimation du serveur. Un aliment absent de la base
     /// n'est plus jeté — le jeter faussait le total de la journée.
@@ -393,9 +449,47 @@ struct VoiceMealSheet: View {
             phase = .results
             // On ouvre d'emblée la première question à laquelle il faut répondre.
             deployee = prochainManquant()
+            lancerRevelation()
         } catch {
             errorMessage = error.localizedDescription
             phase = .failed
+        }
+    }
+
+    /// Pose les aliments un par un, puis fait monter le total jusqu'à sa
+    /// valeur. Purement visuel : rien ici ne touche `items`, `grams` ni
+    /// `totaux`. Sous « Réduire les animations », tout est affiché d'emblée.
+    private func lancerRevelation() {
+        revelation?.cancel()
+        guard !reduceMotion else {
+            revelees = items.count
+            compteurActif = false
+            return
+        }
+        let nombre = visibleItems.count
+        let cible = totaux.kcal
+        revelees = 0
+        kcalAffiche = 0
+        compteurActif = true
+        revelation = Task { @MainActor in
+            for _ in 0..<nombre {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                guard !Task.isCancelled else { return }
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+                    revelees += 1
+                }
+            }
+            if cible > 0 {
+                let pas = 16
+                for i in 1...pas {
+                    try? await Task.sleep(nanoseconds: 30_000_000)
+                    guard !Task.isCancelled else { return }
+                    kcalAffiche = Int((Double(cible) * Double(i) / Double(pas)).rounded())
+                }
+            }
+            guard !Task.isCancelled else { return }
+            revelees = items.count
+            compteurActif = false
         }
     }
 
@@ -535,8 +629,11 @@ private struct VoiceItemRow: View {
                             .foregroundStyle(Kiwio.encre)
                             .lineLimit(1)
                         if manque {
+                            // C'est la question qui bloque l'enregistrement :
+                            // elle ne peut pas être le plus petit texte de la
+                            // ligne (elle l'était, à 12 pt).
                             Text("quantité ?")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(Theme.insightFont)
                                 .foregroundStyle(Kiwio.ambre)
                         } else {
                             // Grammes en vert kiwi, chiffres en chasse fixe : la

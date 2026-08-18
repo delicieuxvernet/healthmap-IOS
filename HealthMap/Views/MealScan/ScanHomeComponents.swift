@@ -4,36 +4,62 @@ import UIKit
 // MARK: - Scan Home (journal calories du jour) — sous-vues
 //
 // Page d'accueil de l'onglet Scan refondue en JOURNAL DU JOUR : navigation
-// jour par jour, carte « Ta journée » (kcal + macros), apports micronutriments
-// du jour, scans récents. Langage v4 : fond crème, cartes `.kiwiCard`,
-// anneaux pleins (recette ZStack track + trim, cap round, rotation -90),
+// jour par jour, carte « Ta journée » (kcal + macros), ce qui a été mangé,
+// apports micronutriments du jour. Langage v4 : fond crème, cartes `.kiwiCard`,
 // couleur = sens (vert ≥60 « ok » / ambre ≥30 « à renforcer » / rouge « à
-// combler »). Aucun chiffre inventé : une cible absente → anneau gris neutre,
-// jamais de fraction fabriquée. La logique (bindings) reste dans MealScanView ;
-// ces composants ne sont que de l'habillage.
+// combler »). Aucun chiffre inventé : une cible absente → pas de fraction
+// fabriquée. La logique (bindings) reste dans MealScanView ; ces composants ne
+// sont que de l'habillage.
+//
+// Hiérarchie (charte du 17 août 2026) : les titres de section passent par
+// `ScanCardHeader` — 13/bold à l'encre du DOMAINE, jamais l'encre neutre — et
+// les conclusions de carte portent `Theme.conclusionFont` (17/heavy), ce qui
+// fait d'elles le pic de leur carte. Les chiffres qui justifient une carte
+// (kcal restantes, % de couverture) sont des données-héros : jamais sous 15 pt,
+// arrondis et à chasse fixe.
+
+// MARK: - Encres de domaine des titres de section
+/// Un titre de section n'est jamais neutre (règle 1 de la charte) : il porte
+/// l'encre de son domaine. Les deux domaines de l'onglet Scan sont l'ÉNERGIE
+/// (kcal, budget du jour, repas comptés) et les APPORTS (micronutriments).
+/// Les deux encres tiennent 4,5:1 sur carte blanche — l'orange du lavis de
+/// l'onglet (`macroFat`) ne le tient pas à 13 pt, d'où cette version foncée.
+enum ScanDomaine {
+    static let energie = Color(hex: "9A5A00")
+    static let apports = Color.kiwiGreenInk
+}
 
 // MARK: - En-tête de section (icône + titre)
-/// En-tête réutilisable : petite icône système + titre. Utilisé à l'intérieur
-/// des cartes (apports / macros) comme hors carte (« Ta journée »).
+/// En-tête réutilisable : petite icône système + titre, tous deux à l'encre du
+/// domaine. C'est LE patron de titre de section de l'onglet (même grammaire que
+/// `BilanV7SectionLabel` côté Bilan) : 13/bold teinté, icône 15/semibold.
 struct ScanCardHeader: View {
     let icon: String
     let title: String
+    /// Encre du domaine. Par défaut les apports (vert), domaine majoritaire.
+    var color: Color = ScanDomaine.apports
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.kiwiGreen)
+                .font(.system(size: 15, weight: .semibold))
+                .accessibilityHidden(true)
             Text(title)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(Theme.sectionLabelFont)
         }
+        .foregroundStyle(color)
     }
 }
 
 // MARK: - Seuils communs (couleur = sens)
 private func scanStatusColor(_ pct: Int) -> Color {
     pct >= 60 ? .kiwiGreen : (pct >= 30 ? .scoreLow : .scoreDeficient)
+}
+/// Encre du statut — la version lisible sur blanc de `scanStatusColor`. Les
+/// teintes vives conviennent à une barre ou à une pastille, pas à du texte de
+/// 15 pt : la donnée-héros chiffrée prend donc l'encre, jamais la teinte.
+private func scanStatusInk(_ pct: Int) -> Color {
+    pct >= 60 ? Color.kiwiInk : (pct >= 30 ? BilanV7.warnInk : BilanV7.alertInk)
 }
 private func scanStatusLabel(_ pct: Int) -> String {
     pct >= 60 ? "ok" : (pct >= 30 ? "à renforcer" : "à combler")
@@ -113,29 +139,29 @@ struct ScanJourneeCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ScanCardHeader(icon: "flame.fill", title: "Ta journée")
+            ScanCardHeader(icon: "flame.fill", title: "Ta journée", color: ScanDomaine.energie)
 
             if objectif == nil {
                 // Objectif non calculable : le consommé, rien d'autre.
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(consommees)")
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .font(Theme.heroValueFont)
                         .foregroundStyle(Color.kiwiCharcoal)
                     Text("kcal")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Theme.dataSecondaryFont)
                         .foregroundStyle(Color.healthMapSecondary)
                 }
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(abs(isToday ? restantes : consommees))")
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .font(Theme.heroValueFont)
                         .foregroundStyle(over ? Color.scoreDeficient : Color.kiwiGreenInk)
                     Text(titreKcal)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Theme.dataSecondaryFont)
                         .foregroundStyle(Color.healthMapSecondary)
                     Spacer(minLength: 8)
                     Text("\(consommees) / \(budget)")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(Theme.dataSecondaryFont.monospacedDigit())
                         .foregroundStyle(Color.healthMapSecondary)
                         .layoutPriority(1)
                 }
@@ -152,13 +178,16 @@ struct ScanJourneeCard: View {
 
                 if let depensees, depensees > 0 {
                     Text("Budget élargi de \(depensees) kcal dépensées · Apple Santé")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(Theme.chromeFont)
                         .foregroundStyle(Color.healthMapMuted)
                 }
             }
 
+            // La conclusion de la carte : le plus gros texte du bloc, jamais
+            // tronqué (règle 2 de la charte).
             Text(headline)
-                .font(.system(size: 17, weight: .bold))
+                .font(Theme.conclusionFont)
+                .tracking(Theme.conclusionTracking)
                 .foregroundStyle(Color.kiwiCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -192,12 +221,12 @@ struct ScanJourneeCard: View {
         let hasTarget = (m.target ?? 0) > 0
         return VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(Theme.chromeFont)
                 .foregroundStyle(Color.healthMapMuted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(hasTarget ? "\(grammes)/\(m.target!) g" : "\(grammes) g")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .font(.system(size: 12, weight: .semibold, design: .rounded).monospacedDigit())
                 .foregroundStyle(Color.healthMapSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -218,10 +247,161 @@ struct ScanJourneeCard: View {
     }
 }
 
+// MARK: - « Mangé aujourd'hui » + porte vers la journée
+/// Ce que la page doit raconter en premier : ce qui a DÉJÀ été enregistré
+/// aujourd'hui. Une ligne par repas (aliments à gauche, créneau + kcal à
+/// droite), puis une ligne-lien qui ouvre le journal du jour complet.
+///
+/// Aucun repas enregistré → la carte ne s'affiche pas du tout : une coquille
+/// vide n'apprend rien et pousse la vraie information vers le bas.
+struct ScanMangeAujourdhuiCard: View {
+    let meals: [MealJournalService.MealRecord]
+    /// kcal restantes sur le budget du jour. nil = aucun objectif calculable :
+    /// on annonce alors le consommé, jamais une cible inventée.
+    let kcalRestantes: Int?
+    let consommees: Int
+    /// Jour passé : on ne parle plus de « restantes » (la journée est finie) et
+    /// le titre cesse de dire « aujourd'hui ».
+    let isToday: Bool
+    let onOpenJournee: () -> Void
+
+    private var trie: [MealJournalService.MealRecord] {
+        meals.sorted { $0.consumedAt < $1.consumedAt }
+    }
+    /// Reste réellement affichable : seul aujourd'hui a des kcal « restantes ».
+    private var reste: Int? { isToday ? kcalRestantes : nil }
+    private var depassement: Bool { (reste ?? 0) < 0 }
+
+    var body: some View {
+        if !trie.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                ScanCardHeader(
+                    icon: "fork.knife",
+                    title: isToday ? "Mangé aujourd'hui" : "Mangé ce jour-là",
+                    color: ScanDomaine.energie
+                )
+
+                VStack(spacing: 0) {
+                    ForEach(Array(trie.enumerated()), id: \.element.id) { index, meal in
+                        if index > 0 {
+                            Divider().overlay(Color.kiwiCharcoal.opacity(0.06))
+                        }
+                        ligne(meal)
+                    }
+                }
+
+                lienJournee
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .kiwiCard(radius: 20)
+        }
+    }
+
+    private func ligne(_ meal: MealJournalService.MealRecord) -> some View {
+        let titre = meal.foods.isEmpty ? "Repas" : meal.foods.joined(separator: ", ")
+        return HStack(spacing: 10) {
+            vignette(meal)
+            Text(titre)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color.kiwiCharcoal)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text("\(meal.slot.label) · \(meal.macros.calories) kcal")
+                .font(Theme.dataSecondaryFont.monospacedDigit())
+                .foregroundStyle(Color.healthMapMuted)
+                .lineLimit(1)
+                .layoutPriority(1)
+        }
+        .padding(.vertical, 9)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(meal.slot.label) : \(titre), \(meal.macros.calories) kilocalories.")
+    }
+
+    /// Mini-photo du scan quand elle existe (vignette locale, retour build
+    /// 319) ; sinon la pastille fourchette — dictée, recherche, ou scan fait
+    /// depuis un autre appareil.
+    @ViewBuilder
+    private func vignette(_ meal: MealJournalService.MealRecord) -> some View {
+        if let thumb = MealThumbnailStore.image(mealId: meal.id, consumedAt: meal.consumedAt) {
+            Image(uiImage: thumb)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 30, height: 30)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .accessibilityHidden(true)
+        } else {
+            ZStack {
+                Circle().fill(Color.kiwiGreenSoft).frame(width: 30, height: 30)
+                Image(systemName: meal.micros.first.map { Fluent3D.symbol(for: $0.id) } ?? "fork.knife")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.kiwiGreen)
+            }
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// La porte vers la journée complète : fond gris très pâle, 44 pt de haut,
+    /// le chiffre qui compte en donnée-héros de ligne.
+    private var lienJournee: some View {
+        Button(action: onOpenJournee) {
+            HStack(spacing: 8) {
+                texteLien
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.healthMapMuted)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(Color.kiwiCharcoal.opacity(0.04))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityLabel(libelleVocal)
+        .accessibilityHint("Ouvre le journal du jour")
+    }
+
+    /// « Ta journée : **420** kcal restantes · macros · micros ». Le chiffre
+    /// porte la donnée-héros de ligne, le reste est de l'habillage.
+    private var texteLien: Text {
+        let prefixe = Text("Ta journée : ")
+            .font(Theme.dataSecondaryFont)
+            .foregroundStyle(Color.healthMapSecondary)
+        let valeur = Text(chiffre)
+            .font(Theme.heroValueRowFont)
+            .foregroundStyle(depassement ? Color.scoreDeficient : Color.kiwiGreenInk)
+        let suffixe = Text(" \(unite) · macros · micros")
+            .font(Theme.dataSecondaryFont)
+            .foregroundStyle(Color.healthMapSecondary)
+        return prefixe + valeur + suffixe
+    }
+
+    private var chiffre: String {
+        guard let reste else { return "\(consommees)" }
+        return "\(abs(reste))"
+    }
+
+    private var unite: String {
+        guard let reste else { return "kcal comptées" }
+        return reste >= 0 ? "kcal restantes" : "kcal au-dessus"
+    }
+
+    private var libelleVocal: String {
+        "Ta journée : \(chiffre) \(unite). Macros et apports détaillés."
+    }
+}
+
 // MARK: - Apports micronutriments du jour
 /// En-tête + phrase de synthèse (les 1-2 apports les plus bas) + liste : puce
-/// colorée, libellé, chip de statut (ok / à renforcer / à combler) et barre de
-/// couverture (largeur = pct, couleur du seuil). Liste vide → invite honnête.
+/// colorée, libellé, PART DU BESOIN COUVERTE (la donnée-héros de la ligne),
+/// chip de statut et barre de couverture. Liste vide → invite honnête.
 struct ScanMicrosJourCard: View {
     /// (id du nutriment, part du besoin couverte aujourd'hui 0-100).
     let items: [(id: String, pct: Int)]
@@ -232,9 +412,10 @@ struct ScanMicrosJourCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ScanCardHeader(icon: "leaf.fill", title: "Tes apports du jour")
+            ScanCardHeader(icon: "leaf.fill", title: "Tes apports du jour", color: ScanDomaine.apports)
             Text(headline)
-                .font(.system(size: 17, weight: .bold))
+                .font(Theme.conclusionFont)
+                .tracking(Theme.conclusionTracking)
                 .foregroundStyle(Color.kiwiCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
             if items.isEmpty {
@@ -260,6 +441,7 @@ struct ScanMicrosJourCard: View {
 
     private func row(_ item: (id: String, pct: Int)) -> some View {
         let color = scanStatusColor(item.pct)
+        let ink = scanStatusInk(item.pct)
         let label = NutrientData.definition(for: item.id)?.label ?? item.id
         return VStack(spacing: 7) {
             HStack(spacing: 8) {
@@ -267,11 +449,17 @@ struct ScanMicrosJourCard: View {
                     .fill(Color.nutrientColor(for: item.id))
                     .frame(width: 8, height: 8)
                 Text(label)
-                    .font(.system(size: 13.5, weight: .bold))
+                    .font(Theme.sectionLabelFont)
                     .foregroundStyle(Color.kiwiCharcoal)
                 Spacer(minLength: 6)
+                // La valeur était calculée depuis toujours et ne servait qu'à la
+                // largeur de la barre : elle est la raison d'être de la ligne,
+                // elle se lit donc (charte : jamais sous 15 pt).
+                Text("\(item.pct)\u{202F}%")
+                    .font(Theme.heroValueRowFont)
+                    .foregroundStyle(ink)
                 Text(scanStatusLabel(item.pct))
-                    .pillStyle(color: color)
+                    .pillStyle(color: ink)
             }
             GeometryReader { g in
                 ZStack(alignment: .leading) {
@@ -287,91 +475,137 @@ struct ScanMicrosJourCard: View {
     }
 }
 
-// MARK: - Scans récents
-/// En-tête + jusqu'à 5 derniers repas (triés du plus récent). Chaque ligne :
-/// icône (SF Symbol du 1er micro sinon fourchette), aliments, créneau + kcal,
-/// heure relative. La carte entière ouvre le journal complet. Vide → masquée.
-struct ScanRecentScansList: View {
-    let meals: [MealJournalService.MealRecord]
-    let onOpen: () -> Void
+// MARK: - Tutoriel de première visite (3 bulles)
+/// Montré UNE fois, à la première arrivée sur l'onglet Scan, puis plus jamais.
+/// Trois bulles, une par geste de la page : les deux gros boutons, la carte de
+/// ce qui a été mangé, la carte des apports. Toujours passable d'un tap.
+///
+/// Patron repris de `TabTourOverlay` (le coach mark déjà en place) : voile
+/// sombre, carte posée en bas, points de progression, « Passer » / « Suivant ».
+/// Ici la carte est sombre et la DA kiwi, pour ne pas se confondre avec les
+/// cartes blanches de la page qu'elle commente.
+struct ScanTutorialOverlay: View {
+    /// Fermeture : le parent mémorise la visite (AppStorage) et retire l'overlay.
+    var onTermine: () -> Void
 
-    private var recent: [MealJournalService.MealRecord] {
-        Array(meals.sorted { $0.consumedAt > $1.consumedAt }.prefix(5))
+    @State private var etape = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private struct Bulle {
+        let icone: String
+        let titre: String
+        let texte: String
     }
+
+    private let bulles: [Bulle] = [
+        Bulle(icone: "mic.fill",
+              titre: "Dicte ou photographie ton repas",
+              texte: "Les deux gros boutons en haut. Maintiens le micro pour dicter, ou prends ton assiette en photo."),
+        Bulle(icone: "fork.knife",
+              titre: "Tes aliments s'ajoutent ici",
+              texte: "Juste sous la recherche, la carte « Mangé aujourd'hui » liste tes repas du jour et ouvre ta journée complète."),
+        Bulle(icone: "leaf.fill",
+              titre: "Et tes apports du jour se mettent à jour là",
+              texte: "Plus bas, la carte des apports montre ce que tu as déjà couvert et ce qu'il reste à renforcer."),
+    ]
+
+    private var derniere: Bool { etape == bulles.count - 1 }
 
     var body: some View {
-        if !recent.isEmpty {
-            Button(action: onOpen) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        ScanCardHeader(icon: "clock.arrow.circlepath", title: "Scans récents")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Color.healthMapMuted)
-                    }
-                    VStack(spacing: 10) {
-                        ForEach(recent) { meal in
-                            row(meal)
+        ZStack {
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+                .onTapGesture {} // le voile absorbe les taps, il ne ferme pas par erreur
+
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+
+                // Le repère de direction : ce dont parle la bulle est au-dessus.
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.6))
+                    .padding(.bottom, 8)
+                    .accessibilityHidden(true)
+
+                carte
+                    .padding(.horizontal, Theme.spacingLG)
+                    .padding(.bottom, 120)
+            }
+        }
+        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97)))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Découverte de l'onglet Scan, étape \(etape + 1) sur \(bulles.count)")
+    }
+
+    private var carte: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: bulles[etape].icone)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.kiwiGreen)
+                    .accessibilityHidden(true)
+                Text(bulles[etape].titre)
+                    .font(Theme.insightFont)
+                    .foregroundStyle(Color.white)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text(bulles[etape].texte)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.82))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 6) {
+                ForEach(0..<bulles.count, id: \.self) { index in
+                    Capsule()
+                        .fill(index == etape ? Color.kiwiGreen : Color.white.opacity(0.28))
+                        .frame(width: index == etape ? 16 : 6, height: 6)
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityHidden(true)
+
+            HStack(spacing: 10) {
+                Button {
+                    HapticService.shared.tap()
+                    onTermine()
+                } label: {
+                    Text("Passer")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.72))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.healthMapPressed)
+
+                Button {
+                    HapticService.shared.tap()
+                    if derniere {
+                        onTermine()
+                    } else {
+                        withAnimation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.86)) {
+                            etape += 1
                         }
                     }
+                } label: {
+                    Text(derniere ? "Terminer" : "Suivant")
+                        .font(Theme.ctaFont)
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.kiwiGreen)
+                        )
+                        .contentShape(Rectangle())
                 }
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .kiwiCard(radius: 20)
-                .contentShape(Rectangle())
+                .buttonStyle(.healthMapPressed)
             }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityHint("Ouvre le journal du jour")
         }
-    }
-
-    private func row(_ meal: MealJournalService.MealRecord) -> some View {
-        let icon = meal.micros.first.map { Fluent3D.symbol(for: $0.id) } ?? "fork.knife"
-        let title = meal.foods.isEmpty ? "Repas" : meal.foods.joined(separator: ", ")
-        return HStack(spacing: 11) {
-            // Mini-photo du scan quand elle existe (vignette locale — retour
-            // build 319) ; sinon l'illustration existante (dictée, recherche,
-            // scan fait sur un autre appareil).
-            if let thumb = MealThumbnailStore.image(mealId: meal.id, consumedAt: meal.consumedAt) {
-                Image(uiImage: thumb)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 34, height: 34)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
-                    .accessibilityHidden(true)
-            } else {
-                ZStack {
-                    Circle().fill(Color.kiwiGreenSoft).frame(width: 34, height: 34)
-                    Image(systemName: icon)
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color.kiwiGreen)
-                }
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                    .lineLimit(1)
-                HStack(spacing: 6) {
-                    Text(meal.slot.label)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.healthMapMuted)
-                    Text("·")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.healthMapMuted)
-                    Text("\(meal.macros.calories) kcal")
-                        .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(Color.healthMapSecondary)
-                }
-            }
-            Spacer(minLength: 6)
-            Text(DateFormatters.relative.localizedString(for: meal.consumedAt, relativeTo: Date()))
-                .font(.system(size: 10.5, weight: .medium))
-                .foregroundStyle(Color.healthMapMuted)
-                .lineLimit(1)
-        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.kiwiCharcoal)
+        )
     }
 }
-
-
