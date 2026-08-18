@@ -985,8 +985,7 @@ if MODE == "tester-code"
     ok, resp = create_offer_code(weekly, offer_name,
       { offerMode: "FREE_TRIAL", duration: "ONE_WEEK", numberOfPeriods: 1,
         customerEligibilities: %w[NEW EXISTING EXPIRED],
-        offerEligibility: "STACK_WITH_INTRO_OFFERS",
-        totalNumberOfCodes: redemptions, active: true }, grid)
+        offerEligibility: "STACK_WITH_INTRO_OFFERS" }, grid)
     exit 1 unless ok
     oc_id = resp.dig("data", "id")
   end
