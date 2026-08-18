@@ -62,7 +62,13 @@ struct SuiviView: View {
     @State private var checkinTick = 0
 
     var body: some View {
-        NavigationStack {
+        // Le moteur de score hebdo tournait TROIS fois par passe de rendu :
+        // `stats` est lu deux fois dans cette pile, et `paliers` le relisait une
+        // troisième. Un seul calcul, passé aux trois cartes. L'onglet étant
+        // monté en permanence, ce coût se payait aussi hors écran.
+        let mesures = stats
+        let prochainsPaliers = paliers(mesures)
+        return NavigationStack {
             ZStack {
                 WarmBackground()
                 // Lavis Suivi : or, le rythme des jours (matin / midi / soir).
@@ -71,7 +77,7 @@ struct SuiviView: View {
                 ScrollView {
                     VStack(spacing: 14) {
                         titleBlock.kiwiEntrance(0)
-                        SuiviStatsRow(stats: stats).kiwiEntrance(1)
+                        SuiviStatsRow(stats: mesures).kiwiEntrance(1)
                         macroCarousel.kiwiEntrance(2)
                         microCarousel.kiwiEntrance(3)
                         symptomCarousel.kiwiEntrance(4)
@@ -91,12 +97,12 @@ struct SuiviView: View {
                             }
                             .kiwiEntrance(5)
                         }
-                        SuiviNeedsCard(delta: stats.besoinsDuJourDeltaPct,
+                        SuiviNeedsCard(delta: mesures.besoinsDuJourDeltaPct,
                                        stepsToday: stepsToday,
                                        tips: weeklyTips,
                                        isPremium: subscriptionService.isPremium)
                             .kiwiEntrance(5)
-                        SuiviPaliersCard(paliers: paliers).kiwiEntrance(6)
+                        SuiviPaliersCard(paliers: prochainsPaliers).kiwiEntrance(6)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
@@ -450,7 +456,7 @@ struct SuiviView: View {
         SuiviEngineV4.weeklyTips(coverage: coverage)
     }
 
-    private var paliers: SuiviEngineV4.NextPaliers {
+    private func paliers(_ stats: SuiviEngineV4.SuiviStats) -> SuiviEngineV4.NextPaliers {
         SuiviEngineV4.nextPaliers(streak: gamification.currentStreak,
                                   besoinsCouvertsPct: stats.besoinsCouvertsPct)
     }
