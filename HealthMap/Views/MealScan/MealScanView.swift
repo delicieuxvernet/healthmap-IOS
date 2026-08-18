@@ -73,13 +73,10 @@ struct MealScanView: View {
     /// nil = Santé non lié / rien partagé → colonne masquée (jamais un « 0 » trompeur).
     /// Lu au chargement de la page (présente la feuille d'autorisation la 1re fois).
     @State private var activeEnergyToday: Int?
-    /// Tutoriel de première visite : 3 bulles, une seule fois dans la vie du
-    /// compte. Mémorisé sur l'appareil — jamais re-montré, même après un
-    /// redémarrage. Il ne se déclenche qu'à l'ARRIVÉE réelle sur l'onglet
-    /// (notification de changement d'onglet) : les cinq onglets étant montés en
-    /// permanence, un `onAppear` l'aurait « consommé » sans que personne le voie.
-    @AppStorage("hasSeenScanTour") private var scanTourVu = false
-    @State private var montreTutoScan = false
+    /// Le tutoriel de première visite (3 bulles) ne vit PLUS ici : il est monté
+    /// au niveau de `MainTabView` (ContentView.swift), seul endroit posé APRÈS
+    /// la barre d'onglets — sinon son voile laissait la barre en pleine lumière
+    /// et tappable. Voir `montreTutoScan` là-bas.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Le résultat du scan est présenté en bottom-sheet : ouvert dès qu'une
@@ -261,16 +258,6 @@ struct MealScanView: View {
             // Le glissé vertical (verrou) appartient à la dictée tant qu'elle
             // court — sinon le défilement le vole et coupe le geste en route.
             .scrollDisabled(dicteeEnCours)
-
-            if montreTutoScan {
-                ScanTutorialOverlay {
-                    scanTourVu = true
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
-                        montreTutoScan = false
-                    }
-                }
-                .zIndex(2)
-            }
         }
     }
 
@@ -414,12 +401,6 @@ struct MealScanView: View {
         // jamais la feuille d'autorisation).
         .onReceive(NotificationCenter.default.publisher(for: .healthmapTabDidChange)) { note in
             guard note.object as? String == NavCardDestination.scanner.rawValue else { return }
-            // Première arrivée sur l'onglet : les 3 bulles, une seule fois.
-            if !scanTourVu && !montreTutoScan {
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
-                    montreTutoScan = true
-                }
-            }
             guard activeEnergyToday == nil else { return }
             Task { activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal() }
         }

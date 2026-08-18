@@ -501,9 +501,13 @@ struct ScanTutorialOverlay: View {
         Bulle(icone: "mic.fill",
               titre: "Dicte ou photographie ton repas",
               texte: "Les deux gros boutons en haut. Maintiens le micro pour dicter, ou prends ton assiette en photo."),
+        // Formulée au FUTUR : le tutoriel ne se joue qu'à la toute première
+        // visite, donc avant le moindre repas — et la carte « Mangé
+        // aujourd'hui » ne s'affiche pas tant que la journée est vide
+        // (`if !trie.isEmpty`). Décrire une carte absente était un contresens.
         Bulle(icone: "fork.knife",
-              titre: "Tes aliments s'ajoutent ici",
-              texte: "Juste sous la recherche, la carte « Mangé aujourd'hui » liste tes repas du jour et ouvre ta journée complète."),
+              titre: "Tes aliments s'ajouteront ici",
+              texte: "Dès ton premier repas enregistré, la carte « Mangé aujourd'hui » apparaîtra sous la recherche et ouvrira ta journée complète."),
         Bulle(icone: "leaf.fill",
               titre: "Et tes apports du jour se mettent à jour là",
               texte: "Plus bas, la carte des apports montre ce que tu as déjà couvert et ce qu'il reste à renforcer."),

@@ -14,17 +14,21 @@ struct TabTourOverlay: View {
     @State private var currentStep = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Les cinq onglets, dans l'ORDRE de la barre : Bilan · Suivi · Scan ·
+    /// Plan · Compléments. Le 5e n'est plus « Profil » depuis que celui-ci est
+    /// passé en feuille (P6) : décrire un onglet qui n'existe pas était la
+    /// première chose que lisait un compte neuf.
     private let steps: [TourStep] = [
-        TourStep(tabIndex: 0, icon: "heart.text.clipboard", title: "Bilan",
-                 description: "Ton bilan sante complet en un coup d'oeil : score global, apports insuffisants detectes et alertes personnalisees."),
+        TourStep(tabIndex: 0, icon: "heart.text.square", title: "Bilan",
+                 description: "Ton bilan complet en un coup d'œil : score global, apports à renforcer et points d'attention personnalisés."),
         TourStep(tabIndex: 1, icon: "checkmark.circle", title: "Suivi",
-                 description: "Enregistre tes habitudes quotidiennes (sommeil, hydratation, energie) et suis ta progression semaine apres semaine."),
-        TourStep(tabIndex: 2, icon: "camera", title: "Scanner",
-                 description: "Prends en photo ton assiette et l'IA analyse instantanement les nutriments de ton repas."),
-        TourStep(tabIndex: 3, icon: "list.bullet.clipboard", title: "Mon Plan",
-                 description: "Decouvre les nutriments qui te manquent, avec des solutions alimentaires concretes."),
-        TourStep(tabIndex: 4, icon: "person.crop.circle", title: "Profil",
-                 description: "Ton profil, tes badges, tes preferences et l'export de tes donnees."),
+                 description: "Enregistre tes habitudes quotidiennes (sommeil, hydratation, énergie) et suis ta progression semaine après semaine."),
+        TourStep(tabIndex: 2, icon: "camera", title: "Scan",
+                 description: "Maintiens le micro pour dicter ton repas, ou photographie ton assiette : tes calories et tes apports se comptent tout seuls."),
+        TourStep(tabIndex: 3, icon: "list.clipboard", title: "Plan",
+                 description: "Découvre les apports qui te manquent, avec des solutions alimentaires concrètes."),
+        TourStep(tabIndex: 4, icon: "pills", title: "Compléments",
+                 description: "Ce qu'il te faut vraiment : par l'assiette d'abord, en gélule si besoin, avec la bonne dose et le bon moment."),
     ]
 
     private var isLastStep: Bool { currentStep == steps.count - 1 }
@@ -45,7 +49,7 @@ struct TabTourOverlay: View {
                     HStack(spacing: 6) {
                         ForEach(0..<steps.count, id: \.self) { index in
                             Circle()
-                                .fill(index == currentStep ? Color.healthMapBlue : Color.white.opacity(0.3))
+                                .fill(index == currentStep ? Color.kiwiGreen : Color.white.opacity(0.3))
                                 .frame(width: index == currentStep ? 10 : 7,
                                        height: index == currentStep ? 10 : 7)
                                 .animation(reduceMotion ? .none : .healthMapQuick, value: currentStep)
@@ -56,29 +60,29 @@ struct TabTourOverlay: View {
                     // Icon
                     ZStack {
                         Circle()
-                            .fill(Color.healthMapBlueLight)
+                            .fill(Color.kiwiTint)
                             .frame(width: 72, height: 72)
 
                         Image(systemName: steps[currentStep].icon)
                             .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(Color.healthMapBlue)
+                            .foregroundStyle(Color.kiwiGreenInk)
                     }
 
                     // Title
                     Text(steps[currentStep].title)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.healthMapText)
+                        .font(Theme.sheetTitleFont)
+                        .foregroundStyle(Color.kiwiCharcoal)
 
                     // Description
                     Text(steps[currentStep].description)
-                        .font(.system(size: 15, weight: .regular))
+                        .font(.system(.subheadline))
                         .foregroundStyle(Color.healthMapSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, Theme.spacingMD)
 
                     // Step counter
                     Text("\(currentStep + 1) sur \(steps.count)")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Theme.dataSecondaryFont)
                         .foregroundStyle(Color.healthMapMuted)
 
                     // Navigation buttons
@@ -88,7 +92,7 @@ struct TabTourOverlay: View {
                             dismiss()
                         } label: {
                             Text("Passer")
-                                .font(.system(size: 15, weight: .medium))
+                                .font(Theme.ctaFont)
                                 .foregroundStyle(Color.healthMapSecondary)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 48)
@@ -105,11 +109,11 @@ struct TabTourOverlay: View {
                             }
                         } label: {
                             Text(isLastStep ? "C'est parti !" : "Suivant")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(Theme.ctaFont)
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 48)
-                                .background(Color.healthMapBlue)
+                                .background(Color.kiwiGreen)
                                 .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                         }
                     }
@@ -128,7 +132,7 @@ struct TabTourOverlay: View {
         }
         .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.95)))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Guide de navigation, etape \(currentStep + 1) sur \(steps.count)")
+        .accessibilityLabel("Guide de navigation, étape \(currentStep + 1) sur \(steps.count)")
     }
 
     private func dismiss() {

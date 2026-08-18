@@ -254,6 +254,15 @@ struct MainTabView: View {
     @AppStorage("hasSeenTabTour") private var hasSeenTabTour = false
     @State private var showTabTour = false
 
+    /// Tutoriel de première visite de l'onglet Scan (3 bulles). Il vit ICI, au
+    /// niveau de MainTabView, et PAS dans MealScanView : la barre d'onglets est
+    /// posée en `.overlay` sur `mainInterface`, donc elle se dessine par-dessus
+    /// tout ce que l'onglet contient. Monté dans l'onglet, son voile sombre
+    /// laissait la barre crème et le cercle Scan en pleine lumière — et
+    /// tappables. Même placement que `TabTourOverlay`, pour la même raison.
+    @AppStorage("hasSeenScanTour") private var scanTourVu = false
+    @State private var montreTutoScan = false
+
     /// Jour où le bilan a été reçu (horodatage). Sert à choisir l'onglet
     /// d'arrivée : le Bilan le jour même — c'est le résultat qu'on vient de
     /// mériter — puis le Scan les jours suivants, qui est ce pour quoi on
@@ -394,6 +403,13 @@ struct MainTabView: View {
                 name: .healthmapTabDidChange,
                 object: nouvel.route
             )
+            // Première arrivée sur le Scan : les 3 bulles, une seule fois dans
+            // la vie du compte. Jamais par-dessus le tour d'onglets.
+            if nouvel == .scanner, !scanTourVu, !montreTutoScan, !showTabTour {
+                withAnimation(reduceMotion ? .none : .easeOut(duration: 0.25)) {
+                    montreTutoScan = true
+                }
+            }
         }
         .ignoresSafeArea(.keyboard)
         .tint(Color.kiwiGreen)
@@ -445,12 +461,7 @@ struct MainTabView: View {
             // before SwiftUI has built this view).
             consumePendingRoute()
 
-            // Trigger tab tour for first-time users who completed the questionnaire
-            if dashboardVM.hasCompletedQuestionnaire && !hasSeenTabTour {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    showTabTour = true
-                }
-            }
+            armerTourOnglets()
         }
         .sheet(isPresented: $showPaywallFromDeepLink) {
             PaywallView()
@@ -473,6 +484,19 @@ struct MainTabView: View {
                 .environmentObject(dashboardVM)
                 .healthMapFullSheet()
         }
+        // Les deux coach marks sont posés ICI, APRÈS `mainInterface` : leur
+        // voile couvre donc AUSSI la barre d'onglets flottante (elle-même en
+        // overlay de `mainInterface`). Ne jamais les remonter dans un onglet.
+        .overlay {
+            if montreTutoScan && !showTabTour {
+                ScanTutorialOverlay {
+                    scanTourVu = true
+                    withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
+                        montreTutoScan = false
+                    }
+                }
+            }
+        }
         .overlay {
             if showTabTour {
                 TabTourOverlay(isShowing: $showTabTour)
@@ -493,11 +517,14 @@ struct MainTabView: View {
             if completed && bilanRecuLe == 0 {
                 bilanRecuLe = Date().timeIntervalSince1970
             }
-            if completed && !hasSeenTabTour {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    showTabTour = true
-                }
-            }
+            armerTourOnglets()
+        }
+        // Le tour d'onglets attend que le bilan soit RÉELLEMENT à l'écran : tant
+        // que `analysisV2` est nil, `AnalysisGateView` couvre tout en plein
+        // écran. Armé sur un minuteur, le tour se révélait pile au moment où le
+        // bilan apparaissait enfin — et le recouvrait.
+        .onChange(of: dashboardVM.analysisV2 == nil) { _, _ in
+            armerTourOnglets()
         }
         .onChange(of: pushService.pendingRoute) { _, newValue in
             // Consume routes arriving while the view is already alive
@@ -541,6 +568,21 @@ struct MainTabView: View {
         )) {
             AnalysisGateView()
                 .environmentObject(dashboardVM)
+        }
+    }
+
+    /// Arme le tour d'onglets — une seule fois par compte, et seulement quand
+    /// il y a quelque chose à commenter : questionnaire fait ET bilan affiché
+    /// (la gate d'analyse refermée). Appelé depuis les trois endroits qui
+    /// peuvent réunir ces conditions ; les appels en trop sont sans effet.
+    private func armerTourOnglets() {
+        guard dashboardVM.hasCompletedQuestionnaire,
+              dashboardVM.analysisV2 != nil,
+              !hasSeenTabTour,
+              !showTabTour else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            guard !hasSeenTabTour else { return }
+            showTabTour = true
         }
     }
 
