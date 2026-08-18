@@ -6,6 +6,9 @@ final class PremiumReadinessTests: XCTestCase {
 
     // MARK: - Catalogue vendu : hebdo + annuel, et rien d'autre (18 août 2026)
 
+    // `subscriptionProductIds` vit dans un service @MainActor : les deux tests
+    // ci-dessous s'y isolent aussi (le reste du fichier lit du `nonisolated`).
+    @MainActor
     func testOnlyWeeklyAndAnnualAreOffered() {
         XCTAssertEqual(
             SubscriptionService.subscriptionProductIds,
@@ -13,6 +16,7 @@ final class PremiumReadinessTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testMonthlyProductIsNeverLoaded() {
         // Le mensuel n'a jamais été approuvé par Apple : s'il revenait dans le
         // repli StoreKit, le paywall pourrait proposer un achat qui échoue.
