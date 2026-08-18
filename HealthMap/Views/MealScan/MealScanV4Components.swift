@@ -91,8 +91,10 @@ struct MealCoverageHero: View {
         HStack(spacing: 18) {
             ring
             VStack(alignment: .leading, spacing: 9) {
+                // Conclusion de la carte héros : le pic de son bloc.
                 Text(headline)
-                    .font(.system(size: 17, weight: .bold))
+                    .font(Theme.conclusionFont)
+                    .tracking(Theme.conclusionTracking)
                     .foregroundStyle(Color.kiwiCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 6) {
@@ -198,19 +200,22 @@ struct FoodTileV4: View {
                             .foregroundStyle(food.status == .neutral ? Color.healthMapMuted : .white)
                     }
                 }
+                // Donnée-héros textuelle de la tuile : l'aliment.
                 Text(food.name)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(Theme.heroTextFont)
                     .foregroundStyle(food.status == .neutral ? Color.healthMapSecondary : Color.kiwiCharcoal)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.75)
                 // Lot 3 — quantités réelles des 2 meilleurs apports (le % seul
-                // cachait la mesure ; la fiche détail garde le reste).
+                // cachait la mesure ; la fiche détail garde le reste). C'est LA
+                // mesure de la tuile : elle sort du plus petit corps gris pour
+                // devenir une donnée-héros de ligne (charte : jamais sous 15).
                 if let amounts = amountsLine {
                     Text(amounts)
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .font(Theme.heroValueRowFont)
+                        .foregroundStyle(Color.healthMapSecondary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.7)
                 }
                 if food.isUltraProcessed { ultraBadge } else { badge }
             }
@@ -433,7 +438,7 @@ struct CompleteMealCardV4: View {
             HStack(spacing: 8) {
                 Fluent3DIcon(name: Fluent3D.sparkles, size: 20)
                 Text("Pour compléter ce repas")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Color.kiwiCharcoal)
             }
             .padding(.bottom, 4)
@@ -448,7 +453,7 @@ struct CompleteMealCardV4: View {
                         .foregroundStyle(Color.scoreDeficient)
                 }
                 Text("Ce qui manque à ton plat")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Color.kiwiCharcoal)
             }
             .padding(.bottom, 4)
@@ -652,6 +657,9 @@ struct ScanNeedTile: View {
 
     private var pct: Int { micro.pctRDA }
     private var color: Color { pct >= 60 ? .kiwiGreen : (pct >= 30 ? .scoreLow : .scoreDeficient) }
+    /// Encre du statut : la teinte vive habille l'anneau, l'encre porte le
+    /// texte (les vifs ne tiennent pas 4,5:1 sur blanc).
+    private var ink: Color { pct >= 60 ? Color.kiwiInk : (pct >= 30 ? BilanV7.warnInk : BilanV7.alertInk) }
     private var label: String { NutrientData.definition(for: micro.nutrientId)?.label ?? micro.label }
     private var status: String { pct >= 60 ? "couvert" : (pct >= 30 ? "à renforcer" : "à combler") }
     private var combler: Bool { pct < 30 }
@@ -662,13 +670,15 @@ struct ScanNeedTile: View {
                 ring
                 VStack(spacing: 1) {
                     Text(label)
-                        .font(.system(size: 12.5, weight: .bold))
+                        .font(Theme.sectionLabelFont)
                         .foregroundStyle(Color.kiwiCharcoal)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Text(status)
-                        .font(.system(size: 10.5, weight: .bold))
-                        .foregroundStyle(color)
+                        .font(.system(size: 10.5, weight: .heavy))
+                        .foregroundStyle(ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -705,12 +715,17 @@ struct ScanNeedTile: View {
             }
             VStack(spacing: 1) {
                 Image(systemName: Fluent3D.symbol(for: micro.nutrientId))
-                    .font(.system(size: 19))
+                    .font(.system(size: 17))
                     .foregroundStyle(color)
-                Text("\(pct)%")
-                    .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(color)
+                // 11 pt dans un anneau de 78 : le chiffre que l'anneau existe
+                // pour montrer était le plus petit texte de la tuile.
+                Text("\(pct)\u{202F}%")
+                    .font(Theme.heroValueRowFont)
+                    .foregroundStyle(ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
+            .padding(.horizontal, 8)
         }
         .frame(width: 78, height: 78)
     }
@@ -827,8 +842,10 @@ struct BesoinsCourbeCard: View {
                     .foregroundStyle(Color.healthMapMuted)
                 if let insight = insight?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !insight.isEmpty {
+                    // Conclusion de la carte courbe : le pic de son bloc.
                     Text(insight)
-                        .font(.system(size: 17, weight: .bold))
+                        .font(Theme.conclusionFont)
+                        .tracking(Theme.conclusionTracking)
                         .foregroundStyle(Color.kiwiCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 7)

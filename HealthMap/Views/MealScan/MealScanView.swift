@@ -73,6 +73,14 @@ struct MealScanView: View {
     /// nil = Santé non lié / rien partagé → colonne masquée (jamais un « 0 » trompeur).
     /// Lu au chargement de la page (présente la feuille d'autorisation la 1re fois).
     @State private var activeEnergyToday: Int?
+    /// Tutoriel de première visite : 3 bulles, une seule fois dans la vie du
+    /// compte. Mémorisé sur l'appareil — jamais re-montré, même après un
+    /// redémarrage. Il ne se déclenche qu'à l'ARRIVÉE réelle sur l'onglet
+    /// (notification de changement d'onglet) : les cinq onglets étant montés en
+    /// permanence, un `onAppear` l'aurait « consommé » sans que personne le voie.
+    @AppStorage("hasSeenScanTour") private var scanTourVu = false
+    @State private var montreTutoScan = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Le résultat du scan est présenté en bottom-sheet : ouvert dès qu'une
     /// analyse est prête, fermé → `reset()` (efface l'analyse et revient à
@@ -253,6 +261,16 @@ struct MealScanView: View {
             // Le glissé vertical (verrou) appartient à la dictée tant qu'elle
             // court — sinon le défilement le vole et coupe le geste en route.
             .scrollDisabled(dicteeEnCours)
+
+            if montreTutoScan {
+                ScanTutorialOverlay {
+                    scanTourVu = true
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
+                        montreTutoScan = false
+                    }
+                }
+                .zIndex(2)
+            }
         }
     }
 
@@ -332,6 +350,20 @@ struct MealScanView: View {
             // produit — au clavier, ou par son code-barres.
             searchEntry
 
+            // Ce que la page doit raconter d'abord : ce qui est DÉJÀ enregistré
+            // aujourd'hui, puis la porte vers la journée complète. Remplace à la
+            // fois le récap « Dernier repas » et la liste « Scans récents » qui
+            // vivaient en bas de page et disaient la même chose deux fois.
+            // Aucun repas ce jour-là → la carte ne s'affiche pas.
+            ScanMangeAujourdhuiCard(
+                meals: journal.dayMeals,
+                kcalRestantes: kcalRestantesDuJour,
+                consommees: journal.dayCalories,
+                isToday: isTodaySelected,
+                onOpenJournee: { showJournal = true }
+            )
+            .padding(.horizontal, Theme.spacingLG)
+
             // Une seule carte pour la journée : kcal restantes vs budget, barre
             // de progression, énergie dépensée et les quatre macros. Remplace la
             // jauge à trois colonnes (nombres qui se touchaient) ET la carte
@@ -363,13 +395,6 @@ struct MealScanView: View {
                 reperesGeneriques: ReperesGeneriquesMention.estVisible(bilanComplete: dashboardVM.bilanComplete)
             )
             .padding(.horizontal, Theme.spacingLG)
-
-            if let last = journal.dayMeals.last {
-                lastScanRecapCard(last)
-            }
-
-            ScanRecentScansList(meals: journal.dayMeals, onOpen: { showJournal = true })
-                .padding(.horizontal, Theme.spacingLG)
         }
         .padding(.vertical, Theme.spacingMD)
         .task {
@@ -388,8 +413,14 @@ struct MealScanView: View {
         // ses yeux). Les appels suivants sont silencieux (iOS ne re-présente
         // jamais la feuille d'autorisation).
         .onReceive(NotificationCenter.default.publisher(for: .healthmapTabDidChange)) { note in
-            guard activeEnergyToday == nil,
-                  note.object as? String == NavCardDestination.scanner.rawValue else { return }
+            guard note.object as? String == NavCardDestination.scanner.rawValue else { return }
+            // Première arrivée sur l'onglet : les 3 bulles, une seule fois.
+            if !scanTourVu && !montreTutoScan {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
+                    montreTutoScan = true
+                }
+            }
+            guard activeEnergyToday == nil else { return }
             Task { activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal() }
         }
         .onChange(of: viewModel.quotaExhausted) { _, exhausted in
@@ -404,6 +435,15 @@ struct MealScanView: View {
     /// « aujourd'hui / restantes » vs jour passé, et périmètre des apports listés).
     private var isTodaySelected: Bool {
         Calendar.current.isDateInToday(journal.selectedDay)
+    }
+
+    /// kcal restantes du jour affiché, avec la MÊME définition de budget que
+    /// `ScanJourneeCard` (objectif du profil + énergie dépensée). nil = aucun
+    /// objectif calculable : on n'invente pas de cible.
+    private var kcalRestantesDuJour: Int? {
+        guard let objectif = dashboardVM.physicalMetrics.macros?.calories else { return nil }
+        let budget = objectif + (isTodaySelected ? (activeEnergyToday ?? 0) : 0)
+        return budget - journal.dayCalories
     }
 
     /// Micronutriments listés dans la carte « apports du jour ». AUJOURD'HUI :
@@ -1271,20 +1311,28 @@ struct MealScanView: View {
                     .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 0) {
+                    // Seul chiffre-héros de l'écran qui n'était ni arrondi ni à
+                    // chasse fixe : il l'est comme tous les autres désormais.
                     Text("\(score)")
-                        .font(.system(size: 22, weight: .bold))
+                        .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.kiwiCharcoal)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
                     Text("/100")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(Theme.chromeFont)
                         .foregroundStyle(Color.healthMapMuted)
                 }
+                .padding(.horizontal, 6)
             }
             .frame(width: 74, height: 74)
 
             VStack(alignment: .leading, spacing: 5) {
+                // La conclusion de la carte : le pic, jamais tronqué.
                 Text(title)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(Theme.conclusionFont)
+                    .tracking(Theme.conclusionTracking)
                     .foregroundStyle(Color.kiwiCharcoal)
+                    .fixedSize(horizontal: false, vertical: true)
                 ForEach(Array(reasons.prefix(3).enumerated()), id: \.offset) { _, raison in
                     scoreReasonRow(raison)
                 }
@@ -1310,7 +1358,7 @@ struct MealScanView: View {
                 .foregroundStyle(negative ? BilanV7.warnInk : Color.kiwiGreenInk)
                 .accessibilityHidden(true)
             Text(texte)
-                .font(.system(size: 12))
+                .font(Theme.dataSecondaryFont)
                 .foregroundStyle(Color.healthMapSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1319,8 +1367,11 @@ struct MealScanView: View {
     // MARK: - « Tes besoins du jour » (Lot 3 — scan_v2.besoins rédigés serveur)
     private func besoinsScanSection(_ besoins: [BesoinScanV2]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            // 16/bold : la SEULE taille de titre de section de la feuille
+            // résultat (elle en portait trois : 17, 16 et 15). Le 17/heavy est
+            // désormais réservé aux conclusions.
             Text("Tes besoins du jour")
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Color.kiwiCharcoal)
                 .padding(.horizontal, 4)
             VStack(spacing: 0) {
@@ -1347,12 +1398,17 @@ struct MealScanView: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(label)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.sectionLabelFont)
                     .foregroundStyle(Color.kiwiCharcoal)
                 Spacer()
-                Text("ce plat en apporte \(pct) %")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(besoin.statut.v7Ink)
+                // Le chiffre est la raison d'être de la ligne : il passe en
+                // donnée-héros (15/heavy mono), son kicker reste de l'habillage.
+                (Text("ce plat en apporte ")
+                    .font(Theme.chromeFont)
+                    .foregroundStyle(Color.healthMapMuted)
+                 + Text("\(pct)\u{202F}%")
+                    .font(Theme.heroValueRowFont)
+                    .foregroundStyle(besoin.statut.v7Ink))
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -1534,28 +1590,9 @@ struct MealScanView: View {
         }
     }
 
-    // MARK: - Recap dernier repas (dernier plat du jour sélectionné)
-    private func lastScanRecapCard(_ meal: MealJournalService.MealRecord) -> some View {
-        HStack(spacing: Theme.spacingSM) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 22))
-                .foregroundStyle(Color.kiwiGreen)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Dernier repas : \(meal.foods.joined(separator: ", "))")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                    .lineLimit(1)
-                Text(DateFormatters.relative.localizedString(for: meal.consumedAt, relativeTo: Date()))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
-            }
-            Spacer()
-        }
-        .padding(Theme.spacingMD)
-        .background(Color.healthMapCard)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal, Theme.spacingLG)
-    }
+    // Le récap « Dernier repas » et la liste « Scans récents » ont été fondus
+    // dans `ScanMangeAujourdhuiCard`, remontée sous la barre de recherche : la
+    // page disait deux fois la même chose, et le disait tout en bas.
 
     // MARK: - Warnings
     private func warningsCard(_ warnings: [String]) -> some View {
@@ -1577,19 +1614,21 @@ struct MealScanView: View {
         .padding(.horizontal, Theme.spacingLG)
     }
 
+    /// CTA primaire de la feuille résultat, à la charte : 15/semibold, h48,
+    /// sans ombre. Il pesait 16/bold sur 54 pt avec un halo vert, plus lourd
+    /// que la conclusion qu'il suivait.
     private var scanAgainButton: some View {
         Button {
             viewModel.reset()
         } label: {
             HStack(spacing: 9) {
-                Image(systemName: "camera.fill").font(.system(size: 19))
+                Image(systemName: "camera.fill").font(.system(size: 15, weight: .semibold))
                 Text("Scanner un autre repas")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(Theme.ctaFont)
             }
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 54)
+            .frame(maxWidth: .infinity, minHeight: 48)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiGreen))
-            .shadow(color: Color.kiwiGreen.opacity(0.30), radius: 14, x: 0, y: 8)
         }
         .buttonStyle(.healthMapPressed)
         .padding(.horizontal, Theme.spacingLG)
@@ -1665,13 +1704,16 @@ struct MealScanView: View {
                             Image(systemName: hit.source == "off" ? "barcode" : "fork.knife")
                                 .font(.system(size: 14))
                                 .foregroundStyle(Color.kiwiGreen)
+                            // Même grammaire que la ligne de recherche du
+                            // journal (JournalEditorComponents) : c'est la même
+                            // ligne, elle s'écrivait de deux façons.
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(hit.name)
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(Color.healthMapText)
                                     .lineLimit(1)
                                 Text(searchHitSub(hit))
-                                    .font(.system(size: 12, design: .rounded))
+                                    .font(.system(size: 13, design: .rounded))
                                     .foregroundStyle(Color.healthMapMuted)
                                     .lineLimit(1)
                             }
