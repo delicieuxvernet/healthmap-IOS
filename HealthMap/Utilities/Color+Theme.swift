@@ -240,6 +240,41 @@ extension Color {
     static let kiwiCharcoal = Color(hex: "211F1A")
 }
 
+// MARK: - Écrin « analyse personnelle » (teasing premium, variante B — 18 août 2026)
+//
+// Un contenu réservé au premium ne se présente plus comme un mur gris : il
+// prend l'aspect d'un écrin précieux (dégradé très doux violet vers rose pâle,
+// filet violet fin). Les violets vifs de la palette restent la source de la
+// famille (`accentIndigo` #5856D6, `nutrientIron` #AF52DE) ; on ajoute
+// seulement les deux fonds pâles du dégradé et l'encre foncée qui leur répond.
+// Teintes additives : aucune couleur existante n'est modifiée.
+extension Color {
+    /// Haut du dégradé de l'écrin premium (violet très pâle).
+    static let premiumTeaseStart = Color(hex: "EEEDFE")
+    /// Bas du dégradé de l'écrin premium (rose très pâle).
+    static let premiumTeaseEnd = Color(hex: "FBEAF0")
+    /// Encre violette foncée de l'écrin : le titre-problème et ses libellés.
+    /// Contraste ~9:1 sur le dégradé, donc AA large ET AA texte courant.
+    static let premiumTeaseInk = Color(hex: "3A2E8F")
+}
+
+extension LinearGradient {
+    /// Fond de l'écrin premium (violet pâle vers rose pâle, en diagonale).
+    static let premiumTease = LinearGradient(
+        colors: [.premiumTeaseStart, .premiumTeaseEnd],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Capsule « PREMIUM » : indigo vers violet, les deux teintes vives déjà
+    /// présentes dans la palette.
+    static let premiumBadge = LinearGradient(
+        colors: [.accentIndigo, .nutrientIron],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+}
+
 // MARK: - Kiwi Card Style (v4)
 /// Carte blanche du langage v4 : rayon généreux (24 par défaut), hairline très
 /// discrète et double ombre douce (proche + portée) pour le relief premium des
