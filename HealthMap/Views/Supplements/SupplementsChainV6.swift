@@ -43,17 +43,15 @@ enum ComplementsVoie: String, CaseIterable, Identifiable {
 }
 
 // MARK: - Palette locale de l'écran
-/// Teintes propres aux deux cartes explicatives. Ce sont les seules couleurs
+/// Teintes propres aux deux explications. Ce sont les seules couleurs
 /// non-vertes de l'écran : elles hiérarchisent « pourquoi » (bleu) et
 /// « précaution » (ambre), et n'existent pas ailleurs dans le thème.
+/// Les fonds et bordures de ces blocs ont disparu avec la charte du 17 août
+/// (les portes sont devenues des lignes) : il ne reste que l'accent et l'encre.
 enum ComplementsChainPalette {
-    static let whyBg = Color(hex: "EDF3FD")
-    static let whyStroke = Color(hex: "2F6FE0").opacity(0.28)
     static let whyAccent = Color(hex: "2F6FE0")
     static let whyInk = Color(hex: "1B4FA8")
 
-    static let careBg = Color(hex: "FFF6E8")
-    static let careStroke = Color(hex: "FF9500").opacity(0.30)
     static let careAccent = Color(hex: "FF9500")
     static let careInk = Color(hex: "8A4B00")
 }
@@ -108,16 +106,27 @@ struct ComplementChain: Identifiable {
     let rec: SupplementRecommendation?
     let apport: ApportV2?
 
-    var statutLabel: String {
-        let base: String
+    /// Le mot du statut, sans son chiffre. La pastille dit l'état ; le chiffre
+    /// vit à côté d'elle, en donnée-héros de ligne (charte : jamais sous 15 pt).
+    var statutMot: String {
         switch statut {
-        case .aCombler: base = "à combler"
-        case .aRenforcer: base = "à renforcer"
-        case .couvre: base = "couvre le besoin"
-        case .neutre: base = "à suivre"
+        case .aCombler: return "à combler"
+        case .aRenforcer: return "à renforcer"
+        case .couvre: return "couvre le besoin"
+        case .neutre: return "à suivre"
         }
-        guard let pct else { return base }
-        return "\(base) · \(pct)%"
+    }
+
+    /// « 38 % » — le chiffre du bilan qui justifie la carte.
+    var pctLabel: String? {
+        guard let pct else { return nil }
+        return "\(pct)\u{202F}%"
+    }
+
+    /// Statut complet, pour la voix de synthèse.
+    var statutLabel: String {
+        guard let pctLabel else { return statutMot }
+        return "\(statutMot) · \(pctLabel)"
     }
 }
 
@@ -139,12 +148,15 @@ struct ComplementsEngagementCard: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
+                // Charte : cette promesse était le plus gros texte de l'onglet,
+                // au-dessus du nutriment et de l'aliment. C'est un titre de
+                // section, pas une réponse : 13 / bold, couleur du domaine.
                 Text("Kiwio ne gagne rien sur ces compléments")
-                    .font(.system(size: 14.5, weight: .heavy))
+                    .font(Theme.sectionLabelFont)
                     .foregroundStyle(Color(hex: "27510A"))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Aucune marque partenaire, aucune commission.")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(Theme.dataSecondaryFont)
                     .lineSpacing(2)
                     .foregroundStyle(Color.kiwiGreenInk)
                     .fixedSize(horizontal: false, vertical: true)
@@ -204,12 +216,13 @@ struct ComplementsRituelStrip: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
+                // Titre de section : jamais neutre, jamais gros (charte).
                 Text("Ton rituel du jour")
-                    .font(.system(size: 13, weight: .heavy))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(Color.kiwiGreenInk)
                     .lineLimit(1)
                 Text(rituel.insight)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(Theme.dataSecondaryFont)
                     .foregroundStyle(Color.healthMapSecondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -301,111 +314,103 @@ private struct RituelPastille: View {
     }
 }
 
-// MARK: - Carte « pourquoi » (PRIORITÉ 2) — l'élément le plus visible du bloc
+// MARK: - Ligne d'action commune aux deux portes (pourquoi / précaution)
+/// Charte du 17 août : une porte ne crie pas plus fort que la réponse qu'elle
+/// explique. Ces deux blocs étaient des cartes teintées à bordure de 1,5 pt
+/// avec une tuile pleine de 30 pt, posées sous un aliment en 11,5 / medium.
+/// Il reste une LIGNE : l'icône (elle porte la couleur du domaine), un titre
+/// de 12 / bold, le résumé, le chevron. Plus de fond coloré : aucun habillage
+/// n'en porte tant que la donnée-héros du bloc n'en porte pas.
+private struct ChainActionRow: View {
+    let icon: String
+    let accent: Color
+    let titleInk: Color
+    let title: String
+    let resume: String
+    let resumeInk: Color
+    let hint: String
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(Color.kiwiCharcoal.opacity(0.06))
+                    .frame(height: 1)
+                    .accessibilityHidden(true)
+
+                HStack(spacing: 10) {
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(accent)
+                        .frame(width: 22)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(titleInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(resume)
+                            .font(Theme.dataSecondaryFont)
+                            .lineSpacing(2)
+                            .foregroundStyle(resumeInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.healthMapMuted)
+                        .accessibilityHidden(true)
+                }
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+        }
+        .buttonStyle(.healthMapPressed)
+        .accessibilityHint(hint)
+    }
+}
+
+// MARK: - Porte « pourquoi » (PRIORITÉ 2)
 struct ChainWhyCard: View {
     let title: String
     let resume: String
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(ComplementsChainPalette.whyAccent)
-                    .frame(width: 30, height: 30)
-                    .overlay(
-                        Image(systemName: "lightbulb.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                    )
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundStyle(ComplementsChainPalette.whyInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(resume)
-                        .font(.system(size: 12, weight: .medium))
-                        .lineSpacing(2)
-                        .foregroundStyle(Color(hex: "3A3833"))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(ComplementsChainPalette.whyAccent)
-                    .accessibilityHidden(true)
-            }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(ComplementsChainPalette.whyBg)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .stroke(ComplementsChainPalette.whyStroke, lineWidth: 1.5)
-            )
-        }
-        .buttonStyle(.healthMapPressed)
-        .accessibilityHint("Ouvre l'explication")
+        ChainActionRow(
+            icon: "lightbulb.fill",
+            accent: ComplementsChainPalette.whyAccent,
+            titleInk: ComplementsChainPalette.whyInk,
+            title: title,
+            resume: resume,
+            resumeInk: Color(hex: "3A3833"),
+            hint: "Ouvre l'explication",
+            onTap: onTap
+        )
     }
 }
 
-// MARK: - Carte « précaution » (PRIORITÉ 3)
+// MARK: - Porte « précaution » (PRIORITÉ 3)
 struct ChainCareCard: View {
     let title: String
     let resume: String
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(ComplementsChainPalette.careAccent)
-                    .frame(width: 30, height: 30)
-                    .overlay(
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                    )
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundStyle(ComplementsChainPalette.careInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(resume)
-                        .font(.system(size: 12, weight: .medium))
-                        .lineSpacing(2)
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(ComplementsChainPalette.careInk)
-                    .accessibilityHidden(true)
-            }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(ComplementsChainPalette.careBg)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .stroke(ComplementsChainPalette.careStroke, lineWidth: 1.5)
-            )
-        }
-        .buttonStyle(.healthMapPressed)
-        .accessibilityHint("Ouvre le détail de la précaution")
+        ChainActionRow(
+            icon: "exclamationmark.triangle.fill",
+            accent: ComplementsChainPalette.careAccent,
+            titleInk: ComplementsChainPalette.careInk,
+            title: title,
+            resume: resume,
+            resumeInk: Color.healthMapSecondary,
+            hint: "Ouvre le détail de la précaution",
+            onTap: onTap
+        )
     }
 }
 
@@ -441,16 +446,36 @@ struct ChainCartLine: View {
 
 // MARK: - La carte repliable : la ligne de tête répond, le tap déplie
 /// La ligne de tête est la réponse à « qu'est-ce que je prends ? » : nutriment
-/// + statut, produit / dose / moment, prix. Le contenu `detail` (pourquoi,
-/// précautions, panier) n'existe à l'écran que si la carte est ouverte.
+/// + statut, produit ou aliment, dose et moment, prix. Le contenu `detail`
+/// (pourquoi, précautions, panier) n'existe à l'écran que si la carte est ouverte.
+///
+/// Charte du 17 août : la réponse (l'aliment, le produit) est LA donnée-héros
+/// de la carte. Elle était rendue en 11,5 / medium / secondary, soit le texte
+/// le plus petit, le plus léger et le plus pâle de son propre bloc, préfixe
+/// collé devant (« Dans l'assiette : lentilles »). Elle occupe désormais sa
+/// ligne, seule, en 17 / heavy / kiwiCharcoal ; le préfixe est remonté en
+/// kicker, la dose et le moment descendent en donnée secondaire.
 struct ChainCollapsibleCard<Detail: View>: View {
     let chain: ComplementChain
-    /// « Bisglycinate · 14 mg, le soir au dîner » — ou pourquoi pas de gélule.
-    let sousTitre: String
+    /// Le rôle de la réponse (« DANS L'ASSIETTE », « EN GÉLULE ») : un kicker
+    /// au-dessus, jamais un préfixe collé devant la réponse.
+    let kicker: String?
+    /// LA réponse : l'aliment ou le produit. Donnée-héros de la carte.
+    let reponse: String
+    /// Ce qui complète la réponse sans lui disputer la place : dose, moment.
+    let precision: String?
     let prixLabel: String
     let isOpen: Bool
     let onToggle: () -> Void
     @ViewBuilder let detail: () -> Detail
+
+    /// Ce que la voix de synthèse lit : le kicker en minuscules (une capitale
+    /// intégrale se fait parfois épeler), puis la réponse et sa précision.
+    private var reponseParlee: String {
+        let entete = kicker.map { "\($0.lowercased())\u{202F}: " } ?? ""
+        let suite = precision.map { ", \($0)" } ?? ""
+        return entete + reponse + suite
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -467,14 +492,26 @@ struct ChainCollapsibleCard<Detail: View>: View {
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 7) {
+                        HStack(spacing: 6) {
+                            // Titre de carte : il annonce, il ne rivalise pas.
                             Text(chain.nom)
-                                .font(.system(size: 13.5, weight: .heavy))
+                                .font(Theme.sectionLabelFont)
                                 .foregroundStyle(Color.kiwiCharcoal)
                                 .lineLimit(1)
 
-                            Text(chain.statutLabel)
-                                .font(.system(size: 10, weight: .heavy))
+                            // Le chiffre du bilan justifie la carte : il ne
+                            // descend plus à 10 pt dans la pastille, il vit à
+                            // côté d'elle en donnée-héros de ligne.
+                            if let pctLabel = chain.pctLabel {
+                                Text(pctLabel)
+                                    .font(Theme.heroValueRowFont)
+                                    .foregroundStyle(chain.statut.inkColor)
+                                    .lineLimit(1)
+                                    .layoutPriority(1)
+                            }
+
+                            Text(chain.statutMot)
+                                .font(.system(size: 10.5, weight: .heavy))
                                 .foregroundStyle(chain.statut.inkColor)
                                 // Jamais sur deux lignes, mais jamais rigide non
                                 // plus : un `fixedSize` ici pouvait pousser la
@@ -491,18 +528,38 @@ struct ChainCollapsibleCard<Detail: View>: View {
                             Spacer(minLength: 0)
                         }
 
-                        Text(sousTitre)
-                            .font(.system(size: 11.5, weight: .medium))
-                            .lineSpacing(2)
-                            .foregroundStyle(Color.healthMapSecondary)
+                        if let kicker {
+                            Text(kicker)
+                                .font(.system(size: 10.5, weight: .heavy))
+                                .tracking(0.4)
+                                .foregroundStyle(Color.healthMapMuted)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                                .padding(.top, 3)
+                        }
+
+                        Text(reponse)
+                            .font(Theme.heroTextFont)
+                            .tracking(Theme.conclusionTracking)
+                            .foregroundStyle(Color.kiwiCharcoal)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
+
+                        if let precision {
+                            Text(precision)
+                                .font(Theme.dataSecondaryFont)
+                                .lineSpacing(2)
+                                .foregroundStyle(Color.healthMapSecondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.leading)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     Text(prixLabel)
-                        .font(.system(size: 12, weight: .bold).monospacedDigit())
+                        .font(Theme.dataSecondaryFont.monospacedDigit())
                         .foregroundStyle(Color.healthMapMuted)
                         .lineLimit(1)
                         .layoutPriority(1)
@@ -517,7 +574,7 @@ struct ChainCollapsibleCard<Detail: View>: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.healthMapPressed)
-            .accessibilityLabel("\(chain.nom), \(chain.statutLabel). \(sousTitre)")
+            .accessibilityLabel("\(chain.nom), \(chain.statutLabel). \(reponseParlee)")
             .accessibilityValue(isOpen ? "déplié" : "replié")
             .accessibilityHint(isOpen ? "Replie le détail" : "Déplie le pourquoi et les précautions")
 
@@ -591,11 +648,13 @@ struct ComplementsTeaserCard: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                    .font(.system(size: 13.5, weight: .heavy))
+                    .font(Theme.sectionLabelFont)
                     .foregroundStyle(Color.kiwiCharcoal)
                     .lineLimit(1)
+                // Pas de donnée-héros ici : la réponse n'existe pas encore.
+                // La promesse reste donc une donnée secondaire, à sa place.
                 Text(Self.sousTitreExemple)
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(Theme.dataSecondaryFont)
                     .lineSpacing(2)
                     .foregroundStyle(Color.healthMapSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -700,24 +759,28 @@ struct ComplementsSummaryCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 8) {
+                // Charte : ce qu'on prend domine ce que ça coûte. Le total
+                // était 2 fois plus gros et 2 crans plus foncé que la seule
+                // ligne qui répond à « qu'est-ce que je prends ? ».
                 VStack(alignment: .leading, spacing: 2) {
                     Text("En un coup d'œil")
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .font(Theme.subLabelFont)
+                        .foregroundStyle(Color.healthMapMuted)
                     Text(countLabel)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .font(Theme.heroTextFont)
+                        .tracking(Theme.conclusionTracking)
+                        .foregroundStyle(Color.kiwiCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(totalLabel)
-                        .font(.system(size: 24, weight: .heavy, design: .rounded).monospacedDigit())
-                        .tracking(-1)
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .font(.system(size: 17, weight: .bold, design: .rounded).monospacedDigit())
+                        .tracking(-0.4)
+                        .foregroundStyle(Color.healthMapSecondary)
                     Text("€/mois")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(Theme.chromeFont)
                         .foregroundStyle(Color.healthMapMuted)
                         .lineLimit(1)
                 }
@@ -738,7 +801,7 @@ struct ComplementsSummaryCard: View {
 
             Text(premium ? "Les formes que ton corps absorbe le mieux."
                          : "Des formes plus simples, un peu moins bien absorbées.")
-                .font(.system(size: 11.5, weight: .medium))
+                .font(Theme.chromeFont)
                 .foregroundStyle(Color.healthMapMuted)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
@@ -791,13 +854,15 @@ struct ComplementsAssietteZeroCard: View {
                 .padding(.top, 1)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
+                // La conclusion est le plus gros texte de sa carte.
                 Text("Tout par l'assiette : 0 € de complément")
-                    .font(.system(size: 13.5, weight: .heavy))
+                    .font(Theme.conclusionFont)
+                    .tracking(Theme.conclusionTracking)
                     .foregroundStyle(Color.kiwiCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Ces aliments couvrent tes besoins. Compte un mois pour sentir la différence.")
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(Theme.dataSecondaryFont)
                     .lineSpacing(2)
                     .foregroundStyle(Color.healthMapSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -861,7 +926,7 @@ struct ChainExplanationSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(Array(explanation.paragraphes.enumerated()), id: \.offset) { _, paragraphe in
                         Text(paragraphe)
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(.subheadline).weight(.medium))
                             .lineSpacing(5)
                             .foregroundStyle(Color(hex: "3A3833"))
                             .fixedSize(horizontal: false, vertical: true)
@@ -882,10 +947,12 @@ struct ChainExplanationSheet: View {
                         Text("EN PRATIQUE")
                             .font(.system(size: 11, weight: .heavy))
                             .foregroundStyle(Color.kiwiGreenInk)
+                        // Le geste concret : c'est la raison d'être de la
+                        // sheet, il passe devant le bouton qui la referme.
                         Text(explanation.practice)
-                            .font(.system(size: 13.5, weight: .medium))
-                            .lineSpacing(5)
-                            .foregroundStyle(Color(hex: "3A3833"))
+                            .font(Theme.insightFont)
+                            .lineSpacing(4)
+                            .foregroundStyle(Color.kiwiCharcoal)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -899,9 +966,9 @@ struct ChainExplanationSheet: View {
 
                 Button(action: onDismiss) {
                     Text("J'ai compris")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(Theme.ctaFont)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .frame(maxWidth: .infinity, minHeight: 48)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .fill(Color.kiwiGreen)
