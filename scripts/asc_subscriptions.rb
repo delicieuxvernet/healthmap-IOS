@@ -954,6 +954,64 @@ if MODE == "trim-monthly"
   exit rest.size == 4 ? 0 : 1
 end
 
+# ── MODE tester-code : code promo « 1 semaine offerte » pour les testeurs ────
+# Demande fondateur (18 août) : un code partageable sur LinkedIn/aux amis, qui
+# ouvre le Premium 7 jours. Posé sur l'HEBDO (0,99 €/sem) et non sur l'annuel :
+# si un testeur oublie de résilier, il risque 0,99 € et non 50 €.
+# TESTER_CODE (défaut HAPPYTESTER2026) · TESTER_REDEMPTIONS (défaut 500).
+if MODE == "tester-code"
+  code = (ENV["TESTER_CODE"].to_s.empty? ? "HAPPYTESTER2026" : ENV["TESTER_CODE"]).upcase
+  redemptions = (ENV["TESTER_REDEMPTIONS"].to_s.empty? ? "500" : ENV["TESTER_REDEMPTIONS"]).to_i
+  weekly = nil
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      weekly = s["id"] if s.dig("attributes", "productId") == "healthmap_weekly"
+    end
+  end
+  abort_with("tester-code", 0, "healthmap_weekly introuvable") unless weekly
+  puts "Abonnement support : healthmap_weekly (#{weekly})"
+
+  offer_name = "Testeurs - 1 semaine offerte"
+  existing = {}
+  get_all("/v1/subscriptions/#{weekly}/offerCodes?limit=200").each { |x| existing[x.dig("attributes", "name")] = x["id"] }
+  oc_id = existing[offer_name]
+
+  if oc_id
+    puts "Offre déjà présente (#{oc_id})"
+  else
+    grid, = offer_price_grid(weekly, TARGETS["healthmap_weekly"][:price])
+    abort_with("tester-code", 0, "aucun point de prix pour la grille") if grid.empty?
+    puts "Grille de prix : #{grid.size} territoires"
+    ok, resp = create_offer_code(weekly, offer_name,
+      { offerMode: "FREE_TRIAL", duration: "ONE_WEEK", numberOfPeriods: 1,
+        customerEligibilities: %w[NEW EXISTING EXPIRED],
+        offerEligibility: "STACK_WITH_INTRO_OFFERS",
+        totalNumberOfCodes: redemptions, active: true }, grid)
+    exit 1 unless ok
+    oc_id = resp.dig("data", "id")
+  end
+
+  # Expiration ~6 mois (Time.now = vrai Ruby CI).
+  expiration = (Time.now + 180 * 24 * 3600).strftime("%Y-%m-%d")
+  already = get_all("/v1/subscriptionOfferCodes/#{oc_id}/customCodes?limit=200")
+  hit = already.find { |c| c.dig("attributes", "customCode").to_s.upcase == code }
+  if hit
+    puts "Custom code « #{code} » déjà créé (#{hit["id"]}), expire le #{hit.dig("attributes", "expirationDate")}"
+  else
+    ok, = create_custom_code(oc_id, code, redemptions, expiration)
+    exit 1 unless ok
+  end
+
+  puts "
+===== CODE TESTEURS PRÊT ====="
+  puts "Code           : #{code}"
+  puts "Offre          : 1 semaine de Premium offerte (puis 0,99 €/sem si non résilié)"
+  puts "Utilisations   : #{redemptions} · expire le #{expiration}"
+  puts "Lien direct    : https://apps.apple.com/redeem?ctx=offercodes&id=#{app_id}&code=#{code}"
+  puts "Dans l'app     : paywall > « J'ai un code » (presentCodeRedemptionSheet)"
+  exit 0
+end
+
 # ── MODE offers : codes promo (NAIA = 3 mois offerts / mensuel, LANCEMENT50 = -50% 1re année / annuel) ──
 if MODE == "offers"
   groups = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
