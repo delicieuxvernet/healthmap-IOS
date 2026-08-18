@@ -19,12 +19,25 @@ enum MealThumbnailStore {
     private static let maxSide: CGFloat = 240   // 120 pt @2x
     private static let maxAge: TimeInterval = 30 * 24 * 3600
 
-    private static var directory: URL {
+    /// Résolu UNE FOIS. C'était une `var` calculée : chaque accès refaisait
+    /// `FileManager.urls(…)` + `createDirectory(…)`, et `image(mealId:…)` y
+    /// touche deux fois — dans une liste réévaluée 20 fois par seconde pendant
+    /// une dictée, cela faisait des dizaines d'accès disque par seconde sur le
+    /// thread principal.
+    private static let directory: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let dir = base.appendingPathComponent("MealThumbs", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
-    }
+    }()
+
+    /// Cache mémoire des vignettes déjà cherchées. Mémorise AUSSI les absences
+    /// (`nil`) : c'est le cas majoritaire — seul un scan photo produit une
+    /// vignette, jamais une dictée ni une recherche — et c'est justement
+    /// l'absence qui coûtait le plus cher (énumération complète du dossier).
+    /// Non isolé : lu et écrit exclusivement depuis le corps des vues (main
+    /// thread), comme l'écriture au moment du scan.
+    private static var cache: [String: UIImage?] = [:]
 
     private static func url(forKey key: String) -> URL {
         directory.appendingPathComponent("\(key).jpg")
@@ -45,6 +58,9 @@ enum MealThumbnailStore {
 
         guard let jpeg = thumb.jpegData(compressionQuality: 0.7) else { return }
         try? jpeg.write(to: url(forKey: key), options: .atomic)
+        // Le cache mémoire a pu mémoriser « pas de vignette » pour ce repas
+        // avant que celle-ci n'existe : on le vide pour que la liste la trouve.
+        cache.removeAll()
         purgeOld()
     }
 
@@ -53,6 +69,13 @@ enum MealThumbnailStore {
     /// Vignette d'un repas : par id d'abord, sinon par proximité temporelle
     /// avec une clé de repli `ts-<epoch>` (±5 min).
     static func image(mealId: String, consumedAt: Date) -> UIImage? {
+        if let connue = cache[mealId] { return connue }
+        let trouvee = chercherSurDisque(mealId: mealId, consumedAt: consumedAt)
+        cache[mealId] = trouvee
+        return trouvee
+    }
+
+    private static func chercherSurDisque(mealId: String, consumedAt: Date) -> UIImage? {
         if let img = UIImage(contentsOfFile: url(forKey: mealId).path) {
             return img
         }
@@ -69,7 +92,11 @@ enum MealThumbnailStore {
 
     /// Vide tout (déconnexion — les photos de repas sont des données du compte).
     static func clearAll() {
+        cache.removeAll()
         try? FileManager.default.removeItem(at: directory)
+        // `directory` n'est plus recalculé à chaque accès : sans cette
+        // recréation, les vignettes suivantes s'écriraient dans le vide.
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
     /// Les vignettes de plus de 30 jours ne servent plus à rien (les listes

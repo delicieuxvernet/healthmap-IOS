@@ -9,27 +9,58 @@ final class MealJournalViewModel: ObservableObject {
     /// 14 derniers jours (semaine courante + précédente) — nourrit le score
     /// de la semaine du Bilan (WeekScoreEngine). `meals` en reste le sous-
     /// ensemble « aujourd'hui », dérivé de la même requête.
-    @Published var fortnight: [MealJournalService.MealRecord] = []
+    @Published var fortnight: [MealJournalService.MealRecord] = [] { didSet { invaliderJour() } }
     @Published var isLoading = false
 
     /// Jour affiché par la page d'accueil Scan (jauge kcal / apports / macros /
     /// récents / dernier plat). Toujours borné à la fenêtre `fortnight` réellement
     /// chargée (≈ 2 semaines … aujourd'hui). Le SCAN, lui, agit toujours sur
     /// aujourd'hui — cette navigation ne concerne QUE l'affichage du journal.
-    @Published var selectedDay: Date = Calendar.current.startOfDay(for: Date())
+    @Published var selectedDay: Date = Calendar.current.startOfDay(for: Date()) { didSet { invaliderJour() } }
 
     /// Repas ANTÉRIEURS à la quinzaine, chargés à la demande quand on remonte
     /// le calendrier. Volontairement séparés de `fortnight` : ce dernier nourrit
     /// le score de la semaine, qui n'a rien à voir avec la profondeur d'archive
     /// que l'utilisateur consulte.
-    @Published private(set) var archives: [MealJournalService.MealRecord] = []
+    @Published private(set) var archives: [MealJournalService.MealRecord] = [] { didSet { invaliderJour() } }
     /// Plus ancien jour effectivement chargé (quinzaine, puis archives).
     @Published private(set) var jourLePlusAncienCharge: Date = Calendar.current.startOfDay(for: Date())
     @Published private(set) var chargeLArchive = false
 
     private let service = MealJournalService.shared
 
+    // MARK: - Mémoïsation du jour affiché
+    //
+    // `dayMeals` était une propriété calculée : elle reconcaténait
+    // `fortnight + archives`, refaisait un `Calendar.current.isDate(...)` par
+    // enregistrement puis un tri, À CHAQUE ACCÈS. Le corps de l'accueil Scan
+    // en déclenche une vingtaine par passe (kcal, 4 macros, ids de micros,
+    // 6 pourcentages…), et ce corps est réévalué 20 à 40 fois par seconde
+    // pendant une dictée. On calcule donc une seule fois par état, et le cache
+    // tombe dès que `fortnight`, `archives` ou `selectedDay` bougent.
+    private let cal = Calendar.autoupdatingCurrent
+    private var cacheDayMeals: [MealJournalService.MealRecord]?
+    private var cacheDayTotaux: (kcal: Int, prot: Double, carb: Double, fat: Double, fiber: Double)?
+    private var cacheDayNutrientIds: [String]?
+    private var cacheDayMicroPct: [String: Int] = [:]
+
+    private func invaliderJour() {
+        cacheDayMeals = nil
+        cacheDayTotaux = nil
+        cacheDayNutrientIds = nil
+        cacheDayMicroPct = [:]
+    }
+
     // MARK: - Chargement
+
+    /// Requête en vol, PARTAGÉE par tous les journaux montés en même temps.
+    /// Le Bilan, le Suivi et le Scan détiennent chacun leur ViewModel et
+    /// appellent `load()` à leur montage : les cinq onglets étant montés dès le
+    /// lancement, le démarrage à froid lançait trois fois la MÊME requête de
+    /// quinzaine, sur le chemin critique. Idem après chaque scan
+    /// (`.healthmapMealScanned` est écouté par les trois).
+    /// Isolé @MainActor comme la classe : pas de course possible.
+    private static var volEnCours: (cle: String, tache: Task<[MealJournalService.MealRecord], Error>)?
 
     func load() async {
         guard let userId = AuthService.shared.cachedCurrentUserIdString else {
@@ -50,7 +81,17 @@ final class MealJournalViewModel: ObservableObject {
             let solSemaine = cal.date(byAdding: .day, value: -7, to: week.start) ?? week.start
             let solAxe = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: Date())) ?? solSemaine
             let from = min(solSemaine, solAxe)
-            let all = try await service.loadRange(userId: userId, from: from, to: week.end)
+            let cle = "\(userId)|\(from.timeIntervalSince1970)|\(week.end.timeIntervalSince1970)"
+            let tache: Task<[MealJournalService.MealRecord], Error>
+            if let vol = Self.volEnCours, vol.cle == cle {
+                tache = vol.tache
+            } else {
+                let service = self.service
+                tache = Task { try await service.loadRange(userId: userId, from: from, to: week.end) }
+                Self.volEnCours = (cle, tache)
+            }
+            defer { if Self.volEnCours?.cle == cle { Self.volEnCours = nil } }
+            let all = try await tache.value
             fortnight = all
             meals = all.filter { Calendar.current.isDateInToday($0.consumedAt) }
             jourLePlusAncienCharge = min(jourLePlusAncienCharge, Calendar.current.startOfDay(for: from))
@@ -194,9 +235,28 @@ final class MealJournalViewModel: ObservableObject {
     /// Puise dans la quinzaine ET dans les mois plus anciens chargés à la
     /// demande par le calendrier.
     var dayMeals: [MealJournalService.MealRecord] {
-        (fortnight + archives)
-            .filter { Calendar.current.isDate($0.consumedAt, inSameDayAs: selectedDay) }
+        if let cacheDayMeals { return cacheDayMeals }
+        let jour = (fortnight + archives)
+            .filter { cal.isDate($0.consumedAt, inSameDayAs: selectedDay) }
             .sorted { $0.consumedAt < $1.consumedAt }
+        cacheDayMeals = jour
+        return jour
+    }
+
+    /// Les cinq totaux du jour en UNE passe. Ils étaient calculés chacun de leur
+    /// côté, donc cinq parcours de `dayMeals` au lieu d'un.
+    private var dayTotaux: (kcal: Int, prot: Double, carb: Double, fat: Double, fiber: Double) {
+        if let cacheDayTotaux { return cacheDayTotaux }
+        var t = (kcal: 0, prot: 0.0, carb: 0.0, fat: 0.0, fiber: 0.0)
+        for repas in dayMeals {
+            t.kcal += repas.macros.calories
+            t.prot += repas.macros.proteins
+            t.carb += repas.macros.carbs
+            t.fat += repas.macros.fats
+            t.fiber += repas.macros.fiber
+        }
+        cacheDayTotaux = t
+        return t
     }
 
     /// Lignes affichables d'un créneau POUR LE JOUR SÉLECTIONNÉ. `rows(in:)`
@@ -219,30 +279,36 @@ final class MealJournalViewModel: ObservableObject {
 
     // MARK: - Totaux du jour sélectionné
 
-    var dayCalories: Int { dayMeals.reduce(0) { $0 + $1.macros.calories } }
-    var dayProteins: Double { dayMeals.reduce(0) { $0 + $1.macros.proteins } }
-    var dayCarbs: Double { dayMeals.reduce(0) { $0 + $1.macros.carbs } }
-    var dayFats: Double { dayMeals.reduce(0) { $0 + $1.macros.fats } }
-    var dayFiber: Double { dayMeals.reduce(0) { $0 + $1.macros.fiber } }
+    var dayCalories: Int { dayTotaux.kcal }
+    var dayProteins: Double { dayTotaux.prot }
+    var dayCarbs: Double { dayTotaux.carb }
+    var dayFats: Double { dayTotaux.fat }
+    var dayFiber: Double { dayTotaux.fiber }
 
     /// Part du besoin couverte aujourd'hui pour un micronutriment : somme des
     /// `pctRDA` des repas du jour portant cet id, plafonnée à 100 (formule
     /// canonique, alignée sur WeekScoreEngine / SuiviEngineV4).
     func dayMicroPct(_ id: String) -> Int {
+        if let connu = cacheDayMicroPct[id] { return connu }
         let sum = dayMeals
             .flatMap { $0.micros }
             .filter { $0.id == id }
             .reduce(0) { $0 + $1.pctRDA }
-        return min(100, sum)
+        let pct = min(100, sum)
+        cacheDayMicroPct[id] = pct
+        return pct
     }
 
     /// Ids des micronutriments présents dans les repas du jour, en ordre
     /// canonique (NutrientData.all) puis le reste (ids hors catalogue, triés).
     var dayNutrientIds: [String] {
+        if let cacheDayNutrientIds { return cacheDayNutrientIds }
         let present = Set(dayMeals.flatMap { $0.micros }.map(\.id))
         let canonical = NutrientData.all.map(\.id.rawValue).filter { present.contains($0) }
         let rest = present.subtracting(canonical).sorted()
-        return canonical + rest
+        let ids = canonical + rest
+        cacheDayNutrientIds = ids
+        return ids
     }
 
     // MARK: - Navigation jour par jour (bornée à la fenêtre `fortnight`)

@@ -49,7 +49,16 @@ enum ScanQuotaUI {
 final class MealScanViewModel: ObservableObject {
 
     // MARK: - State
-    @Published var selectedImage: Data?
+    /// Photo BRUTE de l'appareil (JPEG q0.95, non redimensionné) : c'est la
+    /// matière de l'analyse, jamais la matière de l'affichage. Les vues lisent
+    /// `apercuPhoto`.
+    @Published var selectedImage: Data? { didSet { apercuPhoto = Self.apercu(de: selectedImage) } }
+    /// Version DÉCODÉE UNE FOIS et réduite à la taille d'écran de la photo
+    /// sélectionnée. Les vues appelaient `UIImage(data:)` dans leur corps : à
+    /// chaque passe de rendu, un JPEG plein format était re-décodé sur le
+    /// thread principal — un hoquet visible à chaque ouverture de sous-feuille
+    /// du résultat de scan.
+    @Published private(set) var apercuPhoto: UIImage?
     @Published var isAnalyzing = false
     @Published var analysisResult: MealAnalysisResult?
     @Published var errorMessage: String?
@@ -601,6 +610,20 @@ final class MealScanViewModel: ObservableObject {
         }
 
         isAnalyzing = false
+    }
+
+    /// Décodage + réduction pour l'affichage. 1200 px de côté couvre le plus
+    /// grand usage à l'écran (header plein cadre, 393 pt @3x) ; au-delà on ne
+    /// ferait que porter des pixels invisibles.
+    private static func apercu(de data: Data?) -> UIImage? {
+        guard let data, let image = UIImage(data: data) else { return nil }
+        let maxCote: CGFloat = 1200
+        let plusGrandCote = max(image.size.width, image.size.height)
+        guard plusGrandCote > maxCote else { return image }
+        let facteur = maxCote / plusGrandCote
+        let taille = CGSize(width: image.size.width * facteur,
+                            height: image.size.height * facteur)
+        return image.preparingThumbnail(of: taille) ?? image
     }
 
     // MARK: - Search Foods

@@ -176,6 +176,11 @@ struct BilanV7ScoreRing: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var progress: Double = 0
     @State private var shown: Int = 0
+    /// Le compteur est une tâche, donc une chose à nettoyer. `score` change
+    /// plusieurs fois au démarrage (journal chargé, puis bilan v2 reçu) : sans
+    /// annulation, deux compteurs écrivaient `shown` en même temps à des
+    /// rythmes différents et le chiffre central de l'anneau oscillait.
+    @State private var compteur: Task<Void, Never>?
 
     private var target: Double { Double(score ?? 0) / 100 }
 
@@ -200,11 +205,16 @@ struct BilanV7ScoreRing: View {
             shown = 0
             animate()
         }
+        .onDisappear {
+            compteur?.cancel()
+            compteur = nil
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(score == nil ? "Score du jour indisponible" : "Score du jour : \(score ?? 0) sur 100")
     }
 
     private func animate() {
+        compteur?.cancel()
         guard let score else { return }
         if reduceMotion {
             progress = target
@@ -212,14 +222,17 @@ struct BilanV7ScoreRing: View {
             return
         }
         withAnimation(.easeOut(duration: 1).delay(0.2)) { progress = target }
-        // Compteur 0 → score (easeOutCubic, ~1 s), sans Timer à nettoyer.
-        Task { @MainActor in
+        // Compteur 0 → score (easeOutCubic, ~1 s). Gardé, et annulable : c'est
+        // la tâche elle-même qu'il faut nettoyer.
+        compteur = Task { @MainActor in
             let steps = max(1, min(score, 60))
             for step in 1...steps {
                 try? await Task.sleep(for: .milliseconds(1000 / steps))
+                guard !Task.isCancelled else { return }
                 let p = Double(step) / Double(steps)
                 shown = Int((Double(score) * (1 - pow(1 - p, 3))).rounded())
             }
+            guard !Task.isCancelled else { return }
             shown = score
         }
     }

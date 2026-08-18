@@ -227,7 +227,13 @@ struct DashboardView: View {
 
     // MARK: - Main Content (langage v7)
     private func mainContent(_ v2: AIAnalysisV2) -> some View {
-        ScrollView {
+        // UN SEUL passage du moteur hebdo par rendu : `todayScore` et
+        // `weekScore.delta` le relançaient chacun de leur côté (deux filtres
+        // sur la quinzaine, sept jours de sous-filtres, la semaine précédente
+        // et le topMover, deux fois).
+        let semaine = weekScore
+        let scoreDuJour = semaine.days.first(where: { $0.isToday })?.score ?? semaine.score
+        return ScrollView {
             VStack(spacing: BilanV7.cardGap) {
                 if !immediateRedFlags.isEmpty {
                     RedFlagsCardView(flags: immediateRedFlags)
@@ -246,8 +252,8 @@ struct DashboardView: View {
 
                 // Z2 · Score du jour (anneau compact + tendance de la semaine)
                 BilanV7ScoreCard(
-                    score: todayScore,
-                    delta: weekScore.delta,
+                    score: scoreDuJour,
+                    delta: semaine.delta,
                     insight: v2.bilan?.scoreInsight
                 ) {
                     HapticService.shared.tap()
@@ -358,12 +364,6 @@ struct DashboardView: View {
             meals: journal.fortnight,
             weakNutrients: weakNutrientIds
         )
-    }
-
-    /// Anneau Z2 : la couverture du JOUR si des repas y ont été scannés ;
-    /// à défaut la moyenne de la semaine (le chiffre reste réel), sinon rien.
-    private var todayScore: Int? {
-        weekScore.days.first(where: { $0.isToday })?.score ?? weekScore.score
     }
 
     private var weakNutrientIds: [String] {

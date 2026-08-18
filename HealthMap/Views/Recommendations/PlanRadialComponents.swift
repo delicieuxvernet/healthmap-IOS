@@ -499,6 +499,13 @@ struct PlanRadialMap: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
     @State private var pulse = false
+    /// Le Plan est monté en permanence (les cinq onglets le sont) : son
+    /// `onAppear` se déclenche au LANCEMENT, derrière l'onglet réellement
+    /// affiché. Le halo respirant du moyeu, animé en `repeatForever`, tournait
+    /// donc toute la session sous un `opacity(0)` — qui ne suspend ni le
+    /// pilote d'animation ni la composition. Il n'existe désormais que quand
+    /// l'onglet est à l'écran.
+    @State private var ongletVisible = false
 
     private static let arrowColor = Color.kiwiCharcoal.opacity(0.22)
     private static let headColor = Color.kiwiCharcoal.opacity(0.28)
@@ -550,7 +557,9 @@ struct PlanRadialMap: View {
         }
         .onAppear {
             appeared = true
-            pulse = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .healthmapTabDidChange)) { note in
+            ongletVisible = (note.object as? String) == NavCardDestination.plan.rawValue
         }
     }
 
@@ -562,15 +571,19 @@ struct PlanRadialMap: View {
 
         ZStack {
             // Halo vert respirant — animation infinie, coupée en reduce-motion.
-            Circle()
-                .fill(Color.kiwiGreen.opacity(0.22))
-                .frame(width: d, height: d)
-                .scaleEffect(pulse && !reduceMotion ? 1.55 : 1)
-                .opacity(pulse && !reduceMotion ? 0 : 0.5)
-                .animation(
-                    reduceMotion ? nil : .easeOut(duration: 2.6).repeatForever(autoreverses: false),
-                    value: pulse
-                )
+            // Le `if` n'est pas cosmétique : hors de l'onglet, la vue est
+            // RETIRÉE, ce qui arrête réellement le `repeatForever`. Un simple
+            // `pulse = false` relancerait l'animation infinie en sens inverse.
+            if ongletVisible && !reduceMotion {
+                Circle()
+                    .fill(Color.kiwiGreen.opacity(0.22))
+                    .frame(width: d, height: d)
+                    .scaleEffect(pulse ? 1.55 : 1)
+                    .opacity(pulse ? 0 : 0.5)
+                    .animation(.easeOut(duration: 2.6).repeatForever(autoreverses: false), value: pulse)
+                    .onAppear { pulse = true }
+                    .onDisappear { pulse = false }
+            }
 
             Circle()
                 .fill(Color.healthMapCard)
