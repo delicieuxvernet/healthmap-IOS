@@ -135,11 +135,11 @@ enum FoodScanError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .productNotFound:
-            return "Produit non trouve. Verifie le code-barres."
+            return "Produit introuvable. Vérifie le code-barres."
         case .networkError(let error):
             return "Erreur reseau : \(error.localizedDescription)"
         case .timeout:
-            return "Delai d'attente depasse. Reessaie."
+            return "Délai dépassé. Réessaie."
         case .invalidResponse:
             return "Reponse invalide du serveur."
         }

@@ -284,7 +284,7 @@ final class QuestionnaireViewModel: ObservableObject {
         case "height":
             if let str = value as? String {
                 if !str.isEmpty, Double(str) == nil {
-                    errorMessage = "La taille doit etre un nombre valide (ex: 175)."
+                    errorMessage = "La taille doit être un nombre valide (ex. 175)."
                     return
                 }
                 profile.height = str
@@ -292,7 +292,7 @@ final class QuestionnaireViewModel: ObservableObject {
         case "weight":
             if let str = value as? String {
                 if !str.isEmpty, Double(str) == nil {
-                    errorMessage = "Le poids doit etre un nombre valide (ex: 70)."
+                    errorMessage = "Le poids doit être un nombre valide (ex. 70)."
                     return
                 }
                 profile.weight = str
@@ -568,7 +568,7 @@ final class QuestionnaireViewModel: ObservableObject {
         try? await AuthService.shared.refreshSession()
 
         guard let session = await AuthService.shared.currentSession else {
-            errorMessage = "Vous devez etre connecte pour soumettre le questionnaire."
+            errorMessage = "Tu dois être connecté pour envoyer ton questionnaire."
             return
         }
 
@@ -619,13 +619,13 @@ final class QuestionnaireViewModel: ObservableObject {
             // Map to a user-readable message based on the error type
             let desc = error.localizedDescription.lowercased()
             if desc.contains("offline") || desc.contains("network") || desc.contains("internet") {
-                errorMessage = "Pas de connexion. Verifie ton reseau puis reessaie."
+                errorMessage = "Pas de connexion. Vérifie ton réseau puis réessaie."
             } else if desc.contains("timeout") {
-                errorMessage = "Le serveur met trop de temps a repondre. Reessaie dans un instant."
+                errorMessage = "Le serveur met trop de temps à répondre. Réessaie dans un instant."
             } else if desc.contains("401") || desc.contains("jwt") || desc.contains("token") {
-                errorMessage = "Ta session a expire. Reconnecte-toi puis reessaie."
+                errorMessage = "Ta session a expiré. Reconnecte-toi puis réessaie."
             } else {
-                errorMessage = "Erreur lors de la sauvegarde. Veuillez reessayer."
+                errorMessage = "La sauvegarde a échoué. Réessaie dans un instant."
             }
             AppLogger.database.report(error, context: "Questionnaire submit — \(error)")
             // Intentionally keep the draft on failure so the user can retry

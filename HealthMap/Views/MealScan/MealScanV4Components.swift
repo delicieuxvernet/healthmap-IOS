@@ -211,11 +211,17 @@ struct FoodTileV4: View {
                 // mesure de la tuile : elle sort du plus petit corps gris pour
                 // devenir une donnée-héros de ligne (charte : jamais sous 15).
                 if let amounts = amountsLine {
+                    // Deux nutriments joints par un point médian, en 15 pt, dans
+                    // une tuile de ~133 pt de large (grille à 2 colonnes) : sur
+                    // un `lineLimit(1)` la seconde mesure — la donnée que cette
+                    // ligne existe pour montrer — finissait derrière une
+                    // ellipse. Elle passe à la ligne plutôt que de disparaître.
                     Text(amounts)
                         .font(Theme.heroValueRowFont)
                         .foregroundStyle(Color.healthMapSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.7)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if food.isUltraProcessed { ultraBadge } else { badge }
             }
@@ -308,8 +314,8 @@ struct MacrosCardV4: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("Macros")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(ScanDomaine.energie)
                 Spacer()
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text("\(macros.calories)")
@@ -438,8 +444,8 @@ struct CompleteMealCardV4: View {
             HStack(spacing: 8) {
                 Fluent3DIcon(name: Fluent3D.sparkles, size: 20)
                 Text("Pour compléter ce repas")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(ScanDomaine.apports)
             }
             .padding(.bottom, 4)
         } else {
@@ -453,8 +459,8 @@ struct CompleteMealCardV4: View {
                         .foregroundStyle(Color.scoreDeficient)
                 }
                 Text("Ce qui manque à ton plat")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(ScanDomaine.apports)
             }
             .padding(.bottom, 4)
         }
@@ -751,8 +757,8 @@ struct TaJourneeCard: View {
         VStack(spacing: 0) {
             HStack {
                 Text("Ta journée")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(ScanDomaine.energie)
                 Spacer()
                 HStack(spacing: 0) {
                     Text("\(doneCount)")
@@ -835,8 +841,8 @@ struct BesoinsCourbeCard: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Tes apports vs tes besoins")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(ScanDomaine.apports)
                 Text("cette semaine, d'après tes repas scannés")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.healthMapMuted)

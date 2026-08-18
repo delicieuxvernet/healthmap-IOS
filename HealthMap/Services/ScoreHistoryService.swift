@@ -195,12 +195,12 @@ final class ScoreHistoryService {
     // MARK: - Score Delta
     func getScoreDelta(history: [ScoreSnapshot]) -> (delta: Int, weeks: Int, text: String) {
         guard history.count >= 2 else {
-            return (delta: 0, weeks: 0, text: "Pas encore assez de donnees")
+            return (delta: 0, weeks: 0, text: "Pas encore assez de données")
         }
 
         let sorted = history.sorted { $0.date < $1.date }
         guard let first = sorted.first, let last = sorted.last else {
-            return (delta: 0, weeks: 0, text: "Pas encore assez de donnees")
+            return (delta: 0, weeks: 0, text: "Pas encore assez de données")
         }
 
         let delta = last.score - first.score

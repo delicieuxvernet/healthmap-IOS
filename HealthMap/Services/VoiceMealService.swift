@@ -137,7 +137,14 @@ final class VoiceMealService {
     /// l'état AVANT de lancer l'enregistrement, plutôt que d'échouer après.
     enum QuotaStore {
         /// Dictées offertes par jour hors abonnement.
-        static let dictéesGratuitesParJour = 1
+        ///
+        /// ⚠️ DOIT rester égal à `RATE_LIMIT_FREE` de l'Edge Function
+        /// `parse-meal-voice` (2 au 18 août 2026). Même contrainte que
+        /// `VoiceTranscript.maxChars`. À 1 ici pour 2 côté serveur, l'app était
+        /// plus restrictive que le serveur — et la conséquence n'était pas un
+        /// simple message : `pressionDictee` ouvrait le paywall pour un quota
+        /// qui n'était pas atteint.
+        static let dictéesGratuitesParJour = 2
 
         private static func clef(_ userId: String, _ date: Date = Date()) -> String {
             let f = DateFormatter()

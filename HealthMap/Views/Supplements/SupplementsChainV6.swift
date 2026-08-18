@@ -494,10 +494,17 @@ struct ChainCollapsibleCard<Detail: View>: View {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             // Titre de carte : il annonce, il ne rivalise pas.
+                            // Mais c'est l'IDENTITÉ de la carte : sans priorité
+                            // ni facteur d'échelle, il était le seul des trois
+                            // enfants de cette ligne à pouvoir céder — donc le
+                            // premier tronqué. Il se réduit désormais avant de
+                            // se couper, et ne cède plus avant ses voisins.
                             Text(chain.nom)
                                 .font(Theme.sectionLabelFont)
                                 .foregroundStyle(Color.kiwiCharcoal)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .layoutPriority(1)
 
                             // Le chiffre du bilan justifie la carte : il ne
                             // descend plus à 10 pt dans la pastille, il vit à

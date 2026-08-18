@@ -111,6 +111,13 @@ struct PaywallView: View {
         .onChange(of: subscriptionService.offerings) { _, _ in syncSelection() }
         // Le repli StoreKit peut arriver après l'offering : même resynchronisation.
         .onChange(of: subscriptionService.directProducts.count) { _, _ in syncSelection() }
+        // Code promo : la feuille système Apple se referme sans rien dire à
+        // l'app. Sans cette observation, un code VALIDE laissait le paywall
+        // identique — mêmes formules, même CTA d'achat encore actif — et le
+        // testeur concluait que son code n'avait pas marché (ou repayait).
+        .onChange(of: subscriptionService.isPremium) { _, actif in
+            if actif { showPurchaseSuccess = true }
+        }
         .alert("Kiwio Premium", isPresented: $showAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -378,7 +385,7 @@ struct PaywallView: View {
             // Feuille système Apple de saisie d'un code promo (offer code).
             // Permet d'utiliser un code comme « NAIA » ou « LANCEMENT50 ».
             Button {
-                Purchases.shared.presentCodeRedemptionSheet()
+                subscriptionService.presenterCodePromo()
             } label: {
                 Text("J'ai un code promo")
                     .font(.system(size: 13, weight: .semibold))

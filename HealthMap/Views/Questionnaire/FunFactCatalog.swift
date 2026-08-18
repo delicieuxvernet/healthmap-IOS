@@ -38,19 +38,19 @@ enum FunFactCatalog {
     /// repère : pour un cm donné on prend la plus proche et on formule un écart
     /// EXACT — donc jamais une taille attribuée à tort.
     private static let heightRefs: [(cm: Int, who: String)] = [
-        (147, "Edith Piaf"), (155, "Lady Gaga"), (157, "Kevin Hart"),
-        (165, "Daniel Radcliffe"), (168, "Napoleon"), (170, "Lionel Messi"),
-        (173, "Rihanna"), (178, "Kylian Mbappe"), (185, "Zinedine Zidane"),
+        (147, "Édith Piaf"), (155, "Lady Gaga"), (157, "Kevin Hart"),
+        (165, "Daniel Radcliffe"), (168, "Napoléon"), (170, "Lionel Messi"),
+        (173, "Rihanna"), (178, "Kylian Mbappé"), (185, "Zinédine Zidane"),
         (187, "Cristiano Ronaldo"), (190, "Omar Sy"), (196, "Charles de Gaulle"),
         (204, "Teddy Riner"), (216, "Shaquille O'Neal"),
     ]
 
     private static func heightFact(_ cm: Int) -> String {
-        // Au-dela du plus grand repere reel (Shaquille O'Neal, 216 cm) : humour
-        // assume, hors echelle humaine courante. Ce n'est pas une info fausse,
-        // c'est une blague explicite pour l'extreme haut du slider.
+        // Au-delà du plus grand repère réel (Shaquille O'Neal, 216 cm) : humour
+        // assumé, hors échelle humaine courante. Ce n'est pas une info fausse,
+        // c'est une blague explicite pour l'extrême haut du slider.
         if cm > 216 {
-            return "La tour Eiffel (330 m) garde de l'avance... pour l'instant !"
+            return "La tour Eiffel (330 m) garde de l'avance… pour l'instant !"
         }
         // Célébrité dont la taille est la plus proche de la valeur choisie.
         let ref = heightRefs.min { abs($0.cm - cm) < abs($1.cm - cm) } ?? heightRefs[0]
@@ -59,7 +59,7 @@ enum FunFactCatalog {
             return "Pile la taille de \(ref.who) (\(ref.cm) cm) !"
         }
         if abs(delta) == 1 {
-            return "A un cheveu de \(ref.who) (\(ref.cm) cm) !"
+            return "À un cheveu de \(ref.who) (\(ref.cm) cm) !"
         }
         let sens = delta > 0 ? "de plus que" : "de moins que"
         return "\(cm) cm, soit \(abs(delta)) cm \(sens) \(ref.who) (\(ref.cm) cm)."
@@ -72,14 +72,14 @@ enum FunFactCatalog {
     private static func ageFact(_ years: Int) -> String {
         switch years {
         case ..<18: return "En pleine croissance : ton corps a de grands besoins !"
-        case 18..<25: return "La vingtaine qui demarre, de l'energie a revendre !"
-        case 25..<30: return "Le moment ideal pour installer tes bons reflexes !"
+        case 18..<25: return "La vingtaine qui démarre, de l'énergie à revendre !"
+        case 25..<30: return "Le moment idéal pour installer tes bons réflexes !"
         case 30..<40: return "La trentaine, tu construis ton capital forme !"
-        case 40..<50: return "La quarantaine, experience et vitalite au rendez-vous !"
+        case 40..<50: return "La quarantaine, expérience et vitalité au rendez-vous !"
         case 50..<60: return "La cinquantaine, le bon moment pour chouchouter tes apports !"
-        case 60..<70: return "La soixantaine et une nouvelle liberte : autant la vivre en forme !"
+        case 60..<70: return "La soixantaine et une nouvelle liberté : autant la vivre en forme !"
         case 70..<85: return "Les bonnes habitudes comptent plus que jamais, et tu es au bon endroit !"
-        default: return "Quelle longevite, respect total !"
+        default: return "Quelle longévité, respect total !"
         }
     }
 }

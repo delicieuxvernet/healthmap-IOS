@@ -36,6 +36,10 @@ final class DashboardViewModel: ObservableObject {
     /// inversement (incident bilan indisponible, 4 juillet : la gate bloquait
     /// sur `aiAnalysis`/v7 alors que le bilan RÉELLEMENT affiché est v2).
     @Published var errorMessageV2: String?
+    /// L'utilisateur a demandé à explorer l'app pendant que le bilan se fait
+    /// attendre : la gate plein écran (`AnalysisGateView`) ne se rouvre plus de
+    /// la session. Le bilan continue d'arriver en tâche de fond.
+    @Published var gateContournee = false
 
     // MARK: - Injected Services
 
@@ -289,7 +293,7 @@ final class DashboardViewModel: ObservableObject {
                 self.profile.baselineNutrientScores = profileRow.baselineNutrientScores
             }
         } catch {
-            errorMessage = "Impossible de charger votre profil."
+            errorMessage = "Impossible de charger ton profil pour le moment."
             AppLogger.database.report(error, context: "Dashboard load profile")
         }
 
@@ -433,7 +437,7 @@ final class DashboardViewModel: ObservableObject {
                 // ce n'est PAS un succès. Les scores locaux restent affichés,
                 // mais le bandeau de retry doit apparaître — jamais d'état
                 // silencieux sans analyse ni erreur (incident TestFlight 28).
-                errorMessage = "L'analyse IA n'a pas pu etre generee. Tes scores restent disponibles, reessaie dans un instant."
+                errorMessage = "L'analyse n'a pas pu être générée. Tes scores restent disponibles, réessaie dans un instant."
                 analyticsService.track(.analysisFailed, properties: [
                     "error": "nil_analysis_after_validation",
                 ])
@@ -465,13 +469,13 @@ final class DashboardViewModel: ObservableObject {
                             self.nutrientScores = retried.scores
                             AppLogger.analysis.info("Loaded cached analysis as fallback after AI failure")
                         } else {
-                            errorMessage = "Impossible de charger ton analyse pour le moment. Verifie ta connexion puis reessaie."
+                            errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
                         }
                     } else {
-                        errorMessage = "Impossible de charger ton analyse pour le moment. Verifie ta connexion puis reessaie."
+                        errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
                     }
                 } catch {
-                    errorMessage = "Impossible de charger ton analyse pour le moment. Verifie ta connexion puis reessaie."
+                    errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
                     AppLogger.analysis.report(error, context: "Dashboard fallback cache load")
                 }
             }
@@ -520,9 +524,21 @@ final class DashboardViewModel: ObservableObject {
             // déjà affiché ne doit pas être remplacé par un bandeau d'erreur.
             if analysisV2 == nil {
                 errorMessageV2 = (error as? AIAnalysisError)?.errorDescription
-                    ?? "Impossible de charger ton bilan pour le moment. Reessaie dans un instant."
+                    ?? "Impossible de charger ton bilan pour le moment. Réessaie dans un instant."
             }
         }
+    }
+
+    /// Relance le SEUL bilan v2 — celui que l'écran affiche réellement.
+    ///
+    /// ⚠️ Ne PAS rebrancher le « Réessayer » de la gate sur `triggerAnalysis()` :
+    /// celui-ci commence par `guard !isLoadingAnalysis`, or les deux flux
+    /// partent ensemble et le v7 tient jusqu'à 185 s. Le v2 pouvant échouer en
+    /// deux secondes (429, circuit ouvert), le bouton restait un no-op
+    /// totalement silencieux pendant tout ce temps.
+    func retryBilanV2() async {
+        guard let session = await AuthService.shared.currentSession else { return }
+        await fetchBilanV2(userId: session.user.id.uuidString, forceRefresh: false)
     }
 
     // MARK: - Save Avatar Choice

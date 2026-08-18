@@ -38,7 +38,7 @@ enum PasswordValidationIssue: Equatable {
         case .noDigit:
             return "Le mot de passe doit contenir au moins un chiffre."
         case .noSpecialCharacter:
-            return "Le mot de passe doit contenir au moins un caractere special (!@#$%...)."
+            return "Le mot de passe doit contenir au moins un caractère spécial (!@#$%…)."
         case .commonPassword:
             return "Ce mot de passe est trop courant. Choisissez-en un plus unique."
         }

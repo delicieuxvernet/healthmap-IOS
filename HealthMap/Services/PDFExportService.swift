@@ -180,7 +180,7 @@ final class PDFExportService {
         let regime = profile.dietType
         let pathway = profile.pathway == .express ? "Express" : "Complet"
 
-        let infoText = "Age: \(age) ans  |  Genre: \(genre)  |  Regime: \(regime)  |  Questionnaire: \(pathway)"
+        let infoText = "Âge : \(age) ans  |  Genre : \(genre)  |  Régime : \(regime)  |  Questionnaire : \(pathway)"
         (infoText as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: infoAttrs)
 
         return currentY + 30
@@ -304,7 +304,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 14, weight: .bold),
             .foregroundColor: UIColor.black,
         ]
-        ("Interactions detectees" as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
+        ("Interactions détectées" as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
         currentY += 24
 
         for inter in interactions.prefix(5) {
@@ -492,7 +492,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 8, weight: .regular),
             .foregroundColor: UIColor.gray,
         ]
-        let text = "Ce document est genere a titre informatif uniquement. Il ne constitue pas un avis medical. Les scores et recommandations sont bases sur les informations que vous avez fournies dans le questionnaire. Consultez un professionnel de sante avant de modifier votre alimentation ou de commencer une supplementation."
+        let text = "Ce document est généré à titre informatif uniquement. Il ne constitue pas un avis médical. Les scores et recommandations reposent sur les informations fournies dans le questionnaire. Consulte un professionnel de santé avant de modifier ton alimentation ou de commencer une complémentation."
         let rect = CGRect(x: margin, y: currentY, width: pageWidth - margin * 2, height: 40)
         (text as NSString).draw(in: rect, withAttributes: disclaimerAttrs)
 

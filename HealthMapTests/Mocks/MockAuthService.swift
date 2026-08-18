@@ -39,9 +39,15 @@ final class MockAuthService: AuthServiceProtocol {
 
     // MARK: - AuthServiceProtocol
 
-    func signUp(email: String, password: String, firstName: String) async throws {
+    /// Session posée par défaut. Mets à `false` pour simuler un projet
+    /// Supabase où « Confirm email » est actif.
+    var signUpPoseLaSession = true
+
+    @discardableResult
+    func signUp(email: String, password: String, firstName: String) async throws -> Bool {
         signUpCalls.append((email, password, firstName))
         if let signUpError { throw signUpError }
+        return signUpPoseLaSession
     }
 
     func signIn(email: String, password: String) async throws {

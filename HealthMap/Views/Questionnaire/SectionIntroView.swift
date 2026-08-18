@@ -75,9 +75,9 @@ struct SectionIntroView: View {
         case .profil: return "Faisons connaissance !"
         case .modeDeVie: return "Parlons de ton quotidien."
         case .sante: return "Tu avances bien, continue !"
-        case .nutrition: return "Le coeur de ton bilan."
+        case .nutrition: return "Le cœur de ton bilan."
         case .symptomes: return "Encore quelques instants !"
-        case .medical: return "Derniere ligne droite !"
+        case .medical: return "Dernière ligne droite !"
         }
     }
 
@@ -85,17 +85,17 @@ struct SectionIntroView: View {
     private var whyTheseData: String {
         switch section {
         case .profil:
-            return "Ces infos de base servent a calibrer tes besoins nutritionnels."
+            return "Ces infos de base servent à calibrer tes besoins nutritionnels."
         case .modeDeVie:
             return "Ton rythme de vie influence directement tes besoins en vitamines."
         case .sante:
-            return "Sommeil, stress, hydratation : ces reponses affinent ton bilan."
+            return "Sommeil, stress, hydratation : ces réponses affinent ton bilan."
         case .nutrition:
-            return "Tes habitudes alimentaires determinent l'essentiel de tes apports."
+            return "Tes habitudes alimentaires déterminent l'essentiel de tes apports."
         case .symptomes:
-            return "Certains signes du corps orientent vers des besoins nutritionnels precis."
+            return "Certains signes du corps orientent vers des besoins nutritionnels précis."
         case .medical:
-            return "Ces donnees evitent les recommandations contre-indiquees pour toi."
+            return "Ces données évitent les recommandations contre-indiquées pour toi."
         }
     }
 }
@@ -109,7 +109,7 @@ struct SectionIntroView: View {
             teaser: Teaser(
                 id: "vitD",
                 emoji: "🔍",
-                message: "Beaucoup d'interieur et peu de soleil... On soupconne un besoin en vitamine D. Continue, ton bilan le confirmera !"
+                message: "Beaucoup d'intérieur et peu de soleil… On soupçonne un besoin en vitamine D. Continue, ton bilan le confirmera !"
             )
         )
     }

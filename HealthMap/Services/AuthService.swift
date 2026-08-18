@@ -48,15 +48,21 @@ final class AuthService {
     //
     // Si "Confirm email" est activé dans Supabase Dashboard, la session sera
     // inactive jusqu'au click magic link — gérer ce cas via authStateChanges.
-    func signUp(email: String, password: String, firstName: String) async throws {
+    /// - Returns: `true` si la session est posée immédiatement, `false` si
+    ///   Supabase attend une confirmation par email (réglage « Confirm email »).
+    ///   Le résultat était jeté (`_ =`) : dans le second cas, l'app ne disait
+    ///   RIEN et le formulaire restait affiché, inchangé, après le spinner.
+    @discardableResult
+    func signUp(email: String, password: String, firstName: String) async throws -> Bool {
         pendingSignUpFirstName = firstName
-        _ = try await auth.signUp(
+        let reponse = try await auth.signUp(
             email: email,
             password: password,
             data: [
                 "first_name": .string(firstName)
             ]
         )
+        return reponse.session != nil
     }
 
     /// Wrapper compat : avant l'UI faisait signUpStart → écran code → verifySignUpCode.
@@ -64,7 +70,7 @@ final class AuthService {
     /// peut toujours appeler ces deux fonctions, le résultat sera juste qu'on
     /// est déjà connecté à la fin de signUpStart.
     func signUpStart(email: String, password: String, firstName: String) async throws {
-        try await signUp(email: email, password: password, firstName: firstName)
+        _ = try await signUp(email: email, password: password, firstName: firstName)
     }
 
     /// No-op compat — la session est déjà active après signUp.
@@ -188,18 +194,36 @@ final class AuthService {
     }
 
     // MARK: - Reset Password
+
+    /// Email de la récupération en cours. `verifyOTP` en a besoin : le code à
+    /// 6 chiffres ne vaut que couplé à l'adresse qui l'a demandé.
+    private(set) var pendingResetEmail: String?
+
     func resetPassword(email: String) async throws {
         try await auth.resetPasswordForEmail(email)
+        pendingResetEmail = email
     }
 
-    /// Étape 2 du reset compat : applique le nouveau mot de passe.
-    /// Avec Supabase Auth standard, le reset se fait via magic link → l'user
-    /// arrive sur l'app via deep link + appelle `updateUser(password:)`.
-    /// Pour rester compat avec l'API existante, on tente un update password
-    /// direct (suppose qu'une session est active via le deep link).
+    /// Étape 2 du reset : le code reçu par email est échangé contre une session
+    /// de récupération, puis le nouveau mot de passe est posé.
+    ///
+    /// ⚠️ Cette fonction IGNORAIT le code (`_ = code`) et appelait directement
+    /// `updatePassword`, qui exige une session active. L'utilisateur étant par
+    /// définition déconnecté, elle levait systématiquement `.sessionExpired` —
+    /// et le rattrapage côté ViewModel renvoyait alors un nouveau mail, en
+    /// boucle. Aucun mot de passe n'a jamais pu être réinitialisé depuis l'app.
+    ///
+    /// ⚠️ CÔTÉ SUPABASE : le template d'email « Reset Password » DOIT contenir
+    /// `{{ .Token }}` (le code à 6 chiffres). Le template par défaut ne pose
+    /// qu'un lien `{{ .ConfirmationURL }}` — avec lui, l'utilisateur ne reçoit
+    /// aucun code à saisir et cet écran n'a rien à valider.
     func completeResetPassword(code: String, newPassword: String) async throws {
-        _ = code  // unused — Supabase reset utilise magic link, pas un code 6 chiffres
-        try await updatePassword(newPassword: newPassword)
+        guard let email = pendingResetEmail else {
+            throw HealthMapError.auth(.sessionExpired)
+        }
+        _ = try await auth.verifyOTP(email: email, token: code, type: .recovery)
+        _ = try await auth.update(user: UserAttributes(password: newPassword))
+        pendingResetEmail = nil
     }
 
     // MARK: - Update Password (user connecté)

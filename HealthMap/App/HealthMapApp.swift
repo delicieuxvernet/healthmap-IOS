@@ -89,7 +89,7 @@ struct HealthMapApp: App {
                         ])
                     }
                 }
-                .alert("Avertissement de securite", isPresented: $showIntegrityWarning) {
+                .alert("Avertissement de sécurité", isPresented: $showIntegrityWarning) {
                     Button("J'ai compris", role: .cancel) { }
                 } message: {
                     Text(integrityMessage)

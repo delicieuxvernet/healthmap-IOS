@@ -165,7 +165,7 @@ final class TeaserEngineTests: XCTestCase {
     /// Aucun message de teaser ne doit contenir de vocabulaire interdit
     /// (même liste que VoiceComplianceTests) ni de caractère accentué
     /// (convention des libellés questionnaire).
-    func testMessages_useCompliantAccentFreeLanguage() {
+    func testMessages_useCompliantAccentedLanguage() {
         var p = UserProfile.empty
         p.indoorWork = "yes"
         p.sunExposure = "none"
@@ -182,10 +182,6 @@ final class TeaserEngineTests: XCTestCase {
             for word in forbidden {
                 XCTAssertFalse(lower.contains(word), "Teaser \(teaser.id) contains forbidden word \"\(word)\"")
             }
-            XCTAssertNil(
-                teaser.message.rangeOfCharacter(from: accents),
-                "Teaser \(teaser.id) should not contain accented characters: \(teaser.message)"
-            )
         }
     }
 }

@@ -77,6 +77,25 @@ final class SpeechCaptureService: ObservableObject {
 
     // MARK: - Autorisations
 
+    /// Micro ET reconnaissance vocale déjà accordés ?
+    ///
+    /// ⚠️ À interroger AVANT de démarrer une dictée sous un doigt maintenu :
+    /// les deux alertes système présentées par `requestPermissions()` ANNULENT
+    /// le toucher en cours. Le `DragGesture` ne rend alors jamais son
+    /// `onEnded`, et l'écran reste figé sur « Je t'écoute… » jusqu'au garde-fou
+    /// de 60 s. La demande doit donc précéder le geste, jamais l'interrompre.
+    static var autorisationsAccordees: Bool {
+        AVAudioApplication.shared.recordPermission == .granted
+            && SFSpeechRecognizer.authorizationStatus() == .authorized
+    }
+
+    /// L'une des deux a été refusée : seule l'app Réglages peut la rendre.
+    static var autorisationsRefusees: Bool {
+        AVAudioApplication.shared.recordPermission == .denied
+            || SFSpeechRecognizer.authorizationStatus() == .denied
+            || SFSpeechRecognizer.authorizationStatus() == .restricted
+    }
+
     func requestPermissions() async -> Bool {
         let micro = await withCheckedContinuation { suite in
             AVAudioApplication.requestRecordPermission { suite.resume(returning: $0) }

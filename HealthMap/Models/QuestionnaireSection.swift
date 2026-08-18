@@ -15,10 +15,10 @@ enum QuestionnaireSection: Int, CaseIterable, Identifiable {
         switch self {
         case .profil: return "Profil"
         case .modeDeVie: return "Mode de vie"
-        case .sante: return "Sante"
+        case .sante: return "Santé"
         case .nutrition: return "Nutrition"
-        case .symptomes: return "Symptomes"
-        case .medical: return "Medical"
+        case .symptomes: return "Symptômes"
+        case .medical: return "Médical"
         }
     }
 
@@ -173,11 +173,11 @@ extension QuestionnaireSection {
             type: .multiChoice,
             options: [
                 .init("sleep", "Mieux dormir", emoji: "😴"),
-                .init("energie", "Plus d'energie", emoji: "⚡"),
-                .init("stress", "Gerer mon stress", emoji: "🧘"),
+                .init("energie", "Plus d'énergie", emoji: "⚡"),
+                .init("stress", "Gérer mon stress", emoji: "🧘"),
                 .init("perte_poids", "Perdre du poids", emoji: "🎯"),
                 .init("muscle", "Prendre du muscle", emoji: "💪"),
-                .init("equilibre", "Equilibre nutritionnel", emoji: "🥗"),
+                .init("equilibre", "Équilibre nutritionnel", emoji: "🥗"),
             ]
         ),
         // Masquée si le prénom est déjà connu (signup email OU Sign in with Apple) :
@@ -223,9 +223,9 @@ extension QuestionnaireSection {
             type: .singleChoice,
             options: [
                 .init("none", "Quasi nulle", emoji: "🌑"),
-                .init("very_little", "Tres peu", emoji: "🌥️"),
+                .init("very_little", "Très peu", emoji: "🌥️"),
                 .init("some", "Un peu", emoji: "⛅"),
-                .init("moderate", "Moderee", emoji: "🌤️"),
+                .init("moderate", "Modérée", emoji: "🌤️"),
                 .init("plenty", "Beaucoup", emoji: "☀️"),
             ]
         ),
@@ -234,7 +234,7 @@ extension QuestionnaireSection {
             text: "Ton type de peau ?",
             type: .singleChoice,
             options: [
-                .init("very_fair", "Tres claire"),
+                .init("very_fair", "Très claire"),
                 .init("fair", "Claire"),
                 .init("medium", "Moyenne"),
                 .init("olive", "Mate"),
@@ -246,10 +246,10 @@ extension QuestionnaireSection {
             text: "Ton niveau d'activite physique ?",
             type: .singleChoice,
             options: [
-                .init("none", "Sedentaire", emoji: "🛋️"),
+                .init("none", "Sédentaire", emoji: "🛋️"),
                 .init("light", "Leger (1-2x/sem)", emoji: "🚶"),
                 .init("moderate", "Modere (3-4x/sem)", emoji: "🏃"),
-                .init("regular", "Regulier (4-5x/sem)", emoji: "🏋️"),
+                .init("regular", "Régulier (4-5x/sem)", emoji: "🏋️"),
                 .init("intense", "Intense (6+/sem)", emoji: "🔥"),
             ]
         ),
@@ -282,7 +282,7 @@ extension QuestionnaireSection {
         ),
         Question(
             id: "wakeFeeling",
-            text: "Comment tu te sens au reveil ?",
+            text: "Comment tu te sens au réveil ?",
             type: .singleChoice,
             options: [
                 .init("great", "En pleine forme", emoji: "💪"),
@@ -314,7 +314,7 @@ extension QuestionnaireSection {
         ),
         Question(
             id: "caffeineTiming",
-            text: "Tu bois ton cafe pendant les repas ?",
+            text: "Tu bois ton café pendant les repas ?",
             type: .singleChoice,
             options: [.init("with_meals", "Oui, pendant les repas"), .init("between", "Non, entre les repas"), .init("both", "Les deux")],
             showIf: { ["moderate", "heavy"].contains($0.caffeineIntake) }
@@ -340,7 +340,7 @@ extension QuestionnaireSection {
             type: .singleChoice,
             options: [
                 .init("none", "Jamais"), .init("rarely", "Rarement"),
-                .init("moderate", "Moderee"), .init("regular", "Reguliere"), .init("heavy", "Importante"),
+                .init("moderate", "Modérée"), .init("regular", "Reguliere"), .init("heavy", "Importante"),
             ]
         ),
         Question(
@@ -363,7 +363,7 @@ extension QuestionnaireSection {
     static let nutritionQuestions: [Question] = [
         Question(
             id: "dietType",
-            text: "Ton regime alimentaire ?",
+            text: "Ton régime alimentaire ?",
             type: .singleChoice,
             options: [
                 .init("omnivore", "Omnivore", emoji: "🥩"),
@@ -461,7 +461,7 @@ extension QuestionnaireSection {
         ),
         Question(
             id: "lowCarbDiet",
-            text: "Regime pauvre en glucides ?",
+            text: "Régime pauvre en glucides ?",
             type: .singleChoice,
             options: [.init("yes", "Oui"), .init("no", "Non")]
         ),
@@ -512,7 +512,7 @@ extension QuestionnaireSection {
                 .init("diuretics", "Diuretiques", emoji: "💧"),
                 .init("statins", "Statines", emoji: "❤️"),
                 .init("anticoagulant", "Anticoagulant", emoji: "🩸"),
-                .init("thyroid_med", "Thyroide", emoji: "🦋"),
+                .init("thyroid_med", "Thyroïde", emoji: "🦋"),
                 .init("laxatives", "Laxatifs", emoji: "💊"),
                 .init("antispasmodics", "Antispasmodiques", emoji: "💊"),
                 .init("antidiarrheal", "Anti-diarrheiques", emoji: "💊"),
@@ -524,7 +524,7 @@ extension QuestionnaireSection {
             type: .multiChoice,
             options: [
                 .init("none", "Aucune"),
-                .init("celiac", "Maladie coeliaque"),
+                .init("celiac", "Maladie cœliaque"),
                 .init("crohns_uc", "Crohn / RCH"),
                 .init("ibs", "Syndrome de l'intestin irritable"),
                 .init("acid_reflux", "Reflux gastrique"),
@@ -535,11 +535,11 @@ extension QuestionnaireSection {
         // UX than asking them to pick "Non concerne".
         Question(
             id: "periodFlow",
-            text: "Abondance de tes regles ?",
+            text: "Abondance de tes règles ?",
             type: .singleChoice,
             options: [
                 .init("light", "Legeres"), .init("normal", "Normales"),
-                .init("heavy", "Abondantes"), .init("very_heavy", "Tres abondantes"),
+                .init("heavy", "Abondantes"), .init("very_heavy", "Très abondantes"),
                 .init("na", "Non concerne"),
             ],
             showIf: { $0.gender == .femme }

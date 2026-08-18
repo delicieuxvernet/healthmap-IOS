@@ -23,16 +23,23 @@ import SwiftUI
 enum BilanV7 {
     static let ink = Color(hex: "211F1A")
     static let secondary = Color(hex: "6B7280")
-    static let soft = Color(hex: "9CA3AF")
+    // Encre pâle des mentions. #9CA3AF ne tenait que 2,36:1 sur le fond crème
+    // de l'écran : illisible pour du texte. Même valeur que `secondary`, qui
+    // tient 4,5:1 sur crème comme sur carte blanche.
+    static let soft = Color(hex: "6B7280")
     static let chevron = Color(hex: "C2BDB0")
     static let hairline = Color(hex: "211F1A").opacity(0.06)
 
     /// Libellés de section.
-    static let amber = Color(hex: "D9820A")      // « Tes apports à renforcer »
+    // Encres de section : l'orange vif du lavis ne tient pas 4,5:1 à 13 pt
+    // (un titre de section est du texte courant au sens WCAG : le seuil
+    // « large » commence à 14 pt bold). Mêmes versions foncées que celles déjà
+    // validées sur le Scan (`ScanDomaine.energie`) et le Suivi.
+    static let amber = Color(hex: "9A5A00")      // « Tes apports à renforcer » - 5,47:1
     static let alertInk = Color(hex: "C0322A")   // « Points d'attention » + % bas
     static let warnInk = Color(hex: "B36B00")    // % intermédiaire
     static let blue = Color(hex: "2F6FE0")       // « Tes symptômes suivis » + badge
-    static let flame = Color(hex: "FB8500")      // « Ta série »
+    static let flame = Color(hex: "A44A00")      // « Ta série » - 5,90:1
 
     /// Statuts (mêmes teintes que le contrat côté serveur).
     static let statusCovered = Color(hex: "5DA838")
@@ -40,7 +47,10 @@ enum BilanV7 {
     static let statusFill = Color(hex: "FF3B30")
     static let statusNeutral = Color(hex: "C2BDB0")
 
-    static let sourcesInk = Color(hex: "B7B1A4")
+    // Pied de page « Sources scientifiques » + mention médicale (exigence
+    // App Review 1.4.1) : posé sur le fond crème, #B7B1A4 tombait à 1,99:1 —
+    // présent dans le code, mais pas réellement lisible à l'écran.
+    static let sourcesInk = Color(hex: "7A7466")
 
     /// Marges de l'écran (maquette : 20 pt de marge, 14 pt entre les cartes).
     static let gutter: CGFloat = 20
@@ -176,6 +186,11 @@ struct BilanV7ScoreRing: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var progress: Double = 0
     @State private var shown: Int = 0
+    /// Le compteur est une tâche, donc une chose à nettoyer. `score` change
+    /// plusieurs fois au démarrage (journal chargé, puis bilan v2 reçu) : sans
+    /// annulation, deux compteurs écrivaient `shown` en même temps à des
+    /// rythmes différents et le chiffre central de l'anneau oscillait.
+    @State private var compteur: Task<Void, Never>?
 
     private var target: Double { Double(score ?? 0) / 100 }
 
@@ -200,11 +215,16 @@ struct BilanV7ScoreRing: View {
             shown = 0
             animate()
         }
+        .onDisappear {
+            compteur?.cancel()
+            compteur = nil
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(score == nil ? "Score du jour indisponible" : "Score du jour : \(score ?? 0) sur 100")
     }
 
     private func animate() {
+        compteur?.cancel()
         guard let score else { return }
         if reduceMotion {
             progress = target
@@ -212,14 +232,17 @@ struct BilanV7ScoreRing: View {
             return
         }
         withAnimation(.easeOut(duration: 1).delay(0.2)) { progress = target }
-        // Compteur 0 → score (easeOutCubic, ~1 s), sans Timer à nettoyer.
-        Task { @MainActor in
+        // Compteur 0 → score (easeOutCubic, ~1 s). Gardé, et annulable : c'est
+        // la tâche elle-même qu'il faut nettoyer.
+        compteur = Task { @MainActor in
             let steps = max(1, min(score, 60))
             for step in 1...steps {
                 try? await Task.sleep(for: .milliseconds(1000 / steps))
+                guard !Task.isCancelled else { return }
                 let p = Double(step) / Double(steps)
                 shown = Int((Double(score) * (1 - pow(1 - p, 3))).rounded())
             }
+            guard !Task.isCancelled else { return }
             shown = score
         }
     }
@@ -631,7 +654,12 @@ struct BilanV7SymptomesCard: View {
             )
 
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                // Deux teintes distinctes, comme le fait déjà le Scan
+                // (`scanStatusColor` / `scanStatusInk`) : la couleur vive pour
+                // la tuile d'icône, son ENCRE pour le texte. #FF9500 sur blanc
+                // ne fait que 2,20:1 — le nom du symptôme y était illisible.
                 let tint = row.showsTrend && !row.improving ? BilanV7.statusReinforce : BilanV7.blue
+                let encre = row.showsTrend && !row.improving ? BilanV7.warnInk : BilanV7.blue
                 Button {
                     HapticService.shared.tap()
                     onTapSymptom(row)
@@ -654,7 +682,7 @@ struct BilanV7SymptomesCard: View {
                                 // kicker teinté, le verdict prend le dessus.
                                 Text(row.nom)
                                     .font(Theme.subLabelFont)
-                                    .foregroundStyle(tint)
+                                    .foregroundStyle(encre)
                                     .multilineTextAlignment(.leading)
                                 HStack(spacing: 5) {
                                     Image(systemName: trendIcon(row))

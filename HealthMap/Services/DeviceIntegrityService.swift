@@ -8,9 +8,9 @@ struct DeviceIntegrityResult {
     /// User-facing message (French) summarising any integrity issues.
     var alertMessage: String? {
         guard isCompromised else { return nil }
-        return "Appareil potentiellement compromis detecte. " +
-               "La securite de vos donnees de sante pourrait etre affectee. " +
-               "Nous vous recommandons d'utiliser un appareil non modifie."
+        return "Appareil potentiellement compromis détecté. " +
+               "La sécurité de tes données pourrait être affectée. " +
+               "Nous te recommandons d'utiliser un appareil non modifié."
     }
 }
 

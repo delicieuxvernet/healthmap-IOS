@@ -19,7 +19,9 @@ import SwiftUI
 //
 // Conformité langage (VoiceComplianceTests) : uniquement "besoin", "apport",
 // "on soupconne", "le bilan le confirmera" — jamais de vocabulaire alarmant.
-// Chaînes utilisateur sans accents (convention des libellés questionnaire).
+// Chaînes utilisateur ACCENTUEES : la « convention sans accents » des
+// libellés était une facilité d'écriture, pas une décision produit. Ces
+// messages sont le premier texte rédigé que lit un nouvel inscrit.
 
 // MARK: - Modèle
 struct Teaser: Equatable, Identifiable {
@@ -54,7 +56,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "vitD",
                 emoji: "🔍",
-                message: "Beaucoup d'interieur et peu de soleil... On soupconne un besoin en vitamine D. Continue, ton bilan le confirmera !"
+                message: "Beaucoup d'intérieur et peu de soleil… On soupçonne un besoin en vitamine D. Continue, ton bilan le confirmera !"
             ))
         }
 
@@ -64,7 +66,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "magnesium",
                 emoji: "🔍",
-                message: "Ton niveau de stress nous met la puce a l'oreille : possible besoin en magnesium. Le bilan le confirmera !"
+                message: "Ton niveau de stress nous met la puce à l'oreille : possible besoin en magnésium. Le bilan le confirmera !"
             ))
         }
 
@@ -74,7 +76,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "iron",
                 emoji: "🔍",
-                message: "Fatigue au reveil ? On va surveiller tes apports en fer et en B12. Continue, le bilan affinera tout ca !"
+                message: "Fatigue au réveil ? On va surveiller tes apports en fer et en B12. Continue, le bilan affinera tout ça !"
             ))
         }
 
@@ -84,7 +86,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "b12",
                 emoji: "🔍",
-                message: "Regime vegetarien ou vegan ? On soupconne un besoin en B12. Encore quelques questions et ton bilan le precisera !"
+                message: "Régime végétarien ou végan ? On soupçonne un besoin en B12. Encore quelques questions et ton bilan le précisera !"
             ))
         }
 
@@ -97,7 +99,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "omega3",
                 emoji: "🔍",
-                message: "Peu de poisson gras au menu... On soupconne un besoin en omega-3. Ton bilan le confirmera !"
+                message: "Peu de poisson gras au menu… On soupçonne un besoin en oméga-3. Ton bilan le confirmera !"
             ))
         }
 
@@ -122,7 +124,7 @@ struct TeaserCardView: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                Text("Premiere piste")
+                Text("Première piste")
                     .font(Theme.captionBoldFont)
                     .foregroundStyle(Color.healthMapBlue)
 
@@ -160,7 +162,7 @@ struct TeaserCardView: View {
         TeaserCardView(teaser: Teaser(
             id: "vitD",
             emoji: "🔍",
-            message: "Beaucoup d'interieur et peu de soleil... On soupconne un besoin en vitamine D. Continue, ton bilan le confirmera !"
+            message: "Beaucoup d'intérieur et peu de soleil… On soupçonne un besoin en vitamine D. Continue, ton bilan le confirmera !"
         ))
         .padding()
     }

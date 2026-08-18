@@ -42,8 +42,23 @@ struct MealScanView: View {
     @State private var showVoice = false
     /// Capture audio de l'accueil : elle démarre sous le doigt posé sur « Dicte
     /// ton repas » et se termine dans la feuille vocale, à qui on la passe.
-    @StateObject private var speech = SpeechCaptureService()
+    /// ⚠️ Détenu par une BOÎTE non observante, pas par un `@StateObject` direct.
+    /// `SpeechCaptureService` publie `level` ET `duree` toutes les 50 ms
+    /// pendant un enregistrement : observé ici, il invalidait TOUTE la page
+    /// (en-tête, cartes du jour, vignettes, journée) 20 fois par seconde. Seule
+    /// la bulle d'enregistrement a besoin de ce flux : elle s'y abonne
+    /// elle-même (`BulleDictee`). Ne pas « simplifier » en `@StateObject var
+    /// speech`, c'est exactement ce qui faisait décrocher la waveform.
+    @StateObject private var dicteeBox = DicteeBox()
+    private var speech: SpeechCaptureService { dicteeBox.speech }
+    /// Miroir local de `speech.error` : la page ne suivant plus le service, le
+    /// message d'échec est recopié aux deux endroits qui peuvent en produire un.
+    @State private var erreurDictee: SpeechCaptureService.CaptureError?
     @State private var doigtSurMicro = false
+    /// Première dictée : les deux autorisations (micro + reconnaissance vocale)
+    /// se demandent AVANT le geste, jamais pendant — une alerte système annule
+    /// le toucher en cours et laisse la bulle d'enregistrement orpheline.
+    @State private var demandeAutorisationVocale = false
     @State private var dicteeEnCours = false
     @State private var dicteeTropCourte = false
     /// Glissé vers le haut pendant la dictée : l'enregistrement continue mains
@@ -52,8 +67,14 @@ struct MealScanView: View {
     /// Annulée d'un glissé à gauche : le relâchement qui suit ne doit ni
     /// analyser, ni rouvrir la feuille.
     @State private var dicteeAnnulee = false
-    /// Translation du doigt depuis l'appui — la bulle micro la suit.
-    @State private var glissementDictee: CGSize = .zero
+    /// Translation du doigt depuis l'appui — la bulle micro la suit. Écrite à
+    /// chaque `onChanged` du geste (jusqu'à 120 fois par seconde sur ProMotion),
+    /// elle vit dans la boîte et n'est observée QUE par la bulle : en `@State`
+    /// de la page, elle la réinvalidait au même rythme.
+    private var glissementDictee: CGSize {
+        get { dicteeBox.geste.glissement }
+        nonmutating set { dicteeBox.geste.glissement = newValue }
+    }
     /// Appui simple sur le micro : on ne rouvre PLUS l'ancienne feuille
     /// d'écoute (supprimée le 2 août 2026) — on montre un indice « maintiens
     /// le bouton », façon WhatsApp, qui s'efface tout seul.
@@ -73,13 +94,10 @@ struct MealScanView: View {
     /// nil = Santé non lié / rien partagé → colonne masquée (jamais un « 0 » trompeur).
     /// Lu au chargement de la page (présente la feuille d'autorisation la 1re fois).
     @State private var activeEnergyToday: Int?
-    /// Tutoriel de première visite : 3 bulles, une seule fois dans la vie du
-    /// compte. Mémorisé sur l'appareil — jamais re-montré, même après un
-    /// redémarrage. Il ne se déclenche qu'à l'ARRIVÉE réelle sur l'onglet
-    /// (notification de changement d'onglet) : les cinq onglets étant montés en
-    /// permanence, un `onAppear` l'aurait « consommé » sans que personne le voie.
-    @AppStorage("hasSeenScanTour") private var scanTourVu = false
-    @State private var montreTutoScan = false
+    /// Le tutoriel de première visite (3 bulles) ne vit PLUS ici : il est monté
+    /// au niveau de `MainTabView` (ContentView.swift), seul endroit posé APRÈS
+    /// la barre d'onglets — sinon son voile laissait la barre en pleine lumière
+    /// et tappable. Voir `montreTutoScan` là-bas.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Le résultat du scan est présenté en bottom-sheet : ouvert dès qu'une
@@ -195,6 +213,29 @@ struct MealScanView: View {
                 } message: {
                     Text(barcodeIntrouvable ?? "")
                 }
+                // Autorisations de la dictée : demandées ici, AVANT le geste.
+                // Présentées pendant l'appui, les alertes iOS annulent le
+                // toucher — le geste ne rend jamais sa fin et l'écran reste
+                // figé sur « Je t'écoute… ».
+                .alert("Dicter tes repas", isPresented: $demandeAutorisationVocale) {
+                    if SpeechCaptureService.autorisationsRefusees {
+                        Button("Ouvrir les Réglages") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        Button("Plus tard", role: .cancel) {}
+                    } else {
+                        Button("Continuer") {
+                            Task { _ = await speech.requestPermissions() }
+                        }
+                        Button("Plus tard", role: .cancel) {}
+                    }
+                } message: {
+                    Text(SpeechCaptureService.autorisationsRefusees
+                         ? "Le micro ou la reconnaissance vocale sont bloqués pour Kiwio. Réactive-les dans les Réglages pour dicter tes repas."
+                         : "Pour transformer ta voix en repas, Kiwio a besoin du micro et de la reconnaissance vocale. Rien ne quitte ton téléphone : l'audio est transcrit puis effacé.")
+                }
         }
     }
 
@@ -261,16 +302,6 @@ struct MealScanView: View {
             // Le glissé vertical (verrou) appartient à la dictée tant qu'elle
             // court — sinon le défilement le vole et coupe le geste en route.
             .scrollDisabled(dicteeEnCours)
-
-            if montreTutoScan {
-                ScanTutorialOverlay {
-                    scanTourVu = true
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
-                        montreTutoScan = false
-                    }
-                }
-                .zIndex(2)
-            }
         }
     }
 
@@ -319,8 +350,8 @@ struct MealScanView: View {
             dualEntry
             voiceHint
 
-            if dicteeTropCourte || speech.error != nil {
-                Text(speech.error?.message ?? "Trop court. Garde le doigt appuyé le temps de parler.")
+            if dicteeTropCourte || erreurDictee != nil {
+                Text(erreurDictee?.message ?? "Trop court. Garde le doigt appuyé le temps de parler.")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Kiwio.rouge)
                     .fixedSize(horizontal: false, vertical: true)
@@ -389,12 +420,8 @@ struct MealScanView: View {
 
             captureBlock
 
-            ScanMicrosJourCard(
-                items: microItems,
-                headline: MealJournalViewModel.dayMicroHeadline(microItems, isToday: isTodaySelected),
-                reperesGeneriques: ReperesGeneriquesMention.estVisible(bilanComplete: dashboardVM.bilanComplete)
-            )
-            .padding(.horizontal, Theme.spacingLG)
+            microsJourCard
+                .padding(.horizontal, Theme.spacingLG)
         }
         .padding(.vertical, Theme.spacingMD)
         .task {
@@ -414,20 +441,23 @@ struct MealScanView: View {
         // jamais la feuille d'autorisation).
         .onReceive(NotificationCenter.default.publisher(for: .healthmapTabDidChange)) { note in
             guard note.object as? String == NavCardDestination.scanner.rawValue else { return }
-            // Première arrivée sur l'onglet : les 3 bulles, une seule fois.
-            if !scanTourVu && !montreTutoScan {
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
-                    montreTutoScan = true
-                }
-            }
             guard activeEnergyToday == nil else { return }
             Task { activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal() }
         }
         .onChange(of: viewModel.quotaExhausted) { _, exhausted in
-            if exhausted {
-                showPaywall = true
-                viewModel.quotaExhausted = false
-            }
+            guard exhausted else { return }
+            viewModel.quotaExhausted = false
+            // Ce chemin ne consultait PAS `bilanComplete`, contrairement à toute
+            // la matrice `ScanQuotaUI` : un testeur en découverte, qui n'a jamais
+            // vu de compteur (la pastille est elle aussi conditionnée au bilan),
+            // pouvait se prendre le paywall en pleine figure. Décision V12a :
+            // aucune porte premium tant que le bilan n'est pas fait. Le message
+            // posé par `handleDailyQuotaReached()` reste affiché dans tous les cas.
+            guard ScanQuotaUI.gateEnabled(
+                bilanComplete: dashboardVM.bilanComplete,
+                isPremium: subscriptionService.isPremium
+            ) else { return }
+            showPaywall = true
         }
     }
 
@@ -460,6 +490,19 @@ struct MealScanView: View {
         let canonical = NutrientData.all.map(\.id.rawValue).filter { union.contains($0) }
         let rest = union.subtracting(canonical).sorted()
         return (canonical + rest).prefix(6).map { (id: $0, pct: journal.dayMicroPct($0)) }
+    }
+
+    /// Carte des apports du jour. Isolée dans une propriété pour ne calculer
+    /// `microItems` QU'UNE FOIS : passée à la carte puis recalculée pour la
+    /// phrase de synthèse, elle coûtait deux fois un parcours du journal du
+    /// jour plus six pourcentages de couverture, à chaque passe de rendu.
+    private var microsJourCard: some View {
+        let items = microItems
+        return ScanMicrosJourCard(
+            items: items,
+            headline: MealJournalViewModel.dayMicroHeadline(items, isToday: isTodaySelected),
+            reperesGeneriques: ReperesGeneriquesMention.estVisible(bilanComplete: dashboardVM.bilanComplete)
+        )
     }
 
     // MARK: - Bloc capture (déclenche le scan — inchangé, agit sur aujourd'hui)
@@ -599,9 +642,15 @@ struct MealScanView: View {
             // doigt tient le geste (les touches vont à la colonne dessous) ; une
             // fois verrouillée, ce sont ses boutons qui prennent la main.
             if dicteeEnCours {
-                bulleDictee
-                    .allowsHitTesting(dicteeVerrouillee)
-                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                BulleDictee(
+                    speech: dicteeBox.speech,
+                    geste: dicteeBox.geste,
+                    verrouillee: dicteeVerrouillee,
+                    onAnnuler: { annulerDictee() },
+                    onTerminer: { terminerDictee() }
+                )
+                .allowsHitTesting(dicteeVerrouillee)
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
         }
         .frame(maxWidth: .infinity)
@@ -665,16 +714,39 @@ struct MealScanView: View {
                     doigtSurMicro = true
                     dicteeTropCourte = false
                     dicteeAnnulee = false
+                    erreurDictee = nil
                     glissementDictee = .zero
                     // Quota (famille 5) : vérifié AVANT d'enregistrer — plutôt que
                     // de laisser parler pour échouer ensuite.
                     guard peutDicter else { return }
+                    // Autorisations manquantes : on n'enregistre RIEN et on
+                    // explique, plutôt que de faire surgir deux alertes iOS au
+                    // milieu du geste (elles annulent le toucher : plus de
+                    // `onEnded`, page bloquée jusqu'au garde-fou de 60 s).
+                    guard SpeechCaptureService.autorisationsAccordees else {
+                        doigtSurMicro = false
+                        demandeAutorisationVocale = true
+                        return
+                    }
                     HapticService.shared.primary()
                     demarrageDictee = Task {
                         try? await Task.sleep(nanoseconds: Self.delaiAvantEnregistrement)
                         guard !Task.isCancelled, doigtSurMicro else { return }
-                        dicteeEnCours = true
                         await speech.start()
+                        erreurDictee = speech.error
+
+                        // La bulle ne s'affiche QU'UNE FOIS le micro ouvert :
+                        // doigt déjà relâché, micro refusé, session audio
+                        // occupée → on referme immédiatement au lieu de laisser
+                        // la bulle à l'écran pendant une minute.
+                        guard !Task.isCancelled, doigtSurMicro,
+                              speech.state == .listening else {
+                            speech.stop()
+                            dicteeEnCours = false
+                            doigtSurMicro = false
+                            return
+                        }
+                        dicteeEnCours = true
 
                         // Garde-fou : un geste peut être avalé et ne jamais
                         // rendre son `onEnded`. Sans ce plafond, le micro
@@ -731,7 +803,9 @@ struct MealScanView: View {
                 // (l'ancienne feuille d'écoute est supprimée) — on apprend le
                 // geste, comme WhatsApp : un indice bref, puis il s'efface.
                 guard dicteeEnCours else {
-                    afficherIndiceMaintien()
+                    // Sauf si l'alerte d'autorisation vient de s'ouvrir : elle
+                    // dit déjà ce qu'il faut faire.
+                    if !demandeAutorisationVocale { afficherIndiceMaintien() }
                     return
                 }
                 terminerDictee()
@@ -793,96 +867,25 @@ struct MealScanView: View {
             showPaywall = true
             return
         }
+        guard SpeechCaptureService.autorisationsAccordees else {
+            demandeAutorisationVocale = true
+            return
+        }
         dicteeTropCourte = false
         dicteeAnnulee = false
         glissementDictee = .zero
         dicteeEnCours = true
         dicteeVerrouillee = true
+        erreurDictee = nil
         HapticService.shared.primary()
-        Task { await speech.start() }
-    }
-
-    /// La bulle d'enregistrement, DANS la carte à deux colonnes — le voile
-    /// sombre et la carte flottante d'avant faisaient pop-up, exactement ce que
-    /// les vocaux WhatsApp/Instagram ne font pas. Ici la carte se transforme
-    /// sur place : le micro gonfle sous le doigt et suit le glissement, la
-    /// colonne photo laisse place à la waveform, au minuteur et aux indices.
-    private var bulleDictee: some View {
-        HStack(spacing: 16) {
-            VStack(spacing: 4) {
-                if !dicteeVerrouillee {
-                    IndiceVerrou()
-                }
-                MicroVivant(
-                    level: speech.level,
-                    active: speech.state == .listening,
-                    pressed: !dicteeVerrouillee
-                )
-                // La bulle suit le doigt vers la gauche et s'estompe à
-                // l'approche du seuil — on sent l'annulation venir.
-                .offset(x: max(DicteeGeste.seuilAnnulation, min(0, glissementDictee.width)))
-                .opacity(Double(max(0.25, 1 + min(0, glissementDictee.width) / 140)))
-            }
-
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(spacing: 8) {
-                    PointEnregistrement()
-                    Text(dicteeVerrouillee ? "Mains libres" : "Je t'écoute…")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Kiwio.encre)
-                    Spacer(minLength: 0)
-                    Text(String(format: "%d:%02d", Int(speech.duree) / 60, Int(speech.duree) % 60))
-                        .font(.kiwioMono(13, .medium))
-                        .foregroundStyle(Kiwio.secondaire)
-                }
-
-                // 28 barres : la trace tient dans la colonne droite de la
-                // carte même sur l'écran le plus étroit (SE), sans rognage.
-                Waveform(level: speech.level, active: speech.state == .listening, nbBarres: 28)
-
-                if dicteeVerrouillee {
-                    HStack(spacing: 10) {
-                        Button {
-                            HapticService.shared.tap()
-                            annulerDictee()
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(Kiwio.rouge)
-                                .frame(width: 44, height: 44)
-                                .background(Kiwio.neutre, in: Circle())
-                        }
-                        .buttonStyle(.healthMapPressed)
-                        .accessibilityLabel("Jeter la dictée")
-
-                        Button {
-                            HapticService.shared.tap()
-                            terminerDictee()
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.up")
-                                    .font(.system(size: 15, weight: .bold))
-                                Text("Analyser")
-                                    .font(.system(size: 15, weight: .semibold))
-                            }
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(Kiwio.vert, in: Capsule())
-                        }
-                        .buttonStyle(.healthMapPressed)
-                        .accessibilityLabel("Envoyer à l'analyse")
-                    }
-                } else {
-                    IndiceGlisser()
-                }
+        Task {
+            await speech.start()
+            erreurDictee = speech.error
+            if speech.state != .listening {
+                dicteeEnCours = false
+                dicteeVerrouillee = false
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(dicteeVerrouillee
-                            ? "Enregistrement mains libres."
-                            : "Enregistrement en cours. Relâche pour lancer l'analyse.")
     }
 
     /// Exemple de dictée + confirmation, sous le bloc à deux colonnes.
@@ -1048,7 +1051,7 @@ struct MealScanView: View {
                 }
             } label: {
                 VStack(spacing: Theme.spacingMD) {
-                    if let imageData = viewModel.selectedImage, let uiImage = UIImage(data: imageData) {
+                    if let uiImage = viewModel.apercuPhoto {
                         Image(uiImage: uiImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -1193,7 +1196,7 @@ struct MealScanView: View {
     private func immersiveHeader(_ result: MealScanViewModel.MealAnalysisResult) -> some View {
         ZStack(alignment: .bottomLeading) {
             Group {
-                if let data = viewModel.selectedImage, let uiImage = UIImage(data: data) {
+                if let uiImage = viewModel.apercuPhoto {
                     Image(uiImage: uiImage).resizable().scaledToFill()
                 } else {
                     ZStack {
@@ -1367,12 +1370,15 @@ struct MealScanView: View {
     // MARK: - « Tes besoins du jour » (Lot 3 — scan_v2.besoins rédigés serveur)
     private func besoinsScanSection(_ besoins: [BesoinScanV2]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            // 16/bold : la SEULE taille de titre de section de la feuille
-            // résultat (elle en portait trois : 17, 16 et 15). Le 17/heavy est
-            // désormais réservé aux conclusions.
+            // Charte, règle 1 : un titre de section n'est jamais neutre et
+            // jamais gros — 13/bold à l'encre de son domaine. Le 16/bold posé
+            // ici sortait en plus de l'échelle à 8 tailles, et se retrouvait
+            // PLUS GROS que les données qu'il annonce (% en 15, libellé en 13).
+            // Les six titres de cette feuille passent ensemble au patron du
+            // reste de l'onglet (`ScanCardHeader`).
             Text("Tes besoins du jour")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(Theme.sectionLabelFont)
+                .foregroundStyle(ScanDomaine.apports)
                 .padding(.horizontal, 4)
             VStack(spacing: 0) {
                 let visibles = Array(besoins.prefix(3))
@@ -1475,8 +1481,8 @@ struct MealScanView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Text("Ce que ton plat t'apporte")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .font(Theme.sectionLabelFont)
+                        .foregroundStyle(ScanDomaine.apports)
                     Spacer()
                     Text("Touche pour le détail")
                         .font(.system(size: 11.5, weight: .semibold))
@@ -1500,8 +1506,8 @@ struct MealScanView: View {
         if !shown.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Les aliments de ce repas")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(Theme.sectionLabelFont)
+                    .foregroundStyle(ScanDomaine.energie)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                     ForEach(shown) { food in
                         FoodTileV4(food: food) { selectedFood = food }
@@ -2086,4 +2092,119 @@ private struct IndiceVerrou: View {
 #Preview {
     MealScanView()
         .environmentObject(DashboardViewModel())
+}
+
+// MARK: - Boîte de dictée (détention SANS observation)
+/// `MealScanView` doit DÉTENIR le service de capture (durée de vie de l'écran)
+/// sans s'abonner à ses publications. Cette boîte est un `ObservableObject`
+/// volontairement MUET — aucun `@Published` — donc `@StateObject` garantit une
+/// seule instance sans jamais réinvalider la page. Les objets qui, eux,
+/// publient (le service, le geste) sont observés par la seule bulle.
+@MainActor
+final class DicteeBox: ObservableObject {
+    let speech = SpeechCaptureService()
+    let geste = GesteDictee()
+}
+
+/// Translation du doigt pendant la dictée. Publiée à haute fréquence, lue par
+/// la seule bulle.
+@MainActor
+final class GesteDictee: ObservableObject {
+    @Published var glissement: CGSize = .zero
+}
+
+// MARK: - Bulle d'enregistrement (le seul abonné au flux du micro)
+/// La bulle d'enregistrement, DANS la carte à deux colonnes — le voile sombre
+/// et la carte flottante d'avant faisaient pop-up, exactement ce que les vocaux
+/// WhatsApp/Instagram ne font pas. Ici la carte se transforme sur place : le
+/// micro gonfle sous le doigt et suit le glissement, la colonne photo laisse
+/// place à la waveform, au minuteur et aux indices.
+///
+/// Vue SÉPARÉE, et c'est le point : elle est la seule à observer `speech` et
+/// `geste`, donc la seule que le niveau sonore (20 Hz) et le glissement du
+/// doigt (120 Hz) réinvalident.
+private struct BulleDictee: View {
+    @ObservedObject var speech: SpeechCaptureService
+    @ObservedObject var geste: GesteDictee
+    let verrouillee: Bool
+    let onAnnuler: () -> Void
+    let onTerminer: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            VStack(spacing: 4) {
+                if !verrouillee {
+                    IndiceVerrou()
+                }
+                MicroVivant(
+                    level: speech.level,
+                    active: speech.state == .listening,
+                    pressed: !verrouillee
+                )
+                // La bulle suit le doigt vers la gauche et s'estompe à
+                // l'approche du seuil — on sent l'annulation venir.
+                .offset(x: max(DicteeGeste.seuilAnnulation, min(0, geste.glissement.width)))
+                .opacity(Double(max(0.25, 1 + min(0, geste.glissement.width) / 140)))
+            }
+
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(spacing: 8) {
+                    PointEnregistrement()
+                    Text(verrouillee ? "Mains libres" : "Je t'écoute…")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Kiwio.encre)
+                    Spacer(minLength: 0)
+                    Text(String(format: "%d:%02d", Int(speech.duree) / 60, Int(speech.duree) % 60))
+                        .font(.kiwioMono(13, .medium))
+                        .foregroundStyle(Kiwio.secondaire)
+                }
+
+                // 28 barres : la trace tient dans la colonne droite de la
+                // carte même sur l'écran le plus étroit (SE), sans rognage.
+                Waveform(level: speech.level, active: speech.state == .listening, nbBarres: 28)
+
+                if verrouillee {
+                    HStack(spacing: 10) {
+                        Button {
+                            HapticService.shared.tap()
+                            onAnnuler()
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(Kiwio.rouge)
+                                .frame(width: 44, height: 44)
+                                .background(Kiwio.neutre, in: Circle())
+                        }
+                        .buttonStyle(.healthMapPressed)
+                        .accessibilityLabel("Jeter la dictée")
+
+                        Button {
+                            HapticService.shared.tap()
+                            onTerminer()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.up")
+                                    .font(.system(size: 15, weight: .bold))
+                                Text("Analyser")
+                                    .font(.system(size: 15, weight: .semibold))
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(Kiwio.vert, in: Capsule())
+                        }
+                        .buttonStyle(.healthMapPressed)
+                        .accessibilityLabel("Envoyer à l'analyse")
+                    }
+                } else {
+                    IndiceGlisser()
+                }
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(verrouillee
+                            ? "Enregistrement mains libres."
+                            : "Enregistrement en cours. Relâche pour lancer l'analyse.")
+    }
 }
