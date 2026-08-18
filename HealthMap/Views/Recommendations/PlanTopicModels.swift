@@ -110,6 +110,29 @@ struct PlanSupplementSolution: Identifiable {
     let strong: Bool          // priorité haute -> teinte verte, sinon neutre
 }
 
+/// Une puce de levier, rangée dans l'ordre où l'œil doit la lire : le CONTENU
+/// d'abord (l'aliment, le complément), ses précisions ensuite, l'astuce en
+/// dernier, et la pastille de priorité quand la donnée la porte.
+///
+/// Ce type existe pour que la carte de levier puisse hiérarchiser au lieu
+/// d'aplatir toute la puce en une seule chaîne : c'est la donnée qui doit
+/// dominer sa catégorie, jamais l'inverse (charte de hiérarchie du 17 août
+/// 2026, règle 3). Rien n'est inventé ici — chaque champ vient d'une valeur
+/// déjà calculée par le builder ; vide, il ne s'affiche pas.
+struct PlanLevierLine {
+    /// La donnée-héros de la puce : « Lentilles », « Fer ».
+    let texte: String
+    /// Repères courts déjà calculés (combien, quand, dosage). Vide = rien à dire.
+    var detail: String = ""
+    /// Astuce d'association ou de préparation, plus discrète encore.
+    var astuce: String = ""
+    /// Pastille de priorité (« Prioritaire » / « Si besoin ») quand la source
+    /// la porte. `nil` → aucune pastille, pas de pastille par défaut.
+    var tag: String? = nil
+    /// Priorité haute : la pastille prend l'encre du levier plutôt que le gris.
+    var tagStrong: Bool = false
+}
+
 // MARK: - Vue « Apports » — un nœud par apport à renforcer
 
 /// Construit les topics de la vue « Apports » : la MÊME couronne radiale, mais
