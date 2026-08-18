@@ -24,6 +24,10 @@ TARGETS = {
   # Même service Premium, seules la durée et la facturation changent :
   # Apple recommande donc le même niveau pour obtenir un crossgrade.
   "healthmap_weekly"  => { price: "0.99",  name: "Kiwio Hebdo",   period: "ONE_WEEK",  level: 1 },
+  # Produit jamais vendu, conservé pour l'audit : depuis le 18 août 2026 seules
+  # deux formules sont commercialisées (hebdo + annuel). Le mensuel existe
+  # encore côté App Store Connect (état READY_TO_SUBMIT, jamais soumis) ; on le
+  # garde ici pour que MODE=audit continue de le voir et de le décrire.
   "healthmap_monthly" => { price: "4.99",  name: "Kiwio Mensuel", period: "ONE_MONTH", level: 1 },
   "healthmap_annual"  => { price: "50.00", name: "Kiwio Annuel",  period: "ONE_YEAR",  level: 1 },
 }.freeze
@@ -1064,7 +1068,11 @@ if MODE == "tester-code"
   exit 0
 end
 
-# ── MODE offers : codes promo (NAIA = 3 mois offerts / mensuel, LANCEMENT50 = -50% 1re année / annuel) ──
+# ── MODE offers : codes promo (NAIA = 3 mois offerts / hebdo, LANCEMENT50 = -50% 1re année / annuel) ──
+# NAIA était adossé au mensuel ; ce produit n'étant pas vendu (décision du
+# 18 août 2026 : hebdo + annuel uniquement), l'offre passe sur l'HEBDO à durée
+# identique (3 mois offerts). Un code adossé à un abonnement absent du paywall
+# n'aurait jamais pu être utilisé.
 if MODE == "offers"
   groups = get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200")
   subs = {}
@@ -1073,10 +1081,13 @@ if MODE == "offers"
       subs[s.dig("attributes", "productId")] = s["id"]
     end
   end
-  monthly = subs["healthmap_monthly"]
+  weekly  = subs["healthmap_weekly"]
   annual  = subs["healthmap_annual"]
-  abort_with("offers", 0, "abonnements introuvables") unless monthly && annual
-  puts "Mensuel : #{monthly} | Annuel : #{annual}"
+  # Le mensuel ne sert plus qu'au nettoyage de l'ancienne LANCEMENT50 : son
+  # absence ne doit pas faire échouer le mode.
+  monthly = subs["healthmap_monthly"]
+  abort_with("offers", 0, "abonnements introuvables") unless weekly && annual
+  puts "Hebdo : #{weekly} | Annuel : #{annual}"
 
   # Expiration des codes ~18 mois (Time.now = vrai Ruby CI, pas le sandbox Workflow).
   expiration = (Time.now + 550 * 24 * 3600).strftime("%Y-%m-%d")
@@ -1084,7 +1095,9 @@ if MODE == "offers"
   # Nettoyage : LANCEMENT50 était sur le mensuel ; le code passe sur l'annuel
   # (aucun code redeemable minté → suppression sûre, best-effort).
   legacy = {}
-  get_all("/v1/subscriptions/#{monthly}/offerCodes?limit=200").each { |o| legacy[o.dig("attributes", "name")] = o["id"] }
+  if monthly
+    get_all("/v1/subscriptions/#{monthly}/offerCodes?limit=200").each { |o| legacy[o.dig("attributes", "name")] = o["id"] }
+  end
   if (old_id = legacy["LANCEMENT50 - -50% 3 mois"])
     uri = URI(BASE + "/v1/subscriptionOfferCodes/#{old_id}")
     http = Net::HTTP.new(uri.host, uri.port)
@@ -1095,7 +1108,7 @@ if MODE == "offers"
   end
 
   offers = [
-    { sub: monthly, name: "NAIA - 3 mois offerts", code: "NAIA", redemptions: 20, target: nil,
+    { sub: weekly, name: "NAIA - 3 mois offerts", code: "NAIA", redemptions: 20, target: nil,
       attrs: { offerMode: "FREE_TRIAL", duration: "THREE_MONTHS", numberOfPeriods: 1,
                customerEligibilities: %w[NEW EXISTING EXPIRED], offerEligibility: "STACK_WITH_INTRO_OFFERS" } },
     # -50% sur l'annuel : 1re année à ~25 € (au lieu de 50 €), puis 50 €/an.
@@ -1107,7 +1120,7 @@ if MODE == "offers"
   failures = []
   pending = []
   offers.each do |o|
-    label = o[:sub] == annual ? "annuel" : "mensuel"
+    label = o[:sub] == annual ? "annuel" : "hebdo"
     puts "\n--- #{o[:code]} (#{label}) ---"
     existing = {}
     get_all("/v1/subscriptions/#{o[:sub]}/offerCodes?limit=200").each { |x| existing[x.dig("attributes", "name")] = x["id"] }
@@ -1116,7 +1129,7 @@ if MODE == "offers"
       puts "  offer code déjà présent (#{oc_id})"
     else
       # Grille de prix : prix réduit pour un -50%, prix de base sinon (essai gratuit).
-      grid, real = offer_price_grid(o[:sub], o[:target] || TARGETS["healthmap_monthly"][:price])
+      grid, real = offer_price_grid(o[:sub], o[:target] || TARGETS["healthmap_weekly"][:price])
       if grid.empty?
         puts "  ÉCHEC aucun point de prix pour la cible"
         failures << "#{o[:code]}: prix"
@@ -1149,7 +1162,7 @@ if MODE == "offers"
 
   # Relit les codes custom sur les 2 abonnements
   puts "\n===== ÉTAT FINAL OFFER CODES ====="
-  [monthly, annual].uniq.each do |sub_id|
+  [weekly, annual].uniq.each do |sub_id|
     code, body = req(:get, "/v1/subscriptions/#{sub_id}/offerCodes?include=customCodes&limit=200")
     next unless code == 200
     (body["included"] || []).select { |i| i["type"] == "subscriptionOfferCodeCustomCodes" }.each do |c|
