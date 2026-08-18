@@ -564,6 +564,7 @@ struct VoiceMealSheet: View {
             GamificationService.shared.recordCheckin()
             AnalyticsService.shared.track(.mealScanned)
             GamificationService.shared.unlockMealScanned()
+            MealJournalViewModel.signalerEcriture()
             NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
 
             onAdded(entries.count, totaux.kcal)

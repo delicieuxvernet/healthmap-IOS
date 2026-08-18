@@ -60,7 +60,19 @@ final class MealJournalViewModel: ObservableObject {
     /// quinzaine, sur le chemin critique. Idem après chaque scan
     /// (`.healthmapMealScanned` est écouté par les trois).
     /// Isolé @MainActor comme la classe : pas de course possible.
-    private static var volEnCours: (cle: String, tache: Task<[MealJournalService.MealRecord], Error>)?
+    private static var volEnCours: (cle: String, debut: Date, tache: Task<[MealJournalService.MealRecord], Error>)?
+
+    /// Instant de la dernière écriture connue du journal (repas enregistré,
+    /// quantité modifiée, ligne supprimée). Une requête PARTIE AVANT cette date
+    /// ne peut pas contenir l'écriture : on ne la rejoint jamais, on en lance
+    /// une neuve. Sans cette borne, le partage aurait pu servir des données
+    /// périmées à l'écran juste après un scan.
+    private static var derniereEcriture = Date.distantPast
+
+    /// À appeler juste avant de signaler un changement du journal.
+    static func signalerEcriture() {
+        derniereEcriture = Date()
+    }
 
     func load() async {
         guard let userId = AuthService.shared.cachedCurrentUserIdString else {
@@ -83,14 +95,16 @@ final class MealJournalViewModel: ObservableObject {
             let from = min(solSemaine, solAxe)
             let cle = "\(userId)|\(from.timeIntervalSince1970)|\(week.end.timeIntervalSince1970)"
             let tache: Task<[MealJournalService.MealRecord], Error>
-            if let vol = Self.volEnCours, vol.cle == cle {
+            if let vol = Self.volEnCours, vol.cle == cle, vol.debut > Self.derniereEcriture {
                 tache = vol.tache
             } else {
                 let service = self.service
                 tache = Task { try await service.loadRange(userId: userId, from: from, to: week.end) }
-                Self.volEnCours = (cle, tache)
+                Self.volEnCours = (cle, Date(), tache)
             }
-            defer { if Self.volEnCours?.cle == cle { Self.volEnCours = nil } }
+            // On ne retire QUE sa propre requête : une écriture survenue
+            // pendant le vol a pu en faire démarrer une plus fraîche.
+            defer { if Self.volEnCours?.tache == tache { Self.volEnCours = nil } }
             let all = try await tache.value
             fortnight = all
             meals = all.filter { Calendar.current.isDateInToday($0.consumedAt) }
@@ -195,6 +209,7 @@ final class MealJournalViewModel: ObservableObject {
     /// d'un scan (accueil Scan, Bilan, Suivi, Plan rechargent leurs données).
     /// Nom hérité : `.healthmapMealScanned` signifie « journal modifié ».
     private static func postJournalChanged() {
+        signalerEcriture()
         NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
     }
 

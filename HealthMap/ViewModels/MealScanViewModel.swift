@@ -572,6 +572,7 @@ final class MealScanViewModel: ObservableObject {
             // notifie les écrans en aval pour qu'ils rechargent leur journal,
             // sinon le score hebdo du Bilan et « Ta journée » restent figés sur
             // un instantané antérieur au scan.
+            MealJournalViewModel.signalerEcriture()
             NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
 
             // Vignette LOCALE de la photo pour « Scans récents » / « Tes derniers
