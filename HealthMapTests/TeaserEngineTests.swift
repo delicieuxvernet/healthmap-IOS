@@ -165,7 +165,7 @@ final class TeaserEngineTests: XCTestCase {
     /// Aucun message de teaser ne doit contenir de vocabulaire interdit
     /// (même liste que VoiceComplianceTests) ni de caractère accentué
     /// (convention des libellés questionnaire).
-    func testMessages_useCompliantAccentFreeLanguage() {
+    func testMessages_useCompliantAccentedLanguage() {
         var p = UserProfile.empty
         p.indoorWork = "yes"
         p.sunExposure = "none"

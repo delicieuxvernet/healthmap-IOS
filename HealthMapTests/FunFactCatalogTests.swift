@@ -53,7 +53,7 @@ final class FunFactCatalogTests: XCTestCase {
     /// Repère Mbappé à 178 cm (spécification produit).
     func testHeight_178_isMbappe() {
         let fact = FunFactCatalog.fact(for: "height", value: 178)
-        XCTAssertTrue(fact?.contains("Mbappe") == true, "178 cm should reference Mbappe, got: \(fact ?? "nil")")
+        XCTAssertTrue(fact?.contains("Mbappé") == true, "178 cm should reference Mbappé, got: \(fact ?? "nil")")
     }
 
     /// Humour tour Eiffel aux extrêmes hauts du slider.
@@ -89,7 +89,7 @@ final class FunFactCatalogTests: XCTestCase {
         let fact = FunFactCatalog.fact(for: "height", value: 181)
         XCTAssertEqual(fact?.contains("185"), false, "181 cm must not claim 185 cm, got: \(fact ?? "nil")")
         XCTAssertEqual(fact?.contains("Zidane"), false, "181 cm must not claim Zidane, got: \(fact ?? "nil")")
-        XCTAssertTrue(fact?.contains("Mbappe") == true, "181 cm should anchor on nearest ref Mbappe, got: \(fact ?? "nil")")
+        XCTAssertTrue(fact?.contains("Mbappé") == true, "181 cm should anchor on nearest ref Mbappé, got: \(fact ?? "nil")")
     }
 
     /// Invariant fort : une affirmation « Pile la taille de X (H cm) » ne peut
@@ -116,7 +116,7 @@ final class FunFactCatalogTests: XCTestCase {
     /// Aucun fun fact ne doit contenir de vocabulaire interdit (même liste
     /// que VoiceComplianceTests) ni de caractère accentué (convention des
     /// libellés questionnaire).
-    func testFacts_useCompliantAccentFreeLanguage() {
+    func testFacts_useCompliantAccentedLanguage() {
         let forbidden = ["carence", "diagnostic", "patient", "maladie"]
         let accents = CharacterSet(charactersIn: "àâäéèêëîïôöùûüçÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ")
 

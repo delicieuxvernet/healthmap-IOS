@@ -38,19 +38,19 @@ enum FunFactCatalog {
     /// repère : pour un cm donné on prend la plus proche et on formule un écart
     /// EXACT — donc jamais une taille attribuée à tort.
     private static let heightRefs: [(cm: Int, who: String)] = [
-        (147, "Edith Piaf"), (155, "Lady Gaga"), (157, "Kevin Hart"),
-        (165, "Daniel Radcliffe"), (168, "Napoleon"), (170, "Lionel Messi"),
-        (173, "Rihanna"), (178, "Kylian Mbappe"), (185, "Zinedine Zidane"),
+        (147, "Édith Piaf"), (155, "Lady Gaga"), (157, "Kevin Hart"),
+        (165, "Daniel Radcliffe"), (168, "Napoléon"), (170, "Lionel Messi"),
+        (173, "Rihanna"), (178, "Kylian Mbappé"), (185, "Zinédine Zidane"),
         (187, "Cristiano Ronaldo"), (190, "Omar Sy"), (196, "Charles de Gaulle"),
         (204, "Teddy Riner"), (216, "Shaquille O'Neal"),
     ]
 
     private static func heightFact(_ cm: Int) -> String {
-        // Au-dela du plus grand repere reel (Shaquille O'Neal, 216 cm) : humour
-        // assume, hors echelle humaine courante. Ce n'est pas une info fausse,
-        // c'est une blague explicite pour l'extreme haut du slider.
+        // Au-delà du plus grand repère réel (Shaquille O'Neal, 216 cm) : humour
+        // assumé, hors échelle humaine courante. Ce n'est pas une info fausse,
+        // c'est une blague explicite pour l'extrême haut du slider.
         if cm > 216 {
-            return "La tour Eiffel (330 m) garde de l'avance... pour l'instant !"
+            return "La tour Eiffel (330 m) garde de l'avance… pour l'instant !"
         }
         // Célébrité dont la taille est la plus proche de la valeur choisie.
         let ref = heightRefs.min { abs($0.cm - cm) < abs($1.cm - cm) } ?? heightRefs[0]
@@ -59,7 +59,7 @@ enum FunFactCatalog {
             return "Pile la taille de \(ref.who) (\(ref.cm) cm) !"
         }
         if abs(delta) == 1 {
-            return "A un cheveu de \(ref.who) (\(ref.cm) cm) !"
+            return "À un cheveu de \(ref.who) (\(ref.cm) cm) !"
         }
         let sens = delta > 0 ? "de plus que" : "de moins que"
         return "\(cm) cm, soit \(abs(delta)) cm \(sens) \(ref.who) (\(ref.cm) cm)."
