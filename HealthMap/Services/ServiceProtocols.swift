@@ -15,7 +15,10 @@ import Foundation
 // à l'implémentation d'un provider spécifique.
 
 protocol AuthServiceProtocol: AnyObject {
-    func signUp(email: String, password: String, firstName: String) async throws
+    /// - Returns: `true` si la session est posée immédiatement, `false` si
+    ///   Supabase attend une confirmation par email.
+    @discardableResult
+    func signUp(email: String, password: String, firstName: String) async throws -> Bool
     func signIn(email: String, password: String) async throws
     func signInWithGoogle() async throws -> URL
     func signInWithApple(idToken: String, rawNonce: String) async throws
