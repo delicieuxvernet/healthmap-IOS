@@ -887,8 +887,8 @@ private struct SuiviPosedChart: View {
 
             // Labels POSÉS sur les courbes (fin de tracé). Point unique (jour 0) :
             // le label part À DROITE du point pour ne pas déborder à gauche.
-            // Labels du tracé : « toi » est la série qui compte (11.5 / heavy,
-            // encre verte), la référence et les pôles d'axe restent habillage.
+            // « toi » est la série qui compte et garde son encre verte ; la
+            // référence et les pôles d'axe restent de l'habillage.
             if let tip = reelPts.last {
                 if reelPts.count > 1 {
                     ctx.draw(
