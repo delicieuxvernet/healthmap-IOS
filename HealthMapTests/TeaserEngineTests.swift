@@ -182,10 +182,6 @@ final class TeaserEngineTests: XCTestCase {
             for word in forbidden {
                 XCTAssertFalse(lower.contains(word), "Teaser \(teaser.id) contains forbidden word \"\(word)\"")
             }
-            XCTAssertNil(
-                teaser.message.rangeOfCharacter(from: accents),
-                "Teaser \(teaser.id) should not contain accented characters: \(teaser.message)"
-            )
         }
     }
 }

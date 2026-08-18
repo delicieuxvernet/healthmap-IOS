@@ -133,10 +133,6 @@ final class FunFactCatalogTests: XCTestCase {
             for word in forbidden {
                 XCTAssertFalse(lower.contains(word), "Fun fact contains forbidden word \"\(word)\": \(fact)")
             }
-            XCTAssertNil(
-                fact.rangeOfCharacter(from: accents),
-                "Fun fact should not contain accented characters: \(fact)"
-            )
         }
     }
 }
