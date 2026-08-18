@@ -457,10 +457,13 @@ struct NutrientDetailSheet: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                // Titre de section : couleur du domaine, jamais l'encre neutre.
+                // Titre de section : plus petit que ce qu'il annonce. La
+                // couleur du domaine reste portée par l'icône : `accentSky`
+                // (#5AC8FA) ne tient pas 4,5:1 sur blanc à 11,5 pt, et
+                // l'accessibilité passe avant la règle de couleur.
                 Text(label)
                     .font(Theme.subLabelFont)
-                    .foregroundStyle(tint)
+                    .foregroundStyle(Color.healthMapText)
 
                 Text(text)
                     .font(Theme.captionFont)
