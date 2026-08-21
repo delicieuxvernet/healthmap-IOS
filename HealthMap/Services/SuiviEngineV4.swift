@@ -427,47 +427,24 @@ enum SuiviEngineV4 {
         }
     }
 
-    // MARK: - Seuil « 3 jours d'affilée » + courbes d'exemple
-
-    /// Plus longue série de jours CONSÉCUTIFS (sur `days`) avec au moins un repas
-    /// scanné. Sert de seuil : tant qu'il est < 3, les carrousels macros/micros
-    /// affichent une courbe d'EXEMPLE (badgée) plutôt que des trous — on ne
-    /// montre les vraies courbes qu'une fois 3 jours d'affilée complétés.
-    static func maxConsecutiveScannedDays(fortnight: [MealJournalService.MealRecord],
-                                          days: Int = 14,
-                                          now: Date = Date(),
-                                          calendar: Calendar = .current) -> Int {
-        let scannedDays = Set(fortnight.map { calendar.startOfDay(for: $0.consumedAt) })
-        var best = 0, run = 0
-        for day in dailyAxis(days: days, now: now, calendar: calendar) {
-            if scannedDays.contains(day) { run += 1; best = Swift.max(best, run) } else { run = 0 }
-        }
-        return best
-    }
-
-    /// Série d'EXEMPLE d'une macro (7 jours, tendance douce montante). Purement
-    /// illustrative — affichée badgée « Exemple », jamais présentée comme réelle.
-    static func exampleMacroSeries(_ macro: MacroKind,
-                                   now: Date = Date(),
-                                   calendar: Calendar = .current) -> [DayPoint] {
-        let axis = dailyAxis(days: 7, now: now, calendar: calendar)
-        let base: [Double]
-        switch macro {
-        case .calories: base = [1500, 1650, 1580, 1720, 1800, 1760, 1900]
-        case .proteins: base = [52, 58, 55, 64, 70, 68, 78]
-        case .carbs:    base = [160, 175, 168, 182, 190, 186, 200]
-        case .fats:     base = [48, 52, 50, 55, 58, 56, 62]
-        case .fiber:    base = [14, 16, 15, 19, 22, 21, 25]
-        }
-        return zip(axis, base).map { DayPoint(date: $0, value: $1) }
-    }
-
-    /// Série d'EXEMPLE de couverture d'un micronutriment (%, tendance montante).
-    static func exampleMicroSeries(now: Date = Date(),
-                                   calendar: Calendar = .current) -> [DayPoint] {
-        let axis = dailyAxis(days: 7, now: now, calendar: calendar)
-        let base: [Double] = [38, 45, 42, 54, 60, 58, 70]
-        return zip(axis, base).map { DayPoint(date: $0, value: $1) }
+    /// Largeur de l'axe à tracer : du PREMIER jour scanné à aujourd'hui.
+    ///
+    /// Un axe de 14 jours posé sur un seul jour de scans ne dessine pas une
+    /// courbe, il dessine du vide — c'est ce qui avait fait préférer une courbe
+    /// d'exemple. En calant l'axe sur ce qui existe vraiment, la vraie mesure
+    /// tient l'écran dès le premier repas, sans trou d'amorce et sans invention.
+    ///
+    /// - Returns: 0 si aucun scan (l'appelant montre alors un état vide),
+    ///   sinon le nombre de jours à tracer, plafonné à `maxDays`.
+    static func fenetreMesuree(fortnight: [MealJournalService.MealRecord],
+                               maxDays: Int = 14,
+                               now: Date = Date(),
+                               calendar: Calendar = .current) -> Int {
+        let today = calendar.startOfDay(for: now)
+        let jours = fortnight.map { calendar.startOfDay(for: $0.consumedAt) }
+        guard let premier = jours.min() else { return 0 }
+        let ecart = calendar.dateComponents([.day], from: premier, to: today).day ?? 0
+        return Swift.min(Swift.max(ecart + 1, 1), Swift.max(maxDays, 1))
     }
 
     /// Résumé « il y a N j : X · aujourd'hui : Y » d'une série : premier et
@@ -479,11 +456,19 @@ enum SuiviEngineV4 {
         let gapDays: Int
         var delta: Double { last - first }
     }
+
     static func seriesSummary(_ points: [DayPoint], calendar: Calendar = .current) -> SeriesSummary? {
         let real = points.filter { $0.value != nil }
         guard let f = real.first, let l = real.last, let fv = f.value, let lv = l.value else { return nil }
         let gap = calendar.dateComponents([.day], from: f.date, to: l.date).day ?? 0
         return SeriesSummary(first: fv, last: lv, gapDays: gap)
+    }
+
+    /// Nombre de jours RÉELLEMENT mesurés dans une série (points non nuls).
+    /// En dessous de 2, aucune tendance n'a de sens : l'appelant dit « reviens
+    /// demain » au lieu d'afficher une évolution calculée sur un seul point.
+    static func joursMesures(_ points: [DayPoint]) -> Int {
+        points.filter { $0.value != nil }.count
     }
 
     // MARK: - 4. « Pour faire mieux la semaine prochaine » (2 conseils)

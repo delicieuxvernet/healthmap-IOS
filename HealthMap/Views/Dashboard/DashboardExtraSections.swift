@@ -13,6 +13,11 @@ enum NavCardDestination: String {
 extension Notification.Name {
     static let healthmapNavigateToTab = Notification.Name("healthmapNavigateToTab")
     static let healthmapOpenProfile = Notification.Name("healthmapOpenProfile")
+    /// Rejouer le récap animé. La demande part du profil mais la séquence est
+    /// présentée par `MainTabView` : une feuille plein écran ouverte DEPUIS une
+    /// feuille, en 8e modificateur de présentation sur la même vue, ne s'ouvrait
+    /// pas (bug du 21 août 2026).
+    static let healthmapRejouerRecap = Notification.Name("healthmapRejouerRecap")
     /// Émise après un scan de repas réussi (repas persisté dans meal_scans par la
     /// fonction Edge). Les écrans en aval (Bilan → score hebdo, journal du jour
     /// « Ta journée ») rechargent leur journal à réception.

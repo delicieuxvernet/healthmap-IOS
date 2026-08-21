@@ -93,13 +93,11 @@ final class TeaserOngletsTests: XCTestCase {
         XCTAssertFalse(BilanDoorButton.Libelle.suivi.isEmpty)
         XCTAssertFalse(BilanDoorButton.Libelle.suivi.contains("\u{2014}"))
 
-        // Les carrousels d'exemple ont TOUJOURS de quoi dessiner (macros +
-        // micros), même sans aucun scan ni bilan.
-        for kind in SuiviEngineV4.MacroKind.allCases {
-            XCTAssertFalse(SuiviEngineV4.exampleMacroSeries(kind).isEmpty,
-                           "Courbe d'exemple attendue pour \(kind.rawValue)")
-        }
-        XCTAssertFalse(SuiviEngineV4.exampleMicroSeries().isEmpty)
+        // Sans aucun scan, il n'y a RIEN à tracer — et c'est voulu : depuis le
+        // 21 août 2026 l'app n'illustre plus les courbes avec de fausses
+        // données, elle affiche un état vide qui invite à scanner.
+        XCTAssertEqual(SuiviEngineV4.fenetreMesuree(fortnight: []), 0,
+                       "Aucun scan : aucune fenêtre à tracer")
 
         // Sans bilan v2, aucun symptôme déclaré : la section retombe sur son
         // état d'invitation, sans inventer de courbe personnelle.
