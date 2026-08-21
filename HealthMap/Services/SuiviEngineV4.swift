@@ -447,6 +447,23 @@ enum SuiviEngineV4 {
         return Swift.min(Swift.max(ecart + 1, 1), Swift.max(maxDays, 1))
     }
 
+    /// Résumé « il y a N j : X · aujourd'hui : Y » d'une série : premier et
+    /// dernier points RÉELS (non nil) + écart en jours entre eux. `nil` si
+    /// aucun point mesuré. Sert à l'insight honnête sous chaque courbe.
+    struct SeriesSummary: Equatable {
+        let first: Double
+        let last: Double
+        let gapDays: Int
+        var delta: Double { last - first }
+    }
+
+    static func seriesSummary(_ points: [DayPoint], calendar: Calendar = .current) -> SeriesSummary? {
+        let real = points.filter { $0.value != nil }
+        guard let f = real.first, let l = real.last, let fv = f.value, let lv = l.value else { return nil }
+        let gap = calendar.dateComponents([.day], from: f.date, to: l.date).day ?? 0
+        return SeriesSummary(first: fv, last: lv, gapDays: gap)
+    }
+
     /// Nombre de jours RÉELLEMENT mesurés dans une série (points non nuls).
     /// En dessous de 2, aucune tendance n'a de sens : l'appelant dit « reviens
     /// demain » au lieu d'afficher une évolution calculée sur un seul point.
