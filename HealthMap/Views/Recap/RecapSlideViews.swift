@@ -16,8 +16,8 @@ struct RecapSlideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacingMD) {
             switch slide {
-            case .intro(let prenom, let reponses):
-                intro(prenom: prenom, reponses: reponses)
+            case .intro(let prenom, let réponses):
+                intro(prenom: prenom, réponses: réponses)
             case .score(let valeur, let mot, let insight):
                 score(valeur: valeur, mot: mot, insight: insight)
             case .securite(let message):
@@ -48,7 +48,7 @@ struct RecapSlideView: View {
 
     // MARK: - Ouverture
 
-    private func intro(prenom: String?, reponses: Int) -> some View {
+    private func intro(prenom: String?, réponses: Int) -> some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             KiwiContourMark(size: 52, color: .kiwiGreen)
                 .recapApparition(0)
@@ -58,8 +58,8 @@ struct RecapSlideView: View {
                 .foregroundStyle(Color.kiwiCharcoal)
                 .recapApparition(1)
 
-            Text(reponses > 0
-                 ? "on a lu tes \(reponses) réponses, une par une."
+            Text(réponses > 0
+                 ? "on a lu tes \(réponses) réponses, une par une."
                  : "on a lu tout ce que tu nous as dit.")
                 .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(Color.kiwiCharcoal.opacity(0.75))

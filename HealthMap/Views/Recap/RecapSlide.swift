@@ -14,7 +14,7 @@ import Foundation
 /// Un slide de la séquence, avec son contenu déjà prêt à afficher.
 enum RecapSlide: Identifiable, Equatable {
     /// « Arthur, on a lu tes 42 réponses. »
-    case intro(prenom: String?, reponses: Int)
+    case intro(prenom: String?, réponses: Int)
     /// Compteur animé 0 → score, mot d'état, phrase de l'IA.
     case score(valeur: Int, mot: String, insight: String?)
     /// Signal de sécurité : affiché INTÉGRALEMENT et GRATUITEMENT, toujours.

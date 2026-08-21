@@ -34,7 +34,7 @@ enum RecapBuilder {
     /// - Parameters:
     ///   - analyse: le bilan v2 tel que renvoyé par `generate-analysis`.
     ///   - prenom: pour l'adresse directe du premier slide.
-    ///   - reponses: nombre de réponses au questionnaire (0 = on n'en parle pas).
+    ///   - réponses: nombre de réponses au questionnaire (0 = on n'en parle pas).
     ///   - alertesSecurite: messages des red flags URGENTS (jamais verrouillés).
     ///   - estPremium: aucun verrou si vrai, et l'offre devient « la suite ».
     /// - Returns: la séquence, éventuellement vide si l'analyse est inexploitable
@@ -42,7 +42,7 @@ enum RecapBuilder {
     static func construire(
         analyse: AIAnalysisV2?,
         prenom: String?,
-        reponses: Int,
+        réponses: Int,
         alertesSecurite: [String] = [],
         estPremium: Bool
     ) -> [RecapSlide] {
@@ -52,7 +52,7 @@ enum RecapBuilder {
         let bilan = analyse.bilan
 
         // ① Ouverture — on nomme la personne et l'effort qu'elle vient de fournir.
-        slides.append(.intro(prenom: prenom, reponses: reponses))
+        slides.append(.intro(prenom: prenom, réponses: réponses))
 
         // ② Le score, en compteur animé.
         slides.append(.score(

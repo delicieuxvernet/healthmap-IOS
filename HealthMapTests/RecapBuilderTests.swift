@@ -81,7 +81,7 @@ final class RecapBuilderTests: XCTestCase {
 
     func testSequenceStartsPositiveAndEndsOnTheOffer() {
         let slides = RecapBuilder.construire(
-            analyse: profilComplet(), prenom: "Arthur", reponses: 42, estPremium: false
+            analyse: profilComplet(), prenom: "Arthur", réponses: 42, estPremium: false
         )
 
         XCTAssertEqual(slides.first?.typeName, "intro")
@@ -94,7 +94,7 @@ final class RecapBuilderTests: XCTestCase {
 
     func testSequenceStaysWithinItsBounds() {
         let slides = RecapBuilder.construire(
-            analyse: profilComplet(), prenom: "Arthur", reponses: 42, estPremium: false
+            analyse: profilComplet(), prenom: "Arthur", réponses: 42, estPremium: false
         )
         XCTAssertLessThanOrEqual(slides.count, RecapBuilder.maxSlides)
         XCTAssertGreaterThanOrEqual(slides.count, 8, "En dessous de 8 slides, ça ne fait plus une séquence")
@@ -102,7 +102,7 @@ final class RecapBuilderTests: XCTestCase {
 
     func testApportsAreSortedByDistanceToTheNeed() {
         let slides = RecapBuilder.construire(
-            analyse: profilComplet(), prenom: "Arthur", reponses: 42, estPremium: true
+            analyse: profilComplet(), prenom: "Arthur", réponses: 42, estPremium: true
         )
         let apports = slides.compactMap { slide -> ApportRecap? in
             if case .apport(let a) = slide { return a }
@@ -115,7 +115,7 @@ final class RecapBuilderTests: XCTestCase {
 
     func testFirstApportAndFirstInteractionAreAlwaysFree() {
         let slides = RecapBuilder.construire(
-            analyse: profilComplet(), prenom: "Arthur", reponses: 42, estPremium: false
+            analyse: profilComplet(), prenom: "Arthur", réponses: 42, estPremium: false
         )
         let apports = slides.compactMap { slide -> ApportRecap? in
             if case .apport(let a) = slide { return a }
@@ -134,7 +134,7 @@ final class RecapBuilderTests: XCTestCase {
 
     func testASubscriberSeesNoLockAndNoOffer() {
         let slides = RecapBuilder.construire(
-            analyse: profilComplet(), prenom: "Arthur", reponses: 42, estPremium: true
+            analyse: profilComplet(), prenom: "Arthur", réponses: 42, estPremium: true
         )
         XCTAssertFalse(slides.contains { $0.estVerrouille })
         XCTAssertEqual(slides.last?.typeName, "suite", "Un abonné n'a pas à revoir l'offre")
@@ -147,7 +147,7 @@ final class RecapBuilderTests: XCTestCase {
         let slides = RecapBuilder.construire(
             analyse: profilComplet(),
             prenom: "Arthur",
-            reponses: 42,
+            réponses: 42,
             alertesSecurite: ["Un signe qui mérite un avis médical."],
             estPremium: false
         )
@@ -163,19 +163,19 @@ final class RecapBuilderTests: XCTestCase {
     // MARK: - Cas limites
 
     func testAnEmptyAnalysisProducesNoSequence() {
-        XCTAssertTrue(RecapBuilder.construire(analyse: nil, prenom: nil, reponses: 0, estPremium: false).isEmpty)
+        XCTAssertTrue(RecapBuilder.construire(analyse: nil, prenom: nil, réponses: 0, estPremium: false).isEmpty)
 
         var vide = AIAnalysisV2()
         vide.score = 50
         XCTAssertTrue(
-            RecapBuilder.construire(analyse: vide, prenom: nil, reponses: 0, estPremium: false).isEmpty,
+            RecapBuilder.construire(analyse: vide, prenom: nil, réponses: 0, estPremium: false).isEmpty,
             "Sans apport, l'analyse est inexploitable : on retombe sur le Bilan classique"
         )
     }
 
     func testASingleApportIsOfferedInFull() {
         let une = analyse(apports: [apport(id: "iron", nom: "Fer", statut: .aCombler, pct: 38)])
-        let slides = RecapBuilder.construire(analyse: une, prenom: "Léa", reponses: 21, estPremium: false)
+        let slides = RecapBuilder.construire(analyse: une, prenom: "Léa", réponses: 21, estPremium: false)
 
         let apports = slides.compactMap { slide -> ApportRecap? in
             if case .apport(let a) = slide { return a }
@@ -192,7 +192,7 @@ final class RecapBuilderTests: XCTestCase {
             apports: [apport(id: "iron", nom: "Fer", statut: .aCombler, pct: 38)],
             interactions: []
         )
-        let slides = RecapBuilder.construire(analyse: sans, prenom: nil, reponses: 0, estPremium: false)
+        let slides = RecapBuilder.construire(analyse: sans, prenom: nil, réponses: 0, estPremium: false)
         XCTAssertFalse(slides.contains { $0.typeName == "interaction" }, "Une section vide s'omet, elle ne s'affiche pas vide")
     }
 
@@ -205,7 +205,7 @@ final class RecapBuilderTests: XCTestCase {
                 apport(id: "vitD", nom: "Vitamine D", statut: .couvre, pct: 88),
             ]
         )
-        let slides = RecapBuilder.construire(analyse: parfait, prenom: "Thomas", reponses: 46, estPremium: false)
+        let slides = RecapBuilder.construire(analyse: parfait, prenom: "Thomas", réponses: 46, estPremium: false)
         XCTAssertFalse(slides.isEmpty)
         XCTAssertEqual(slides.first?.typeName, "intro")
         XCTAssertEqual(slides.last?.typeName, "offre")
@@ -216,7 +216,7 @@ final class RecapBuilderTests: XCTestCase {
             apports: [apport(id: "iron", nom: "   ", statut: .aCombler, pct: 30)],
             interactions: [interaction("   ", "   ")]
         )
-        let slides = RecapBuilder.construire(analyse: flou, prenom: nil, reponses: 0, estPremium: false)
+        let slides = RecapBuilder.construire(analyse: flou, prenom: nil, réponses: 0, estPremium: false)
         XCTAssertFalse(slides.contains { $0.typeName == "apport" })
         XCTAssertFalse(slides.contains { $0.typeName == "interaction" })
     }

@@ -15,7 +15,7 @@ extension DashboardViewModel {
         RecapBuilder.construire(
             analyse: analysisV2,
             prenom: profile.firstName,
-            reponses: RecapBuilder.compterReponses(profile),
+            réponses: RecapBuilder.compterRéponses(profile),
             // Les signaux urgents passent en entier et gratuitement, toujours.
             alertesSecurite: redFlags
                 .filter { $0.urgency == .immediate }
@@ -34,7 +34,7 @@ extension RecapBuilder {
     /// parcours (express, complet) ne comptent pas le même nombre de questions.
     /// Les champs d'identité et de mécanique (prénom, e-mail, parcours, drapeau
     /// de complétion) sont exclus — ce ne sont pas des réponses.
-    static func compterReponses(_ profil: UserProfile) -> Int {
+    static func compterRéponses(_ profil: UserProfile) -> Int {
         guard let donnees = try? JSONEncoder().encode(profil),
               let objet = try? JSONSerialization.jsonObject(with: donnees) as? [String: Any] else {
             return 0
