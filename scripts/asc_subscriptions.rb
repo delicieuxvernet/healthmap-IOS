@@ -615,7 +615,7 @@ if MODE == "apply-app"
          screen > the paywall opens.
       2. Bilan tab > profile icon (top-right) > "Passer a Premium".
       The paywall displays the auto-renewable subscriptions of group Kiwio
-      Premium with their names, durations and prices: Annual (50 EUR) and
+      Premium with their names, durations and prices: Annual (30 EUR) and
       Weekly (0.99 EUR). Both subscriptions (Weekly and Annual) are submitted
       with this version. The Monthly subscription is NOT part of this
       submission and is not displayed in the app.
@@ -984,7 +984,7 @@ end
 # pas à repasser en review (contrairement à la 1.0, cf. l'épisode des 4 refus).
 # VERSION_STRING (défaut 1.0.1) · WHATS_NEW (défaut : les notes ci-dessous).
 if MODE == "new-version"
-  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.1" : ENV["VERSION_STRING"]
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.2" : ENV["VERSION_STRING"]
 
   existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
     .find { |v| v.dig("attributes", "versionString") == vs }
@@ -1001,19 +1001,17 @@ if MODE == "new-version"
   end
 
   notes = ENV["WHATS_NEW"].to_s.empty? ? <<~NOTES.strip : ENV["WHATS_NEW"]
-    Kiwio s'ouvre enfin sans détour.
+    Ton bilan se raconte, maintenant.
 
-    Entrée libre : explore l'app, scanne et dicte tes repas avant même de faire ton bilan. Le bilan reste là quand tu veux, en 3 minutes.
+    À la fin du questionnaire, ton bilan se dévoile étape par étape : ton score qui monte, ce que tu fais déjà bien, puis tes apports à renforcer un par un, avec la part de ton besoin couverte qui se remplit sous tes yeux. Tu peux le revoir quand tu veux depuis ton profil, ou le lire en liste si tu préfères.
 
-    Scan repas repensé : tes repas du jour sous la recherche, tes calories restantes et tes apports en un coup d'oeil, et un petit guide à ta première visite.
+    Suivi : tes courbes affichent tes vraies données dès ton premier repas scanné. Plus d'exemple à la place de tes chiffres.
 
-    Dictée vocale : tes aliments apparaissent au fil de ta phrase.
+    Abonnement : l'offre annuelle passe à 30 euros. Le paywall met le prix en avant et affiche l'équivalent par mois, pour comparer les deux formules d'un coup d'œil.
 
-    Lecture plus claire partout : l'information qui compte saute aux yeux, dans tous les onglets.
+    Codes promo : la saisie d'un code dit enfin où elle en est, confirme l'activation et affiche jusqu'à quand ton accès est ouvert.
 
-    Suivi : tes courbes affichent enfin tes vraies données dès trois jours de suivi.
-
-    Et de nombreuses corrections de stabilité et d'affichage.
+    Et des corrections d'affichage un peu partout.
   NOTES
 
   get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20").each do |l|
@@ -1769,7 +1767,7 @@ if MODE == "fix-meta"
        screen > the paywall opens.
     2. Bilan tab > profile icon (top-right) > "Passer a Premium".
     The paywall lists the auto-renewable subscriptions of group Kiwio Premium:
-    Annual (50 EUR) and Weekly (0.99 EUR) - names, durations and prices are
+    Annual (30 EUR) and Weekly (0.99 EUR) - names, durations and prices are
     displayed. Both are submitted with this version. The Monthly subscription
     is NOT part of this submission and is not displayed in the app.
 
