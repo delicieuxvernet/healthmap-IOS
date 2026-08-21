@@ -88,7 +88,9 @@ struct PaywallView: View {
 
     var body: some View {
         ZStack {
-            Color.healthMapBackground
+            // Crème v4 comme le reste de l'app (DESIGN-PAGES) : le paywall était
+            // le dernier écran resté sur le fond bleuté hérité du web.
+            Color.healthMapWarm
                 .ignoresSafeArea()
 
             ScrollView {
@@ -180,48 +182,57 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(spacing: Theme.spacingSM) {
-            KiwiContourMark(size: 72, color: .kiwiGreen)
+            KiwiContourMark(size: 56, color: .kiwiGreen)
 
             Text("Kiwio Premium")
                 .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.kiwiCharcoal)
 
-            Text("Toute ton analyse, avec plus de profondeur")
+            Text("Ton bilan complet, tes solutions\net tes scans, sans limite.")
                 .font(Theme.subheadlineFont)
                 .foregroundStyle(Color.healthMapSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
+    /// Ce que Premium change, avec le contraste gratuit là où il existe :
+    /// « 30 scans par jour » ne dit rien tant qu'on ignore qu'on en a 3.
     private var featureList: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            featureRow("camera.fill", "Jusqu’à 30 scans repas par jour")
-            featureRow("chart.xyaxis.line", "Tendances détaillées de tes apports")
-            featureRow("sparkles", "Astuces et synergies personnalisées")
-            featureRow("list.bullet.clipboard.fill", "Rituels et solutions détaillés")
+            featureRow("camera.fill", "30 scans repas par jour", "3 par jour en gratuit")
+            featureRow("chart.xyaxis.line", "Tes tendances détaillées", "semaine après semaine")
+            featureRow("sparkles", "Le pourquoi de chaque apport", "et le geste qui le comble")
+            featureRow("list.bullet.clipboard.fill", "Ton rituel du jour complet", "compléments et solutions")
         }
         .padding(.horizontal, Theme.spacingXL)
     }
 
-    private func featureRow(_ icon: String, _ text: String) -> some View {
+    /// Une seule icône par ligne : la coche à gauche ET le symbole à droite
+    /// faisaient doublon, pour deux fois plus de bruit visuel.
+    private func featureRow(_ icon: String, _ title: String, _ detail: String) -> some View {
         HStack(spacing: Theme.spacingSM) {
-            ZStack {
-                Circle()
-                    .fill(Color.kiwiTint)
-                    .frame(width: 24, height: 24)
-                Image(systemName: "checkmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.kiwiInk)
-            }
-
-            Text(text)
-                .font(.system(size: 14))
-                .foregroundStyle(Color.healthMapText)
-
-            Spacer()
-
             Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundStyle(Color.healthMapMuted)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.kiwiInk)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(Color.kiwiTint)
+                )
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.kiwiCharcoal)
+                Text(detail)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.healthMapMuted)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
     }
@@ -240,12 +251,12 @@ struct PaywallView: View {
     }
 
     private var planCards: some View {
-        VStack(spacing: Theme.spacingSM) {
+        VStack(spacing: Theme.spacingMD) {
             if let annual = annualPlan {
                 planCard(
                     plan: annual,
                     title: "Annuel",
-                    subtitle: annualSubtitle(annual),
+                    detail: perMonthLabel(for: annual).map { "soit \($0) par mois" },
                     badge: annualBadge(annual)
                 )
             }
@@ -256,8 +267,8 @@ struct PaywallView: View {
                 planCard(
                     plan: weekly,
                     title: "Hebdomadaire",
-                    subtitle: shortSubtitle(weekly, unit: "sem"),
-                    badge: nil
+                    detail: shortDetail(weekly),
+                    badge: trialLabel(for: weekly).map { "\($0) gratuits" }
                 )
             }
         }
@@ -265,23 +276,33 @@ struct PaywallView: View {
         .padding(.top, Theme.spacingSM)
     }
 
-    private func planCard(plan: PlanOption, title: String, subtitle: String, badge: String?) -> some View {
+    /// Une carte de formule. Le PRIX est l'information principale : la durée
+    /// seule ne se compare pas, et c'est le prix qu'on vient chercher ici.
+    /// Le badge est posé à GAUCHE — à droite il chevauchait la coche de
+    /// sélection.
+    private func planCard(plan: PlanOption, title: String, detail: String?, badge: String?) -> some View {
         let isSelected = selectedPlan?.id == plan.id
 
         return Button {
             selectedPlan = plan
         } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: Theme.spacingSM) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.healthMapText)
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(isSelected ? Color.kiwiInk : Color.healthMapSecondary)
+                    Text(priceLabel(for: plan))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.kiwiCharcoal)
+                    if let detail {
+                        Text(detail)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.healthMapSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
-                Spacer()
+                Spacer(minLength: 0)
 
                 ZStack {
                     Circle()
@@ -296,26 +317,26 @@ struct PaywallView: View {
                 }
             }
             .padding(Theme.spacingMD)
-            .background(Color.healthMapCard)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .background(isSelected ? Color.kiwiTint : Color.healthMapCard)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(isSelected ? Color.kiwiGreen : Color.healthMapMuted.opacity(0.3), lineWidth: 2)
             )
-            .overlay(alignment: .topTrailing) {
+            .overlay(alignment: .topLeading) {
                 if let badge {
                     Text(badge)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isSelected ? .white : Color.kiwiInk)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.kiwiGreen))
-                        .offset(x: -12, y: -10)
+                        .background(Capsule().fill(isSelected ? Color.kiwiGreen : Color.kiwiTint))
+                        .offset(x: 12, y: -10)
                 }
             }
         }
         .buttonStyle(.healthMapPressed)
-        .accessibilityLabel("\(title), \(subtitle)")
+        .accessibilityLabel([title, priceLabel(for: plan), detail, badge].compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -413,7 +434,11 @@ struct PaywallView: View {
                 .foregroundStyle(Color.kiwiInk)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
-                .background(Capsule().fill(Color.kiwiTint))
+                // Secondaire = glass (loi 7 de DESIGN-PAGES) : en aplat vert
+                // tendre, ce bouton concurrençait visuellement le CTA d'achat
+                // alors qu'il ne concerne qu'une minorité d'utilisateurs.
+                .background(Capsule().fill(.ultraThinMaterial))
+                .overlay(Capsule().strokeBorder(Color.kiwiGreen.opacity(0.22), lineWidth: 1))
             }
             .disabled(isRedeemingPromo)
             .padding(.horizontal, Theme.spacingMD)
@@ -501,21 +526,24 @@ struct PaywallView: View {
         return base + " Abonnement à renouvellement automatique : reconduit pour la même durée sauf résiliation au moins 24 h avant la fin de la période en cours, dans les Réglages de ton compte Apple."
     }
 
-    private func annualSubtitle(_ plan: PlanOption) -> String {
-        var parts = ["\(plan.localizedPriceString) / an"]
-        if let monthlyEquivalent = perMonthLabel(for: plan) {
-            parts.append("soit \(monthlyEquivalent) / mois")
+    /// « 30,00 € / an », « 0,99 € / semaine » — le prix ET sa durée, dans
+    /// la même ligne : c'est l'information qu'on vient chercher.
+    private func priceLabel(for plan: PlanOption) -> String {
+        let periode: String
+        switch plan.periodUnit {
+        case .year: periode = "an"
+        case .week: periode = "semaine"
+        case .day: periode = "jour"
+        default: periode = "mois"
         }
-        return parts.joined(separator: " · ")
+        return "\(plan.localizedPriceString) / \(periode)"
     }
 
-    /// Sous-titre de la formule courte (hebdo) : prix / unité + essai.
-    private func shortSubtitle(_ plan: PlanOption, unit: String) -> String {
-        var parts = ["\(plan.localizedPriceString) / \(unit)"]
-        if let trial = trialLabel(for: plan) {
-            parts.append("\(trial) gratuits")
-        }
-        return parts.joined(separator: " · ")
+    /// Détail de la formule courte : équivalent mensuel (pour se comparer à
+    /// l'annuel sans calcul mental) et absence d'engagement, son vrai argument.
+    private func shortDetail(_ plan: PlanOption) -> String {
+        guard let parMois = perMonthLabel(for: plan) else { return "sans engagement" }
+        return "soit \(parMois) par mois, sans engagement"
     }
 
     /// Badge de la carte annuelle : essai + économie vs 1 an de la formule courte
@@ -557,14 +585,22 @@ struct PaywallView: View {
         }
     }
 
-    private func perMonthLabel(for annual: PlanOption) -> String? {
-        let perMonth = annual.price / 12
-        let formatter = annual.product.priceFormatter ?? {
+    /// Équivalent mensuel d'une formule, quelle que soit sa durée : c'est la
+    /// seule façon de comparer 0,99 €/semaine à 30 €/an sans calcul mental.
+    private func perMonthLabel(for plan: PlanOption) -> String? {
+        let parMois: Decimal
+        switch plan.periodUnit {
+        case .year: parMois = plan.price / 12
+        case .week: parMois = plan.price * 52 / 12
+        case .month: parMois = plan.price
+        default: return nil
+        }
+        let formatter = plan.product.priceFormatter ?? {
             let f = NumberFormatter()
             f.numberStyle = .currency
             return f
         }()
-        return formatter.string(from: perMonth as NSDecimalNumber)
+        return formatter.string(from: parMois as NSDecimalNumber)
     }
 
     // MARK: - Actions
