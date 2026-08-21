@@ -261,18 +261,18 @@ struct SuiviCurveInsight: View {
     }
 }
 
-// MARK: - Note « Exemple » sous une courbe illustrative
-/// Affichée à la place de l'insight tant que l'utilisateur n'a pas complété
-/// 3 jours d'affilée de scans : la courbe montrée est un exemple, pas ses vraies
-/// données. Même esprit que le badge d'exemple des symptômes.
-struct SuiviExampleNote: View {
+// MARK: - Note du premier jour mesuré
+/// Affichée à la place de l'insight quand un seul jour est mesuré : une tendance
+/// calculée sur un point unique n'en est pas une. On dit ce qui manque, on
+/// n'invente pas la suite.
+struct SuiviPremierJourNote: View {
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "sparkles")
+            Image(systemName: "calendar")
                 .font(.system(size: 11.5, weight: .bold))
                 .foregroundStyle(Color.kiwiGreenInk)
-            (Text("Exemple").fontWeight(.heavy)
-             + Text(" : complète 3 jours d'affilée pour voir tes vraies courbes."))
+            (Text("Premier jour mesuré").fontWeight(.heavy)
+             + Text(" : scanne encore demain pour voir une tendance."))
                 .font(Theme.dataSecondaryFont)
                 .foregroundStyle(Color.healthMapSecondary)
                 .fixedSize(horizontal: false, vertical: true)

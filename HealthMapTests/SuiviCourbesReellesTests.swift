@@ -87,10 +87,9 @@ final class SuiviCourbesReellesTests: XCTestCase {
         }
         XCTAssertEqual(repas.count, 4, "chaque consumed_at réel doit être lu")
 
-        // Seuil « 3 jours d'affilée » : 4 soirs consécutifs le franchissent.
-        let serieJours = SuiviEngineV4.maxConsecutiveScannedDays(fortnight: repas, now: now, calendar: paris)
-        XCTAssertEqual(serieJours, 4)
-        XCTAssertGreaterThanOrEqual(serieJours, 3, "les vraies courbes doivent remplacer l'exemple")
+        // L'axe se cale sur ce qui existe : du premier repas à aujourd'hui.
+        let fenetre = SuiviEngineV4.fenetreMesuree(fortnight: repas, now: now, calendar: paris)
+        XCTAssertEqual(fenetre, 4, "4 soirs scannés, du 1er au 4 août")
 
         // Courbe kcal : 4 points mesurés, chacun sur SON jour local (Paris).
         let serie = SuiviEngineV4.macroDailySeries(fortnight: repas, macro: .calories,
@@ -187,5 +186,68 @@ final class SuiviCourbesReellesTests: XCTestCase {
         XCTAssertEqual(evolutions.count, 1)
         XCTAssertEqual(evolutions.first?.isExample, false, "la courbe ne doit plus être un exemple")
         XCTAssertEqual(evolutions.first?.reel.count, 5, "baseline + 4 check-ins = 5 points reliés")
+    }
+
+    // MARK: - La vraie mesure dès le premier repas (21 août 2026)
+
+    /// Un seul repas scanné aujourd'hui : l'axe fait UN jour, la courbe porte
+    /// UN point réel. Avant, l'app affichait à la place une courbe d'exemple
+    /// inventée sur 7 jours — on scannait, la courbe ne bougeait pas, et on
+    /// concluait que l'app était cassée.
+    func testUnSeulRepasDonneUnPointReelPasUneCourbeInventee() throws {
+        let paris = try XCTUnwrap(TimeZone(identifier: "Europe/Paris"))
+        var calendrier = Calendar(identifier: .gregorian)
+        calendrier.timeZone = paris
+        let maintenant = Date(timeIntervalSince1970: 1_787_000_000)
+
+        let repas = [
+            MealJournalService.MealRecord(
+                id: "m0", consumedAt: maintenant, slot: .lunch, foods: ["salade"],
+                macros: MealJournalService.MealMacros(calories: 540, proteins: 28),
+                micros: [MealJournalService.MicroPct(id: "iron", pctRDA: 35)]
+            )
+        ]
+
+        let fenetre = SuiviEngineV4.fenetreMesuree(fortnight: repas, now: maintenant, calendar: calendrier)
+        XCTAssertEqual(fenetre, 1, "Un seul jour scanné : un axe d'un jour, pas quatorze")
+
+        let serie = SuiviEngineV4.macroDailySeries(
+            fortnight: repas, macro: .calories, days: fenetre, now: maintenant, calendar: calendrier
+        )
+        XCTAssertEqual(serie.count, 1)
+        XCTAssertEqual(serie.compactMap(\.value), [540], "La valeur mesurée, pas une illustration")
+        XCTAssertEqual(SuiviEngineV4.joursMesures(serie), 1)
+    }
+
+    /// Aucun scan : rien à tracer. L'écran doit montrer un état vide, jamais
+    /// une courbe de démonstration.
+    func testAucunScanNeProduitAucuneFenetre() {
+        XCTAssertEqual(SuiviEngineV4.fenetreMesuree(fortnight: []), 0)
+    }
+
+    /// Deux jours mesurés : la tendance a enfin un sens.
+    func testDeuxJoursMesuresAutorisentUneTendance() throws {
+        let paris = try XCTUnwrap(TimeZone(identifier: "Europe/Paris"))
+        var calendrier = Calendar(identifier: .gregorian)
+        calendrier.timeZone = paris
+        let maintenant = Date(timeIntervalSince1970: 1_787_000_000)
+        let hier = try XCTUnwrap(calendrier.date(byAdding: .day, value: -1, to: maintenant))
+
+        let repas = [maintenant, hier].enumerated().map { i, date in
+            MealJournalService.MealRecord(
+                id: "m\(i)", consumedAt: date, slot: .dinner, foods: ["repas"],
+                macros: MealJournalService.MealMacros(calories: 500 + i * 100, proteins: 20),
+                micros: []
+            )
+        }
+
+        let fenetre = SuiviEngineV4.fenetreMesuree(fortnight: repas, now: maintenant, calendar: calendrier)
+        XCTAssertEqual(fenetre, 2)
+
+        let serie = SuiviEngineV4.macroDailySeries(
+            fortnight: repas, macro: .calories, days: fenetre, now: maintenant, calendar: calendrier
+        )
+        XCTAssertEqual(SuiviEngineV4.joursMesures(serie), 2)
+        XCTAssertNotNil(SuiviEngineV4.seriesSummary(serie, calendar: calendrier))
     }
 }
