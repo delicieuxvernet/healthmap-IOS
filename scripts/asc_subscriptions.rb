@@ -29,9 +29,23 @@ TARGETS = {
   # encore côté App Store Connect (état READY_TO_SUBMIT, jamais soumis) ; on le
   # garde ici pour que MODE=audit continue de le voir et de le décrire.
   "healthmap_monthly" => { price: "4.99",  name: "Kiwio Mensuel", period: "ONE_MONTH", level: 1 },
-  "healthmap_annual"  => { price: "50.00", name: "Kiwio Annuel",  period: "ONE_YEAR",  level: 1 },
+  # 30 € depuis le 21 août 2026 (était 50 €) : à 0,99 €/sem l'hebdo revenait à
+  # 51,48 € l'an, l'annuel n'était donc que 3 % moins cher et le paywall n'avait
+  # aucun argument à afficher. À 30 € l'écart devient réel (−42 %).
+  "healthmap_annual"  => { price: "30.00", name: "Kiwio Annuel",  period: "ONE_YEAR",  level: 1 },
 }.freeze
 SUBSCRIPTION_DESCRIPTION = "Kiwio Premium : jusqu’à 30 scans par jour, tendances et plan détaillés.".freeze
+# OPTIONS : « CLE=valeur,CLE2=valeur2 » injectées dans l'environnement.
+# `workflow_dispatch` plafonne à 10 entrées : une seule sert donc de fourre-tout
+# pour les réglages rares (PRICE, TESTER_DURATION, TESTER_CODE…), au lieu d'en
+# ajouter une par besoin. Lu AVANT les constantes ci-dessous pour pouvoir aussi
+# porter ONLY_PRODUCT.
+ENV["OPTIONS"].to_s.split(",").each do |pair|
+  key, value = pair.split("=", 2)
+  next if key.nil? || value.nil?
+  ENV[key.strip] = value.strip
+end
+
 # ONLY_PRODUCT : si défini, apply ne configure QUE ce produit (les autres intacts).
 ONLY_PRODUCT = ENV["ONLY_PRODUCT"].to_s.strip
 MODE = (ENV["MODE"] || "audit").downcase
@@ -1011,36 +1025,162 @@ if MODE == "new-version"
   exit 0
 end
 
-# ── MODE tester-code : code promo « 1 semaine offerte » pour les testeurs ────
-# Demande fondateur (18 août) : un code partageable sur LinkedIn/aux amis, qui
-# ouvre le Premium 7 jours. Posé sur l'HEBDO (0,99 €/sem) et non sur l'annuel :
-# si un testeur oublie de résilier, il risque 0,99 € et non 50 €.
-# TESTER_CODE (défaut HAPPYTESTER2026) · TESTER_REDEMPTIONS (défaut 500).
-if MODE == "tester-code"
-  code = (ENV["TESTER_CODE"].to_s.empty? ? "HAPPYTESTER2026" : ENV["TESTER_CODE"]).upcase
-  redemptions = (ENV["TESTER_REDEMPTIONS"].to_s.empty? ? "500" : ENV["TESTER_REDEMPTIONS"]).to_i
-  weekly = nil
+# ── MODE price : changer le PRIX d'un abonnement, et rien d'autre ────────────
+# `apply` sait déjà poser un prix, mais il touche aussi les localisations, la
+# disponibilité, l'essai gratuit et la capture de review : beaucoup trop large
+# quand une version est en attente de revue. Ce mode ne fait QUE le prix, sur un
+# seul produit : point de prix France, puis égalisation sur tous les territoires
+# (sans elle, seuls les Français verraient le nouveau tarif).
+# Une BAISSE s'applique aux abonnés existants sans qu'ils aient rien à valider.
+# ONLY_PRODUCT (obligatoire) · PRICE (défaut : le prix inscrit dans TARGETS).
+if MODE == "price"
+  product_id = ONLY_PRODUCT
+  abort_with("price", 0, "ONLY_PRODUCT est obligatoire (ex. healthmap_annual)") if product_id.empty?
+  spec = TARGETS[product_id]
+  abort_with("price", 0, "produit inconnu : #{product_id}") unless spec
+  target = ENV["PRICE"].to_s.strip.empty? ? spec[:price] : ENV["PRICE"].to_s.strip
+
+  sub_id = nil
   get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
     get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
-      weekly = s["id"] if s.dig("attributes", "productId") == "healthmap_weekly"
+      sub_id = s["id"] if s.dig("attributes", "productId") == product_id
     end
   end
-  abort_with("tester-code", 0, "healthmap_weekly introuvable") unless weekly
-  puts "Abonnement support : healthmap_weekly (#{weekly})"
+  abort_with("price", 0, "#{product_id} introuvable") unless sub_id
+  puts "Abonnement : #{product_id} (#{sub_id}) — prix cible #{target} €"
 
-  offer_name = "Testeurs - 1 semaine offerte"
+  found = find_price_point(sub_id, target)
+  abort_with("price", 0, "aucun point de prix FRA proche de #{target}") unless found
+  pp_id, real_price = found
+  puts "Point de prix France retenu : #{real_price} €"
+
+  # Sur un abonnement DÉJÀ APPROUVÉ, Apple n'accepte pas un prix « nu » : sans
+  # `startDate` le POST est lu comme la création du prix INITIAL et rejeté
+  # (« Initial price cannot be created again after subscription is approved »,
+  # HTTP 409 — constaté le 21 août 2026, y compris avec preserveCurrentPrice
+  # seul). Une date d'effet en fait un CHANGEMENT de prix, qui passe.
+  # Conséquence : un changement de prix n'est JAMAIS immédiat. Par défaut on
+  # vise le lendemain (UTC), au plus tôt. START_DATE (AAAA-MM-JJ) pour choisir.
+  # `preserveCurrentPrice` : false (défaut ici) = les abonnés existants suivent
+  # le nouveau tarif, ce qu'on veut pour une baisse ; PRESERVE_CURRENT_PRICE=1
+  # les laisse sur leur prix actuel (défaut Apple).
+  start_date = ENV["START_DATE"].to_s.strip
+  start_date = (Time.now.utc + 24 * 3600).strftime("%Y-%m-%d") if start_date.empty?
+  price_attrs = {
+    preserveCurrentPrice: ENV["PRESERVE_CURRENT_PRICE"].to_s.strip == "1",
+    startDate: start_date,
+  }
+  puts "Changement de prix : effet le #{start_date}, abonnés existants #{price_attrs[:preserveCurrentPrice] ? "sur leur prix actuel" : "sur le nouveau prix"}"
+
+  # Grille courante : sert à l'idempotence (relancer le mode ne repose rien).
+  current_pp_ids = []
+  url = "/v1/subscriptions/#{sub_id}/prices?limit=200&fields[subscriptionPrices]=subscriptionPricePoint&include=subscriptionPricePoint&fields[subscriptionPricePoints]=customerPrice"
+  while url
+    code, body = req(:get, url)
+    abort_with("prices (grille)", code, body) unless code == 200
+    body["data"].each { |p| current_pp_ids << p.dig("relationships", "subscriptionPricePoint", "data", "id") }
+    url = body.dig("links", "next")
+  end
+
+  if current_pp_ids.include?(pp_id)
+    puts "  OK  prix France déjà à #{real_price} €"
+  else
+    ok, = write("prix France #{real_price} €", :post, "/v1/subscriptionPrices",
+      { data: { type: "subscriptionPrices",
+                attributes: price_attrs,
+                relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
+                                 subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: pp_id } } } } })
+    exit 1 unless ok
+  end
+
+  target_ids = get_all("/v1/subscriptionPricePoints/#{pp_id}/equalizations?limit=200&fields[subscriptionPricePoints]=customerPrice")
+    .map { |e| e["id"] }
+  missing = target_ids - current_pp_ids
+  if missing.empty?
+    puts "  OK  grille déjà alignée (#{current_pp_ids.uniq.size} points de prix)"
+  else
+    ok_n = 0
+    ko_n = 0
+    first_error = nil
+    missing.each do |eq_id|
+      code, resp = req(:post, "/v1/subscriptionPrices",
+        { data: { type: "subscriptionPrices",
+                  attributes: price_attrs,
+                  relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
+                                   subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: eq_id } } } } })
+      if (200..299).cover?(code)
+        ok_n += 1
+      else
+        ko_n += 1
+        first_error ||= [code, resp]
+      end
+    end
+    puts "  alignement grille : #{ok_n} OK, #{ko_n} en échec (sur #{missing.size})"
+    if first_error
+      puts "  première erreur -> HTTP #{first_error[0]}"
+      puts(first_error[1].is_a?(String) ? first_error[1] : JSON.pretty_generate(first_error[1]))
+    end
+    exit 1 if ok_n.zero?
+  end
+
+  puts "\n===== PRIX POSÉ ====="
+  puts "#{product_id} : #{real_price} € en France, grille égalisée sur les autres territoires."
+  puts "Les prix sont lus depuis StoreKit à l'exécution : aucun nouveau build n'est nécessaire."
+  exit 0
+end
+
+# ── MODE tester-code : code promo « X offert(s) » pour les testeurs ──────────
+# Demande fondateur (18 août) : un code partageable sur LinkedIn/aux amis, qui
+# ouvre le Premium. Par défaut sur l'HEBDO (0,99 €/sem) : si un testeur oublie
+# de résilier, il risque 0,99 € et non le tarif annuel.
+# Depuis le 21 août le mode est paramétrable, pour poser aussi un code sur
+# l'annuel (1 mois offert, décision fondateur).
+# ONLY_PRODUCT ou TESTER_PRODUCT (défaut healthmap_weekly) ·
+# TESTER_DURATION (défaut ONE_WEEK) · TESTER_CODE (défaut HAPPYTESTER2026) ·
+# TESTER_REDEMPTIONS (défaut 500).
+DUREES_OFFRE = {
+  "ONE_WEEK" => "1 semaine offerte",
+  "ONE_MONTH" => "1 mois offert",
+  "TWO_MONTHS" => "2 mois offerts",
+  "THREE_MONTHS" => "3 mois offerts",
+  "SIX_MONTHS" => "6 mois offerts",
+  "ONE_YEAR" => "1 an offert",
+}.freeze
+
+if MODE == "tester-code"
+  product_id = [ENV["TESTER_PRODUCT"].to_s.strip, ONLY_PRODUCT, "healthmap_weekly"].find { |v| !v.empty? }
+  duration = (ENV["TESTER_DURATION"].to_s.strip.empty? ? "ONE_WEEK" : ENV["TESTER_DURATION"].to_s.strip).upcase
+  abort_with("tester-code", 0, "durée inconnue : #{duration}") unless DUREES_OFFRE.key?(duration)
+  spec = TARGETS[product_id]
+  abort_with("tester-code", 0, "produit inconnu : #{product_id}") unless spec
+  code = (ENV["TESTER_CODE"].to_s.empty? ? "HAPPYTESTER2026" : ENV["TESTER_CODE"]).upcase
+  redemptions = (ENV["TESTER_REDEMPTIONS"].to_s.empty? ? "500" : ENV["TESTER_REDEMPTIONS"]).to_i
+  support = nil
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      support = s["id"] if s.dig("attributes", "productId") == product_id
+    end
+  end
+  abort_with("tester-code", 0, "#{product_id} introuvable") unless support
+  puts "Abonnement support : #{product_id} (#{support}) — #{DUREES_OFFRE[duration]}"
+
+  # Le nom porte la durée : deux offres de durées différentes sur le même
+  # abonnement ne se marchent donc pas dessus. Le nom historique de l'hebdo
+  # (« Testeurs - 1 semaine offerte ») est reproduit à l'identique — relancer
+  # le mode sans paramètre ne crée pas de doublon.
+  offer_name = "Testeurs - #{DUREES_OFFRE[duration]}"
   existing = {}
-  get_all("/v1/subscriptions/#{weekly}/offerCodes?limit=200").each { |x| existing[x.dig("attributes", "name")] = x["id"] }
+  get_all("/v1/subscriptions/#{support}/offerCodes?limit=200").each { |x| existing[x.dig("attributes", "name")] = x["id"] }
   oc_id = existing[offer_name]
 
   if oc_id
     puts "Offre déjà présente (#{oc_id})"
   else
-    grid, = offer_price_grid(weekly, TARGETS["healthmap_weekly"][:price])
+    grid, = offer_price_grid(support, spec[:price])
     abort_with("tester-code", 0, "aucun point de prix pour la grille") if grid.empty?
     puts "Grille de prix : #{grid.size} territoires"
-    ok, resp = create_offer_code(weekly, offer_name,
-      { offerMode: "FREE_TRIAL", duration: "ONE_WEEK", numberOfPeriods: 1,
+    ok, resp = create_offer_code(support, offer_name,
+      { offerMode: "FREE_TRIAL", duration: duration, numberOfPeriods: 1,
         customerEligibilities: %w[NEW EXISTING EXPIRED],
         offerEligibility: "STACK_WITH_INTRO_OFFERS" }, grid)
     exit 1 unless ok
@@ -1060,8 +1200,9 @@ if MODE == "tester-code"
 
   puts "
 ===== CODE TESTEURS PRÊT ====="
+  periode = { "ONE_WEEK" => "sem", "ONE_MONTH" => "mois", "ONE_YEAR" => "an" }[spec[:period]] || "période"
   puts "Code           : #{code}"
-  puts "Offre          : 1 semaine de Premium offerte (puis 0,99 €/sem si non résilié)"
+  puts "Offre          : #{DUREES_OFFRE[duration]} (puis #{spec[:price]} €/#{periode} si non résilié)"
   puts "Utilisations   : #{redemptions} · expire le #{expiration}"
   puts "Lien direct    : https://apps.apple.com/redeem?ctx=offercodes&id=#{app_id}&code=#{code}"
   puts "Dans l'app     : paywall > « J'ai un code » (presentCodeRedemptionSheet)"

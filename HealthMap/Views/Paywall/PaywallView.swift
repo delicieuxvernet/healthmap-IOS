@@ -37,6 +37,19 @@ struct PaywallView: View {
     @State private var showAlert = false
     @State private var showPurchaseSuccess = false
 
+    /// Saisie d'un code promo en cours (feuille Apple ouverte, puis attente de
+    /// l'activation) : le bouton dit ce qu'il fait au lieu de rester inerte.
+    @State private var isRedeemingPromo = false
+
+    /// Message affiché sous le bouton de code promo quand l'attente n'a rien
+    /// ouvert. Jamais « code invalide » : la feuille système ne dit pas ce que
+    /// l'utilisateur y a fait.
+    @State private var promoNotice: String?
+
+    /// Ce qui vient d'ouvrir l'accès — le texte de confirmation n'est pas le
+    /// même après un paiement et après un code promo.
+    @State private var successKind: PremiumSuccessKind = .achat
+
     /// Le chargement des offerings a échoué (ou dépassé le timeout) : on montre
     /// un message + bouton Réessayer au lieu d'un spinner infini. Sans cet état,
     /// un échec RevenueCat laissait le paywall bloqué sur « Chargement des
@@ -126,6 +139,8 @@ struct PaywallView: View {
         }
         .sheet(isPresented: $showPurchaseSuccess) {
             PremiumPurchaseSuccessView(
+                kind: successKind,
+                echeance: echeanceLabel,
                 onExplore: {
                     completeSuccess()
                 },
@@ -381,18 +396,38 @@ struct PaywallView: View {
         VStack(spacing: Theme.spacingSM) {
             // Feuille système Apple de saisie d'un code promo (offer code).
             // Permet d'utiliser un code comme « NAIA » ou « LANCEMENT50 ».
+            // Le bouton reste occupé tant que l'app n'a pas su si l'accès s'est
+            // ouvert : la feuille Apple, elle, ne rend jamais de résultat.
             Button {
-                subscriptionService.presenterCodePromo()
+                Task { await saisirCodePromo() }
             } label: {
-                Text("J'ai un code promo")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.kiwiInk)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(Capsule().fill(Color.kiwiTint))
+                HStack(spacing: Theme.spacingXS) {
+                    if isRedeemingPromo {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .tint(Color.kiwiInk)
+                    }
+                    Text(isRedeemingPromo ? "Vérification de ton code…" : "J'ai un code promo")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(Color.kiwiInk)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Capsule().fill(Color.kiwiTint))
             }
+            .disabled(isRedeemingPromo)
             .padding(.horizontal, Theme.spacingMD)
             .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
+
+            if let promoNotice {
+                Text(promoNotice)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.healthMapSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, Theme.spacingLG)
+                    .accessibilityAddTraits(.isStaticText)
+            }
 
             Button {
                 Task { await restore() }
@@ -423,6 +458,19 @@ struct PaywallView: View {
     }
 
     // MARK: - Textes dérivés des produits StoreKit
+
+    /// « Renouvellement le 28 août » / « Premium actif jusqu'au 28 août », lu
+    /// depuis l'entitlement RevenueCat. Nil tant que la date n'est pas connue :
+    /// on n'invente jamais une échéance, et l'écran de confirmation s'en passe.
+    private var echeanceLabel: String? {
+        guard let entitlement = subscriptionService.customerInfo?
+            .entitlements[SubscriptionService.entitlementId],
+              let expiration = entitlement.expirationDate else { return nil }
+        let date = expiration.formatted(date: .abbreviated, time: .omitted)
+        return entitlement.willRenew
+            ? "Renouvellement le \(date)"
+            : "Premium actif jusqu'au \(date)"
+    }
 
     private var ctaTitle: String {
         if let trial = trialLabel(for: selectedPlan) {
@@ -552,8 +600,36 @@ struct PaywallView: View {
         }
     }
 
+    /// Code promo : ouvre la feuille Apple, puis attend VRAIMENT que l'accès
+    /// s'ouvre avant de conclure. Sans cette attente, la feuille se refermait
+    /// et le paywall restait identique — l'utilisateur ne savait pas si son
+    /// code avait marché.
+    private func saisirCodePromo() async {
+        guard !isRedeemingPromo else { return }
+        isRedeemingPromo = true
+        promoNotice = nil
+        successKind = .codePromo
+        defer { isRedeemingPromo = false }
+
+        switch await subscriptionService.saisirCodePromo() {
+        case .active:
+            AnalyticsService.shared.track(.paywallConverted, properties: [
+                "source": source,
+                "package": "code_promo",
+            ])
+            AnalyticsService.shared.track(.subscriptionStarted, properties: [
+                "package": "code_promo",
+            ])
+            showPurchaseSuccess = true
+        case .aucuneActivation:
+            successKind = .achat
+            promoNotice = "Aucun code n'a été appliqué. Si tu viens d'en saisir un, laisse-lui quelques secondes puis touche « Restaurer mes achats »."
+        }
+    }
+
     private func purchaseSelected() async {
         guard let plan = selectedPlan, !isPurchasing else { return }
+        successKind = .achat
         isPurchasing = true
         defer { isPurchasing = false }
 
@@ -625,6 +701,7 @@ struct PaywallView: View {
 
     private func restore() async {
         guard !isRestoring else { return }
+        successKind = .achat
         isRestoring = true
         defer { isRestoring = false }
 
@@ -660,12 +737,40 @@ struct PaywallView: View {
 }
 
 // MARK: - Confirmation d'activation Premium
+/// Ce qui vient d'ouvrir l'accès Premium. Un code promo n'est pas un achat :
+/// remercier « pour ta confiance » quelqu'un qui n'a rien payé sonne faux, et
+/// surtout il a besoin de savoir JUSQU'À QUAND son accès est ouvert.
+enum PremiumSuccessKind {
+    case achat
+    case codePromo
+}
+
 private struct PremiumPurchaseSuccessView: View {
+    let kind: PremiumSuccessKind
+    /// « Renouvellement le 28 août » / « Premium actif jusqu'au 28 août ».
+    /// Nil quand RevenueCat ne connaît pas encore la date.
+    let echeance: String?
     let onExplore: () -> Void
     let onBilan: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var revealed = false
+
+    private var titre: String {
+        switch kind {
+        case .achat: return "Bienvenue dans Kiwio Premium"
+        case .codePromo: return "Ton code est accepté"
+        }
+    }
+
+    private var sousTitre: String {
+        switch kind {
+        case .achat:
+            return "Merci pour ta confiance. Ton abonnement est actif et tes avantages sont disponibles maintenant."
+        case .codePromo:
+            return "Ton accès Premium est ouvert. Tout est débloqué dès maintenant."
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -686,16 +791,28 @@ private struct PremiumPurchaseSuccessView: View {
                 .accessibilityHidden(true)
 
                 VStack(spacing: Theme.spacingXS) {
-                    Text("Bienvenue dans Kiwio Premium")
+                    Text(titre)
                         .font(.system(size: 23, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.kiwiCharcoal)
                         .multilineTextAlignment(.center)
 
-                    Text("Merci pour ta confiance. Ton abonnement est actif et tes avantages sont disponibles maintenant.")
+                    Text(sousTitre)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(Color.healthMapSecondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    // Échéance : la seule information que l'utilisateur ne peut
+                    // pas deviner, et celle qui évite le prélèvement surprise.
+                    if let echeance {
+                        Text(echeance)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.kiwiInk)
+                            .padding(.horizontal, Theme.spacingSM)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Color.kiwiTint))
+                            .padding(.top, Theme.spacingXS)
+                    }
                 }
 
                 VStack(spacing: 0) {

@@ -153,4 +153,92 @@ final class PremiumReadinessTests: XCTestCase {
         XCTAssertFalse(cleared.isPremium)
         XCTAssertNil(cleared.expirationDate)
     }
+
+    // MARK: - Code promo : le serveur doit apprendre l'ouverture de l'accès
+
+    func testAccessOpeningAlwaysNotifiesTheServer() {
+        // C'est LE cas du code promo : l'accès s'ouvre sans passer par un achat.
+        XCTAssertTrue(
+            SubscriptionService.doitPrevenirLeServeur(
+                etaitPremium: false,
+                estPremium: true,
+                ancienneFormule: nil,
+                nouvelleFormule: "healthmap_weekly"
+            )
+        )
+    }
+
+    func testPlanChangeNotifiesTheServer() {
+        // Hebdo vers annuel : le tier serveur doit suivre, sinon les quotas
+        // restent ceux de l'ancienne formule.
+        XCTAssertTrue(
+            SubscriptionService.doitPrevenirLeServeur(
+                etaitPremium: true,
+                estPremium: true,
+                ancienneFormule: "healthmap_weekly",
+                nouvelleFormule: "healthmap_annual"
+            )
+        )
+    }
+
+    func testColdStartOfASubscriberDoesNotCallTheServer() {
+        // Au démarrage, l'état premium vient du cache disque : aucune formule
+        // n'est connue avant. Prévenir le serveur ici, c'est un appel à chaque
+        // lancement pour rien (la vérification périodique de 24 h suffit).
+        XCTAssertFalse(
+            SubscriptionService.doitPrevenirLeServeur(
+                etaitPremium: true,
+                estPremium: true,
+                ancienneFormule: nil,
+                nouvelleFormule: "healthmap_annual"
+            )
+        )
+    }
+
+    func testLosingAccessDoesNotCallTheServer() {
+        XCTAssertFalse(
+            SubscriptionService.doitPrevenirLeServeur(
+                etaitPremium: true,
+                estPremium: false,
+                ancienneFormule: "healthmap_weekly",
+                nouvelleFormule: nil
+            )
+        )
+    }
+
+    func testSameFormulaReadAgainDoesNotCallTheServer() {
+        XCTAssertFalse(
+            SubscriptionService.doitPrevenirLeServeur(
+                etaitPremium: true,
+                estPremium: true,
+                ancienneFormule: "healthmap_annual",
+                nouvelleFormule: "healthmap_annual"
+            )
+        )
+    }
+
+    // MARK: - Code promo : la fenêtre d'attente doit couvrir une vraie saisie
+
+    func testPromoCodeWaitCoversARealCodeEntry() {
+        let paliers = SubscriptionService.paliersAttenteCodePromo
+        // Saisir un code prend de 10 à 60 secondes. Une relecture unique à 1 s
+        // (ce que faisait l'app avant le 21 août 2026) tombait pendant la
+        // frappe : l'activation n'était jamais vue, et l'app restait muette.
+        XCTAssertGreaterThanOrEqual(paliers.reduce(0, +), 45)
+        XCTAssertGreaterThanOrEqual(paliers.count, 8)
+    }
+
+    func testPromoCodeFirstCheckStaysQuick() {
+        // Code déjà dans le presse-papier, collé en un geste : la confirmation
+        // ne doit pas se faire attendre.
+        XCTAssertLessThanOrEqual(SubscriptionService.paliersAttenteCodePromo.first ?? 99, 3)
+    }
+
+    func testPromoCodeResyncStepsExist() {
+        let paliers = SubscriptionService.paliersAttenteCodePromo
+        XCTAssertFalse(SubscriptionService.paliersResync.isEmpty)
+        for index in SubscriptionService.paliersResync {
+            XCTAssertTrue(paliers.indices.contains(index), "palier de resync hors bornes : \(index)")
+        }
+    }
 }
