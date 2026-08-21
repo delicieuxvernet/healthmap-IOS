@@ -12,7 +12,7 @@ on:
         required: true
         default: audit
         type: choice
-        options: [audit, apply, app-audit, deep-audit, fix-subs, apply-app, offers, screenshots, submit, fix-meta, attach-video, trim-monthly, cancel-submission, stage-version, stage-subs, send-submission, set-availability, tester-code, new-version]
+        options: [audit, apply, app-audit, deep-audit, fix-subs, apply-app, offers, price, screenshots, submit, fix-meta, attach-video, trim-monthly, cancel-submission, stage-version, stage-subs, send-submission, set-availability, tester-code, new-version]
       display_type:
         description: "screenshots : type d'écran Apple (APP_IPHONE_67 = 1290x2796)"
         required: false
@@ -54,6 +54,11 @@ on:
         default: ""
         type: string
 
+      options:
+        description: "Options libres CLE=valeur separees par des virgules (ex. PRICE=30.00 ou TESTER_DURATION=ONE_MONTH,TESTER_CODE=KIWIOANNUEL)"
+        required: false
+        default: ""
+        type: string
 permissions:
   contents: read
 
@@ -115,4 +120,5 @@ jobs:
           SUBMISSION_ID: ${{ inputs.submission_id }}
           RELEASE_TYPE: ${{ inputs.release_type }}
           SCREENS_DIR: ${{ inputs.screens_dir }}
+          OPTIONS: ${{ inputs.options }}
         run: ruby scripts/asc_subscriptions.rb
