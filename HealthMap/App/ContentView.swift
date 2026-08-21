@@ -230,6 +230,7 @@ struct LaunchScreenView: View {
 struct MainTabView: View {
     @EnvironmentObject var pushService: PushNotificationService
     @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject var subscriptionService: SubscriptionService
     @StateObject private var dashboardVM = DashboardViewModel()
     @StateObject private var questionnaireVM = QuestionnaireViewModel()
     @ObservedObject private var gamification = GamificationService.shared
@@ -253,6 +254,12 @@ struct MainTabView: View {
     /// Tab tour — shown once after the user completes the questionnaire.
     @AppStorage("hasSeenTabTour") private var hasSeenTabTour = false
     @State private var showTabTour = false
+
+    /// Récap animé : la séquence qui délivre le bilan juste après le
+    /// questionnaire. Les slides sont construits UNE fois, au moment de
+    /// présenter — pendant la lecture, plus rien n'est calculé ni chargé.
+    @State private var slidesRecap: [RecapSlide] = []
+    @State private var afficheRecap = false
 
     /// Tutoriel de première visite de l'onglet Scan (3 bulles). Il vit ICI, au
     /// niveau de MainTabView, et PAS dans MealScanView : la barre d'onglets est
@@ -524,6 +531,7 @@ struct MainTabView: View {
         // écran. Armé sur un minuteur, le tour se révélait pile au moment où le
         // bilan apparaissait enfin — et le recouvrait.
         .onChange(of: dashboardVM.analysisV2 == nil) { _, _ in
+            preparerRecap()
             armerTourOnglets()
         }
         .onChange(of: pushService.pendingRoute) { _, newValue in
@@ -548,6 +556,17 @@ struct MainTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .healthmapOpenProfile)) { _ in
             showProfile = true
+        }
+        // Le récap se joue par-dessus tout, barre d'onglets comprise : c'est un
+        // moment, pas un écran de plus. Il ne s'ouvre QUE s'il y a une séquence
+        // — une analyse inexploitable laisse l'utilisateur sur son Bilan, sans
+        // rien casser.
+        .fullScreenCover(isPresented: $afficheRecap) {
+            RecapView(slides: slidesRecap) {
+                afficheRecap = false
+                // Le tour d'onglets attendait la fin du récap : il peut passer.
+                armerTourOnglets()
+            }
         }
         // BLOCAGE pendant la 1re analyse IA (retour test 20 juin) : tant que le
         // bilan n'est pas prêt, on couvre TOUTE l'app (barre d'onglets comprise)
@@ -578,6 +597,27 @@ struct MainTabView: View {
         }
     }
 
+    /// Joue le récap animé si le questionnaire vient d'être terminé et que le
+    /// bilan est arrivé. `recapArme` n'est posé que par la fin du questionnaire :
+    /// un compte déjà installé ne se prend jamais la séquence à l'ouverture.
+    private func preparerRecap() {
+        guard dashboardVM.recapArme, dashboardVM.analysisV2 != nil, !afficheRecap else { return }
+        let slides = dashboardVM.construireRecap(estPremium: subscriptionService.isPremium)
+        // Séquence vide = analyse inexploitable : on désarme et on laisse le
+        // Bilan classique faire son travail. Le récap ne bloque JAMAIS le parcours.
+        dashboardVM.recapArme = false
+        guard !slides.isEmpty else { return }
+        slidesRecap = slides
+        // Le récap s'ouvre à l'instant PRÉCIS où la gate d'analyse se referme
+        // (les deux sont pilotées par l'arrivée de `analysisV2`). Deux
+        // présentations plein écran qui se croisent dans le même cycle et
+        // SwiftUI en avale une : on laisse la première finir de sortir.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard !slidesRecap.isEmpty else { return }
+            afficheRecap = true
+        }
+    }
+
     /// Arme le tour d'onglets — une seule fois par compte, et seulement quand
     /// il y a quelque chose à commenter : questionnaire fait ET bilan affiché
     /// (la gate d'analyse refermée). Appelé depuis les trois endroits qui
@@ -585,6 +625,10 @@ struct MainTabView: View {
     private func armerTourOnglets() {
         guard dashboardVM.hasCompletedQuestionnaire,
               dashboardVM.analysisV2 != nil,
+              // Le récap passe AVANT le tour : deux surcouches en même temps,
+              // et on ne lit ni l'une ni l'autre.
+              !dashboardVM.recapArme,
+              !afficheRecap,
               !hasSeenTabTour,
               !showTabTour else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
@@ -696,6 +740,10 @@ struct ProfileView: View {
     @State private var isRestoringPurchases = false
     @State private var restoreResultMessage: String?
     @State private var showRestoreResult = false
+
+    /// Relecture du récap animé depuis le profil.
+    @State private var slidesRecap: [RecapSlide] = []
+    @State private var afficheRecap = false
 
     // Code promo : la feuille système Apple se referme sans rien rendre. Ces
     // états portent l'attente ET la réponse — l'écran ne peut plus rester muet.
@@ -827,6 +875,17 @@ struct ProfileView: View {
 
                 // Quick links
                 Section("Mon bilan") {
+                    // Rejouer le récap : la séquence se regarde une fois à chaud,
+                    // et se revoit à froid. Sans cette entrée, elle n'existerait
+                    // qu'une minute dans la vie du compte.
+                    if dashboardVM.analysisV2 != nil {
+                        Button {
+                            rejouerRecap()
+                        } label: {
+                            Label("Revoir mon bilan animé", systemImage: "play.circle")
+                        }
+                    }
+
                     NavigationLink {
                         EditProfileView()
                             .environmentObject(dashboardVM)
@@ -1061,6 +1120,9 @@ struct ProfileView: View {
                     Text(promoResultMessage)
                 }
             }
+            .fullScreenCover(isPresented: $afficheRecap) {
+                RecapView(slides: slidesRecap) { afficheRecap = false }
+            }
         }
     }
 
@@ -1076,6 +1138,18 @@ struct ProfileView: View {
     /// real-world success rate of restores. The success path also fires
     /// `subscriptionRestored`, which the funnel uses to attribute later
     /// engagement to recovered subscribers.
+    // MARK: - Récap animé
+
+    /// Reconstruit la séquence à partir du bilan courant et la rejoue. Le
+    /// verrouillage est recalculé : quelqu'un qui vient de s'abonner revoit
+    /// son bilan entièrement ouvert.
+    private func rejouerRecap() {
+        let slides = dashboardVM.construireRecap(estPremium: subscriptionService.isPremium)
+        guard !slides.isEmpty else { return }
+        slidesRecap = slides
+        afficheRecap = true
+    }
+
     // MARK: - Code promo
 
     /// Ouvre la feuille Apple de saisie d'un code, puis attend vraiment que
