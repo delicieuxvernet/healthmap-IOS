@@ -44,9 +44,16 @@ enum RecapBuilder {
         prenom: String?,
         réponses: Int,
         alertesSecurite: [String] = [],
-        estPremium: Bool
+        estPremium: Bool,
+        scoreDeSecours: Int = 0
     ) -> [RecapSlide] {
-        guard let analyse, analyse.isValidV2, let score = analyse.score else { return [] }
+        guard let analyse, analyse.isValidV2 else { return [] }
+        // Le Bilan s'affiche sans exiger `score` : le récap ne doit pas être plus
+        // exigeant que lui, sinon le bouton « Revoir mon bilan » ne fait RIEN
+        // sur les profils où le serveur n'a pas renvoyé de score (bug du
+        // 21 août 2026). On retombe alors sur le score calculé localement.
+        let score = analyse.score ?? scoreDeSecours
+        guard score > 0 else { return [] }
 
         var slides: [RecapSlide] = []
         let bilan = analyse.bilan

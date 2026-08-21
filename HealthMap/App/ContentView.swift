@@ -557,6 +557,22 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .healthmapOpenProfile)) { _ in
             showProfile = true
         }
+        // Relecture demandée depuis le profil. On laisse la feuille du profil se
+        // refermer avant d'ouvrir la séquence : deux présentations qui se
+        // croisent dans le même cycle et SwiftUI en avale une.
+        .onReceive(NotificationCenter.default.publisher(for: .healthmapRejouerRecap)) { _ in
+            let slides = dashboardVM.construireRecap(estPremium: subscriptionService.isPremium)
+            guard !slides.isEmpty else {
+                // Ne jamais rester muet : si la séquence ne peut pas se construire,
+                // on le dit au lieu de laisser croire à un bouton mort.
+                ToastService.shared.showÉchecRecap()
+                return
+            }
+            slidesRecap = slides
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                afficheRecap = true
+            }
+        }
         // Le récap se joue par-dessus tout, barre d'onglets comprise : c'est un
         // moment, pas un écran de plus. Il ne s'ouvre QUE s'il y a une séquence
         // — une analyse inexploitable laisse l'utilisateur sur son Bilan, sans
@@ -741,10 +757,6 @@ struct ProfileView: View {
     @State private var restoreResultMessage: String?
     @State private var showRestoreResult = false
 
-    /// Relecture du récap animé depuis le profil.
-    @State private var slidesRecap: [RecapSlide] = []
-    @State private var afficheRecap = false
-
     // Code promo : la feuille système Apple se referme sans rien rendre. Ces
     // états portent l'attente ET la réponse — l'écran ne peut plus rester muet.
     @State private var isRedeemingPromo = false
@@ -878,7 +890,7 @@ struct ProfileView: View {
                     // Rejouer le récap : la séquence se regarde une fois à chaud,
                     // et se revoit à froid. Sans cette entrée, elle n'existerait
                     // qu'une minute dans la vie du compte.
-                    if dashboardVM.analysisV2 != nil {
+                    if dashboardVM.recapDisponible {
                         Button {
                             rejouerRecap()
                         } label: {
@@ -1120,9 +1132,6 @@ struct ProfileView: View {
                     Text(promoResultMessage)
                 }
             }
-            .fullScreenCover(isPresented: $afficheRecap) {
-                RecapView(slides: slidesRecap) { afficheRecap = false }
-            }
         }
     }
 
@@ -1140,14 +1149,14 @@ struct ProfileView: View {
     /// engagement to recovered subscribers.
     // MARK: - Récap animé
 
-    /// Reconstruit la séquence à partir du bilan courant et la rejoue. Le
-    /// verrouillage est recalculé : quelqu'un qui vient de s'abonner revoit
-    /// son bilan entièrement ouvert.
+    /// Demande la relecture du récap, puis referme le profil.
+    ///
+    /// La séquence est présentée par `MainTabView`, pas ici : une feuille plein
+    /// écran ouverte DEPUIS une feuille, et en 8e modificateur de présentation
+    /// sur la même vue, ne s'ouvrait tout simplement pas.
     private func rejouerRecap() {
-        let slides = dashboardVM.construireRecap(estPremium: subscriptionService.isPremium)
-        guard !slides.isEmpty else { return }
-        slidesRecap = slides
-        afficheRecap = true
+        dismiss()
+        NotificationCenter.default.post(name: .healthmapRejouerRecap, object: nil)
     }
 
     // MARK: - Code promo

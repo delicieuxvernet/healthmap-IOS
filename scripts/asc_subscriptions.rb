@@ -151,7 +151,12 @@ def sub_snapshot(sub_id)
     { locale: a["locale"], name: a["name"], state: a["state"], hasDescription: !a["description"].to_s.strip.empty? }
   end
 
-  code, pr = req(:get, "/v1/subscriptions/#{sub_id}/prices?filter[territory]=FRA&include=subscriptionPricePoint&limit=200")
+  # Territoire du relevé de prix. La France par défaut, mais StoreKit sert le
+  # prix du STOREFRONT de l'appareil : pour comprendre un prix vu en dollars sur
+  # un TestFlight, il faut pouvoir lire un autre territoire (TERRITORY=USA).
+  territoire = ENV["TERRITORY"].to_s.strip.empty? ? "FRA" : ENV["TERRITORY"].to_s.strip.upcase
+  code, pr = req(:get, "/v1/subscriptions/#{sub_id}/prices?filter[territory]=#{territoire}&include=subscriptionPricePoint&limit=200")
+  snap[:territoire] = territoire
   snap[:prices_fra] =
     if code == 200
       incl = (pr["included"] || []).to_h { |i| [i["id"], i] }

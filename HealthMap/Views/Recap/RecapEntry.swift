@@ -20,8 +20,20 @@ extension DashboardViewModel {
             alertesSecurite: redFlags
                 .filter { $0.urgency == .immediate }
                 .map(\.message),
-            estPremium: estPremium
+            estPremium: estPremium,
+            // Le Bilan sait afficher un score sans que le serveur en renvoie un :
+            // le récap s'appuie sur le même filet.
+            scoreDeSecours: healthScore
         )
+    }
+
+    /// Y a-t-il de quoi jouer une séquence ? Test bon marché (aucun encodage,
+    /// aucune construction) pour n'afficher l'entrée « Revoir mon bilan » que
+    /// lorsqu'elle mène quelque part. Un bouton qui ne fait rien est pire que
+    /// pas de bouton.
+    var recapDisponible: Bool {
+        guard analysisV2?.bilan?.apports?.isEmpty == false else { return false }
+        return (analysisV2?.score ?? healthScore) > 0
     }
 }
 

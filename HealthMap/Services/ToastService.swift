@@ -96,6 +96,13 @@ final class ToastService: ObservableObject {
         show(Self.actionToasts[index])
     }
 
+    /// La séquence animée n'a pas pu être construite (bilan incomplet). On le dit
+    /// plutôt que de laisser un bouton sans effet : « rien ne se passe » est le
+    /// pire retour qu'une interface puisse donner.
+    func showÉchecRecap() {
+        show("Ton bilan animé n'est pas disponible pour l'instant.")
+    }
+
     // MARK: - Display & Auto-Dismiss
     private func show(_ message: String) {
         currentToast = message
