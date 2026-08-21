@@ -608,7 +608,14 @@ struct MainTabView: View {
         dashboardVM.recapArme = false
         guard !slides.isEmpty else { return }
         slidesRecap = slides
-        afficheRecap = true
+        // Le récap s'ouvre à l'instant PRÉCIS où la gate d'analyse se referme
+        // (les deux sont pilotées par l'arrivée de `analysisV2`). Deux
+        // présentations plein écran qui se croisent dans le même cycle et
+        // SwiftUI en avale une : on laisse la première finir de sortir.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard !slidesRecap.isEmpty else { return }
+            afficheRecap = true
+        }
     }
 
     /// Arme le tour d'onglets — une seule fois par compte, et seulement quand
