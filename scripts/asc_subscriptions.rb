@@ -1054,6 +1054,19 @@ if MODE == "price"
   pp_id, real_price = found
   puts "Point de prix France retenu : #{real_price} €"
 
+  # Un POST sans `attributes` est lu par Apple comme la création du prix INITIAL
+  # et refusé sur un abonnement déjà approuvé (« Initial price cannot be created
+  # again after subscription is approved », HTTP 409, constaté le 21 août 2026).
+  # Les attributs en font un CHANGEMENT de prix.
+  # `preserveCurrentPrice` : false = les abonnés existants suivent le nouveau
+  # tarif (voulu pour une baisse) ; true = ils gardent le leur (défaut Apple).
+  # `startDate` : absent = dès que possible. START_DATE (AAAA-MM-JJ) pour
+  # programmer le changement plus tard.
+  price_attrs = { preserveCurrentPrice: ENV["PRESERVE_CURRENT_PRICE"].to_s.strip == "1" }
+  start_date = ENV["START_DATE"].to_s.strip
+  price_attrs[:startDate] = start_date unless start_date.empty?
+  puts "Changement de prix : #{price_attrs.inspect}"
+
   # Grille courante : sert à l'idempotence (relancer le mode ne repose rien).
   current_pp_ids = []
   url = "/v1/subscriptions/#{sub_id}/prices?limit=200&fields[subscriptionPrices]=subscriptionPricePoint&include=subscriptionPricePoint&fields[subscriptionPricePoints]=customerPrice"
@@ -1069,6 +1082,7 @@ if MODE == "price"
   else
     ok, = write("prix France #{real_price} €", :post, "/v1/subscriptionPrices",
       { data: { type: "subscriptionPrices",
+                attributes: price_attrs,
                 relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
                                  subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: pp_id } } } } })
     exit 1 unless ok
@@ -1086,6 +1100,7 @@ if MODE == "price"
     missing.each do |eq_id|
       code, resp = req(:post, "/v1/subscriptionPrices",
         { data: { type: "subscriptionPrices",
+                  attributes: price_attrs,
                   relationships: { subscription: { data: { type: "subscriptions", id: sub_id } },
                                    subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: eq_id } } } } })
       if (200..299).cover?(code)
