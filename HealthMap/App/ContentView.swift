@@ -697,6 +697,12 @@ struct ProfileView: View {
     @State private var restoreResultMessage: String?
     @State private var showRestoreResult = false
 
+    // Code promo : la feuille système Apple se referme sans rien rendre. Ces
+    // états portent l'attente ET la réponse — l'écran ne peut plus rester muet.
+    @State private var isRedeemingPromo = false
+    @State private var promoResultMessage: String?
+    @State private var showPromoResult = false
+
     // RGPD Data Export state
     @State private var isExportingData = false
 
@@ -775,15 +781,22 @@ struct ProfileView: View {
                     // aucune formule, aucun prix — donc V12a est respectée.
                     if !subscriptionService.isPremium {
                         Button {
-                            subscriptionService.presenterCodePromo()
+                            Task { await saisirCodePromo() }
                         } label: {
                             HStack {
-                                Image(systemName: "ticket")
-                                    .foregroundStyle(Color.healthMapBlue)
-                                Text("J'ai un code")
+                                if isRedeemingPromo {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 18, height: 18)
+                                } else {
+                                    Image(systemName: "ticket")
+                                        .foregroundStyle(Color.healthMapBlue)
+                                }
+                                Text(isRedeemingPromo ? "Vérification de ton code…" : "J'ai un code")
                                     .foregroundStyle(Color.healthMapBlue)
                             }
                         }
+                        .disabled(isRedeemingPromo)
                         .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
                     }
 
@@ -1038,6 +1051,16 @@ struct ProfileView: View {
                     Text(restoreResultMessage)
                 }
             }
+            // Code promo : la feuille Apple ne rend aucun résultat. Sans ce
+            // retour explicite, la saisie d'un code se terminait sur un écran
+            // inchangé — impossible de savoir si l'accès s'était ouvert.
+            .alert("Code promo", isPresented: $showPromoResult) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                if let promoResultMessage {
+                    Text(promoResultMessage)
+                }
+            }
         }
     }
 
@@ -1053,6 +1076,38 @@ struct ProfileView: View {
     /// real-world success rate of restores. The success path also fires
     /// `subscriptionRestored`, which the funnel uses to attribute later
     /// engagement to recovered subscribers.
+    // MARK: - Code promo
+
+    /// Ouvre la feuille Apple de saisie d'un code, puis attend vraiment que
+    /// l'accès s'ouvre avant de répondre. La feuille système ne dit jamais si
+    /// un code a été saisi : le message d'échec ne parle donc pas de « code
+    /// invalide », il constate seulement qu'aucun accès n'est apparu.
+    private func saisirCodePromo() async {
+        guard !isRedeemingPromo else { return }
+        isRedeemingPromo = true
+        defer { isRedeemingPromo = false }
+
+        switch await subscriptionService.saisirCodePromo() {
+        case .active:
+            var message = "Ton accès Premium est ouvert. Tout est débloqué dès maintenant."
+            if let entitlement = subscriptionService.customerInfo?
+                .entitlements[SubscriptionService.entitlementId],
+               let expiration = entitlement.expirationDate {
+                let date = expiration.formatted(date: .abbreviated, time: .omitted)
+                message += entitlement.willRenew
+                    ? " Renouvellement le \(date)."
+                    : " Actif jusqu'au \(date)."
+            }
+            promoResultMessage = message
+            AnalyticsService.shared.track(.subscriptionStarted, properties: [
+                "package": "code_promo",
+            ])
+        case .aucuneActivation:
+            promoResultMessage = "Aucun code n'a été appliqué. Si tu viens d'en saisir un, laisse-lui quelques secondes puis touche « Restaurer mes achats »."
+        }
+        showPromoResult = true
+    }
+
     private func restorePurchases() async {
         guard !isRestoringPurchases else { return }
         isRestoringPurchases = true

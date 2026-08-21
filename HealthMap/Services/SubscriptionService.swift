@@ -1,5 +1,6 @@
 import Foundation
 import RevenueCat
+import StoreKit
 import SwiftUI
 
 enum PurchaseOutcome: Equatable {
@@ -24,6 +25,17 @@ enum PurchaseOutcome: Equatable {
         if userCancelled { return .cancelled }
         return entitlementIsActive ? .activated : .entitlementPending
     }
+}
+
+/// Issue de la saisie d'un code promo, du point de vue de l'utilisateur.
+enum CodePromoOutcome: Equatable {
+    /// L'accès Premium est ouvert : le code a été accepté.
+    case active
+    /// Rien ne s'est ouvert au bout de l'attente. Ce n'est PAS une erreur :
+    /// la feuille système ne dit jamais si l'utilisateur a saisi un code,
+    /// annulé, ou simplement fermé — on ne peut donc pas afficher
+    /// « code invalide », seulement constater qu'il n'y a rien de nouveau.
+    case aucuneActivation
 }
 
 // MARK: - Filet hors-ligne (promesse V10 #4)
@@ -133,6 +145,8 @@ final class SubscriptionService: ObservableObject {
     ///   qu'une périmée.
     fileprivate func applyFresh(customerInfo info: CustomerInfo?, isPremiumOverride: Bool? = nil) {
         premiumGeneration += 1
+        let etaitPremium = isPremium
+        let ancienneFormule = customerInfo?.entitlements[Self.entitlementId]?.productIdentifier
         customerInfo = info
         let entitlement = info?.entitlements[Self.entitlementId]
         isPremium = isPremiumOverride ?? (entitlement?.isActive == true)
@@ -140,19 +154,134 @@ final class SubscriptionService: ObservableObject {
             isPremium: isPremium,
             expirationDate: isPremiumOverride == nil ? entitlement?.expirationDate : nil
         ).save()
+
+        if Self.doitPrevenirLeServeur(
+            etaitPremium: etaitPremium,
+            estPremium: isPremium,
+            ancienneFormule: ancienneFormule,
+            nouvelleFormule: entitlement?.productIdentifier
+        ) {
+            prevenirLeServeur()
+        }
+    }
+
+    /// Le serveur doit-il recouper l'abonnement MAINTENANT ?
+    ///
+    /// `profiles.tier` commande les quotas SERVEUR (30 scans repas par jour en
+    /// Premium contre 3 en gratuit). Jusqu'ici seul le chemin d'ACHAT prévenait
+    /// le serveur : un accès ouvert par code promo, par restauration ou par
+    /// approbation parentale laissait `tier = free`, et l'abonné gardait les
+    /// quotas du gratuit sans que rien ne le lui dise.
+    ///
+    /// - L'accès s'ouvre (false → true) : oui.
+    /// - La formule change alors qu'on était déjà abonné (hebdo → annuel) : oui.
+    /// - Cold start d'un abonné (l'état vient du cache disque, aucune formule
+    ///   connue avant) : non — la vérification périodique de 24 h suffit,
+    ///   inutile d'appeler le serveur à chaque lancement.
+    nonisolated static func doitPrevenirLeServeur(
+        etaitPremium: Bool,
+        estPremium: Bool,
+        ancienneFormule: String?,
+        nouvelleFormule: String?
+    ) -> Bool {
+        if !etaitPremium && estPremium { return true }
+        guard estPremium, let ancienneFormule, let nouvelleFormule else { return false }
+        return ancienneFormule != nouvelleFormule
+    }
+
+    /// Demande au serveur de recouper l'abonnement contre RevenueCat et
+    /// d'aligner `profiles.tier`. Non bloquant, sans effet visible : c'est le
+    /// serveur qui tranche (`verify-receipt` résout l'identité depuis le JWT).
+    private func prevenirLeServeur() {
+        let identifiant = Purchases.shared.appUserID
+        Task {
+            await ReceiptValidationService.shared.verifyCurrentEntitlements(
+                userId: identifiant,
+                force: true
+            )
+        }
     }
 
     // MARK: - Code promo (offer code)
 
-    /// Ouvre la feuille système Apple de saisie d'un code, puis va CHERCHER
-    /// l'état d'abonnement : la feuille se referme sans notifier l'app, et rien
-    /// ne garantit un passage par `scenePhase == .active` au retour.
-    func presenterCodePromo() {
+    /// Paliers d'attente (en secondes) après l'ouverture de la feuille Apple.
+    ///
+    /// La feuille de rédemption se referme SANS prévenir l'app, ne rend aucun
+    /// résultat, et ne garantit aucun passage par `scenePhase == .active` au
+    /// retour. La seule façon fiable de savoir si un code a été accepté est
+    /// d'aller relire l'abonnement, plusieurs fois. Les paliers couvrent le
+    /// temps réel de saisie (≈ 10 à 60 s) sans marteler le réseau : 11
+    /// relectures étalées sur ~1 min. Le premier palier reste court (2 s) pour
+    /// le cas fréquent du code déjà dans le presse-papier, collé en un geste.
+    ///
+    /// ⚠️ Ne pas raccourcir cette fenêtre : une relecture unique à 1 s tombait
+    /// pendant que l'utilisateur tapait encore son code, ne voyait donc jamais
+    /// l'activation, et l'app restait muette (bug constaté le 21 août 2026).
+    nonisolated static let paliersAttenteCodePromo: [Double] = [2, 3, 3, 4, 5, 6, 6, 8, 8, 8, 8]
+
+    /// Paliers où l'on force une resynchronisation StoreKit → RevenueCat au lieu
+    /// d'une simple relecture : un code accepté crée une transaction que le SDK
+    /// ne remonte pas toujours de lui-même.
+    nonisolated static let paliersResync: Set<Int> = [3, 8]
+
+    /// Ouvre la feuille système Apple de saisie d'un code promo, puis ATTEND que
+    /// l'accès s'ouvre pour de bon (cf. `attendreActivation`).
+    func saisirCodePromo() async -> CodePromoOutcome {
         Purchases.shared.presentCodeRedemptionSheet()
-        Task {
-            try? await Task.sleep(for: .seconds(1))
-            await checkPremiumStatus()
+        return await attendreActivation()
+    }
+
+    /// Relit l'abonnement par paliers jusqu'à ce que l'accès s'ouvre.
+    func attendreActivation(
+        paliers: [Double] = SubscriptionService.paliersAttenteCodePromo
+    ) async -> CodePromoOutcome {
+        for (index, delai) in paliers.enumerated() {
+            try? await Task.sleep(for: .seconds(delai))
+
+            // Le push RevenueCat (ou le retour au premier plan) a pu écrire
+            // l'accès pendant l'attente : inutile d'appeler le réseau.
+            if isPremium { return .active }
+
+            if Self.paliersResync.contains(index) {
+                if let resynchronise = try? await Purchases.shared.syncPurchases() {
+                    applyFresh(customerInfo: resynchronise)
+                }
+            } else if let frais = try? await Purchases.shared.customerInfo(fetchPolicy: .fetchCurrent) {
+                applyFresh(customerInfo: frais)
+            }
+
+            if isPremium { return .active }
         }
+
+        // Dernier recours : StoreKit connaît-il une transaction active sur un de
+        // NOS abonnements ? Si oui, le code a bien été accepté par Apple et c'est
+        // le rattachement à l'entitlement RevenueCat qui manque. L'accès est
+        // accordé quand même (même promesse que l'achat, V10 #3) et l'anomalie
+        // est signalée : c'est un réglage de tableau de bord, pas un bug client.
+        if await Self.transactionActiveSurUnAbonnementVendu() {
+            AppLogger.subscription.error("Code promo accepté par StoreKit mais entitlement « premium » absent chez RevenueCat — vérifier le rattachement des produits à l'entitlement.")
+            CrashReportingService.shared.captureMessage(
+                "promo code redeemed but RevenueCat entitlement missing",
+                level: .warning
+            )
+            applyFresh(customerInfo: customerInfo, isPremiumOverride: true)
+            return .active
+        }
+
+        return .aucuneActivation
+    }
+
+    /// Une transaction StoreKit active existe-t-elle sur un des abonnements que
+    /// l'app vend ? Lecture locale, sans réseau.
+    private static func transactionActiveSurUnAbonnementVendu() async -> Bool {
+        let vendus = Set(subscriptionProductIds)
+        for await resultat in StoreKit.Transaction.currentEntitlements {
+            guard case .verified(let transaction) = resultat else { continue }
+            if transaction.revocationDate == nil, vendus.contains(transaction.productID) {
+                return true
+            }
+        }
+        return false
     }
 
     // MARK: - Check Premium Status
@@ -268,16 +397,10 @@ final class SubscriptionService: ObservableObject {
             outcome = .activatedSyncPending
         }
 
-        // Post-purchase StoreKit 2 verification (non-blocking). `force: true` :
-        // c'est LE moment où le serveur doit recouper l'achat — sans lui, une
-        // vérification périodique < 24 h rendait cet appel no-op (V10 #2).
-        if outcome == .activated || outcome == .activatedSyncPending {
-            let userId = result.customerInfo.originalAppUserId
-            Task {
-                await ReceiptValidationService.shared.verifyCurrentEntitlements(userId: userId, force: true)
-            }
-        }
-
+        // La vérification serveur post-achat (`verify-receipt`, force: true) est
+        // désormais déclenchée par `applyFresh` dès que l'accès s'ouvre — donc
+        // ici, mais aussi après un code promo, une restauration ou une
+        // approbation Ask to Buy, qui en étaient privées.
         return outcome
     }
 
