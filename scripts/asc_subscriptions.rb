@@ -1054,18 +1054,23 @@ if MODE == "price"
   pp_id, real_price = found
   puts "Point de prix France retenu : #{real_price} €"
 
-  # Un POST sans `attributes` est lu par Apple comme la création du prix INITIAL
-  # et refusé sur un abonnement déjà approuvé (« Initial price cannot be created
-  # again after subscription is approved », HTTP 409, constaté le 21 août 2026).
-  # Les attributs en font un CHANGEMENT de prix.
-  # `preserveCurrentPrice` : false = les abonnés existants suivent le nouveau
-  # tarif (voulu pour une baisse) ; true = ils gardent le leur (défaut Apple).
-  # `startDate` : absent = dès que possible. START_DATE (AAAA-MM-JJ) pour
-  # programmer le changement plus tard.
-  price_attrs = { preserveCurrentPrice: ENV["PRESERVE_CURRENT_PRICE"].to_s.strip == "1" }
+  # Sur un abonnement DÉJÀ APPROUVÉ, Apple n'accepte pas un prix « nu » : sans
+  # `startDate` le POST est lu comme la création du prix INITIAL et rejeté
+  # (« Initial price cannot be created again after subscription is approved »,
+  # HTTP 409 — constaté le 21 août 2026, y compris avec preserveCurrentPrice
+  # seul). Une date d'effet en fait un CHANGEMENT de prix, qui passe.
+  # Conséquence : un changement de prix n'est JAMAIS immédiat. Par défaut on
+  # vise le lendemain (UTC), au plus tôt. START_DATE (AAAA-MM-JJ) pour choisir.
+  # `preserveCurrentPrice` : false (défaut ici) = les abonnés existants suivent
+  # le nouveau tarif, ce qu'on veut pour une baisse ; PRESERVE_CURRENT_PRICE=1
+  # les laisse sur leur prix actuel (défaut Apple).
   start_date = ENV["START_DATE"].to_s.strip
-  price_attrs[:startDate] = start_date unless start_date.empty?
-  puts "Changement de prix : #{price_attrs.inspect}"
+  start_date = (Time.now.utc + 24 * 3600).strftime("%Y-%m-%d") if start_date.empty?
+  price_attrs = {
+    preserveCurrentPrice: ENV["PRESERVE_CURRENT_PRICE"].to_s.strip == "1",
+    startDate: start_date,
+  }
+  puts "Changement de prix : effet le #{start_date}, abonnés existants #{price_attrs[:preserveCurrentPrice] ? "sur leur prix actuel" : "sur le nouveau prix"}"
 
   # Grille courante : sert à l'idempotence (relancer le mode ne repose rien).
   current_pp_ids = []
