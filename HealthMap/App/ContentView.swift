@@ -561,6 +561,7 @@ struct MainTabView: View {
         // refermer avant d'ouvrir la séquence : deux présentations qui se
         // croisent dans le même cycle et SwiftUI en avale une.
         .onReceive(NotificationCenter.default.publisher(for: .healthmapRejouerRecap)) { _ in
+            showProfile = false
             let slides = dashboardVM.construireRecap(estPremium: subscriptionService.isPremium)
             guard !slides.isEmpty else {
                 // Ne jamais rester muet : si la séquence ne peut pas se construire,
@@ -1155,7 +1156,9 @@ struct ProfileView: View {
     /// écran ouverte DEPUIS une feuille, et en 8e modificateur de présentation
     /// sur la même vue, ne s'ouvrait tout simplement pas.
     private func rejouerRecap() {
-        dismiss()
+        // C'est `MainTabView` qui a ouvert cette feuille : c'est lui qui la
+        // referme, puis qui présente la séquence. `ProfileView` n'a pas à
+        // connaître sa propre présentation.
         NotificationCenter.default.post(name: .healthmapRejouerRecap, object: nil)
     }
 
