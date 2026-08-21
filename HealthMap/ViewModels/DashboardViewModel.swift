@@ -40,6 +40,13 @@ final class DashboardViewModel: ObservableObject {
     /// attendre : la gate plein écran (`AnalysisGateView`) ne se rouvre plus de
     /// la session. Le bilan continue d'arriver en tâche de fond.
     @Published var gateContournee = false
+    /// Le récap animé attend le bilan pour se jouer.
+    ///
+    /// Armé UNIQUEMENT à la fin du questionnaire, jamais au lancement : sinon
+    /// tout utilisateur déjà installé se serait pris la séquence en pleine
+    /// figure à la première ouverture après mise à jour. Il se rejoue à la
+    /// demande depuis le profil (« Revoir mon bilan animé »).
+    @Published var recapArme = false
 
     // MARK: - Injected Services
 

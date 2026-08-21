@@ -42,6 +42,16 @@ enum AnalyticsEvent: String {
     case recommendationsViewed = "recommendations_viewed"
     case interactionViewed = "interaction_viewed"
 
+    // Récap animé de fin de questionnaire
+    case recapStarted = "recap_started"
+    case recapSlideViewed = "recap_slide_viewed"
+    case recapSkipped = "recap_skipped"
+    case recapCompleted = "recap_completed"
+    /// Le signal d'intention d'achat le plus fort de toute l'app : la personne
+    /// a touché un contenu réservé APRÈS avoir vu la valeur offerte.
+    case recapLockedTapped = "recap_locked_tapped"
+    case recapShared = "recap_shared"
+
     // Paywall
     case paywallShown = "paywall_shown"
     case paywallDismissed = "paywall_dismissed"

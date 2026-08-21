@@ -495,6 +495,10 @@ struct QuestionnaireContainerView: View {
                 // Flip immédiat du flag (point d'observation `bilanComplete`) :
                 // toutes les vues qui l'observent basculent sans relance.
                 dashboardVM.hasCompletedQuestionnaire = true
+                // Le récap animé se jouera dès que le bilan arrivera. Armé ICI
+                // et nulle part ailleurs : c'est le seul moment où la séquence
+                // a du sens — on vient de répondre, on attend le résultat.
+                dashboardVM.recapArme = true
                 // Entrée libre (V12a) : le questionnaire vit dans une feuille —
                 // on la referme, l'utilisateur retrouve son onglet d'origine.
                 // La gate de 1re analyse (AnalysisGateView) couvre ensuite
