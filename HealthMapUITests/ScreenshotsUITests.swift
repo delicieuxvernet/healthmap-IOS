@@ -87,6 +87,35 @@ final class ScreenshotsUITests: XCTestCase {
             fermerFeuille()
         }
 
+        // Recherche → fiche portion d'un aliment qui se compte (œuf) : la
+        // quantité se saisit en unités (Petit / Moyen / Gros, « 1 œuf »).
+        if app.buttons["Ajouter un repas"].waitForExistence(timeout: 5) {
+            app.buttons["Ajouter un repas"].tap()
+            if app.buttons["Rechercher"].waitForExistence(timeout: 5) {
+                app.buttons["Rechercher"].tap()
+                let champ = app.textFields["Rechercher un aliment"]
+                if champ.waitForExistence(timeout: 8) {
+                    champ.tap()
+                    champ.typeText("oeuf")
+                    sleep(4)
+                    snap("15-recherche")
+                    let resultat = app.buttons.matching(NSPredicate(
+                        format: "(label CONTAINS[c] %@ OR label CONTAINS[c] %@) AND NOT (label BEGINSWITH %@)",
+                        "oeuf", "œuf", "Ajouter")).firstMatch
+                    if resultat.waitForExistence(timeout: 5) {
+                        resultat.tap()
+                        sleep(3)
+                        snap("16-fiche-portion-unites")
+                        app.swipeDown(velocity: .fast)
+                        sleep(1)
+                    }
+                }
+                fermerFeuille()
+            } else {
+                fermerFeuille()
+            }
+        }
+
         // Fiche apport (première ligne de « Apports à renforcer »).
         let apport = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "pour cent de tes besoins")).firstMatch
         if apport.waitForExistence(timeout: 5) {

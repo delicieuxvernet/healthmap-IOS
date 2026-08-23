@@ -695,7 +695,8 @@ struct FoodSearchSheet: View {
                 .contentShape(Rectangle())
             }
             .disabled(loadingHitId != nil)
-            .accessibilityLabel("Ajouter \(hit.name), 100 grammes")
+            .accessibilityLabel(UnitPortionCatalog.unite(pourNom: hit.name).map { "Ajouter \(hit.name), \($0.libelle(nombre: 1))" }
+                                ?? "Ajouter \(hit.name), 100 grammes")
         }
         .padding(12)
         .background(
@@ -744,9 +745,13 @@ struct FoodSearchSheet: View {
                     selectedDetail = detail   // fiche → note « incomptable »
                     return
                 }
-                if await onAdd(detail, 100) {
+                // Le « + » rapide ajoute une portion courante : 1 unité pour
+                // un aliment qui se compte (1 œuf = 50 g, pas 100 g), 100 g sinon.
+                let grams = UnitPortionCatalog.unite(pourNom: detail.name,
+                                                     portions: detail.portions.map { (label: $0.label, grammes: $0.grammes) })?.grammes ?? 100
+                if await onAdd(detail, grams) {
                     HapticService.shared.success()
-                    showConfirmation(for: detail, grams: 100)
+                    showConfirmation(for: detail, grams: grams)
                 }
             } catch {
                 AppLogger.database.warning("quickAdd failed: \(error.localizedDescription, privacy: .public)")
