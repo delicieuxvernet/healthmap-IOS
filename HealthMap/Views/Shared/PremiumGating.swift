@@ -273,73 +273,60 @@ struct UnlockDoor: View {
             }
         } label: {
             if compact {
+                // Mur de quota : capsule pleine, sans ombre.
                 HStack(spacing: 8) {
                     Image(systemName: icon)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
                     Text(title)
-                        .font(.system(size: 14, weight: .heavy))
+                        .font(.dsSousTitreFort)
                         .foregroundStyle(.white)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-                .background(Color.kiwiGreen, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                .contentShape(Rectangle())
+                .frame(height: DS.hauteurBouton)
+                .background(Capsule().fill(Color.dsAccent))
+                .contentShape(Capsule())
             } else {
-                // Écrin premium : le bénéfice spécifique porte la conclusion
-                // (17 / heavy, encre violette), le CTA kiwi porte l'action.
-                VStack(alignment: .leading, spacing: 10) {
-                    PremiumTeaseHeader()
-
+                // Refonte 23 août 2026 : la porte est CALME. Une carte blanche,
+                // le bénéfice en headline, la précision en secondaire, puis un
+                // lien vert. Plus d'écrin violet, plus de CTA pleine largeur,
+                // plus d'ombre : le paywall vit dans Réglages, la porte n'est
+                // qu'un lien vers lui.
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(Theme.conclusionFont)
-                        .tracking(Theme.conclusionTracking)
-                        .lineSpacing(2)
-                        .foregroundStyle(Color.premiumTeaseInk)
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
+                        .foregroundStyle(Color.dsTexte)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     if let subtitle, !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(Theme.dataSecondaryFont)
-                            .foregroundStyle(Color.premiumTeaseInk.opacity(0.75))
+                            .font(.dsSousTitre)
+                            .tracking(DSTracking.sousTitre)
+                            .foregroundStyle(Color.dsSecondaire)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    HStack(spacing: 7) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 15, weight: .semibold))
-                        Text("Débloquer mon analyse")
-                            .font(.system(size: 14.5, weight: .semibold))
+                    HStack(spacing: 6) {
+                        Text("S'ouvre avec Kiwio Premium")
+                            .font(.dsSousTitreFort)
+                            .foregroundStyle(Color.dsAccent)
+                        DSChevron(couleur: .dsAccent)
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.kiwiGreen, Color.kiwiGreenInk],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    )
-                    .shadow(color: Color.kiwiGreen.opacity(0.26), radius: 10, x: 0, y: 5)
+                    .padding(.top, 8)
+                    .frame(minHeight: 32)
                 }
-                .padding(14)
+                .padding(DS.paddingCarte)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(LinearGradient.premiumTease)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.accentIndigo.opacity(0.3), lineWidth: 1)
-                )
+                .dsCard()
                 .contentShape(Rectangle())
             }
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel(subtitle == nil ? title : "\(title). \(subtitle ?? "")")
         .accessibilityAddTraits(.isButton)
         .sheet(isPresented: $showPaywall) {

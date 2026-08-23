@@ -52,28 +52,68 @@ struct SafeFluent3DIcon: View {
 
 
 // MARK: - Bottom sheet : détail d'un apport (contrat v2)
-/// Fiche fidèle à la maquette : poignée, en-tête icône + nom + badge statut,
-/// grand anneau 132 pt (pctBesoin, couleur du statut), « Pourquoi », « Où le
-/// trouver » (aliments du contrat, icônes 3D), encart bleu « Interaction à
-/// connaître », CTA « Voir mon plan détaillé ».
+/// Fiche apport de la refonte (23 août 2026, §4.3 du document) : le
+/// « pourquoi », puis les clés. Feuille sur fond neutre :
+///   1. titre 34 + rôle en une ligne, bouton fermer 32 pt ;
+///   2. carte état : `42` (48 pt) + ` %`, « 5,9 sur 14 mg », jauge 6 pt,
+///      une phrase d'état ;
+///   3. « Pourquoi il est bas » : l'explication du contrat v2 ;
+///   4. « Ce qui le remonte » : les aliments du contrat + l'interaction à
+///      connaître (réservé au premium, comme avant : voile + porte calme) ;
+///   5. bouton capsule vers le plan.
+/// Règle d'écriture : la cause avant la solution. Aucun chiffre inventé : la
+/// quantité absolue dérive du pourcentage et de la référence canonique.
 struct ApportV2DetailSheet: View {
     let apport: ApportV2
     let onSeePlan: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Source unique premium (loi 11), OBSERVÉE : un achat depuis la fiche
     /// défloute les sections gatées en direct, sans réouverture.
     @ObservedObject private var subscriptionService = SubscriptionService.shared
-    @State private var animatedPct: CGFloat = 0
 
     private var pct: Int { min(100, max(0, apport.pctBesoin ?? 0)) }
     private var statut: StatutV2 { apport.statut }
-    private var whyTitle: String {
-        statut == .couvre ? "Pourquoi c'est bien couvert" : "Pourquoi à renforcer"
+    private var definition: NutrientDefinition? {
+        apport.id.flatMap { NutrientData.definition(for: $0) }
     }
+    private var nom: String { apport.nom ?? definition?.label ?? "Apport" }
     private var aliments: [AlimentV2] {
         (apport.aliments ?? []).filter { $0.nom?.isEmpty == false }
+    }
+
+    private var couleurStatut: Color {
+        switch statut {
+        case .couvre: return .dsAccent
+        case .aRenforcer: return .dsARenforcer
+        case .aCombler: return .dsACombler
+        case .neutre: return Color.dsStatut(pct)
+        }
+    }
+
+    private var titrePourquoi: String {
+        switch statut {
+        case .couvre: return "Pourquoi c'est couvert"
+        case .aRenforcer, .aCombler: return "Pourquoi il est bas"
+        case .neutre: return "Ce qu'on observe"
+        }
+    }
+
+    private var phraseEtat: String {
+        switch statut {
+        case .couvre: return "Ton besoin est couvert."
+        case .aRenforcer: return "Un peu sous ton besoin."
+        case .aCombler: return "Nettement sous ton besoin."
+        case .neutre: return "À suivre sur tes prochains repas."
+        }
+    }
+
+    /// « 5,9 sur 14 mg » : part couverte × référence canonique. nil si le
+    /// nutriment n'est pas au catalogue (on n'invente pas d'unité).
+    private var quantite: String? {
+        guard let definition else { return nil }
+        let absolu = definition.rda * Double(pct) / 100
+        return "\(DS.decimal(absolu)) sur \(DS.decimal(definition.rda))\(DS.fine)\(definition.unit)"
     }
 
     var body: some View {
@@ -81,250 +121,236 @@ struct ApportV2DetailSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
 
-                HStack { Spacer(); ring; Spacer() }
+                etatCard
                     .padding(.top, 18)
 
-                // Titre de section : teinté par le statut de l'apport, et
-                // rangé SOUS son contenu (11.5 / bold, jamais l'encre neutre).
-                Text(whyTitle)
-                    .font(Theme.subLabelFont)
-                    .textCase(.uppercase)
-                    .kerning(0.4)
-                    .foregroundStyle(statut.inkColor)
-                    .padding(.top, 16)
-                    .padding(.bottom, 6)
-                // L'explication : c'est le contenu, donc le pic de son bloc.
-                Text(apport.why ?? "Tes assiettes récentes en apportent peu. Un apport régulier cette semaine t'aidera à mieux couvrir ce besoin.")
-                    .font(Theme.insightFont)
-                    .foregroundStyle(Color.kiwiCharcoal)
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let why = apport.why, !why.isEmpty {
+                    DSSectionHeader(titre: titrePourquoi)
+                        .padding(.top, -4)
+                    pourquoiCard(why)
+                }
 
-                // « Où le trouver » + « Interaction à connaître » = le
-                // COMMENT, réservé au premium. Le teasing garde net le quoi
-                // et le pourquoi (anneau, statut, « Pourquoi ») ; ces deux
-                // sections passent sous le même patron que la fiche nutriment
-                // (GatedOverlay teaser + porte verte), une seule porte.
-                if subscriptionService.isPremium {
-                    ouLeTrouverSection
-                    interactionSection
-                } else if hasGatedContent {
-                    VStack(spacing: Theme.spacingSM) {
-                        GatedOverlay(intensity: .teaser) {
-                            VStack(alignment: .leading, spacing: 0) {
-                                ouLeTrouverSection
-                                interactionSection
-                            }
+                if hasGatedContent {
+                    DSSectionHeader(titre: "Ce qui le remonte")
+                        .padding(.top, -4)
+                    if subscriptionService.isPremium {
+                        remonteCard
+                    } else {
+                        VStack(spacing: DS.interCarte) {
+                            GatedOverlay(intensity: .teaser) { remonteCard }
+                            UnlockDoor(icon: "lock.fill", title: doorTitle, subtitle: doorSubtitle, zone: "fiche_apport_bilan")
                         }
-                        UnlockDoor(icon: "lock.fill", title: doorTitle, subtitle: doorSubtitle, zone: "fiche_apport_bilan")
                     }
                 }
 
-                Button {
+                DSCapsuleButton(titre: "Voir dans mon plan") {
+                    HapticService.shared.tap()
                     onSeePlan()
-                } label: {
-                    // CTA primaire de la charte : 15 / semibold, hauteur 48,
-                    // sans ombre. Un CTA n'est jamais plus lourd que ce qu'il
-                    // sert (ici : l'explication, à 15 / semibold elle aussi).
-                    HStack(spacing: 8) {
-                        Text("Voir mon plan détaillé")
-                            .font(Theme.ctaFont)
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.kiwiGreen))
                 }
-                .buttonStyle(.healthMapPressed)
-                .padding(.top, 22)
+                .padding(.top, DS.marge)
             }
-            .padding(.horizontal, 22)
-            // Marge haute commune aux fiches en bottom sheet : l'en-tête doit
-            // respirer sous la poignée (retour fondateur, 3 août 2026).
-            .padding(.top, Theme.spacingLG)
+            .padding(.horizontal, DS.marge)
+            .padding(.top, 12)
             .padding(.bottom, 30)
         }
-        .background(Color.kiwiCream)
+        .background(Color.dsFond)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(30)
-        .onAppear {
-            let target = CGFloat(pct) / 100
-            if reduceMotion {
-                animatedPct = target
-            } else {
-                withAnimation(.easeOut(duration: 1.0).delay(0.15)) { animatedPct = target }
+        .presentationCornerRadius(34)
+    }
+
+    // MARK: En-tête
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(nom)
+                    .font(.dsGrandTitre)
+                    .tracking(DSTracking.grandTitre)
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let id = apport.id, let role = ApportRole.role(for: id) {
+                    Text(role)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
+            Spacer(minLength: 0)
+            DSCloseButton { dismiss() }
         }
     }
 
-    // MARK: Sections gatées (premium) — « Où le trouver » / « Interaction »
+    // MARK: État
+
+    private var etatCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(pct)")
+                    .font(.dsHeros48)
+                    .tracking(DSTracking.heros48)
+                    .foregroundStyle(Color.dsTexte)
+                    .contentTransition(.numericText())
+                Text("%")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.dsSecondaire)
+                Spacer(minLength: 8)
+                if let quantite {
+                    Text(quantite)
+                        .font(.dsValeurLigne)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsSecondaire)
+                }
+            }
+            DSGauge(fraction: Double(pct) / 100, couleur: couleurStatut, hauteur: 6, delai: 0.3)
+                .padding(.top, 14)
+            Text(phraseEtat)
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .padding(.top, 10)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(nom), \(pct) pour cent de ton besoin. \(quantite ?? "") \(phraseEtat)")
+    }
+
+    // MARK: Pourquoi
+
+    /// La première phrase porte la cause, le reste l'explique : une seule
+    /// ligne avec titre + mécanisme, comme les lignes de la maquette.
+    private func pourquoiCard(_ why: String) -> some View {
+        let cause = PlanTopicText.firstSentence(why)
+        let reste = why.dropFirst(cause.count).trimmingCharacters(in: .whitespacesAndNewlines)
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "text.quote")
+                .font(.system(size: 21, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(couleurStatut)
+                .frame(width: 21)
+                .padding(.top, 2)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(cause.isEmpty ? why : cause)
+                    .font(.dsCorps)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !reste.isEmpty, !cause.isEmpty {
+                    Text(reste)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+    }
+
+    // MARK: Ce qui le remonte (premium)
 
     /// Le tip existe-t-il ? (même condition qu'avant le gating)
     private var hasTip: Bool {
         (apport.tipBold?.isEmpty == false) || (apport.tipRest?.isEmpty == false)
     }
 
-    /// Au moins une des deux sections premium a du contenu réel — sinon ni
+    /// Au moins une des deux sections premium a du contenu réel, sinon ni
     /// flou ni porte (jamais de coquille vide).
     private var hasGatedContent: Bool {
         !aliments.isEmpty || hasTip
     }
 
     /// Wording de la porte : toujours un bénéfice spécifique à l'apport,
-    /// jamais un « Passe Premium » générique (même convention que la fiche
-    /// nutriment : « Débloque le hack B12 »).
+    /// jamais un « Passe Premium » générique.
     private var doorTitle: String {
         aliments.isEmpty
-            ? "Débloque l'interaction \(apport.nom ?? "de cet apport")"
-            : "Débloque les aliments \(apport.nom ?? "ciblés")"
+            ? "Débloque l'interaction \(nom)"
+            : "Débloque les aliments qui remontent \(nom)"
     }
 
     private var doorSubtitle: String {
         if !aliments.isEmpty && hasTip {
-            return "Où le trouver + l'interaction à connaître"
+            return "Où le trouver, et l'interaction à connaître"
         }
         return aliments.isEmpty
             ? "L'interaction à connaître avec tes habitudes"
             : "Les aliments qui couvrent ce besoin"
     }
 
-    @ViewBuilder
-    private var ouLeTrouverSection: some View {
-        if !aliments.isEmpty {
-            Text("Où le trouver")
-                .font(Theme.subLabelFont)
-                .textCase(.uppercase)
-                .kerning(0.4)
-                .foregroundStyle(Color.kiwiInk)
-                .padding(.top, 20)
-                .padding(.bottom, 12)
-            HStack(spacing: 10) {
-                ForEach(Array(aliments.prefix(3).enumerated()), id: \.offset) { _, aliment in
-                    VStack(spacing: 8) {
-                        SafeFluent3DIcon(name: aliment.icone, size: 40)
-                        Text(aliment.nom ?? "")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Color.kiwiCharcoal)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+    private var remonteCard: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(aliments.prefix(3).enumerated()), id: \.offset) { index, aliment in
+                if index > 0 { DSSeparator() }
+                DSRow(titre: aliment.nom ?? "") {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color.dsAccent)
+                        .accessibilityHidden(true)
+                }
+            }
+            if hasTip {
+                if !aliments.isEmpty { DSSeparator(retrait: DS.retraitSeparateurIcone) }
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "lightbulb")
+                        .font(.system(size: 21, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .frame(width: 21)
+                        .padding(.top, 2)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let bold = apport.tipBold, !bold.isEmpty {
+                            Text(bold)
+                                .font(.dsCorps)
+                                .tracking(DSTracking.corps)
+                                .foregroundStyle(Color.dsTexte)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let rest = apport.tipRest, !rest.isEmpty {
+                            Text(rest)
+                                .font(.dsSousTitre)
+                                .tracking(DSTracking.sousTitre)
+                                .foregroundStyle(Color.dsSecondaire)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 8)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.healthMapCard))
-                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1))
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, DS.paddingCarte)
+                .padding(.vertical, 14)
             }
         }
+        .dsCard()
     }
+}
 
-    @ViewBuilder
-    private var interactionSection: some View {
-        if hasTip {
-            HStack(alignment: .top, spacing: 11) {
-                Image(systemName: "lightbulb.fill")
-                    .font(.system(size: 17))
-                    .foregroundStyle(Color.healthMapBlue)
-                    .padding(.top, 1)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("INTERACTION À CONNAÎTRE")
-                        .font(Theme.subLabelFont)
-                        .tracking(0.4)
-                        .foregroundStyle(Color.healthMapBlue)
-                    tipText
-                        .foregroundStyle(Color.kiwiCharcoal)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.healthMapBlueLight))
-            .padding(.top, 18)
-        }
-    }
+// MARK: - Rôle d'un apport, en une ligne (catalogue déterministe)
 
-    /// L'interaction est la conclusion de son encart : elle passe devant son
-    /// propre titre de section (15 / heavy pour le geste, 15 / medium pour le
-    /// reste de la phrase).
-    private var tipText: Text {
-        var t = Text("")
-        if let bold = apport.tipBold, !bold.isEmpty {
-            t = t + Text(bold).font(.system(.subheadline).weight(.heavy))
+/// Le rôle physiologique, en trois mots : la ligne secondaire sous le titre
+/// de la fiche. Catalogue côté client, jamais l'IA.
+enum ApportRole {
+    static func role(for id: String) -> String? {
+        switch id {
+        case "vitD": return "Os, immunité, humeur"
+        case "vitB12": return "Nerfs, globules rouges, énergie"
+        case "iron": return "Transport de l'oxygène, énergie"
+        case "magnesium": return "Muscles, nerfs, sommeil"
+        case "omega3": return "Cœur, cerveau, inflammation"
+        case "vitC": return "Immunité, absorption du fer"
+        case "calcium": return "Os, dents, contraction musculaire"
+        case "zinc": return "Immunité, peau, cicatrisation"
+        case "iodine": return "Thyroïde, métabolisme"
+        case "fiber": return "Digestion, satiété, glycémie"
+        default: return nil
         }
-        if let rest = apport.tipRest, !rest.isEmpty {
-            let sep = (apport.tipBold?.isEmpty == false) ? " : " : ""
-            t = t + Text(sep + rest).font(.system(.subheadline).weight(.medium))
-        }
-        return t
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .fill(statut.color.opacity(0.14))
-                    .frame(width: 48, height: 48)
-                Image(systemName: Fluent3D.symbol(for: apport.id ?? ""))
-                    .font(.system(size: 24))
-                    .foregroundStyle(statut.color)
-            }
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(apport.nom ?? "Apport")
-                    .font(Theme.sheetTitleFont)
-                    .foregroundStyle(Color.kiwiCharcoal)
-                HStack(spacing: 5) {
-                    Circle().fill(statut.inkColor).frame(width: 7, height: 7)
-                    Text(statut.displayLabel)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(statut.inkColor)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(statut.color.opacity(0.14)))
-            }
-            Spacer()
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.kiwiCharcoal.opacity(0.06)))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityLabel("Fermer")
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var ring: some View {
-        ZStack {
-            Circle()
-                .stroke(statut.color.opacity(0.16), lineWidth: 12)
-            Circle()
-                .trim(from: 0, to: animatedPct)
-                .stroke(statut.color, style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            VStack(spacing: 2) {
-                Text("\(pct)%")
-                    .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(statut.inkColor)
-                Text("de ton besoin")
-                    .font(Theme.chromeFont)
-                    .foregroundStyle(Color.healthMapMuted)
-            }
-        }
-        .frame(width: 132, height: 132)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(pct) pour cent de ton besoin couvert.")
     }
 }
