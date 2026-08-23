@@ -1331,6 +1331,7 @@ struct JournalView: View {
                     .foregroundStyle(Color.dsSecondaire)
                 TextField("Rechercher un aliment…", text: $viewModel.searchQuery)
                     .font(Theme.bodyFont)
+                    .accessibilityIdentifier("recherche.champ")
                     .autocorrectionDisabled()
                     .onChange(of: viewModel.searchQuery) { _, _ in
                         Task { await viewModel.searchFoods() }

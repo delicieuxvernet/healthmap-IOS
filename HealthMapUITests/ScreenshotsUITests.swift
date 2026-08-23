@@ -306,10 +306,18 @@ final class ScreenshotsUITests: XCTestCase {
         fermerTutorielClavier()
         champ.typeText(aliment)
         sleep(4)
-        let plus = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ajouter ")).firstMatch
-        if plus.waitForExistence(timeout: 5) {
-            plus.tap()
-            sleep(3)
+        // Première ligne de résultats → fiche portion → « Ajouter au … ».
+        let premier = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS[c] %@ AND NOT (label BEGINSWITH %@)", aliment, "Ajouter")).firstMatch
+        if premier.waitForExistence(timeout: 5) {
+            premier.tap()
+            let ajouter = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ajouter ")).firstMatch
+            if ajouter.waitForExistence(timeout: 6) {
+                ajouter.tap()
+                sleep(3)
+            } else {
+                app.swipeDown(velocity: .fast)
+            }
         }
         fermerFeuille()
         sleep(1)
