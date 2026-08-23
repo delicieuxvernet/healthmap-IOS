@@ -20,37 +20,31 @@ import SwiftUI
 // Aucune donnée n'est inventée : une section sans donnée réelle est masquée.
 
 // MARK: - Palette de l'écran (hex de la maquette)
+// Refonte 23 août 2026 : la palette de l'ancienne maquette (crème, encres
+// orange / rouge / bleue par section, tuiles d'icônes colorées) est repointée
+// sur les tokens du socle `KiwiDS`. Les titres de section sont neutres, la
+// couleur de statut ne vit que dans les jauges, les icônes sont grises.
 enum BilanV7 {
-    static let ink = Color(hex: "211F1A")
-    static let secondary = Color(hex: "6B7280")
-    // Encre pâle des mentions. #9CA3AF ne tenait que 2,36:1 sur le fond crème
-    // de l'écran : illisible pour du texte. Même valeur que `secondary`, qui
-    // tient 4,5:1 sur crème comme sur carte blanche.
-    static let soft = Color(hex: "6B7280")
-    static let chevron = Color(hex: "C2BDB0")
-    static let hairline = Color(hex: "211F1A").opacity(0.06)
+    static let ink = Color.dsTexte
+    static let secondary = Color.dsSecondaire
+    static let soft = Color.dsSecondaire
+    static let chevron = Color.dsTertiaire
+    static let hairline = Color.dsSeparateur
 
-    /// Libellés de section.
-    // Encres de section : l'orange vif du lavis ne tient pas 4,5:1 à 13 pt
-    // (un titre de section est du texte courant au sens WCAG : le seuil
-    // « large » commence à 14 pt bold). Mêmes versions foncées que celles déjà
-    // validées sur le Scan (`ScanDomaine.energie`) et le Suivi.
-    static let amber = Color(hex: "9A5A00")      // « Tes apports à renforcer » - 5,47:1
-    static let alertInk = Color(hex: "C0322A")   // « Points d'attention » + % bas
-    static let warnInk = Color(hex: "B36B00")    // % intermédiaire
-    static let blue = Color(hex: "2F6FE0")       // « Tes symptômes suivis » + badge
-    static let flame = Color(hex: "A44A00")      // « Ta série » - 5,90:1
+    /// Libellés de section : neutres, comme partout ailleurs dans l'app.
+    static let amber = Color.dsTexte
+    static let alertInk = Color.dsTexte
+    static let warnInk = Color.dsSecondaire
+    static let blue = Color.dsTexte
+    static let flame = Color.dsTexte
 
-    /// Statuts (mêmes teintes que le contrat côté serveur).
-    static let statusCovered = Color(hex: "5DA838")
-    static let statusReinforce = Color(hex: "FF9500")
-    static let statusFill = Color(hex: "FF3B30")
-    static let statusNeutral = Color(hex: "C2BDB0")
+    /// Statuts : réservés aux jauges (jamais au texte).
+    static let statusCovered = Color.dsAccent
+    static let statusReinforce = Color.dsARenforcer
+    static let statusFill = Color.dsACombler
+    static let statusNeutral = Color.dsTrait
 
-    // Pied de page « Sources scientifiques » + mention médicale (exigence
-    // App Review 1.4.1) : posé sur le fond crème, #B7B1A4 tombait à 1,99:1 —
-    // présent dans le code, mais pas réellement lisible à l'écran.
-    static let sourcesInk = Color(hex: "7A7466")
+    static let sourcesInk = Color.dsSecondaire
 
     /// Marges de l'écran (maquette : 20 pt de marge, 14 pt entre les cartes).
     static let gutter: CGFloat = 20
@@ -69,15 +63,9 @@ extension StatutV2 {
         }
     }
 
-    /// Encre du pourcentage (contraste AA sur fond blanc).
-    var v7Ink: Color {
-        switch self {
-        case .couvre:     return Color.dsTexte
-        case .aRenforcer: return BilanV7.warnInk
-        case .aCombler:   return BilanV7.alertInk
-        case .neutre:     return BilanV7.secondary
-        }
-    }
+    /// Encre du pourcentage : une valeur de ligne, secondaire — la couleur
+    /// reste dans la jauge (refonte 23 août 2026).
+    var v7Ink: Color { Color.dsSecondaire }
 }
 
 // MARK: - Carte blanche (.card)
@@ -86,12 +74,8 @@ struct BilanV7CardStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(Color.dsCarte)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(BilanV7.ink.opacity(0.04), lineWidth: 1)
-            )
-            // (ombre retirée, refonte 23 août 2026)
+            .clipShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+            // (ombre et filet retirés, refonte 23 août 2026)
     }
 }
 
@@ -117,12 +101,14 @@ struct BilanV7SectionLabel: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 15, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsSecondaire)
                 .accessibilityHidden(true)
             Text(text)
                 .font(Theme.sectionLabelFont)
+                .foregroundStyle(color)
         }
-        .foregroundStyle(color)
     }
 }
 
@@ -132,13 +118,12 @@ struct BilanV7SectionLabel: View {
 /// qui attend derrière le tap, sans rien livrer.
 struct BilanV7PremiumBadge: View {
     var body: some View {
-        Text("PREMIUM")
-            .font(.system(size: 10, weight: .bold))
-            .tracking(0.3)
-            .foregroundStyle(.white)
+        Text("Premium")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color.dsSecondaire)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(LinearGradient.premiumBadge, in: Capsule())
+            .background(Color.dsRemplissage, in: Capsule())
             .accessibilityLabel("Analyse réservée à Kiwio Premium")
     }
 }
@@ -442,17 +427,16 @@ struct BilanV7ApportsCard: View {
     @ViewBuilder
     private func row(_ apport: ApportV2, delay: Double) -> some View {
         let id = apport.id ?? ""
-        let tint = Color.nutrientColor(for: id)
         let pct = max(0, min(100, apport.pctBesoin ?? 0))
 
         HStack(spacing: 11) {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(tint.opacity(0.1))
+                .fill(Color.dsRemplissage)
                 .frame(width: 36, height: 36)
                 .overlay(
                     Image(systemName: BilanV7Nutrient.icon(for: id))
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(tint)
+                        .foregroundStyle(Color.dsSecondaire)
                 )
                 .accessibilityHidden(true)
 
@@ -556,19 +540,18 @@ struct BilanV7AttentionCard: View {
 
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                 // Maquette : la 1re ligne porte l'accent rouge, les suivantes l'ambre.
-                let tint = index == 0 ? BilanV7.statusFill : BilanV7.statusReinforce
                 Button {
                     HapticService.shared.tap()
                     onTap(item)
                 } label: {
                     HStack(spacing: 11) {
                         RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(tint.opacity(index == 0 ? 0.1 : 0.12))
+                            .fill(Color.dsRemplissage)
                             .frame(width: 34, height: 34)
                             .overlay(
                                 Image(systemName: icon(for: item.icone))
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(tint)
+                                    .foregroundStyle(Color.dsSecondaire)
                             )
                             .accessibilityHidden(true)
 
@@ -658,7 +641,6 @@ struct BilanV7SymptomesCard: View {
                 // (`scanStatusColor` / `scanStatusInk`) : la couleur vive pour
                 // la tuile d'icône, son ENCRE pour le texte. #FF9500 sur blanc
                 // ne fait que 2,20:1 — le nom du symptôme y était illisible.
-                let tint = row.showsTrend && !row.improving ? BilanV7.statusReinforce : BilanV7.blue
                 let encre = row.showsTrend && !row.improving ? BilanV7.warnInk : BilanV7.blue
                 Button {
                     HapticService.shared.tap()
@@ -666,12 +648,12 @@ struct BilanV7SymptomesCard: View {
                 } label: {
                     HStack(spacing: 11) {
                         RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(tint.opacity(0.1))
+                            .fill(Color.dsRemplissage)
                             .frame(width: 34, height: 34)
                             .overlay(
                                 Image(systemName: icon(for: row.nom))
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(tint)
+                                    .foregroundStyle(Color.dsSecondaire)
                             )
                             .accessibilityHidden(true)
 
@@ -735,7 +717,7 @@ struct BilanV7SymptomesCard: View {
                             .font(.system(size: 11.5, weight: .bold, design: .default).monospacedDigit())
                             .foregroundStyle(.white)
                             .frame(minWidth: 20, minHeight: 20)
-                            .background(BilanV7.blue, in: Capsule())
+                            .background(Color.white.opacity(0.25), in: Capsule())
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -1028,17 +1010,16 @@ struct BilanV7ApportsTeaserCard: View {
     @ViewBuilder
     private func row(_ def: NutrientDefinition) -> some View {
         let id = def.id.rawValue
-        let tint = Color.nutrientColor(for: id)
         let stat = TeaserStatsCatalog.stat(for: id)
 
         HStack(spacing: 11) {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(tint.opacity(0.1))
+                .fill(Color.dsRemplissage)
                 .frame(width: 36, height: 36)
                 .overlay(
                     Image(systemName: BilanV7Nutrient.icon(for: id))
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(tint)
+                        .foregroundStyle(Color.dsSecondaire)
                 )
                 .accessibilityHidden(true)
 
@@ -1095,7 +1076,7 @@ struct BilanV7AttentionTeaserCard: View {
             // pas une alerte détectée — jamais l'accent rouge du réel).
             HStack(spacing: 11) {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(BilanV7.statusReinforce.opacity(0.12))
+                    .fill(Color.dsRemplissage)
                     .frame(width: 34, height: 34)
                     .overlay(
                         Image(systemName: "cup.and.saucer")

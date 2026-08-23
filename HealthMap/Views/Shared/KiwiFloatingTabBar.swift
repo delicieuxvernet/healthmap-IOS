@@ -94,6 +94,7 @@ struct KiwiFloatingTabBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(item.label)
+        .accessibilityIdentifier("tab.\(String(describing: item.tab))")
         .accessibilityAddTraits(actif ? [.isButton, .isSelected] : .isButton)
     }
 }
