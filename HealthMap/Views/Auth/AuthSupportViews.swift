@@ -24,6 +24,7 @@ struct AuthTextField: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .focused(focused, equals: field)
+                .accessibilityIdentifier(field == .email ? "auth.email" : "auth.firstName")
         }
         .padding(.horizontal, Theme.spacingMD)
         .frame(height: 50)
@@ -61,6 +62,7 @@ struct AuthSecureField: View {
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
             .focused(focused, equals: field)
+            .accessibilityIdentifier("auth.password")
 
             Button {
                 showPassword.toggle()
