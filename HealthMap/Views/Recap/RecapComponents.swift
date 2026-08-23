@@ -27,9 +27,9 @@ struct RecapProgressBar: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule()
-                            .fill(Color.kiwiCharcoal.opacity(0.16))
+                            .fill(Color.dsTexte.opacity(0.16))
                         Capsule()
-                            .fill(Color.kiwiCharcoal.opacity(0.75))
+                            .fill(Color.dsTexte.opacity(0.75))
                             .frame(width: geo.size.width * remplissage(position))
                     }
                 }
@@ -54,14 +54,14 @@ struct RecapProgressBar: View {
 struct RecapCompteur: View {
     let valeur: Int
     let taille: CGFloat
-    var couleur: Color = .kiwiCharcoal
+    var couleur: Color = .dsTexte
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var affiche: Double = 0
 
     var body: some View {
         Text("\(Int(affiche.rounded()))")
-            .font(.system(size: taille, weight: .bold, design: .rounded))
+            .font(.system(size: taille, weight: .bold, design: .default))
             .monospacedDigit()
             .foregroundStyle(couleur)
             .contentTransition(.numericText())
@@ -99,7 +99,7 @@ struct RecapJaugeApport: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color.kiwiCharcoal.opacity(0.08))
+                        .fill(Color.dsTexte.opacity(0.08))
 
                     Capsule()
                         .fill(couleur)
@@ -107,7 +107,7 @@ struct RecapJaugeApport: View {
 
                     // Repère de la zone visée : sans lui, 62 % ne veut rien dire.
                     Rectangle()
-                        .fill(Color.kiwiCharcoal.opacity(0.35))
+                        .fill(Color.dsTexte.opacity(0.35))
                         .frame(width: 2, height: 16)
                         .offset(x: geo.size.width * zoneVisee - 1)
                 }
@@ -118,14 +118,14 @@ struct RecapJaugeApport: View {
                 Text(masquee ? "•• %" : "\(pourcent) %")
                     .font(.system(size: 13, weight: .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                 Text("du besoin couvert")
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                 Spacer(minLength: 0)
                 Text("visé : 70 %")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
             }
         }
         .onAppear {
@@ -201,14 +201,14 @@ struct RecapVoile<Substitut: View>: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.kiwiGreen.opacity(0.22), lineWidth: 1)
+                .strokeBorder(Color.dsAccent.opacity(0.22), lineWidth: 1)
         )
         .overlay(alignment: .topTrailing) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.kiwiInk)
+                .foregroundStyle(Color.dsTexte)
                 .padding(8)
-                .background(Circle().fill(Color.kiwiTint))
+                .background(Circle().fill(Color.dsRemplissage))
                 .offset(x: -10, y: 10)
                 .accessibilityHidden(true)
         }
@@ -228,7 +228,7 @@ struct RecapLignesMasquees: View {
         VStack(alignment: .leading, spacing: 7) {
             ForEach(0..<max(lignes, 1), id: \.self) { rang in
                 Capsule()
-                    .fill(Color.kiwiCharcoal.opacity(0.12))
+                    .fill(Color.dsTexte.opacity(0.12))
                     .frame(height: 10)
                     .frame(maxWidth: rang == lignes - 1 ? 160 : .infinity, alignment: .leading)
             }

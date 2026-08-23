@@ -346,14 +346,14 @@ struct ComplementsTeaserCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(Theme.sectionLabelFont)
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                 // Pas de donnée-héros ici : la réponse n'existe pas encore.
                 // La promesse reste donc une donnée secondaire, à sa place.
                 Text(Self.sousTitreExemple)
                     .font(Theme.dataSecondaryFont)
                     .lineSpacing(2)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.leading)
             }
@@ -398,7 +398,7 @@ struct ComplementsAssietteZeroCard: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "basket.fill")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.kiwiGreenInk)
+                .foregroundStyle(Color.dsTexte)
                 .padding(.top, 1)
                 .accessibilityHidden(true)
 
@@ -407,12 +407,12 @@ struct ComplementsAssietteZeroCard: View {
                 Text("Tout par l'assiette : 0 € de complément")
                     .font(Theme.conclusionFont)
                     .tracking(Theme.conclusionTracking)
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Ces aliments couvrent tes besoins. Compte un mois pour sentir la différence.")
                     .font(Theme.dataSecondaryFont)
                     .lineSpacing(2)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -464,7 +464,7 @@ struct ChainExplanationSheet: View {
                         Text(explanation.titre)
                             .font(.system(size: 18, weight: .bold))
                             .tracking(-0.4)
-                            .foregroundStyle(Color.kiwiCharcoal)
+                            .foregroundStyle(Color.dsTexte)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -494,13 +494,13 @@ struct ChainExplanationSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("EN PRATIQUE")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.kiwiGreenInk)
+                            .foregroundStyle(Color.dsTexte)
                         // Le geste concret : c'est la raison d'être de la
                         // sheet, il passe devant le bouton qui la referme.
                         Text(explanation.practice)
                             .font(Theme.insightFont)
                             .lineSpacing(4)
-                            .foregroundStyle(Color.kiwiCharcoal)
+                            .foregroundStyle(Color.dsTexte)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -519,7 +519,7 @@ struct ChainExplanationSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.kiwiGreen)
+                                .fill(Color.dsAccent)
                         )
                 }
                 .buttonStyle(.healthMapPressed)

@@ -202,7 +202,7 @@ struct QuestionnaireContainerView: View {
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Color.healthMapBlue)
+                            .foregroundStyle(Color.dsAccent)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
@@ -218,16 +218,17 @@ struct QuestionnaireContainerView: View {
             }
 
             HStack {
-                Text("\(viewModel.currentSection.emoji) Section · \(viewModel.currentSection.title)")
-                    .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                Text(viewModel.currentSection.title)
+                    .font(.dsLegendeMoyenne)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
 
                 Spacer()
 
                 Text("Question \(viewModel.currentQuestionNumberInSection)/\(viewModel.totalQuestionsInSection)")
-                    .font(Theme.captionFont)
+                    .font(.dsLegende)
                     .monospacedDigit()
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsTertiaire)
             }
             .padding(.horizontal, Theme.spacingMD)
         }
@@ -244,10 +245,10 @@ struct QuestionnaireContainerView: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.healthMapMuted.opacity(0.12))
+                    .fill(Color.dsRemplissage)
 
                 Capsule()
-                    .fill(Color.kiwiGreen)
+                    .fill(Color.dsAccent)
                     .frame(width: max(geo.size.width * viewModel.sectionProgress, 6))
                     .animation(reduceMotion ? .none : .healthMapSpring, value: viewModel.sectionProgress)
             }
@@ -285,9 +286,9 @@ struct QuestionnaireContainerView: View {
         VStack(alignment: .leading, spacing: Theme.spacingLG) {
             // Titre de la question — gros et lisible (suit Dynamic Type)
             Text(question.text)
-                .font(Theme.titleFont)
-                .brandTitleKerning()
-                .foregroundStyle(Color.healthMapText)
+                .font(.dsSection)
+                .tracking(DSTracking.section)
+                .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
 
@@ -319,11 +320,11 @@ struct QuestionnaireContainerView: View {
             // poids non numérique). L'erreur de soumission passe par l'alert.
             if let error = viewModel.errorMessage {
                 Text(error)
-                    .font(Theme.captionFont)
-                    .foregroundStyle(.red)
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsACombler)
             }
         }
-        .padding(.horizontal, Theme.spacingLG)
+        .padding(.horizontal, DS.marge)
     }
 
     // MARK: - Question View Router
@@ -409,8 +410,8 @@ struct QuestionnaireContainerView: View {
                     dashboardVM.questionnaireOuvert = false
                 } label: {
                     Text("Explorer d'abord")
-                        .font(Theme.subheadlineFont)
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .font(.dsSousTitreFort)
+                        .foregroundStyle(Color.dsAccent)
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
                         .contentShape(Rectangle())
@@ -448,31 +449,19 @@ struct QuestionnaireContainerView: View {
                 advance()
             }
         } label: {
-            // CTA façon iOS : aplat vert kiwi, coins continus, ombre discrète
-            // (fini le dégradé + halo). Chevron SF Symbol sur « Continuer ».
-            // État envoi / choix non renseigné → gris muted, sans ombre.
+            // Bouton capsule du DS (refonte 23 août 2026) : 50 pt, sans ombre.
+            // État envoi / choix non renseigné → gris tertiaire.
             let inactive = viewModel.isSubmitting || isBlockedOnSingleChoice
-            HStack(spacing: 6) {
-                Text(primaryButtonLabel)
-                if primaryButtonLabel == "Continuer" {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 15, weight: .semibold))
-                }
-            }
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(inactive ? Color.healthMapMuted : Color.kiwiGreen)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(
-                color: inactive ? .clear : Color.kiwiGreen.opacity(0.28),
-                radius: 12,
-                x: 0,
-                y: 6
-            )
+            Text(primaryButtonLabel)
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: DS.hauteurBouton)
+                .background(Capsule().fill(inactive ? Color.dsTertiaire : Color.dsAccent))
+                .contentShape(Capsule())
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .disabled(viewModel.isSubmitting || isBlockedOnSingleChoice)
     }
 
@@ -518,9 +507,9 @@ struct QuestionnaireContainerView: View {
             // Loader signature : le kiwi qui marche (remplace le spinner nu).
             KiwiWalkerView(size: 140)
 
-            Text("Sauvegarde en cours...")
-                .font(Theme.headlineFont)
-                .foregroundStyle(Color.healthMapText)
+            Text("Sauvegarde en cours…")
+                .font(.dsHeadline)
+                .foregroundStyle(Color.dsTexte)
         }
     }
 
@@ -528,13 +517,10 @@ struct QuestionnaireContainerView: View {
     /// Léger lavis de la teinte de la section courante en haut de l'écran,
     /// fondu vers le crème de base. L'accent vert kiwi reste la seule couleur
     /// « active » (barre + CTA) — la teinte n'est qu'une ambiance douce.
+    /// Refonte 23 août 2026 : plus de teinte par section, le fond neutre et
+    /// le voile de marque, comme partout.
     private var sectionBackground: some View {
-        LinearGradient(
-            colors: [viewModel.currentSection.flowTint, Color.healthMapWarm],
-            startPoint: .top,
-            endPoint: .center
-        )
-        .background(Color.healthMapWarm)
+        DSPageBackground()
     }
 
     // MARK: - Navigation entre écrans
@@ -879,8 +865,8 @@ private struct QuestionnaireGateView: View {
             // empilaient deux fois le même fruit.
             KiwiLoader(size: 72)
             Text("Analyse de tes réponses…")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.healthMapSecondary)
+                .font(.dsHeadline)
+                .foregroundStyle(Color.dsTexte)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -894,61 +880,44 @@ private struct QuestionnaireGateView: View {
         return VStack {
             Spacer()
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 9) {
-                    Fluent3DIcon(name: c.asset, size: 34)
-                    Text(c.kicker)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.kiwiGreen)
-                }
+                Text(c.kicker)
+                    .font(.dsLegendeMoyenne)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
                 Text(c.title)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(.dsSection)
+                    .tracking(DSTracking.section)
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 12)
+                    .padding(.top, 8)
                 Text(c.sub)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
 
-                Button(action: onDeepen) {
-                    HStack {
-                        Text(c.cta).font(.system(size: 16, weight: .bold))
-                        Spacer()
-                        Image(systemName: "arrow.right").font(.system(size: 18, weight: .semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .frame(height: 56)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiGreen))
-                    .shadow(color: Color.kiwiGreen.opacity(0.32), radius: 12, x: 0, y: 8)
-                }
-                .buttonStyle(.healthMapPressed)
-                .padding(.top, 24)
+                DSCapsuleButton(titre: c.cta, action: onDeepen)
+                    .padding(.top, 20)
 
                 Button(action: onSkip) {
                     VStack(spacing: 2) {
                         Text(c.skip)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.healthMapMuted)
-                            .underline()
+                            .font(.dsSousTitreFort)
+                            .foregroundStyle(Color.dsAccent)
                         Text("plus rapide, mais ton bilan sera moins fiable")
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundStyle(Color.healthMapMuted.opacity(0.7))
+                            .font(.dsLegende)
+                            .foregroundStyle(Color.dsTertiaire)
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.healthMapPressed)
-                .padding(.top, 18)
+                .buttonStyle(.dsPress)
+                .padding(.top, 12)
             }
-            .padding(24)
+            .padding(20)
             .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.healthMapCard)
-                    .shadow(color: Color.kiwiCharcoal.opacity(0.08), radius: 24, x: 0, y: 12)
-            )
+            .dsCard()
             .padding(.horizontal, Theme.spacingLG)
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 14)
@@ -959,21 +928,6 @@ private struct QuestionnaireGateView: View {
             else { withAnimation(.easeOut(duration: 0.45)) { appeared = true } }
         }
         .accessibilityElement(children: .contain)
-    }
-}
-
-// MARK: - Teinte de fond par section
-private extension QuestionnaireSection {
-    /// Teinte douce du haut de l'écran, propre à chaque section du questionnaire.
-    var flowTint: Color {
-        switch self {
-        case .profil:    return .sectionTintGold
-        case .modeDeVie: return .sectionTintBlue
-        case .sante:     return .sectionTintRose
-        case .nutrition: return .sectionTintGreen
-        case .symptomes: return .sectionTintCoral
-        case .medical:   return .sectionTintTeal
-        }
     }
 }
 
@@ -1012,11 +966,11 @@ private struct SectionCompletionOverlay: View {
                 VStack(spacing: 16) {
                     ZStack {
                         Circle()
-                            .fill(Color.kiwiTint)
+                            .fill(Color.dsRemplissage)
                             .frame(width: 48, height: 48)
                         Image(systemName: "checkmark")
                             .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(Color.kiwiInk)
+                            .foregroundStyle(Color.dsAccent)
                     }
                     .scaleEffect(validated ? 1 : 0.3)
                     .opacity(validated ? 1 : 0)
@@ -1025,9 +979,9 @@ private struct SectionCompletionOverlay: View {
                         .frame(height: thick ? 14 : 6)
                         .padding(.horizontal, 18)
 
-                    Text("Section \(sectionTitle) terminee")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
+                    Text("Section \(sectionTitle) terminée")
+                        .font(.dsLegendeMoyenne)
+                        .foregroundStyle(Color.dsSecondaire)
                         .opacity(validated ? 1 : 0)
                 }
                 .frame(width: geo.size.width)
@@ -1045,9 +999,9 @@ private struct SectionCompletionOverlay: View {
     private var progressCapsule: some View {
         GeometryReader { g in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.kiwiGreen.opacity(0.14))
+                Capsule().fill(Color.dsRemplissage)
                 Capsule()
-                    .fill(Color.kiwiGreen)
+                    .fill(Color.dsAccent)
                     .frame(width: max(g.size.width * fill, 8))
             }
         }

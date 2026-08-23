@@ -772,7 +772,7 @@ struct JournalView: View {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 26))
                                 .foregroundStyle(.white)
-                                .shadow(radius: 4)
+                                // (ombre retirée, refonte 23 août 2026)
                                 .frame(width: DS.cibleTactile, height: DS.cibleTactile)
                         }
                         .accessibilityLabel("Retirer la photo"),
@@ -863,7 +863,7 @@ struct JournalView: View {
             .containerRelativeFrame(.horizontal)
         }
         .ignoresSafeArea(edges: .top)
-        .background(Color.kiwiCream.ignoresSafeArea())
+        .background(Color.dsFond.ignoresSafeArea())
         .task {
             await journal.load()
             if let uid = AuthService.shared.cachedCurrentUserIdString {
@@ -881,7 +881,7 @@ struct JournalView: View {
                     Image(uiImage: uiImage).resizable().scaledToFill()
                 } else {
                     ZStack {
-                        Color.kiwiGreenSoft
+                        Color.dsRemplissage
                         Fluent3DIcon(name: Fluent3D.spaghetti, size: 90)
                     }
                 }
@@ -989,7 +989,7 @@ struct JournalView: View {
                   : "Repas à rééquilibrer"
         return HStack(spacing: 14) {
             ZStack {
-                Circle().stroke(Color.kiwiCharcoal.opacity(0.08), lineWidth: 8)
+                Circle().stroke(Color.dsTexte.opacity(0.08), lineWidth: 8)
                 Circle()
                     .trim(from: 0, to: CGFloat(max(4, min(100, score))) / 100)
                     .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
@@ -998,13 +998,13 @@ struct JournalView: View {
                     // Seul chiffre-héros de l'écran qui n'était ni arrondi ni à
                     // chasse fixe : il l'est comme tous les autres désormais.
                     Text("\(score)")
-                        .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .font(.system(size: 26, weight: .bold, design: .default).monospacedDigit())
+                        .foregroundStyle(Color.dsTexte)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
                     Text("/100")
                         .font(Theme.chromeFont)
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 .padding(.horizontal, 6)
             }
@@ -1015,7 +1015,7 @@ struct JournalView: View {
                 Text(title)
                     .font(Theme.conclusionFont)
                     .tracking(Theme.conclusionTracking)
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                 ForEach(Array(reasons.prefix(3).enumerated()), id: \.offset) { _, raison in
                     scoreReasonRow(raison)
@@ -1039,11 +1039,11 @@ struct JournalView: View {
         return HStack(alignment: .firstTextBaseline, spacing: 5) {
             Image(systemName: negative ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                 .font(.system(size: 11))
-                .foregroundStyle(negative ? BilanV7.warnInk : Color.kiwiGreenInk)
+                .foregroundStyle(negative ? BilanV7.warnInk : Color.dsTexte)
                 .accessibilityHidden(true)
             Text(texte)
                 .font(Theme.dataSecondaryFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -1086,20 +1086,20 @@ struct JournalView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(label)
                     .font(Theme.sectionLabelFont)
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                 Spacer()
                 // Le chiffre est la raison d'être de la ligne : il passe en
                 // donnée-héros (15/heavy mono), son kicker reste de l'habillage.
                 (Text("ce plat en apporte ")
                     .font(Theme.chromeFont)
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
                  + Text("\(pct)\u{202F}%")
                     .font(Theme.heroValueRowFont)
                     .foregroundStyle(besoin.statut.v7Ink))
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.kiwiCharcoal.opacity(0.07))
+                    Capsule().fill(Color.dsTexte.opacity(0.07))
                     Capsule()
                         .fill(besoin.statut.v7Color)
                         .frame(width: max(6, geo.size.width * CGFloat(pct) / 100))
@@ -1109,22 +1109,22 @@ struct JournalView: View {
             if let why = besoin.why, !why.isEmpty {
                 Text(why)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let complements = besoin.alimentsComplement, !complements.isEmpty {
                 HStack(spacing: 6) {
                     Text("À compléter :")
                         .font(.system(size: 11.5))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                     ForEach(Array(complements.prefix(3).enumerated()), id: \.offset) { _, aliment in
                         if let nom = aliment.nom, !nom.isEmpty {
                             Text(nom)
                                 .font(.system(size: 11.5, weight: .medium))
-                                .foregroundStyle(Color.kiwiCharcoal)
+                                .foregroundStyle(Color.dsTexte)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(Capsule().fill(Color.kiwiCream))
+                                .background(Capsule().fill(Color.dsFond))
                                 .overlay(Capsule().stroke(BilanV7.hairline, lineWidth: 1))
                         }
                     }
@@ -1167,7 +1167,7 @@ struct JournalView: View {
                     Spacer()
                     Text("Touche pour le détail")
                         .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 HStack(spacing: 11) {
                     ForEach(shown) { micro in
@@ -1291,7 +1291,7 @@ struct JournalView: View {
             ForEach(warnings, id: \.self) { warning in
                 Text("• \(warning)")
                     .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1315,7 +1315,7 @@ struct JournalView: View {
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiGreen))
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsAccent))
         }
         .buttonStyle(.healthMapPressed)
         .padding(.horizontal, Theme.spacingLG)
@@ -1326,7 +1326,7 @@ struct JournalView: View {
         VStack(spacing: Theme.spacingMD) {
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
                 TextField("Rechercher un aliment…", text: $viewModel.searchQuery)
                     .font(Theme.bodyFont)
                     .autocorrectionDisabled()
@@ -1339,12 +1339,12 @@ struct JournalView: View {
                         viewModel.searchResults = []
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(Color.healthMapMuted)
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                 }
             }
             .padding(Theme.spacingSM)
-            .background(Color.healthMapCard)
+            .background(Color.dsCarte)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM))
             .padding(.horizontal, Theme.spacingLG)
 
@@ -1352,7 +1352,7 @@ struct JournalView: View {
                 VStack(alignment: .leading, spacing: Theme.spacingSM) {
                     Text("Essaie par exemple :")
                         .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                     HStack(spacing: 8) {
                         quickSearchButton("Épinards")
                         quickSearchButton("Saumon")
@@ -1365,14 +1365,14 @@ struct JournalView: View {
             if let confirmation = addFoodConfirmation {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.kiwiGreen)
+                        .foregroundStyle(Color.dsAccent)
                     Text(confirmation)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.kiwiGreenInk)
+                        .foregroundStyle(Color.dsTexte)
                     Spacer()
                 }
                 .padding(Theme.spacingSM)
-                .background(Color.kiwiGreenSoft)
+                .background(Color.dsRemplissage)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .padding(.horizontal, Theme.spacingLG)
                 .transition(.opacity)
@@ -1380,7 +1380,7 @@ struct JournalView: View {
 
             if viewModel.isSearching {
                 ProgressView()
-                    .tint(Color.kiwiGreen)
+                    .tint(Color.dsAccent)
                     .padding()
             } else {
                 ForEach(viewModel.searchResults) { hit in
@@ -1390,31 +1390,31 @@ struct JournalView: View {
                         HStack(spacing: 10) {
                             Image(systemName: hit.source == "off" ? "barcode" : "fork.knife")
                                 .font(.system(size: 14))
-                                .foregroundStyle(Color.kiwiGreen)
+                                .foregroundStyle(Color.dsAccent)
                             // Même grammaire que la ligne de recherche du
                             // journal (JournalEditorComponents) : c'est la même
                             // ligne, elle s'écrivait de deux façons.
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(hit.name)
                                     .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(Color.healthMapText)
+                                    .foregroundStyle(Color.dsTexte)
                                     .lineLimit(1)
                                 Text(searchHitSub(hit))
-                                    .font(.system(size: 13, design: .rounded))
-                                    .foregroundStyle(Color.healthMapMuted)
+                                    .font(.system(size: 13, design: .default))
+                                    .foregroundStyle(Color.dsSecondaire)
                                     .lineLimit(1)
                             }
                             Spacer()
                             if isAddingFood {
-                                ProgressView().tint(Color.kiwiGreen).scaleEffect(0.8)
+                                ProgressView().tint(Color.dsAccent).scaleEffect(0.8)
                             } else {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(Color.healthMapMuted)
+                                    .foregroundStyle(Color.dsSecondaire)
                             }
                         }
                         .padding(Theme.spacingSM)
-                        .background(Color.healthMapCard)
+                        .background(Color.dsCarte)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.healthMapPressed)
@@ -1496,10 +1496,10 @@ struct JournalView: View {
         } label: {
             Text(text)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.kiwiGreenInk)
+                .foregroundStyle(Color.dsTexte)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.kiwiTint)
+                .background(Color.dsRemplissage)
                 .clipShape(Capsule())
         }
     }
@@ -1515,7 +1515,7 @@ private struct NeedImpactDetailSheet: View {
 
     private var pct: Int { micro.pctRDA }
     private var color: Color {
-        pct >= 60 ? .kiwiGreen : (pct >= 30 ? .scoreLow : .scoreDeficient)
+        pct >= 60 ? .dsAccent : (pct >= 30 ? .scoreLow : .scoreDeficient)
     }
     private var def: NutrientDefinition? { NutrientData.definition(for: micro.nutrientId) }
     private var label: String { def?.label ?? micro.label }
@@ -1547,18 +1547,18 @@ private struct NeedImpactDetailSheet: View {
 
                 Text("Ce que ce repas apporte")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .padding(.top, 16)
                     .padding(.bottom, 6)
                 Text(why)
                     .font(.system(size: 13.5, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if !foods.isEmpty {
                     Text("Pour le compléter")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .foregroundStyle(Color.dsTexte)
                         .padding(.top, 20)
                         .padding(.bottom, 12)
                     HStack(spacing: 10) {
@@ -1567,15 +1567,15 @@ private struct NeedImpactDetailSheet: View {
                                 Fluent3DIcon(name: food.asset, size: 40)
                                 Text(food.label)
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Color.kiwiCharcoal)
+                                    .foregroundStyle(Color.dsTexte)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .padding(.horizontal, 8)
-                            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.healthMapCard))
-                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1))
+                            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsCarte))
+                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.dsTexte.opacity(0.05), lineWidth: 1))
                         }
                     }
                 }
@@ -1592,8 +1592,8 @@ private struct NeedImpactDetailSheet: View {
                     }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiGreen))
-                    .shadow(color: Color.kiwiGreen.opacity(0.34), radius: 12, x: 0, y: 8)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsAccent))
+                    // (ombre retirée, refonte 23 août 2026)
                 }
                 .buttonStyle(.healthMapPressed)
                 .padding(.top, 22)
@@ -1602,7 +1602,7 @@ private struct NeedImpactDetailSheet: View {
             .padding(.top, 8)
             .padding(.bottom, 30)
         }
-        .background(Color.kiwiCream)
+        .background(Color.dsFond)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(30)
@@ -1625,7 +1625,7 @@ private struct NeedImpactDetailSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(label)
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                 HStack(spacing: 5) {
                     Circle().fill(color).frame(width: 7, height: 7)
                     Text(statusText)
@@ -1640,9 +1640,9 @@ private struct NeedImpactDetailSheet: View {
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.kiwiCharcoal.opacity(0.06)))
+                    .background(Circle().fill(Color.dsTexte.opacity(0.06)))
             }
             .buttonStyle(.healthMapPressed)
             .accessibilityLabel("Fermer")
@@ -1661,11 +1661,11 @@ private struct NeedImpactDetailSheet: View {
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 2) {
                 Text("\(pct)%")
-                    .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 34, weight: .bold, design: .default).monospacedDigit())
                     .foregroundStyle(color)
                 Text("de ton besoin")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
             }
         }
         .frame(width: 132, height: 132)
@@ -1741,7 +1741,7 @@ private struct IndiceGlisser: View {
             Text("Glisse pour annuler")
                 .font(.system(size: 12.5, weight: .medium))
         }
-        .foregroundStyle(Kiwio.secondaire)
+        .foregroundStyle(Color.dsSecondaire)
         .offset(x: decale ? -6 : 0)
         .animation(
             reduceMotion ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
@@ -1762,10 +1762,10 @@ private struct IndiceVerrou: View {
             Image(systemName: "chevron.up")
                 .font(.system(size: 10, weight: .semibold))
         }
-        .foregroundStyle(Kiwio.secondaire)
+        .foregroundStyle(Color.dsSecondaire)
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
-        .background(Kiwio.neutre, in: Capsule())
+        .background(Color.dsRemplissage, in: Capsule())
         .accessibilityHidden(true)
     }
 }
@@ -1833,11 +1833,11 @@ private struct BulleDictee: View {
                     PointEnregistrement()
                     Text(verrouillee ? "Mains libres" : "Je t'écoute…")
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Kiwio.encre)
+                        .foregroundStyle(Color.dsTexte)
                     Spacer(minLength: 0)
                     Text(String(format: "%d:%02d", Int(speech.duree) / 60, Int(speech.duree) % 60))
                         .font(.kiwioMono(13, .medium))
-                        .foregroundStyle(Kiwio.secondaire)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
 
                 // 28 barres : la trace tient dans la colonne droite de la
@@ -1854,7 +1854,7 @@ private struct BulleDictee: View {
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(Kiwio.rouge)
                                 .frame(width: 44, height: 44)
-                                .background(Kiwio.neutre, in: Circle())
+                                .background(Color.dsRemplissage, in: Circle())
                         }
                         .buttonStyle(.healthMapPressed)
                         .accessibilityLabel("Jeter la dictée")
@@ -1871,7 +1871,7 @@ private struct BulleDictee: View {
                             }
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(Kiwio.vert, in: Capsule())
+                            .background(Color.dsAccent, in: Capsule())
                         }
                         .buttonStyle(.healthMapPressed)
                         .accessibilityLabel("Envoyer à l'analyse")

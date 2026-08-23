@@ -469,11 +469,11 @@ struct SuiviView: View {
 
     private func macroColor(_ k: SuiviEngineV4.MacroKind) -> Color {
         switch k {
-        case .calories: return Color.kiwiCharcoal
+        case .calories: return Color.dsTexte
         case .proteins: return Color.macroProtein
         case .carbs:    return Color.macroCarb
         case .fats:     return Color.macroFat
-        case .fiber:    return Color.kiwiGreen
+        case .fiber:    return Color.dsAccent
         }
     }
     private func microColor(_ id: String) -> Color { Color.nutrientColor(for: id) }
@@ -602,10 +602,10 @@ private struct SuiviLoadingCard: View {
     let text: String
     var body: some View {
         HStack(spacing: 12) {
-            ProgressView().tint(Color.kiwiGreen)
+            ProgressView().tint(Color.dsAccent)
             Text(text)
                 .font(Theme.dataSecondaryFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 18)
@@ -620,10 +620,10 @@ private struct SuiviNoSymptomCard: View {
             Text("Aucun symptôme à suivre")
                 .font(Theme.conclusionFont)
                 .tracking(Theme.conclusionTracking)
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
             Text("Tu n'as déclaré aucun symptôme dans ton questionnaire, il n'y a donc rien à suivre ici pour le moment.")
                 .font(Theme.dataSecondaryFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -645,14 +645,14 @@ private struct SuiviStartBanner: View {
             HStack(alignment: .top, spacing: 11) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.dsTexte)
                     .padding(.top, 1)
                 // Conclusion du bandeau : c'est elle le pic, pas le bouton qui la
                 // sert (règle 2).
                 Text("Ces courbes sont un exemple. Démarre ton suivi pour les remplir avec tes vraies données.")
                     .font(Theme.conclusionFont)
                     .tracking(Theme.conclusionTracking)
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
@@ -665,7 +665,7 @@ private struct SuiviStartBanner: View {
                     .frame(minHeight: 48)
                     .background(
                         RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            .fill(Color.kiwiGreen)
+                            .fill(Color.dsAccent)
                     )
                     .contentShape(Rectangle())
             }
@@ -675,7 +675,7 @@ private struct SuiviStartBanner: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.kiwiGreenSoft))
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.dsRemplissage))
     }
 }
 
@@ -714,13 +714,13 @@ private struct SuiviSymptomPage: View {
     }
     private var pillColor: Color {
         if evolution.isExample || chartLocked { return Color(hex: "5F5E5A") }
-        if isDayZero { return Color.kiwiGreenInk }
-        return evolution.improving ? Color.kiwiGreenInk : Color(hex: "D9820A")
+        if isDayZero { return Color.dsTexte }
+        return evolution.improving ? Color.dsTexte : Color(hex: "D9820A")
     }
     private var pillBg: Color {
         if evolution.isExample || chartLocked { return Color(hex: "F1EFE8") }
-        if isDayZero { return Color.kiwiGreenSoft }
-        return evolution.improving ? Color.kiwiGreenSoft : Color(hex: "FDECD6")
+        if isDayZero { return Color.dsRemplissage }
+        return evolution.improving ? Color.dsRemplissage : Color(hex: "FDECD6")
     }
     /// Icône de pastille : neutre en exemple / jour 0 / gaté, flèche de sens en réel.
     private var pillIcon: String? {
@@ -789,7 +789,7 @@ private struct SuiviSymptomPage: View {
             Text(insightSentence)
                 .font(Theme.conclusionFont)
                 .tracking(Theme.conclusionTracking)
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
 
@@ -863,7 +863,7 @@ private struct SuiviPosedChart: View {
             for g in stride(from: 0.0, through: 1.0, by: 0.25) {
                 let y = h * g
                 var gp = Path(); gp.move(to: CGPoint(x: 0, y: y)); gp.addLine(to: CGPoint(x: w, y: y))
-                ctx.stroke(gp, with: .color(Color.kiwiCharcoal.opacity(0.05)),
+                ctx.stroke(gp, with: .color(Color.dsTexte.opacity(0.05)),
                            style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [1, 5]))
             }
 
@@ -879,7 +879,7 @@ private struct SuiviPosedChart: View {
             // fondu + tirets ; sinon plein. Avec un seul point (jour 0), on ne
             // trace pas de ligne, juste le point.
             let reelPts = reelPoints(reel)
-            let toiColor = Color.kiwiGreen
+            let toiColor = Color.dsAccent
             let toiOpacity: Double = evolution.isExample ? 0.42 : 1.0
             let toiDash: [CGFloat] = evolution.isExample ? [7, 5] : []
 
@@ -921,7 +921,7 @@ private struct SuiviPosedChart: View {
                     ctx.draw(
                         Text(evolution.labelToi)
                             .font(.system(size: 11.5, weight: .bold))
-                            .foregroundStyle(Color.kiwiGreenInk),
+                            .foregroundStyle(Color.dsTexte),
                         at: CGPoint(x: tip.x - 4, y: max(12, tip.y - 14)),
                         anchor: .trailing
                     )
@@ -929,7 +929,7 @@ private struct SuiviPosedChart: View {
                     ctx.draw(
                         Text(evolution.labelToi)
                             .font(.system(size: 11.5, weight: .bold))
-                            .foregroundStyle(Color.kiwiGreenInk),
+                            .foregroundStyle(Color.dsTexte),
                         at: CGPoint(x: tip.x + 10, y: max(12, tip.y - 14)),
                         anchor: .leading
                     )
@@ -948,13 +948,13 @@ private struct SuiviPosedChart: View {
         .overlay(alignment: .topLeading) {
             Text(evolution.labelHaut)
                 .font(Theme.chromeFont)
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
                 .padding(.leading, 2)
         }
         .overlay(alignment: .bottomLeading) {
             Text(evolution.labelBas)
                 .font(Theme.chromeFont)
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
                 .padding(.leading, 2)
         }
         .accessibilityElement()
@@ -990,14 +990,14 @@ private struct SuiviNeedsCard: View {
             HStack(spacing: 6) {
                 Image(systemName: "camera")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.dsTexte)
                 Text("Besoins vs apports")
                     .font(Theme.sectionLabelFont)
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.dsTexte)
                 Spacer()
                 Text("7 j")
                     .font(Theme.chromeFont)
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
             }
             .padding(.horizontal, 2)
 
@@ -1008,7 +1008,7 @@ private struct SuiviNeedsCard: View {
 
             if !tips.isEmpty {
                 Rectangle()
-                    .fill(Color.kiwiCharcoal.opacity(0.06))
+                    .fill(Color.dsTexte.opacity(0.06))
                     .frame(height: 1)
                     .padding(.top, 14)
 
@@ -1032,7 +1032,7 @@ private struct SuiviNeedsCard: View {
                 // message d'invitation honnête, jamais de faux chiffre.
                 Text("Scanne tes repas pour voir tes apports se comparer à tes besoins, jour après jour.")
                     .font(Theme.dataSecondaryFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 12)
                     .padding(.horizontal, 2)
@@ -1049,9 +1049,9 @@ private struct SuiviNeedsCard: View {
         HStack(spacing: 13) {
             ZStack {
                 RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .fill(Color.healthMapCard)
+                    .fill(Color.dsCarte)
                     .frame(width: 50, height: 50)
-                    .shadow(color: Color.kiwiCharcoal.opacity(0.08), radius: 4, x: 0, y: 2)
+                    // (ombre retirée, refonte 23 août 2026)
                 Image(systemName: "heart.fill")
                     .font(.system(size: 24))
                     .foregroundStyle(Color.scoreDeficient)
@@ -1059,7 +1059,7 @@ private struct SuiviNeedsCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Tes besoins ont augmenté aujourd'hui")
                     .font(Theme.insightFont)
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(stepsSubtitle)
                     .font(Theme.dataSecondaryFont)
@@ -1070,18 +1070,18 @@ private struct SuiviNeedsCard: View {
             VStack(spacing: 2) {
                 Text("+\(delta)%")
                     .font(Theme.heroValueFont)
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 // L'unité se range sous le chiffre par la taille (10.5 contre 28),
                 // pas par un vert délavé qui ne tenait pas le contraste.
                 Text("besoins")
                     .font(Theme.chromeFont)
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.dsTexte)
             }
         }
         .padding(15)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.kiwiGreenSoft))
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.dsRemplissage))
     }
 
     private var stepsSubtitle: String {
@@ -1116,7 +1116,7 @@ private struct SuiviNeedsCard: View {
             // son kicker et son icône.
             Text(isPremium ? tip.text : freeText(tip))
                 .font(Theme.insightFont)
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
@@ -1162,10 +1162,10 @@ private struct SuiviPaliersCard: View {
             HStack(spacing: 6) {
                 Image(systemName: "target")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.dsTexte)
                 Text("Tes prochains paliers")
                     .font(Theme.sectionLabelFont)
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.dsTexte)
             }
             .padding(.horizontal, 2)
 
@@ -1177,7 +1177,7 @@ private struct SuiviPaliersCard: View {
                     GaugeBar(fraction: fruitFraction)
                     Text("en continuant à scanner tes repas")
                         .font(Theme.chromeFont)
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
             }
             .padding(.top, 14)
@@ -1186,20 +1186,20 @@ private struct SuiviPaliersCard: View {
             HStack(spacing: 13) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.kiwiGreenSoft)
+                        .fill(Color.dsRemplissage)
                         .frame(width: 38, height: 38)
                     Image(systemName: "trophy")
                         .font(.system(size: 18))
-                        .foregroundStyle(Color.kiwiGreenInk)
+                        .foregroundStyle(Color.dsTexte)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(paliers.projectionText)
                         .font(Theme.insightFont)
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .foregroundStyle(Color.dsTexte)
                         .fixedSize(horizontal: false, vertical: true)
                     Text("en suivant ton plan, tu es sur la bonne trajectoire")
                         .font(Theme.chromeFont)
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -1207,7 +1207,7 @@ private struct SuiviPaliersCard: View {
             .padding(.top, 14)
             .overlay(alignment: .top) {
                 Rectangle()
-                    .fill(Color.kiwiCharcoal.opacity(0.06))
+                    .fill(Color.dsTexte.opacity(0.06))
                     .frame(height: 1)
             }
         }
@@ -1224,13 +1224,13 @@ private struct SuiviPaliersCard: View {
                 (Text("\(paliers.fruitName) débloqué dans ")
                     + Text("\(paliers.joursRestants) j")
                         .font(Theme.heroValueRowFont)
-                        .foregroundStyle(Color.kiwiGreenInk))
+                        .foregroundStyle(Color.dsTexte))
             } else {
                 Text("\(paliers.fruitName) débloqué\u{00A0}!")
             }
         }
         .font(Theme.insightFont)
-        .foregroundStyle(Color.kiwiCharcoal)
+        .foregroundStyle(Color.dsTexte)
     }
 
     /// Progression vers le prochain fruit : plus il reste de jours, moins la
@@ -1251,7 +1251,7 @@ private struct GaugeBar: View {
         GeometryReader { g in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color(hex: "E3DFD5")).frame(height: 6)
-                Capsule().fill(Color.kiwiGreen)
+                Capsule().fill(Color.dsAccent)
                     .frame(width: max(6, g.size.width * max(0, min(1, fraction))), height: 6)
             }
         }
@@ -1287,7 +1287,7 @@ private struct SuiviCheckinPopup: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.kiwiCharcoal.opacity(0.4)
+            Color.dsTexte.opacity(0.4)
                 .ignoresSafeArea()
                 .onTapGesture { dismissLater() }
 
@@ -1301,7 +1301,7 @@ private struct SuiviCheckinPopup: View {
         VStack(spacing: 0) {
             // Poignée
             Capsule()
-                .fill(Color.kiwiCharcoal.opacity(0.16))
+                .fill(Color.dsTexte.opacity(0.16))
                 .frame(width: 38, height: 5)
                 .padding(.top, 14)
                 .padding(.bottom, 16)
@@ -1315,8 +1315,8 @@ private struct SuiviCheckinPopup: View {
         .padding(.horizontal, 22)
         .padding(.bottom, 24)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.kiwiCream))
-        .shadow(color: Color.black.opacity(0.22), radius: 40, x: 0, y: 20)
+        .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.dsFond))
+        // (ombre retirée, refonte 23 août 2026)
     }
 
     private var questionsView: some View {
@@ -1325,10 +1325,10 @@ private struct SuiviCheckinPopup: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Comment tu te sens ?")
                         .font(Theme.sheetTitleFont)
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .foregroundStyle(Color.dsTexte)
                     Text("Un tap par symptôme, ça met tes courbes à jour")
                         .font(Theme.dataSecondaryFont)
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 Spacer()
                 // Action secondaire : jamais de fond coloré, jamais le poids du
@@ -1336,7 +1336,7 @@ private struct SuiviCheckinPopup: View {
                 Button { dismissLater() } label: {
                     Text("Plus tard")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                         .padding(8)
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
@@ -1379,7 +1379,7 @@ private struct SuiviCheckinPopup: View {
                     .frame(minHeight: 48)
                     .background(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(anyAnswered ? Color.kiwiGreen : Color.healthMapMuted)
+                            .fill(anyAnswered ? Color.dsAccent : Color.dsSecondaire)
                     )
             }
             .buttonStyle(.healthMapPressed)
@@ -1392,18 +1392,18 @@ private struct SuiviCheckinPopup: View {
     private var confirmationView: some View {
         VStack(spacing: 12) {
             ZStack {
-                Circle().fill(Color.kiwiGreenSoft).frame(width: 72, height: 72)
+                Circle().fill(Color.dsRemplissage).frame(width: 72, height: 72)
                 Image(systemName: "checkmark")
                     .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(Color.kiwiGreen)
+                    .foregroundStyle(Color.dsAccent)
             }
             Text("C'est enregistré\u{00A0}!")
                 .font(Theme.conclusionFont)
                 .tracking(Theme.conclusionTracking)
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
             Text("Tes courbes se mettent à jour. À demain\u{00A0}!")
                 .font(Theme.dataSecondaryFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -1415,10 +1415,10 @@ private struct SuiviCheckinPopup: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.dsTexte)
                 Text(title)
                     .font(Theme.insightFont)
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -1440,12 +1440,12 @@ private struct SuiviCheckinPopup: View {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 24))
-                    .foregroundStyle(isSelected ? Color.kiwiGreenInk : Color.healthMapMuted)
+                    .foregroundStyle(isSelected ? Color.dsTexte : Color.dsSecondaire)
                 // La sélection se lit à la graisse et à l'encre, pas à un gras
                 // permanent qui mettrait les trois options au même niveau.
                 Text(label)
                     .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
-                    .foregroundStyle(isSelected ? Color.kiwiGreenInk : Color.healthMapSecondary)
+                    .foregroundStyle(isSelected ? Color.dsTexte : Color.dsSecondaire)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -1455,11 +1455,11 @@ private struct SuiviCheckinPopup: View {
             .padding(.horizontal, 4)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isSelected ? Color.kiwiGreenSoft : Color.healthMapCard)
+                    .fill(isSelected ? Color.dsRemplissage : Color.dsCarte)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(isSelected ? Color.kiwiGreen : Color.kiwiCharcoal.opacity(0.07),
+                    .stroke(isSelected ? Color.dsAccent : Color.dsTexte.opacity(0.07),
                             lineWidth: isSelected ? 1.5 : 1)
             )
             .contentShape(Rectangle())

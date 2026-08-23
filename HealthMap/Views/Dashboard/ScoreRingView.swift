@@ -25,7 +25,7 @@ struct MiniScoreRing: View {
                 .rotationEffect(.degrees(-90))
 
             Text("\(score)")
-                .font(.system(size: size * 0.32, weight: .bold, design: .rounded))
+                .font(.system(size: size * 0.32, weight: .bold, design: .default))
                 .foregroundStyle(color)
         }
         .onAppear {

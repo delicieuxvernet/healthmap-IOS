@@ -252,5 +252,5 @@ private struct MascotOpenSmileShape: Shape {
         MascotView(mood: .thinking, size: 72)
     }
     .padding()
-    .background(Color.healthMapBackground)
+    .background(Color.dsFond)
 }

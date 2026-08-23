@@ -70,13 +70,13 @@ struct RedFlagsCardView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.healthMapCard)
+        .background(Color.dsCarte)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(BilanV7.statusFill.opacity(0.18), lineWidth: 1)
         )
-        .shadow(color: BilanV7.ink.opacity(0.05), radius: 1.5, x: 0, y: 1)
+        // (ombre retirée, refonte 23 août 2026)
     }
 
     /// Palette v7 (couleur = sens) plutôt que les anciens tons « tout bleu » :

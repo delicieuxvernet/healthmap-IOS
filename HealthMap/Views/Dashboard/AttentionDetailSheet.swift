@@ -64,7 +64,7 @@ struct AttentionDetailSheet: View {
                     Text(teasing)
                         .font(Theme.conclusionFont)
                         .tracking(Theme.conclusionTracking)
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .foregroundStyle(Color.dsTexte)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 18)
@@ -91,7 +91,7 @@ struct AttentionDetailSheet: View {
             .padding(.top, Theme.spacingLG)
             .padding(.bottom, 30)
         }
-        .background(Color.kiwiCream)
+        .background(Color.dsFond)
     }
 
     // MARK: - 1 · Header
@@ -119,7 +119,7 @@ struct AttentionDetailSheet: View {
                     .foregroundStyle(BilanV7.alertInk)
                 Text("Détecté dans tes réponses")
                     .font(Theme.dataSecondaryFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                 if let nutrient {
                     Text(nutrient.label)
                         .font(.system(size: 11, weight: .bold))
@@ -138,9 +138,9 @@ struct AttentionDetailSheet: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.kiwiCharcoal.opacity(0.06)))
+                    .background(Circle().fill(Color.dsTexte.opacity(0.06)))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -164,7 +164,7 @@ struct AttentionDetailSheet: View {
             if let rest = interaction.tipRest, !rest.isEmpty {
                 Text(rest)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.kiwiCharcoal.opacity(0.85))
+                    .foregroundStyle(Color.dsTexte.opacity(0.85))
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 18)
@@ -178,7 +178,7 @@ struct AttentionDetailSheet: View {
 
     private func schemaView(_ mechanism: AttentionMechanism) -> some View {
         HStack(alignment: .top, spacing: 4) {
-            stepView(mechanism.habit, tint: Color.kiwiCharcoal)
+            stepView(mechanism.habit, tint: Color.dsTexte)
             arrow
             stepView(mechanism.mechanism, tint: BilanV7.warnInk)
             arrow
@@ -204,10 +204,10 @@ struct AttentionDetailSheet: View {
             VStack(spacing: 1) {
                 Text(step.line1)
                     .font(.system(size: 11.5, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                 Text(step.line2)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
             }
             .multilineTextAlignment(.center)
         }
@@ -217,7 +217,7 @@ struct AttentionDetailSheet: View {
     private var arrow: some View {
         Image(systemName: "arrow.right")
             .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(Color.healthMapMuted)
+            .foregroundStyle(Color.dsSecondaire)
             .frame(height: 44)
             .accessibilityHidden(true)
     }
@@ -227,25 +227,25 @@ struct AttentionDetailSheet: View {
             HStack(spacing: 7) {
                 Image(systemName: "lightbulb.fill")
                     .font(.system(size: 15))
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.dsTexte)
                     .accessibilityHidden(true)
                 // Titre de section : teinté, et rangé SOUS son contenu.
                 Text("Ta solution")
                     .font(Theme.subLabelFont)
                     .textCase(.uppercase)
                     .kerning(0.4)
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.dsTexte)
             }
             // Le geste : c'est la réponse de la carte, donc son pic.
             Text(text)
                 .font(Theme.insightFont)
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.kiwiTint))
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.dsRemplissage))
     }
 
     // MARK: - Promesses de l'écrin (contenu premium RÉEL, toujours flouté)
@@ -305,11 +305,11 @@ struct AttentionDetailSheet: View {
                     .font(.system(size: 15, weight: .semibold))
                     .accessibilityHidden(true)
             }
-            .foregroundStyle(Color.kiwiInk)
+            .foregroundStyle(Color.dsTexte)
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.kiwiCharcoal.opacity(0.05))
+                    .fill(Color.dsTexte.opacity(0.05))
             )
             .contentShape(Rectangle())
         }

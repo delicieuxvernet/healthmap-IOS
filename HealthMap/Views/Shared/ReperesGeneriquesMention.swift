@@ -20,7 +20,7 @@ struct ReperesGeneriquesMention: View {
     var body: some View {
         Text(Self.texte)
             .font(.system(size: 11.5, weight: .medium))
-            .foregroundStyle(Color.healthMapMuted)
+            .foregroundStyle(Color.dsSecondaire)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

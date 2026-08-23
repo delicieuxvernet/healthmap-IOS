@@ -74,11 +74,11 @@ enum PrecisionCatalog {
     /// User-facing title for each precision picker.
     static func title(for key: String) -> String {
         switch key {
-        case "vegetableServings":  return "☑️ Coche les légumes que tu manges"
-        case "fruitServings":      return "☑️ Coche les fruits que tu manges"
-        case "meatPoultry":        return "☑️ Coche tes protéines"
-        case "dairyServings":      return "☑️ Coche tes laitiers"
-        case "wholegrainPerWeek":  return "☑️ Coche tes céréales"
+        case "vegetableServings":  return "Coche les légumes que tu manges"
+        case "fruitServings":      return "Coche les fruits que tu manges"
+        case "meatPoultry":        return "Coche tes protéines"
+        case "dairyServings":      return "Coche tes laitiers"
+        case "wholegrainPerWeek":  return "Coche tes céréales"
         default:                   return ""
         }
     }

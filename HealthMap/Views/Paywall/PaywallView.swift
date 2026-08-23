@@ -88,9 +88,9 @@ struct PaywallView: View {
 
     var body: some View {
         ZStack {
-            // Crème v4 comme le reste de l'app (DESIGN-PAGES) : le paywall était
-            // le dernier écran resté sur le fond bleuté hérité du web.
-            Color.healthMapWarm
+            // Refonte 23 août 2026 : fond neutre, ton calme, sans capitales ni
+            // compte à rebours (§3 du document).
+            Color.dsFond
                 .ignoresSafeArea()
 
             ScrollView {
@@ -167,13 +167,16 @@ struct PaywallView: View {
                 ])
                 dismiss()
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(Color.healthMapMuted)
-                    // Zone tactile ≥ 44 pt (HIG) — l'icône seule ne fait que ~28 pt.
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.dsSecondaire)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Color.dsBoutonNeutre))
+                    // Zone tactile ≥ 44 pt (HIG).
                     .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .contentShape(Circle())
             }
+            .buttonStyle(.dsPress)
             .accessibilityLabel("Fermer")
         }
         .padding(.horizontal, Theme.spacingMD)
@@ -182,15 +185,17 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(spacing: Theme.spacingSM) {
-            KiwiContourMark(size: 56, color: .kiwiGreen)
+            KiwiContourMark(size: 56, color: .dsAccent)
 
             Text("Kiwio Premium")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(.dsGrandTitre)
+                .tracking(DSTracking.grandTitre)
+                .foregroundStyle(Color.dsTexte)
 
             Text("Ton bilan complet, tes solutions\net tes scans, sans limite.")
-                .font(Theme.subheadlineFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -199,36 +204,38 @@ struct PaywallView: View {
     /// Ce que Premium change, avec le contraste gratuit là où il existe :
     /// « 30 scans par jour » ne dit rien tant qu'on ignore qu'on en a 3.
     private var featureList: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            featureRow("camera.fill", "30 scans repas par jour", "3 par jour en gratuit")
+        VStack(alignment: .leading, spacing: 12) {
+            featureRow("camera", "30 scans repas par jour", "3 par jour en gratuit")
             featureRow("chart.xyaxis.line", "Tes tendances détaillées", "semaine après semaine")
-            featureRow("sparkles", "Le pourquoi de chaque apport", "et le geste qui le comble")
-            featureRow("list.bullet.clipboard.fill", "Ton rituel du jour complet", "compléments et solutions")
+            featureRow("testtube.2", "Le pourquoi de chaque apport", "et le geste qui le comble")
+            featureRow("map", "Ton plan complet, pas à pas", "compléments et solutions")
         }
-        .padding(.horizontal, Theme.spacingXL)
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .padding(.horizontal, DS.marge)
     }
 
     /// Une seule icône par ligne : la coche à gauche ET le symbole à droite
     /// faisaient doublon, pour deux fois plus de bruit visuel.
     private func featureRow(_ icon: String, _ title: String, _ detail: String) -> some View {
-        HStack(spacing: Theme.spacingSM) {
+        HStack(spacing: 11) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.kiwiInk)
-                .frame(width: 28, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(Color.kiwiTint)
-                )
+                .font(.system(size: 20, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsAccent)
+                .frame(width: 24)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(.dsCorps)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
                 Text(detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
             }
             .fixedSize(horizontal: false, vertical: true)
 
@@ -272,7 +279,7 @@ struct PaywallView: View {
                 )
             }
         }
-        .padding(.horizontal, Theme.spacingMD)
+        .padding(.horizontal, DS.marge)
         .padding(.top, Theme.spacingSM)
     }
 
@@ -287,17 +294,30 @@ struct PaywallView: View {
             selectedPlan = plan
         } label: {
             HStack(spacing: Theme.spacingSM) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(isSelected ? Color.kiwiInk : Color.healthMapSecondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(.dsSousTitre)
+                            .tracking(DSTracking.sousTitre)
+                            .foregroundStyle(Color.dsSecondaire)
+                        if let badge {
+                            Text(badge)
+                                .font(.dsLegendeMoyenne)
+                                .foregroundStyle(isSelected ? Color.white : Color.dsSecondaire)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(isSelected ? Color.dsAccent : Color.dsRemplissage))
+                        }
+                    }
                     Text(priceLabel(for: plan))
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
+                        .foregroundStyle(Color.dsTexte)
                     if let detail {
                         Text(detail)
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .font(.dsLegende)
+                            .tracking(DSTracking.legende)
+                            .foregroundStyle(Color.dsSecondaire)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -306,8 +326,8 @@ struct PaywallView: View {
 
                 ZStack {
                     Circle()
-                        .strokeBorder(isSelected ? Color.kiwiGreen : Color.healthMapMuted, lineWidth: 2)
-                        .background(Circle().fill(isSelected ? Color.kiwiGreen : Color.clear))
+                        .strokeBorder(isSelected ? Color.dsAccent : Color.dsTertiaire, lineWidth: 2)
+                        .background(Circle().fill(isSelected ? Color.dsAccent : Color.clear))
                         .frame(width: 22, height: 22)
                     if isSelected {
                         Image(systemName: "checkmark")
@@ -316,26 +336,15 @@ struct PaywallView: View {
                     }
                 }
             }
-            .padding(Theme.spacingMD)
-            .background(isSelected ? Color.kiwiTint : Color.healthMapCard)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(DS.paddingCarte)
+            .background(Color.dsCarte)
+            .clipShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(isSelected ? Color.kiwiGreen : Color.healthMapMuted.opacity(0.3), lineWidth: 2)
+                RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                    .strokeBorder(isSelected ? Color.dsAccent : Color.clear, lineWidth: 1.5)
             )
-            .overlay(alignment: .topLeading) {
-                if let badge {
-                    Text(badge)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(isSelected ? .white : Color.kiwiInk)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(isSelected ? Color.kiwiGreen : Color.kiwiTint))
-                        .offset(x: 12, y: -10)
-                }
-            }
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel([title, priceLabel(for: plan), detail, badge].compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -353,23 +362,26 @@ struct PaywallView: View {
                             .tint(.white)
                     } else {
                         Text(ctaTitle)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.dsHeadline)
+                            .tracking(DSTracking.corps)
                     }
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(Capsule().fill(Color.kiwiGreen))
+                .frame(height: DS.hauteurBouton)
+                .background(Capsule().fill(Color.dsAccent))
+                .contentShape(Capsule())
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
             .disabled(isPurchasing || selectedPlan == nil)
-            .padding(.horizontal, Theme.spacingMD)
+            .padding(.horizontal, DS.marge)
 
             Text(ctaNote)
-                .font(.system(size: 12))
-                .foregroundStyle(Color.healthMapMuted)
+                .font(.dsLegende)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.spacingMD)
+                .padding(.horizontal, DS.marge)
         }
         .padding(.top, Theme.spacingSM)
     }
@@ -378,8 +390,8 @@ struct PaywallView: View {
         VStack(spacing: Theme.spacingSM) {
             KiwiLoader(size: 48)
             Text("Chargement des offres…")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.healthMapMuted)
+                .font(.dsLegende)
+                .foregroundStyle(Color.dsSecondaire)
         }
         .padding(.vertical, Theme.spacingXL)
     }
@@ -389,26 +401,27 @@ struct PaywallView: View {
     private var offeringsErrorState: some View {
         VStack(spacing: Theme.spacingSM) {
             Image(systemName: "wifi.exclamationmark")
-                .font(.system(size: 28))
-                .foregroundStyle(Color.healthMapMuted)
+                .font(.system(size: 28, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsSecondaire)
                 .accessibilityHidden(true)
 
             Text("Impossible de charger les offres.\nVérifie ta connexion et réessaie.")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.healthMapSecondary)
+                .font(.dsSousTitre)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
 
             Button {
                 Task { await loadOfferingsWithTimeout(force: true) }
             } label: {
                 Text("Réessayer")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.dsSousTitreFort)
                     .foregroundStyle(.white)
                     .frame(minWidth: 140)
                     .frame(height: 44)
-                    .background(Capsule().fill(Color.kiwiGreen))
+                    .background(Capsule().fill(Color.dsAccent))
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
         }
         .padding(.vertical, Theme.spacingXL)
     }
@@ -426,28 +439,25 @@ struct PaywallView: View {
                     if isRedeemingPromo {
                         ProgressView()
                             .scaleEffect(0.7)
-                            .tint(Color.kiwiInk)
+                            .tint(Color.dsAccent)
                     }
                     Text(isRedeemingPromo ? "Vérification de ton code…" : "J'ai un code promo")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.dsSousTitreFort)
                 }
-                .foregroundStyle(Color.kiwiInk)
+                .foregroundStyle(Color.dsAccent)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
-                // Secondaire = glass (loi 7 de DESIGN-PAGES) : en aplat vert
-                // tendre, ce bouton concurrençait visuellement le CTA d'achat
-                // alors qu'il ne concerne qu'une minorité d'utilisateurs.
-                .background(Capsule().fill(.ultraThinMaterial))
-                .overlay(Capsule().strokeBorder(Color.kiwiGreen.opacity(0.22), lineWidth: 1))
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.dsPress)
             .disabled(isRedeemingPromo)
-            .padding(.horizontal, Theme.spacingMD)
+            .padding(.horizontal, DS.marge)
             .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
 
             if let promoNotice {
                 Text(promoNotice)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, Theme.spacingLG)
@@ -462,9 +472,9 @@ struct PaywallView: View {
                         .scaleEffect(0.8)
                 } else {
                     Text("Restaurer mes achats")
-                        .font(.system(size: 12))
+                        .font(.dsLegende)
                         .underline()
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
             }
             .disabled(isRestoring)
@@ -474,11 +484,11 @@ struct PaywallView: View {
             HStack(spacing: 8) {
                 Link("Conditions d'utilisation", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                 Text("\u{00B7}")
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsTertiaire)
                 Link("Politique de confidentialité", destination: URL(string: "https://healthmap.fr/privacy")!)
             }
-            .font(.system(size: 11))
-            .foregroundStyle(Color.healthMapMuted)
+            .font(.dsLegende)
+            .foregroundStyle(Color.dsSecondaire)
         }
     }
 
@@ -813,14 +823,14 @@ private struct PremiumPurchaseSuccessView: View {
             VStack(spacing: Theme.spacingMD) {
                 ZStack {
                     Circle()
-                        .fill(Color.kiwiTint)
+                        .fill(Color.dsRemplissage)
                         .frame(width: 80, height: 80)
                     Circle()
-                        .stroke(Color.kiwiGreen.opacity(0.22), lineWidth: 8)
+                        .stroke(Color.dsAccent.opacity(0.22), lineWidth: 8)
                         .frame(width: 64, height: 64)
                     Image(systemName: "checkmark")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.kiwiGreen)
+                        .font(.system(size: 28, weight: .bold, design: .default))
+                        .foregroundStyle(Color.dsAccent)
                 }
                 .scaleEffect(revealed ? 1 : 0.82)
                 .opacity(revealed ? 1 : 0)
@@ -828,13 +838,13 @@ private struct PremiumPurchaseSuccessView: View {
 
                 VStack(spacing: Theme.spacingXS) {
                     Text(titre)
-                        .font(.system(size: 23, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .font(.system(size: 23, weight: .bold, design: .default))
+                        .foregroundStyle(Color.dsTexte)
                         .multilineTextAlignment(.center)
 
                     Text(sousTitre)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -843,10 +853,10 @@ private struct PremiumPurchaseSuccessView: View {
                     if let echeance {
                         Text(echeance)
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.kiwiInk)
+                            .foregroundStyle(Color.dsTexte)
                             .padding(.horizontal, Theme.spacingSM)
                             .padding(.vertical, 5)
-                            .background(Capsule().fill(Color.kiwiTint))
+                            .background(Capsule().fill(Color.dsRemplissage))
                             .padding(.top, Theme.spacingXS)
                     }
                 }
@@ -860,7 +870,7 @@ private struct PremiumPurchaseSuccessView: View {
                 }
                 .padding(.horizontal, Theme.spacingMD)
                 .background(
-                    Color.healthMapCard,
+                    Color.dsCarte,
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
 
@@ -870,7 +880,7 @@ private struct PremiumPurchaseSuccessView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .background(
-                            Color.kiwiGreen,
+                            Color.dsAccent,
                             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                         )
                         .contentShape(Rectangle())
@@ -880,12 +890,12 @@ private struct PremiumPurchaseSuccessView: View {
                 Button(action: onBilan) {
                     Text("Continuer sur mon bilan")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.kiwiInk)
+                        .foregroundStyle(Color.dsTexte)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.kiwiGreen.opacity(0.18), lineWidth: 1)
+                                .stroke(Color.dsAccent.opacity(0.18), lineWidth: 1)
                         )
                         .contentShape(Rectangle())
                 }
@@ -914,12 +924,12 @@ private struct PremiumPurchaseSuccessView: View {
         HStack(spacing: Theme.spacingSM) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.kiwiGreen)
+                .foregroundStyle(Color.dsAccent)
                 .frame(width: 28, height: 44)
                 .accessibilityHidden(true)
             Text(title)
                 .font(.system(size: 13.5, weight: .semibold))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }

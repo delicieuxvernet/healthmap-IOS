@@ -26,11 +26,11 @@ struct BlurredSection<Content: View>: View {
                 VStack(spacing: Theme.spacingSM) {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 24))
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
 
                     Text(title)
                         .font(Theme.captionBoldFont)
-                        .foregroundStyle(Color.healthMapText)
+                        .foregroundStyle(Color.dsTexte)
                         .multilineTextAlignment(.center)
 
                     Button {
@@ -45,7 +45,7 @@ struct BlurredSection<Content: View>: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(Color.healthMapBlue)
+                        .background(Color.dsAccent)
                         .clipShape(Capsule())
                     }
                 }
@@ -89,7 +89,7 @@ struct PremiumGateModifier: ViewModifier {
                             Text("Premium")
                                 .font(.system(size: 11, weight: .semibold))
                         }
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                     )
             }
             .buttonStyle(.plain)

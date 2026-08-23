@@ -163,7 +163,7 @@ struct RecapView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.kiwiCharcoal.opacity(0.6))
+                        .foregroundStyle(Color.dsTexte.opacity(0.6))
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -185,7 +185,7 @@ struct RecapView: View {
                     } label: {
                         Text("Passer")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color.kiwiCharcoal.opacity(0.6))
+                            .foregroundStyle(Color.dsTexte.opacity(0.6))
                             .frame(height: 44)
                             .padding(.horizontal, Theme.spacingSM)
                             .contentShape(Rectangle())
@@ -204,7 +204,7 @@ struct RecapView: View {
                 Text("Voir en liste")
                     .font(.system(size: 13, weight: .medium))
                     .underline()
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.dsTexte)
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -213,7 +213,7 @@ struct RecapView: View {
             // d'un dosage. Une ligne, en bas, sur tous les slides.
             Text("Estimation basée sur tes déclarations. Ne remplace pas un avis médical.")
                 .font(.system(size: 11))
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, Theme.spacingLG)

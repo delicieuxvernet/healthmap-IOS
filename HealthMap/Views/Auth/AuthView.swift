@@ -49,7 +49,7 @@ struct AuthView: View {
 
     var body: some View {
         ZStack {
-            Color.kiwiCream
+            Color.dsFond
                 .ignoresSafeArea()
                 .onTapGesture { focusedField = nil }
 
@@ -106,19 +106,19 @@ struct AuthView: View {
                                 Button {
                                     showForgotPassword = true
                                 } label: {
-                                    Text("Mot de passe oublié ?")
-                                        .font(Theme.captionBoldFont)
-                                        .foregroundStyle(Color.kiwiGreenInk)
+                                    Text("Mot de passe oublié\u{202F}?")
+                                        .font(.dsLegendeMoyenne)
+                                        .foregroundStyle(Color.dsAccent)
                                         .frame(minHeight: 44)
                                         .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.healthMapPressed)
+                                .buttonStyle(.dsPress)
                             }
                         }
                     }
-                    .padding(Theme.spacingLG)
-                    .cardStyle()
-                    .padding(.horizontal, Theme.spacingLG)
+                    .padding(DS.paddingCarte)
+                    .dsCard()
+                    .padding(.horizontal, DS.marge)
 
                     // Error message
                     if let error = authViewModel.errorMessage {
@@ -146,7 +146,8 @@ struct AuthView: View {
                     } label: {
                         ZStack {
                             Text(isSignUp ? "Créer mon compte" : "Se connecter")
-                                .font(Theme.headlineFont)
+                                .font(.dsHeadline)
+                                .tracking(DSTracking.corps)
                                 .foregroundStyle(.white)
                                 .opacity(authViewModel.isProcessing ? 0 : 1)
 
@@ -156,26 +157,25 @@ struct AuthView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(Color.kiwiGreen)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                        .shadow(color: Color.kiwiGreen.opacity(0.34), radius: 13, x: 0, y: 10)
+                        .frame(height: DS.hauteurBouton)
+                        .background(Capsule().fill(Color.dsAccent))
+                        .contentShape(Capsule())
                     }
-                    .buttonStyle(.healthMapPressed)
+                    .buttonStyle(.dsPress)
                     .disabled(authViewModel.isProcessing)
-                    .padding(.horizontal, Theme.spacingLG)
+                    .padding(.horizontal, DS.marge)
 
                     // Divider
                     HStack {
                         Rectangle()
-                            .fill(Color.healthMapMuted.opacity(0.3))
-                            .frame(height: 1)
+                            .fill(Color.dsSeparateur)
+                            .frame(height: 0.5)
                         Text("ou")
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapMuted)
+                            .font(.dsLegende)
+                            .foregroundStyle(Color.dsSecondaire)
                         Rectangle()
-                            .fill(Color.healthMapMuted.opacity(0.3))
-                            .frame(height: 1)
+                            .fill(Color.dsSeparateur)
+                            .frame(height: 0.5)
                     }
                     .padding(.horizontal, Theme.spacingXL)
 
@@ -194,9 +194,9 @@ struct AuthView: View {
                         }
                     )
                     .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                    .frame(height: 54)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                    .padding(.horizontal, Theme.spacingLG)
+                    .frame(height: DS.hauteurBouton)
+                    .clipShape(Capsule())
+                    .padding(.horizontal, DS.marge)
 
                     // Google sign in
                     Button {
@@ -206,29 +206,26 @@ struct AuthView: View {
                     } label: {
                         HStack(spacing: Theme.spacingSM) {
                             Image(systemName: "globe")
-                                .font(.system(size: 18))
+                                .font(.system(size: 18, weight: .medium))
                             Text("Continuer avec Google")
-                                .font(Theme.headlineFont)
+                                .font(.dsHeadline)
+                                .tracking(DSTracking.corps)
                         }
-                        .foregroundStyle(Color.healthMapText)
+                        .foregroundStyle(Color.dsTexte)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(Color.healthMapCard)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                                .stroke(Color.healthMapMuted.opacity(0.3), lineWidth: 1)
-                        )
+                        .frame(height: DS.hauteurBouton)
+                        .background(Capsule().fill(Color.dsCarte))
+                        .contentShape(Capsule())
                     }
-                    .buttonStyle(.healthMapPressed)
-                    .padding(.horizontal, Theme.spacingLG)
+                    .buttonStyle(.dsPress)
+                    .padding(.horizontal, DS.marge)
 
                     // Toggle login/signup — typo subheadline (lisible) +
                     // zone de tap >= 44pt sur le bouton.
                     HStack(spacing: Theme.spacingXS) {
-                        Text(isSignUp ? "Déjà un compte ?" : "Pas encore de compte ?")
-                            .font(Theme.subheadlineFont)
-                            .foregroundStyle(Color.healthMapSecondary)
+                        Text(isSignUp ? "Déjà un compte\u{202F}?" : "Pas encore de compte\u{202F}?")
+                            .font(.dsSousTitre)
+                            .foregroundStyle(Color.dsSecondaire)
                         // frame+contentShape DANS le label (zone tappable 44pt
                         // réelle — voir bouton « Mot de passe oublié ? »).
                         Button {
@@ -238,12 +235,12 @@ struct AuthView: View {
                             }
                         } label: {
                             Text(isSignUp ? "Se connecter" : "Créer un compte")
-                                .font(Theme.subheadlineFont.weight(.semibold))
-                                .foregroundStyle(Color.kiwiGreenInk)
+                                .font(.dsSousTitreFort)
+                                .foregroundStyle(Color.dsAccent)
                                 .frame(minHeight: 44)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.healthMapPressed)
+                        .buttonStyle(.dsPress)
                     }
                     .padding(.bottom, Theme.spacingXL)
                 }
@@ -349,16 +346,17 @@ struct AuthView: View {
                 .frame(width: 84, height: 84)
                 .accessibilityHidden(true)
 
-            (Text("kiwi").foregroundStyle(Color.kiwiCharcoal)
-             + Text("o").foregroundStyle(Color.kiwiGreen))
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .brandTitleKerning()
+            (Text("kiwi").foregroundStyle(Color.dsTexte)
+             + Text("o").foregroundStyle(Color.dsAccent))
+                .font(.dsGrandTitre)
+                .tracking(DSTracking.grandTitre)
 
             Text(isSignUp
-                 ? "Gratuit : ton bilan nutritionnel t'attend."
+                 ? "Gratuit\u{202F}: ton bilan nutritionnel t'attend."
                  : "Connecte-toi pour retrouver ton bilan.")
-                .font(Theme.subheadlineFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)

@@ -13,23 +13,15 @@ private struct SweepSelectBackground: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
         return shape
-            .fill(Color.healthMapCard)
+            .fill(Color.dsCarte)
             .overlay(alignment: .leading) {
                 GeometryReader { geo in
-                    Color.kiwiTint
+                    Color.dsAccent.opacity(0.08)
                         .frame(width: isSelected ? geo.size.width : 0)
                         .animation(reduceMotion ? .none : .healthMapQuick, value: isSelected)
                 }
             }
             .clipShape(shape)
-            .shadow(
-                color: isSelected
-                    ? Color.kiwiGreen.opacity(0.22)
-                    : Color.black.opacity(Theme.shadowCard.opacity),
-                radius: Theme.shadowCard.radius,
-                x: 0,
-                y: Theme.shadowCard.y
-            )
     }
 }
 
@@ -57,23 +49,18 @@ struct SingleChoiceView: View {
                     onSelect(option.id)
                 } label: {
                     HStack(spacing: Theme.spacingSM) {
-                        if let emoji = option.emoji {
-                            Text(emoji)
-                                .font(.title3)
-                        }
-
                         Text(option.label)
                             .font(Theme.bodyFont.weight(isSelected ? .semibold : .regular))
-                            .foregroundStyle(Color.healthMapText)
+                            .foregroundStyle(Color.dsTexte)
                             .multilineTextAlignment(.leading)
 
                         Spacer()
 
                         Circle()
-                            .strokeBorder(isSelected ? Color.kiwiGreen : Color.healthMapMuted.opacity(0.4), lineWidth: 2)
+                            .strokeBorder(isSelected ? Color.dsAccent : Color.dsSecondaire.opacity(0.4), lineWidth: 2)
                             .background(
                                 Circle()
-                                    .fill(isSelected ? AnyShapeStyle(Color.kiwiGreen) : AnyShapeStyle(Color.clear))
+                                    .fill(isSelected ? AnyShapeStyle(Color.dsAccent) : AnyShapeStyle(Color.clear))
                                     .padding(4)
                             )
                             .frame(width: 22, height: 22)
@@ -87,10 +74,8 @@ struct SingleChoiceView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                             .stroke(
-                                isSelected
-                                    ? Color.kiwiGreen.opacity(0.5)
-                                    : Color.healthMapMuted.opacity(Theme.opacityStrong),
-                                lineWidth: isSelected ? 1.5 : 1
+                                isSelected ? Color.dsAccent : Color.clear,
+                                lineWidth: 1.5
                             )
                     )
                     .animation(reduceMotion ? .none : .healthMapQuick, value: isSelected)
@@ -121,23 +106,18 @@ struct MultiChoiceView: View {
                     onToggle(option.id)
                 } label: {
                     HStack(spacing: Theme.spacingSM) {
-                        if let emoji = option.emoji {
-                            Text(emoji)
-                                .font(.title3)
-                        }
-
                         Text(option.label)
                             .font(Theme.bodyFont.weight(isSelected ? .semibold : .regular))
-                            .foregroundStyle(Color.healthMapText)
+                            .foregroundStyle(Color.dsTexte)
                             .multilineTextAlignment(.leading)
 
                         Spacer()
 
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .strokeBorder(isSelected ? Color.kiwiGreen : Color.healthMapMuted.opacity(0.4), lineWidth: 2)
+                            .strokeBorder(isSelected ? Color.dsAccent : Color.dsSecondaire.opacity(0.4), lineWidth: 2)
                             .background(
                                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(isSelected ? AnyShapeStyle(Color.kiwiGreen) : AnyShapeStyle(Color.clear))
+                                    .fill(isSelected ? AnyShapeStyle(Color.dsAccent) : AnyShapeStyle(Color.clear))
                                     .padding(3)
                             )
                             .overlay(
@@ -157,10 +137,8 @@ struct MultiChoiceView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                             .stroke(
-                                isSelected
-                                    ? Color.kiwiGreen.opacity(0.5)
-                                    : Color.healthMapMuted.opacity(Theme.opacityStrong),
-                                lineWidth: isSelected ? 1.5 : 1
+                                isSelected ? Color.dsAccent : Color.clear,
+                                lineWidth: 1.5
                             )
                     )
                     .opacity(isNone && !currentValues.isEmpty && !isSelected ? 0.5 : 1.0)
@@ -185,8 +163,8 @@ struct NumericInputView: View {
         HStack(spacing: Theme.spacingSM) {
             TextField(placeholder, text: $text)
                 .keyboardType(.decimalPad)
-                .font(.system(size: 28, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.healthMapText)
+                .font(.system(size: 28, weight: .semibold, design: .default))
+                .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
                 .focused($isFocused)
                 .frame(minWidth: 80)
@@ -194,24 +172,18 @@ struct NumericInputView: View {
             if let suffix {
                 Text(suffix)
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
             }
         }
         .padding(.horizontal, Theme.spacingLG)
         .padding(.vertical, Theme.spacingLG)
         .background(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.healthMapCard)
-                .shadow(
-                    color: .black.opacity(Theme.shadowCard.opacity),
-                    radius: Theme.shadowCard.radius,
-                    x: 0,
-                    y: Theme.shadowCard.y
-                )
+                .fill(Color.dsCarte)
         )
         .overlay(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(isFocused ? Color.healthMapBlue.opacity(0.4) : Color.healthMapMuted.opacity(Theme.opacityStrong), lineWidth: 1)
+                .stroke(isFocused ? Color.dsAccent : Color.clear, lineWidth: 1.5)
         )
         .onAppear {
             isFocused = true
@@ -266,7 +238,7 @@ struct WheelInputView: View {
         Picker(question.text, selection: $tick) {
             ForEach(0..<count, id: \.self) { t in
                 Text(label(t))
-                    .font(.system(size: 22, weight: .medium, design: .rounded))
+                    .font(.system(size: 22, weight: .medium, design: .default))
                     .tag(t)
             }
         }
@@ -278,21 +250,13 @@ struct WheelInputView: View {
         .padding(.vertical, Theme.spacingSM)
         .background(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.healthMapCard)
-                .shadow(
-                    color: .black.opacity(Theme.shadowCard.opacity),
-                    radius: Theme.shadowCard.radius,
-                    x: 0,
-                    y: Theme.shadowCard.y
-                )
+                .fill(Color.dsCarte)
         )
         .overlay(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                 .stroke(
-                    hasInteracted || !text.isEmpty
-                        ? Color.healthMapBlue.opacity(0.4)
-                        : Color.healthMapMuted.opacity(Theme.opacityStrong),
-                    lineWidth: 1
+                    hasInteracted || !text.isEmpty ? Color.dsAccent : Color.clear,
+                    lineWidth: 1.5
                 )
         )
         .onChange(of: tick) { _, newTick in
@@ -314,8 +278,8 @@ struct TextInputView: View {
 
     var body: some View {
         TextField(placeholder, text: $text)
-            .font(.system(size: 24, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.healthMapText)
+            .font(.system(size: 24, weight: .semibold, design: .default))
+            .foregroundStyle(Color.dsTexte)
             .multilineTextAlignment(.center)
             .autocorrectionDisabled()
             .focused($isFocused)
@@ -323,17 +287,11 @@ struct TextInputView: View {
             .padding(.vertical, Theme.spacingLG)
             .background(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .fill(Color.healthMapCard)
-                    .shadow(
-                        color: .black.opacity(Theme.shadowCard.opacity),
-                        radius: Theme.shadowCard.radius,
-                        x: 0,
-                        y: Theme.shadowCard.y
-                    )
+                    .fill(Color.dsCarte)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .stroke(isFocused ? Color.healthMapBlue.opacity(0.4) : Color.healthMapMuted.opacity(Theme.opacityStrong), lineWidth: 1)
+                    .stroke(isFocused ? Color.dsAccent : Color.clear, lineWidth: 1.5)
             )
             .onAppear {
                 isFocused = true

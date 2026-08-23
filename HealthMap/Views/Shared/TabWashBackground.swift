@@ -20,7 +20,7 @@ import SwiftUI
 ///   - Compléments → `kiwiGreen`      (décision fondateur)
 ///
 /// Placement : juste APRÈS le fond de base (`WarmBackground()` ou
-/// `Color.kiwiCream`) dans le `ZStack` racine de l'onglet, AVANT le contenu.
+/// `Color.dsFond`) dans le `ZStack` racine de l'onglet, AVANT le contenu.
 ///
 /// `ignoresSafeArea` : le lavis monte sous la barre d'état (fix #208 — un fond
 /// qui s'arrête à la status bar laisse une bande « hors de l'app » en haut).
@@ -46,6 +46,6 @@ struct TabWashBackground: View {
 #Preview {
     ZStack {
         WarmBackground()
-        TabWashBackground(tint: .kiwiGreen)
+        TabWashBackground(tint: .dsAccent)
     }
 }

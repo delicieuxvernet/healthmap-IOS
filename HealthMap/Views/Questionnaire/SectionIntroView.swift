@@ -25,34 +25,45 @@ struct SectionIntroView: View {
         VStack(spacing: Theme.spacingLG) {
             Spacer(minLength: Theme.spacingMD)
 
-            Text(section.emoji)
-                .font(.system(size: 56))
+            // Refonte 23 août 2026 : plus d'emoji ; le symbole de la section,
+            // en hiérarchique, sur une pastille neutre.
+            Image(systemName: section.symboleDS)
+                .font(.system(size: 30, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsAccent)
+                .frame(width: 72, height: 72)
+                .background(Circle().fill(Color.dsAccentPale))
                 .accessibilityHidden(true)
 
             Text(section.title)
-                .font(Theme.titleFont)
-                .brandTitleKerning()
-                .foregroundStyle(Color.healthMapText)
+                .font(.dsGrandTitre)
+                .tracking(DSTracking.grandTitre)
+                .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
 
             VStack(spacing: Theme.spacingSM) {
                 Text(encouragement)
-                    .font(Theme.headlineFont)
-                    .brandHeadlineKerning()
-                    .foregroundStyle(Color.healthMapText)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
 
                 Text(whyTheseData)
-                    .font(Theme.bodyFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
             }
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, Theme.spacingMD)
 
             Text(questionCount <= 1 ? "1 question" : "\(questionCount) questions")
-                .pillStyle(color: Color.healthMapBlue)
+                .font(.dsLegendeMoyenne)
+                .foregroundStyle(Color.dsSecondaire)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.dsRemplissage))
 
             // Teaser bienveillant (Lot E) — apparaît en différé sous le
             // pill, sans modifier le reste de l'écran d'intro existant.
@@ -100,9 +111,23 @@ struct SectionIntroView: View {
     }
 }
 
+private extension QuestionnaireSection {
+    /// Symbole SF de chaque section (remplace l'emoji d'intro).
+    var symboleDS: String {
+        switch self {
+        case .profil: return "person"
+        case .modeDeVie: return "figure.walk"
+        case .sante: return "heart"
+        case .nutrition: return "fork.knife"
+        case .symptomes: return "waveform.path.ecg"
+        case .medical: return "cross.case"
+        }
+    }
+}
+
 #Preview {
     ZStack {
-        Color.healthMapBackground.ignoresSafeArea()
+        Color.dsFond.ignoresSafeArea()
         SectionIntroView(
             section: .nutrition,
             questionCount: 23,

@@ -34,7 +34,7 @@ struct GroceryShoppingView: View {
 
     var body: some View {
         ZStack {
-            Color.healthMapBackground.ignoresSafeArea()
+            Color.dsFond.ignoresSafeArea()
             if showQuantities { quantitiesScreen } else { aisleScreen }
         }
     }
@@ -51,7 +51,7 @@ struct GroceryShoppingView: View {
                     Button { HapticService.shared.tap(); onCancel() } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.healthMapMuted)
+                            .foregroundStyle(Color.dsSecondaire)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
@@ -59,11 +59,11 @@ struct GroceryShoppingView: View {
                     Spacer()
                     Text("Rayon \(aisleIndex + 1)/\(aisles.count)")
                         .font(Theme.captionFont).monospacedDigit()
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.healthMapMuted.opacity(0.12))
+                        Capsule().fill(Color.dsSecondaire.opacity(0.12))
                         Capsule().fill(LinearGradient.healthMapBrand)
                             .frame(width: max(geo.size.width * CGFloat(aisleIndex + 1) / CGFloat(aisles.count), 6))
                             .animation(reduceMotion ? .none : .healthMapSpring, value: aisleIndex)
@@ -73,12 +73,12 @@ struct GroceryShoppingView: View {
                 HStack {
                     Text("\(aisle.emoji) \(aisle.label)")
                         .font(Theme.captionBoldFont)
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                     Spacer()
                     if !selections.isEmpty {
                         Text("\(selections.count) 🛒")
                             .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapBlue)
+                            .foregroundStyle(Color.dsAccent)
                     }
                 }
             }
@@ -87,7 +87,7 @@ struct GroceryShoppingView: View {
 
             Text("🛒 Que mets-tu dans ton caddie ?")
                 .font(Theme.headlineFont)
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Theme.spacingLG)
                 .padding(.top, Theme.spacingSM)
@@ -108,9 +108,9 @@ struct GroceryShoppingView: View {
                     Button { back() } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Color.healthMapBlue)
+                            .foregroundStyle(Color.dsAccent)
                             .frame(width: 56, height: 56)
-                            .background(Color.healthMapCard)
+                            .background(Color.dsCarte)
                             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                     }
                     .buttonStyle(.healthMapPressed)
@@ -142,7 +142,7 @@ struct GroceryShoppingView: View {
                 Text(item.emoji).font(.system(size: 26))
                 Text(item.name)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity)
@@ -150,16 +150,16 @@ struct GroceryShoppingView: View {
             .padding(.vertical, 10)
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, minHeight: 80)
-            .background(on ? Color.healthMapBlueLight : Color.healthMapCard)
+            .background(on ? Color.dsRemplissage : Color.dsCarte)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                    .stroke(on ? Color.healthMapBlue : Color.clear, lineWidth: 1.5)
+                    .stroke(on ? Color.dsAccent : Color.clear, lineWidth: 1.5)
             )
             .overlay(alignment: .topTrailing) {
                 Image(systemName: on ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 16))
-                    .foregroundStyle(on ? Color.healthMapBlue : Color.healthMapMuted.opacity(0.4))
+                    .foregroundStyle(on ? Color.dsAccent : Color.dsSecondaire.opacity(0.4))
                     .padding(5)
             }
         }
@@ -186,7 +186,7 @@ struct GroceryShoppingView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -195,7 +195,7 @@ struct GroceryShoppingView: View {
                 Button { HapticService.shared.tap(); onCancel() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -207,11 +207,11 @@ struct GroceryShoppingView: View {
                 Text("📋 Tes quantités")
                     .font(Theme.titleFont)
                     .brandTitleKerning()
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
                     .accessibilityAddTraits(.isHeader)
                 Text("Combien de fois par semaine, en moyenne ?")
                     .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -224,7 +224,7 @@ struct GroceryShoppingView: View {
                     Text("🛒").font(.system(size: 34))
                     Text("Ton caddie est vide. Reviens cocher des aliments.")
                         .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, Theme.spacingXL)
@@ -256,7 +256,7 @@ struct GroceryShoppingView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
-                        .background(families.isEmpty ? AnyShapeStyle(Color.healthMapMuted) : AnyShapeStyle(LinearGradient.healthMapBrand))
+                        .background(families.isEmpty ? AnyShapeStyle(Color.dsSecondaire) : AnyShapeStyle(LinearGradient.healthMapBrand))
                         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                 }
                 .buttonStyle(.healthMapPressed)
@@ -265,7 +265,7 @@ struct GroceryShoppingView: View {
                 Button { HapticService.shared.tap(); goBackToShopping(lastAisle: false) } label: {
                     Text("‹ Modifier mes courses")
                         .font(Theme.captionBoldFont)
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                 }
             }
             .padding(.horizontal, Theme.spacingLG)
@@ -279,7 +279,7 @@ struct GroceryShoppingView: View {
         HStack(spacing: 5) {
             ForEach(0..<count, id: \.self) { i in
                 Capsule()
-                    .fill(i <= current ? Color.healthMapBlue : Color.healthMapMuted.opacity(0.18))
+                    .fill(i <= current ? Color.dsAccent : Color.dsSecondaire.opacity(0.18))
                     .frame(height: 6)
             }
         }
@@ -311,16 +311,16 @@ struct GroceryShoppingView: View {
             HStack {
                 Text("Précision de ton bilan")
                     .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                 Spacer()
                 Text("\(covered)/\(total) familles")
                     .font(Theme.captionBoldFont)
                     .monospacedDigit()
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.healthMapMuted.opacity(0.12))
+                    Capsule().fill(Color.dsSecondaire.opacity(0.12))
                     Capsule().fill(LinearGradient.healthMapBrand)
                         .frame(width: max(geo.size.width * CGFloat(covered) / CGFloat(total), 6))
                         .animation(reduceMotion ? .none : .healthMapSpring, value: covered)
@@ -330,12 +330,12 @@ struct GroceryShoppingView: View {
             if covered < total {
                 Text("Complète les \(total) familles pour un bilan plus précis.")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(Theme.spacingMD)
-        .background(Color.healthMapCard)
+        .background(Color.dsCarte)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Précision du bilan : \(covered) familles sur \(total)")
@@ -348,7 +348,7 @@ struct GroceryShoppingView: View {
                 Text(family.emoji).font(.system(size: 15))
                 Text(family.label)
                     .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
             }
             .accessibilityAddTraits(.isHeader)
             ForEach(items(in: family)) { item in bracketRow(item) }
@@ -362,7 +362,7 @@ struct GroceryShoppingView: View {
         return VStack(alignment: .leading, spacing: 8) {
             Text("\(item.emoji) \(item.name)")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
                 .lineLimit(1)
             HStack(spacing: 8) {
                 ForEach(QuantityBracket.allCases) { bracket in
@@ -371,7 +371,7 @@ struct GroceryShoppingView: View {
             }
         }
         .padding(Theme.spacingMD)
-        .background(Color.healthMapCard)
+        .background(Color.dsCarte)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
     }
 
@@ -383,16 +383,16 @@ struct GroceryShoppingView: View {
             Text(bracket.label)
                 .font(.system(size: 15, weight: .semibold))
                 .monospacedDigit()
-                .foregroundStyle(selected ? .white : Color.healthMapText)
+                .foregroundStyle(selected ? .white : Color.dsTexte)
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(selected ? Color.healthMapBlue : Color.healthMapBackground)
+                        .fill(selected ? Color.dsAccent : Color.dsFond)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(selected ? Color.clear : Color.healthMapMuted.opacity(0.35), lineWidth: 1)
+                        .stroke(selected ? Color.clear : Color.dsSecondaire.opacity(0.35), lineWidth: 1)
                 )
         }
         .buttonStyle(.healthMapPressed)
@@ -439,7 +439,7 @@ struct GroceryQuestionControl: View {
         VStack(alignment: .leading, spacing: Theme.spacingMD) {
             Text("Coche tout ce que tu manges d'habitude, rayon par rayon. On s'en sert pour calculer tes apports.")
                 .font(Theme.bodyFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
 
             if count > 0 {
@@ -450,16 +450,16 @@ struct GroceryQuestionControl: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Courses validées")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.healthMapText)
+                            .foregroundStyle(Color.dsTexte)
                         Text("\(count) aliment\(count > 1 ? "s" : "") dans ton caddie")
                             .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                     Spacer()
                 }
                 .padding(Theme.spacingMD)
                 .frame(maxWidth: .infinity)
-                .background(Color.healthMapCard)
+                .background(Color.dsCarte)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                 .accessibilityElement(children: .combine)
             } else {

@@ -11,9 +11,11 @@ enum Theme {
     static let spacingXXL: CGFloat = 48
 
     // Corner Radius
-    static let cornerRadius: CGFloat = 16
+    // Refonte 23 août 2026 : un seul rayon de carte (14), les petits
+    // contrôles à 10.
+    static let cornerRadius: CGFloat = 14
     static let cornerRadiusSM: CGFloat = 10
-    static let cornerRadiusLG: CGFloat = 20
+    static let cornerRadiusLG: CGFloat = 14
     static let cornerRadiusPill: CGFloat = 100
 
     // Card
@@ -138,12 +140,14 @@ enum Theme {
     static let opacityOverlay: Double = 0.25
 
     // Standardized shadows
-    static let shadowCard = (opacity: 0.04, radius: CGFloat(8), y: CGFloat(2))
-    static let shadowElevated = (opacity: 0.08, radius: CGFloat(12), y: CGFloat(4))
-    static let shadowFloating = (opacity: 0.15, radius: CGFloat(20), y: CGFloat(10))
+    // Refonte 23 août 2026 : aucune ombre sur les cartes. Les tokens restent
+    // pour les appelants, à zéro.
+    static let shadowCard = (opacity: 0.0, radius: CGFloat(0), y: CGFloat(0))
+    static let shadowElevated = (opacity: 0.0, radius: CGFloat(0), y: CGFloat(0))
+    static let shadowFloating = (opacity: 0.0, radius: CGFloat(0), y: CGFloat(0))
     // Ombre teintée bleue des CTA brand (miroir du web BRAND.shadow :
     // `0 4px 24px rgba(0,122,255,0.35)`). À utiliser avec Color.healthMapBlue.
-    static let shadowBrandGlow = (opacity: 0.35, radius: CGFloat(12), y: CGFloat(4))
+    static let shadowBrandGlow = (opacity: 0.0, radius: CGFloat(0), y: CGFloat(0))
 }
 
 // MARK: - Brand Title Modifier

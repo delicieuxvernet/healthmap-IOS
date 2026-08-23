@@ -44,7 +44,7 @@ struct SparkleBurst: View {
         .accessibilityHidden(true)
     }
 
-    private static let palette: [Color] = [.healthMapBlue, .accentIndigo, Color(hex: "EF9F27")]
+    private static let palette: [Color] = [.dsAccent, .accentIndigo, Color(hex: "EF9F27")]
 
     private static func draw(in context: GraphicsContext, size: CGSize, time: Double) {
         let sz = min(size.width, size.height)
@@ -85,5 +85,5 @@ struct SparkleBurst: View {
     SparkleBurst(size: 240)
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.healthMapBackground)
+        .background(Color.dsFond)
 }

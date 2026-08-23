@@ -46,8 +46,8 @@ struct OnboardingView: View {
                                 hasSeenOnboarding = true
                             }
                         }
-                        .font(Theme.subheadlineFont)
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .font(.dsSousTitreFort)
+                        .foregroundStyle(Color.dsAccent)
                     }
                 }
                 .padding(.horizontal, Theme.spacingLG)
@@ -70,9 +70,7 @@ struct OnboardingView: View {
                 HStack(spacing: 8) {
                     ForEach(0..<pageCount, id: \.self) { index in
                         Capsule()
-                            .fill(index == currentPage
-                                  ? AnyShapeStyle(LinearGradient.healthMapBrand)
-                                  : AnyShapeStyle(Color.healthMapMuted.opacity(0.35)))
+                            .fill(index == currentPage ? Color.dsAccent : Color.dsTertiaire)
                             .frame(width: index == currentPage ? 22 : 8, height: 8)
                             .animation(reduceMotion ? .none : .healthMapQuick, value: currentPage)
                     }
@@ -89,23 +87,16 @@ struct OnboardingView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: Theme.spacingSM) {
-                        Text(ctaLabel)
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(LinearGradient.healthMapBrand)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                    .shadow(color: Color.healthMapBlue.opacity(Theme.shadowBrandGlow.opacity),
-                            radius: Theme.shadowBrandGlow.radius,
-                            x: 0,
-                            y: Theme.shadowBrandGlow.y)
+                    Text(ctaLabel)
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: DS.hauteurBouton)
+                        .background(Capsule().fill(Color.dsAccent))
+                        .contentShape(Capsule())
                 }
-                .buttonStyle(.healthMapPressed)
+                .buttonStyle(.dsPress)
                 .padding(.horizontal, Theme.spacingLG)
                 .padding(.bottom, Theme.spacingXL)
             }
@@ -137,38 +128,36 @@ private struct OnboardingCoverPageView: View {
             Spacer()
 
             // Badge (miroir du badge hero web "Bilan nutritionnel personnalisé")
-            HStack(spacing: 6) {
-                Image(systemName: "bolt.fill")
-                Text("Bilan nutritionnel personnalisé")
-            }
-            .pillStyle(color: .healthMapBlue)
+            Text("Bilan nutritionnel personnalisé")
+                .font(.dsLegendeMoyenne)
+                .foregroundStyle(Color.dsSecondaire)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Color.dsRemplissage))
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 16)
             .animation(staged(0), value: appeared)
 
             // Mascotte kiwi — grande, joyeuse
             MascotView(mood: .happy, size: 160)
-                .shadow(color: .black.opacity(Theme.opacityLight),
-                        radius: Theme.shadowElevated.radius,
-                        x: 0,
-                        y: Theme.shadowElevated.y)
                 .scaleEffect(appeared ? 1.0 : 0.7)
                 .opacity(appeared ? 1 : 0)
                 .animation(staged(0.08), value: appeared)
 
             // Wordmark — "Map" en gradient brand, comme le logo du site
-            (Text("Kiwi").foregroundStyle(Color.healthMapText)
-             + Text("o").foregroundStyle(LinearGradient.healthMapBrand))
-                .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                .brandTitleKerning()
+            (Text("Kiwi").foregroundStyle(Color.dsTexte)
+             + Text("o").foregroundStyle(Color.dsAccent))
+                .font(.dsGrandTitre)
+                .tracking(DSTracking.grandTitre)
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 16)
                 .animation(staged(0.16), value: appeared)
 
             // Promesse (copy du hero web)
             Text("Découvre la cause de tes symptômes. Réponds à quelques questions, reçois un plan micro-nutrition sur mesure.")
-                .font(Theme.bodyFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .font(.dsCorps)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Theme.spacingXL)
                 .opacity(appeared ? 1 : 0)
@@ -195,10 +184,10 @@ private struct OnboardingCoverPageView: View {
         HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
             Text(text)
-                .font(Theme.captionFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .font(.dsLegende)
+                .foregroundStyle(Color.dsSecondaire)
         }
     }
 
@@ -221,26 +210,23 @@ private struct OnboardingPageView: View {
             // Icône sur halo bleu, teinte gradient brand
             ZStack {
                 Circle()
-                    .fill(Color.healthMapBlueLight)
+                    .fill(Color.dsAccentPale)
                     .frame(width: 120, height: 120)
 
                 Image(systemName: page.icon)
-                    .font(.system(size: 48))
-                    .foregroundStyle(LinearGradient.healthMapBrand)
+                    .font(.system(size: 44, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.dsAccent)
             }
-            .shadow(color: Color.healthMapBlue.opacity(Theme.opacityStrong),
-                    radius: Theme.shadowFloating.radius,
-                    x: 0,
-                    y: Theme.shadowFloating.y)
             .scaleEffect(appeared ? 1.0 : 0.6)
             .opacity(appeared ? 1 : 0)
             .animation(staged(0), value: appeared)
 
             // Title
             Text(page.title)
-                .font(Theme.titleFont)
-                .brandTitleKerning()
-                .foregroundStyle(Color.healthMapText)
+                .font(.dsSection)
+                .tracking(DSTracking.section)
+                .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
                 .offset(y: appeared ? 0 : 20)
                 .opacity(appeared ? 1 : 0)
@@ -248,8 +234,9 @@ private struct OnboardingPageView: View {
 
             // Description
             Text(page.description)
-                .font(Theme.bodyFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .font(.dsCorps)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Theme.spacingXL)
                 .offset(y: appeared ? 0 : 20)

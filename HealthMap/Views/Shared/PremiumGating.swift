@@ -49,7 +49,7 @@ struct GatedOverlay<Content: View>: View {
             .allowsHitTesting(false)
             .overlay(
                 LinearGradient(
-                    colors: [Color.healthMapCard.opacity(0), Color.healthMapCard.opacity(0.55)],
+                    colors: [Color.dsCarte.opacity(0), Color.dsCarte.opacity(0.55)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -357,17 +357,17 @@ struct QuotaMeter: View {
                     Text(label)
                         .font(.system(size: 13, weight: .bold))
                 }
-                .foregroundStyle(Color.kiwiInk)
+                .foregroundStyle(Color.dsTexte)
                 Spacer()
                 Text("\(used) / \(total)")
-                    .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .font(.system(size: 12, weight: .bold, design: .default).monospacedDigit())
+                    .foregroundStyle(Color.dsSecondaire)
             }
 
             HStack(spacing: 7) {
                 ForEach(0..<max(1, total), id: \.self) { index in
                     Capsule()
-                        .fill(index < used ? Color.kiwiGreen : Color.kiwiGreen.opacity(0.18))
+                        .fill(index < used ? Color.dsAccent : Color.dsAccent.opacity(0.18))
                         .frame(height: 8)
                 }
             }
@@ -375,7 +375,7 @@ struct QuotaMeter: View {
 
             (Text("Il te reste ")
                 + Text("\(remaining) \(unit)\(remaining > 1 ? "s" : "")")
-                    .font(.system(size: 12.5, weight: .bold)).foregroundColor(Color.kiwiInk)
+                    .font(.system(size: 12.5, weight: .bold)).foregroundColor(Color.dsTexte)
                 + Text(remaining > 1 ? ", encore de quoi avancer aujourd’hui." : ". Ton quota revient demain."))
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundColor(Color(hex: "3A3833"))
@@ -384,10 +384,10 @@ struct QuotaMeter: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.healthMapCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.kiwiCharcoal.opacity(0.04), lineWidth: 1)
+                .stroke(Color.dsTexte.opacity(0.04), lineWidth: 1)
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label) : \(used) sur \(total). Il te reste \(remaining) \(unit)\(remaining > 1 ? "s" : "").")
@@ -411,23 +411,23 @@ struct QuotaWall: View {
         VStack(spacing: 0) {
             ZStack {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.kiwiTint)
+                    .fill(Color.dsRemplissage)
                     .frame(width: 52, height: 52)
                 Image(systemName: icon)
                     .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(Color.kiwiGreen)
+                    .foregroundStyle(Color.dsAccent)
             }
             .accessibilityHidden(true)
 
             Text(title)
                 .font(.system(size: 16, weight: .bold))
                 .tracking(-0.3)
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
                 .padding(.top, 12)
 
             Text(message)
                 .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .lineSpacing(1.5)
                 .fixedSize(horizontal: false, vertical: true)
@@ -439,17 +439,17 @@ struct QuotaWall: View {
 
             Text(escapeText)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .padding(.top, 10)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity)
-        .background(Color.healthMapCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.kiwiCharcoal.opacity(0.04), lineWidth: 1)
+                .stroke(Color.dsTexte.opacity(0.04), lineWidth: 1)
         )
     }
 }
@@ -459,7 +459,7 @@ struct QuotaWall: View {
         VStack(spacing: 16) {
             GatedOverlay(intensity: .teaser) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Où la trouver").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.kiwiInk)
+                    Text("Où la trouver").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.dsTexte)
                     Text("Œufs · Sardines · Fromage. Associe la B12 à des folates pour doubler l'assimilation.")
                         .font(.system(size: 12))
                 }

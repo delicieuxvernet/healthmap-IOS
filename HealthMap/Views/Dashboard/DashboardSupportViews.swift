@@ -6,7 +6,7 @@ import SwiftUI
 /// with an actionable retry card so the user always has a clear next step.
 ///
 /// Brand rules:
-///   - Icon `wifi.exclamationmark` is muted blue (Color.healthMapBlue) -- the
+///   - Icon `wifi.exclamationmark` is muted blue (Color.dsAccent) -- the
 ///     error state is recoverable, not dangerous, so we deliberately do NOT
 ///     use `Color.urgencyImmediate` (red is reserved for safety/medical
 ///     warnings per the audit checklist).
@@ -28,17 +28,17 @@ struct AnalysisErrorRetryView: View {
 
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.dsAccent)
                 .accessibilityHidden(true)
 
             VStack(spacing: Theme.spacingSM) {
                 Text("Analyse indisponible")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.healthMapText)
+                    .font(.system(size: 20, weight: .bold, design: .default))
+                    .foregroundStyle(Color.dsTexte)
 
                 Text(message)
                     .font(Theme.bodyFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, Theme.spacingXL)
@@ -65,7 +65,7 @@ struct AnalysisErrorRetryView: View {
                 .padding(.horizontal, Theme.spacingLG)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                        .fill(Color.healthMapBlue)
+                        .fill(Color.dsAccent)
                 )
             }
             .disabled(isRetrying)
@@ -75,7 +75,7 @@ struct AnalysisErrorRetryView: View {
                 Button(action: onExplorer) {
                     Text("Explorer l'app en attendant")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                         .frame(minHeight: 44)
                         .padding(.horizontal, Theme.spacingLG)
                 }
@@ -125,7 +125,7 @@ struct AllNutrientsSheet: View {
 
                                 Text(nutrient.label)
                                     .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(Color.healthMapSecondary)
+                                    .foregroundStyle(Color.dsSecondaire)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
                             }
@@ -133,7 +133,7 @@ struct AllNutrientsSheet: View {
                             .padding(.vertical, Theme.spacingSM)
                             .background(
                                 RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                                    .fill(Color.healthMapCard)
+                                    .fill(Color.dsCarte)
                             )
                         }
                         .buttonStyle(.healthMapPressed)
@@ -142,7 +142,7 @@ struct AllNutrientsSheet: View {
                 .padding(.horizontal, Theme.spacingLG)
                 .padding(.vertical, Theme.spacingMD)
             }
-            .background(Color.healthMapBackground)
+            .background(Color.dsFond)
             .navigationTitle("Tous mes nutriments")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -152,7 +152,7 @@ struct AllNutrientsSheet: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(Color.healthMapMuted)
+                            .foregroundStyle(Color.dsSecondaire)
                             // Zone tactile ≥ 44 pt RÉELLE (loi 20) — même fix
                             // que PaywallView : l'icône seule fait ~20 pt.
                             .frame(width: 44, height: 44)

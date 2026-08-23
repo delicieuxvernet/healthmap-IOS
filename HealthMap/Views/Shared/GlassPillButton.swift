@@ -25,13 +25,13 @@ struct GlassPillButton: View {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
             }
-            .foregroundStyle(Color.healthMapBlue)
+            .foregroundStyle(Color.dsAccent)
             .padding(.horizontal, Theme.spacingMD)
             .frame(minHeight: 44)
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(
                 Capsule()
-                    .stroke(Color.healthMapBlue.opacity(Theme.opacityMedium), lineWidth: 1)
+                    .stroke(Color.dsAccent.opacity(Theme.opacityMedium), lineWidth: 1)
             )
             .contentShape(Capsule())
         }
@@ -47,5 +47,5 @@ struct GlassPillButton: View {
         GlassPillButton(title: "Tous mes nutriments (10)", systemImage: "square.grid.3x3") {}
     }
     .padding()
-    .background(Color.healthMapBackground)
+    .background(Color.dsFond)
 }

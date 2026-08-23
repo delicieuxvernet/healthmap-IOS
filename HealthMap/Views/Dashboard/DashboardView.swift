@@ -296,10 +296,10 @@ struct DashboardView: View {
                 // Indicateur de rafraîchissement (bilan déjà présent)
                 if viewModel.isLoadingAnalysis || viewModel.isLoadingAnalysisV2 {
                     HStack(spacing: Theme.spacingSM) {
-                        ProgressView().tint(Color.kiwiGreen)
+                        ProgressView().tint(Color.dsAccent)
                         Text("Mise à jour de l'analyse…")
                             .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                     .padding(.vertical, Theme.spacingSM)
                 }
@@ -524,11 +524,11 @@ struct FullAnalysisLoadingView: View {
             VStack(spacing: Theme.spacingSM) {
                 Text("On analyse ton profil…")
                     .font(Theme.headlineFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
 
                 Text(messages[messageIndex])
                     .font(Theme.bodyFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(minHeight: 48)
@@ -538,21 +538,21 @@ struct FullAnalysisLoadingView: View {
 
             ProgressView(value: progress)
                 .progressViewStyle(.linear)
-                .tint(Color.kiwiGreen)
+                .tint(Color.dsAccent)
                 .frame(maxWidth: 200)
                 .animation(.easeInOut(duration: 0.4), value: progress)
 
             VStack(spacing: Theme.spacingSM) {
                 Text("Compte 2 à 3 minutes")
                     .font(Theme.captionFont)
-                    .foregroundStyle(Color.kiwiGreen)
+                    .foregroundStyle(Color.dsAccent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 5)
-                    .background(Color.kiwiGreen.opacity(0.12), in: Capsule())
+                    .background(Color.dsAccent.opacity(0.12), in: Capsule())
 
                 Text("Tu peux laisser l'app ouverte, on s'occupe de tout.")
                     .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
             }
 

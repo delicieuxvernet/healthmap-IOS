@@ -85,11 +85,11 @@ struct PortionSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(titleText)
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
                 .lineLimit(2)
             Text(subtitleText)
-                .font(.system(size: 13, design: .rounded))
-                .foregroundStyle(Color.healthMapSecondary)
+                .font(.system(size: 13, design: .default))
+                .foregroundStyle(Color.dsSecondaire)
         }
     }
 
@@ -131,21 +131,21 @@ struct PortionSheet: View {
                     TextField("0", text: gramsBinding)
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.center)
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.healthMapText)
+                        .font(.system(size: 22, weight: .semibold, design: .default))
+                        .foregroundStyle(Color.dsTexte)
                         .frame(width: 96, height: 44)
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.healthMapCard)
+                                .fill(Color.dsCarte)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.kiwiGreen, lineWidth: 1.5)
+                                        .stroke(Color.dsAccent, lineWidth: 1.5)
                                 )
                         )
                         .accessibilityLabel("Quantité en grammes")
                     Text("g")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 stepButton("plus", delta: 10)
             }
@@ -154,12 +154,12 @@ struct PortionSheet: View {
             VStack(spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(scaled.kcal)")
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.healthMapText)
+                        .font(.system(size: 22, weight: .semibold, design: .default))
+                        .foregroundStyle(Color.dsTexte)
                         .contentTransition(.numericText())
                     Text("kcal")
                         .font(.system(size: 13))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 HStack(spacing: Theme.spacingMD) {
                     macroDot("P", scaled.p, color: .macroProtein)
@@ -181,17 +181,17 @@ struct PortionSheet: View {
                 Text(label)
                     .font(.system(size: 13, weight: .semibold))
                 Text("\(value) g")
-                    .font(.system(size: 11, design: .rounded))
+                    .font(.system(size: 11, design: .default))
             }
-            .foregroundStyle(grams == value ? Color.kiwiGreenInk : Color.healthMapSecondary)
+            .foregroundStyle(grams == value ? Color.dsTexte : Color.dsSecondaire)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(grams == value ? Color.kiwiGreenSoft : Color.healthMapCard)
+                    .fill(grams == value ? Color.dsRemplissage : Color.dsCarte)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(grams == value ? Color.kiwiGreen : Color.kiwiCharcoal.opacity(0.08),
+                            .stroke(grams == value ? Color.dsAccent : Color.dsTexte.opacity(0.08),
                                     lineWidth: 1)
                     )
             )
@@ -206,14 +206,14 @@ struct PortionSheet: View {
         } label: {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
                 .frame(width: 44, height: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.healthMapCard)
+                        .fill(Color.dsCarte)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.kiwiCharcoal.opacity(0.08), lineWidth: 1)
+                                .stroke(Color.dsTexte.opacity(0.08), lineWidth: 1)
                         )
                 )
         }
@@ -232,8 +232,8 @@ struct PortionSheet: View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 7, height: 7)
             Text("\(label) \(Int(value.rounded())) g")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.healthMapText)
+                .font(.system(size: 13, weight: .semibold, design: .default))
+                .foregroundStyle(Color.dsTexte)
         }
     }
 
@@ -285,17 +285,17 @@ struct PortionSheet: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "info.circle")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
             Text(text)
                 .font(.system(size: 12))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(Theme.spacingMD)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.kiwiCharcoal.opacity(0.04))
+                .fill(Color.dsTexte.opacity(0.04))
         )
     }
 
@@ -348,7 +348,7 @@ struct PortionSheet: View {
             .frame(height: 48)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.kiwiGreen)
+                    .fill(Color.dsAccent)
             )
             .opacity(enabled ? 1 : 0.4)
         }
@@ -426,7 +426,7 @@ struct FoodSearchSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.kiwiCream.ignoresSafeArea()
+                Color.dsFond.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: Theme.spacingMD) {
                         searchBar
@@ -437,12 +437,12 @@ struct FoodSearchSheet: View {
                             examples
                         } else if vm.isSearching {
                             ProgressView()
-                                .tint(Color.kiwiGreen)
+                                .tint(Color.dsAccent)
                                 .padding(.top, Theme.spacingLG)
                         } else if vm.hits.isEmpty {
                             Text("Aucun résultat. Essaie un autre nom.")
                                 .font(.system(size: 13))
-                                .foregroundStyle(Color.healthMapMuted)
+                                .foregroundStyle(Color.dsSecondaire)
                                 .padding(.top, Theme.spacingLG)
                         } else {
                             ForEach(vm.hits) { hit in
@@ -459,7 +459,7 @@ struct FoodSearchSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
-                        .foregroundStyle(Color.kiwiGreenInk)
+                        .foregroundStyle(Color.dsTexte)
                 }
             }
         }
@@ -478,7 +478,7 @@ struct FoodSearchSheet: View {
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
             TextField("Rechercher un aliment", text: $vm.query)
                 .font(Theme.bodyFont)
                 .autocorrectionDisabled()
@@ -489,13 +489,13 @@ struct FoodSearchSheet: View {
                     vm.hits = []
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 .accessibilityLabel("Effacer la recherche")
             }
         }
         .padding(Theme.spacingSM)
-        .background(Color.healthMapCard)
+        .background(Color.dsCarte)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -503,7 +503,7 @@ struct FoodSearchSheet: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Essaie par exemple :")
                 .font(Theme.captionFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
             HStack(spacing: 8) {
                 exampleChip("Yaourt")
                 exampleChip("Saumon")
@@ -520,10 +520,10 @@ struct FoodSearchSheet: View {
         } label: {
             Text(text)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.kiwiGreenInk)
+                .foregroundStyle(Color.dsTexte)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.kiwiGreenSoft)
+                .background(Color.dsRemplissage)
                 .clipShape(Capsule())
         }
     }
@@ -536,20 +536,20 @@ struct FoodSearchSheet: View {
                 HStack(spacing: 12) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.kiwiGreenSoft)
+                            .fill(Color.dsRemplissage)
                             .frame(width: 40, height: 40)
                         Image(systemName: hit.source == "off" ? "barcode" : "fork.knife")
                             .font(.system(size: 16))
-                            .foregroundStyle(Color.kiwiGreen)
+                            .foregroundStyle(Color.dsAccent)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(hit.name)
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.healthMapText)
+                            .foregroundStyle(Color.dsTexte)
                             .lineLimit(1)
                         Text(hitSub(hit))
-                            .font(.system(size: 13, design: .rounded))
-                            .foregroundStyle(Color.healthMapMuted)
+                            .font(.system(size: 13, design: .default))
+                            .foregroundStyle(Color.dsSecondaire)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 4)
@@ -561,7 +561,7 @@ struct FoodSearchSheet: View {
                 quickAdd(hit)
             } label: {
                 ZStack {
-                    Circle().fill(Color.kiwiGreen).frame(width: 32, height: 32)
+                    Circle().fill(Color.dsAccent).frame(width: 32, height: 32)
                     if loadingHitId == hit.id {
                         ProgressView().tint(.white).scaleEffect(0.7)
                     } else {
@@ -579,10 +579,10 @@ struct FoodSearchSheet: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.healthMapCard)
+                .fill(Color.dsCarte)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1)
+                        .stroke(Color.dsTexte.opacity(0.05), lineWidth: 1)
                 )
         )
     }
@@ -645,15 +645,15 @@ struct FoodSearchSheet: View {
     private func confirmationPill(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Color.kiwiGreen)
+                .foregroundStyle(Color.dsAccent)
             Text(text)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.kiwiGreenInk)
+                .foregroundStyle(Color.dsTexte)
                 .lineLimit(1)
             Spacer()
         }
         .padding(Theme.spacingSM)
-        .background(Color.kiwiGreenSoft)
+        .background(Color.dsRemplissage)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .transition(.opacity)
     }

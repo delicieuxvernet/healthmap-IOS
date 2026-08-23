@@ -80,7 +80,7 @@ struct VoiceMealSheet: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Kiwio.fondSheet.ignoresSafeArea())
+        .background(Color.dsFond.ignoresSafeArea())
         .presentationDetents(hauteurs)
         .presentationDragIndicator(.visible)
         .task { await finishListening() }
@@ -103,13 +103,13 @@ struct VoiceMealSheet: View {
     private var analyzingView: some View {
         VStack(spacing: 12) {
             Spacer()
-            KiwiLoader(size: 60, color: Kiwio.encre)
+            KiwiLoader(size: 60, color: Color.dsTexte)
             Text("J'identifie tes aliments…")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Kiwio.encre)
+                .foregroundStyle(Color.dsTexte)
             Text("kcal, macros et micros compris.")
                 .font(.footnote)
-                .foregroundStyle(Kiwio.secondaire)
+                .foregroundStyle(Color.dsSecondaire)
             Spacer()
         }
         .padding(.horizontal, 20)
@@ -122,13 +122,13 @@ struct VoiceMealSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Voici ce que j'ai compris")
                     .font(Theme.sheetTitleFont)
-                    .foregroundStyle(Kiwio.encre)
+                    .foregroundStyle(Color.dsTexte)
                     .padding(.top, 18)
 
                 Text("« \(quotedTranscript) »")
                     .font(.system(size: 14))
                     .italic()
-                    .foregroundStyle(Kiwio.secondaire)
+                    .foregroundStyle(Color.dsSecondaire)
 
                 Picker("Repas", selection: $slot) {
                     ForEach(MealJournalService.MealSlot.allCases, id: \.self) { s in
@@ -159,8 +159,8 @@ struct VoiceMealSheet: View {
                         estimatedNames.count == 1
                         ? "« \(estimatedNames[0]) » n'a pas de fiche exacte : les valeurs sont estimées. C'est bien compté dans ta journée."
                         : "\(estimatedNames.count) aliments n'ont pas de fiche exacte : leurs valeurs sont estimées. Ils sont bien comptés.",
-                        couleur: Kiwio.secondaire,
-                        fond: Kiwio.neutre
+                        couleur: Color.dsSecondaire,
+                        fond: Color.dsRemplissage
                     )
                 }
 
@@ -217,14 +217,14 @@ struct VoiceMealSheet: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Total du repas")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Kiwio.secondaire)
+                    .foregroundStyle(Color.dsSecondaire)
                 Spacer()
                 Text("\(kcalTotalAffiche)")
                     .font(.kiwioMono(26, .bold))
-                    .foregroundStyle(Kiwio.encre)
+                    .foregroundStyle(Color.dsTexte)
                 Text("kcal")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Kiwio.discret)
+                    .foregroundStyle(Color.dsTertiaire)
             }
             HStack(spacing: 7) {
                 MacroPill("P", totaux.proteines, Kiwio.proteines, Kiwio.proteinesFond)
@@ -233,7 +233,7 @@ struct VoiceMealSheet: View {
             }
         }
         .padding(14)
-        .background(Kiwio.carte, in: RoundedRectangle(cornerRadius: 14))
+        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14))
         .padding(.top, 4)
     }
 
@@ -242,7 +242,7 @@ struct VoiceMealSheet: View {
         if visibleItems.isEmpty {
             Text("Plus aucun aliment. Recommence la dictée.")
                 .font(.footnote)
-                .foregroundStyle(Kiwio.discret)
+                .foregroundStyle(Color.dsTertiaire)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 8)
         } else if let manquant = missingNames.first {
@@ -278,7 +278,7 @@ struct VoiceMealSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Kiwio.vert)
+            .tint(Color.dsAccent)
             .disabled(isSaving || savableItems.isEmpty)
         }
 
@@ -289,7 +289,7 @@ struct VoiceMealSheet: View {
             dismiss()
         }
         .font(.system(size: 14, weight: .medium))
-        .foregroundStyle(Kiwio.secondaire)
+        .foregroundStyle(Color.dsSecondaire)
         .frame(maxWidth: .infinity, minHeight: 44)
     }
 
@@ -303,7 +303,7 @@ struct VoiceMealSheet: View {
                 .foregroundStyle(Kiwio.ambre)
             Text(errorMessage ?? "Je n'ai pas réussi à analyser ton repas.")
                 .font(.system(size: 15))
-                .foregroundStyle(Kiwio.secondaire)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
             // Relancer l'ANALYSE sur ce qui a déjà été dit, sans refaire parler :
             // l'échec vient presque toujours du serveur, pas de la dictée, et
@@ -313,24 +313,24 @@ struct VoiceMealSheet: View {
                     Task { await analyser(dernierTranscript) }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Kiwio.vert)
+                .tint(Color.dsAccent)
 
                 Text("« \(dernierTranscript) »")
                     .font(.system(size: 13))
-                    .foregroundStyle(Kiwio.discret)
+                    .foregroundStyle(Color.dsTertiaire)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .padding(.horizontal, 8)
 
                 Button("Redire mon repas") { HapticService.shared.tap(); dismiss() }
                     .font(.system(size: 15))
-                    .foregroundStyle(Kiwio.secondaire)
+                    .foregroundStyle(Color.dsSecondaire)
             } else {
                 // Rien à réanalyser : on referme, l'utilisateur redicte en
                 // maintenant le micro de l'accueil.
                 Button("Réessayer") { HapticService.shared.tap(); dismiss() }
                     .buttonStyle(.borderedProminent)
-                    .tint(Kiwio.vert)
+                    .tint(Color.dsAccent)
             }
             Spacer()
         }
@@ -625,17 +625,17 @@ private struct VoiceItemRow: View {
                 HStack(spacing: 10) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(manque ? Kiwio.ambreFond : Kiwio.vertPale)
+                            .fill(manque ? Kiwio.ambreFond : Color.dsRemplissage)
                         Image(systemName: manque ? "questionmark" : "fork.knife")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(manque ? Kiwio.ambre : Kiwio.vertFonce)
+                            .foregroundStyle(manque ? Kiwio.ambre : Color.dsTexte)
                     }
                     .frame(width: 38, height: 38)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.nom)
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Kiwio.encre)
+                            .foregroundStyle(Color.dsTexte)
                             .lineLimit(1)
                         if manque {
                             // C'est la question qui bloque l'enregistrement :
@@ -650,10 +650,10 @@ private struct VoiceItemRow: View {
                             HStack(spacing: 0) {
                                 Text("\(Int(grams ?? 0)) g")
                                     .font(.kiwioMono(12, .bold))
-                                    .foregroundStyle(Kiwio.vert)
+                                    .foregroundStyle(Color.dsAccent)
                                 Text(" · \(kcalAffichees) kcal")
                                     .font(.kiwioMono(12, .regular))
-                                    .foregroundStyle(Kiwio.secondaire)
+                                    .foregroundStyle(Color.dsSecondaire)
                             }
                         }
                     }
@@ -663,11 +663,11 @@ private struct VoiceItemRow: View {
                     if !manque {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 18))
-                            .foregroundStyle(Kiwio.vert)
+                            .foregroundStyle(Color.dsAccent)
                     }
                     Image(systemName: "pencil")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Kiwio.discret)
+                        .foregroundStyle(Color.dsTertiaire)
                 }
                 .contentShape(Rectangle())
             }
@@ -682,7 +682,7 @@ private struct VoiceItemRow: View {
                     if manque {
                         Text("Quelle quantité as-tu mangée ?")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Kiwio.encre)
+                            .foregroundStyle(Color.dsTexte)
                     }
 
                     if !item.portions.isEmpty {
@@ -700,10 +700,10 @@ private struct VoiceItemRow: View {
                                 }
                                 .buttonStyle(.plain)
                                 .background(
-                                    grams == p.grammes ? Kiwio.vert : Kiwio.neutre,
+                                    grams == p.grammes ? Color.dsAccent : Color.dsRemplissage,
                                     in: RoundedRectangle(cornerRadius: 10)
                                 )
-                                .foregroundStyle(grams == p.grammes ? .white : Kiwio.encre)
+                                .foregroundStyle(grams == p.grammes ? .white : Color.dsTexte)
                             }
                         }
                     }
@@ -717,10 +717,10 @@ private struct VoiceItemRow: View {
                         VStack(spacing: 0) {
                             Text("\(Int(grams ?? 0)) g")
                                 .font(.kiwioMono(20, .bold))
-                                .foregroundStyle(manque ? Kiwio.discret : Kiwio.vert)
+                                .foregroundStyle(manque ? Color.dsTertiaire : Color.dsAccent)
                             Text("\(kcalAffichees) kcal")
                                 .font(.kiwioMono(12, .regular))
-                                .foregroundStyle(Kiwio.secondaire)
+                                .foregroundStyle(Color.dsSecondaire)
                         }
                         .frame(maxWidth: .infinity)
 
@@ -730,7 +730,7 @@ private struct VoiceItemRow: View {
                     Button(action: onRemove) {
                         Label("Retirer cet aliment", systemImage: "xmark")
                             .font(.system(size: 13))
-                            .foregroundStyle(Kiwio.secondaire)
+                            .foregroundStyle(Color.dsSecondaire)
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.plain)
@@ -739,7 +739,7 @@ private struct VoiceItemRow: View {
             }
         }
         .padding(12)
-        .background(Kiwio.carte, in: RoundedRectangle(cornerRadius: 14))
+        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .stroke(manque ? Kiwio.ambreBordure : Color.clear, lineWidth: 1)
@@ -769,9 +769,9 @@ private struct BoutonPas: View {
         Button(action: action) {
             Image(systemName: symbole)
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(actif ? Kiwio.encre : Kiwio.discret)
+                .foregroundStyle(actif ? Color.dsTexte : Color.dsTertiaire)
                 .frame(width: 44, height: 44)
-                .background(Kiwio.neutre, in: Circle())
+                .background(Color.dsRemplissage, in: Circle())
         }
         .buttonStyle(.plain)
         .disabled(!actif)
@@ -805,20 +805,20 @@ struct MicroVivant: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(Kiwio.vert.opacity(0.10))
+                .fill(Color.dsAccent.opacity(0.10))
                 .frame(width: 96, height: 96)
                 .scaleEffect(reduceMotion ? 1 : 1 + amplitude * 0.30)
 
             Circle()
-                .fill(Kiwio.vert.opacity(0.16))
+                .fill(Color.dsAccent.opacity(0.16))
                 .frame(width: 76, height: 76)
                 .scaleEffect(reduceMotion ? 1 : 1 + amplitude * 0.18)
 
             Circle()
-                .fill(active ? Kiwio.vert : Kiwio.secondaire)
+                .fill(active ? Color.dsAccent : Color.dsSecondaire)
                 .frame(width: 68, height: 68)
                 .scaleEffect(pressed ? 0.94 : 1)
-                .shadow(color: active ? Kiwio.vert.opacity(0.35) : .clear,
+                .shadow(color: active ? Color.dsAccent.opacity(0.35) : .clear,
                         radius: 12, x: 0, y: 6)
 
             Image(systemName: "mic.fill")
@@ -890,7 +890,7 @@ struct Waveform: View {
         HStack(spacing: 2) {
             ForEach(Array(historique.enumerated()), id: \.offset) { _, h in
                 Capsule()
-                    .fill(Kiwio.vert.opacity(active ? 1 : 0.35))
+                    .fill(Color.dsAccent.opacity(active ? 1 : 0.35))
                     .frame(
                         width: 2.5,
                         height: Self.hauteurMin + h * (Self.hauteurMax - Self.hauteurMin)

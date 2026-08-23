@@ -78,7 +78,7 @@ struct EditFieldSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.healthMapBackground.ignoresSafeArea()
+                Color.dsFond.ignoresSafeArea()
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.spacingLG) {
@@ -88,8 +88,8 @@ struct EditFieldSheet: View {
                                 .font(.system(size: 32))
                                 .accessibilityHidden(true)
                             Text(field.label)
-                                .font(.system(.title2, design: .rounded).weight(.bold))
-                                .foregroundStyle(Color.healthMapText)
+                                .font(.system(.title2, design: .default).weight(.bold))
+                                .foregroundStyle(Color.dsTexte)
                         }
                         .padding(.top, Theme.spacingSM)
 
@@ -97,7 +97,7 @@ struct EditFieldSheet: View {
                         editor
                             .padding(Theme.spacingMD)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.healthMapCard)
+                            .background(Color.dsCarte)
                             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                     }
                     .padding(.horizontal, Theme.spacingLG)
@@ -136,7 +136,7 @@ struct EditFieldSheet: View {
         switch field.kind {
         case .text(let placeholder):
             TextField(placeholder, text: $textValue)
-                .font(.system(.body, design: .rounded))
+                .font(.system(.body, design: .default))
                 .focused($isInputFocused)
                 .textInputAutocapitalization(.words)
                 .submitLabel(.done)
@@ -147,27 +147,27 @@ struct EditFieldSheet: View {
                 Stepper(value: $intValue, in: min...max) {
                     HStack {
                         Text("\(intValue)")
-                            .font(.system(.title3, design: .rounded).weight(.semibold))
+                            .font(.system(.title3, design: .default).weight(.semibold))
                             .monospacedDigit()
                             .contentTransition(.numericText(value: Double(intValue)))
                         Text(unit)
-                            .font(.system(.body, design: .rounded))
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .font(.system(.body, design: .default))
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                 }
             }
-            .tint(Color.healthMapBlue)
+            .tint(Color.dsAccent)
 
         case .decimal(let unit):
             HStack {
                 TextField("0", text: $textValue)
                     .keyboardType(.decimalPad)
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
+                    .font(.system(.title3, design: .default).weight(.semibold))
                     .focused($isInputFocused)
                     .onAppear { isInputFocused = true }
                 Text(unit)
-                    .font(.system(.body, design: .rounded))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .font(.system(.body, design: .default))
+                    .foregroundStyle(Color.dsSecondaire)
             }
 
         case .pickerSingle(let options):
@@ -179,13 +179,13 @@ struct EditFieldSheet: View {
                     } label: {
                         HStack {
                             Text(opt.label)
-                                .font(.system(.body, design: .rounded))
-                                .foregroundStyle(Color.healthMapText)
+                                .font(.system(.body, design: .default))
+                                .foregroundStyle(Color.dsTexte)
                             Spacer()
                             if textValue == opt.value {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color.healthMapBlue)
+                                    .foregroundStyle(Color.dsAccent)
                             }
                         }
                         .padding(.vertical, 12)
@@ -211,12 +211,12 @@ struct EditFieldSheet: View {
                     } label: {
                         HStack {
                             Text(opt.label)
-                                .font(.system(.body, design: .rounded))
-                                .foregroundStyle(Color.healthMapText)
+                                .font(.system(.body, design: .default))
+                                .foregroundStyle(Color.dsTexte)
                             Spacer()
                             Image(systemName: arrayValue.contains(opt.value) ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 20))
-                                .foregroundStyle(arrayValue.contains(opt.value) ? Color.healthMapBlue : Color.healthMapMuted.opacity(0.4))
+                                .foregroundStyle(arrayValue.contains(opt.value) ? Color.dsAccent : Color.dsSecondaire.opacity(0.4))
                         }
                         .padding(.vertical, 12)
                         .contentShape(Rectangle())
@@ -231,10 +231,10 @@ struct EditFieldSheet: View {
         case .toggle:
             Toggle(isOn: $boolValue) {
                 Text(field.label)
-                    .font(.system(.body, design: .rounded))
-                    .foregroundStyle(Color.healthMapText)
+                    .font(.system(.body, design: .default))
+                    .foregroundStyle(Color.dsTexte)
             }
-            .tint(Color.healthMapBlue)
+            .tint(Color.dsAccent)
         }
     }
 

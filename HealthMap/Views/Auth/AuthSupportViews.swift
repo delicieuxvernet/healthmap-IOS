@@ -13,8 +13,9 @@ struct AuthTextField: View {
     var body: some View {
         HStack(spacing: Theme.spacingSM) {
             Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundStyle(Color.healthMapMuted)
+                .font(.system(size: 16, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsSecondaire)
                 .frame(width: 24)
 
             TextField(placeholder, text: $text)
@@ -26,8 +27,8 @@ struct AuthTextField: View {
         }
         .padding(.horizontal, Theme.spacingMD)
         .frame(height: 50)
-        .background(Color.healthMapBackground)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+        .background(Color.dsFond)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -44,8 +45,9 @@ struct AuthSecureField: View {
     var body: some View {
         HStack(spacing: Theme.spacingSM) {
             Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundStyle(Color.healthMapMuted)
+                .font(.system(size: 16, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsSecondaire)
                 .frame(width: 24)
 
             Group {
@@ -65,13 +67,13 @@ struct AuthSecureField: View {
             } label: {
                 Image(systemName: showPassword ? "eye.slash" : "eye")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
             }
         }
         .padding(.horizontal, Theme.spacingMD)
         .frame(height: 50)
-        .background(Color.healthMapBackground)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+        .background(Color.dsFond)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -115,7 +117,7 @@ struct ForgotPasswordSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                 }
             }
             .onChange(of: step) { _, newStep in
@@ -132,7 +134,7 @@ struct ForgotPasswordSheet: View {
     private var emailStep: some View {
         Text("Entre ton adresse email pour recevoir un code de réinitialisation.")
             .font(Theme.bodyFont)
-            .foregroundStyle(Color.healthMapSecondary)
+            .foregroundStyle(Color.dsSecondaire)
             .multilineTextAlignment(.center)
             .padding(.top, Theme.spacingMD)
 
@@ -143,7 +145,7 @@ struct ForgotPasswordSheet: View {
             .textInputAutocapitalization(.never)
             .padding(.horizontal, Theme.spacingMD)
             .frame(height: 50)
-            .background(Color.healthMapBackground)
+            .background(Color.dsFond)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
 
         if let err = authVM.errorMessage {
@@ -175,7 +177,7 @@ struct ForgotPasswordSheet: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 54)
-            .background(Color.healthMapBlue)
+            .background(Color.dsAccent)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         }
         .disabled(email.isEmpty || authVM.isProcessing)
@@ -185,7 +187,7 @@ struct ForgotPasswordSheet: View {
     private var codeStep: some View {
         Text("Un code à 6 chiffres vient de partir vers \(email). Regarde tes mails, et le dossier spam.")
             .font(Theme.bodyFont)
-            .foregroundStyle(Color.healthMapSecondary)
+            .foregroundStyle(Color.dsSecondaire)
             .multilineTextAlignment(.center)
             .padding(.top, Theme.spacingMD)
 
@@ -195,7 +197,7 @@ struct ForgotPasswordSheet: View {
             .focused($focusedField, equals: .code)
             .padding(.horizontal, Theme.spacingMD)
             .frame(minHeight: 50)
-            .background(Color.healthMapBackground)
+            .background(Color.dsFond)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
 
         SecureField("Nouveau mot de passe", text: $newPassword)
@@ -203,7 +205,7 @@ struct ForgotPasswordSheet: View {
             .focused($focusedField, equals: .newPassword)
             .padding(.horizontal, Theme.spacingMD)
             .frame(minHeight: 50)
-            .background(Color.healthMapBackground)
+            .background(Color.dsFond)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
 
         SecureField("Confirme le mot de passe", text: $confirmPassword)
@@ -211,7 +213,7 @@ struct ForgotPasswordSheet: View {
             .focused($focusedField, equals: .confirmPassword)
             .padding(.horizontal, Theme.spacingMD)
             .frame(minHeight: 50)
-            .background(Color.healthMapBackground)
+            .background(Color.dsFond)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
 
         // Live password validation issues
@@ -260,7 +262,7 @@ struct ForgotPasswordSheet: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 54)
-            .background(Color.healthMapBlue)
+            .background(Color.dsAccent)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         }
         .disabled(!canSubmitReset || authVM.isProcessing)
@@ -273,7 +275,7 @@ struct ForgotPasswordSheet: View {
         } label: {
             Text("Renvoyer le code")
                 .font(Theme.captionFont)
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.dsAccent)
                 .frame(minHeight: 44)
         }
         .disabled(authVM.isProcessing)
@@ -301,7 +303,7 @@ struct ForgotPasswordSheet: View {
                  ? "Connexion en cours…"
                  : "Tu peux maintenant te connecter avec ton nouveau mot de passe.")
                 .font(Theme.bodyFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
         }
         .padding(.top, Theme.spacingXL)
@@ -341,7 +343,7 @@ struct EmailCodeVerificationSheet: View {
             VStack(spacing: Theme.spacingLG) {
                 Image(systemName: "envelope.badge")
                     .font(.system(size: 48))
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
                     .padding(.top, Theme.spacingXL)
 
                 Text("Vérifie ton email")
@@ -349,18 +351,18 @@ struct EmailCodeVerificationSheet: View {
 
                 Text("On t'a envoyé un code à 6 chiffres sur \(email). Saisis-le ci-dessous pour finaliser ton compte.")
                     .font(Theme.bodyFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.spacingMD)
 
                 TextField("Code à 6 chiffres", text: $code)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
-                    .font(.system(size: 24, weight: .semibold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 24, weight: .semibold, design: .default).monospacedDigit())
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.spacingMD)
                     .frame(height: 60)
-                    .background(Color.healthMapBackground)
+                    .background(Color.dsFond)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
                     .focused($isCodeFocused)
                     .onChange(of: code) { _, newValue in
@@ -398,7 +400,7 @@ struct EmailCodeVerificationSheet: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(Color.healthMapBlue)
+                    .background(Color.dsAccent)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                 }
                 .disabled(code.count != 6 || authVM.isProcessing)
@@ -420,7 +422,7 @@ struct EmailCodeVerificationSheet: View {
                 } label: {
                     Text("Renvoyer le code")
                         .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                         .frame(minHeight: 44)
                 }
                 .disabled(authVM.isProcessing)

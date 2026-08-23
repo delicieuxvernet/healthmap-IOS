@@ -126,11 +126,11 @@ struct TeaserCardView: View {
             VStack(alignment: .leading, spacing: Theme.spacingXS) {
                 Text("Première piste")
                     .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
 
                 Text(teaser.message)
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.healthMapText)
+                    .font(.system(size: 14, weight: .medium, design: .default))
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.leading)
             }
@@ -139,11 +139,11 @@ struct TeaserCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.healthMapBlueLight)
+                .fill(Color.dsRemplissage)
         )
         .overlay(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(Color.healthMapBlue.opacity(0.2), lineWidth: 1)
+                .stroke(Color.dsAccent.opacity(0.2), lineWidth: 1)
         )
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared || reduceMotion ? 0 : 12)
@@ -158,7 +158,7 @@ struct TeaserCardView: View {
 
 #Preview {
     ZStack {
-        Color.healthMapBackground.ignoresSafeArea()
+        Color.dsFond.ignoresSafeArea()
         TeaserCardView(teaser: Teaser(
             id: "vitD",
             emoji: "🔍",

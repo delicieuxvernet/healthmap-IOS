@@ -58,7 +58,7 @@ struct EditProfileView: View {
         /// Blue nuances only, per the "tout bleu" brand rule.
         var color: Color {
             switch self {
-            case .profil: return .healthMapBlue
+            case .profil: return .dsAccent
             case .modeDeVie: return Color(hex: "5AC8FA")
             case .sante: return Color(hex: "0056CC")
             case .nutrition: return Color(hex: "64D2FF")
@@ -78,7 +78,7 @@ struct EditProfileView: View {
 
     var body: some View {
         ZStack {
-            Color.healthMapBackground.ignoresSafeArea()
+            Color.dsFond.ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: Theme.spacingSM) {
@@ -152,18 +152,18 @@ struct EditProfileView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Apple Santé")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.healthMapText)
+                        .foregroundStyle(Color.dsTexte)
                     if healthLinked {
                         HStack(spacing: 5) {
                             Image(systemName: "checkmark.circle.fill").font(.system(size: 11))
                             Text("Connecté · synchronisé")
                         }
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.kiwiGreen)
+                        .foregroundStyle(Color.dsAccent)
                     } else {
                         Text("Importe ton activité, ton poids et ton sommeil.")
                             .font(.system(size: 12))
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -173,7 +173,7 @@ struct EditProfileView: View {
                 if healthLinked {
                     Button("Gérer") { showHealthManage = true }
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                         .buttonStyle(.healthMapPressed)
                 }
             }
@@ -202,7 +202,7 @@ struct EditProfileView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 46)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.kiwiGreen))
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.dsAccent))
                 }
                 .buttonStyle(.healthMapPressed)
                 .disabled(healthSyncing)
@@ -216,10 +216,10 @@ struct EditProfileView: View {
                     Text("Connexion disponible sur iPhone")
                 }
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.healthMapBackground))
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.dsFond))
                 .padding(.horizontal, Theme.spacingMD)
                 .padding(.bottom, Theme.spacingMD)
             }
@@ -227,16 +227,16 @@ struct EditProfileView: View {
             if let note = healthNote {
                 Text(note)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, Theme.spacingMD)
                     .padding(.bottom, Theme.spacingMD)
             }
         }
-        .background(Color.healthMapCard)
+        .background(Color.dsCarte)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+        // (ombre retirée, refonte 23 août 2026)
         .padding(.horizontal, Theme.spacingLG)
         .confirmationDialog("Apple Santé", isPresented: $showHealthManage, titleVisibility: .visible) {
             Button("Délier Apple Santé", role: .destructive) { disconnectHealth() }
@@ -250,17 +250,17 @@ struct EditProfileView: View {
         HStack(spacing: Theme.spacingSM) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.dsAccent)
                 .frame(width: 28, height: 28)
-                .background(Color.healthMapBlue.opacity(0.12))
+                .background(Color.dsAccent.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             Text(label)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
             Spacer()
             Text(value)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
                 .monospacedDigit()
         }
         .padding(.horizontal, Theme.spacingMD)
@@ -350,13 +350,13 @@ struct EditProfileView: View {
 
                     Text(section.rawValue)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.healthMapText)
+                        .foregroundStyle(Color.dsTexte)
 
                     Spacer()
 
                     Image(systemName: expandedSection == section ? "chevron.up" : "chevron.down")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 .padding(Theme.spacingMD)
                 .contentShape(Rectangle())
@@ -380,9 +380,9 @@ struct EditProfileView: View {
                 }
             }
         }
-        .background(Color.healthMapCard)
+        .background(Color.dsCarte)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+        // (ombre retirée, refonte 23 août 2026)
         .padding(.horizontal, Theme.spacingLG)
     }
 
@@ -399,18 +399,18 @@ struct EditProfileView: View {
 
                 Text(field.label)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
 
                 Spacer()
 
                 Text(displayValue(for: field.id))
                     .font(.system(size: 13))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .lineLimit(1)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
                     .accessibilityHidden(true)
             }
             .padding(.horizontal, Theme.spacingMD)
@@ -448,7 +448,7 @@ struct EditProfileView: View {
             .frame(minHeight: 52)
             .background(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius)
-                    .fill(showSaved ? Color(hex: "0056CC") : Color.healthMapBlue)
+                    .fill(showSaved ? Color(hex: "0056CC") : Color.dsAccent)
             )
         }
         .buttonStyle(.healthMapPressed)
@@ -457,7 +457,7 @@ struct EditProfileView: View {
         .padding(.bottom, Theme.spacingMD)
         .background(
             LinearGradient(
-                colors: [Color.healthMapBackground.opacity(0), Color.healthMapBackground],
+                colors: [Color.dsFond.opacity(0), Color.dsFond],
                 startPoint: .top,
                 endPoint: .bottom
             )

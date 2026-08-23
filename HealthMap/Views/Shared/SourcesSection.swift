@@ -42,43 +42,43 @@ struct SourcesSection: View {
             HStack(spacing: Theme.spacingSM) {
                 ZStack {
                     Circle()
-                        .fill(Color.kiwiTint)
+                        .fill(Color.dsRemplissage)
                         .frame(width: 26, height: 26)
                     Image(systemName: "text.book.closed.fill")
                         .font(.system(size: 13))
-                        .foregroundStyle(Color.kiwiInk)
+                        .foregroundStyle(Color.dsTexte)
                 }
                 Text("Sources scientifiques")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
             }
 
             Text("Les repères et recommandations s'appuient sur les références nutritionnelles officielles\u{202F}:")
                 .font(.system(size: 12.5))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
 
             // Références cliquables
             VStack(spacing: 0) {
                 ForEach(Array(ScientificSources.all.enumerated()), id: \.element.id) { index, source in
                     if index > 0 {
-                        Divider().overlay(Color.healthMapMuted.opacity(0.18))
+                        Divider().overlay(Color.dsSecondaire.opacity(0.18))
                     }
                     Link(destination: source.url) {
                         HStack(spacing: Theme.spacingSM) {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(source.name)
                                     .font(.system(size: 13.5, weight: .semibold))
-                                    .foregroundStyle(Color.healthMapText)
+                                    .foregroundStyle(Color.dsTexte)
                                 Text(source.subtitle)
                                     .font(.system(size: 11.5))
-                                    .foregroundStyle(Color.healthMapMuted)
+                                    .foregroundStyle(Color.dsSecondaire)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer(minLength: Theme.spacingSM)
                             Image(systemName: "arrow.up.right")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.kiwiGreen)
+                                .foregroundStyle(Color.dsAccent)
                         }
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
@@ -91,25 +91,25 @@ struct SourcesSection: View {
             HStack(alignment: .top, spacing: Theme.spacingSM) {
                 Image(systemName: "info.circle")
                     .font(.system(size: 13))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
                 Text("Information nutritionnelle éducative. Ne remplace pas un avis médical. Consulte un professionnel de santé pour toute décision de santé.")
                     .font(.system(size: 11.5))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(Theme.spacingSM)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.healthMapBackground)
+                    .fill(Color.dsFond)
             )
         }
         .padding(Theme.spacingMD)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.healthMapCard)
+                .fill(Color.dsCarte)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color.healthMapMuted.opacity(0.18), lineWidth: 1)
+                        .strokeBorder(Color.dsSecondaire.opacity(0.18), lineWidth: 1)
                 )
         )
         .accessibilityElement(children: .contain)
@@ -121,5 +121,5 @@ struct SourcesSection: View {
         SourcesSection()
             .padding()
     }
-    .background(Color.healthMapBackground)
+    .background(Color.dsFond)
 }

@@ -5,8 +5,8 @@ import SwiftUI
 
 struct AnimatedNumber: View, Animatable {
     var value: Double
-    var font: Font = .system(size: 48, weight: .bold, design: .rounded)
-    var color: Color = .healthMapText
+    var font: Font = .system(size: 48, weight: .bold, design: .default)
+    var color: Color = .dsTexte
     var suffix: String = ""
 
     var animatableData: Double {
@@ -26,8 +26,8 @@ struct AnimatedNumber: View, Animatable {
 // MARK: - Animated Number View (convenience wrapper with auto-trigger)
 struct AnimatedNumberView: View {
     let targetValue: Int
-    var font: Font = .system(size: 48, weight: .bold, design: .rounded)
-    var color: Color = .healthMapText
+    var font: Font = .system(size: 48, weight: .bold, design: .default)
+    var color: Color = .dsTexte
     var suffix: String = ""
 
     @State private var displayValue: Double = 0
@@ -63,10 +63,10 @@ struct AnimatedNumberView: View {
 
 #Preview {
     VStack(spacing: 20) {
-        AnimatedNumberView(targetValue: 72, color: .healthMapBlue, suffix: "/100")
+        AnimatedNumberView(targetValue: 72, color: .dsAccent, suffix: "/100")
         AnimatedNumberView(
             targetValue: 85,
-            font: .system(size: 24, weight: .semibold, design: .rounded),
+            font: .system(size: 24, weight: .semibold, design: .default),
             color: .scoreGood
         )
     }

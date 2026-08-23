@@ -17,9 +17,9 @@ struct PrecisionPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text(title)
-                .font(Theme.subheadlineFont)
-                .foregroundStyle(Color.healthMapSecondary)
-                .tracking(-0.2)
+                .font(.dsSousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .tracking(DSTracking.sousTitre)
                 .accessibilityAddTraits(.isHeader)
 
             LazyVGrid(
@@ -46,41 +46,35 @@ struct PrecisionPicker: View {
                 }
             }
         } label: {
+            // Refonte 23 août 2026 : puce blanche sans ombre ni emoji ; la
+            // sélection se dit par le liseré accent et la coche.
             HStack(spacing: 6) {
-                Text(option.emoji)
-                    .font(.callout)
-
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.dsAccent)
+                        .accessibilityHidden(true)
+                }
                 Text(option.label)
-                    .font(.system(.footnote, design: .rounded).weight(.medium))
+                    .font(.dsLegendeMoyenne)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
-                    .tracking(-0.1)
+                    .tracking(DSTracking.legende)
             }
             .padding(.horizontal, Theme.spacingMD)
             .padding(.vertical, Theme.spacingSM)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Color.healthMapBlue : Color.healthMapCard)
-                    .shadow(
-                        color: isSelected
-                            ? Color.healthMapBlue.opacity(Theme.opacityStrong)
-                            : Color.black.opacity(Theme.shadowCard.opacity),
-                        radius: Theme.shadowCard.radius,
-                        x: 0,
-                        y: Theme.shadowCard.y
-                    )
+                    .fill(Color.dsCarte)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(
-                        isSelected ? Color.healthMapBlue : Color.healthMapMuted.opacity(0.25),
-                        lineWidth: 1
-                    )
+                    .stroke(isSelected ? Color.dsAccent : Color.clear, lineWidth: 1.5)
             )
-            .foregroundStyle(isSelected ? Color.white : Color.healthMapText)
+            .foregroundStyle(Color.dsTexte)
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel("\(option.label), \(isSelected ? "sélectionné" : "non sélectionné")")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityHint("Double tape pour \(isSelected ? "désélectionner" : "sélectionner")")

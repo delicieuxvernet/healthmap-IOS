@@ -55,7 +55,7 @@ struct SuiviCarouselBlock<Content: View>: View {
                 // Donnée-héros textuelle du bloc : le nom de la courbe affichée.
                 Text(pageTitles.indices.contains(index) ? pageTitles[index] : "")
                     .font(Theme.heroTextFont)
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Spacer(minLength: 8)
@@ -110,11 +110,11 @@ struct SuiviCarouselBlock<Content: View>: View {
         } label: {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
                 .frame(width: 36, height: 36)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.kiwiCharcoal.opacity(0.10), lineWidth: 1)
+                        .stroke(Color.dsTexte.opacity(0.10), lineWidth: 1)
                 )
                 .contentShape(Rectangle())
         }
