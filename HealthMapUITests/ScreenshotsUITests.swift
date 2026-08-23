@@ -311,10 +311,10 @@ final class ScreenshotsUITests: XCTestCase {
             format: "label CONTAINS[c] %@ AND NOT (label BEGINSWITH %@)", aliment, "Ajouter")).firstMatch
         if premier.waitForExistence(timeout: 5) {
             premier.tap()
-            // CTA de la fiche portion : « Ajouter le midi » / « le matin » /
-            // « le soir » / « en encas » — jamais le « + » flottant (« Ajouter un repas »).
-            let ajouter = app.buttons.matching(NSPredicate(
-                format: "label BEGINSWITH %@ AND NOT (label BEGINSWITH %@)", "Ajouter ", "Ajouter un repas")).firstMatch
+            // CTA de la fiche portion (« Ajouter le midi »…) par identifiant :
+            // « Ajouter une unité » (le + du compteur) et « Ajouter un repas »
+            // (le bouton flottant) commencent pareil.
+            let ajouter = app.buttons["portion.valider"]
             if ajouter.waitForExistence(timeout: 6) {
                 ajouter.tap()
                 // L'ajout est réseau : la fiche ne se referme qu'une fois
