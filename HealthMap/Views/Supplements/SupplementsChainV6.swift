@@ -727,7 +727,7 @@ struct ComplementsVoieSwitch: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1)
         )
-        .shadow(color: Color.kiwiCharcoal.opacity(0.14), radius: 9, x: 0, y: 5)
+        // (ombre retirée, refonte 23 août 2026)
         .padding(.horizontal, 20)
         // Le bouton Scan de la tab bar est surélevé : il déborde de 17 pt
         // au-dessus de la barre (+ son anneau crème de 5 pt). Sous 24 pt de
