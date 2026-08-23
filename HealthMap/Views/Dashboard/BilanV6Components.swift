@@ -136,22 +136,32 @@ struct ApportV2DetailSheet: View {
                     if subscriptionService.isPremium {
                         remonteCard
                     } else {
-                        VStack(spacing: DS.interCarte) {
-                            GatedOverlay(intensity: .teaser) { remonteCard }
-                            UnlockDoor(icon: "lock.fill", title: doorTitle, subtitle: doorSubtitle, zone: "fiche_apport_bilan")
-                        }
+                        // Gratuit : la cause reste en clair, l'ordonnance est
+                        // floutée ; la porte est épinglée en bas de la feuille.
+                        GatedOverlay(intensity: .teaser) { remonteCard }
                     }
                 }
 
-                DSCapsuleButton(titre: "Voir dans mon plan") {
-                    HapticService.shared.tap()
-                    onSeePlan()
+                if subscriptionService.isPremium || !hasGatedContent {
+                    DSCapsuleButton(titre: "Voir dans mon plan") {
+                        HapticService.shared.tap()
+                        onSeePlan()
+                    }
+                    .padding(.top, DS.marge)
                 }
-                .padding(.top, DS.marge)
             }
             .padding(.horizontal, DS.marge)
             .padding(.top, 12)
             .padding(.bottom, 30)
+        }
+        .safeAreaInset(edge: .bottom) {
+            if !subscriptionService.isPremium, hasGatedContent {
+                UnlockDoor(icon: "lock", title: doorTitle, subtitle: doorSubtitle, zone: "fiche_apport_bilan")
+                    .padding(.horizontal, DS.marge)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
+                    .background(Color.dsFond)
+            }
         }
         .background(Color.dsFond)
         .presentationDetents([.medium, .large])
@@ -270,20 +280,25 @@ struct ApportV2DetailSheet: View {
     }
 
     /// Wording de la porte : toujours un bénéfice spécifique à l'apport,
-    /// jamais un « Passe Premium » générique.
+    /// jamais un « Passe Premium » générique. Le compte annoncé est celui des
+    /// lignes réellement floutées, rien de plus.
     private var doorTitle: String {
-        aliments.isEmpty
-            ? "Débloque l'interaction \(nom)"
-            : "Débloque les aliments qui remontent \(nom)"
+        let n = aliments.prefix(3).count + (hasTip ? 1 : 0)
+        let mots = ["", "Une", "Deux", "Trois", "Quatre"]
+        let nombre = n < mots.count ? mots[n] : "\(n)"
+        return n == 1 ? "\(nombre) clé t'attend" : "\(nombre) clés t'attendent"
     }
 
     private var doorSubtitle: String {
+        let quoi: String
         if !aliments.isEmpty && hasTip {
-            return "Où le trouver, et l'interaction à connaître"
+            quoi = "Où le trouver, et l'interaction à connaître avec tes habitudes."
+        } else if aliments.isEmpty {
+            quoi = "L'interaction à connaître avec tes habitudes."
+        } else {
+            quoi = "Les aliments qui couvrent ce besoin."
         }
-        return aliments.isEmpty
-            ? "L'interaction à connaître avec tes habitudes"
-            : "Les aliments qui couvrent ce besoin"
+        return quoi + " La cause, elle, reste toujours gratuite."
     }
 
     private var remonteCard: some View {

@@ -244,69 +244,85 @@ struct UnlockDoor: View {
     var onUnlock: (() -> Void)? = nil
 
     @State private var showPaywall = false
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
+
+    private func ouvrir() {
+        HapticService.shared.tap()
+        if let onUnlock {
+            onUnlock()
+        } else {
+            showPaywall = true
+        }
+    }
 
     var body: some View {
+        if compact {
+            compactDoor
+        } else {
+            fullDoor
+        }
+    }
+
+    /// Maquette « Fiche apport · gratuit » : cadenas + titre en headline, la
+    /// précision en secondaire, puis la capsule d'essai (libellé lu depuis
+    /// StoreKit, jamais codé en dur). Carte blanche, sans ombre.
+    private var fullDoor: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "lock")
+                    .font(.system(size: 19, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 7)
+            }
+            DSCapsuleButton(titre: PremiumOffre.titreEssai(offerings: subscriptionService.offerings,
+                                                          produits: subscriptionService.directProducts)) {
+                ouvrir()
+            }
+            .padding(.top, 16)
+        }
+        .padding(DS.paddingCarte)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .accessibilityElement(children: .contain)
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(source: zone.isEmpty ? "premium_gate" : zone)
+                .healthMapFullSheet()
+        }
+    }
+
+    /// Mur de quota : capsule pleine, sans ombre.
+    private var compactDoor: some View {
         Button {
-            HapticService.shared.tap()
-            if let onUnlock {
-                onUnlock()
-            } else {
-                showPaywall = true
-            }
+            ouvrir()
         } label: {
-            if compact {
-                // Mur de quota : capsule pleine, sans ombre.
-                HStack(spacing: 8) {
-                    Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text(title)
-                        .font(.dsSousTitreFort)
-                        .foregroundStyle(.white)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: DS.hauteurBouton)
-                .background(Capsule().fill(Color.dsAccent))
-                .contentShape(Capsule())
-            } else {
-                // Refonte 23 août 2026 : la porte est CALME. Une carte blanche,
-                // le bénéfice en headline, la précision en secondaire, puis un
-                // lien vert. Plus d'écrin violet, plus de CTA pleine largeur,
-                // plus d'ombre : le paywall vit dans Réglages, la porte n'est
-                // qu'un lien vers lui.
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.dsHeadline)
-                        .tracking(DSTracking.corps)
-                        .foregroundStyle(Color.dsTexte)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if let subtitle, !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.dsSousTitre)
-                            .tracking(DSTracking.sousTitre)
-                            .foregroundStyle(Color.dsSecondaire)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    HStack(spacing: 6) {
-                        Text("S'ouvre avec Kiwio Premium")
-                            .font(.dsSousTitreFort)
-                            .foregroundStyle(Color.dsAccent)
-                        DSChevron(couleur: .dsAccent)
-                    }
-                    .padding(.top, 8)
-                    .frame(minHeight: 32)
-                }
-                .padding(DS.paddingCarte)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .dsCard()
-                .contentShape(Rectangle())
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(title)
+                    .font(.dsSousTitreFort)
+                    .foregroundStyle(.white)
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: DS.hauteurBouton)
+            .background(Capsule().fill(Color.dsAccent))
+            .contentShape(Capsule())
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel(subtitle == nil ? title : "\(title). \(subtitle ?? "")")
