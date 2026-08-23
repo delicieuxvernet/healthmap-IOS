@@ -89,15 +89,25 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
+          # « Réduire les animations » : l'app gate ses animations infinies sur ce
+          # réglage. Sans lui, XCUITest attend jusqu'à 60 s « que l'app soit au
+          # repos » avant CHAQUE geste (mesuré : 3 min pour deux captures).
+          xcrun simctl spawn "$UDID" defaults write com.apple.Accessibility ReduceMotionEnabled -bool true
+          xcrun simctl shutdown "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
           xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
           xcrun simctl ui "$UDID" appearance light
           echo "Simulateur $DEVICE = $UDID"
 
       - name: Run screenshot UI tests
         timeout-minutes: 40
+        # xcodebuild ne transmet au test runner QUE les variables préfixées
+        # TEST_RUNNER_ (préfixe retiré à l'arrivée). Sans lui, l'email tapé
+        # dans le champ de connexion était vide (run du 23 août).
         env:
-          SCREENSHOT_EMAIL: audit-b@test.com
-          SCREENSHOT_PASSWORD: ${{ secrets.DEMO_ACCOUNT_PASSWORD }}
+          TEST_RUNNER_SCREENSHOT_EMAIL: audit-b@test.com
+          TEST_RUNNER_SCREENSHOT_PASSWORD: ${{ secrets.DEMO_ACCOUNT_PASSWORD }}
         run: |
           set -o pipefail
           xcodebuild test \
@@ -115,24 +125,32 @@ jobs:
           mkdir -p "$RUNNER_TEMP/shots" "$RUNNER_TEMP/out"
           xcrun xcresulttool export attachments --path "$RUNNER_TEMP/Screenshots.xcresult" --output-path "$RUNNER_TEMP/shots" || true
           python3 - <<'EOF'
-          import json, os, shutil, glob
+          import json, os, re, shutil, glob
           src = os.environ["RUNNER_TEMP"] + "/shots"
           out = os.environ["RUNNER_TEMP"] + "/out"
           manifest = os.path.join(src, "manifest.json")
-          n = 0
+          # Seules NOS captures (« NN-ecran ») sont publiées : XCTest joint aussi
+          # ses propres pièces de diagnostic (« Debug description for `"…" Button` »),
+          # dont les guillemets font échouer upload-artifact.
+          nom_capture = re.compile(r"^(\d{2}-[a-z0-9-]+)")
+          n, ignores = 0, 0
+          def publier(nom, chemin):
+              global n, ignores
+              m = nom_capture.match(os.path.basename(nom))
+              if not m:
+                  ignores += 1
+                  return
+              shutil.copy(chemin, os.path.join(out, m.group(1) + ".png")); n += 1
           if os.path.exists(manifest):
               for test in json.load(open(manifest)):
                   for att in test.get("attachments", []):
-                      name = att.get("suggestedHumanReadableName") or att.get("exportedFileName")
                       exported = att.get("exportedFileName")
                       if not exported: continue
-                      base = os.path.splitext(name)[0]
-                      dst = os.path.join(out, base + ".png")
-                      shutil.copy(os.path.join(src, exported), dst); n += 1
+                      publier(att.get("suggestedHumanReadableName") or exported, os.path.join(src, exported))
           else:
               for f in glob.glob(src + "/*"):
-                  shutil.copy(f, out); n += 1
-          print("captures:", n, sorted(os.listdir(out)))
+                  publier(f, f)
+          print("captures:", n, "ignorees:", ignores, sorted(os.listdir(out)))
           EOF
 
       - name: Upload screenshots

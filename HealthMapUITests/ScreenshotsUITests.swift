@@ -18,6 +18,17 @@ final class ScreenshotsUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = true
+        // Sur simulateur, StoreKit (RevenueCat) déclenche une alerte Springboard
+        // « Sign in to Apple Account » au premier chargement des offres. On la
+        // ferme tout de suite plutôt que de laisser le gestionnaire par défaut
+        // la chercher pendant de longues secondes.
+        addUIInterruptionMonitor(withDescription: "Apple Account") { alerte in
+            for titre in ["Not Now", "Cancel", "Plus tard", "Annuler"] {
+                let bouton = alerte.buttons[titre]
+                if bouton.exists { bouton.tap(); return true }
+            }
+            return false
+        }
     }
 
     // MARK: - 1. Page de garde, onboarding, connexion (compte neuf)
@@ -37,7 +48,7 @@ final class ScreenshotsUITests: XCTestCase {
         }
 
         // Page de garde non connecté.
-        if app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 15) {
+        if app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 30) {
             snap("03-page-de-garde")
             app.buttons["J'ai déjà un compte"].tap()
             sleep(1)
