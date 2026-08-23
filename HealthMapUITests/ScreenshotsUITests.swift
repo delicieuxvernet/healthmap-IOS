@@ -320,7 +320,7 @@ final class ScreenshotsUITests: XCTestCase {
                 // L'ajout est réseau : la fiche ne se referme qu'une fois
                 // l'écriture faite. Fermer la recherche avant, c'est taper
                 // dans le vide sous la fiche encore ouverte.
-                _ = ajouter.waitForNonExistence(withTimeout: 20)
+                _ = ajouter.waitForNonExistence(timeout: 20)
                 sleep(1)
             } else {
                 app.swipeDown(velocity: .fast)
