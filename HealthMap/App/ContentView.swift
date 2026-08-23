@@ -435,7 +435,10 @@ struct MainTabView: View {
             // v7 : la barre dessine elle-même son fond translucide pleine
             // largeur + sa hairline ; aucun encart ici, sinon le bouton
             // Scan surélevé se retrouverait rogné.
-            KiwiFloatingTabBar(selected: $selectedTab)
+            KiwiFloatingTabBar(
+                selected: $selectedTab,
+                estompes: dashboardVM.bilanComplete ? [] : [.progres, .plan, .complements]
+            )
         }
         // Overlay de célébrations gamification (« Badge débloqué / Niveau
         // supérieur ») retiré le 28 juin 2026 : feedback jugé « cheap ».

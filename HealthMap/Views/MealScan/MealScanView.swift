@@ -361,28 +361,8 @@ struct JournalView: View {
 
     private var journalContent: some View {
         VStack(spacing: 0) {
-            JournalSemainier(
-                jourSelectionne: journal.selectedDay,
-                onChoisir: { jour in Task { await journal.allerAuJour(jour) } }
-            )
-            .padding(.top, 6)
-
-            if !isTodaySelected {
-                Button {
-                    Task { await journal.allerAuJour(Date()) }
-                } label: {
-                    Text("Revenir à aujourd'hui")
-                        .font(.dsLegendeMoyenne)
-                        .foregroundStyle(Color.dsAccent)
-                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.dsPress)
-                .padding(.top, 2)
-            }
-
             // La dictée mains libres et la photo en attente d'analyse vivent
-            // ici, sous le semainier : visibles, jamais par-dessus la page.
+            // ici, sous le titre : visibles, jamais par-dessus la page.
             if dicteeEnCours {
                 BulleDictee(
                     speech: dicteeBox.speech,
@@ -392,7 +372,7 @@ struct JournalView: View {
                     onTerminer: { terminerDictee() }
                 )
                 .dsCard()
-                .padding(.top, DS.marge)
+                .padding(.top, 16)
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
 
@@ -409,29 +389,32 @@ struct JournalView: View {
 
             captureBlock
 
-            JournalCaloriesCard(
-                consommees: journal.dayCalories,
-                objectif: dashboardVM.physicalMetrics.macros?.calories,
-                depensees: isTodaySelected ? activeEnergyToday : nil,
-                isToday: isTodaySelected
-            )
-            .padding(.top, DS.marge)
+            if dashboardVM.bilanAffichage == .decouverte {
+                // Avant le questionnaire : aucune donnée perso, la population
+                // à la place (maquette « Journal · avant questionnaire »).
+                avantQuestionnaire
+            } else {
+                JournalCaloriesCard(
+                    consommees: journal.dayCalories,
+                    objectif: dashboardVM.physicalMetrics.macros?.calories,
+                    depensees: isTodaySelected ? activeEnergyToday : nil,
+                    isToday: isTodaySelected
+                )
+                .padding(.top, 16)
 
-            HStack(spacing: DS.interCarte) {
-                JournalMacroCard(valeur: journal.dayProteins, cible: dashboardVM.physicalMetrics.macros?.protein,
-                                 libelle: "Protéines", couleur: .dsProteines, delai: 0.35)
-                JournalMacroCard(valeur: journal.dayCarbs, cible: dashboardVM.physicalMetrics.macros?.carbs,
-                                 libelle: "Glucides", couleur: .dsGlucides, delai: 0.40)
-                JournalMacroCard(valeur: journal.dayFats, cible: dashboardVM.physicalMetrics.macros?.fat,
-                                 libelle: "Lipides", couleur: .dsLipides, delai: 0.45)
+                JournalMacrosCard(
+                    prot: (g: journal.dayProteins, cible: dashboardVM.physicalMetrics.macros?.protein),
+                    carb: (g: journal.dayCarbs, cible: dashboardVM.physicalMetrics.macros?.carbs),
+                    fat: (g: journal.dayFats, cible: dashboardVM.physicalMetrics.macros?.fat)
+                )
+                .padding(.top, DS.interCarte)
+
+                apportsSection
+
+                DSSectionHeader(titre: "Aujourd'hui")
+                    .padding(.top, 2)
+                repasList
             }
-            .padding(.top, DS.interCarte)
-
-            apportsSection
-
-            DSSectionHeader(titre: isTodaySelected ? "Aujourd'hui" : journal.dayLabel)
-                .padding(.top, 2)
-            repasList
 
             // Bas de page : l'espace du bouton flottant.
             Color.clear.frame(height: 60)
@@ -464,6 +447,30 @@ struct JournalView: View {
                 isPremium: subscriptionService.isPremium
             ) else { return }
             showPaywall = true
+        }
+    }
+
+    // MARK: - Avant le questionnaire (découverte)
+
+    /// La porte vers le questionnaire, les ordres de grandeur français à la
+    /// place des chiffres perso, ce que le questionnaire va donner. Les repas
+    /// déjà ajoutés aujourd'hui (entrée libre) restent listés en dessous.
+    @ViewBuilder
+    private var avantQuestionnaire: some View {
+        JournalAvantQuestionnaireCard { dashboardVM.demarrerBilan() }
+            .padding(.top, 14)
+
+        DSSectionHeader(titre: "En attendant, en France")
+            .padding(.top, -6)
+        JournalPopulationCard()
+
+        JournalFinQuestionnaireCard()
+            .padding(.top, 18)
+
+        if !journal.dayMeals.isEmpty {
+            DSSectionHeader(titre: "Aujourd'hui")
+                .padding(.top, 2)
+            repasList
         }
     }
 
@@ -524,9 +531,9 @@ struct JournalView: View {
                 onRetry: { Task { await dashboardVM.retryBilanV2() } }
             )
         case .decouverte:
-            JournalApportsPorteCard {
-                dashboardVM.demarrerBilan()
-            }
+            // Jamais atteint : avant le questionnaire, `journalContent` rend
+            // `avantQuestionnaire` à la place de cette section.
+            EmptyView()
         }
     }
 
