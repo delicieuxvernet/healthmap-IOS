@@ -54,51 +54,22 @@ struct PlanVueSwitch: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(PlanVue.allCases) { item in
-                let active = vue == item
-                Button {
-                    guard !active else { return }
-                    HapticService.shared.selection()
-                    withAnimation(reduceMotion ? .none : .easeOut(duration: 0.18)) {
-                        vue = item
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: item.icon)
-                            .font(.system(size: 14, weight: .semibold))
-                        Text(item.label)
-                            .font(.system(size: 13, weight: .bold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                    }
-                    .foregroundStyle(active ? Color.kiwiCharcoal : Color.healthMapSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 38)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(active ? Color.white : .clear)
-                            .shadow(color: active ? Color.kiwiCharcoal.opacity(0.12) : .clear,
-                                    radius: 3, x: 0, y: 1)
-                    )
-                    .contentShape(Rectangle())
+        // Refonte 23 août 2026 : le contrôle segmenté natif, rien d'autre.
+        Picker("Vue", selection: Binding(
+            get: { vue },
+            set: { nouvelle in
+                guard nouvelle != vue else { return }
+                HapticService.shared.selection()
+                withAnimation(reduceMotion ? .none : .easeOut(duration: 0.18)) {
+                    vue = nouvelle
                 }
-                .buttonStyle(.healthMapPressed)
-                .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+            }
+        )) {
+            ForEach(PlanVue.allCases) { item in
+                Text(item.label).tag(item)
             }
         }
-        .padding(3)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(hex: "F0ECE3").opacity(0.82))
-                )
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1)
-        )
+        .pickerStyle(.segmented)
         .accessibilityLabel("Vue choisie")
     }
 }
@@ -139,24 +110,21 @@ struct PlanRadialScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Ton plan")
-                    .font(.system(size: 28, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                Text(displayTopics.isEmpty ? "Ton plan s'écrit au fil de tes bilans" : "Appuie sur ce que tu veux régler")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 22)
+            // Le titre « Plan » est porté par la barre de navigation (grand
+            // titre natif) ; ici, seule la consigne, en 17 secondaire.
+            Text(displayTopics.isEmpty ? "Ton plan s'écrit au fil de tes bilans" : "Appuie sur ce que tu veux régler")
+                .font(.dsCorps)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, DS.marge)
 
-            // Le sélecteur de vue, sous le titre — même patron visuel que le
-            // sélecteur de voie des Compléments (cf. PlanVueSwitch).
+            // Le sélecteur de vue (contrôle segmenté natif).
             if let vue {
                 PlanVueSwitch(vue: vue)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
+                    .padding(.horizontal, DS.marge)
+                    .padding(.top, 12)
             }
 
             if displayTopics.isEmpty {
@@ -191,13 +159,6 @@ struct PlanRadialScreen: View {
                     }
                 }
 
-                // La légende explique le code couleur symptôme/objectif : en
-                // vue « Apports », les cerclages portent la couleur canonique
-                // de chaque nutriment — elle n'aurait rien à expliquer.
-                if displayTopics.contains(where: { $0.kind != .apport }) {
-                    PlanRadialLegend()
-                        .frame(maxWidth: .infinity)
-                }
             }
 
             if let focus {
@@ -457,34 +418,6 @@ private struct PlanRadialArrowShaft: Shape {
     }
 }
 
-/// La pointe triangulaire, qui voyage avec l'extrémité du fût.
-private struct PlanRadialArrowHead: Shape {
-    var progress: CGFloat
-    let from: CGPoint
-    let to: CGPoint
-
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        guard progress > 0.02 else { return p }
-        let dx = to.x - from.x, dy = to.y - from.y
-        let len = max(sqrt(dx * dx + dy * dy), 0.001)
-        let ux = dx / len, uy = dy / len
-        let tip = CGPoint(x: from.x + dx * progress, y: from.y + dy * progress)
-        let back = CGPoint(x: tip.x - ux * 7, y: tip.y - uy * 7)
-        let nx = -uy, ny = ux
-        p.move(to: tip)
-        p.addLine(to: CGPoint(x: back.x + nx * 3.5, y: back.y + ny * 3.5))
-        p.addLine(to: CGPoint(x: back.x - nx * 3.5, y: back.y - ny * 3.5))
-        p.closeSubpath()
-        return p
-    }
-}
-
 // MARK: - La carte radiale
 
 struct PlanRadialMap: View {
@@ -498,17 +431,9 @@ struct PlanRadialMap: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
-    @State private var pulse = false
-    /// Le Plan est monté en permanence (les cinq onglets le sont) : son
-    /// `onAppear` se déclenche au LANCEMENT, derrière l'onglet réellement
-    /// affiché. Le halo respirant du moyeu, animé en `repeatForever`, tournait
-    /// donc toute la session sous un `opacity(0)` — qui ne suspend ni le
-    /// pilote d'animation ni la composition. Il n'existe désormais que quand
-    /// l'onglet est à l'écran.
-    @State private var ongletVisible = false
 
-    private static let arrowColor = Color.kiwiCharcoal.opacity(0.22)
-    private static let headColor = Color.kiwiCharcoal.opacity(0.28)
+    /// Traits de liaison : fins, `#D1D1D6`, sans pointe (refonte 23 août 2026).
+    private static let arrowColor = Color.dsTrait
     /// Fondu des bulles d'exemple : LA valeur de l'état « exemple » déjà posée
     /// ailleurs (courbe « toi » d'exemple du Suivi, SuiviSymptomChart) — pas
     /// une nouvelle opacité inventée.
@@ -526,11 +451,7 @@ struct PlanRadialMap: View {
                     let progress: CGFloat = appeared ? 1 : 0
 
                     PlanRadialArrowShaft(progress: progress, from: from, to: to)
-                        .stroke(Self.arrowColor, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-                        .animation(arrowAnimation(index), value: appeared)
-
-                    PlanRadialArrowHead(progress: progress, from: from, to: to)
-                        .fill(Self.headColor)
+                        .stroke(Self.arrowColor, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                         .animation(arrowAnimation(index), value: appeared)
                 }
                 .accessibilityHidden(true)
@@ -558,9 +479,6 @@ struct PlanRadialMap: View {
         .onAppear {
             appeared = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: .healthmapTabDidChange)) { note in
-            ongletVisible = (note.object as? String) == NavCardDestination.plan.rawValue
-        }
     }
 
     // MARK: Moyeu
@@ -570,35 +488,20 @@ struct PlanRadialMap: View {
         let d = layout.hubDiameter
 
         ZStack {
-            // Halo vert respirant — animation infinie, coupée en reduce-motion.
-            // Le `if` n'est pas cosmétique : hors de l'onglet, la vue est
-            // RETIRÉE, ce qui arrête réellement le `repeatForever`. Un simple
-            // `pulse = false` relancerait l'animation infinie en sens inverse.
-            if ongletVisible && !reduceMotion {
-                Circle()
-                    .fill(Color.kiwiGreen.opacity(0.22))
-                    .frame(width: d, height: d)
-                    .scaleEffect(pulse ? 1.55 : 1)
-                    .opacity(pulse ? 0 : 0.5)
-                    .animation(.easeOut(duration: 2.6).repeatForever(autoreverses: false), value: pulse)
-                    .onAppear { pulse = true }
-                    .onDisappear { pulse = false }
-            }
-
+            // Refonte 23 août 2026 : plus de halo respirant, plus d'ombre. Un
+            // disque blanc posé sur le gris, le kiwi 3D (asset de marque, la
+            // seule illustration conservée), le compteur en tabulaire.
             Circle()
-                .fill(Color.healthMapCard)
+                .fill(Color.dsCarte)
                 .frame(width: d, height: d)
-                .overlay(Circle().stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1))
-                .shadow(color: Color.kiwiCharcoal.opacity(0.10), radius: 20, x: 0, y: 6)
 
             VStack(spacing: 1) {
                 Fluent3DIcon(name: "fluent_kiwi", size: d * 0.41)
                 if exemple {
-                    // Découverte : pas de compteur (rien n'est mesuré) — la
-                    // promesse, dans le style du libellé existant du moyeu.
+                    // Découverte : pas de compteur (rien n'est mesuré).
                     Text("Ton plan t'attend")
-                        .font(.system(size: max(9, d * 0.078), weight: .bold))
-                        .foregroundStyle(Color(hex: "6B7280"))
+                        .font(.system(size: max(10, d * 0.09), weight: .medium))
+                        .foregroundStyle(Color.dsSecondaire)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.85)
@@ -606,12 +509,12 @@ struct PlanRadialMap: View {
                         .padding(.top, 2)
                 } else {
                     Text("\(topics.count)")
-                        .font(.system(size: d * 0.13, weight: .heavy, design: .monospaced))
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .font(.system(size: max(13, d * 0.13), weight: .bold).monospacedDigit())
+                        .foregroundStyle(Color.dsTexte)
                         .padding(.top, 2)
                     Text("à travailler")
-                        .font(.system(size: max(9, d * 0.078), weight: .bold))
-                        .foregroundStyle(Color(hex: "6B7280"))
+                        .font(.system(size: max(10, d * 0.095)))
+                        .foregroundStyle(Color.dsSecondaire)
                 }
             }
         }
@@ -649,31 +552,21 @@ private struct PlanRadialNodeView: View {
         Button(action: onTap) {
             VStack(spacing: layout.gap) {
                 ZStack {
+                    // Refonte 23 août 2026 : disque blanc, sans cerclage ni
+                    // ombre ; symbole noir (aucun emoji dans l'interface, la
+                    // vue « Apports » prend le SF Symbol canonique du nutriment).
                     Circle()
-                        .fill(Color.healthMapCard)
-                        .overlay(
-                            Circle().stroke(
-                                topic.radialRing.opacity(topic.kind == .symptome ? 0.30 : 0.40),
-                                lineWidth: 1.5
-                            )
-                        )
-                        .shadow(color: Color.kiwiCharcoal.opacity(0.09), radius: 12, x: 0, y: 3)
-                    // Vue « Apports » : l'emoji canonique du nutriment remplace
-                    // le SF Symbol — même disque, même taille de glyphe.
-                    if let emoji = topic.emojiBadge {
-                        Text(emoji)
-                            .font(.system(size: layout.nodeDiameter * 0.38))
-                    } else {
-                        Image(systemName: topic.radialSymbol)
-                            .font(.system(size: layout.nodeDiameter * 0.41, weight: .regular))
-                            .foregroundStyle(topic.radialRing)
-                    }
+                        .fill(Color.dsCarte)
+                    Image(systemName: topic.radialSymbolRefonte)
+                        .font(.system(size: layout.nodeDiameter * 0.39, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.dsTexte)
                 }
                 .frame(width: layout.nodeDiameter, height: layout.nodeDiameter)
 
                 Text(topic.name)
-                    .font(.system(size: max(10, 11.5 * layout.nodeWidth / 84), weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(.system(size: max(11, 13 * layout.nodeWidth / 84), weight: .medium))
+                    .foregroundStyle(Color.dsTexte)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
@@ -685,32 +578,9 @@ private struct PlanRadialNodeView: View {
             )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel("\(topic.kicker.lowercased()) : \(topic.name)")
         .accessibilityHint("Ouvre les solutions")
-    }
-}
-
-// MARK: - Légende symptôme / objectif
-
-struct PlanRadialLegend: View {
-    var body: some View {
-        HStack(spacing: 16) {
-            item(color: Color(hex: "2F6FE0"), text: "symptôme")
-            item(color: Color.kiwiGreen, text: "objectif")
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func item(color: Color, text: String) -> some View {
-        HStack(spacing: 5) {
-            Circle()
-                .stroke(color, lineWidth: 2)
-                .frame(width: 9, height: 9)
-            Text(text)
-                .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(Color(hex: "6B7280"))
-        }
     }
 }
 
@@ -722,53 +592,34 @@ struct PlanFocusLineV7: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 11) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.kiwiGreenSoft)
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "target")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.kiwiGreenInk)
+            // Refonte 23 août 2026 : carte de pied blanche, la mission en
+            // headline, le progrès en secondaire, un lien vert vers Progrès.
+            VStack(alignment: .leading, spacing: 6) {
+                Text(missionShort)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Ton focus de la semaine, \(focus.done) sur \(focus.total) faits.")
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 6) {
+                    Text("Voir dans Progrès")
+                        .font(.dsSousTitreFort)
+                        .foregroundStyle(Color.dsAccent)
+                    DSChevron(couleur: .dsAccent)
                 }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    // Le titre situe la ligne ; c'est la mission qui la porte.
-                    Text("TON FOCUS DE LA SEMAINE")
-                        .font(.system(size: 10.5, weight: .heavy))
-                        .kerning(0.5)
-                        .foregroundStyle(Color.kiwiGreenInk)
-                    Text(missionShort)
-                        .font(Theme.insightFont)
-                        .foregroundStyle(Color.kiwiCharcoal)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                // Le progrès réel, en chiffres : une donnée-héros de ligne ne
-                // descend jamais sous 15 pt.
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text("\(focus.done)/\(focus.total)")
-                        .font(Theme.heroValueRowFont)
-                        .foregroundStyle(Color.kiwiGreenInk)
-                    Text("faits")
-                        .font(Theme.chromeFont)
-                        .foregroundStyle(Color.healthMapMuted)
-                }
-                .layoutPriority(1)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color(hex: "C2BDB0"))
+                .padding(.top, 8)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .kiwiCard(radius: 16)
+            .padding(18)
+            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
+            .dsCard()
             .contentShape(Rectangle())
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel("Focus de la semaine. \(missionShort). \(focus.done) sur \(focus.total) faits.")
         .accessibilityHint("Ouvre ton suivi")
     }
@@ -795,38 +646,27 @@ struct PlanSolutionsSheetV7: View {
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var showSources = false
 
-    private let blue = Color(hex: "2F6FE0")
-    private let blueInk = Color(hex: "1B4FA8")
-    private let amber = Color(hex: "FF9500")
-    private let amberInk = Color(hex: "8A4B00")
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
 
-                // La cause, en une phrase — avec les vraies valeurs du bilan.
-                // Rien à dire honnêtement → on n'écrit pas d'amorce vide.
-                // Gratuit : si l'intro d'origine est un levier actionnable,
-                // la variante teasing (nomme le problème) la remplace.
+                // La cause, en une phrase, avec les vraies valeurs du bilan.
+                // Rien à dire honnêtement → aucune amorce vide. Gratuit : si
+                // l'intro d'origine est un levier actionnable, la variante
+                // teasing (nomme le problème) la remplace.
                 let cause = subscriptionService.isPremium ? topic.radialCause : topic.radialCauseFree
                 if !cause.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        // Le label annonce, la preuve chiffrée conclut : c'est
-                        // elle le pic de la pop-up, jamais son étiquette.
-                        Text("CE QU'ON VOIT")
-                            .font(.system(size: 10.5, weight: .heavy))
-                            .kerning(0.5)
-                            .foregroundStyle(Color.healthMapMuted)
-                        Text(cause)
-                            .font(Theme.conclusionFont)
-                            .tracking(Theme.conclusionTracking)
-                            .foregroundStyle(Color.kiwiCharcoal)
-                            .lineSpacing(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 13)
+                    Text(cause)
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
+                        .foregroundStyle(Color.dsTexte)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(DS.paddingCarte)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .dsCard()
+                        .padding(.top, 18)
                 }
 
                 // Les 3 leviers. Gratuit : la silhouette reste lisible sous le
@@ -844,76 +684,60 @@ struct PlanSolutionsSheetV7: View {
                     .padding(.top, 12)
                 }
 
-                // Le délai d'effet — affiché seulement s'il vient de l'analyse.
+                // Le délai d'effet attendu, affiché seulement s'il vient de l'analyse.
                 if let delai = topic.radialDelai, subscriptionService.isPremium {
                     HStack(spacing: 8) {
                         Image(systemName: "clock")
-                            .font(.system(size: 15))
-                            .foregroundStyle(Color.kiwiGreenInk)
+                            .font(.system(size: 15, weight: .medium))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(Color.dsSecondaire)
+                            .accessibilityHidden(true)
                         Text(delai)
-                            .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundStyle(Color(hex: "27510A"))
+                            .font(.dsLegende)
+                            .tracking(DSTracking.legende)
+                            .foregroundStyle(Color.dsSecondaire)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                     }
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .fill(Color.kiwiGreenSoft)
-                    )
-                    .padding(.top, 13)
+                    .padding(.top, 14)
+                    .padding(.horizontal, 4)
                 }
 
                 // Un seul bouton.
-                Button {
+                DSCapsuleButton(titre: "C'est noté") {
                     HapticService.shared.tap()
                     dismiss()
-                } label: {
-                    // Un bouton de sortie ne pèse pas plus que ce qu'il sert :
-                    // taille et hauteur du CTA de la charte, rien de plus.
-                    Text("C'est noté")
-                        .font(Theme.ctaFont)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.kiwiGreen)
-                        )
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.healthMapPressed)
-                .padding(.top, 14)
+                .padding(.top, 20)
 
-                // Citation des sources (App Store guideline 1.4.1) — discrète,
+                // Citation des sources (App Store guideline 1.4.1), discrète,
                 // au plus près du conseil qu'elles fondent.
                 Button {
                     showSources = true
                 } label: {
                     Text("Sources scientifiques")
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(Color(hex: "6B7280"))
+                        .font(.dsLegende)
+                        .foregroundStyle(Color.dsSecondaire)
                         .underline()
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 22)
-            // Marge haute commune aux fiches en bottom sheet (cf. ApportV2DetailSheet).
-            .padding(.top, Theme.spacingLG)
+            .padding(.horizontal, DS.marge)
+            .padding(.top, 12)
             .padding(.bottom, 26)
         }
         .scrollIndicators(.hidden)
-        .background(Color.kiwiCream.ignoresSafeArea())
+        .background(Color.dsFond.ignoresSafeArea())
         .presentationDetents([.fraction(0.82), .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(30)
+        .presentationCornerRadius(34)
         .sheet(isPresented: $showSources) {
             ScrollView {
                 SourcesSection().padding(20)
             }
-            .background(Color.kiwiCream.ignoresSafeArea())
+            .background(Color.dsFond.ignoresSafeArea())
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
@@ -922,76 +746,65 @@ struct PlanSolutionsSheetV7: View {
     // MARK: En-tête
 
     private var header: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .fill(topic.tint)
-                    .frame(width: 46, height: 46)
-                // Un apport garde son emoji canonique jusque dans la pop-up —
-                // le même repère visuel que sa bulle et que le Bilan.
-                if let emoji = topic.emojiBadge {
-                    Text(emoji)
-                        .font(.system(size: 24))
-                } else {
-                    Image(systemName: topic.radialSymbol)
-                        .font(.system(size: 23))
-                        .foregroundStyle(topic.accent)
-                }
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                Text(topic.kicker)
-                    .font(.system(size: 10.5, weight: .heavy))
-                    .kerning(0.3)
-                    .foregroundStyle(topic.accent)
+        // Refonte 23 août 2026 : titre 34 / 700 + rôle en une ligne secondaire,
+        // bouton fermer circulaire 32 pt à droite. Plus de tuile teintée.
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(topic.name)
-                    .font(Theme.sheetTitleFont)
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(.dsGrandTitre)
+                    .tracking(DSTracking.grandTitre)
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
+                Text(topic.kicker.capitalized)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
             }
             Spacer(minLength: 0)
+            DSCloseButton { dismiss() }
         }
     }
 
     // MARK: Les 3 leviers
 
     private var leviers: some View {
-        VStack(spacing: 9) {
+        VStack(spacing: DS.interCarte) {
             PlanLevierCard(
-                symbol: "leaf.fill",
-                tint: Color.kiwiGreenSoft,
-                iconColor: Color.kiwiGreenInk,
-                title: "Par la nutrition",
-                titleColor: Color.kiwiGreenInk,
-                bulletColor: Color.kiwiGreen,
+                symbol: "leaf",
+                tint: Color.dsCarte,
+                iconColor: Color.dsSecondaire,
+                title: "Nutrition",
+                titleColor: Color.dsTexte,
+                bulletColor: Color.dsTertiaire,
                 lines: topic.radialNutrition,
                 action: nil
             )
             PlanLevierCard(
-                symbol: "pills.fill",
-                tint: blue.opacity(0.1),
-                iconColor: blue,
-                title: "Par les compléments",
-                titleColor: blueInk,
-                bulletColor: blue,
+                symbol: "pills",
+                tint: Color.dsCarte,
+                iconColor: Color.dsSecondaire,
+                title: "Compléments",
+                titleColor: Color.dsTexte,
+                bulletColor: Color.dsTertiaire,
                 lines: topic.radialComplements,
                 // Le seul chemin de sortie de la pop-up : la chaîne vers
                 // l'onglet Compléments. Coupé quand la zone est gatée.
                 action: subscriptionService.isPremium ? onSeeSupplements : nil
             )
             PlanLevierCard(
-                symbol: "sun.max.fill",
-                tint: amber.opacity(0.14),
-                iconColor: Color(hex: "B36B00"),
-                title: "Par les habitudes",
-                titleColor: amberInk,
-                bulletColor: amber,
+                symbol: "sun.max",
+                tint: Color.dsCarte,
+                iconColor: Color.dsSecondaire,
+                title: "Habitudes",
+                titleColor: Color.dsTexte,
+                bulletColor: Color.dsTertiaire,
                 // Le geste est déjà la seule chose que porte une habitude :
                 // rien à ranger sous lui, il tient la ligne à lui seul.
                 lines: topic.radialHabitudes.map { PlanLevierLine(texte: $0) },
                 action: nil
             )
         }
-        .padding(.top, 15)
+        .padding(.top, DS.interCarte)
     }
 }
 
@@ -1027,7 +840,7 @@ private struct PlanLevierCard: View {
             } label: {
                 card.contentShape(Rectangle())
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
             .accessibilityHint("Ouvre tes compléments")
         } else {
             card
@@ -1035,26 +848,23 @@ private struct PlanLevierCard: View {
     }
 
     private var card: some View {
+        // Refonte 23 août 2026 : carte blanche, icône hiérarchique secondaire,
+        // catégorie en secondaire, deux puces en corps 17 avec détail 15.
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 9) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(tint)
-                        .frame(width: 28, height: 28)
-                    Image(systemName: symbol)
-                        .font(.system(size: 15))
-                        .foregroundStyle(iconColor)
-                }
-                // Kicker : la catégorie s'annonce, elle ne rivalise pas.
-                Text(title.uppercased())
-                    .font(.system(size: 10.5, weight: .heavy))
-                    .kerning(0.5)
-                    .foregroundStyle(titleColor)
+                Image(systemName: symbol)
+                    .font(.system(size: 17, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(iconColor)
+                    .frame(width: 21)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
                 Spacer(minLength: 0)
                 if action != nil {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color(hex: "C2BDB0"))
+                    DSChevron()
                 }
             }
 
@@ -1063,14 +873,13 @@ private struct PlanLevierCard: View {
                     Circle()
                         .fill(bulletColor)
                         .frame(width: 5, height: 5)
-                        .padding(.top, 8)
+                        .padding(.top, 9)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 7) {
-                            // La réponse : plus grande taille, encre la plus
-                            // foncée de la carte.
                             Text(line.texte)
-                                .font(Theme.insightFont)
-                                .foregroundStyle(Color.kiwiCharcoal)
+                                .font(.dsCorps)
+                                .tracking(DSTracking.corps)
+                                .foregroundStyle(Color.dsTexte)
                                 .fixedSize(horizontal: false, vertical: true)
                             if let tag = line.tag {
                                 pastille(tag, strong: line.tagStrong)
@@ -1079,48 +888,59 @@ private struct PlanLevierCard: View {
                         }
                         if !line.detail.isEmpty {
                             Text(line.detail)
-                                .font(Theme.dataSecondaryFont)
-                                .foregroundStyle(Color.healthMapSecondary)
+                                .font(.dsSousTitre)
+                                .tracking(DSTracking.sousTitre)
+                                .foregroundStyle(Color.dsSecondaire)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         if !line.astuce.isEmpty {
                             Text(line.astuce)
-                                .font(Theme.chromeFont)
-                                .foregroundStyle(Color.healthMapMuted)
+                                .font(.dsLegende)
+                                .tracking(DSTracking.legende)
+                                .foregroundStyle(Color.dsTertiaire)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.top, index == 0 ? 10 : 9)
+                .padding(.top, index == 0 ? 12 : 10)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 13)
+        .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .kiwiCard(radius: 15)
+        .dsCard()
     }
 
-    /// Pastille de priorité — même patron que les statuts de l'onglet
-    /// Compléments : capsule teintée à 14 %, encre du statut, jamais de fond
-    /// plein qui volerait la vedette à la donnée qu'elle qualifie.
+    /// Pastille de priorité : capsule grise, texte secondaire (« Prioritaire »
+    /// prend l'encre principale). Aucun fond coloré.
     private func pastille(_ texte: String, strong: Bool) -> some View {
-        let encre = strong ? iconColor : Color.healthMapSecondary
+        let encre = strong ? Color.dsTexte : Color.dsSecondaire
         return Text(texte)
-            .font(.system(size: 10.5, weight: .heavy))
+            .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(encre)
             .lineLimit(1)
             .minimumScaleFactor(0.85)
             .layoutPriority(1)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Capsule().fill(encre.opacity(0.14)))
+            .background(Capsule().fill(Color.dsRemplissage))
     }
 }
 
 // MARK: - Projections « format court » d'un topic
 
 extension PlanTopic {
+
+    /// SF Symbol du nœud dans la refonte (aucun emoji dans l'interface) : un
+    /// apport prend le symbole canonique de son nutriment (table du Bilan),
+    /// un symptôme ou un objectif garde `radialSymbol`.
+    var radialSymbolRefonte: String {
+        if kind == .apport {
+            let nutrientId = id.hasPrefix("app_") ? String(id.dropFirst(4)) : id
+            return BilanV7Nutrient.icon(for: nutrientId)
+        }
+        return radialSymbol
+    }
 
     /// Couleur du cerclage et de l'icône du nœud. Décoratif : le vert vif de la
     /// marque pour un objectif, le bleu pour un symptôme, la couleur canonique

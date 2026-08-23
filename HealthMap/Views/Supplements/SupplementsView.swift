@@ -165,9 +165,8 @@ struct SupplementsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                WarmBackground()
-                // Lavis Compléments : vert kiwi (décision fondateur).
-                TabWashBackground(tint: .kiwiGreen)
+                // Refonte 23 août 2026 : fond neutre + voile de marque.
+                DSPageBackground()
 
                 if !dashboardVM.bilanComplete {
                     // Mode découverte (V12c) : pas de bilan → la liste serait
@@ -201,20 +200,10 @@ struct SupplementsView: View {
             }
             .onChange(of: complementsSignature) { _, _ in refreshRituel() }
             .onChange(of: chainsSignature) { _, _ in seedDefaults() }
-            .navigationBarTitleDisplayMode(.inline)
-            .kiwiNavigationBarBackground()
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
-                    } label: {
-                        Image(systemName: "person.crop.circle")
-                            .font(.system(size: 22))
-                            .foregroundStyle(Color.kiwiGreen)
-                    }
-                    .accessibilityLabel("Profil")
-                }
-            }
+            // Grand titre natif (se replie en inline au défilement). Les
+            // Réglages sont un onglet : plus de bouton Profil dans la barre.
+            .navigationTitle("Compléments")
+            .navigationBarTitleDisplayMode(.large)
             .sheet(item: $explanation) { item in
                 ChainExplanationSheet(explanation: item) { explanation = nil }
             }
@@ -341,18 +330,15 @@ struct SupplementsView: View {
         }
     }
 
+    /// Le titre « Compléments » est porté par la barre de navigation (grand
+    /// titre natif) ; ici, seule la précision, en 17 secondaire.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text("Compléments")
-                .font(Theme.screenTitleFont)
-                .tracking(Theme.screenTitleTracking)
-                .foregroundStyle(Color.kiwiCharcoal)
-            Text(subtitle)
-                .font(Theme.dataSecondaryFont)
-                .foregroundStyle(Color.healthMapMuted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 2)
+        Text(subtitle)
+            .font(.dsCorps)
+            .tracking(DSTracking.corps)
+            .foregroundStyle(Color.dsSecondaire)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var subtitle: String {

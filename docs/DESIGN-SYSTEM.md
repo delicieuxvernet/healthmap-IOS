@@ -2,8 +2,40 @@
 
 > Source de vérité des **tokens** (police, espacement, rayon, ombre, couleur).
 > La structure des écrans, elle, vit dans `DESIGN-PAGES.md` à la racine.
-> Fichiers de code : `HealthMap/Views/Shared/ThemeConstants.swift` (tokens)
-> et `HealthMap/Utilities/Color+Theme.swift` (palette).
+> Fichiers de code : `HealthMap/Views/Shared/KiwiDS.swift` (**DS de la refonte
+> du 23 août 2026, à consommer sur tout écran refondu**), puis les tokens
+> historiques `HealthMap/Views/Shared/ThemeConstants.swift` et
+> `HealthMap/Utilities/Color+Theme.swift` (basculés sur le socle neutre).
+
+---
+
+## Socle « qualité Apple » (23 août 2026)
+
+Trois règles portent 80 % de l'écart perçu :
+
+1. **Fond neutre** `Color.dsFond` (`systemGroupedBackground`, #F2F2F7). Le crème ne survit
+   qu'en voile de marque sur 240 pt (`DSBrandWash`, `DSPageBackground`).
+2. **Le vert `Color.dsAccent` ne colore que ce qui se tape** : onglet actif, bouton, lien, `+`,
+   chevron d'action. Les chiffres sont noirs (`dsTexte`). Seules les jauges gardent une couleur
+   de statut (`dsACombler` #FF3B30, `dsARenforcer` #FF9500, `dsCalories` #FF6B35) ; macros :
+   `dsProteines` #3B82F6, `dsGlucides` #34C759, `dsLipides` #FFCC00.
+3. **Un seul chiffre héros par écran** (`.dsHeros48`), puis deux niveaux décroissants.
+
+| Token | Valeur |
+|---|---|
+| Neutres | `dsTexte` (label) · `dsSecondaire` (secondaryLabel) · `dsTertiaire` (tertiaryLabel) · `dsSeparateur` (separator, 0,5 pt) · `dsRemplissage` (#EFEFF4) · `dsTrait` (#D1D1D6) |
+| Typo (SF Pro, ≤ 700) | `dsGrandTitre` 34/700 · `dsSection` 22/700 · `dsHeadline` 17/600 · `dsCorps` 17/400 · `dsSousTitre` 15/400 · `dsLegende` 13/400 · chiffres `dsHeros48`, `dsHeros34`, `dsValeur24`, `dsValeurLigne` (tabulaires) |
+| Tracking | `DSTracking` : −0,95 grand titre · −0,55 section · −0,4 corps · −0,2 sous-titre · −2,2 héros 48 |
+| Cartes | `.dsCard()` : blanc, rayon 14 continu, **aucune ombre, aucune bordure** |
+| Listes | `DSGroupedList` + `DSRow` + `DSSeparator(retrait: 49 avec icône / 16 sans)` |
+| Jauges | `DSGauge` (4 pt, animée 1 s easeOut, cascade 50 ms) · `DSRing` (92 pt, trait 9) |
+| Boutons | `DSCapsuleButton` (50 pt, capsule) · `DSLinkRow` (lien vert de fin de carte) · `.dsPress` (0,97 + assombrissement) |
+| Formats | `DS.entier(1021)` → `1 021` · `DS.pourcent(42)` → `42 %` · `DS.decimal(5.9)` → `5,9` (espace fine U+202F) |
+| Navigation | `KiwiFloatingTabBar` (capsule, 5 onglets) · `DSAddButton` (60 pt) · grands titres natifs `.large` |
+
+Vocabulaire imposé (CI) : « apports à renforcer », « à combler », « besoins », jamais les quatre
+mots proscrits par `VoiceComplianceTests`. Aucun emoji dans l'interface (seule exception : le kiwi 3D
+du Plan).
 
 ---
 

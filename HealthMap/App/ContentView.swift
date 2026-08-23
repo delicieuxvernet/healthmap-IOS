@@ -239,17 +239,12 @@ struct MainTabView: View {
     /// Currently selected tab. Driven by user taps in the normal flow and by
     /// `PushNotificationService.pendingRoute` when the app is launched or
     /// resumed from a notification tap (see `consumePendingRoute`).
-    @State private var selectedTab: Tab = .bilan
+    @State private var selectedTab: Tab = .journal
 
     /// Shown when a notification or deep link asks us to surface the paywall
     /// (e.g. renewal reminder, upsell). Kept separate from the `Profil` tab
     /// so the route doesn't force a tab switch on top of the sheet.
     @State private var showPaywallFromDeepLink = false
-
-    /// Profil présenté en sheet (l'onglet Profil a été remplacé par Mes
-    /// compléments — P6) : ouvert par l'avatar du Bilan, la route deep-link
-    /// `.profile`, ou une nav-card `.profil`.
-    @State private var showProfile = false
 
     /// Tab tour — shown once after the user completes the questionnaire.
     @AppStorage("hasSeenTabTour") private var hasSeenTabTour = false
@@ -261,55 +256,61 @@ struct MainTabView: View {
     @State private var slidesRecap: [RecapSlide] = []
     @State private var afficheRecap = false
 
-    /// Tutoriel de première visite de l'onglet Scan (3 bulles). Il vit ICI, au
-    /// niveau de MainTabView, et PAS dans MealScanView : la barre d'onglets est
+    /// Tutoriel de première visite du Journal (3 bulles). Il vit ICI, au
+    /// niveau de MainTabView, et PAS dans JournalView : la barre d'onglets est
     /// posée en `.overlay` sur `mainInterface`, donc elle se dessine par-dessus
     /// tout ce que l'onglet contient. Monté dans l'onglet, son voile sombre
-    /// laissait la barre crème et le cercle Scan en pleine lumière — et
-    /// tappables. Même placement que `TabTourOverlay`, pour la même raison.
+    /// laissait la barre et le bouton d'ajout en pleine lumière, et tappables.
+    /// Même placement que `TabTourOverlay`, pour la même raison.
     @AppStorage("hasSeenScanTour") private var scanTourVu = false
     @State private var montreTutoScan = false
 
-    /// Jour où le bilan a été reçu (horodatage). Sert à choisir l'onglet
-    /// d'arrivée : le Bilan le jour même — c'est le résultat qu'on vient de
-    /// mériter — puis le Scan les jours suivants, qui est ce pour quoi on
-    /// rouvre l'app (compter son repas, voir ses macros).
-    ///
-    /// `0` = jamais horodaté : soit le questionnaire n'est pas fait, soit le
-    /// bilan date d'avant cette version. Dans le second cas on part sur le
-    /// Scan, ce qui est le bon comportement pour un compte déjà installé.
-    @AppStorage("bilanRecuLe") private var bilanRecuLe: Double = 0
-
-    /// Internal tab identifier. Uses a symbolic enum rather than `Int` so
-    /// adding or reordering tabs doesn't silently break the deep-link mapping.
+    /// Identifiant d'onglet. Refonte du 23 août 2026 : cinq onglets qui
+    /// nomment des OBJETS, pas des concepts. Le Bilan a fusionné dans le
+    /// Journal (le tableau de bord du jour EST le journal), le Scan a quitté
+    /// la barre (bouton d'ajout flottant du Journal), les Réglages y entrent.
     enum Tab: Hashable, CaseIterable, Identifiable {
-        case bilan, suivi, scanner, plan, complements
+        case journal, progres, plan, complements, reglages
 
         var id: Self { self }
 
-        /// Position dans la barre d'onglets — c'est elle qui donne le SENS de
+        /// Position dans la barre d'onglets : c'est elle qui donne le SENS de
         /// la transition (aller vers un onglet à gauche = l'écran glisse vers
         /// la droite). Ne pas dériver de `allCases` ailleurs : l'ordre visuel
         /// de la barre est la seule référence.
         var position: Int {
             switch self {
-            case .bilan: return 0
-            case .suivi: return 1
-            case .scanner: return 2
-            case .plan: return 3
-            case .complements: return 4
+            case .journal: return 0
+            case .progres: return 1
+            case .plan: return 2
+            case .complements: return 3
+            case .reglages: return 4
             }
         }
 
         /// Identifiant partagé avec les deep links (`NavCardDestination`), pour
-        /// que les écrans puissent réagir à leur propre apparition.
+        /// que les écrans puissent réagir à leur propre apparition. Les
+        /// identifiants historiques sont conservés (contrats analytics et
+        /// listeners existants) : `scanner` désigne le Journal, `suivi` les
+        /// Progrès, `profil` les Réglages.
         var route: String {
             switch self {
-            case .bilan: return NavCardDestination.bilan.rawValue
-            case .suivi: return NavCardDestination.suivi.rawValue
-            case .scanner: return NavCardDestination.scanner.rawValue
+            case .journal: return NavCardDestination.scanner.rawValue
+            case .progres: return NavCardDestination.suivi.rawValue
             case .plan: return NavCardDestination.plan.rawValue
             case .complements: return NavCardDestination.complements.rawValue
+            case .reglages: return NavCardDestination.profil.rawValue
+            }
+        }
+
+        /// Onglet visé par une destination de navigation interne.
+        static func pour(_ destination: NavCardDestination) -> Tab {
+            switch destination {
+            case .bilan, .scanner: return .journal
+            case .suivi: return .progres
+            case .plan: return .plan
+            case .complements: return .complements
+            case .profil: return .reglages
             }
         }
     }
@@ -368,16 +369,18 @@ struct MainTabView: View {
     @ViewBuilder
     private func tabContent(_ tab: Tab) -> some View {
         switch tab {
-        case .bilan:
-            DashboardView().environmentObject(dashboardVM)
-        case .suivi:
+        case .journal:
+            JournalView().environmentObject(dashboardVM)
+        case .progres:
             SuiviView().environmentObject(dashboardVM)
-        case .scanner:
-            MealScanView().environmentObject(dashboardVM)
         case .plan:
             RecommendationsView().environmentObject(dashboardVM)
         case .complements:
             SupplementsView().environmentObject(dashboardVM)
+        case .reglages:
+            ReglagesView()
+                .environmentObject(dashboardVM)
+                .environmentObject(authViewModel)
         }
     }
 
@@ -410,13 +413,10 @@ struct MainTabView: View {
                 name: .healthmapTabDidChange,
                 object: nouvel.route
             )
-            // Première arrivée sur le Scan : les 3 bulles, une seule fois dans
-            // la vie du compte. Jamais par-dessus le tour d'onglets.
-            if nouvel == .scanner, !scanTourVu, !montreTutoScan, !showTabTour {
-                withAnimation(reduceMotion ? .none : .easeOut(duration: 0.25)) {
-                    montreTutoScan = true
-                }
-            }
+            // Retour sur le Journal sans avoir vu ses 3 bulles : on les montre
+            // (une seule fois dans la vie du compte). Jamais par-dessus le
+            // tour d'onglets.
+            if nouvel == .journal { armerTutoJournal() }
         }
         .ignoresSafeArea(.keyboard)
         .tint(Color.kiwiGreen)
@@ -441,6 +441,22 @@ struct MainTabView: View {
         // supérieur ») retiré le 28 juin 2026 : feedback jugé « cheap ».
         // Les badges/XP/séries restent suivis en silence côté GamificationService.
         .onAppear {
+            // Barre de navigation (refonte 23 août 2026) : grand titre 34 / 700
+            // avec tracking optique −0,95, titre inline 17 / 600. Polices
+            // mises à l'échelle par `UIFontMetrics` : Dynamic Type suit.
+            let nav = UINavigationBar.appearance()
+            nav.largeTitleTextAttributes = [
+                .font: UIFontMetrics(forTextStyle: .largeTitle)
+                    .scaledFont(for: UIFont.systemFont(ofSize: 34, weight: .bold)),
+                .kern: -0.95,
+                .foregroundColor: UIColor.label,
+            ]
+            nav.titleTextAttributes = [
+                .font: UIFontMetrics(forTextStyle: .headline)
+                    .scaledFont(for: UIFont.systemFont(ofSize: 17, weight: .semibold)),
+                .foregroundColor: UIColor.label,
+            ]
+
             // Tab bar appearance
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
@@ -460,24 +476,19 @@ struct MainTabView: View {
             UITabBar.appearance().scrollEdgeAppearance = appearance
 
             gamification.recordCheckin()
-            // Onglet d'arrivée AVANT la route en attente : une notification ou
-            // un lien profond doit pouvoir écraser ce choix, pas l'inverse.
-            choisirOngletDArrivee()
+            // Le Journal est l'accueil : tableau de bord du jour et journal ne
+            // font qu'un. Un lien profond ou une notification peut l'écraser.
             // Consume any pending route queued while MainTabView did not exist
             // (e.g. cold start from a notification tap — the delegate fires
             // before SwiftUI has built this view).
             consumePendingRoute()
 
             armerTourOnglets()
+            armerTutoJournal()
         }
         .sheet(isPresented: $showPaywallFromDeepLink) {
             PaywallView()
                 .healthMapFullSheet()
-        }
-        .sheet(isPresented: $showProfile) {
-            ProfileView()
-                .environmentObject(dashboardVM)
-                .environmentObject(authViewModel)
         }
         // Entrée libre (V12a) : le questionnaire se lance/reprend depuis
         // n'importe quel onglet via `dashboardVM.demarrerBilan()`. Feuille
@@ -516,14 +527,7 @@ struct MainTabView: View {
         }
         // Fix: onAppear doesn't re-fire when the questionnaire is completed
         // inside MainTabView (Bilan tab). This onChange catches the transition.
-        .onChange(of: dashboardVM.hasCompletedQuestionnaire) { _, completed in
-            // Le bilan vient d'être obtenu, dans cette session : on horodate le
-            // jour. Les lancements du MÊME jour rouvriront sur le Bilan, ceux
-            // d'après sur le Scan. On ne change PAS d'onglet ici — on est déjà
-            // sur le Bilan, c'est tout l'intérêt du moment.
-            if completed && bilanRecuLe == 0 {
-                bilanRecuLe = Date().timeIntervalSince1970
-            }
+        .onChange(of: dashboardVM.hasCompletedQuestionnaire) { _, _ in
             armerTourOnglets()
         }
         // Le tour d'onglets attend que le bilan soit RÉELLEMENT à l'écran : tant
@@ -544,24 +548,22 @@ struct MainTabView: View {
             guard let raw = notification.object as? String,
                   let dest = NavCardDestination(rawValue: raw) else { return }
             withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.25)) {
-                switch dest {
-                case .bilan: selectedTab = .bilan
-                case .suivi: selectedTab = .suivi
-                case .scanner: selectedTab = .scanner
-                case .plan: selectedTab = .plan
-                case .complements: selectedTab = .complements
-                case .profil: showProfile = true
-                }
+                selectedTab = Tab.pour(dest)
+            }
+            // « Scanner » = le Journal avec sa feuille d'ajout ouverte : c'est
+            // là que vit toute la saisie désormais.
+            if dest == .scanner {
+                NotificationCenter.default.post(name: .healthmapOuvrirAjout, object: nil)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .healthmapOpenProfile)) { _ in
-            showProfile = true
+            withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.25)) {
+                selectedTab = .reglages
+            }
         }
-        // Relecture demandée depuis le profil. On laisse la feuille du profil se
-        // refermer avant d'ouvrir la séquence : deux présentations qui se
-        // croisent dans le même cycle et SwiftUI en avale une.
+        // Relecture demandée depuis les Réglages (onglet, plus une feuille) :
+        // la séquence est présentée ICI, par la racine, jamais depuis l'onglet.
         .onReceive(NotificationCenter.default.publisher(for: .healthmapRejouerRecap)) { _ in
-            showProfile = false
             let slides = dashboardVM.construireRecap(estPremium: subscriptionService.isPremium)
             guard !slides.isEmpty else {
                 // Ne jamais rester muet : si la séquence ne peut pas se construire,
@@ -654,25 +656,13 @@ struct MainTabView: View {
         }
     }
 
-    /// Choisit l'onglet sur lequel l'app s'ouvre.
-    ///
-    /// Le jour où le bilan est reçu, on rouvre dessus : c'est le résultat qu'on
-    /// vient de mériter. Les jours suivants, on ouvre sur le **Scan** — on ne
-    /// rouvre pas Kiwio pour relire son bilan, on le rouvre pour compter un
-    /// repas et voir ses macros et micronutriments.
-    ///
-    /// Sans questionnaire terminé, on reste sur le Bilan (défaut) : c'est lui
-    /// qui porte l'invitation à faire le bilan (entrée libre V12a) — les
-    /// autres onglets restent librement accessibles par la barre.
-    private func choisirOngletDArrivee() {
-        guard dashboardVM.hasCompletedQuestionnaire else { return }
-        // Bilan reçu aujourd'hui → on y retourne. Jamais horodaté (compte
-        // antérieur à cette version) → le bilan n'est pas du jour, donc Scan.
-        if bilanRecuLe > 0,
-           Calendar.current.isDateInToday(Date(timeIntervalSince1970: bilanRecuLe)) {
-            return
+    /// Les 3 bulles du Journal : une seule fois dans la vie du compte, quand
+    /// le Journal est à l'écran, jamais par-dessus le tour d'onglets.
+    private func armerTutoJournal() {
+        guard selectedTab == .journal, !scanTourVu, !montreTutoScan, !showTabTour else { return }
+        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.25)) {
+            montreTutoScan = true
         }
-        selectedTab = .scanner
     }
 
     /// Routes a queued `DeepLinkRoute` to the matching tab or modal, then
@@ -684,15 +674,16 @@ struct MainTabView: View {
 
         switch route {
         case .dashboard:
-            selectedTab = .bilan
+            selectedTab = .journal
         case .checkin:
-            selectedTab = .suivi
+            selectedTab = .progres
         case .mealScan:
-            selectedTab = .scanner
+            selectedTab = .journal
+            NotificationCenter.default.post(name: .healthmapOuvrirAjout, object: nil)
         case .recommendations:
             selectedTab = .plan
         case .profile:
-            showProfile = true
+            selectedTab = .reglages
         case .paywall:
             // Don't force a tab switch on top of the modal — keep the user
             // on whatever tab they were already looking at when the paywall
@@ -729,742 +720,6 @@ private struct AnalysisGateView: View {
             } else {
                 FullAnalysisLoadingView()
             }
-        }
-    }
-}
-
-// MARK: - Profile View (complete with gamification, settings, etc.)
-struct ProfileView: View {
-    @EnvironmentObject var authViewModel: AuthViewModel
-    @EnvironmentObject var dashboardVM: DashboardViewModel
-    @ObservedObject private var gamification = GamificationService.shared
-    @ObservedObject private var subscriptionService = SubscriptionService.shared
-    @State private var showPaywall = false
-    @State private var showManageSubscriptions = false
-
-    // Delete account flow state (two-step confirmation per Apple HIG).
-    @State private var showDeleteFirstConfirm = false
-    @State private var showDeleteSecondConfirm = false
-    @State private var deleteConfirmationText = ""
-    @State private var isDeletingAccount = false
-    @State private var deleteErrorMessage: String?
-
-    // Restore Purchases state — required by Apple App Store Review for any
-    // app with subscriptions (Guideline 3.1.1). Without an explicit Restore
-    // affordance, a user who reinstalls the app or signs in on a new device
-    // has no way to recover their existing entitlement and Apple rejects
-    // the build automatically.
-    @State private var isRestoringPurchases = false
-    @State private var restoreResultMessage: String?
-    @State private var showRestoreResult = false
-
-    // Code promo : la feuille système Apple se referme sans rien rendre. Ces
-    // états portent l'attente ET la réponse — l'écran ne peut plus rester muet.
-    @State private var isRedeemingPromo = false
-    @State private var promoResultMessage: String?
-    @State private var showPromoResult = false
-
-    // RGPD Data Export state
-    @State private var isExportingData = false
-
-    /// Le bouton de confirmation ne s'active que lorsque l'utilisateur a tapé
-    /// le mot « SUPPRIMER ». Comparaison insensible à la casse (taper
-    /// « supprimer » suffit — pas de piège lié au clavier iOS) et espaces
-    /// parasites de l'autocomplétion retirés, pour ne jamais laisser le
-    /// bouton bloqué à tort.
-    private var isDeleteConfirmed: Bool {
-        deleteConfirmationText
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .uppercased() == "SUPPRIMER"
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                // Account section
-                Section("Compte") {
-                    if let email = authViewModel.userEmail {
-                        LabeledContent("Email", value: email)
-                    }
-
-                    if subscriptionService.isPremium {
-                        HStack {
-                            Image(systemName: "crown.fill")
-                                .foregroundStyle(Color.healthMapBlue)
-                            Text("Premium")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.healthMapText)
-                        }
-
-                        // Date de renouvellement / expiration — lue depuis le SDK
-                        // RevenueCat (customerInfo), pas besoin d'appel serveur.
-                        if let ent = subscriptionService.customerInfo?.entitlements["premium"],
-                           let exp = ent.expirationDate {
-                            LabeledContent(
-                                ent.willRenew ? "Renouvellement" : "Expire le",
-                                value: exp.formatted(date: .abbreviated, time: .omitted)
-                            )
-                        }
-
-                        // Gerer / annuler — ouvre la feuille systeme d'abonnements
-                        // Apple (l'annulation in-app passe obligatoirement par la).
-                        Button {
-                            showManageSubscriptions = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "gearshape")
-                                    .foregroundStyle(Color.healthMapBlue)
-                                Text("Gérer mon abonnement")
-                                    .foregroundStyle(Color.healthMapBlue)
-                            }
-                        }
-                        .accessibilityHint("Ouvre la gestion de ton abonnement (modifier ou annuler) dans les réglages Apple.")
-                    } else if dashboardVM.bilanComplete {
-                        // Entrée libre (V12a) : la porte premium n'apparaît
-                        // qu'une fois le bilan fait (décision fondateur).
-                        Button {
-                            showPaywall = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "crown.fill")
-                                    .foregroundStyle(Color.healthMapBlue)
-                                Text("Passer à Premium")
-                                    .foregroundStyle(Color.healthMapBlue)
-                            }
-                        }
-                    }
-
-                    // Code promo — visible AVANT le bilan, contrairement à la
-                    // porte Premium. Le paywall était son seul point d'entrée
-                    // dans toute l'app, et il n'apparaît qu'une fois le bilan
-                    // fait : un testeur qui reçoit un code au lancement n'avait
-                    // nulle part où le saisir. Ce n'est pas une porte premium —
-                    // aucune formule, aucun prix — donc V12a est respectée.
-                    if !subscriptionService.isPremium {
-                        Button {
-                            Task { await saisirCodePromo() }
-                        } label: {
-                            HStack {
-                                if isRedeemingPromo {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                        .frame(width: 18, height: 18)
-                                } else {
-                                    Image(systemName: "ticket")
-                                        .foregroundStyle(Color.healthMapBlue)
-                                }
-                                Text(isRedeemingPromo ? "Vérification de ton code…" : "J'ai un code")
-                                    .foregroundStyle(Color.healthMapBlue)
-                            }
-                        }
-                        .disabled(isRedeemingPromo)
-                        .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
-                    }
-
-                    // Restore Purchases — visible regardless of `isPremium` so
-                    // that an existing subscriber who reinstalls the app or
-                    // signs in on a new device can always recover their
-                    // entitlement. Required by App Store Review Guideline
-                    // 3.1.1; reviewers actively look for this affordance.
-                    Button {
-                        Task { await restorePurchases() }
-                    } label: {
-                        HStack {
-                            if isRestoringPurchases {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                    .frame(width: 18, height: 18)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                                    .foregroundStyle(Color.healthMapBlue)
-                            }
-                            Text("Restaurer mes achats")
-                                .foregroundStyle(Color.healthMapBlue)
-                        }
-                    }
-                    .disabled(isRestoringPurchases)
-                    .accessibilityHint("Restaure un abonnement Premium acheté avant avec ce même identifiant Apple.")
-                }
-
-                // Quick links
-                Section("Mon bilan") {
-                    // Rejouer le récap : la séquence se regarde une fois à chaud,
-                    // et se revoit à froid. Sans cette entrée, elle n'existerait
-                    // qu'une minute dans la vie du compte.
-                    if dashboardVM.recapDisponible {
-                        Button {
-                            rejouerRecap()
-                        } label: {
-                            Label("Revoir mon bilan animé", systemImage: "play.circle")
-                        }
-                    }
-
-                    NavigationLink {
-                        EditProfileView()
-                            .environmentObject(dashboardVM)
-                    } label: {
-                        Label("Modifier mon profil", systemImage: "pencil.circle")
-                    }
-
-                    NavigationLink {
-                        ScoreHistoryView()
-                            .environmentObject(dashboardVM)
-                    } label: {
-                        Label("Évolution du score", systemImage: "chart.xyaxis.line")
-                    }
-
-                    if dashboardVM.hasCompletedQuestionnaire {
-                        NavigationLink {
-                            SupplementsView()
-                                .environmentObject(dashboardVM)
-                        } label: {
-                            Label("Mes compléments", systemImage: "pills")
-                        }
-                    }
-
-                    NavigationLink {
-                        MethodeView()
-                    } label: {
-                        Label("Notre méthode", systemImage: "brain")
-                    }
-                }
-
-                // Gamification
-                if !gamification.isZenMode {
-                    Section("Progression") {
-                        HStack {
-                            Image(systemName: "flame.fill")
-                                .foregroundStyle(Color.accentSky)
-                            Text("Série actuelle")
-                            Spacer()
-                            Text("\(gamification.currentStreak) jours")
-                                .foregroundStyle(Color.healthMapSecondary)
-                        }
-
-                        HStack {
-                            Image(systemName: "star.fill")
-                                .foregroundStyle(Color.accentSky)
-                            Text("Meilleure série")
-                            Spacer()
-                            Text("\(gamification.bestStreak) jours")
-                                .foregroundStyle(Color.healthMapSecondary)
-                        }
-
-                        HStack {
-                            Image(systemName: "checkmark.seal.fill")
-                                .foregroundStyle(Color.healthMapBlue)
-                            Text("Total des check-ins")
-                            Spacer()
-                            Text("\(gamification.totalCheckins)")
-                                .foregroundStyle(Color.healthMapSecondary)
-                        }
-
-                        HStack {
-                            Image(systemName: "medal.fill")
-                                .foregroundStyle(Color.healthMapBlue)
-                            Text("Badges")
-                            Spacer()
-                            Text("\(gamification.earnedBadges.count)/\(BadgeType.allCases.count)")
-                                .foregroundStyle(Color.healthMapSecondary)
-                        }
-                    }
-                }
-
-                // Legal
-                Section("Légal") {
-                    Link(destination: URL(string: "https://healthmap.fr/privacy")!) {
-                        Label("Politique de confidentialité", systemImage: "hand.raised.fill")
-                    }
-
-                    Link(destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!) {
-                        Label("Conditions d'utilisation", systemImage: "doc.text.fill")
-                    }
-                }
-
-                // Settings
-                Section("Préférences") {
-                    Toggle(isOn: Binding(
-                        get: { gamification.isZenMode },
-                        set: { _ in gamification.toggleZenMode() }
-                    )) {
-                        HStack {
-                            Image(systemName: "leaf.fill")
-                                .foregroundStyle(Color.healthMapBlue)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Mode Zen")
-                                Text("Désactive les badges, les confettis et les notifications")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(Color.healthMapSecondary)
-                            }
-                        }
-                    }
-                }
-
-                // RGPD — Data Export (Article 20)
-                Section("Mes données") {
-                    Button {
-                        Task { await exportUserData() }
-                    } label: {
-                        HStack {
-                            if isExportingData {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                    .frame(width: 18, height: 18)
-                            } else {
-                                Image(systemName: "square.and.arrow.up")
-                                    .foregroundStyle(Color.healthMapBlue)
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Exporter mes données")
-                                    .foregroundStyle(Color.healthMapBlue)
-                                Text("Pour les confier à une IA, les archiver ou les réutiliser ailleurs")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(Color.healthMapSecondary)
-                            }
-                        }
-                    }
-                    .disabled(isExportingData)
-                    .accessibilityHint("Télécharge toutes tes données Kiwio au format JSON (RGPD Article 20).")
-                }
-
-                // Sign out
-                Section {
-                    Button("Se déconnecter", role: .destructive) {
-                        Task {
-                            gamification.reset()
-                            await authViewModel.signOut()
-                        }
-                    }
-                }
-
-                // Danger zone — permanent account deletion
-                // Required by Apple App Store guideline 5.1.1(v): apps that support
-                // account creation must provide in-app account deletion.
-                // We intentionally let SwiftUI apply the system destructive tint
-                // (red) here, matching the "Se deconnecter" button above. Brand
-                // rule "tout bleu" applies to decorative accents, not safety
-                // affordances — Apple HIG explicitly reserves red for danger.
-                Section {
-                    Button(role: .destructive) {
-                        showDeleteFirstConfirm = true
-                    } label: {
-                        Label("Supprimer mon compte", systemImage: "trash")
-                    }
-                    .disabled(isDeletingAccount)
-                } header: {
-                    Text("Zone dangereuse")
-                } footer: {
-                    Text("La suppression de ton compte est définitive. Toutes tes données (profil, bilan, historique, scans) seront effacées tout de suite et ne pourront pas être récupérées. Cette action est requise par le RGPD (Article 17 : droit à l'effacement).")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.healthMapSecondary)
-                }
-
-                // Numero de version + build, visible en bas du profil. Permet de
-                // verifier d'un coup d'oeil QUEL build TestFlight tourne reellement
-                // sur l'appareil (le build number = github.run_number du workflow).
-                Section {
-                    HStack {
-                        Spacer()
-                        Text("Kiwio v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.healthMapSecondary)
-                            .textSelection(.enabled)
-                        Spacer()
-                    }
-                    .listRowBackground(Color.clear)
-                }
-            }
-            // Ruban de fond aussi sur le Profil (loi 2) : on masque le fond
-            // système de la List puis on glisse le ruban derrière.
-            .scrollContentBackground(.hidden)
-            .background(WarmBackground())
-            .navigationTitle("Profil")
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .healthMapFullSheet()
-            }
-            .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
-            // 1st confirmation — quick Apple-style alert
-            .alert("Supprimer ton compte ?", isPresented: $showDeleteFirstConfirm) {
-                Button("Annuler", role: .cancel) { }
-                Button("Continuer", role: .destructive) {
-                    deleteConfirmationText = ""
-                    deleteErrorMessage = nil
-                    showDeleteSecondConfirm = true
-                }
-            } message: {
-                Text("Cette action est irréversible. Tu vas perdre ton bilan, ton historique, tes scans et tous tes rappels. Continue seulement si tu es sûr(e).")
-            }
-            // 2e confirmation — mot tapé pour prouver l'intention (RGPD + Apple review).
-            // Detent .large obligatoire : le contenu (icône + bullets + champ +
-            // boutons) ne tient PAS en .medium — en build 28 les textes se
-            // superposaient (illisible) et le clavier masquait le bouton
-            // Annuler. Le swipe-down reste actif : seul `isDeletingAccount`
-            // le bloque (géré dans le sheet), jamais de blocage inconditionnel.
-            .sheet(isPresented: $showDeleteSecondConfirm) {
-                deleteAccountConfirmationSheet
-                    .healthMapFullSheet()
-            }
-            // Export offline alert — the export needs Supabase data, so
-            // block the request and explain why when offline.
-            .alert("Hors ligne", isPresented: $showExportOfflineAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("L'export a besoin d'une connexion internet pour récupérer toutes tes données. Reconnecte-toi puis réessaie.")
-            }
-            // Restore Purchases result alert. Uses the existing-message
-            // pattern (no `presenting:`) so the alert can be reused for
-            // both success ("Achats restaures") and failure ("Erreur...")
-            // states without spinning up two separate alerts.
-            .alert("Restaurer mes achats", isPresented: $showRestoreResult) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                if let restoreResultMessage {
-                    Text(restoreResultMessage)
-                }
-            }
-            // Code promo : la feuille Apple ne rend aucun résultat. Sans ce
-            // retour explicite, la saisie d'un code se terminait sur un écran
-            // inchangé — impossible de savoir si l'accès s'était ouvert.
-            .alert("Code promo", isPresented: $showPromoResult) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                if let promoResultMessage {
-                    Text(promoResultMessage)
-                }
-            }
-        }
-    }
-
-    // MARK: - Restore Purchases (App Store Guideline 3.1.1)
-
-    /// Calls RevenueCat's `restorePurchases` and surfaces the result via an
-    /// alert. Three branches:
-    ///   1. Success + entitlement now active → "Achats restaures..."
-    ///   2. Success + still no entitlement → "Aucun achat a restaurer..."
-    ///      (the user genuinely never bought anything with this Apple ID)
-    ///   3. Failure → "Erreur lors de la restauration..." with a retry hint
-    /// All three are accompanied by analytics so we can monitor the
-    /// real-world success rate of restores. The success path also fires
-    /// `subscriptionRestored`, which the funnel uses to attribute later
-    /// engagement to recovered subscribers.
-    // MARK: - Récap animé
-
-    /// Demande la relecture du récap, puis referme le profil.
-    ///
-    /// La séquence est présentée par `MainTabView`, pas ici : une feuille plein
-    /// écran ouverte DEPUIS une feuille, et en 8e modificateur de présentation
-    /// sur la même vue, ne s'ouvrait tout simplement pas.
-    private func rejouerRecap() {
-        // C'est `MainTabView` qui a ouvert cette feuille : c'est lui qui la
-        // referme, puis qui présente la séquence. `ProfileView` n'a pas à
-        // connaître sa propre présentation.
-        NotificationCenter.default.post(name: .healthmapRejouerRecap, object: nil)
-    }
-
-    // MARK: - Code promo
-
-    /// Ouvre la feuille Apple de saisie d'un code, puis attend vraiment que
-    /// l'accès s'ouvre avant de répondre. La feuille système ne dit jamais si
-    /// un code a été saisi : le message d'échec ne parle donc pas de « code
-    /// invalide », il constate seulement qu'aucun accès n'est apparu.
-    private func saisirCodePromo() async {
-        guard !isRedeemingPromo else { return }
-        isRedeemingPromo = true
-        defer { isRedeemingPromo = false }
-
-        switch await subscriptionService.saisirCodePromo() {
-        case .active:
-            var message = "Ton accès Premium est ouvert. Tout est débloqué dès maintenant."
-            if let entitlement = subscriptionService.customerInfo?
-                .entitlements[SubscriptionService.entitlementId],
-               let expiration = entitlement.expirationDate {
-                let date = expiration.formatted(date: .abbreviated, time: .omitted)
-                message += entitlement.willRenew
-                    ? " Renouvellement le \(date)."
-                    : " Actif jusqu'au \(date)."
-            }
-            promoResultMessage = message
-            AnalyticsService.shared.track(.subscriptionStarted, properties: [
-                "package": "code_promo",
-            ])
-        case .aucuneActivation:
-            promoResultMessage = "Aucun code n'a été appliqué. Si tu viens d'en saisir un, laisse-lui quelques secondes puis touche « Restaurer mes achats »."
-        }
-        showPromoResult = true
-    }
-
-    private func restorePurchases() async {
-        guard !isRestoringPurchases else { return }
-        isRestoringPurchases = true
-        defer { isRestoringPurchases = false }
-
-        do {
-            try await subscriptionService.restorePurchases()
-            if subscriptionService.isPremium {
-                restoreResultMessage = "Achats restaurés. Bienvenue dans Premium !"
-                AnalyticsService.shared.track(.subscriptionRestored, properties: [
-                    "outcome": "success",
-                ])
-            } else {
-                restoreResultMessage = "Aucun achat à restaurer pour cet identifiant Apple. Si tu penses qu'il y a une erreur, écris au support."
-                AnalyticsService.shared.track(.subscriptionRestored, properties: [
-                    "outcome": "no_purchase",
-                ])
-            }
-        } catch {
-            restoreResultMessage = "La restauration n'a pas abouti. Vérifie ta connexion puis réessaie, ou écris au support."
-            AnalyticsService.shared.track(.subscriptionRestored, properties: [
-                "outcome": "error",
-            ])
-            AppLogger.subscription.report(error, context: "ProfileView restore purchases")
-        }
-
-        showRestoreResult = true
-    }
-
-    // MARK: - RGPD Data Export (Article 20)
-
-    @State private var showExportOfflineAlert = false
-
-    private func exportUserData() async {
-        guard !isExportingData else { return }
-
-        guard ConnectivityService.shared.isOnline else {
-            showExportOfflineAlert = true
-            return
-        }
-
-        isExportingData = true
-        defer { isExportingData = false }
-
-        guard let session = await AuthService.shared.currentSession else { return }
-        let userId = session.user.id.uuidString
-
-        do {
-            let (data, filename) = try await DataExportService.shared.generateExport(
-                userId: userId,
-                authEmail: authViewModel.userEmail
-            )
-            DataExportService.shared.presentShareSheet(data: data, filename: filename)
-        } catch {
-            AppLogger.app.report(error, context: "ProfileView data export")
-        }
-    }
-
-    // MARK: - Delete account confirmation sheet (2e étape)
-    /// Refonte UX (plainte fondateur, build 28) : l'ancien layout vivait dans
-    /// un detent .medium sans ScrollView — les textes `fixedSize` débordaient
-    /// et se chevauchaient (illisible), et le clavier masquait le bouton
-    /// Annuler (utilisateur piégé, obligé de fermer l'app). Désormais :
-    ///   - detent .large + contenu scrollable → plus aucune superposition,
-    ///     quel que soit le réglage Dynamic Type ;
-    ///   - boutons épinglés via `safeAreaInset` → TOUJOURS visibles
-    ///     au-dessus du clavier pendant la saisie ;
-    ///   - « Annuler » doublé dans la barre de navigation, actif en
-    ///     permanence sauf pendant l'appel réseau de suppression.
-    /// La logique métier (`performDeleteAccount`) est inchangée.
-    private var deleteAccountConfirmationSheet: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.spacingLG) {
-                    // En-tête avertissement
-                    VStack(spacing: Theme.spacingMD) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 44))
-                            .foregroundStyle(Color.urgencyImmediate)
-                            .accessibilityHidden(true)
-
-                        Text("Confirmation finale")
-                            .font(Theme.titleFont)
-                            .foregroundStyle(Color.healthMapText)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, Theme.spacingMD)
-
-                    // Rappel des conséquences
-                    VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                        bulletRow("Ton profil et ton bilan seront effacés")
-                        bulletRow("Ton historique de scores sera effacé")
-                        bulletRow("Tes scans et tes rappels seront effacés")
-                        bulletRow("Ton abonnement Premium ne sera PAS annulé automatiquement (gère-le dans Réglages > Apple ID)")
-                        bulletRow("Cette action est IRRÉVERSIBLE")
-                    }
-
-                    // Champ de confirmation — TextField natif : le placeholder
-                    // disparaît dès la première lettre tapée, donc aucun label
-                    // ne peut se superposer au texte saisi.
-                    VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                        Text("Pour confirmer, tape le mot **SUPPRIMER** (majuscules ou minuscules) :")
-                            .font(Theme.bodyFont)
-                            .foregroundStyle(Color.healthMapText)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        TextField("Tape SUPPRIMER ici", text: $deleteConfirmationText)
-                            .font(Theme.bodyFont)
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled()
-                            .submitLabel(.done)
-                            .padding(Theme.spacingMD)
-                            .frame(minHeight: 44)
-                            .background(Color.healthMapCard)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                                    .strokeBorder(
-                                        isDeleteConfirmed ? Color.urgencyImmediate : Color.healthMapMuted.opacity(0.35),
-                                        lineWidth: 1.5
-                                    )
-                            )
-                            .accessibilityLabel("Champ de confirmation. Tape le mot SUPPRIMER pour activer la suppression.")
-
-                        // Feedback immédiat : confirme que la saisie est reconnue.
-                        if isDeleteConfirmed {
-                            Label("Confirmation reconnue", systemImage: "checkmark.circle.fill")
-                                .font(Theme.captionBoldFont)
-                                .foregroundStyle(Color.urgencyImmediate)
-                        }
-                    }
-
-                    // Erreur serveur éventuelle (suppression échouée)
-                    if let errorMessage = deleteErrorMessage {
-                        Text(errorMessage)
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Color.urgencyImmediate)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .padding(.horizontal, Theme.spacingLG)
-                .padding(.bottom, Theme.spacingLG)
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .background(Color.healthMapBackground)
-            // Boutons d'action épinglés en bas : `safeAreaInset` les maintient
-            // au-dessus du clavier — « Annuler » et « Supprimer » restent donc
-            // TOUJOURS visibles, même pendant la saisie (bug build 28 :
-            // Annuler passait sous le clavier).
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: Theme.spacingSM) {
-                    Button {
-                        HapticService.shared.warning()
-                        Task { await performDeleteAccount() }
-                    } label: {
-                        HStack(spacing: Theme.spacingSM) {
-                            if isDeletingAccount {
-                                ProgressView().tint(.white)
-                                Text("Suppression en cours...")
-                            } else {
-                                Image(systemName: "trash")
-                                Text("Supprimer définitivement")
-                            }
-                        }
-                        .font(Theme.headlineFont)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 50)
-                        .background(
-                            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                                .fill(isDeleteConfirmed ? Color.urgencyImmediate : Color.healthMapMuted)
-                        )
-                    }
-                    .buttonStyle(.healthMapPressed)
-                    .disabled(!isDeleteConfirmed || isDeletingAccount)
-                    .accessibilityHint(isDeleteConfirmed
-                        ? "Supprime ton compte tout de suite et définitivement."
-                        : "Tape d'abord le mot SUPPRIMER dans le champ de confirmation.")
-
-                    Button {
-                        showDeleteSecondConfirm = false
-                    } label: {
-                        Text("Annuler")
-                            .font(Theme.headlineFont)
-                            .foregroundStyle(Color.healthMapBlue)
-                            .frame(maxWidth: .infinity)
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.healthMapPressed)
-                    .disabled(isDeletingAccount)
-                }
-                .padding(.horizontal, Theme.spacingLG)
-                .padding(.vertical, Theme.spacingSM)
-                .background(Color.healthMapBackground)
-            }
-            .navigationTitle("Supprimer mon compte")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                // Sortie évidente en permanence : « Annuler » dans la barre de
-                // navigation (même pattern que EditFieldSheet), inactif
-                // uniquement pendant l'appel réseau de suppression.
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") {
-                        showDeleteSecondConfirm = false
-                    }
-                    .disabled(isDeletingAccount)
-                }
-            }
-            // Swipe-down bloqué UNIQUEMENT pendant la suppression en vol
-            // (état non-annulable côté serveur) — jamais inconditionnellement.
-            .interactiveDismissDisabled(isDeletingAccount)
-            // Défensif : on vide le champ à chaque disparition du sheet
-            // (swipe-down, Annuler, suppression réussie). L'alerte de 1re
-            // étape le réinitialise aussi avant ouverture — ceinture et
-            // bretelles pour qu'aucun refactor futur ne laisse « SUPPRIMER »
-            // pré-rempli d'une session à l'autre.
-            .onDisappear {
-                deleteConfirmationText = ""
-                deleteErrorMessage = nil
-            }
-        }
-    }
-
-    private func bulletRow(_ text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("•")
-                .foregroundStyle(Color.urgencyImmediate)
-            // Text style relatif (pas de taille fixe) → suit Dynamic Type ;
-            // le ScrollView parent absorbe le débordement éventuel.
-            Text(text)
-                .font(Theme.subheadlineFont)
-                .foregroundStyle(Color.healthMapText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func performDeleteAccount() async {
-        guard !isDeletingAccount else { return }
-        isDeletingAccount = true
-        deleteErrorMessage = nil
-
-        AnalyticsService.shared.track(.accountDeletionRequested)
-
-        let success = await authViewModel.deleteAccount()
-        isDeletingAccount = false
-
-        if success {
-            AnalyticsService.shared.track(.accountDeletionCompleted)
-            // Haptique de clôture — confirme physiquement que la suppression
-            // a abouti (pattern HapticService déjà utilisé dans EditProfileView).
-            HapticService.shared.success()
-            // Reset local state (gamification cache, etc.) first.
-            gamification.reset()
-
-            // Dismiss the sheet BEFORE flipping `isAuthenticated`, otherwise
-            // SwiftUI cross-fades MainTabView → AuthView over the still-open
-            // confirmation sheet and the user sees a visible flash.
-            showDeleteSecondConfirm = false
-
-            // Give SwiftUI one animation tick to finish the sheet dismissal,
-            // then route to AuthView. 350ms matches the default sheet
-            // dismissal animation curve on iOS 17.
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            authViewModel.finaliseSignOutAfterDeletion()
-        } else {
-            AnalyticsService.shared.track(.accountDeletionFailed)
-            // Haptique d'erreur : la suppression a échoué, le sheet reste
-            // ouvert avec le message d'erreur affiché.
-            HapticService.shared.error()
-            deleteErrorMessage = authViewModel.errorMessage ?? "La suppression n'a pas abouti. Réessaie ou écris au support."
         }
     }
 }

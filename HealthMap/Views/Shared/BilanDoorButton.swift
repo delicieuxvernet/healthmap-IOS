@@ -27,21 +27,22 @@ struct BilanDoorButton: View {
             DecouverteFunnel.ctaBilan(zone: zone)
             action()
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 16, weight: .semibold))
-                    .accessibilityHidden(true)
-                Text(title)
-            }
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(Color.kiwiGreen)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: Color.kiwiGreen.opacity(0.28), radius: 12, x: 0, y: 6)
+            // Refonte 23 août 2026 : bouton capsule du DS (50 pt, 17 / 600,
+            // aucune ombre, aucune icône décorative).
+            Text(title)
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.85)
+                .lineLimit(1)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
+                .frame(height: DS.hauteurBouton)
+                .background(Capsule().fill(Color.dsAccent))
+                .contentShape(Capsule())
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel(accessibilityText)
     }
 }

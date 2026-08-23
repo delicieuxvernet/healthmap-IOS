@@ -35,18 +35,11 @@ struct TabWashBackground: View {
     /// Fraction de la hauteur d'écran où le lavis est complètement éteint.
     private static let extinction: CGFloat = 0.66
 
+    /// Refonte 23 août 2026 : un seul voile pour tous les onglets, celui de la
+    /// marque (`#E9F2E2` vers le transparent sur 240 pt). La teinte par onglet
+    /// n'est plus rendue ; le paramètre reste pour les appelants.
     var body: some View {
-        LinearGradient(
-            stops: [
-                .init(color: tint.opacity(Self.opaciteHaut), location: 0),
-                .init(color: tint.opacity(0), location: Self.extinction),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        DSBrandWash()
     }
 }
 

@@ -271,7 +271,7 @@ struct ComplementsRituelStrip: View {
                 .stroke(Color.kiwiGreen, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text("\(rituel.doneCount)/\(rituel.total)")
-                .font(.system(size: 10.5, weight: .heavy, design: .rounded).monospacedDigit())
+                .font(.system(size: 10.5, weight: .bold, design: .rounded).monospacedDigit())
                 .foregroundStyle(Color.kiwiCharcoal)
         }
         .frame(width: 38, height: 38)
@@ -518,7 +518,7 @@ struct ChainCollapsibleCard<Detail: View>: View {
                             }
 
                             Text(chain.statutMot)
-                                .font(.system(size: 10.5, weight: .heavy))
+                                .font(.system(size: 10.5, weight: .bold))
                                 .foregroundStyle(chain.statut.inkColor)
                                 // Jamais sur deux lignes, mais jamais rigide non
                                 // plus : un `fixedSize` ici pouvait pousser la
@@ -537,7 +537,7 @@ struct ChainCollapsibleCard<Detail: View>: View {
 
                         if let kicker {
                             Text(kicker)
-                                .font(.system(size: 10.5, weight: .heavy))
+                                .font(.system(size: 10.5, weight: .bold))
                                 .tracking(0.4)
                                 .foregroundStyle(Color.healthMapMuted)
                                 .lineLimit(1)
@@ -727,7 +727,7 @@ struct ComplementsVoieSwitch: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1)
         )
-        .shadow(color: Color.kiwiCharcoal.opacity(0.14), radius: 9, x: 0, y: 5)
+        // (ombre retirée, refonte 23 août 2026)
         .padding(.horizontal, 20)
         // Le bouton Scan de la tab bar est surélevé : il déborde de 17 pt
         // au-dessus de la barre (+ son anneau crème de 5 pt). Sous 24 pt de
@@ -917,11 +917,11 @@ struct ChainExplanationSheet: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(explanation.kicker)
-                            .font(.system(size: 11, weight: .heavy))
+                            .font(.system(size: 11, weight: .bold))
                             .tracking(0.35)
                             .foregroundStyle(kickerColor)
                         Text(explanation.titre)
-                            .font(.system(size: 18, weight: .heavy))
+                            .font(.system(size: 18, weight: .bold))
                             .tracking(-0.4)
                             .foregroundStyle(Color.kiwiCharcoal)
                             .fixedSize(horizontal: false, vertical: true)
@@ -952,7 +952,7 @@ struct ChainExplanationSheet: View {
                 if !explanation.practice.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("EN PRATIQUE")
-                            .font(.system(size: 11, weight: .heavy))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(Color.kiwiGreenInk)
                         // Le geste concret : c'est la raison d'être de la
                         // sheet, il passe devant le bouton qui la referme.

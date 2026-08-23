@@ -14,7 +14,41 @@
 
 ---
 
-## ⭐ Refonte « v4 — 3D » (direction validée 28 juin 2026 — déploiement onglet par onglet)
+## ⭐⭐ Refonte « qualité Apple » (direction du 23 août 2026 — socle iOS natif)
+
+> **Sources de vérité** : `Kiwio iOS - refonte.dc.html` (maquette, 7 écrans, iPhone 393 pt) et
+> `instructions-claude-code-refonte-ios.md` (document d'implémentation), tous deux dans
+> `C:\Users\stana\Downloads\`. Cette direction **remplace** la DA crème/vert ci-dessous : le fond
+> devient neutre (`systemGroupedBackground`), le vert ne colore que ce qui se tape, un seul chiffre
+> héros par écran, cartes blanches rayon 14 **sans ombre**, gras plafonné à 700, chiffres SF Pro
+> tabulaires. Tokens : `HealthMap/Views/Shared/KiwiDS.swift` (préfixe `ds`).
+>
+> **Navigation (5 onglets, capsule flottante)** : **Journal · Progrès · Plan · Compléments · Réglages**.
+> Le Bilan a fusionné dans le Journal (son écran complet reste accessible par « Tout afficher »,
+> en feuille, sans paywall) ; le Scan est devenu le bouton `+` flottant du Journal et sa feuille
+> d'ajout à 6 entrées (dicter · scanner · rechercher · code-barres · ma journée · activité) ; les
+> Réglages sont le **seul** endroit qui parle d'argent (carte Premium, prix et essai lus depuis StoreKit).
+>
+> **Écrans** :
+> - **Journal** (`MealScanView.swift` → `JournalView`, `JournalComponents.swift`) : semainier · carte
+>   calories (héros 48 + anneau) · 3 cartes macros · « Apports à renforcer » (interaction détectée,
+>   preuve, 3 apports, une sortie verte) AVANT · « Aujourd'hui » (4 repas) · bouton `+`.
+> - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) : titre 34 + rôle · carte état
+>   (« 42 % », « 5,9 sur 18 mg » dérivé de la référence canonique, jauge) · Pourquoi · Ce qui le remonte ·
+>   capsule vers le plan.
+> - **Progrès** (`SuiviView.swift`, `ProgresComponents.swift`) : vue d'ensemble (2 cartes) · besoins et
+>   apports (segmented natif, conclusion, barres + pointillé) · apports à renforcer · état premier jour
+>   en une carte ; check-in et courbes symptômes conservés.
+> - **Plan** (`PlanRadialComponents.swift`) : traits fins `#D1D1D6`, disques blancs sans ombre, symboles
+>   noirs, carte de pied ; feuille de nœud (cause → 3 leviers → délai → capsule).
+> - **Réglages** (`ReglagesView.swift`) : avatar + prénom · carte Premium · Mon compte · transparence ·
+>   mon bilan · progression · préférences · déconnexion. Sous-pages : abonnement, données (RGPD).
+>
+> **Non appliqué (décisions produit à trancher, pas du design)** : le verrouillage par nœud du Plan
+> (2 nets / 3 floutés) ; « Mes aliments » et « Activité » comme saisie (remplacés par le journal complet
+> et l'énergie active Apple Santé). Le gating premium existant est inchangé partout.
+
+## ⭐ Refonte « v4 — 3D » (direction validée 28 juin 2026 — remplacée le 23 août 2026, conservée pour l'historique)
 
 > DA validée par Arthur (maquettes *« … v4 - 3D »*, dossier *Corrections design et interface app*) :
 > **fond crème** (`#FBF6EF`), **anneaux pleins**, **petites illustrations 3D** (Microsoft Fluent

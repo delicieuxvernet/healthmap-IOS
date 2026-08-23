@@ -31,11 +31,10 @@ extension Color {
     // Alignés sur l'ambiance lumineuse du site web (radial-gradients bleu/violet
     // sur fond clair, cf. src/pages/Home.jsx) : les neutres prennent une teinte
     // bleutée subtile au lieu du gris/noir pur — l'app paraît moins sombre.
-    static let healthMapBackground = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x11/255, green: 0x14/255, blue: 0x1D/255, alpha: 1.0)
-            : UIColor(red: 0xF6/255, green: 0xF8/255, blue: 0xFD/255, alpha: 1.0)
-    })
+    // Refonte « qualité Apple » (23 août 2026) : le fond devient NEUTRE, le
+    // gris groupé des Réglages iOS (`systemGroupedBackground`, #F2F2F7). Le
+    // beige code « wellness », le gris système code « instrument fiable ».
+    static let healthMapBackground = Color(uiColor: .systemGroupedBackground)
     static let healthMapCard = Color(uiColor: UIColor { trait in
         trait.userInterfaceStyle == .dark
             ? UIColor(red: 0x1A/255, green: 0x1E/255, blue: 0x2A/255, alpha: 1.0)
@@ -127,16 +126,11 @@ extension Color {
 
     // Teintes chaudes — fond unifié premium (WarmBackground), remplace le ruban
     // animé retiré. Dynamiques light/dark comme les autres neutres.
-    static let healthMapWarm = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x14/255, green: 0x13/255, blue: 0x0F/255, alpha: 1.0)
-            : UIColor(red: 0xFB/255, green: 0xF6/255, blue: 0xEF/255, alpha: 1.0)
-    })
-    static let healthMapWarmGlow = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x3A/255, green: 0x2E/255, blue: 0x1C/255, alpha: 1.0)
-            : UIColor(red: 0xFF/255, green: 0xE9/255, blue: 0xCF/255, alpha: 1.0)
-    })
+    // Refonte 23 août 2026 : le crème a disparu. Les deux tokens restent pour
+    // les appelants historiques mais valent désormais le fond neutre et le
+    // voile de marque (`#E9F2E2`) qui le coiffe sur 240 pt (cf. `KiwiDS`).
+    static let healthMapWarm = Color(uiColor: .systemGroupedBackground)
+    static let healthMapWarmGlow = Color(hex: "E9F2E2")
 
     // Mascotte kiwi (MascotView) — couleurs d'illustration, constantes entre modes
     // (comme un asset : la mascotte garde son identité en light et dark).
@@ -215,8 +209,7 @@ struct CardStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(Color.healthMapCard)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -241,8 +234,10 @@ extension Color {
     static let kiwiGreenSoft = Color(hex: "EAF3DE")
     /// Texte vert sur fond teinté (paliers récolte, etc.).
     static let kiwiGreenInk = Color(hex: "3B6D11")
-    /// Crème chaud du langage v4 (alias lisible de `healthMapWarm`).
-    static let kiwiCream = Color(hex: "FBF6EF")
+    /// Ex-crème du langage v4 : depuis la refonte du 23 août 2026, c'est le
+    /// fond neutre (`systemGroupedBackground`). Le nom reste pour les
+    /// appelants ; la valeur, elle, n'est plus crème.
+    static let kiwiCream = Color(uiColor: .systemGroupedBackground)
     /// Encre charbon des titres/aplats v4 (distincte de `kiwiInk`, qui est le
     /// vert « texte sur tint »).
     static let kiwiCharcoal = Color(hex: "211F1A")
@@ -283,28 +278,25 @@ extension LinearGradient {
     )
 }
 
-// MARK: - Kiwi Card Style (v4)
-/// Carte blanche du langage v4 : rayon généreux (24 par défaut), hairline très
-/// discrète et double ombre douce (proche + portée) pour le relief premium des
-/// maquettes. Laisse `cardStyle()` (rayon 16) intact pour les écrans existants.
+// MARK: - Kiwi Card Style
+/// Carte blanche posée sur le gris : rayon 14 (Santé / Fitness), AUCUNE ombre,
+/// AUCUNE bordure. L'ombre douce sous chaque carte était le marqueur « template
+/// web » le plus reconnaissable ; sa suppression est le changement le plus
+/// visible de la refonte du 23 août 2026. Le paramètre `radius` reste accepté
+/// pour les appelants historiques mais tout le monde est ramené à 14 : un seul
+/// rayon de carte dans toute l'app.
 struct KiwiCardStyle: ViewModifier {
-    var radius: CGFloat = 24
+    var radius: CGFloat = 14
     func body(content: Content) -> some View {
         content
             .background(Color.healthMapCard)
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1)
-            )
-            .shadow(color: Color.kiwiCharcoal.opacity(0.05), radius: 3, x: 0, y: 1)
-            .shadow(color: Color.kiwiCharcoal.opacity(0.08), radius: 26, x: 0, y: 14)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
 extension View {
-    /// Carte du langage v4 (rayon 24 par défaut).
-    func kiwiCard(radius: CGFloat = 24) -> some View {
+    /// Carte blanche sans ombre, rayon 14.
+    func kiwiCard(radius: CGFloat = 14) -> some View {
         modifier(KiwiCardStyle(radius: radius))
     }
 }

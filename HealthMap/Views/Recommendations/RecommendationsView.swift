@@ -27,11 +27,8 @@ struct RecommendationsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Fond crème chaud du langage v4.
-                Color.kiwiCream.ignoresSafeArea()
-                // Lavis Plan : indigo, la projection long terme (fin du
-                // dégradé de marque).
-                TabWashBackground(tint: .accentIndigo)
+                // Refonte 23 août 2026 : fond neutre + voile de marque.
+                DSPageBackground()
 
                 if !dashboardVM.bilanComplete {
                     // Mode découverte (V12c) : la MÊME couronne, en exemples
@@ -86,23 +83,10 @@ struct RecommendationsView: View {
                     await dashboardVM.triggerAnalysis()
                 }
             }
-            // L'en-tête de l'écran fait office de titre (même parti que le
-            // Bilan v7) — la barre reste inline et vide, seul le Profil y est.
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .kiwiNavigationBarBackground()
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
-                    } label: {
-                        Image(systemName: "person.crop.circle")
-                            .font(.system(size: 22))
-                            .foregroundStyle(Color.kiwiGreen)
-                    }
-                    .accessibilityLabel("Profil")
-                }
-            }
+            // Grand titre natif (se replie en inline au défilement). Les
+            // Réglages sont un onglet : plus de bouton Profil dans la barre.
+            .navigationTitle("Plan")
+            .navigationBarTitleDisplayMode(.large)
         }
     }
 }

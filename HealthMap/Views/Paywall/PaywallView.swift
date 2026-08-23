@@ -819,7 +819,7 @@ private struct PremiumPurchaseSuccessView: View {
                         .stroke(Color.kiwiGreen.opacity(0.22), lineWidth: 8)
                         .frame(width: 64, height: 64)
                     Image(systemName: "checkmark")
-                        .font(.system(size: 28, weight: .heavy, design: .rounded))
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.kiwiGreen)
                 }
                 .scaleEffect(revealed ? 1 : 0.82)
@@ -828,7 +828,7 @@ private struct PremiumPurchaseSuccessView: View {
 
                 VStack(spacing: Theme.spacingXS) {
                     Text(titre)
-                        .font(.system(size: 23, weight: .heavy, design: .rounded))
+                        .font(.system(size: 23, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.kiwiCharcoal)
                         .multilineTextAlignment(.center)
 

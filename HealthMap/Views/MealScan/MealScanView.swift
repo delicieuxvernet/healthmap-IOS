@@ -1,22 +1,32 @@
 import SwiftUI
 import PhotosUI
 
-// MARK: - Meal Scan View (caméra + analyse IA) — résultat « p-scanner » immersif
+// MARK: - Journal (refonte « qualité Apple », 23 août 2026 : ex-Scan + ex-Bilan)
 //
-// Source maquette : `p-scanner.dc.html`. À l'état RÉSULTAT, l'écran devient
-// immersif : header photo plein cadre, carte couverture « N de tes besoins »
-// chevauchant le header, anneaux d'apport cliquables, tuiles aliments 3D,
-// « Ta journée » (Matin/Midi/Soir), macros FoodVisor, « Ce qui manque »,
-// courbe 7 j apports/besoins, bandeau premium, CTA. La capture et la recherche
-// gardent la barre de navigation normale. Couleur = sens ; héros = couverture
-// des besoins (jamais les kcal). UI only : toute la logique reste au ViewModel.
-struct MealScanView: View {
+// Source maquette : `Kiwio iOS - refonte.dc.html`, écran 1 (9 blocs → 4).
+// Le tableau de bord du jour EST le journal. Ordre vertical :
+//   1. grand titre « Journal » (natif, se replie au défilement) + pill série ;
+//   2. semainier (7 colonnes L→D, jour courant en disque noir) ;
+//   3. carte calories : chiffre héros `1 021` + anneau 92 pt ;
+//   4. trois cartes macros côte à côte ;
+//   5. « Apports à renforcer » + « Tout afficher » : LE cœur de la valeur,
+//      AVANT la liste des repas (l'interaction détectée, la preuve, 3 apports,
+//      une seule sortie verte) ;
+//   6. « Aujourd'hui » : les 4 repas, kcal en secondaire, `+` vert ;
+//   7. bouton d'ajout flottant (60 pt) → feuille d'ajout à 6 entrées.
+//
+// Toute la SAISIE a quitté l'écran : dictée, photo, recherche, code-barres
+// vivent derrière le `+`. La machinerie (quota, résultat immersif du scan,
+// recherche, fiche portion, dictée mains libres) est inchangée : ce fichier
+// n'est qu'un nouvel habillage posé sur les mêmes ViewModels.
+struct JournalView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @StateObject private var viewModel = MealScanViewModel()
     @StateObject private var journal = MealJournalViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var gamification = GamificationService.shared
     @State private var selectedItem: PhotosPickerItem?
-    /// Choix appareil photo / galerie au tap sur la zone de capture.
+    /// Choix appareil photo / galerie, déclenché par « Scanner mon plat ».
     @State private var showCaptureChoice = false
     @State private var showCamera = false
     @State private var showPhotoLibrary = false
@@ -28,10 +38,9 @@ struct MealScanView: View {
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
     @State private var showJournal = false
-    /// Recherche d'aliment présentée en bottom-sheet depuis la barre d'accueil
-    /// (remplace l'ancien plein écran piloté par `selectedTab`).
+    /// Recherche d'aliment présentée en bottom-sheet.
     @State private var showSearch = false
-    /// Scanner de code-barres, ouvert par le bouton logé dans la barre de recherche.
+    /// Scanner de code-barres.
     @State private var showBarcode = false
     /// Code lu, en attente de résolution produit. Passe par un `@State` plutôt
     /// qu'un appel direct depuis la feuille : la résolution démarre pendant que
@@ -40,69 +49,66 @@ struct MealScanView: View {
     @State private var barcodeDetail: MealJournalService.FoodDetail?
     @State private var barcodeIntrouvable: String?
     @State private var showVoice = false
-    /// Capture audio de l'accueil : elle démarre sous le doigt posé sur « Dicte
-    /// ton repas » et se termine dans la feuille vocale, à qui on la passe.
+    /// Capture audio : démarre mains libres depuis la feuille d'ajout et se
+    /// termine dans la feuille vocale, à qui on la passe.
     /// ⚠️ Détenu par une BOÎTE non observante, pas par un `@StateObject` direct.
     /// `SpeechCaptureService` publie `level` ET `duree` toutes les 50 ms
     /// pendant un enregistrement : observé ici, il invalidait TOUTE la page
-    /// (en-tête, cartes du jour, vignettes, journée) 20 fois par seconde. Seule
-    /// la bulle d'enregistrement a besoin de ce flux : elle s'y abonne
-    /// elle-même (`BulleDictee`). Ne pas « simplifier » en `@StateObject var
-    /// speech`, c'est exactement ce qui faisait décrocher la waveform.
+    /// 20 fois par seconde. Seule la bulle d'enregistrement a besoin de ce
+    /// flux : elle s'y abonne elle-même (`BulleDictee`).
     @StateObject private var dicteeBox = DicteeBox()
     private var speech: SpeechCaptureService { dicteeBox.speech }
     /// Miroir local de `speech.error` : la page ne suivant plus le service, le
-    /// message d'échec est recopié aux deux endroits qui peuvent en produire un.
+    /// message d'échec est recopié ici.
     @State private var erreurDictee: SpeechCaptureService.CaptureError?
     @State private var doigtSurMicro = false
     /// Première dictée : les deux autorisations (micro + reconnaissance vocale)
-    /// se demandent AVANT le geste, jamais pendant — une alerte système annule
-    /// le toucher en cours et laisse la bulle d'enregistrement orpheline.
+    /// se demandent AVANT d'enregistrer, jamais pendant.
     @State private var demandeAutorisationVocale = false
     @State private var dicteeEnCours = false
     @State private var dicteeTropCourte = false
-    /// Glissé vers le haut pendant la dictée : l'enregistrement continue mains
-    /// libres, clos par les boutons de la bulle (façon WhatsApp).
+    /// La dictée lancée depuis la feuille d'ajout est TOUJOURS mains libres :
+    /// la bulle et ses boutons (jeter / analyser) prennent la main.
     @State private var dicteeVerrouillee = false
-    /// Annulée d'un glissé à gauche : le relâchement qui suit ne doit ni
-    /// analyser, ni rouvrir la feuille.
     @State private var dicteeAnnulee = false
-    /// Translation du doigt depuis l'appui — la bulle micro la suit. Écrite à
-    /// chaque `onChanged` du geste (jusqu'à 120 fois par seconde sur ProMotion),
-    /// elle vit dans la boîte et n'est observée QUE par la bulle : en `@State`
-    /// de la page, elle la réinvalidait au même rythme.
     private var glissementDictee: CGSize {
         get { dicteeBox.geste.glissement }
         nonmutating set { dicteeBox.geste.glissement = newValue }
     }
-    /// Appui simple sur le micro : on ne rouvre PLUS l'ancienne feuille
-    /// d'écoute (supprimée le 2 août 2026) — on montre un indice « maintiens
-    /// le bouton », façon WhatsApp, qui s'efface tout seul.
-    @State private var montrerIndiceMaintien = false
-    @State private var masquageIndice: Task<Void, Never>?
-    /// Démarrage différé : sans ce délai, un appui simple lancerait puis
-    /// couperait l'enregistrement dans la foulée, pour rien.
     @State private var demarrageDictee: Task<Void, Never>?
     @State private var voiceConfirmation: String?
     /// Découverte (V12e) : la porte bilan du résultat de scan doit d'abord
     /// refermer le sheet résultat — ce drapeau fait ouvrir la feuille
     /// questionnaire (racine) à la fermeture, jamais par-dessus le sheet.
     @State private var bilanApresFermeture = false
-    /// Apports quotidiens (score) des 7 derniers jours — courbe « apports vs besoins ».
+    /// Apports quotidiens (score) des 7 derniers jours — courbe du résultat de scan.
     @State private var curve: [Int] = []
-    /// Énergie active du jour (Apple Santé) → colonne « dépensées » de la jauge kcal.
-    /// nil = Santé non lié / rien partagé → colonne masquée (jamais un « 0 » trompeur).
-    /// Lu au chargement de la page (présente la feuille d'autorisation la 1re fois).
+    /// Énergie active du jour (Apple Santé) → élargit le budget kcal.
+    /// nil = Santé non lié / rien partagé → jamais un « 0 » trompeur.
     @State private var activeEnergyToday: Int?
-    /// Le tutoriel de première visite (3 bulles) ne vit PLUS ici : il est monté
-    /// au niveau de `MainTabView` (ContentView.swift), seul endroit posé APRÈS
-    /// la barre d'onglets — sinon son voile laissait la barre en pleine lumière
-    /// et tappable. Voir `montreTutoScan` là-bas.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // Refonte : feuille d'ajout et ses suites.
+    @State private var showAjout = false
+    /// Geste choisi dans la feuille d'ajout, exécuté APRÈS sa fermeture : deux
+    /// présentations qui se croisent dans le même cycle, SwiftUI en avale une.
+    @State private var actionAjout: AjoutAction?
+    /// Créneau visé par le `+` d'une ligne repas (sinon : déduit de l'heure).
+    @State private var slotCible: MealJournalService.MealSlot?
+    @State private var showActivite = false
+    /// Fiche apport ouverte depuis « Apports à renforcer ».
+    @State private var selectedApport: ApportV2?
+    /// Bilan complet (ex-onglet), présenté par « Tout afficher ».
+    @State private var showBilanComplet = false
+    @AppStorage("healthkit_linked") private var healthLinked = false
+
+    /// Les six entrées de la feuille d'ajout.
+    enum AjoutAction {
+        case dicter, scanner, rechercher, codeBarres, journee, activite
+    }
+
     /// Le résultat du scan est présenté en bottom-sheet : ouvert dès qu'une
-    /// analyse est prête, fermé → `reset()` (efface l'analyse et revient à
-    /// l'accueil pour un nouveau scan).
+    /// analyse est prête, fermé → `reset()`.
     private var resultBinding: Binding<Bool> {
         Binding(
             get: { viewModel.analysisResult != nil },
@@ -112,35 +118,55 @@ struct MealScanView: View {
 
     var body: some View {
         NavigationStack {
-            normalScaffold
+            scaffold
                 .kiwiTabBarBottomInset()
-                // Recharge le journal du jour (« Ta journée ») dès qu'un scan est persisté.
+                // Recharge le journal du jour dès qu'un scan est persisté.
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
                     Task { await journal.load() }
                 }
-                // Titre porté dans le contenu (grand « Scan » en tête de scroll) —
-                // barre de navigation réduite à ses boutons (journal + profil).
-                .navigationTitle("")
-                .navigationBarTitleDisplayMode(.inline)
-                .kiwiNavigationBarBackground()
+                // Grand titre natif : il se replie en titre inline au défilement,
+                // avec apparition progressive du filet de barre (§5 du document).
+                .navigationTitle("Journal")
+                .navigationBarTitleDisplayMode(.large)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button { showJournal = true } label: {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 20))
-                                .foregroundStyle(Color.kiwiGreen)
-                        }
-                        .accessibilityLabel("Journal du jour")
-                    }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
-                        } label: {
-                            Image(systemName: "person.crop.circle")
-                                .font(.system(size: 22))
-                                .foregroundStyle(Color.kiwiGreen)
+                        // La série ne s'affiche que lorsqu'elle existe : un
+                        // « 0 » dans une pill n'encourage personne.
+                        if !gamification.isZenMode, gamification.currentStreak > 0 {
+                            seriePill
                         }
-                        .accessibilityLabel("Profil")
+                    }
+                }
+                // Le Bilan complet garde sa propre pile de navigation : on le
+                // présente en feuille, jamais poussé (pile dans la pile).
+                .sheet(isPresented: $showBilanComplet) {
+                    DashboardView()
+                        .environmentObject(dashboardVM)
+                        .healthMapFullSheet()
+                }
+                .sheet(isPresented: $showAjout, onDismiss: executerActionAjout) {
+                    AjoutSheet(
+                        compteur: compteurScans,
+                        onChoisir: { action in
+                            actionAjout = action
+                            showAjout = false
+                        }
+                    )
+                }
+                .sheet(isPresented: $showActivite) {
+                    ActiviteSheet(
+                        kcalActives: activeEnergyToday,
+                        lie: healthLinked,
+                        onLier: { await lierAppleSante() }
+                    )
+                }
+                .sheet(item: $selectedApport) { apport in
+                    ApportV2DetailSheet(apport: apport) {
+                        selectedApport = nil
+                        NotificationCenter.default.post(
+                            name: .healthmapNavigateToTab,
+                            object: NavCardDestination.plan.rawValue
+                        )
                     }
                 }
                 .sheet(isPresented: $showVoice) {
@@ -177,9 +203,6 @@ struct MealScanView: View {
                     )
                 }
                 // Résultat du scan en bottom-sheet (contenu immersif inchangé).
-                // onDismiss : si la porte bilan du résultat a été tapée (V12e),
-                // la feuille questionnaire s'ouvre APRÈS la fermeture du sheet
-                // (elle est présentée par la racine MainTabView).
                 .sheet(isPresented: resultBinding, onDismiss: {
                     if bilanApresFermeture {
                         bilanApresFermeture = false
@@ -188,7 +211,6 @@ struct MealScanView: View {
                 }) {
                     resultSheet
                 }
-                // Recherche d'aliment en bottom-sheet depuis la barre d'accueil.
                 .sheet(isPresented: $showSearch) {
                     searchSheet
                 }
@@ -213,10 +235,7 @@ struct MealScanView: View {
                 } message: {
                     Text(barcodeIntrouvable ?? "")
                 }
-                // Autorisations de la dictée : demandées ici, AVANT le geste.
-                // Présentées pendant l'appui, les alertes iOS annulent le
-                // toucher — le geste ne rend jamais sa fin et l'écran reste
-                // figé sur « Je t'écoute… ».
+                // Autorisations de la dictée : demandées AVANT d'enregistrer.
                 .alert("Dicter tes repas", isPresented: $demandeAutorisationVocale) {
                     if SpeechCaptureService.autorisationsRefusees {
                         Button("Ouvrir les Réglages") {
@@ -236,19 +255,18 @@ struct MealScanView: View {
                          ? "Le micro ou la reconnaissance vocale sont bloqués pour Kiwio. Réactive-les dans les Réglages pour dicter tes repas."
                          : "Pour transformer ta voix en repas, Kiwio a besoin du micro et de la reconnaissance vocale. Rien ne quitte ton téléphone : l'audio est transcrit puis effacé.")
                 }
+                // Ouvert par le routage (« scanner » = le Journal + sa feuille).
+                .onReceive(NotificationCenter.default.publisher(for: .healthmapOuvrirAjout)) { _ in
+                    slotCible = nil
+                    showAjout = true
+                }
         }
     }
 
     // MARK: - Sheet résultat du scan (contenu immersif préservé à l'identique)
-    // Les sous-sheets (détail aliment / impact besoin) sont attachés ICI pour
-    // se présenter AU-DESSUS du sheet résultat (sheet-sur-sheet, iOS 17).
     @ViewBuilder
     private var resultSheet: some View {
         if let result = viewModel.analysisResult {
-            // Pas de NavigationStack : immersiveResult n'a aucune navigation et son
-            // header photo est full-bleed (.ignoresSafeArea top) — une barre de nav
-            // vide au-dessus casserait la DA du résultat. Le drag indicator du sheet
-            // suffit à signaler qu'on peut le refermer.
             immersiveResult(result)
                 .sheet(item: $selectedFood) { food in
                     FoodDetailSheetV4(food: food)
@@ -268,13 +286,13 @@ struct MealScanView: View {
                 searchTab
                     .padding(.vertical, Theme.spacingMD)
             }
-            .background(Color.kiwiCream.ignoresSafeArea())
-            .navigationTitle("Rechercher un aliment")
+            .background(Color.dsFond.ignoresSafeArea())
+            .navigationTitle("Rechercher")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { showSearch = false }
-                        .foregroundStyle(Color.kiwiGreen)
+                        .foregroundStyle(Color.dsAccent)
                         .accessibilityLabel("Fermer")
                 }
             }
@@ -283,162 +301,153 @@ struct MealScanView: View {
         .presentationDragIndicator(.visible)
     }
 
-    // MARK: - Scaffold normal (journal du jour — accueil Scan)
-    /// Plus de voile ni de carte flottante pendant la dictée : la bulle
-    /// d'enregistrement vit DANS la carte à deux colonnes (cf. `dualEntry`),
-    /// comme un vocal WhatsApp — la page reste elle-même.
-    private var normalScaffold: some View {
+    // MARK: - Scaffold
+
+    private var scaffold: some View {
         ZStack {
-            Color.kiwiCream.ignoresSafeArea()
-            // Lavis Scanner : orange, la chaleur de l'assiette (couleur des
-            // lipides du scan).
-            TabWashBackground(tint: .macroFat)
+            DSPageBackground()
             ScrollView {
-                scanHome
+                journalContent
                     // Épingle la largeur du contenu à celle du conteneur : empêche
-                    // toute dérive/scroll horizontal (le scroll reste vertical only).
+                    // toute dérive/scroll horizontal.
                     .containerRelativeFrame(.horizontal)
             }
-            // Le glissé vertical (verrou) appartient à la dictée tant qu'elle
-            // court — sinon le défilement le vole et coupe le geste en route.
-            .scrollDisabled(dicteeEnCours)
+        }
+        // Le bouton d'ajout flotte au-dessus de la barre d'onglets, coin bas
+        // droit. Le choix appareil photo / galerie lui est attaché : depuis
+        // iOS 26 la feuille émerge du contrôle qui l'a déclenchée.
+        .overlay(alignment: .bottomTrailing) {
+            DSAddButton {
+                HapticService.shared.tap()
+                slotCible = nil
+                showAjout = true
+            }
+            .padding(.trailing, DS.marge)
+            .padding(.bottom, 32)
+            .confirmationDialog(
+                "Ajouter une photo de ton repas",
+                isPresented: $showCaptureChoice,
+                titleVisibility: .visible
+            ) {
+                Button("Prendre une photo") { showCamera = true }
+                Button("Choisir dans la galerie") { showPhotoLibrary = true }
+                Button("Annuler", role: .cancel) {}
+            }
         }
     }
 
-    // MARK: - Page d'accueil Scan = journal calories du jour
-    // Ordre (maquette validée) : titre · nav jour · capture · recherche · jauge
-    // kcal · apports micros du jour · macros du jour · dernier plat · récents.
-    private var scanHome: some View {
-        VStack(spacing: Theme.spacingLG) {
-            // Header unifié (retour build 319) : titre + nav jour fusionnés dans
-            // la DA kiwi (fini le bloc monospace détaché), badge scans à droite.
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Scan")
-                        .font(.system(size: 28, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.kiwiCharcoal)
-                    ScanDayNav(
-                        label: journal.dayLabel,
-                        sub: journal.daySub,
-                        canNext: journal.canGoNext,
-                        onPrev: { journal.goPrevDay() },
-                        onNext: { journal.goNextDay() }
-                    )
-                }
-                Spacer()
-                // COMPTEUR (info neutre) dès le bilan fait, premium inclus
-                // (x/30) ; la PORTE (tap pastille épuisée → paywall) reste
-                // réservée au non-premium. Matrice complète : `ScanQuotaUI`
-                // (MealScanViewModel.swift).
-                if ScanQuotaUI.meterVisible(
-                    bilanComplete: dashboardVM.bilanComplete,
-                    remaining: viewModel.scansRemaining
-                ), let remaining = viewModel.scansRemaining {
-                    scanCounterPill(
-                        remaining,
-                        gated: ScanQuotaUI.gateEnabled(
-                            bilanComplete: dashboardVM.bilanComplete,
-                            isPremium: subscriptionService.isPremium
-                        )
-                    )
-                }
-            }
-            .padding(.horizontal, Theme.spacingLG)
+    // MARK: - Pill série (barre de navigation)
 
-            // Les deux gestes principaux côte à côte (dicter | scanner), puis
-            // l'exemple de dictée, la jauge kcal et la recherche produit.
-            dualEntry
-            voiceHint
+    private var seriePill: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 15, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsCalories)
+                .accessibilityHidden(true)
+            Text("\(gamification.currentStreak)")
+                .font(.system(.subheadline, design: .default).weight(.bold).monospacedDigit())
+                .contentTransition(.numericText())
+                .foregroundStyle(Color.dsTexte)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 7)
+        .background(Capsule().fill(Color.dsCarte.opacity(0.7)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Série : \(gamification.currentStreak) jours")
+    }
 
-            if dicteeTropCourte || erreurDictee != nil {
-                Text(erreurDictee?.message ?? "Trop court. Garde le doigt appuyé le temps de parler.")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Kiwio.rouge)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, Theme.spacingLG)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .transition(.opacity)
-            } else if montrerIndiceMaintien {
-                // Appui simple : on apprend le geste (façon WhatsApp), sans
-                // rien ouvrir. S'efface tout seul (~2,5 s).
-                HStack(spacing: 6) {
-                    Image(systemName: "hand.tap.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .accessibilityHidden(true)
-                    Text("Maintiens le bouton appuyé pour dicter ton repas")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundStyle(Color.kiwiGreenInk)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Capsule().fill(Color.kiwiGreenSoft))
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, Theme.spacingLG)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+    // MARK: - Contenu
 
-            // Troisième entrée, juste sous les deux gestes phares : chercher un
-            // produit — au clavier, ou par son code-barres.
-            searchEntry
-
-            // Ce que la page doit raconter d'abord : ce qui est DÉJÀ enregistré
-            // aujourd'hui, puis la porte vers la journée complète. Remplace à la
-            // fois le récap « Dernier repas » et la liste « Scans récents » qui
-            // vivaient en bas de page et disaient la même chose deux fois.
-            // Aucun repas ce jour-là → la carte ne s'affiche pas.
-            ScanMangeAujourdhuiCard(
-                meals: journal.dayMeals,
-                kcalRestantes: kcalRestantesDuJour,
-                consommees: journal.dayCalories,
-                isToday: isTodaySelected,
-                onOpenJournee: { showJournal = true }
+    private var journalContent: some View {
+        VStack(spacing: 0) {
+            JournalSemainier(
+                jourSelectionne: journal.selectedDay,
+                onChoisir: { jour in Task { await journal.allerAuJour(jour) } }
             )
-            .padding(.horizontal, Theme.spacingLG)
+            .padding(.top, 6)
 
-            // Une seule carte pour la journée : kcal restantes vs budget, barre
-            // de progression, énergie dépensée et les quatre macros. Remplace la
-            // jauge à trois colonnes (nombres qui se touchaient) ET la carte
-            // macros à anneaux, qui répétait la même journée deux cartes plus bas.
-            ScanJourneeCard(
-                consommees: journal.dayCalories,
-                objectif: dashboardVM.physicalMetrics.macros?.calories,
-                depensees: isTodaySelected ? activeEnergyToday : nil,
-                isToday: isTodaySelected,
-                prot: (g: journal.dayProteins, target: dashboardVM.physicalMetrics.macros?.protein),
-                carb: (g: journal.dayCarbs, target: dashboardVM.physicalMetrics.macros?.carbs),
-                fat: (g: journal.dayFats, target: dashboardVM.physicalMetrics.macros?.fat),
-                fiber: (g: journal.dayFiber, target: 30),
-                headline: MealJournalViewModel.dayMacroHeadline(
-                    prot: (g: journal.dayProteins, target: dashboardVM.physicalMetrics.macros?.protein),
-                    carb: (g: journal.dayCarbs, target: dashboardVM.physicalMetrics.macros?.carbs),
-                    fat: (g: journal.dayFats, target: dashboardVM.physicalMetrics.macros?.fat),
-                    fiber: (g: journal.dayFiber, target: 30),
-                    isToday: isTodaySelected
+            if !isTodaySelected {
+                Button {
+                    Task { await journal.allerAuJour(Date()) }
+                } label: {
+                    Text("Revenir à aujourd'hui")
+                        .font(.dsLegendeMoyenne)
+                        .foregroundStyle(Color.dsAccent)
+                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.dsPress)
+                .padding(.top, 2)
+            }
+
+            // La dictée mains libres et la photo en attente d'analyse vivent
+            // ici, sous le semainier : visibles, jamais par-dessus la page.
+            if dicteeEnCours {
+                BulleDictee(
+                    speech: dicteeBox.speech,
+                    geste: dicteeBox.geste,
+                    verrouillee: dicteeVerrouillee,
+                    onAnnuler: { annulerDictee() },
+                    onTerminer: { terminerDictee() }
                 )
-            )
-            .padding(.horizontal, Theme.spacingLG)
+                .dsCard()
+                .padding(.top, DS.marge)
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
+
+            if let message = messageSaisie {
+                Text(message.texte)
+                    .font(.dsLegendeMoyenne)
+                    .foregroundStyle(message.erreur ? Color.dsACombler : Color.dsAccent)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 14)
+                    .transition(.opacity)
+            }
 
             captureBlock
 
-            microsJourCard
-                .padding(.horizontal, Theme.spacingLG)
+            JournalCaloriesCard(
+                consommees: journal.dayCalories,
+                objectif: dashboardVM.physicalMetrics.macros?.calories,
+                depensees: isTodaySelected ? activeEnergyToday : nil,
+                isToday: isTodaySelected
+            )
+            .padding(.top, DS.marge)
+
+            HStack(spacing: DS.interCarte) {
+                JournalMacroCard(valeur: journal.dayProteins, cible: dashboardVM.physicalMetrics.macros?.protein,
+                                 libelle: "Protéines", couleur: .dsProteines, delai: 0.35)
+                JournalMacroCard(valeur: journal.dayCarbs, cible: dashboardVM.physicalMetrics.macros?.carbs,
+                                 libelle: "Glucides", couleur: .dsGlucides, delai: 0.40)
+                JournalMacroCard(valeur: journal.dayFats, cible: dashboardVM.physicalMetrics.macros?.fat,
+                                 libelle: "Lipides", couleur: .dsLipides, delai: 0.45)
+            }
+            .padding(.top, DS.interCarte)
+
+            apportsSection
+
+            DSSectionHeader(titre: isTodaySelected ? "Aujourd'hui" : journal.dayLabel)
+                .padding(.top, 2)
+            repasList
+
+            // Bas de page : l'espace du bouton flottant.
+            Color.clear.frame(height: 60)
         }
-        .padding(.vertical, Theme.spacingMD)
+        .padding(.horizontal, DS.marge)
+        .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.8), value: dicteeEnCours)
         .task {
             await journal.load()
-            // Énergie active du jour (Apple Santé) pour la « dépense » de la jauge —
-            // présente la feuille d'autorisation la 1re fois, sinon lecture directe.
-            // Entrée libre (V12a) : les 5 onglets montent dès le lancement — sans
-            // bilan, on NE présente PAS la feuille HealthKit à froid (première
-            // session), on attend que le Scan soit réellement visible (onReceive).
+            // Énergie active du jour (Apple Santé) pour élargir le budget.
+            // Entrée libre (V12a) : sans bilan, on NE présente PAS la feuille
+            // HealthKit à froid, on attend que le Journal soit réellement
+            // visible (onReceive ci-dessous).
             if dashboardVM.bilanComplete {
                 activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal()
             }
         }
-        // Sans bilan, la feuille HealthKit n'est présentée qu'au moment où
-        // l'utilisateur ARRIVE sur l'onglet Scan (contexte : la jauge est sous
-        // ses yeux). Les appels suivants sont silencieux (iOS ne re-présente
-        // jamais la feuille d'autorisation).
         .onReceive(NotificationCenter.default.publisher(for: .healthmapTabDidChange)) { note in
             guard note.object as? String == NavCardDestination.scanner.rawValue else { return }
             guard activeEnergyToday == nil else { return }
@@ -447,12 +456,9 @@ struct MealScanView: View {
         .onChange(of: viewModel.quotaExhausted) { _, exhausted in
             guard exhausted else { return }
             viewModel.quotaExhausted = false
-            // Ce chemin ne consultait PAS `bilanComplete`, contrairement à toute
-            // la matrice `ScanQuotaUI` : un testeur en découverte, qui n'a jamais
-            // vu de compteur (la pastille est elle aussi conditionnée au bilan),
-            // pouvait se prendre le paywall en pleine figure. Décision V12a :
-            // aucune porte premium tant que le bilan n'est pas fait. Le message
-            // posé par `handleDailyQuotaReached()` reste affiché dans tous les cas.
+            // Décision V12a : aucune porte premium tant que le bilan n'est pas
+            // fait. Le message posé par `handleDailyQuotaReached()` reste
+            // affiché dans tous les cas.
             guard ScanQuotaUI.gateEnabled(
                 bilanComplete: dashboardVM.bilanComplete,
                 isPremium: subscriptionService.isPremium
@@ -461,102 +467,215 @@ struct MealScanView: View {
         }
     }
 
-    /// Vrai si le jour affiché par le journal est aujourd'hui (formulations
-    /// « aujourd'hui / restantes » vs jour passé, et périmètre des apports listés).
+    /// Message de suivi de saisie (confirmation de dictée ou d'ajout, erreur
+    /// de dictée) : une ligne sous le semainier, jamais une fenêtre.
+    private var messageSaisie: (texte: String, erreur: Bool)? {
+        if let erreur = erreurDictee { return (erreur.message, true) }
+        if dicteeTropCourte { return ("Trop court. Parle un peu plus longtemps, puis touche Analyser.", true) }
+        if let voiceConfirmation { return (voiceConfirmation, false) }
+        if let addFoodConfirmation { return (addFoodConfirmation, false) }
+        return nil
+    }
+
+    /// Vrai si le jour affiché par le journal est aujourd'hui.
     private var isTodaySelected: Bool {
         Calendar.current.isDateInToday(journal.selectedDay)
     }
 
-    /// kcal restantes du jour affiché, avec la MÊME définition de budget que
-    /// `ScanJourneeCard` (objectif du profil + énergie dépensée). nil = aucun
-    /// objectif calculable : on n'invente pas de cible.
-    private var kcalRestantesDuJour: Int? {
-        guard let objectif = dashboardVM.physicalMetrics.macros?.calories else { return nil }
-        let budget = objectif + (isTodaySelected ? (activeEnergyToday ?? 0) : 0)
-        return budget - journal.dayCalories
-    }
+    // MARK: - Apports à renforcer (le cœur de la valeur, avant les repas)
 
-    /// Micronutriments listés dans la carte « apports du jour ». AUJOURD'HUI :
-    /// union des nutriments scannés du jour et des apports du user à renforcer
-    /// (scores < 60, source dashboardVM). JOUR PASSÉ : uniquement les nutriments
-    /// réellement présents ce jour-là (on ne projette pas le contexte d'aujourd'hui
-    /// sur une date antérieure). Ordre canonique, plafonné à 6. pct = couverture
-    /// réelle du jour sélectionné (0 si non couvert).
-    private var microItems: [(id: String, pct: Int)] {
-        let deficient = isTodaySelected
-            ? dashboardVM.nutrientScores.filter { $0.value < 60 }.map(\.key)
-            : []
-        let union = Set(journal.dayNutrientIds).union(deficient)
-        let canonical = NutrientData.all.map(\.id.rawValue).filter { union.contains($0) }
-        let rest = union.subtracting(canonical).sorted()
-        return (canonical + rest).prefix(6).map { (id: $0, pct: journal.dayMicroPct($0)) }
-    }
-
-    /// Carte des apports du jour. Isolée dans une propriété pour ne calculer
-    /// `microItems` QU'UNE FOIS : passée à la carte puis recalculée pour la
-    /// phrase de synthèse, elle coûtait deux fois un parcours du journal du
-    /// jour plus six pourcentages de couverture, à chaque passe de rendu.
-    private var microsJourCard: some View {
-        let items = microItems
-        return ScanMicrosJourCard(
-            items: items,
-            headline: MealJournalViewModel.dayMicroHeadline(items, isToday: isTodaySelected),
-            reperesGeneriques: ReperesGeneriquesMention.estVisible(bilanComplete: dashboardVM.bilanComplete)
-        )
-    }
-
-    // MARK: - Bloc capture (déclenche le scan — inchangé, agit sur aujourd'hui)
     @ViewBuilder
-    private var captureBlock: some View {
-        VStack(spacing: Theme.spacingMD) {
-            if viewModel.isAnalyzing {
-                VStack(spacing: Theme.spacingMD) {
-                    KiwiWalkerView(size: 140)
-                    Text("Analyse en cours…")
-                        .font(Theme.bodyFont)
-                        .foregroundStyle(Color.healthMapSecondary)
-                    Text("J'identifie les aliments et je calcule ce qu'ils t'apportent")
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapMuted)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(Theme.spacingXL)
-            } else if viewModel.selectedImage != nil {
-                // L'ENTRÉE photo vit désormais dans le bloc à deux colonnes
-                // (dualEntry) : ici on ne montre plus que la photo choisie et
-                // son bouton d'analyse, sinon la carte faisait doublon.
-                captureZone
+    private var apportsSection: some View {
+        let immediats = dashboardVM.redFlags.filter { $0.urgency == .immediate }
+        if !immediats.isEmpty {
+            RedFlagsCardView(flags: immediats)
+                .padding(.top, DS.avantSection)
+        }
+
+        DSSectionHeader(
+            titre: "Apports à renforcer",
+            lien: dashboardVM.bilanAffichage == .bilan ? "Tout afficher" : nil,
+            action: { showBilanComplet = true }
+        )
+
+        switch dashboardVM.bilanAffichage {
+        case .bilan:
+            if let bilan = dashboardVM.analysisV2?.bilan {
+                JournalApportsCard(
+                    bilan: bilan,
+                    isPremium: subscriptionService.isPremium,
+                    onApport: { apport in
+                        HapticService.shared.tap()
+                        selectedApport = apport
+                    },
+                    onRemonter: {
+                        HapticService.shared.tap()
+                        NotificationCenter.default.post(
+                            name: .healthmapNavigateToTab,
+                            object: NavCardDestination.plan.rawValue
+                        )
+                    }
+                )
             }
-
-            if let error = viewModel.errorMessage {
-                HStack(spacing: Theme.spacingSM) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(Color.scoreDeficient)
-                    Text(error)
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.scoreDeficient)
-                }
-                .padding(Theme.spacingSM)
-                .background(Color.scoreDeficient.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .padding(.horizontal, Theme.spacingLG)
-
-                Button("Réessayer") { viewModel.reset() }
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.kiwiGreen)
+        case .attente:
+            JournalApportsAttenteCard(
+                enCours: dashboardVM.isLoadingAnalysisV2,
+                erreur: dashboardVM.errorMessageV2,
+                onRetry: { Task { await dashboardVM.retryBilanV2() } }
+            )
+        case .decouverte:
+            JournalApportsPorteCard {
+                dashboardVM.demarrerBilan()
             }
         }
     }
 
-    // MARK: - Entrée recherche (surface l'onglet recherche existant)
-    /// Point d'entrée de la fonction phare : dicter son repas. Placé AVANT la
-    /// recherche et le scan photo — c'est le chemin qu'on met en avant.
-    /// Les DEUX supports de la page, côte à côte, séparés au milieu :
-    /// « Dicte ton repas » (vocal, fonction phare) à gauche · « Scanne ton
-    /// repas » (photo) à droite. Remplace l'empilement vocal → recherche →
-    /// photo, qui noyait les deux gestes principaux.
-    /// Les anciennes ondes pulsantes (animation infinie autour du micro) ont
-    /// été retirées : elles produisaient un cercle qui semblait s'envoler.
+    // MARK: - Aujourd'hui (les quatre repas)
+
+    private var repasList: some View {
+        DSGroupedList {
+            ForEach(Array(MealJournalService.MealSlot.ordreJournal.enumerated()), id: \.element) { index, slot in
+                if index > 0 {
+                    DSSeparator(retrait: DS.retraitSeparateurIcone)
+                }
+                repasRow(slot)
+            }
+        }
+    }
+
+    private func repasRow(_ slot: MealJournalService.MealSlot) -> some View {
+        let kcal = journal.dayCalories(in: slot)
+        let vide = journal.dayRows(in: slot).isEmpty
+        return HStack(spacing: 0) {
+            Button {
+                HapticService.shared.tap()
+                showJournal = true
+            } label: {
+                DSRow(
+                    icone: slot.symboleJournal,
+                    titre: slot.titreJournal,
+                    sousTitre: vide ? "Rien pour l'instant" : nil,
+                    sousTitreCouleur: .dsTertiaire,
+                    valeur: vide ? nil : DS.entier(kcal)
+                ) { EmptyView() }
+                .padding(.trailing, isTodaySelected ? -DS.paddingCarte : 0)
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityLabel(vide
+                ? "\(slot.titreJournal), rien pour l'instant"
+                : "\(slot.titreJournal), \(kcal) kilocalories")
+            .accessibilityHint("Ouvre le journal du jour")
+
+            if isTodaySelected {
+                Button {
+                    HapticService.shared.tap()
+                    slotCible = slot
+                    showAjout = true
+                } label: {
+                    DSPlusIcon()
+                }
+                .buttonStyle(.dsPress)
+                .padding(.trailing, 4)
+                .accessibilityLabel("Ajouter \(slot.complementDeTemps)")
+            }
+        }
+    }
+
+    // MARK: - Feuille d'ajout : suites
+
+    /// Compteur de scans (info neutre dès le bilan fait, premium inclus).
+    private var compteurScans: String? {
+        guard ScanQuotaUI.meterVisible(
+            bilanComplete: dashboardVM.bilanComplete,
+            remaining: viewModel.scansRemaining
+        ), let remaining = viewModel.scansRemaining else { return nil }
+        if remaining <= 0 { return "Scans du jour épuisés, ça se recharge demain." }
+        return "\(remaining) scan\(remaining > 1 ? "s" : "") photo restant\(remaining > 1 ? "s" : "") aujourd'hui."
+    }
+
+    /// Exécute le geste choisi dans la feuille d'ajout, une fois celle-ci
+    /// refermée : c'est la seule façon fiable d'enchaîner deux présentations.
+    private func executerActionAjout() {
+        guard let action = actionAjout else { return }
+        actionAjout = nil
+        switch action {
+        case .dicter:
+            demarrerDicteeMainsLibres()
+        case .scanner:
+            if CameraPicker.isAvailable {
+                showCaptureChoice = true
+            } else {
+                showPhotoLibrary = true
+            }
+        case .rechercher:
+            showSearch = true
+        case .codeBarres:
+            showBarcode = true
+        case .journee:
+            showJournal = true
+        case .activite:
+            showActivite = true
+        }
+    }
+
+    /// Lie Apple Santé depuis la feuille Activité (même geste que le profil),
+    /// puis relit l'énergie active du jour.
+    private func lierAppleSante() async {
+        let granted = await HealthKitService.shared.requestAuthorization()
+        guard granted else { return }
+        healthLinked = true
+        HapticService.shared.success()
+        activeEnergyToday = await HealthKitService.shared.todayActiveEnergyKcal()
+    }
+
+    // MARK: - Bloc capture (photo choisie → analyse ; agit sur aujourd'hui)
+    @ViewBuilder
+    private var captureBlock: some View {
+        if viewModel.isAnalyzing {
+            VStack(spacing: Theme.spacingMD) {
+                KiwiWalkerView(size: 120)
+                Text("Analyse en cours…")
+                    .font(.dsHeadline)
+                    .foregroundStyle(Color.dsTexte)
+                Text("J'identifie les aliments et je calcule ce qu'ils t'apportent")
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(22)
+            .dsCard()
+            .padding(.top, DS.marge)
+        } else if viewModel.selectedImage != nil {
+            captureZone
+                .padding(.top, DS.marge)
+        }
+
+        if let error = viewModel.errorMessage {
+            VStack(spacing: 10) {
+                HStack(spacing: Theme.spacingSM) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.dsACombler)
+                        .accessibilityHidden(true)
+                    Text(error)
+                        .font(.dsLegende)
+                        .foregroundStyle(Color.dsTexte)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button("Réessayer") { viewModel.reset() }
+                    .font(.dsSousTitreFort)
+                    .foregroundStyle(Color.dsAccent)
+                    .frame(minHeight: DS.cibleTactile)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(DS.paddingCarte)
+            .dsCard()
+            .padding(.top, DS.interCarte)
+        }
+    }
+
+    // MARK: - Dictée mains libres (depuis la feuille d'ajout)
+
     /// Reste-t-il une dictée aujourd'hui ? (illimité pour un abonné)
     private var peutDicter: Bool {
         guard let uid = AuthService.shared.cachedCurrentUserIdString else { return true }
@@ -566,268 +685,40 @@ struct MealScanView: View {
         )
     }
 
-    /// Sous-titre de la colonne micro : la contrainte est annoncée d'emblée,
-    /// jamais découverte après avoir parlé.
-    private var sousTitreVocal: String {
-        if subscriptionService.isPremium { return "À voix haute" }
-        return peutDicter ? "1 dictée offerte aujourd'hui" : "Dictée du jour utilisée"
-    }
-
-    private var dualEntry: some View {
-        ZStack {
-            HStack(spacing: 0) {
-                // Colonne micro : pas un `Button`, mais le même visuel piloté par un
-                // geste — c'est le doigt POSÉ qui enregistre (façon Instagram), et un
-                // bouton n'aurait rapporté que le relâchement.
-                entryColumnLabel(
-                    icon: "mic.fill",
-                    iconColor: .white,
-                    circleFill: Kiwio.vert,
-                    title: "Dicte ton repas",
-                    subtitle: sousTitreVocal
-                )
-                .scaleEffect(doigtSurMicro ? 0.97 : 1)
-                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: doigtSurMicro)
-                .contentShape(Rectangle())
-                .gesture(pressionDictee)
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isButton)
-                .accessibilityLabel("Dicte ton repas")
-                .accessibilityHint("Maintiens le doigt pour enregistrer, glisse à gauche pour annuler, vers le haut pour continuer mains libres, relâche pour lancer l'analyse. En lecture d'écran, active pour dicter mains libres.")
-                .accessibilityAction { demarrerDicteePourAccessibilite() }
-
-                Rectangle()
-                    .fill(Color.kiwiCharcoal.opacity(0.08))
-                    .frame(width: 1)
-                    .padding(.vertical, 14)
-
-                Button {
-                    if CameraPicker.isAvailable {
-                        showCaptureChoice = true
-                    } else {
-                        showPhotoLibrary = true
-                    }
-                } label: {
-                    entryColumnLabel(
-                        icon: "camera.fill",
-                        iconColor: Color.kiwiGreenInk,
-                        circleFill: Color.kiwiTint,
-                        title: "Scanne ton repas",
-                        subtitle: "Photo de l'assiette"
-                    )
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.healthMapPressed)
-                .disabled(dicteeEnCours)
-                .accessibilityLabel("Scanne ton repas")
-                .accessibilityHint("Prends une photo de ton assiette pour l'analyser")
-                // Le choix appareil photo / galerie est porté PAR le bouton, pas par
-                // l'écran : depuis iOS 26 la feuille émerge du contrôle qui l'a
-                // déclenchée, et attachée au scaffold sa flèche visait le milieu de
-                // la page au lieu de « Scanne ton repas ».
-                .confirmationDialog(
-                    "Ajouter une photo de ton repas",
-                    isPresented: $showCaptureChoice,
-                    titleVisibility: .visible
-                ) {
-                    Button("Prendre une photo") { showCamera = true }
-                    Button("Choisir dans la galerie") { showPhotoLibrary = true }
-                    Button("Annuler", role: .cancel) {}
-                }
-            }
-            .opacity(dicteeEnCours ? 0 : 1)
-
-            // La bulle d'enregistrement remplace les deux colonnes DANS le même
-            // cadre — jamais une fenêtre par-dessus la page. Passive tant que le
-            // doigt tient le geste (les touches vont à la colonne dessous) ; une
-            // fois verrouillée, ce sont ses boutons qui prennent la main.
-            if dicteeEnCours {
-                BulleDictee(
-                    speech: dicteeBox.speech,
-                    geste: dicteeBox.geste,
-                    verrouillee: dicteeVerrouillee,
-                    onAnnuler: { annulerDictee() },
-                    onTerminer: { terminerDictee() }
-                )
-                .allowsHitTesting(dicteeVerrouillee)
-                .transition(.opacity.combined(with: .scale(scale: 0.92)))
-            }
+    /// Démarre une dictée directement VERROUILLÉE, mains libres : la bulle et
+    /// ses boutons (jeter / analyser) prennent la main, aucun maintien requis.
+    /// C'est aussi le chemin VoiceOver (qui ne peut pas « maintenir »).
+    private func demarrerDicteeMainsLibres() {
+        guard !dicteeEnCours else { return }
+        guard peutDicter else {
+            showPaywall = true
+            return
         }
-        .frame(maxWidth: .infinity)
-        .background(Color.healthMapCard)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1)
-        )
-        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: dicteeEnCours)
-        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: dicteeVerrouillee)
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    /// Visuel d'une colonne d'entrée. Séparé de son interaction : le micro est
-    /// piloté par un geste maintenu, la photo par un bouton classique.
-    private func entryColumnLabel(
-        icon: String,
-        iconColor: Color,
-        circleFill: Color,
-        title: String,
-        subtitle: String
-    ) -> some View {
-        VStack(spacing: 9) {
-            ZStack {
-                Circle()
-                    .fill(circleFill)
-                    .frame(width: 58, height: 58)
-                Image(systemName: icon)
-                    .font(.system(size: 23, weight: .semibold))
-                    .foregroundStyle(iconColor)
-            }
-            Text(title)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Kiwio.encre)
-                .multilineTextAlignment(.center)
-            Text(subtitle)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Kiwio.secondaire)
+        guard SpeechCaptureService.autorisationsAccordees else {
+            demandeAutorisationVocale = true
+            return
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
-    }
-
-    // MARK: - Dictée maintenue depuis l'accueil
-
-    /// Appui simple (moins de `delaiAvantEnregistrement`) : on ouvre la feuille
-    /// comme avant, sans rien enregistrer. Appui maintenu : l'enregistrement
-    /// démarre ICI, sous le doigt, et la feuille ne s'ouvre qu'au relâchement,
-    /// directement sur l'analyse. C'est le geste demandé le 29 juillet — le
-    /// détour par « ouvrir la feuille, puis maintenir le micro » a sauté.
-    private static let delaiAvantEnregistrement: UInt64 = 250_000_000
-
-    private var pressionDictee: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                if !doigtSurMicro {
-                    // Une dictée verrouillée court déjà : ce nouveau toucher
-                    // n'est pas un départ, la bulle a ses propres boutons.
-                    guard !dicteeEnCours else { return }
-                    doigtSurMicro = true
-                    dicteeTropCourte = false
-                    dicteeAnnulee = false
-                    erreurDictee = nil
-                    glissementDictee = .zero
-                    // Quota (famille 5) : vérifié AVANT d'enregistrer — plutôt que
-                    // de laisser parler pour échouer ensuite.
-                    guard peutDicter else { return }
-                    // Autorisations manquantes : on n'enregistre RIEN et on
-                    // explique, plutôt que de faire surgir deux alertes iOS au
-                    // milieu du geste (elles annulent le toucher : plus de
-                    // `onEnded`, page bloquée jusqu'au garde-fou de 60 s).
-                    guard SpeechCaptureService.autorisationsAccordees else {
-                        doigtSurMicro = false
-                        demandeAutorisationVocale = true
-                        return
-                    }
-                    HapticService.shared.primary()
-                    demarrageDictee = Task {
-                        try? await Task.sleep(nanoseconds: Self.delaiAvantEnregistrement)
-                        guard !Task.isCancelled, doigtSurMicro else { return }
-                        await speech.start()
-                        erreurDictee = speech.error
-
-                        // La bulle ne s'affiche QU'UNE FOIS le micro ouvert :
-                        // doigt déjà relâché, micro refusé, session audio
-                        // occupée → on referme immédiatement au lieu de laisser
-                        // la bulle à l'écran pendant une minute.
-                        guard !Task.isCancelled, doigtSurMicro,
-                              speech.state == .listening else {
-                            speech.stop()
-                            dicteeEnCours = false
-                            doigtSurMicro = false
-                            return
-                        }
-                        dicteeEnCours = true
-
-                        // Garde-fou : un geste peut être avalé et ne jamais
-                        // rendre son `onEnded`. Sans ce plafond, le micro
-                        // tournerait indéfiniment (verrou compris).
-                        try? await Task.sleep(nanoseconds: 60_000_000_000)
-                        guard !Task.isCancelled, dicteeEnCours else { return }
-                        doigtSurMicro = false
-                        terminerDictee()
-                    }
-                    return
-                }
-
-                // Doigt toujours posé : la bulle suit le glissement, et les deux
-                // seuils de la grammaire WhatsApp s'appliquent — à gauche on
-                // annule, vers le haut on verrouille (mains libres).
-                guard dicteeEnCours, !dicteeVerrouillee else { return }
-                glissementDictee = value.translation
-                switch DicteeGeste.decision(pour: value.translation) {
-                case .annuler:
-                    dicteeAnnulee = true
-                    annulerDictee()
-                case .verrouiller:
-                    dicteeVerrouillee = true
-                    glissementDictee = .zero
-                    HapticService.shared.strong()
-                case .continuer:
-                    break
-                }
+        dicteeTropCourte = false
+        dicteeAnnulee = false
+        voiceConfirmation = nil
+        glissementDictee = .zero
+        dicteeEnCours = true
+        dicteeVerrouillee = true
+        erreurDictee = nil
+        HapticService.shared.primary()
+        Task {
+            await speech.start()
+            erreurDictee = speech.error
+            if speech.state != .listening {
+                dicteeEnCours = false
+                dicteeVerrouillee = false
             }
-            .onEnded { _ in
-                doigtSurMicro = false
-
-                // Annulée d'un glissé : le relâchement ne déclenche plus rien.
-                if dicteeAnnulee {
-                    dicteeAnnulee = false
-                    return
-                }
-                // Verrouillée : l'enregistrement continue mains libres, la
-                // bulle se clôt par ses boutons (poubelle / envoi).
-                if dicteeVerrouillee {
-                    glissementDictee = .zero
-                    return
-                }
-
-                demarrageDictee?.cancel()
-                demarrageDictee = nil
-
-                guard peutDicter else {
-                    showPaywall = true
-                    return
-                }
-
-                // Rien n'a démarré : c'était un appui simple. On n'ouvre RIEN
-                // (l'ancienne feuille d'écoute est supprimée) — on apprend le
-                // geste, comme WhatsApp : un indice bref, puis il s'efface.
-                guard dicteeEnCours else {
-                    // Sauf si l'alerte d'autorisation vient de s'ouvrir : elle
-                    // dit déjà ce qu'il faut faire.
-                    if !demandeAutorisationVocale { afficherIndiceMaintien() }
-                    return
-                }
-                terminerDictee()
-            }
-    }
-
-    /// Indice « maintiens pour dicter » : visible ~2,5 s, remplacé si l'on
-    /// retape, jamais bloquant.
-    private func afficherIndiceMaintien() {
-        HapticService.shared.tap()
-        masquageIndice?.cancel()
-        withAnimation { montrerIndiceMaintien = true }
-        masquageIndice = Task {
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
-            guard !Task.isCancelled else { return }
-            withAnimation { montrerIndiceMaintien = false }
         }
     }
 
-    /// Clôt la dictée maintenue : trop courte, on annule sans faire attendre ;
-    /// sinon la feuille s'ouvre directement sur l'analyse de ce qui vient
-    /// d'être enregistré.
+    /// Clôt la dictée : trop courte, on annule sans faire attendre ; sinon la
+    /// feuille s'ouvre directement sur l'analyse de ce qui vient d'être
+    /// enregistré.
     private func terminerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
@@ -844,10 +735,8 @@ struct MealScanView: View {
         showVoice = true
     }
 
-    /// Annulation volontaire (glissé à gauche, ou poubelle de la bulle
-    /// verrouillée) : on jette l'enregistrement sans message d'erreur — c'est
-    /// un choix, pas un raté. Ne touche PAS à `doigtSurMicro` : le doigt peut
-    /// encore être posé, c'est `onEnded` qui le rendra.
+    /// Annulation volontaire (poubelle de la bulle) : on jette l'enregistrement
+    /// sans message d'erreur — c'est un choix, pas un raté.
     private func annulerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
@@ -858,251 +747,36 @@ struct MealScanView: View {
         speech.reset()
     }
 
-    /// Accessibilité (VoiceOver ne peut pas « maintenir ») : démarre une
-    /// dictée directement VERROUILLÉE, mains libres — la bulle et ses boutons
-    /// (annuler / envoyer) prennent la main, aucun maintien requis.
-    private func demarrerDicteePourAccessibilite() {
-        guard !dicteeEnCours else { return }
-        guard peutDicter else {
-            showPaywall = true
-            return
-        }
-        guard SpeechCaptureService.autorisationsAccordees else {
-            demandeAutorisationVocale = true
-            return
-        }
-        dicteeTropCourte = false
-        dicteeAnnulee = false
-        glissementDictee = .zero
-        dicteeEnCours = true
-        dicteeVerrouillee = true
-        erreurDictee = nil
-        HapticService.shared.primary()
-        Task {
-            await speech.start()
-            erreurDictee = speech.error
-            if speech.state != .listening {
-                dicteeEnCours = false
-                dicteeVerrouillee = false
-            }
-        }
-    }
-
-    /// Exemple de dictée + confirmation, sous le bloc à deux colonnes.
-    private var voiceHint: some View {
-        VStack(spacing: 10) {
-
-            // L'exemple porte des QUANTITÉS, volontairement : c'est ce que les
-            // gens oublient de dire, et c'est ce qui décide de la justesse du
-            // comptage. Sans quantité, l'app doit reposer la question.
-            Text("« Ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt »")
-                .font(.system(size: 13))
-                .foregroundStyle(Kiwio.secondaire)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 12)
-
-            if let msg = voiceConfirmation {
-                Text(msg)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.scoreExcellent)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    // Barre pilule (maquette 20 juillet) — placée sous la jauge kcal, le
-    // séparateur « ou » n'a plus de sens depuis la réorganisation.
-    /// Troisième entrée de la page, sous les deux gestes principaux : la barre
-    /// de recherche produit. Le code-barres vit DANS cette barre, à droite —
-    /// c'est la même intention (« trouver un produit »), pas un quatrième bouton.
-    /// Deux boutons distincts plutôt qu'un bouton dans un bouton : SwiftUI ne
-    /// sait pas router le tap entre deux boutons imbriqués.
-    private var searchEntry: some View {
-        HStack(spacing: 0) {
-            Button {
-                showSearch = true
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color.healthMapMuted)
-                    Text("Produit, marque ou ingrédient…")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                    Spacer(minLength: 0)
-                }
-                .padding(.leading, Theme.spacingMD)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityLabel("Rechercher un produit, une marque ou un ingrédient")
-
-            Rectangle()
-                .fill(Color.kiwiCharcoal.opacity(0.08))
-                .frame(width: 1, height: 22)
-
-            Button {
-                showBarcode = true
-            } label: {
-                Image(systemName: "barcode.viewfinder")
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(Color.kiwiGreen)
-                    .frame(width: 52, height: 48)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityLabel("Scanner un code-barres")
-        }
-        .background(Color.healthMapCard)
-        .clipShape(Capsule())
-        .overlay(Capsule().stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1))
-        .padding(.horizontal, Theme.spacingLG)
-    }
-
-    // MARK: - Carte photo compacte
-    /// Remplace le viseur plein écran quand aucune photo n'est choisie :
-    /// vignette caméra + libellé + chevron, bordure pointillée verte (repère
-    /// « zone d'ajout »). Le tap ouvre le choix appareil photo / galerie.
-    private var compactCapturePrompt: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.kiwiTint)
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.kiwiGreenInk)
-            }
-            .frame(width: 38, height: 38)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Photographie ton assiette")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.kiwiCharcoal)
-                Text("appareil photo ou galerie")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Color.healthMapMuted)
-            }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.healthMapMuted)
-        }
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity, minHeight: 60)
-        .background(Color.healthMapCard, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.kiwiGreen, style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Photographie ton assiette. Appareil photo ou galerie.")
-    }
-
-    // MARK: - Compteur de scans gratuits (badge compact du header)
-    /// Pastille compteur du header. `gated` = la pastille est AUSSI une porte
-    /// paywall quand le quota est épuisé (non-premium uniquement — matrice
-    /// `ScanQuotaUI`). Pour un abonné elle reste purement informative : tap
-    /// inerte, aucune mention premium, « ça se recharge demain ».
-    private func scanCounterPill(_ remaining: Int, gated: Bool) -> some View {
-        let ok = remaining > 0
-        let plural = remaining > 1 ? "s" : ""
-        return HStack(spacing: 5) {
-            Image(systemName: ok ? "bolt.fill" : (gated ? "lock.fill" : "hourglass"))
-                .font(.system(size: 10))
-            Text(ok ? "\(remaining) scan\(plural)" : "Épuisés")
-                .font(.system(size: 12, weight: .semibold))
-        }
-        .foregroundStyle(ok ? Color.kiwiGreenInk : Color.scoreLow)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background((ok ? Color.kiwiGreen : Color.scoreLow).opacity(0.10))
-        .clipShape(Capsule())
-        .onTapGesture { if !ok && gated { showPaywall = true } }
-        .accessibilityLabel(ok
-            ? "\(remaining) scan\(plural) restant\(plural) aujourd'hui"
-            : "Scans du jour épuisés")
-        .accessibilityHint(ok
-            ? ""
-            : (gated
-                ? "Passer en Premium pour débloquer jusqu’à 30 scans par jour"
-                : "Ça se recharge demain"))
-    }
-
-    // MARK: - Capture Zone
+    // MARK: - Capture Zone (photo choisie, en attente d'analyse)
     private var captureZone: some View {
         VStack(spacing: Theme.spacingMD) {
-            // Le tap ouvre un CHOIX appareil photo / galerie (retour build 319 :
-            // la galerie seule ne suffit pas, on doit pouvoir photographier
-            // l'assiette directement). Sur simulateur (pas de caméra), on passe
-            // directement à la galerie sans dialogue inutile.
-            Button {
-                if CameraPicker.isAvailable {
-                    showCaptureChoice = true
-                } else {
-                    showPhotoLibrary = true
-                }
-            } label: {
-                VStack(spacing: Theme.spacingMD) {
-                    if let uiImage = viewModel.apercuPhoto {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(height: 250)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
-                            .overlay(
-                                Button {
-                                    viewModel.selectedImage = nil
-                                    selectedItem = nil
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundStyle(.white)
-                                        .shadow(radius: 4)
-                                }
-                                .padding(8),
-                                alignment: .topTrailing
-                            )
-                    } else {
-                        // Carte compacte (maquette 20 juillet) : le grand viseur
-                        // 250 pt écrasait la page — la photo n'est plus le chemin
-                        // n°1 (le vocal l'est), une ligne suffit.
-                        compactCapturePrompt
-                    }
-                }
-            }
-            .buttonStyle(.healthMapPressed)
-            // ⚠️ Les présentations photo (dialogue, caméra, galerie) NE SONT PLUS
-            // attachées ici : `captureZone` n'est monté que lorsqu'une photo est
-            // déjà choisie, donc les modificateurs disparaissaient de la
-            // hiérarchie et le bouton « Scanne ton repas » ne présentait rien.
-            // Elles vivent désormais à la racine de l'écran (voir `photoPresentations`).
-
-            if viewModel.selectedImage != nil {
-                Button {
-                    Task { await viewModel.analyzePhoto() }
-                } label: {
-                    HStack {
-                        Image(systemName: "sparkles")
-                        Text("Analyser ce repas")
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    .foregroundStyle(.white)
+            if let uiImage = viewModel.apercuPhoto {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 220)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.kiwiGreen)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
-                }
+                    .clipShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+                    .overlay(
+                        Button {
+                            viewModel.selectedImage = nil
+                            selectedItem = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 26))
+                                .foregroundStyle(.white)
+                                .shadow(radius: 4)
+                                .frame(width: DS.cibleTactile, height: DS.cibleTactile)
+                        }
+                        .accessibilityLabel("Retirer la photo"),
+                        alignment: .topTrailing
+                    )
+            }
+
+            DSCapsuleButton(titre: "Analyser ce repas") {
+                Task { await viewModel.analyzePhoto() }
             }
         }
-        .padding(.horizontal, Theme.spacingLG)
     }
 
     // MARK: - Résultat immersif (p-scanner)
@@ -2090,12 +1764,12 @@ private struct IndiceVerrou: View {
 }
 
 #Preview {
-    MealScanView()
+    JournalView()
         .environmentObject(DashboardViewModel())
 }
 
 // MARK: - Boîte de dictée (détention SANS observation)
-/// `MealScanView` doit DÉTENIR le service de capture (durée de vie de l'écran)
+/// `JournalView` doit DÉTENIR le service de capture (durée de vie de l'écran)
 /// sans s'abonner à ses publications. Cette boîte est un `ObservableObject`
 /// volontairement MUET — aucun `@Published` — donc `@StateObject` garantit une
 /// seule instance sans jamais réinvalider la page. Les objets qui, eux,

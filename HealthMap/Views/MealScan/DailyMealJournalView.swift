@@ -27,26 +27,45 @@ struct DailyMealJournalView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                WarmBackground()
-                ScrollView {
-                    VStack(spacing: Theme.spacingLG) {
-                        barreDeJour
-                        headerCard
-                        ForEach(MealJournalService.MealSlot.allCases, id: \.self) { slot in
-                            slotSection(slot)
-                        }
+            // Refonte 23 août 2026 : une liste NATIVE (swipe pour supprimer ou
+            // modifier, sections par repas), sur le fond neutre. L'en-tête
+            // reprend les cartes du Journal (calories + macros), même donnée,
+            // même dessin.
+            List {
+                Section {
+                    barreDeJour
+                    JournalCaloriesCard(
+                        consommees: vm.dayCalories,
+                        objectif: kcalTarget,
+                        depensees: nil,
+                        isToday: estAujourdhui
+                    )
+                    HStack(spacing: DS.interCarte) {
+                        JournalMacroCard(valeur: vm.dayProteins, cible: protTarget,
+                                         libelle: "Protéines", couleur: .dsProteines, delai: 0.35)
+                        JournalMacroCard(valeur: vm.dayCarbs, cible: carbTarget,
+                                         libelle: "Glucides", couleur: .dsGlucides, delai: 0.40)
+                        JournalMacroCard(valeur: vm.dayFats, cible: fatTarget,
+                                         libelle: "Lipides", couleur: .dsLipides, delai: 0.45)
                     }
-                    .padding(.vertical, Theme.spacingMD)
-                    .padding(.horizontal, Theme.spacingLG)
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 6, leading: DS.marge, bottom: 6, trailing: DS.marge))
+
+                ForEach(MealJournalService.MealSlot.ordreJournal, id: \.self) { slot in
+                    slotSection(slot)
                 }
             }
-            .navigationTitle("Journal")
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color.dsFond.ignoresSafeArea())
+            .navigationTitle("Ma journée")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
-                        .foregroundStyle(Color.kiwiGreenInk)
+                        .foregroundStyle(Color.dsAccent)
                 }
             }
             .task { await vm.load() }
@@ -91,8 +110,8 @@ struct DailyMealJournalView: View {
                 Task { await vm.allerAuJour(Calendar.current.date(byAdding: .day, value: -1, to: vm.selectedDay) ?? vm.selectedDay) }
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.dsAccent)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -106,16 +125,16 @@ struct DailyMealJournalView: View {
                         .font(.system(size: 14, weight: .semibold))
                     VStack(spacing: 1) {
                         Text(vm.dayLabel)
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(.dsHeadline)
                         Text(vm.daySub)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.healthMapMuted)
+                            .font(.dsLegende)
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                     if vm.chargeLArchive {
                         ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
                     }
                 }
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
@@ -128,8 +147,8 @@ struct DailyMealJournalView: View {
                 Task { await vm.allerAuJour(Calendar.current.date(byAdding: .day, value: 1, to: vm.selectedDay) ?? vm.selectedDay) }
             } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(vm.canGoNext ? Color.kiwiGreenInk : Color.healthMapMuted.opacity(0.4))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(vm.canGoNext ? Color.dsAccent : Color.dsTertiaire)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -137,7 +156,7 @@ struct DailyMealJournalView: View {
             .accessibilityLabel("Jour suivant")
         }
         .padding(.horizontal, 4)
-        .kiwiCard(radius: 20)
+        .dsCard()
     }
 
     private var feuilleCalendrier: some View {
@@ -152,217 +171,119 @@ struct DailyMealJournalView: View {
                 displayedComponents: .date
             )
             .datePickerStyle(.graphical)
-            .tint(Color.kiwiGreen)
+            .tint(Color.dsAccent)
             .padding(.horizontal, Theme.spacingMD)
             .navigationTitle("Aller à une date")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("OK") { montreCalendrier = false }
-                        .foregroundStyle(Color.kiwiGreenInk)
+                        .foregroundStyle(Color.dsAccent)
                 }
             }
         }
         .presentationDetents([.medium, .large])
     }
 
-    // MARK: - En-tête (kcal restantes + macros vs cibles réelles)
-
-    private var headerCard: some View {
-        let consumed = vm.dayCalories
-        return VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            Text(estAujourdhui
-                 ? "Aujourd'hui · \(Self.dayFormatter.string(from: vm.selectedDay))"
-                 : Self.dayFormatter.string(from: vm.selectedDay).capitalized)
-                .font(.system(size: 12))
-                .foregroundStyle(Color.healthMapMuted)
-
-            if let target = kcalTarget, target > 0 {
-                let rest = target - consumed
-                HStack(alignment: .firstTextBaseline) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        // Même donnée que l'accueil Scan (kcal restantes) : même
-                        // style, désormais (elle s'écrivait 30/bold là-bas et
-                        // 28/semibold ici).
-                        Text("\(abs(rest))")
-                            .font(Theme.heroValueFont)
-                            .foregroundStyle(rest >= 0 ? Color.kiwiGreenInk : Color.scoreDeficient)
-                        Text(rest >= 0 ? (estAujourdhui ? "kcal restantes" : "kcal sous l'objectif") : "kcal au-dessus")
-                            .font(Theme.dataSecondaryFont)
-                            .foregroundStyle(Color.healthMapSecondary)
-                    }
-                    Spacer()
-                    Text("\(consumed) / \(target)")
-                        .font(Theme.dataSecondaryFont.monospacedDigit())
-                        .foregroundStyle(Color.healthMapSecondary)
-                }
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.kiwiGreen.opacity(0.14))
-                        Capsule().fill(Color.kiwiGreen)
-                            .frame(width: max(4, g.size.width * CGFloat(min(1, Double(consumed) / Double(target)))))
-                    }
-                }
-                .frame(height: 8)
-            } else {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("\(consumed)")
-                        .font(Theme.heroValueFont)
-                        .foregroundStyle(Color.healthMapText)
-                    Text(estAujourdhui ? "kcal aujourd'hui" : "kcal ce jour-là")
-                        .font(Theme.dataSecondaryFont)
-                        .foregroundStyle(Color.healthMapSecondary)
-                }
-            }
-
-            HStack(spacing: Theme.spacingMD) {
-                macroBar("Protéines", vm.dayProteins, target: protTarget, color: .macroProtein)
-                macroBar("Glucides", vm.dayCarbs, target: carbTarget, color: .macroCarb)
-                macroBar("Lipides", vm.dayFats, target: fatTarget, color: .macroFat)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.spacingMD)
-        .kiwiCard(radius: 24)
-    }
-
-    /// Barre macro : rempli vs cible réelle du profil ; SANS cible → grammes
-    /// seuls sur piste neutre vide (jamais un ratio inventé).
-    private func macroBar(_ label: String, _ value: Double, target: Int?, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Text(label)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.healthMapMuted)
-                Spacer(minLength: 2)
-                Text(target.map { "\(Int(value.rounded()))/\($0) g" } ?? "\(Int(value.rounded())) g")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.healthMapSecondary)
-            }
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            GeometryReader { g in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(color.opacity(0.16))
-                    if let t = target, t > 0 {
-                        Capsule().fill(color)
-                            .frame(width: max(2, g.size.width * CGFloat(min(1, value / Double(t)))))
-                    }
-                }
-            }
-            .frame(height: 4)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Créneau (Matin / Midi / Soir / Encas)
+    // MARK: - Créneau (section native : titre, kcal, +)
 
     private func slotSection(_ slot: MealJournalService.MealSlot) -> some View {
         let rows = vm.dayRows(in: slot)
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 7) {
-                // Titre de section : même grammaire que `ScanCardHeader` sur
-                // l'accueil (13/bold à l'encre du domaine). L'onglet en portait
-                // deux, 16/bold ici et 15/semibold là.
-                Text(slot.emoji).font(.system(size: 15))
-                Text(slot.label)
-                    .font(Theme.sectionLabelFont)
-                    .foregroundStyle(ScanDomaine.energie)
-                if !rows.isEmpty {
-                    Text("\(vm.dayCalories(in: slot)) kcal")
-                        .font(Theme.dataSecondaryFont.monospacedDigit())
-                        .foregroundStyle(Color.healthMapMuted)
-                }
-                Spacer()
-                // L'ajout écrit toujours sur AUJOURD'HUI : on ne le propose donc
-                // pas quand on relit un jour passé, plutôt que de faire atterrir
-                // l'aliment sur la mauvaise date.
-                if estAujourdhui {
-                    Button {
-                        searchSlot = slot
-                    } label: {
-                        ZStack {
-                            Circle().fill(Color.kiwiGreenSoft).frame(width: 28, height: 28)
-                            Image(systemName: "plus")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.kiwiGreenInk)
-                        }
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("Ajouter un aliment, \(slot.label)")
-                }
-            }
-            .padding(.horizontal, 4)
-
+        return Section {
             if rows.isEmpty {
                 Text("Rien pour l'instant")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.healthMapMuted)
-                    .padding(.horizontal, 4)
+                    .font(.dsSousTitre)
+                    .foregroundStyle(Color.dsTertiaire)
             } else {
                 ForEach(rows) { row in
-                    rowCard(row)
+                    rowContent(row)
+                        .contentShape(Rectangle())
+                        .onTapGesture { selectedRow = row }
+                        // Swipe natif : supprimer (et modifier quand la
+                        // quantité est éditable). Plus de bouton visible.
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                HapticService.shared.warning()
+                                Task { await vm.delete(row) }
+                            } label: {
+                                Label(row.deletesWholeRecord ? "Supprimer" : "Retirer", systemImage: "trash")
+                            }
+                            if row.isQuantityEditable {
+                                Button {
+                                    selectedRow = row
+                                } label: {
+                                    Label("Modifier", systemImage: "pencil")
+                                }
+                                .tint(Color.dsAccent)
+                            }
+                        }
+                        .accessibilityHint("Voir le détail. Balaye vers la gauche pour supprimer.")
                 }
             }
+        } header: {
+            HStack(spacing: 8) {
+                Image(systemName: slot.symboleJournal)
+                    .font(.system(size: 15, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .accessibilityHidden(true)
+                Text(slot.titreJournal)
+                    .font(.dsSousTitreFort)
+                if !rows.isEmpty {
+                    Text("\(DS.entier(vm.dayCalories(in: slot))) kcal")
+                        .font(.dsValeurLigne)
+                }
+                Spacer(minLength: 0)
+                // L'ajout écrit toujours sur AUJOURD'HUI : on ne le propose donc
+                // pas quand on relit un jour passé.
+                if estAujourdhui {
+                    Button {
+                        HapticService.shared.tap()
+                        searchSlot = slot
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(Color.dsAccent)
+                            .frame(width: DS.cibleTactile, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.dsPress)
+                    .accessibilityLabel("Ajouter un aliment, \(slot.titreJournal)")
+                }
+            }
+            .foregroundStyle(Color.dsSecondaire)
+            .textCase(nil)
         }
     }
 
     // MARK: - Ligne aliment
 
-    private func rowCard(_ row: MealJournalRow) -> some View {
-        Button { selectedRow = row } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.kiwiGreenSoft)
-                        .frame(width: 40, height: 40)
-                    Image(systemName: rowSymbol(row))
-                        .font(.system(size: 17))
-                        .foregroundStyle(Color.kiwiGreen)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(row.name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.healthMapText)
-                        .lineLimit(1)
-                    if let g = row.grams {
-                        Text("\(Int(g.rounded())) g")
-                            .font(.system(size: 13, design: .rounded))
-                            .foregroundStyle(Color.healthMapMuted)
-                    }
-                }
-                Spacer(minLength: 8)
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text("\(row.calories)")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.healthMapText)
-                    Text("kcal")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.healthMapMuted)
+    private func rowContent(_ row: MealJournalRow) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: rowSymbol(row))
+                .font(.system(size: 21, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsSecondaire)
+                .frame(width: 21)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.name)
+                    .font(.dsCorps)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
+                if let g = row.grams {
+                    Text("\(DS.entier(Int(g.rounded()))) g")
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.healthMapCard)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.kiwiCharcoal.opacity(0.05), lineWidth: 1)
-                    )
-            )
+            Spacer(minLength: 8)
+            Text("\(DS.entier(row.calories)) kcal")
+                .font(.dsValeurLigne)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
         }
-        .buttonStyle(.healthMapPressed)
-        .contextMenu {
-            Button(role: .destructive) {
-                Task { await vm.delete(row) }
-            } label: {
-                Label(row.deletesWholeRecord ? "Supprimer du journal" : "Retirer cet aliment",
-                      systemImage: "trash")
-            }
-        }
-        .accessibilityHint("Voir le détail et supprimer")
+        .padding(.vertical, 4)
     }
 
     private func rowSymbol(_ row: MealJournalRow) -> String {

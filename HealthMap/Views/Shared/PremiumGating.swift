@@ -85,44 +85,42 @@ struct PremiumTeasePromise: Identifiable {
     let blurred: String
 }
 
-/// En-tête de l'écrin : kicker « 💎 ANALYSE PERSONNELLE » + badge « PREMIUM ».
+/// En-tête de l'écrin, version calme (refonte 23 août 2026) : un kicker en
+/// légende secondaire, sans emoji ni badge dégradé.
 struct PremiumTeaseHeader: View {
-    var kicker: String = "ANALYSE PERSONNELLE"
+    var kicker: String = "Analyse personnelle"
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            Text("💎 \(kicker)")
-                .font(.system(size: 11, weight: .heavy))
-                .tracking(0.4)
-                .foregroundStyle(Color.premiumTeaseInk)
+            Text(kicker)
+                .font(.dsLegende)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Spacer(minLength: 4)
-            Text("PREMIUM")
-                .font(.system(size: 10, weight: .heavy))
-                .tracking(0.3)
-                .foregroundStyle(.white)
+            Text("Premium")
+                .font(.dsLegendeMoyenne)
+                .foregroundStyle(Color.dsSecondaire)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(LinearGradient.premiumBadge, in: Capsule())
+                .background(Capsule().fill(Color.dsRemplissage))
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Analyse personnelle, réservée à Kiwio Premium")
     }
 }
 
-/// Tuile de promesse : libellé net, deuxième ligne floutée.
+/// Tuile de promesse : libellé net, deuxième ligne floutée. Fond gris
+/// neutre, encre du DS (plus d'emoji).
 private struct PremiumTeaseTile: View {
     let promise: PremiumTeasePromise
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(promise.emoji)
-                .font(.system(size: 13))
-                .accessibilityHidden(true)
             Text(promise.label)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.premiumTeaseInk)
+                .font(.dsLegendeMoyenne)
+                .foregroundStyle(Color.dsTexte)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             // Le vrai contenu premium, illisible : flou 4 pt, aucune
@@ -130,7 +128,7 @@ private struct PremiumTeaseTile: View {
             // pour VoiceOver. Le `clipShape` de la tuile coupe la bavure.
             Text(promise.blurred)
                 .font(.system(size: 10.5, weight: .medium))
-                .foregroundStyle(Color.premiumTeaseInk.opacity(0.75))
+                .foregroundStyle(Color.dsSecondaire)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .frame(height: 26, alignment: .topLeading)
@@ -140,42 +138,31 @@ private struct PremiumTeaseTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(9)
-        .background(Color.white.opacity(0.55))
+        .background(Color.dsRemplissage)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(promise.label), réservé à Kiwio Premium")
     }
 }
 
-/// Bouton de l'écrin : aplat kiwi dégradé, sparkles, hauteur 48.
+/// Sortie de l'écrin : un lien vert, pas un CTA pleine largeur (le paywall
+/// vit dans Réglages ; la porte n'est qu'un lien vers lui).
 private struct PremiumTeaseButton: View {
     let title: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 15, weight: .semibold))
-                    .accessibilityHidden(true)
+            HStack(spacing: 6) {
                 Text(title)
-                    .font(.system(size: 14.5, weight: .semibold))
+                    .font(.dsSousTitreFort)
+                    .foregroundStyle(Color.dsAccent)
+                DSChevron(couleur: .dsAccent)
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(
-                LinearGradient(
-                    colors: [Color.kiwiGreen, Color.kiwiGreenInk],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
-            .shadow(color: Color.kiwiGreen.opacity(0.26), radius: 10, x: 0, y: 5)
+            .frame(minHeight: 32)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel(title)
     }
 }
@@ -186,8 +173,8 @@ private struct PremiumTeaseButton: View {
 struct PremiumTeaseCard: View {
     let title: String
     let promises: [PremiumTeasePromise]
-    var kicker: String = "ANALYSE PERSONNELLE"
-    var ctaTitle: String = "Débloquer mon analyse"
+    var kicker: String = "Analyse personnelle"
+    var ctaTitle: String = "S'ouvre avec Kiwio Premium"
     /// Identifiant de zone (tracking paywall contextualisé).
     var zone: String = ""
     /// Navigation custom ; si nil → présente `PaywallView`.
@@ -200,10 +187,10 @@ struct PremiumTeaseCard: View {
             PremiumTeaseHeader(kicker: kicker)
 
             Text(title)
-                .font(Theme.conclusionFont)
-                .tracking(Theme.conclusionTracking)
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
                 .lineSpacing(2)
-                .foregroundStyle(Color.premiumTeaseInk)
+                .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -225,14 +212,9 @@ struct PremiumTeaseCard: View {
                 }
             }
         }
-        .padding(14)
+        .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LinearGradient.premiumTease)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.accentIndigo.opacity(0.3), lineWidth: 1)
-        )
+        .dsCard()
         .sheet(isPresented: $showPaywall) {
             PaywallView(source: zone.isEmpty ? "premium_gate" : zone)
                 .healthMapFullSheet()
@@ -273,73 +255,60 @@ struct UnlockDoor: View {
             }
         } label: {
             if compact {
+                // Mur de quota : capsule pleine, sans ombre.
                 HStack(spacing: 8) {
                     Image(systemName: icon)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
                     Text(title)
-                        .font(.system(size: 14, weight: .heavy))
+                        .font(.dsSousTitreFort)
                         .foregroundStyle(.white)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-                .background(Color.kiwiGreen, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                .contentShape(Rectangle())
+                .frame(height: DS.hauteurBouton)
+                .background(Capsule().fill(Color.dsAccent))
+                .contentShape(Capsule())
             } else {
-                // Écrin premium : le bénéfice spécifique porte la conclusion
-                // (17 / heavy, encre violette), le CTA kiwi porte l'action.
-                VStack(alignment: .leading, spacing: 10) {
-                    PremiumTeaseHeader()
-
+                // Refonte 23 août 2026 : la porte est CALME. Une carte blanche,
+                // le bénéfice en headline, la précision en secondaire, puis un
+                // lien vert. Plus d'écrin violet, plus de CTA pleine largeur,
+                // plus d'ombre : le paywall vit dans Réglages, la porte n'est
+                // qu'un lien vers lui.
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(Theme.conclusionFont)
-                        .tracking(Theme.conclusionTracking)
-                        .lineSpacing(2)
-                        .foregroundStyle(Color.premiumTeaseInk)
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
+                        .foregroundStyle(Color.dsTexte)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     if let subtitle, !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(Theme.dataSecondaryFont)
-                            .foregroundStyle(Color.premiumTeaseInk.opacity(0.75))
+                            .font(.dsSousTitre)
+                            .tracking(DSTracking.sousTitre)
+                            .foregroundStyle(Color.dsSecondaire)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    HStack(spacing: 7) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 15, weight: .semibold))
-                        Text("Débloquer mon analyse")
-                            .font(.system(size: 14.5, weight: .semibold))
+                    HStack(spacing: 6) {
+                        Text("S'ouvre avec Kiwio Premium")
+                            .font(.dsSousTitreFort)
+                            .foregroundStyle(Color.dsAccent)
+                        DSChevron(couleur: .dsAccent)
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.kiwiGreen, Color.kiwiGreenInk],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    )
-                    .shadow(color: Color.kiwiGreen.opacity(0.26), radius: 10, x: 0, y: 5)
+                    .padding(.top, 8)
+                    .frame(minHeight: 32)
                 }
-                .padding(14)
+                .padding(DS.paddingCarte)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(LinearGradient.premiumTease)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.accentIndigo.opacity(0.3), lineWidth: 1)
-                )
+                .dsCard()
                 .contentShape(Rectangle())
             }
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel(subtitle == nil ? title : "\(title). \(subtitle ?? "")")
         .accessibilityAddTraits(.isButton)
         .sheet(isPresented: $showPaywall) {
@@ -390,7 +359,7 @@ struct QuotaMeter: View {
 
             (Text("Il te reste ")
                 + Text("\(remaining) \(unit)\(remaining > 1 ? "s" : "")")
-                    .font(.system(size: 12.5, weight: .heavy)).foregroundColor(Color.kiwiInk)
+                    .font(.system(size: 12.5, weight: .bold)).foregroundColor(Color.kiwiInk)
                 + Text(remaining > 1 ? ", encore de quoi avancer aujourd’hui." : ". Ton quota revient demain."))
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundColor(Color(hex: "3A3833"))
@@ -435,7 +404,7 @@ struct QuotaWall: View {
             .accessibilityHidden(true)
 
             Text(title)
-                .font(.system(size: 16, weight: .heavy))
+                .font(.system(size: 16, weight: .bold))
                 .tracking(-0.3)
                 .foregroundStyle(Color.healthMapText)
                 .padding(.top, 12)
@@ -474,7 +443,7 @@ struct QuotaWall: View {
         VStack(spacing: 16) {
             GatedOverlay(intensity: .teaser) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Où la trouver").font(.system(size: 11, weight: .heavy)).foregroundStyle(Color.kiwiInk)
+                    Text("Où la trouver").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.kiwiInk)
                     Text("Œufs · Sardines · Fromage. Associe la B12 à des folates pour doubler l'assimilation.")
                         .font(.system(size: 12))
                 }

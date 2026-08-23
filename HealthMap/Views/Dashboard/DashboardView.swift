@@ -1,6 +1,13 @@
 import SwiftUI
 
-// MARK: - Dashboard View (onglet Bilan — refonte « v7 dashboard », 22 juillet 2026)
+// MARK: - Dashboard View (Bilan complet — refonte « v7 dashboard », 22 juillet 2026)
+//
+// Refonte 23 août 2026 : le Bilan n'est plus un onglet. Il a fusionné dans le
+// Journal, qui en porte l'essentiel (apports à renforcer, interaction
+// détectée). Cet écran reste le BILAN COMPLET, présenté en feuille depuis
+// « Tout afficher » : score, apports, points d'attention, symptômes, série,
+// repas, sources. Il ne vend plus rien : la carte et la pill Premium ont
+// quitté le Bilan (le paywall vit uniquement dans Réglages).
 //
 // Maquette de référence : « Kiwio - Bilan (standalone) » (iPhone 393 pt).
 // Ordre de lecture Z1 → Z7 :
@@ -32,19 +39,16 @@ struct DashboardView: View {
 
     @State private var selectedApport: ApportV2?
     @State private var selectedAttention: InteractionV2?
-    @State private var showPaywall = false
     @State private var showTrophies = false
     @State private var showScoreDetail = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             ZStack {
-                WarmBackground()
-                // Lavis Bilan : bleu, l'accent historique de l'analyse.
-                TabWashBackground(tint: .healthMapBlue)
+                DSPageBackground(voile: false)
                 content
             }
-            .kiwiTabBarBottomInset()
             // Recharge le journal dès qu'un scan est persisté ailleurs (onglet
             // Scanner) — posé ICI (pas dans mainContent) pour rester vivant même
             // si le bilan v2 n'est pas encore chargé/valide (mainContent n'est
@@ -52,23 +56,16 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
                 Task { await journal.load() }
             }
-            // v7 : l'en-tête de l'écran fait office de titre — la barre reste
-            // inline et vide, seul l'avatar Profil y demeure.
+            // L'en-tête de l'écran fait office de titre ; la barre ne porte
+            // que le bouton de fermeture de la feuille.
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .kiwiNavigationBarBackground()
             .toolbar {
-                // Avatar Profil en haut à droite (ouvre le Profil en sheet via
-                // NotificationCenter, consommé par MainTabView). Accent vert kiwi.
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
-                    } label: {
-                        Image(systemName: "person.crop.circle")
-                            .font(.system(size: 22))
-                            .foregroundStyle(Color.kiwiGreen)
-                    }
-                    .accessibilityLabel("Profil")
+                    Button("Fermer") { dismiss() }
+                        .foregroundStyle(Color.dsAccent)
+                        .accessibilityLabel("Fermer")
                 }
             }
             .navigationDestination(isPresented: $showScoreDetail) {
@@ -95,11 +92,6 @@ struct DashboardView: View {
             // Trophées de la récolte (feuille existante, alimentée par la série).
             .sheet(isPresented: $showTrophies) {
                 RecolteDetailSheet(streak: gamification.currentStreak)
-            }
-            // Paywall ouvert par la pill et la carte Premium du Bilan.
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .healthMapFullSheet()
             }
         }
     }
@@ -163,15 +155,9 @@ struct DashboardView: View {
                     RedFlagsCardView(flags: immediateRedFlags)
                 }
 
-                // Z1 · En-tête (pill Premium masquée avant le bilan)
-                BilanV7Header(
-                    date: Date(),
-                    showsPremiumPill: viewModel.premiumVisible
-                ) {
-                    HapticService.shared.tap()
-                    showPaywall = true
-                }
-                .staggeredAppear(index: 0)
+                // Z1 · En-tête (plus de pill Premium : le paywall vit dans Réglages)
+                BilanV7Header(date: Date(), showsPremiumPill: false) { }
+                    .staggeredAppear(index: 0)
 
                 // Z2 · Hero : l'anneau attend le bilan (aucun bouton ici —
                 // un CTA géant par zone, jamais trois empilés)
@@ -239,16 +225,9 @@ struct DashboardView: View {
                     RedFlagsCardView(flags: immediateRedFlags)
                 }
 
-                // Z1 · En-tête + pill Premium (masquée tant que le bilan
-                // n'est pas fait — `premiumVisible`, décision fondateur V12a)
-                BilanV7Header(
-                    date: Date(),
-                    showsPremiumPill: viewModel.premiumVisible
-                ) {
-                    HapticService.shared.tap()
-                    showPaywall = true
-                }
-                .staggeredAppear(index: 0)
+                // Z1 · En-tête (plus de pill Premium : le paywall vit dans Réglages)
+                BilanV7Header(date: Date(), showsPremiumPill: false) { }
+                    .staggeredAppear(index: 0)
 
                 // Z2 · Score du jour (anneau compact + tendance de la semaine)
                 BilanV7ScoreCard(
@@ -311,15 +290,8 @@ struct DashboardView: View {
                         .staggeredAppear(index: 6)
                 }
 
-                // Z7 · Kiwio Premium (non-premium uniquement, et jamais
-                // avant le bilan — `premiumVisible`)
-                if viewModel.premiumVisible {
-                    BilanV7PremiumCard {
-                        HapticService.shared.tap()
-                        showPaywall = true
-                    }
-                    .staggeredAppear(index: 7)
-                }
+                // Z7 (ex-carte Kiwio Premium) : retirée, le paywall vit
+                // uniquement dans Réglages (refonte 23 août 2026).
 
                 // Indicateur de rafraîchissement (bilan déjà présent)
                 if viewModel.isLoadingAnalysis || viewModel.isLoadingAnalysisV2 {
@@ -482,12 +454,17 @@ struct DashboardView: View {
     }
 
     // MARK: - Navigation onglets (mécanisme existant)
+    /// Le Bilan est une feuille : on la referme AVANT de changer d'onglet,
+    /// sinon l'onglet visé s'ouvre derrière elle.
     private func openTab(_ destination: NavCardDestination) {
         HapticService.shared.tap()
-        NotificationCenter.default.post(
-            name: .healthmapNavigateToTab,
-            object: destination.rawValue
-        )
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            NotificationCenter.default.post(
+                name: .healthmapNavigateToTab,
+                object: destination.rawValue
+            )
+        }
     }
 }
 

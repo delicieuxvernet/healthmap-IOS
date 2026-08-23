@@ -191,7 +191,7 @@ struct SupplementPrecautionsSheet: View {
                         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white))
                         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(Color.kiwiCharcoal.opacity(0.04), lineWidth: 1))
-                        .shadow(color: Color.kiwiCharcoal.opacity(0.05), radius: 3, x: 0, y: 1)
+                        // (ombre retirée, refonte 23 août 2026)
                     }
                 }
 

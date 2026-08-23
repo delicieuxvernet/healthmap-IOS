@@ -36,7 +36,7 @@ struct RedFlagsCardView: View {
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(urgencyLabel(flag.urgency))
-                            .font(.system(size: 11, weight: .heavy))
+                            .font(.system(size: 11, weight: .bold))
                             .kerning(0.3)
                             .textCase(.uppercase)
                             .foregroundStyle(tint)
