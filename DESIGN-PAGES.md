@@ -16,9 +16,10 @@
 
 ## ⭐⭐ Refonte « qualité Apple » (direction du 23 août 2026 — socle iOS natif)
 
-> **Sources de vérité** : `Kiwio iOS - refonte.dc.html` (maquette, 7 écrans, iPhone 393 pt) et
-> `instructions-claude-code-refonte-ios.md` (document d'implémentation), tous deux dans
-> `C:\Users\stana\Downloads\`. Cette direction **remplace** la DA crème/vert ci-dessous : le fond
+> **Sources de vérité** : `Kiwio iOS - refonte.dc.html` (maquette, **10 écrans** dans sa
+> version du 23 août 11:52, `C:\Users\stana\AppData\Local\Temp\` ; la v1 à 7 écrans est dans
+> `Downloads`) et `instructions-claude-code-refonte-ios.md` (document d'implémentation,
+> `Downloads`). Cette direction **remplace** la DA crème/vert ci-dessous : le fond
 > devient neutre (`systemGroupedBackground`), le vert ne colore que ce qui se tape, un seul chiffre
 > héros par écran, cartes blanches rayon 14 **sans ombre**, gras plafonné à 700, chiffres SF Pro
 > tabulaires. Tokens : `HealthMap/Views/Shared/KiwiDS.swift` (préfixe `ds`).
@@ -30,19 +31,29 @@
 > Réglages sont le **seul** endroit qui parle d'argent (carte Premium, prix et essai lus depuis StoreKit).
 >
 > **Écrans** :
-> - **Journal** (`MealScanView.swift` → `JournalView`, `JournalComponents.swift`) : semainier · carte
->   calories (héros 48 + anneau) · 3 cartes macros · « Apports à renforcer » (interaction détectée,
->   preuve, 3 apports, une sortie verte) AVANT · « Aujourd'hui » (4 repas) · bouton `+`.
+> - **Journal** (`MealScanView.swift` → `JournalView`, `JournalComponents.swift`) : le jour même (la
+>   navigation par jour vit dans « Ma journée ») · carte calories (héros 48 + anneau 76) · macros en
+>   une carte · « Apports à renforcer » (la phrase de l'interaction, 3 apports, une sortie verte) AVANT
+>   · « Aujourd'hui » (4 repas) · bouton `+`. **Avant le questionnaire** : « On ne connaît pas encore
+>   tes besoins » (porte), « En attendant, en France » (`TeaserStatsCatalog`, jamais un chiffre
+>   inventé), « À la fin du questionnaire » ; Progrès · Plan · Compléments estompés dans la barre.
 > - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) : titre 34 + rôle · carte état
 >   (« 42 % », « 5,9 sur 18 mg » dérivé de la référence canonique, jauge) · Pourquoi · Ce qui le remonte ·
->   capsule vers le plan.
+>   capsule vers le plan. **Gratuit** : la cause en clair, « Ce qui le remonte » floutée, porte
+>   épinglée en bas (`UnlockDoor` : cadenas, titre honnête, précision, capsule d'essai StoreKit).
+> - **Compléments** (`SupplementsView.swift`, `SupplementsRefonteComponents.swift`) : segmented natif
+>   Compléments · Par l'assiette, carte d'engagement (première visite) puis ligne, « Ton rituel du
+>   jour » (matin · midi · soir, un tap coche le moment), « Recommandés pour toi » (une carte par
+>   apport : produit, dose et moment, Pourquoi celui-là, Précautions, Ma sélection), ligne « Ma
+>   sélection · N compléments · X € par mois » → feuille (qualité des formes + cases).
 > - **Progrès** (`SuiviView.swift`, `ProgresComponents.swift`) : vue d'ensemble (2 cartes) · besoins et
 >   apports (segmented natif, conclusion, barres + pointillé) · apports à renforcer · état premier jour
 >   en une carte ; check-in et courbes symptômes conservés.
 > - **Plan** (`PlanRadialComponents.swift`) : traits fins `#D1D1D6`, disques blancs sans ombre, symboles
 >   noirs, carte de pied ; feuille de nœud (cause → 3 leviers → délai → capsule).
-> - **Réglages** (`ReglagesView.swift`) : avatar + prénom · carte Premium · Mon compte · transparence ·
->   mon bilan · progression · préférences · déconnexion. Sous-pages : abonnement, données (RGPD).
+> - **Réglages** (`ReglagesView.swift`) : avatar 64 + prénom · carte Premium · Mon compte (profil et
+>   objectifs, abonnement, Apple Santé) · transparence · mon bilan · progression · préférences ·
+>   déconnexion. Sous-pages : abonnement, données (RGPD).
 >
 > **Non appliqué (décisions produit à trancher, pas du design)** : le verrouillage par nœud du Plan
 > (2 nets / 3 floutés) ; « Mes aliments » et « Activité » comme saisie (remplacés par le journal complet
