@@ -73,8 +73,13 @@ final class ScreenshotsUITests: XCTestCase {
         connecterSiBesoin()
 
         // Journal : le premier onglet, une fois le profil chargé.
-        XCTAssertTrue(app.buttons["Progrès"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
         attendreChargement()
+
+        // Deux aliments dans la journée (yaourt, banane) : les cartes calories
+        // et macros de la capture ne sont pas à zéro.
+        for aliment in ["Yaourt nature", "Banane"] { ajouterRapide(aliment) }
+        sleep(2)
         snap("10-journal")
         app.swipeUp()
         sleep(1)
@@ -136,9 +141,13 @@ final class ScreenshotsUITests: XCTestCase {
             fermerFeuille()
         }
 
-        // Progrès.
-        app.buttons["Progrès"].tap()
+        // Progrès (le check-in du jour s'ouvre à la première visite : plus tard).
+        app.buttons["tab.progres"].tap()
         sleep(2)
+        if app.buttons["Plus tard"].waitForExistence(timeout: 3) {
+            app.buttons["Plus tard"].tap()
+            sleep(1)
+        }
         snap("20-progres")
         app.swipeUp()
         sleep(1)
@@ -146,7 +155,7 @@ final class ScreenshotsUITests: XCTestCase {
         app.swipeDown()
 
         // Plan + feuille d'un nœud.
-        app.buttons["Plan"].tap()
+        app.buttons["tab.plan"].tap()
         sleep(3)
         snap("30-plan")
         let noeud = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@", "symptôme", "objectif", "apport")).firstMatch
@@ -158,7 +167,7 @@ final class ScreenshotsUITests: XCTestCase {
         }
 
         // Compléments.
-        app.buttons["Compléments"].tap()
+        app.buttons["tab.complements"].tap()
         sleep(3)
         snap("40-complements")
         app.swipeUp()
@@ -167,7 +176,7 @@ final class ScreenshotsUITests: XCTestCase {
         app.swipeDown()
 
         // Réglages + sous-pages.
-        app.buttons["Réglages"].tap()
+        app.buttons["tab.reglages"].tap()
         sleep(2)
         snap("50-reglages")
         app.swipeUp()
@@ -218,15 +227,15 @@ final class ScreenshotsUITests: XCTestCase {
         app.launch()
 
         connecterSiBesoin()
-        XCTAssertTrue(app.buttons["Progrès"].waitForExistence(timeout: 120))
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120))
         attendreChargement()
         snap("60-journal-avant-questionnaire")
 
         // Progrès / Plan / Compléments en découverte.
-        app.buttons["Progrès"].tap(); sleep(2); snap("61-progres-decouverte")
-        app.buttons["Plan"].tap(); sleep(3); snap("62-plan-decouverte")
-        app.buttons["Compléments"].tap(); sleep(2); snap("63-complements-decouverte")
-        app.buttons["Journal"].tap(); sleep(1)
+        app.buttons["tab.progres"].tap(); sleep(2); snap("61-progres-decouverte")
+        app.buttons["tab.plan"].tap(); sleep(3); snap("62-plan-decouverte")
+        app.buttons["tab.complements"].tap(); sleep(2); snap("63-complements-decouverte")
+        app.buttons["tab.journal"].tap(); sleep(1)
 
         // Le questionnaire : porte « Répondre au questionnaire ».
         let porte = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "questionnaire")).firstMatch
@@ -266,7 +275,7 @@ final class ScreenshotsUITests: XCTestCase {
         let motDePasse = app.launchEnvironment["SCREENSHOT_PASSWORD"] ?? ""
         NSLog("captures: identifiants transmis à l'app — email %d caractères, mot de passe %d caractères", identifiant.count, motDePasse.count)
         fermerAlerteApple()
-        if app.buttons["Progrès"].waitForExistence(timeout: 45) { autoriserSante(); return }
+        if app.buttons["tab.progres"].waitForExistence(timeout: 45) { autoriserSante(); return }
         guard app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 10) else { return }
         app.buttons["J'ai déjà un compte"].tap()
         let email = app.textFields["auth.email"]
@@ -281,6 +290,29 @@ final class ScreenshotsUITests: XCTestCase {
         password.typeText(motDePasse)
         sleep(1)
         app.buttons["Se connecter"].firstMatch.tap()
+    }
+
+    /// Ajoute un aliment à la journée par la recherche et le « + » rapide de
+    /// la première ligne de résultats (1 unité pour un aliment qui se compte,
+    /// 100 g sinon). Sans effet si la recherche ne répond pas.
+    private func ajouterRapide(_ aliment: String) {
+        guard app.buttons["Ajouter un repas"].waitForExistence(timeout: 5) else { return }
+        app.buttons["Ajouter un repas"].tap()
+        guard app.buttons["Rechercher"].waitForExistence(timeout: 5) else { fermerFeuille(); return }
+        app.buttons["Rechercher"].tap()
+        let champ = app.textFields["Rechercher un aliment"]
+        guard champ.waitForExistence(timeout: 8) else { fermerFeuille(); return }
+        champ.tap()
+        fermerTutorielClavier()
+        champ.typeText(aliment)
+        sleep(4)
+        let plus = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ajouter ")).firstMatch
+        if plus.waitForExistence(timeout: 5) {
+            plus.tap()
+            sleep(3)
+        }
+        fermerFeuille()
+        sleep(1)
     }
 
     /// Laisse le temps au Journal de charger ses données (journal, bilan).
