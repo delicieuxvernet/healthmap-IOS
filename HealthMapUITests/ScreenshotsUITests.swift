@@ -145,7 +145,7 @@ final class ScreenshotsUITests: XCTestCase {
         app.buttons["tab.progres"].tap()
         sleep(2)
         if app.buttons["Plus tard"].waitForExistence(timeout: 3) {
-            app.buttons["Plus tard"].tap()
+            taper(app.buttons["Plus tard"])
             sleep(1)
         }
         snap("20-progres")
@@ -184,32 +184,32 @@ final class ScreenshotsUITests: XCTestCase {
         snap("51-reglages-bas")
         app.swipeDown()
         if app.buttons["Mon abonnement"].firstMatch.waitForExistence(timeout: 5) {
-            app.buttons["Mon abonnement"].firstMatch.tap()
+            taper(app.buttons["Mon abonnement"].firstMatch)
             sleep(2)
             snap("52-abonnement")
             retour()
         }
         if app.buttons["Mes données et confidentialité"].firstMatch.waitForExistence(timeout: 5) {
-            app.buttons["Mes données et confidentialité"].firstMatch.tap()
+            taper(app.buttons["Mes données et confidentialité"].firstMatch)
             sleep(2)
             snap("53-donnees")
             retour()
         }
         if app.buttons["Mon profil et mes objectifs"].firstMatch.waitForExistence(timeout: 5) {
-            app.buttons["Mon profil et mes objectifs"].firstMatch.tap()
+            taper(app.buttons["Mon profil et mes objectifs"].firstMatch)
             sleep(2)
             snap("54-profil")
             retour()
         }
         if app.buttons["Notre méthode et nos sources"].firstMatch.waitForExistence(timeout: 5) {
-            app.buttons["Notre méthode et nos sources"].firstMatch.tap()
+            taper(app.buttons["Notre méthode et nos sources"].firstMatch)
             sleep(2)
             snap("55-methode")
             retour()
         }
         // Paywall depuis la carte Premium (gratuit) ou l'abonnement.
         if app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Essayer")).firstMatch.exists {
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Essayer")).firstMatch.tap()
+            taper(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Essayer")).firstMatch)
             sleep(3)
             snap("56-paywall")
             fermerFeuille()
@@ -405,6 +405,13 @@ final class ScreenshotsUITests: XCTestCase {
         let back = app.navigationBars.buttons.element(boundBy: 0)
         if back.exists { back.tap() } else { app.swipeRight() }
         sleep(1)
+    }
+
+    /// Tap par coordonnées : XCUITest déclare « non touchable » des boutons
+    /// pourtant visibles et actifs (cartes SwiftUI sous le bouton flottant,
+    /// overlays), et refuse alors le tap classique.
+    private func taper(_ element: XCUIElement) {
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     private func snap(_ name: String) {
