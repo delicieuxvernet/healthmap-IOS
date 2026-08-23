@@ -538,6 +538,7 @@ struct AjoutSheet: View {
                     }
                     .buttonStyle(.dsPress)
                     .accessibilityLabel(cible.titre.replacingOccurrences(of: "\n", with: " "))
+                    .cibleTutoriel(.tuileDicter, si: cible.id == .dicter)
                 }
             }
             .padding(.top, 26)
@@ -564,6 +565,13 @@ struct AjoutSheet: View {
             .padding(.bottom, 8)
         }
         .padding(.horizontal, DS.marge)
+        // Étape « dicter » du tutoriel : la feuille est son propre arbre de
+        // vues, elle porte donc sa propre surcouche (voile + bulle).
+        .overlayPreferenceValue(TutorielCibleKey.self) { ancres in
+            GeometryReader { proxy in
+                TutorielOverlayAjout(service: TutorielService.partage, ancres: ancres, proxy: proxy)
+            }
+        }
         .presentationDetents([.height(compteur == nil ? 404 : 426)])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.dsFond)

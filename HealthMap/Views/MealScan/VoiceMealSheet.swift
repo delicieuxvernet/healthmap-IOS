@@ -88,6 +88,15 @@ struct VoiceMealSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.dsFond.ignoresSafeArea())
+        // Étape « vérifier » du tutoriel : la bulle se pose sous la liste,
+        // sans voile — la seule question posée est déjà mise en avant, et le
+        // bouton d'enregistrement doit rester accessible (le contenu défile
+        // au-dessus grâce au safeAreaInset).
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if phase == .results {
+                TutorielBulleVerifier(service: TutorielService.partage)
+            }
+        }
         .presentationDetents(hauteurs)
         .presentationDragIndicator(.visible)
         .task { await finishListening() }
@@ -95,6 +104,9 @@ struct VoiceMealSheet: View {
             revelation?.cancel()
             revelation = nil
             speech.reset()
+            // Feuille refermée sans enregistrement : le tutoriel saute la
+            // « valeur » (aucun repas) et passe à la suite.
+            TutorielService.partage.dicteeAbandonnee()
         }
     }
 
@@ -616,6 +628,7 @@ struct VoiceMealSheet: View {
             MealJournalViewModel.signalerEcriture()
             NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
 
+            TutorielService.partage.repasEnregistre()
             onAdded(entries.count, totaux.kcal)
             dismiss()
         } catch {
