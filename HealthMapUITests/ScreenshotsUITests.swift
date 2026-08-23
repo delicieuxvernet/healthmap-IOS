@@ -262,6 +262,9 @@ final class ScreenshotsUITests: XCTestCase {
     /// `SCREENSHOT_PASSWORD` dans AuthViewModel) : on attend d'abord la barre
     /// d'onglets. La saisie au clavier n'est qu'un repli.
     private func connecterSiBesoin() {
+        let email = app.launchEnvironment["SCREENSHOT_EMAIL"] ?? ""
+        let motDePasse = app.launchEnvironment["SCREENSHOT_PASSWORD"] ?? ""
+        NSLog("captures: identifiants transmis à l'app — email %d caractères, mot de passe %d caractères", email.count, motDePasse.count)
         fermerAlerteApple()
         if app.buttons["Progrès"].waitForExistence(timeout: 45) { return }
         guard app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 10) else { return }
@@ -270,9 +273,13 @@ final class ScreenshotsUITests: XCTestCase {
         XCTAssertTrue(email.waitForExistence(timeout: 10), "Champ email introuvable")
         email.tap()
         email.typeText(app.launchEnvironment["SCREENSHOT_EMAIL"] ?? "")
-        let password = app.secureTextFields["auth.password"]
+        let oeil = app.buttons["auth.togglePassword"]
+        if oeil.waitForExistence(timeout: 3) { oeil.tap() }
+        let password = app.textFields["auth.password"].exists
+            ? app.textFields["auth.password"] : app.secureTextFields["auth.password"]
         password.tap()
-        password.typeText(app.launchEnvironment["SCREENSHOT_PASSWORD"] ?? "")
+        password.typeText(motDePasse)
+        sleep(1)
         app.buttons["Se connecter"].firstMatch.tap()
     }
 

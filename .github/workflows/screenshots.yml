@@ -114,6 +114,8 @@ jobs:
           TEST_RUNNER_SCREENSHOT_PASSWORD: ${{ secrets.DEMO_ACCOUNT_PASSWORD }}
         run: |
           set -o pipefail
+          # Diagnostic (valeurs jamais affichées) : longueur des identifiants transmis.
+          echo "email=${#TEST_RUNNER_SCREENSHOT_EMAIL} caractères, mot de passe=${#TEST_RUNNER_SCREENSHOT_PASSWORD} caractères"
           xcodebuild test \
             -project HealthMap.xcodeproj \
             -scheme HealthMapScreenshots \
