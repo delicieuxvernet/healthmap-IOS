@@ -266,7 +266,7 @@ final class ScreenshotsUITests: XCTestCase {
         let motDePasse = app.launchEnvironment["SCREENSHOT_PASSWORD"] ?? ""
         NSLog("captures: identifiants transmis à l'app — email %d caractères, mot de passe %d caractères", identifiant.count, motDePasse.count)
         fermerAlerteApple()
-        if app.buttons["Progrès"].waitForExistence(timeout: 45) { return }
+        if app.buttons["Progrès"].waitForExistence(timeout: 45) { autoriserSante(); return }
         guard app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 10) else { return }
         app.buttons["J'ai déjà un compte"].tap()
         let email = app.textFields["auth.email"]
@@ -285,7 +285,42 @@ final class ScreenshotsUITests: XCTestCase {
 
     /// Laisse le temps au Journal de charger ses données (journal, bilan).
     private func attendreChargement() {
+        autoriserSante()
         sleep(4)
+    }
+
+    /// Première ouverture du Journal : iOS présente la feuille « Health
+    /// Access » (Apple Santé). On autorise tout, comme le ferait une personne
+    /// qui installe l'app, pour que les captures montrent l'état connecté.
+    /// La feuille est hébergée par un autre processus : on interroge l'app
+    /// ET Springboard.
+    private func autoriserSante() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let hotes = [app!, springboard]
+        guard hotes.contains(where: { $0.staticTexts["Health Access"].waitForExistence(timeout: 3) }) else { return }
+        for hote in hotes {
+            for element in [hote.buttons["Turn On All"], hote.cells["Turn On All"],
+                            hote.staticTexts["Turn On All"], hote.buttons["Tout activer"]] where element.exists {
+                element.tap()
+                sleep(1)
+                break
+            }
+        }
+        for hote in hotes {
+            for bouton in [hote.buttons["Allow"], hote.buttons["Autoriser"]] where bouton.exists && bouton.isEnabled {
+                bouton.tap()
+                sleep(2)
+                return
+            }
+        }
+        // Rien d'activable : on refuse plutôt que de rester bloqué.
+        for hote in hotes {
+            for bouton in [hote.buttons["Don't Allow"], hote.buttons["Ne pas autoriser"]] where bouton.exists {
+                bouton.tap()
+                sleep(1)
+                return
+            }
+        }
     }
 
     /// Sur simulateur, StoreKit déclenche au lancement l'alerte Springboard
