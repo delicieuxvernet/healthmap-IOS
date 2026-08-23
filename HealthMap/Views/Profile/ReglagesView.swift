@@ -39,21 +39,21 @@ struct ReglagesView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         identite
-                            .padding(.top, 22)
+                            .padding(.top, 16)
 
                         if subscriptionService.isPremium {
-                            premiumActiveCard.padding(.top, 24)
+                            premiumActiveCard.padding(.top, 18)
                         } else if dashboardVM.bilanComplete {
                             // Entrée libre (V12a) : la porte premium n'apparaît
                             // qu'une fois le bilan fait (décision fondateur).
-                            premiumCard.padding(.top, 24)
+                            premiumCard.padding(.top, 18)
                         }
 
                         DSSectionHeader(titre: "Mon compte")
                         compteList
 
                         transparenceList
-                            .padding(.top, DS.marge)
+                            .padding(.top, 14)
 
                         DSSectionHeader(titre: "Mon bilan")
                         bilanList
@@ -99,20 +99,20 @@ struct ReglagesView: View {
                     Image(variant.imageName)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 88, height: 88)
+                        .frame(width: 64, height: 64)
                         .clipShape(Circle())
                 } else {
                     Image(systemName: "person.fill")
-                        .font(.system(size: 40, weight: .medium))
+                        .font(.system(size: 30, weight: .medium))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(Color.dsAccent)
                 }
             }
-            .frame(width: 88, height: 88)
+            .frame(width: 64, height: 64)
             .accessibilityHidden(true)
 
             Text(prenom)
-                .font(.dsSection)
+                .font(.system(.title3, design: .default).weight(.bold))
                 .tracking(DSTracking.corps)
                 .foregroundStyle(Color.dsTexte)
         }
@@ -160,9 +160,9 @@ struct ReglagesView: View {
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 10)
+                .padding(.top, 8)
         }
-        .padding(22)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
         .task {
@@ -248,20 +248,10 @@ struct ReglagesView: View {
                 EditProfileView()
                     .environmentObject(dashboardVM)
             } label: {
-                DSRow(icone: "person.crop.circle", titre: "Mon profil et mes objectifs")
+                DSRow(icone: "person.crop.circle", titre: "Mon profil et mes objectifs",
+                      sousTitre: authViewModel.userEmail)
             }
             .buttonStyle(.dsPress)
-
-            DSSeparator(retrait: DS.retraitSeparateurIcone)
-
-            // Sauvegarde : le compte et ses données vivent sur le serveur,
-            // rattachés à l'adresse ci-dessous. Pastille verte = synchronisé.
-            DSRow(icone: "icloud", titre: "Sauvegarde", sousTitre: authViewModel.userEmail) {
-                Circle()
-                    .fill(Color.dsAccent)
-                    .frame(width: 9, height: 9)
-                    .accessibilityLabel("Activée")
-            }
 
             DSSeparator(retrait: DS.retraitSeparateurIcone)
 

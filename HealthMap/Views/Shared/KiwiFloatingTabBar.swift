@@ -17,6 +17,10 @@ import SwiftUI
 // eux-mêmes via `.kiwiTabBarBottomInset()` (voir plus bas).
 struct KiwiFloatingTabBar: View {
     @Binding var selected: MainTabView.Tab
+    /// Onglets estompés (`tertiaryLabel`) : avant le questionnaire, Progrès,
+    /// Plan et Compléments n'ont aucune donnée perso. Ils restent ouverts
+    /// (entrée libre), seule leur présence dans la barre s'efface.
+    var estompes: Set<MainTabView.Tab> = []
 
     /// Hauteur de la capsule.
     static let barHeight: CGFloat = 60
@@ -78,7 +82,7 @@ struct KiwiFloatingTabBar: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .foregroundStyle(actif ? Color.dsAccent : Color.dsSecondaire)
+            .foregroundStyle(actif ? Color.dsAccent : (estompes.contains(item.tab) ? Color.dsTertiaire : Color.dsSecondaire))
             .padding(.horizontal, actif ? 14 : 8)
             .padding(.vertical, 6)
             .background(

@@ -40,14 +40,11 @@ struct DailyMealJournalView: View {
                         depensees: nil,
                         isToday: estAujourdhui
                     )
-                    HStack(spacing: DS.interCarte) {
-                        JournalMacroCard(valeur: vm.dayProteins, cible: protTarget,
-                                         libelle: "Protéines", couleur: .dsProteines, delai: 0.35)
-                        JournalMacroCard(valeur: vm.dayCarbs, cible: carbTarget,
-                                         libelle: "Glucides", couleur: .dsGlucides, delai: 0.40)
-                        JournalMacroCard(valeur: vm.dayFats, cible: fatTarget,
-                                         libelle: "Lipides", couleur: .dsLipides, delai: 0.45)
-                    }
+                    JournalMacrosCard(
+                        prot: (g: vm.dayProteins, cible: protTarget),
+                        carb: (g: vm.dayCarbs, cible: carbTarget),
+                        fat: (g: vm.dayFats, cible: fatTarget)
+                    )
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)

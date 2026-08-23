@@ -33,92 +33,6 @@ extension MealJournalService.MealSlot {
     }
 }
 
-// MARK: - Semainier (7 colonnes L→D)
-
-/// Initiale en `secondaryLabel` + numéro tabulaire. Le jour sélectionné est un
-/// disque noir de 28 pt, texte blanc. Les jours futurs en `tertiaryLabel`,
-/// inactifs. Un glissé horizontal change de semaine.
-struct JournalSemainier: View {
-    let jourSelectionne: Date
-    let onChoisir: (Date) -> Void
-
-    private var calendrier: Calendar { WeekScoreEngine.mondayFirst }
-
-    private var jours: [Date] {
-        let cal = calendrier
-        let debut = WeekScoreEngine.currentWeekInterval(containing: jourSelectionne).start
-        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: debut) }
-    }
-
-    private static let initiales = ["L", "M", "M", "J", "V", "S", "D"]
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(jours.enumerated()), id: \.element) { index, jour in
-                colonne(jour, initiale: Self.initiales[index])
-            }
-        }
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 30)
-                .onEnded { value in
-                    guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                    let cal = calendrier
-                    let delta = value.translation.width < 0 ? 7 : -7
-                    guard let cible = cal.date(byAdding: .day, value: delta, to: jourSelectionne) else { return }
-                    // Pas de futur : on ne mange pas demain.
-                    if delta > 0, cible > cal.startOfDay(for: Date()) { return }
-                    HapticService.shared.selection()
-                    onChoisir(cible)
-                }
-        )
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Semaine")
-    }
-
-    private func colonne(_ jour: Date, initiale: String) -> some View {
-        let cal = calendrier
-        let aujourdHui = cal.startOfDay(for: Date())
-        let futur = jour > aujourdHui
-        let selectionne = cal.isDate(jour, inSameDayAs: jourSelectionne)
-        let numero = cal.component(.day, from: jour)
-        return Button {
-            guard !futur, !selectionne else { return }
-            HapticService.shared.selection()
-            onChoisir(jour)
-        } label: {
-            VStack(spacing: 6) {
-                Text(initiale)
-                    .font(.dsLegendeMoyenne)
-                    .tracking(DSTracking.legende)
-                    .foregroundStyle(futur ? Color.dsTertiaire : Color.dsSecondaire)
-                Text("\(numero)")
-                    .font(selectionne ? .dsJour.weight(.bold) : .dsJour)
-                    .foregroundStyle(selectionne ? Color.white : (futur ? Color.dsTertiaire : Color.dsSecondaire))
-                    .frame(width: 28, height: 28)
-                    .background(Circle().fill(selectionne ? Color.dsEncre : Color.clear))
-            }
-            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(futur)
-        .accessibilityLabel(Self.libelleVocal(jour))
-        .accessibilityAddTraits(selectionne ? [.isButton, .isSelected] : .isButton)
-    }
-
-    private static let formateurVocal: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.setLocalizedDateFormatFromTemplate("EEEE d MMMM")
-        return f
-    }()
-
-    private static func libelleVocal(_ jour: Date) -> String {
-        formateurVocal.string(from: jour)
-    }
-}
-
 // MARK: - Carte calories (chiffre héros + anneau)
 
 /// Le seul chiffre héros de l'écran : les kcal restantes, 48 / 700. À droite,
@@ -177,7 +91,7 @@ struct JournalCaloriesCard: View {
             Spacer(minLength: 8)
             if objectif != nil {
                 ZStack {
-                    DSRing(fraction: fraction, couleur: depasse ? .dsACombler : .dsCalories)
+                    DSRing(fraction: fraction, couleur: depasse ? .dsACombler : .dsCalories, taille: 76, epaisseur: 8)
                     VStack(spacing: 0) {
                         Text("\(min(pourcent, 999))")
                             .font(.dsValeurAnneau)
@@ -190,7 +104,7 @@ struct JournalCaloriesCard: View {
                 }
             }
         }
-        .padding(22)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
         .animation(.easeOut(duration: 0.4), value: consommees)
@@ -206,31 +120,39 @@ struct JournalCaloriesCard: View {
     }
 }
 
-// MARK: - Carte macro (valeur 24 / 700, libellé, jauge 4 pt)
+// MARK: - Carte macros (une carte, trois colonnes : valeur 20 / 700, libellé, jauge 4 pt)
 
-struct JournalMacroCard: View {
-    let valeur: Double
-    let cible: Int?
-    let libelle: String
-    let couleur: Color
-    var delai: Double = 0
-
-    private var grammes: Int { Int(valeur.rounded()) }
-    private var fraction: Double {
-        guard let cible, cible > 0 else { return 0 }
-        return valeur / Double(cible)
-    }
+struct JournalMacrosCard: View {
+    let prot: (g: Double, cible: Int?)
+    let carb: (g: Double, cible: Int?)
+    let fat: (g: Double, cible: Int?)
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 1) {
+        HStack(alignment: .top, spacing: 0) {
+            colonne("Protéines", prot, couleur: .dsProteines, delai: 0.35)
+                .padding(.trailing, 16)
+            colonne("Glucides", carb, couleur: .dsGlucides, delai: 0.40)
+                .padding(.trailing, 16)
+            colonne("Lipides", fat, couleur: .dsLipides, delai: 0.45)
+        }
+        .padding(.vertical, 13)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity)
+        .dsCard()
+    }
+
+    private func colonne(_ libelle: String, _ m: (g: Double, cible: Int?), couleur: Color, delai: Double) -> some View {
+        let grammes = Int(m.g.rounded())
+        let fraction: Double = (m.cible ?? 0) > 0 ? m.g / Double(m.cible!) : 0
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(DS.entier(grammes))
-                    .font(.dsValeur24)
-                    .tracking(DSTracking.valeur24)
+                    .font(.system(size: 20, weight: .bold).monospacedDigit())
+                    .tracking(-0.6)
                     .foregroundStyle(Color.dsTexte)
                     .contentTransition(.numericText())
                 Text("g")
-                    .font(.dsSousTitreFort)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.dsSecondaire)
             }
             .lineLimit(1)
@@ -239,19 +161,15 @@ struct JournalMacroCard: View {
                 .font(.dsLegende)
                 .tracking(DSTracking.legende)
                 .foregroundStyle(Color.dsSecondaire)
-                .padding(.top, 2)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             DSGauge(fraction: fraction, couleur: couleur, delai: delai)
-                .padding(.top, 9)
+                .padding(.top, 6)
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity)
-        .dsCard()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeOut(duration: 0.4), value: grammes)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(cible.map { "\(libelle) : \(grammes) grammes sur \($0)." } ?? "\(libelle) : \(grammes) grammes.")
+        .accessibilityLabel(m.cible.map { "\(libelle) : \(grammes) grammes sur \($0)." } ?? "\(libelle) : \(grammes) grammes.")
     }
 }
 
@@ -293,33 +211,19 @@ struct JournalApportsCard: View {
         return "Tes apports sont au vert aujourd'hui."
     }
 
-    /// La preuve, sous le titre.
-    private var preuve: String? {
-        guard let interaction else { return nil }
-        if isPremium, let rest = interaction.tipRest, !rest.isEmpty { return rest }
-        return "Détecté dans tes réponses."
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(titre)
-                    .font(.dsHeadline)
-                    .tracking(DSTracking.corps)
-                    .foregroundStyle(Color.dsTexte)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let preuve {
-                    Text(preuve)
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, DS.paddingCarte)
-            .padding(.top, DS.paddingCarte)
-            .padding(.bottom, 12)
+            // L'interaction détectée, en une phrase : l'en-tête narratif de la
+            // carte (la preuve vit dans la fiche, au tap).
+            Text(titre)
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, DS.paddingCarte)
+                .padding(.top, DS.paddingCarte)
+                .padding(.bottom, 12)
 
             ForEach(Array(apports.enumerated()), id: \.offset) { index, apport in
                 DSSeparator()
@@ -356,7 +260,7 @@ struct JournalApportsCard: View {
                 DSChevron()
             }
             .padding(.horizontal, DS.paddingCarte)
-            .padding(.vertical, 13)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
             .contentShape(Rectangle())
         }
@@ -429,35 +333,144 @@ struct JournalApportsAttenteCard: View {
     }
 }
 
-// MARK: - Apports : la porte du bilan (découverte, sans questionnaire)
+// MARK: - Avant le questionnaire : la porte (maquette « Journal · avant questionnaire »)
 
-struct JournalApportsPorteCard: View {
+/// « On ne connaît pas encore tes besoins » : pourquoi, le bouton, la
+/// promesse de durée. Le tap passe par `BilanDoorButton` (haptique + funnel
+/// découverte + `demarrerBilan`), comme toutes les portes bilan de l'app.
+struct JournalAvantQuestionnaireCard: View {
     let onStart: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Tes apports, calculés sur ton profil")
-                .font(.dsHeadline)
-                .tracking(DSTracking.corps)
+            Text("On ne connaît pas encore tes besoins")
+                .font(.dsSection)
+                .tracking(DSTracking.section)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Trois minutes de questions pour voir ce que ton assiette couvre, ce qui te manque, et les habitudes qui se gênent.")
+            Text("Ils dépendent de ton âge, de ton poids, de ton activité et de ce que tu manges déjà. Douze questions suffisent à les calculer.")
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 4)
+                .padding(.top, 8)
             BilanDoorButton(
-                title: BilanDoorButton.Libelle.bilanApports,
-                accessibilityText: "Voir mes apports, bilan en 3 minutes",
+                title: BilanDoorButton.Libelle.journal,
+                accessibilityText: "Répondre au questionnaire, trois minutes",
                 zone: .bilanApports,
                 action: onStart
             )
             .padding(.top, 16)
+            Text("Trois minutes. Tu peux t'arrêter et reprendre.")
+                .font(.dsLegende)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 9)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+    }
+}
+
+/// « En attendant, en France » : deux ordres de grandeur issus du catalogue
+/// canonique (`TeaserStatsCatalog`, études publiques, jamais un chiffre
+/// inventé), avec leur mention de source et la réserve « pas sur toi ».
+struct JournalPopulationCard: View {
+    private struct Ligne: Identifiable {
+        let id: String
+        let fraction: String
+        let texte: String
+    }
+
+    /// Deux nutriments dont le catalogue porte un chiffre national robuste.
+    private var lignes: [Ligne] {
+        let phrases: [(id: String, texte: String)] = [
+            ("vitD", "adultes ont un apport en vitamine D sous les repères"),
+            ("iron", "femmes en âge d'avoir des enfants ont un apport en fer insuffisant"),
+        ]
+        return phrases.compactMap { item in
+            guard let fraction = TeaserStatsCatalog.stat(for: item.id).fraction else { return nil }
+            return Ligne(id: item.id, fraction: fraction.replacingOccurrences(of: " sur ", with: "/"), texte: item.texte)
+        }
+    }
+
+    private var sources: String {
+        let noms = lignes.map { TeaserStatsCatalog.stat(for: $0.id).source }
+        let uniques = noms.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        return "Études \(uniques.joined(separator: " et ")) · repères ANSES. Ces chiffres portent sur la population, pas sur toi."
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            DSGroupedList {
+                ForEach(Array(lignes.enumerated()), id: \.element.id) { index, ligne in
+                    if index > 0 { DSSeparator() }
+                    HStack(alignment: .center, spacing: 14) {
+                        Text(ligne.fraction)
+                            .font(.system(size: 26, weight: .bold).monospacedDigit())
+                            .tracking(-0.9)
+                            .foregroundStyle(Color.dsTexte)
+                            .frame(width: 74, alignment: .leading)
+                        Text(ligne.texte)
+                            .font(.dsSousTitre)
+                            .tracking(DSTracking.sousTitre)
+                            .foregroundStyle(Color.dsTexte)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, DS.paddingCarte)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(TeaserStatsCatalog.stat(for: ligne.id).fraction ?? "") \(ligne.texte), source \(TeaserStatsCatalog.stat(for: ligne.id).source)")
+                }
+            }
+            Text(sources)
+                .font(.dsLegende)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 4)
+                .padding(.top, 9)
+        }
+    }
+}
+
+/// « À la fin du questionnaire » : ce que le bilan va donner, en trois lignes.
+struct JournalFinQuestionnaireCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("À la fin du questionnaire")
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(Color.dsTexte)
+            promesse("testtube.2", "Tes dix apports, classés par priorité")
+                .padding(.top, 11)
+            promesse("arrow.triangle.swap", "Les interactions de tes habitudes")
+                .padding(.top, 9)
+            promesse("map", "Ton plan, avec les gains chiffrés")
+                .padding(.top, 9)
         }
         .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
+    }
+
+    private func promesse(_ symbole: String, _ texte: String) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: symbole)
+                .font(.system(size: 19, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsAccent)
+                .frame(width: 22)
+                .accessibilityHidden(true)
+            Text(texte)
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
