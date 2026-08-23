@@ -143,24 +143,24 @@ struct FunFactLabel: View {
                 .accessibilityHidden(true)
 
             Text(fact)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .font(.system(size: 14, weight: .medium, design: .default))
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.leading)
         }
-        .foregroundStyle(Color.healthMapBlue)
+        .foregroundStyle(Color.dsAccent)
         .padding(.horizontal, Theme.spacingMD)
         .padding(.vertical, Theme.spacingSM + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                .fill(Color.healthMapBlueLight)
+                .fill(Color.dsRemplissage)
         )
     }
 }
 
 #Preview {
     ZStack {
-        Color.healthMapBackground.ignoresSafeArea()
+        Color.dsFond.ignoresSafeArea()
         VStack(spacing: Theme.spacingMD) {
             FunFactLabel(questionId: "height", value: 184)
             FunFactLabel(questionId: "age", value: 28)

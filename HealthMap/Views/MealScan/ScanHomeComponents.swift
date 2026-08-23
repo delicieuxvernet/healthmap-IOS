@@ -26,7 +26,7 @@ import UIKit
 /// l'onglet (`macroFat`) ne le tient pas à 13 pt, d'où cette version foncée.
 enum ScanDomaine {
     static let energie = Color(hex: "9A5A00")
-    static let apports = Color.kiwiGreenInk
+    static let apports = Color.dsTexte
 }
 
 // MARK: - En-tête de section (icône + titre)
@@ -120,7 +120,7 @@ struct ScanTutorialOverlay: View {
             HStack(spacing: 8) {
                 Image(systemName: bulles[etape].icone)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.kiwiGreen)
+                    .foregroundStyle(Color.dsAccent)
                     .accessibilityHidden(true)
                 Text(bulles[etape].titre)
                     .font(Theme.insightFont)
@@ -136,7 +136,7 @@ struct ScanTutorialOverlay: View {
             HStack(spacing: 6) {
                 ForEach(0..<bulles.count, id: \.self) { index in
                     Capsule()
-                        .fill(index == etape ? Color.kiwiGreen : Color.white.opacity(0.28))
+                        .fill(index == etape ? Color.dsAccent : Color.white.opacity(0.28))
                         .frame(width: index == etape ? 16 : 6, height: 6)
                 }
                 Spacer(minLength: 0)
@@ -172,7 +172,7 @@ struct ScanTutorialOverlay: View {
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.kiwiGreen)
+                                .fill(Color.dsAccent)
                         )
                         .contentShape(Rectangle())
                 }

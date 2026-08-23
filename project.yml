@@ -118,7 +118,36 @@ targets:
     dependencies:
       - target: HealthMap
 
+  HealthMapUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: HealthMapUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.healthmap.app.uitests
+        PRODUCT_NAME: HealthMapUITests
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: HealthMap
+    dependencies:
+      - target: HealthMap
+
 schemes:
+  # Captures d'écran (workflow screenshots.yml) : un scheme à part, pour que
+  # le scheme `HealthMap` (gate de PR) ne lance jamais les tests UI.
+  HealthMapScreenshots:
+    build:
+      targets:
+        HealthMap: all
+        HealthMapUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - HealthMapUITests
   HealthMap:
     build:
       targets:

@@ -180,7 +180,7 @@ struct SupplementsView: View {
                         KiwiWalkerView(size: 140)
                         Text("Chargement...")
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                 } else {
                     emptyState
@@ -435,14 +435,14 @@ struct SupplementsView: View {
         HStack(spacing: 6) {
             Image(systemName: "arrow.triangle.branch")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.kiwiGreenInk)
+                .foregroundStyle(Color.dsTexte)
                 .accessibilityHidden(true)
             // Titre de section : couleur du domaine (le vert de l'onglet),
             // jamais l'encre neutre, et rangé sous le contenu par sa taille.
             Text(voie == .complements ? "Tes apports → tes compléments"
                                       : "Tes apports → ton assiette")
                 .font(Theme.sectionLabelFont)
-                .foregroundStyle(Color.kiwiGreenInk)
+                .foregroundStyle(Color.dsTexte)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 2)
@@ -642,27 +642,27 @@ struct SupplementsView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: block.1)
                                     .font(.system(size: 13))
-                                    .foregroundStyle(Color.kiwiGreen)
+                                    .foregroundStyle(Color.dsAccent)
                                     .accessibilityHidden(true)
                                 Text(block.0)
                                     .font(Theme.sectionLabelFont)
-                                    .foregroundStyle(Color.kiwiGreenInk)
+                                    .foregroundStyle(Color.dsTexte)
                                 Spacer()
                             }
                             ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                                 HStack(spacing: 12) {
                                     ZStack {
                                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(Color.kiwiGreenSoft)
+                                            .fill(Color.dsRemplissage)
                                             .frame(width: 40, height: 40)
                                         Image(systemName: "pills.fill")
                                             .font(.system(size: 18))
-                                            .foregroundStyle(Color.kiwiGreen)
+                                            .foregroundStyle(Color.dsAccent)
                                     }
                                     .accessibilityHidden(true)
                                     Text(entry.displayText)
                                         .font(Theme.insightFont)
-                                        .foregroundStyle(Color.kiwiCharcoal)
+                                        .foregroundStyle(Color.dsTexte)
                                     Spacer()
                                 }
                             }
@@ -682,11 +682,11 @@ struct SupplementsView: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "info.circle.fill")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
                 .accessibilityHidden(true)
             Text("Ces suggestions viennent de ton bilan. Elles ne remplacent pas l'avis d'un médecin.")
                 .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -699,21 +699,21 @@ struct SupplementsView: View {
         VStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color.kiwiGreenSoft)
+                    .fill(Color.dsRemplissage)
                     .frame(width: 88, height: 88)
                 Image(systemName: "pills.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(Color.kiwiGreen)
+                    .foregroundStyle(Color.dsAccent)
             }
             .accessibilityHidden(true)
             Text("Rien à ajouter pour l'instant")
                 .font(Theme.conclusionFont)
                 .tracking(Theme.conclusionTracking)
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
             Text("Ton bilan ne fait ressortir aucun complément utile. Si tu viens de le remplir, laisse-lui un instant.")
                 .font(.system(.subheadline).weight(.medium))
                 .lineSpacing(3)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
         }

@@ -24,14 +24,14 @@ struct RecolteDetailSheet: View {
                 HStack {
                     Text("Ta récolte")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .foregroundStyle(Color.dsTexte)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                             .frame(width: 34, height: 34)
-                            .background(Circle().fill(Color.kiwiCharcoal.opacity(0.06)))
+                            .background(Circle().fill(Color.dsTexte.opacity(0.06)))
                     }
                     .buttonStyle(.healthMapPressed)
                     .accessibilityLabel("Fermer")
@@ -40,18 +40,18 @@ struct RecolteDetailSheet: View {
                 // Série en cours (le « trophée » de jours d'affilée)
                 HStack(spacing: 14) {
                     ZStack {
-                        Circle().fill(Color.kiwiGreenSoft).frame(width: 56, height: 56)
+                        Circle().fill(Color.dsRemplissage).frame(width: 56, height: 56)
                         Image(systemName: "flame.fill")
                             .font(.system(size: 26))
-                            .foregroundStyle(Color.kiwiGreen)
+                            .foregroundStyle(Color.dsAccent)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(streak) jour\(streak > 1 ? "s" : "") d'affilée")
                             .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(Color.kiwiCharcoal)
+                            .foregroundStyle(Color.dsTexte)
                         Text("Chaque palier de série débloque un fruit.")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
@@ -60,14 +60,14 @@ struct RecolteDetailSheet: View {
 
                 Text("Tes fruits")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .padding(.top, 22)
                     .padding(.bottom, 10)
 
                 VStack(spacing: 0) {
                     ForEach(Array(ladder.enumerated()), id: \.element.id) { idx, rung in
                         if idx > 0 {
-                            Divider().background(Color.kiwiCharcoal.opacity(0.07))
+                            Divider().background(Color.dsTexte.opacity(0.07))
                         }
                         rungRow(rung)
                     }
@@ -80,7 +80,7 @@ struct RecolteDetailSheet: View {
             .padding(.top, 8)
             .padding(.bottom, 30)
         }
-        .background(Color.kiwiCream)
+        .background(Color.dsFond)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(30)
@@ -97,10 +97,10 @@ struct RecolteDetailSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(rung.name)
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                 Text("Débloqué à \(rung.threshold) jour\(rung.threshold > 1 ? "s" : "") d'affilée")
                     .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
             }
             Spacer(minLength: 8)
             if earned {
@@ -108,17 +108,17 @@ struct RecolteDetailSheet: View {
                     Image(systemName: "checkmark.circle.fill").font(.system(size: 12))
                     Text("Obtenu").font(.system(size: 11, weight: .bold))
                 }
-                .foregroundStyle(Color.kiwiGreenInk)
+                .foregroundStyle(Color.dsTexte)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
-                .background(Capsule().fill(Color.kiwiGreenSoft))
+                .background(Capsule().fill(Color.dsRemplissage))
             } else {
                 Text("Dans \(left) j")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .foregroundStyle(Color.dsSecondaire)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.kiwiCharcoal.opacity(0.06)))
+                    .background(Capsule().fill(Color.dsTexte.opacity(0.06)))
             }
         }
         .padding(.vertical, 12)

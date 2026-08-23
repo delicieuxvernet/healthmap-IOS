@@ -48,7 +48,7 @@ struct TabTourOverlay: View {
                     HStack(spacing: 6) {
                         ForEach(0..<steps.count, id: \.self) { index in
                             Circle()
-                                .fill(index == currentStep ? Color.kiwiGreen : Color.white.opacity(0.3))
+                                .fill(index == currentStep ? Color.dsAccent : Color.white.opacity(0.3))
                                 .frame(width: index == currentStep ? 10 : 7,
                                        height: index == currentStep ? 10 : 7)
                                 .animation(reduceMotion ? .none : .healthMapQuick, value: currentStep)
@@ -59,30 +59,30 @@ struct TabTourOverlay: View {
                     // Icon
                     ZStack {
                         Circle()
-                            .fill(Color.kiwiTint)
+                            .fill(Color.dsRemplissage)
                             .frame(width: 72, height: 72)
 
                         Image(systemName: steps[currentStep].icon)
                             .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(Color.kiwiGreenInk)
+                            .foregroundStyle(Color.dsTexte)
                     }
 
                     // Title
                     Text(steps[currentStep].title)
                         .font(Theme.sheetTitleFont)
-                        .foregroundStyle(Color.kiwiCharcoal)
+                        .foregroundStyle(Color.dsTexte)
 
                     // Description
                     Text(steps[currentStep].description)
                         .font(.system(.subheadline))
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, Theme.spacingMD)
 
                     // Step counter
                     Text("\(currentStep + 1) sur \(steps.count)")
                         .font(Theme.dataSecondaryFont)
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
 
                     // Navigation buttons
                     HStack(spacing: Theme.spacingMD) {
@@ -92,7 +92,7 @@ struct TabTourOverlay: View {
                         } label: {
                             Text("Passer")
                                 .font(Theme.ctaFont)
-                                .foregroundStyle(Color.healthMapSecondary)
+                                .foregroundStyle(Color.dsSecondaire)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 48)
                         }
@@ -112,7 +112,7 @@ struct TabTourOverlay: View {
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 48)
-                                .background(Color.kiwiGreen)
+                                .background(Color.dsAccent)
                                 .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                         }
                     }
@@ -122,8 +122,8 @@ struct TabTourOverlay: View {
                 .padding(Theme.spacingLG)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.cornerRadiusLG, style: .continuous)
-                        .fill(Color.healthMapCard)
-                        .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
+                        .fill(Color.dsCarte)
+                        // (ombre retirée, refonte 23 août 2026)
                 )
                 .padding(.horizontal, Theme.spacingLG)
                 .padding(.bottom, 100) // Above tab bar

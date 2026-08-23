@@ -121,8 +121,9 @@ extension Color {
 
     // Brand gradient (miroir du web : BRAND.gradient = linear-gradient(135deg, #007AFF, #5856D6)).
     // Consommer via `LinearGradient.healthMapBrand` pour les CTA / wordmark / badges.
-    static let healthMapGradientStart = Color(hex: "007AFF")
-    static let healthMapGradientEnd = Color(hex: "5856D6")
+    // Refonte 23 août 2026 : le « dégradé de marque » est le vert Kiwio, uni.
+    static let healthMapGradientStart = Color(hex: "5DA838")
+    static let healthMapGradientEnd = Color(hex: "5DA838")
 
     // Teintes chaudes — fond unifié premium (WarmBackground), remplace le ruban
     // animé retiré. Dynamiques light/dark comme les autres neutres.

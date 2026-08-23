@@ -193,5 +193,5 @@ struct KiwiWalkerView: View {
     KiwiWalkerView(size: 180)
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.healthMapBackground)
+        .background(Color.dsFond)
 }

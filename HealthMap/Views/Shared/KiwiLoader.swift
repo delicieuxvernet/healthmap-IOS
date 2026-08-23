@@ -19,7 +19,7 @@ import SwiftUI
 // - Reduce Motion : couronne pleine et figée (aucune animation).
 struct KiwiLoader: View {
     var size: CGFloat = 44
-    var color: Color = .kiwiCharcoal
+    var color: Color = .dsTexte
     var lineWidth: CGFloat = 2.3
     /// Fibres rayonnantes de la chair — lisibles au grand format (splash),
     /// bruit visuel en dessous de ~80 pt.
@@ -101,7 +101,7 @@ struct KiwiLoader: View {
 
 #Preview {
     ZStack {
-        Color.kiwiCream.ignoresSafeArea()
+        Color.dsFond.ignoresSafeArea()
         VStack(spacing: 36) {
             KiwiLoader(size: 104, showFibers: true)
             KiwiLoader(size: 56)

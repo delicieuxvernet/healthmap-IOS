@@ -87,7 +87,7 @@ struct BarcodeScannerSheet: View {
                 }
             }
             .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(Color.kiwiCharcoal)
+            .foregroundStyle(Color.dsTexte)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             .background(Capsule().fill(.white))
@@ -107,7 +107,7 @@ struct BarcodeScannerSheet: View {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 Link("Ouvrir les Réglages", destination: url)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
                     .background(Capsule().fill(.white))

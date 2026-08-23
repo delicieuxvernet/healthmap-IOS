@@ -72,7 +72,7 @@ extension StatutV2 {
     /// Encre du pourcentage (contraste AA sur fond blanc).
     var v7Ink: Color {
         switch self {
-        case .couvre:     return Color.kiwiInk
+        case .couvre:     return Color.dsTexte
         case .aRenforcer: return BilanV7.warnInk
         case .aCombler:   return BilanV7.alertInk
         case .neutre:     return BilanV7.secondary
@@ -85,13 +85,13 @@ extension StatutV2 {
 struct BilanV7CardStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .background(Color.healthMapCard)
+            .background(Color.dsCarte)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(BilanV7.ink.opacity(0.04), lineWidth: 1)
             )
-            .shadow(color: BilanV7.ink.opacity(0.05), radius: 1.5, x: 0, y: 1)
+            // (ombre retirée, refonte 23 août 2026)
     }
 }
 
@@ -197,13 +197,13 @@ struct BilanV7ScoreRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.kiwiGreen.opacity(0.15), lineWidth: lineWidth)
+                .stroke(Color.dsAccent.opacity(0.15), lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(Color.kiwiGreen, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(Color.dsAccent, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(score == nil ? "—" : "\(shown)")
-                .font(.system(size: 19, weight: .bold, design: .rounded).monospacedDigit())
+                .font(.system(size: 19, weight: .bold, design: .default).monospacedDigit())
                 .tracking(-0.8)
                 .foregroundStyle(BilanV7.ink)
                 .monospacedDigit()
@@ -281,10 +281,10 @@ struct BilanV7Header: View {
                         Text("Premium")
                             .font(.system(size: 12, weight: .bold))
                     }
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.dsTexte)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
-                    .background(Color.kiwiTint, in: Capsule())
+                    .background(Color.dsRemplissage, in: Capsule())
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 }
@@ -310,7 +310,7 @@ struct BilanV7ScoreCard: View {
         }
         let lead = delta > 0 ? "En hausse : " : "En baisse : "
         let value = delta > 0 ? "+\(delta)" : "\(delta)"
-        let color = delta > 0 ? Color.kiwiInk : BilanV7.alertInk
+        let color = delta > 0 ? Color.dsTexte : BilanV7.alertInk
         var line = Text(lead)
             + Text(value)
                 .font(Theme.heroValueRowFont)
@@ -331,7 +331,7 @@ struct BilanV7ScoreCard: View {
                     // Titre de section : teinté, rangé sous son contenu.
                     Text("Ton score du jour")
                         .font(Theme.sectionLabelFont)
-                        .foregroundStyle(Color.kiwiInk)
+                        .foregroundStyle(Color.dsTexte)
                     // La tendance est la CONCLUSION de la carte : plus jamais
                     // en gris tronqué à deux lignes.
                     trendLine
@@ -477,7 +477,7 @@ struct BilanV7ApportsCard: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.dsTexte)
                     .frame(width: 26, height: 26)
                     .background(Color(hex: "787880").opacity(0.1), in: Circle())
                     .frame(width: 44, height: 44)
@@ -687,7 +687,7 @@ struct BilanV7SymptomesCard: View {
                                 HStack(spacing: 5) {
                                     Image(systemName: trendIcon(row))
                                         .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(row.improving ? Color.kiwiInk : BilanV7.warnInk)
+                                        .foregroundStyle(row.improving ? Color.dsTexte : BilanV7.warnInk)
                                         .accessibilityHidden(true)
                                     Text(row.verdict)
                                         .font(Theme.insightFont)
@@ -732,7 +732,7 @@ struct BilanV7SymptomesCard: View {
                         .foregroundStyle(.white)
                     if solutionsCount > 0 {
                         Text("\(solutionsCount)")
-                            .font(.system(size: 11.5, weight: .bold, design: .rounded).monospacedDigit())
+                            .font(.system(size: 11.5, weight: .bold, design: .default).monospacedDigit())
                             .foregroundStyle(.white)
                             .frame(minWidth: 20, minHeight: 20)
                             .background(BilanV7.blue, in: Capsule())
@@ -740,7 +740,7 @@ struct BilanV7SymptomesCard: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
-                .background(Color.kiwiGreen, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Color.dsAccent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .contentShape(Rectangle())
             }
             .buttonStyle(BilanV7PressStyle())
@@ -782,7 +782,7 @@ struct BilanV7SerieCard: View {
         return Text("Prochain trophée : ")
             + Text(rung.name).font(.system(.caption).weight(.bold)).foregroundStyle(BilanV7.ink)
             + Text(" dans ")
-            + Text("\(daysLeft)").font(.system(.caption, design: .rounded).weight(.bold).monospacedDigit())
+            + Text("\(daysLeft)").font(.system(.caption, design: .default).weight(.bold).monospacedDigit())
             + Text(daysLeft > 1 ? " jours" : " jour")
     }
 
@@ -822,7 +822,7 @@ struct BilanV7SerieCard: View {
                             .foregroundStyle(BilanV7.secondary)
                             .fixedSize(horizontal: false, vertical: true)
 
-                        BilanV7Bar(value: progress, color: Color.kiwiGreen, height: 6, delay: 0.5)
+                        BilanV7Bar(value: progress, color: Color.dsAccent, height: 6, delay: 0.5)
                             .padding(.top, 6)
                     }
                 }
@@ -851,13 +851,13 @@ struct BilanV7RepasCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            BilanV7SectionLabel(icon: "fork.knife", text: "Tes derniers repas", color: Color.kiwiInk)
+            BilanV7SectionLabel(icon: "fork.knife", text: "Tes derniers repas", color: Color.dsTexte)
 
             ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
                 HStack(alignment: .top, spacing: 9) {
                     Image(systemName: line.positive ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundStyle(line.positive ? Color.kiwiGreen : BilanV7.statusReinforce)
+                        .foregroundStyle(line.positive ? Color.dsAccent : BilanV7.statusReinforce)
                         .padding(.top, 1)
                         .accessibilityHidden(true)
                     // Bilan d'un repas : c'est un verdict, donc une conclusion
@@ -917,7 +917,7 @@ struct BilanV7PremiumCard: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity)
-            .background(Color.kiwiGreen, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.dsAccent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.healthMapPressed)
@@ -941,14 +941,14 @@ struct BilanV7ScoreTeaserCard: View {
             // (64 pt, trait 7), piste kiwi existante, « ? » au centre.
             ZStack {
                 Circle()
-                    .stroke(Color.kiwiGreen.opacity(0.15), lineWidth: 7)
+                    .stroke(Color.dsAccent.opacity(0.15), lineWidth: 7)
                 Circle()
                     .stroke(
-                        Color.kiwiGreen.opacity(0.45),
+                        Color.dsAccent.opacity(0.45),
                         style: StrokeStyle(lineWidth: 7, lineCap: .round, dash: [2, 8])
                     )
                 Text("?")
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .font(.system(size: 19, weight: .bold, design: .default))
                     .tracking(-0.8)
                     .foregroundStyle(BilanV7.ink)
             }
@@ -960,7 +960,7 @@ struct BilanV7ScoreTeaserCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Ton score t'attend")
                     .font(Theme.sectionLabelFont)
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.dsTexte)
                 Text("\(NutrientData.all.count) apports calculés depuis TES réponses")
                     .font(Theme.insightFont)
                     .foregroundStyle(BilanV7.ink)
@@ -1130,7 +1130,7 @@ struct BilanV7AttentionTeaserCard: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(Color.kiwiGreen, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.dsAccent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .contentShape(Rectangle())
             }
             .buttonStyle(BilanV7PressStyle())

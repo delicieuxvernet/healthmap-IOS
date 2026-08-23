@@ -1,0 +1,152 @@
+# Captures d'écran automatisées sur simulateur (audit visuel + fiche App Store).
+#
+# Lance les tests UI `HealthMapUITests` (scheme `HealthMapScreenshots`) sur un
+# simulateur iPhone, connecté avec le compte d'audit, puis extrait les captures
+# attachées au `.xcresult` et les publie en artefact (PNG nommés `NN-ecran`).
+# La barre d'état est forcée (9:41, batterie pleine, wifi) pour des captures
+# propres. Déclenchement manuel uniquement.
+name: Screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: "Simulateur (iPhone 16 Plus = 1290x2796, le format 6,7 pouces de l'App Store)"
+        required: false
+        default: "iPhone 16 Plus"
+        type: string
+      ref:
+        description: "Branche ou SHA à capturer (vide = la branche du déclenchement)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    env:
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+
+      - name: Select Xcode 26.2
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Inject Config.xcconfig
+        env:
+          CONFIG_XCCONFIG_BASE64: ${{ secrets.CONFIG_XCCONFIG_BASE64 }}
+        run: |
+          mkdir -p HealthMap/Resources
+          echo -n "$CONFIG_XCCONFIG_BASE64" | base64 --decode > HealthMap/Resources/Config.xcconfig
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', 'project.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Resolve SPM dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project HealthMap.xcodeproj \
+            -scheme HealthMapScreenshots
+
+      - name: Boot simulator and set status bar
+        id: sim
+        run: |
+          DEVICE="${{ inputs.device }}"
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)['devices']
+          name='$DEVICE'
+          for rt,devs in sorted(d.items(), reverse=True):
+              for dev in devs:
+                  if dev['name']==name and dev.get('isAvailable',True):
+                      print(dev['udid']); sys.exit(0)
+          sys.exit(1)
+          ")
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+          xcrun simctl ui "$UDID" appearance light
+          echo "Simulateur $DEVICE = $UDID"
+
+      - name: Run screenshot UI tests
+        timeout-minutes: 40
+        env:
+          SCREENSHOT_EMAIL: audit-b@test.com
+          SCREENSHOT_PASSWORD: ${{ secrets.DEMO_ACCOUNT_PASSWORD }}
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project HealthMap.xcodeproj \
+            -scheme HealthMapScreenshots \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath "$RUNNER_TEMP/Screenshots.xcresult" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 600 \
+            CODE_SIGNING_ALLOWED=NO || echo "::warning::Des tests UI ont échoué, les captures disponibles sont tout de même publiées"
+
+      - name: Extract screenshots from xcresult
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots" "$RUNNER_TEMP/out"
+          xcrun xcresulttool export attachments --path "$RUNNER_TEMP/Screenshots.xcresult" --output-path "$RUNNER_TEMP/shots" || true
+          python3 - <<'EOF'
+          import json, os, shutil, glob
+          src = os.environ["RUNNER_TEMP"] + "/shots"
+          out = os.environ["RUNNER_TEMP"] + "/out"
+          manifest = os.path.join(src, "manifest.json")
+          n = 0
+          if os.path.exists(manifest):
+              for test in json.load(open(manifest)):
+                  for att in test.get("attachments", []):
+                      name = att.get("suggestedHumanReadableName") or att.get("exportedFileName")
+                      exported = att.get("exportedFileName")
+                      if not exported: continue
+                      base = os.path.splitext(name)[0]
+                      dst = os.path.join(out, base + ".png")
+                      shutil.copy(os.path.join(src, exported), dst); n += 1
+          else:
+              for f in glob.glob(src + "/*"):
+                  shutil.copy(f, out); n += 1
+          print("captures:", n, sorted(os.listdir(out)))
+          EOF
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/out
+          if-no-files-found: warn
+
+      - name: Upload xcresult
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Screenshots.xcresult
+          path: ${{ runner.temp }}/Screenshots.xcresult
+          if-no-files-found: warn

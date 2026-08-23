@@ -14,7 +14,7 @@ import SwiftUI
 // bien autour du centre du ZStack).
 struct KiwiContourMark: View {
     var size: CGFloat = 96
-    var color: Color = .kiwiCharcoal
+    var color: Color = .dsTexte
     var lineWidth: CGFloat = 2.3
 
     /// Échelle depuis le repère de référence (110 pt) du dessin.
@@ -64,7 +64,7 @@ struct KiwiContourMark: View {
         Color(hex: "FBF6EF").ignoresSafeArea()
         VStack(spacing: 20) {
             KiwiContourMark(size: 104)
-            Text("Kiwio").font(.system(size: 30, weight: .bold, design: .rounded))
+            Text("Kiwio").font(.system(size: 30, weight: .bold, design: .default))
         }
     }
 }

@@ -325,6 +325,24 @@ final class DashboardViewModel: ObservableObject {
             }
         }
 
+        #if DEBUG
+        // Captures d'écran (workflow `screenshots.yml`) : avec l'argument de
+        // lancement `-captureDecouverte`, le compte d'audit se comporte comme
+        // un compte sans questionnaire (Journal « avant questionnaire »,
+        // onglets en découverte, porte vers le questionnaire). Jamais en
+        // Release : le bloc n'existe pas dans le binaire App Store.
+        if ProcessInfo.processInfo.arguments.contains("-captureDecouverte") {
+            profile.completed = false
+            hasCompletedQuestionnaire = false
+            analysisV2 = nil
+            aiAnalysis = nil
+            gateContournee = true
+            didFinishInitialLoad = true
+            analyticsService.track(.dashboardViewed, properties: nil)
+            return
+        }
+        #endif
+
         // Le statut de routing (`hasCompletedQuestionnaire`) est désormais
         // connu → on peut afficher la bonne branche sans clignotement.
         didFinishInitialLoad = true

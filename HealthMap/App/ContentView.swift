@@ -188,7 +188,7 @@ private struct OfflineBanner: View {
                     Text("Reconnecté. Synchronisation...")
                         .font(.system(size: 12, weight: .medium))
                 }
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.dsAccent)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -217,10 +217,10 @@ struct LaunchScreenView: View {
                 // Le logo EST l'indicateur d'attente : même dessin qu'au repos
                 // (`KiwiContourMark`), pépins qui s'allument en traînée. Le
                 // spinner sous le nom devenait redondant — il a sauté.
-                KiwiLoader(size: 104, color: .kiwiCharcoal, showFibers: true)
+                KiwiLoader(size: 104, color: .dsTexte, showFibers: true)
                 Text("Kiwio")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(.system(size: 30, weight: .bold, design: .default))
+                    .foregroundStyle(Color.dsTexte)
             }
         }
     }
@@ -419,7 +419,7 @@ struct MainTabView: View {
             if nouvel == .journal { armerTutoJournal() }
         }
         .ignoresSafeArea(.keyboard)
-        .tint(Color.kiwiGreen)
+        .tint(Color.dsAccent)
         // Tab bar flottante (langage v4). ⚠️ SURIMPRESSION, pas `safeAreaInset` :
         // depuis le passage au conteneur maison (plus de TabView UIKit), un
         // inset posé ici se propagerait aux écrans — qui réservent DÉJÀ la
@@ -469,9 +469,9 @@ struct MainTabView: View {
                 .foregroundColor: UIColor.secondaryLabel,
                 .font: UIFont.systemFont(ofSize: 11, weight: .semibold)
             ]
-            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.kiwiGreen)
+            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.dsAccent)
             appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
-                .foregroundColor: UIColor(Color.kiwiGreen),
+                .foregroundColor: UIColor(Color.dsAccent),
                 .font: UIFont.systemFont(ofSize: 11, weight: .bold)
             ]
             appearance.shadowColor = UIColor.black.withAlphaComponent(0.08)

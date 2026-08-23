@@ -28,7 +28,7 @@ struct ScoreHistoryView: View {
                     KiwiLoader(size: 52)
                     Text("Chargement de l'historique...")
                         .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
             } else {
                 ScrollView {
@@ -82,17 +82,17 @@ struct ScoreHistoryView: View {
         HStack(spacing: Theme.spacingSM) {
             Image(systemName: delta > 0 ? "arrow.up.right" : delta < 0 ? "arrow.down.right" : "minus")
                 .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(delta > 0 ? Color.scoreGood : delta < 0 ? Color.scoreDeficient : Color.healthMapMuted)
+                .foregroundStyle(delta > 0 ? Color.scoreGood : delta < 0 ? Color.scoreDeficient : Color.dsSecondaire)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(text)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(delta > 0 ? Color.scoreGood : delta < 0 ? Color.scoreDeficient : Color.healthMapMuted)
+                    .foregroundStyle(delta > 0 ? Color.scoreGood : delta < 0 ? Color.scoreDeficient : Color.dsSecondaire)
 
                 if let first = history.sorted(by: { $0.date < $1.date }).first {
                     Text("Depuis le \(first.dateFormatted)")
                         .font(Theme.captionFont)
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
             }
 
@@ -108,7 +108,7 @@ struct ScoreHistoryView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Évolution")
                 .font(Theme.captionBoldFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .padding(.horizontal, Theme.spacingLG)
 
             Chart {
@@ -127,14 +127,14 @@ struct ScoreHistoryView: View {
                         x: .value("Date", snapshot.date),
                         y: .value("Score", snapshot.score)
                     )
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
                     .lineStyle(StrokeStyle(lineWidth: 2.5))
 
                     PointMark(
                         x: .value("Date", snapshot.date),
                         y: .value("Score", snapshot.score)
                     )
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
                     .symbolSize(40)
                 }
             }
@@ -158,11 +158,11 @@ struct ScoreHistoryView: View {
 
             Text("Pas encore assez de données")
                 .font(Theme.headlineFont)
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
 
             Text("Complète tes suivis hebdomadaires pour voir l'évolution de ton score dans le temps.")
                 .font(Theme.bodyFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Theme.spacingXL)
         }
@@ -174,19 +174,19 @@ struct ScoreHistoryView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Historique")
                 .font(Theme.captionBoldFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
 
             ForEach(history.sorted(by: { $0.date > $1.date }).prefix(12)) { snapshot in
                 HStack(spacing: Theme.spacingSM) {
                     Text(snapshot.dateFormatted)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.healthMapText)
+                        .foregroundStyle(Color.dsTexte)
                         .frame(width: 60, alignment: .leading)
 
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(Color.healthMapMuted.opacity(0.1))
+                                .fill(Color.dsSecondaire.opacity(0.1))
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(Color.globalScoreColor(for: snapshot.score))
                                 .frame(width: geo.size.width * CGFloat(snapshot.score) / 100.0)
@@ -195,7 +195,7 @@ struct ScoreHistoryView: View {
                     .frame(height: 16)
 
                     Text("\(snapshot.score)%")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.system(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.globalScoreColor(for: snapshot.score))
                         .frame(width: 40, alignment: .trailing)
                 }

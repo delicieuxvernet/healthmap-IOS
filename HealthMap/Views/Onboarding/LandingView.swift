@@ -19,20 +19,14 @@ struct LandingView: View {
     /// Mode d'auth demandé — pilote le sheet (`nil` = pas de sheet).
     @State private var authMode: AuthView.Mode?
 
-    // Couleurs du design (spec Arthur).
-    private let cream = LinearGradient(
-        colors: [Color(red: 0.984, green: 0.933, blue: 0.867),
-                 Color(red: 0.984, green: 0.965, blue: 0.937),
-                 Color(red: 0.992, green: 0.984, blue: 0.969)],
-        startPoint: .top, endPoint: .bottom)
-    private let kiwi = Color(red: 0.365, green: 0.659, blue: 0.220)      // #5DA838
-    private let ink = Color(red: 0.129, green: 0.122, blue: 0.102)       // #211F1A
-    private let greenDeep = Color(red: 0.231, green: 0.427, blue: 0.067) // #3B6D11
-    private let greenSoft = Color(red: 0.918, green: 0.953, blue: 0.871) // #EAF3DE
+    // Refonte 23 août 2026 : couleurs du DS (fond neutre + voile de marque,
+    // accent vert réservé à l'interactif et à l'anneau signature).
+    private let kiwi = Color.dsAccent
+    private let ink = Color.dsTexte
 
     var body: some View {
         ZStack {
-            cream.ignoresSafeArea()
+            DSPageBackground()
 
             VStack(spacing: 0) {
                 // Wordmark en haut
@@ -57,7 +51,8 @@ struct LandingView: View {
                     .animation(staged(0.12), value: appeared)
 
                 Text("Découvre la cause de tes symptômes.")
-                    .font(.system(size: 33, weight: .bold))
+                    .font(.dsGrandTitre)
+                    .tracking(DSTracking.grandTitre)
                     .foregroundStyle(ink)
                     .multilineTextAlignment(.center)
                     .lineSpacing(2)
@@ -68,8 +63,9 @@ struct LandingView: View {
                     .animation(staged(0.18), value: appeared)
 
                 Text("Et reçois ton plan micro-nutrition sur mesure, en quelques minutes.")
-                    .font(.system(size: 16.5, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .font(.dsCorps)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.spacingXL)
                     .padding(.top, Theme.spacingMD)
@@ -112,7 +108,7 @@ struct LandingView: View {
 
             // Anneau + centre
             ZStack {
-                Circle().stroke(kiwi.opacity(0.15), lineWidth: 9)
+                Circle().stroke(Color.dsRemplissage, lineWidth: 9)
                 Circle()
                     .trim(from: 0, to: reduceMotion ? 0.78 : ringProgress)
                     .stroke(kiwi, style: StrokeStyle(lineWidth: 9, lineCap: .round))
@@ -120,7 +116,7 @@ struct LandingView: View {
                 Circle()
                     .fill(.white)
                     .frame(width: 56, height: 56)
-                    .shadow(color: Color(red: 0.176, green: 0.353, blue: 0.078).opacity(0.14), radius: 8, x: 0, y: 6)
+                    // (ombre retirée, refonte 23 août 2026)
                     .overlay(Image(systemName: "leaf.fill").font(.system(size: 26)).foregroundStyle(kiwi))
                     .scaleEffect(floating && !reduceMotion ? 1.08 : 1.0)
                     .animation(reduceMotion ? nil : .easeInOut(duration: 3).repeatForever(autoreverses: true), value: floating)
@@ -140,59 +136,44 @@ struct LandingView: View {
     private func nutrientPill(_ label: String, dot: Color, delay: Double) -> some View {
         HStack(spacing: 7) {
             Circle().fill(dot).frame(width: 8, height: 8)
-            Text(label).font(.system(size: 12.5, weight: .bold)).foregroundStyle(ink)
+            Text(label).font(.dsLegendeMoyenne).foregroundStyle(ink)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Capsule().fill(.white).shadow(color: ink.opacity(0.10), radius: 8, x: 0, y: 6))
+        .background(Capsule().fill(Color.dsCarte))
         .offset(y: floating && !reduceMotion ? -6 : 0)
         .animation(reduceMotion ? nil : .easeInOut(duration: 3.4).repeatForever(autoreverses: true).delay(delay), value: floating)
     }
 
     private var badge: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles").font(.system(size: 14))
-            Text("Bilan nutritionnel personnalisé").font(.system(size: 13, weight: .bold))
-        }
-        .foregroundStyle(greenDeep)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 9)
-        .background(Capsule().fill(greenSoft))
+        Text("Bilan nutritionnel personnalisé")
+            .font(.dsLegendeMoyenne)
+            .foregroundStyle(Color.dsSecondaire)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(Capsule().fill(Color.dsRemplissage))
     }
 
     // MARK: - CTAs
 
     private var ctaSection: some View {
         VStack(spacing: Theme.spacingSM) {
-            Button {
+            DSCapsuleButton(titre: "C'est parti") {
                 authMode = .signUp
-            } label: {
-                HStack(spacing: Theme.spacingSM) {
-                    Text("C'est parti")
-                    Image(systemName: "arrow.right").font(.system(size: 17, weight: .semibold))
-                }
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(kiwi)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                .shadow(color: kiwi.opacity(0.34), radius: 13, x: 0, y: 10)
             }
-            .buttonStyle(.healthMapPressed)
             .accessibilityHint("Ouvre la création de compte.")
 
             Button {
                 authMode = .signIn
             } label: {
                 Text("J'ai déjà un compte")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(greenDeep)
+                    .font(.dsSousTitreFort)
+                    .foregroundStyle(Color.dsAccent)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
             .accessibilityHint("Ouvre la connexion avec un compte existant.")
         }
         .padding(.horizontal, Theme.spacingLG)

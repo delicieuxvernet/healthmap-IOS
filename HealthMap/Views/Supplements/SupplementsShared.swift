@@ -144,13 +144,13 @@ struct SupplementPrecautionsSheet: View {
                             .foregroundStyle(Color(hex: "C0322A"))
                         Text(rec.nutrientLabel)
                             .font(.system(size: 19, weight: .bold))
-                            .foregroundStyle(Color.kiwiCharcoal)
+                            .foregroundStyle(Color.dsTexte)
                     }
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                             .frame(width: 34, height: 34)
                             .background(Circle().fill(Color(hex: "EFEBE2")))
                     }
@@ -160,7 +160,7 @@ struct SupplementPrecautionsSheet: View {
 
                 Text("Interactions détectées sur ton profil")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .padding(.top, 18)
                     .padding(.bottom, 11)
 
@@ -178,10 +178,10 @@ struct SupplementPrecautionsSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.title)
                                     .font(.system(size: 13.5, weight: .bold))
-                                    .foregroundStyle(Color.kiwiCharcoal)
+                                    .foregroundStyle(Color.dsTexte)
                                 Text(item.note)
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(Color.healthMapSecondary)
+                                    .foregroundStyle(Color.dsSecondaire)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer(minLength: 0)
@@ -190,7 +190,7 @@ struct SupplementPrecautionsSheet: View {
                         .frame(maxWidth: .infinity)
                         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white))
                         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.kiwiCharcoal.opacity(0.04), lineWidth: 1))
+                            .stroke(Color.dsTexte.opacity(0.04), lineWidth: 1))
                         // (ombre retirée, refonte 23 août 2026)
                     }
                 }
@@ -198,16 +198,16 @@ struct SupplementPrecautionsSheet: View {
                 HStack(spacing: 10) {
                     Image(systemName: "lightbulb.fill")
                         .font(.system(size: 17))
-                        .foregroundStyle(Color.kiwiGreenInk)
+                        .foregroundStyle(Color.dsTexte)
                     Text(tip)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.kiwiGreenInk)
+                        .foregroundStyle(Color.dsTexte)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 13)
-                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiGreenSoft))
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsRemplissage))
                 .padding(.top, 16)
 
                 Button { dismiss() } label: {
@@ -215,7 +215,7 @@ struct SupplementPrecautionsSheet: View {
                         .font(.system(size: 14.5, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 50)
-                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.kiwiCharcoal))
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsTexte))
                 }
                 .buttonStyle(.healthMapPressed)
                 .padding(.top, 20)
@@ -224,7 +224,7 @@ struct SupplementPrecautionsSheet: View {
             .padding(.top, 14)
             .padding(.bottom, 30)
         }
-        .background(Color.kiwiCream)
+        .background(Color.dsFond)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(30)

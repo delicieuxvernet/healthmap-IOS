@@ -50,25 +50,25 @@ struct RecapSlideView: View {
 
     private func intro(prenom: String?, réponses: Int) -> some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            KiwiContourMark(size: 52, color: .kiwiGreen)
+            KiwiContourMark(size: 52, color: .dsAccent)
                 .recapApparition(0)
 
             Text(prenom.map { "\($0)," } ?? "C'est prêt.")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(.system(size: 30, weight: .bold, design: .default))
+                .foregroundStyle(Color.dsTexte)
                 .recapApparition(1)
 
             Text(réponses > 0
                  ? "on a lu tes \(réponses) réponses, une par une."
                  : "on a lu tout ce que tu nous as dit.")
                 .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(Color.kiwiCharcoal.opacity(0.75))
+                .foregroundStyle(Color.dsTexte.opacity(0.75))
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(2)
 
             Text("Voici ce qu'on y a trouvé.")
                 .font(.system(size: 15))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(3)
         }
     }
@@ -79,14 +79,14 @@ struct RecapSlideView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Ton score global")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(0)
 
             HStack(alignment: .lastTextBaseline, spacing: 4) {
                 RecapCompteur(valeur: valeur, taille: 84, couleur: HealthScale.color(for: valeur))
                 Text("/ 100")
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.healthMapMuted)
+                    .font(.system(size: 22, weight: .semibold, design: .default))
+                    .foregroundStyle(Color.dsSecondaire)
             }
             .recapApparition(1)
             .accessibilityElement()
@@ -103,7 +103,7 @@ struct RecapSlideView: View {
             if let insight {
                 Text(insight)
                     .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                     .recapApparition(3)
             }
@@ -125,13 +125,13 @@ struct RecapSlideView: View {
 
             Text(message)
                 .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(1)
 
             Text("Ce point est affiché en entier, et il le restera : on ne réserve jamais un signal de sécurité. Parles-en à un professionnel de santé.")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(2)
         }
@@ -143,14 +143,14 @@ struct RecapSlideView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Ce que tu fais déjà bien")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(0)
 
             HStack(alignment: .lastTextBaseline, spacing: 8) {
-                RecapCompteur(valeur: nourris, taille: 72, couleur: .kiwiGreen)
+                RecapCompteur(valeur: nourris, taille: 72, couleur: .dsAccent)
                 Text(nourris > 1 ? "besoins déjà nourris" : "besoin déjà nourri")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
             }
             .recapApparition(1)
             .accessibilityElement()
@@ -159,7 +159,7 @@ struct RecapSlideView: View {
             if let insight {
                 Text(insight)
                     .font(.system(size: 17))
-                    .foregroundStyle(Color.kiwiCharcoal.opacity(0.8))
+                    .foregroundStyle(Color.dsTexte.opacity(0.8))
                     .fixedSize(horizontal: false, vertical: true)
                     .recapApparition(2)
             }
@@ -172,14 +172,14 @@ struct RecapSlideView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Et là où ça coince")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(0)
 
             HStack(alignment: .lastTextBaseline, spacing: 8) {
                 RecapCompteur(valeur: apports, taille: 72, couleur: .scoreLow)
                 Text("apports à renforcer")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
             }
             .recapApparition(1)
             .accessibilityElement()
@@ -187,7 +187,7 @@ struct RecapSlideView: View {
 
             Text("On te les montre un par un, avec ce qui les explique.")
                 .font(.system(size: 16))
-                .foregroundStyle(Color.kiwiCharcoal.opacity(0.8))
+                .foregroundStyle(Color.dsTexte.opacity(0.8))
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(2)
         }
@@ -199,14 +199,14 @@ struct RecapSlideView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Apport n° \(apport.rang)")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(0)
 
             // Le NOM est masqué quand c'est réservé ; le statut, lui, reste
             // visible — on masque le contenu, jamais l'existence.
             Text(apport.verrouille ? "Réservé à Premium" : apport.nom)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(apport.verrouille ? Color.kiwiCharcoal.opacity(0.35) : Color.kiwiCharcoal)
+                .font(.system(size: 30, weight: .bold, design: .default))
+                .foregroundStyle(apport.verrouille ? Color.dsTexte.opacity(0.35) : Color.dsTexte)
                 .recapApparition(1)
 
             Text(apport.mot)
@@ -236,7 +236,7 @@ struct RecapSlideView: View {
                 if let pourquoi = apport.pourquoi {
                     Text(pourquoi)
                         .font(.system(size: 16))
-                        .foregroundStyle(Color.kiwiCharcoal.opacity(0.85))
+                        .foregroundStyle(Color.dsTexte.opacity(0.85))
                         .fixedSize(horizontal: false, vertical: true)
                         .recapApparition(4)
                 }
@@ -254,17 +254,17 @@ struct RecapSlideView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
                 Text("Ce qui se joue entre deux choses")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
             }
             .recapApparition(0)
 
             if interaction.verrouille {
                 Text("Une autre interaction t'attend")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.kiwiCharcoal.opacity(0.4))
+                    .font(.system(size: 26, weight: .bold, design: .default))
+                    .foregroundStyle(Color.dsTexte.opacity(0.4))
                     .fixedSize(horizontal: false, vertical: true)
                     .recapApparition(1)
 
@@ -277,15 +277,15 @@ struct RecapSlideView: View {
                     .recapApparition(3)
             } else {
                 Text(interaction.titre)
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(.system(size: 26, weight: .bold, design: .default))
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                     .recapApparition(1)
 
                 if let detail = interaction.detail {
                     Text(detail)
                         .font(.system(size: 17))
-                        .foregroundStyle(Color.kiwiCharcoal.opacity(0.85))
+                        .foregroundStyle(Color.dsTexte.opacity(0.85))
                         .fixedSize(horizontal: false, vertical: true)
                         .recapApparition(2)
                 }
@@ -299,30 +299,30 @@ struct RecapSlideView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Ce que tu ressens")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(0)
 
             Text(symptome.nom)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(.system(size: 28, weight: .bold, design: .default))
+                .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(1)
 
             Text("Ces pistes sont parfois associées :")
                 .font(.system(size: 15))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(2)
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(symptome.causes.enumerated()), id: \.offset) { position, cause in
                     HStack(alignment: .top, spacing: 8) {
                         Circle()
-                            .fill(Color.kiwiGreen)
+                            .fill(Color.dsAccent)
                             .frame(width: 6, height: 6)
                             .padding(.top, 7)
                         Text(cause)
                             .font(.system(size: 16))
-                            .foregroundStyle(Color.kiwiCharcoal.opacity(0.85))
+                            .foregroundStyle(Color.dsTexte.opacity(0.85))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .recapApparition(3 + position)
@@ -337,19 +337,19 @@ struct RecapSlideView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Par où commencer")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(0)
 
             Text(aliments.vedette)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(.system(size: 30, weight: .bold, design: .default))
+                .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(1)
 
             if let detail = aliments.detail {
                 Text(detail)
                     .font(.system(size: 17))
-                    .foregroundStyle(Color.kiwiCharcoal.opacity(0.85))
+                    .foregroundStyle(Color.dsTexte.opacity(0.85))
                     .fixedSize(horizontal: false, vertical: true)
                     .recapApparition(2)
             }
@@ -358,7 +358,7 @@ struct RecapSlideView: View {
                 RecapVoile(titre: "\(aliments.autresVerrouilles) autres recommandations sont réservées à Premium") {
                     Text("\(aliments.autresVerrouilles) autres recommandations")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.kiwiCharcoal.opacity(0.55))
+                        .foregroundStyle(Color.dsTexte.opacity(0.55))
                     RecapLignesMasquees(lignes: 2)
                 }
                 .recapApparition(3)
@@ -382,12 +382,12 @@ struct RecapSlideView: View {
                     Text("Partager ma carte")
                         .font(.system(size: 16, weight: .semibold))
                 }
-                .foregroundStyle(Color.kiwiInk)
+                .foregroundStyle(Color.dsTexte)
                 .frame(maxWidth: .infinity, minHeight: 52)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.kiwiGreen.opacity(0.25), lineWidth: 1)
+                        .strokeBorder(Color.dsAccent.opacity(0.25), lineWidth: 1)
                 )
                 .contentShape(Rectangle())
             }
@@ -402,18 +402,18 @@ struct RecapSlideView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Il en reste")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(0)
 
             Text("Ton bilan complet t'attend")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(.system(size: 28, weight: .bold, design: .default))
+                .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(1)
 
             Text("Les apports qu'on a couverts, ce qui les explique, et le plan pour les combler.")
                 .font(.system(size: 16))
-                .foregroundStyle(Color.kiwiCharcoal.opacity(0.8))
+                .foregroundStyle(Color.dsTexte.opacity(0.8))
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(2)
 
@@ -422,7 +422,7 @@ struct RecapSlideView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(Color.kiwiGreen, in: Capsule())
+                    .background(Color.dsAccent, in: Capsule())
                     .contentShape(Rectangle())
             }
             .buttonStyle(.healthMapPressed)
@@ -431,7 +431,7 @@ struct RecapSlideView: View {
             Button(action: onTerminer) {
                 Text("Voir mon bilan")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.kiwiInk)
+                    .foregroundStyle(Color.dsTexte)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
             }
@@ -443,17 +443,17 @@ struct RecapSlideView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("La suite")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .recapApparition(0)
 
             Text("Tout est ouvert")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .font(.system(size: 28, weight: .bold, design: .default))
+                .foregroundStyle(Color.dsTexte)
                 .recapApparition(1)
 
             Text("Ton plan détaillé, tes solutions et tes scans t'attendent dans l'app.")
                 .font(.system(size: 16))
-                .foregroundStyle(Color.kiwiCharcoal.opacity(0.8))
+                .foregroundStyle(Color.dsTexte.opacity(0.8))
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(2)
 
@@ -462,7 +462,7 @@ struct RecapSlideView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(Color.kiwiGreen, in: Capsule())
+                    .background(Color.dsAccent, in: Capsule())
                     .contentShape(Rectangle())
             }
             .buttonStyle(.healthMapPressed)
@@ -476,19 +476,19 @@ struct RecapSlideView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "lightbulb.fill")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.kiwiInk)
+                .foregroundStyle(Color.dsTexte)
                 .frame(width: 28, height: 28)
-                .background(Circle().fill(Color.kiwiTint))
+                .background(Circle().fill(Color.dsRemplissage))
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(bold)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .foregroundStyle(Color.dsTexte)
                 if let rest {
                     Text(rest)
                         .font(.system(size: 14))
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -496,7 +496,7 @@ struct RecapSlideView: View {
             Spacer(minLength: 0)
         }
         .padding(Theme.spacingSM)
-        .background(Color.healthMapCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
@@ -510,7 +510,7 @@ struct RecapSlideView: View {
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(Color.kiwiGreen, in: Capsule())
+            .background(Color.dsAccent, in: Capsule())
             .contentShape(Rectangle())
         }
         .buttonStyle(.healthMapPressed)
@@ -527,10 +527,10 @@ struct RecapCartePartage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacingMD) {
             HStack {
-                KiwiContourMark(size: 30, color: .kiwiGreen)
+                KiwiContourMark(size: 30, color: .dsAccent)
                 Text("Kiwio")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.kiwiCharcoal)
+                    .font(.system(size: 17, weight: .bold, design: .default))
+                    .foregroundStyle(Color.dsTexte)
                 Spacer()
             }
 
@@ -538,16 +538,16 @@ struct RecapCartePartage: View {
                 if let prenom = carte.prenom {
                     Text("Le bilan de \(prenom)")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 HStack(alignment: .lastTextBaseline, spacing: 4) {
                     Text("\(carte.score)")
-                        .font(.system(size: 64, weight: .bold, design: .rounded))
+                        .font(.system(size: 64, weight: .bold, design: .default))
                         .monospacedDigit()
                         .foregroundStyle(HealthScale.color(for: carte.score))
                     Text("/ 100")
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .font(.system(size: 18, weight: .semibold, design: .default))
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 Text(carte.mot)
                     .font(.system(size: 15, weight: .semibold))
@@ -555,33 +555,33 @@ struct RecapCartePartage: View {
             }
 
             HStack(spacing: Theme.spacingSM) {
-                chiffre(carte.besoinsNourris, "besoins nourris", .kiwiGreen)
+                chiffre(carte.besoinsNourris, "besoins nourris", .dsAccent)
                 chiffre(carte.apportsARenforcer, "à renforcer", .scoreLow)
             }
 
             Text("Estimation basée sur mes déclarations.\nNe remplace pas un avis médical.")
                 .font(.system(size: 10))
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(Theme.spacingLG)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.healthMapCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.kiwiGreen.opacity(0.18), lineWidth: 1)
+                .strokeBorder(Color.dsAccent.opacity(0.18), lineWidth: 1)
         )
     }
 
     private func chiffre(_ valeur: Int, _ legende: String, _ couleur: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("\(valeur)")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .font(.system(size: 26, weight: .bold, design: .default))
                 .monospacedDigit()
                 .foregroundStyle(couleur)
             Text(legende)
                 .font(.system(size: 12))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.spacingSM)

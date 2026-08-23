@@ -62,11 +62,11 @@ extension DashboardView {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12))
                 }
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.dsAccent)
                 .padding(Theme.spacingSM)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                        .fill(Color.healthMapBlueLight)
+                        .fill(Color.dsRemplissage)
                 )
             }
             .buttonStyle(.healthMapPressed)
@@ -84,11 +84,11 @@ extension DashboardView {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12))
                 }
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.dsAccent)
                 .padding(Theme.spacingSM)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                        .fill(Color.healthMapBlueLight)
+                        .fill(Color.dsRemplissage)
                 )
             }
             .buttonStyle(.healthMapPressed)
@@ -129,11 +129,11 @@ extension DashboardView {
         HStack(alignment: .center, spacing: Theme.spacingSM) {
             Image(systemName: "info.circle.fill")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
 
             Text("Informatif\u{202F}: ne remplace pas un avis médical.")
                 .font(.system(size: 11))
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }

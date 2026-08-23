@@ -77,7 +77,7 @@ struct NutrientDetailSheet: View {
                 .padding(.horizontal, Theme.spacingLG)
                 .padding(.vertical, Theme.spacingMD)
             }
-            .background(Color.healthMapBackground)
+            .background(Color.dsFond)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -86,7 +86,7 @@ struct NutrientDetailSheet: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(Color.healthMapMuted)
+                            .foregroundStyle(Color.dsSecondaire)
                             // Zone tactile ≥ 44 pt RÉELLE (loi 20) — l'icône
                             // seule fait ~20 pt (même fix qu'AllNutrientsSheet).
                             .frame(width: 44, height: 44)
@@ -116,7 +116,7 @@ struct NutrientDetailSheet: View {
                     .accessibilityHidden(true)
                 Text(nutrient.label)
                     .font(Theme.headlineFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
             }
 
             Text(HealthScale.nutrientLabel(for: nutrient.score))
@@ -130,7 +130,7 @@ struct NutrientDetailSheet: View {
             if let verdict = heroVerdict {
                 Text(verdict)
                     .font(Theme.bodyFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
@@ -165,12 +165,12 @@ struct NutrientDetailSheet: View {
             // même taille que l'explication qu'il introduit (delta 0).
             Text("Pourquoi ce score")
                 .font(Theme.subLabelFont)
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.dsAccent)
 
             if let pourquoi = nutrient.pourquoiCeScore, !pourquoi.isEmpty {
                 Text(pourquoi)
                     .font(Theme.insightFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
                     .lineLimit(4)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
@@ -180,15 +180,15 @@ struct NutrientDetailSheet: View {
                 HStack(spacing: Theme.spacingXS) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                         .accessibilityHidden(true)
                     Text("Détecté dans tes réponses")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.healthMapSecondary)
+                        .foregroundStyle(Color.dsSecondaire)
                     Spacer()
                     if let fiabilite = reliabilityBadge {
                         Text(fiabilite)
-                            .pillStyle(color: Color.healthMapBlue)
+                            .pillStyle(color: Color.dsAccent)
                     }
                 }
                 .padding(.top, 2)
@@ -198,12 +198,12 @@ struct NutrientDetailSheet: View {
                         // Signal — texte libre IA : 1 ligne max (loi 9)
                         Text(signal)
                             .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapText)
+                            .foregroundStyle(Color.dsTexte)
                             .lineLimit(1)
                             .truncationMode(.tail)
                             .padding(.horizontal, Theme.pillPaddingH)
                             .padding(.vertical, Theme.pillPaddingV)
-                            .background(Color.healthMapBlueLight)
+                            .background(Color.dsRemplissage)
                             .clipShape(Capsule())
                     }
                 }
@@ -232,7 +232,7 @@ struct NutrientDetailSheet: View {
     private func comparisonQuote(_ comparaison: String) -> some View {
         HStack(alignment: .top, spacing: Theme.spacingSM) {
             RoundedRectangle(cornerRadius: 1.5)
-                .fill(Color.healthMapBlue.opacity(Theme.opacityOverlay))
+                .fill(Color.dsAccent.opacity(Theme.opacityOverlay))
                 .frame(width: 3)
                 .accessibilityHidden(true)
 
@@ -241,7 +241,7 @@ struct NutrientDetailSheet: View {
                 // l'app : l'italique suffit à marquer la citation.
                 .font(.system(size: 14, weight: .regular))
                 .italic()
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .lineLimit(3)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
@@ -273,7 +273,7 @@ struct NutrientDetailSheet: View {
                 Text(action)
                     .font(Theme.heroTextFont)
                     .tracking(Theme.conclusionTracking)
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
                     .lineLimit(3)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
@@ -285,7 +285,7 @@ struct NutrientDetailSheet: View {
             if let dosage = solution.dosage, !dosage.isEmpty {
                 Text(dosage)
                     .font(Theme.heroValueRowFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
@@ -294,7 +294,7 @@ struct NutrientDetailSheet: View {
             if let quand = solution.quand, !quand.isEmpty {
                 Text(quand)
                     .font(Theme.insightFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
@@ -368,7 +368,7 @@ struct NutrientDetailSheet: View {
     private func collapsibleBody(_ text: String) -> some View {
         Text(text)
             .font(Theme.captionFont)
-            .foregroundStyle(Color.healthMapSecondary)
+            .foregroundStyle(Color.dsSecondaire)
             .lineLimit(4)
             .truncationMode(.tail)
             .fixedSize(horizontal: false, vertical: true)
@@ -463,11 +463,11 @@ struct NutrientDetailSheet: View {
                 // l'accessibilité passe avant la règle de couleur.
                 Text(label)
                     .font(Theme.subLabelFont)
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
 
                 Text(text)
                     .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .lineLimit(3)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
@@ -493,7 +493,7 @@ struct NutrientDetailSheet: View {
                         ProgressView()
                         Text("Recherche en cours\u{2026} environ une minute")
                             .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 case .loaded(let result):
@@ -502,7 +502,7 @@ struct NutrientDetailSheet: View {
                     VStack(alignment: .leading, spacing: Theme.spacingSM) {
                         Text(message)
                             .font(Theme.captionFont)
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                             .fixedSize(horizontal: false, vertical: true)
                         deepSearchButton(title: "Réessayer", subtitle: nil)
                     }
@@ -540,7 +540,7 @@ struct NutrientDetailSheet: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                    .fill(Color.healthMapBlue)
+                    .fill(Color.dsAccent)
             )
             .contentShape(Rectangle())
         }
@@ -552,16 +552,16 @@ struct NutrientDetailSheet: View {
             HStack(spacing: Theme.spacingSM) {
                 Image(systemName: "sparkle.magnifyingglass")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
                     .accessibilityHidden(true)
                 Text("Recherche approfondie")
                     .font(Theme.subLabelFont)
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
                 Spacer()
                 if let n = result.meta?.webResults, n > 0 {
                     Text("\(n) sources")
                         .font(.system(size: 11))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
             }
 
@@ -575,12 +575,12 @@ struct NutrientDetailSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(label)
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.healthMapText)
+                            .foregroundStyle(Color.dsTexte)
                             .fixedSize(horizontal: false, vertical: true)
                         if let reason = confirmed.reason, !reason.isEmpty {
                             Text(reason)
                                 .font(Theme.captionFont)
-                                .foregroundStyle(Color.healthMapSecondary)
+                                .foregroundStyle(Color.dsSecondaire)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -590,7 +590,7 @@ struct NutrientDetailSheet: View {
             if let synthesis = result.synthesis, !synthesis.isEmpty {
                 Text(synthesis)
                     .font(Theme.captionFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -599,11 +599,11 @@ struct NutrientDetailSheet: View {
                 HStack(spacing: Theme.spacingXS) {
                     Image(systemName: "link")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                         .accessibilityHidden(true)
                     Text("Sources scientifiques")
                         .font(Theme.subLabelFont)
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                 }
                 ForEach(evidence.prefix(6)) { source in
                     sourceRow(source)
@@ -612,7 +612,7 @@ struct NutrientDetailSheet: View {
 
             Text("Informatif\u{202F}: ne remplace pas un avis médical.")
                 .font(.system(size: 10))
-                .foregroundStyle(Color.healthMapMuted)
+                .foregroundStyle(Color.dsSecondaire)
                 .padding(.top, 2)
         }
     }
@@ -626,25 +626,25 @@ struct NutrientDetailSheet: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(source.title ?? source.host)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 4) {
                     Text(source.host)
                         .font(.system(size: 10))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                         .lineLimit(1)
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 10))
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                         .accessibilityHidden(true)
                 }
             }
             .padding(Theme.spacingSM)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(Color.healthMapBlueLight)
+            .background(Color.dsRemplissage)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
             .contentShape(Rectangle())
         }
@@ -703,19 +703,19 @@ private struct FicheCollapsible<Content: View>: View {
                 HStack(spacing: Theme.spacingSM) {
                     Image(systemName: icon)
                         .font(.system(size: 14))
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                         .accessibilityHidden(true)
 
                     // Titre de section : teinté comme son icône, jamais neutre.
                     Text(title)
                         .font(Theme.subLabelFont)
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
 
                     Spacer()
 
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.healthMapMuted)
+                        .foregroundStyle(Color.dsSecondaire)
                         .accessibilityHidden(true)
                 }
                 // Zone tactile ≥ 44 pt RÉELLE dans le label (loi 20).

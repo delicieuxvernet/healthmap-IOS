@@ -61,12 +61,12 @@ struct PlanTopic: Identifiable {
     /// ET pour un apport. La couleur du nutriment est réservée au décor
     /// (cf. `radialRing`) — elle ne tient pas le contraste AA en petit texte
     /// sur crème. Le vert vif de la marque non plus.
-    var accent: Color { kind == .symptome ? Color(hex: "2F6FE0") : Color.kiwiGreenInk }
+    var accent: Color { kind == .symptome ? Color(hex: "2F6FE0") : Color.dsTexte }
     var tint: Color {
         switch kind {
         case .symptome: return Color(hex: "EAF0FB")
-        case .objectif: return Color.kiwiGreenSoft
-        case .apport: return (apportColor ?? Color.kiwiGreen).opacity(0.14)
+        case .objectif: return Color.dsRemplissage
+        case .apport: return (apportColor ?? Color.dsAccent).opacity(0.14)
         }
     }
     /// Nombre total de solutions disponibles pour ce bloc.

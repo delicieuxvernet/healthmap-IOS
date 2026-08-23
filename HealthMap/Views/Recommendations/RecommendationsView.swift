@@ -56,7 +56,7 @@ struct RecommendationsView: View {
                         KiwiWalkerView(size: 140)
                         Text("Chargement du plan…")
                             .font(Theme.bodyFont)
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                 } else {
                     VStack(spacing: Theme.spacingMD) {
@@ -65,7 +65,7 @@ struct RecommendationsView: View {
                         MascotView(mood: .thinking, size: 72)
                         Text("Aucune analyse disponible")
                             .font(Theme.bodyFont)
-                            .foregroundStyle(Color.healthMapSecondary)
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                 }
             }

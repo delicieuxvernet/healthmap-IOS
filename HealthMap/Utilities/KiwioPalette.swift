@@ -74,6 +74,6 @@ extension Font {
     /// dès qu'un chiffre côtoyait son libellé (retour du 29 juil. 2026). Les
     /// chiffres restent alignés, ils ne changent plus de police.
     static func kiwioMono(_ taille: CGFloat, _ poids: Font.Weight = .semibold) -> Font {
-        .system(size: taille, weight: poids, design: .rounded).monospacedDigit()
+        .system(size: taille, weight: poids, design: .default).monospacedDigit()
     }
 }

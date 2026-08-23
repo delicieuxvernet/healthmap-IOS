@@ -13,12 +13,12 @@ struct ToastOverlayView: View {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "lightbulb.fill")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                         .accessibilityHidden(true)
 
                     Text(toast)
-                        .font(.system(.footnote, design: .rounded).weight(.medium))
-                        .foregroundStyle(Color.healthMapText)
+                        .font(.system(.footnote, design: .default).weight(.medium))
+                        .foregroundStyle(Color.dsTexte)
                         .multilineTextAlignment(.leading)
                         .lineLimit(3)
                         .minimumScaleFactor(0.9)
@@ -31,9 +31,9 @@ struct ToastOverlayView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(Color.healthMapBlue.opacity(0.15), lineWidth: 0.5)
+                        .strokeBorder(Color.dsAccent.opacity(0.15), lineWidth: 0.5)
                 )
-                .shadow(color: Color.black.opacity(0.08), radius: 16, y: 4)
+                // (ombre retirée, refonte 23 août 2026)
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .transition(

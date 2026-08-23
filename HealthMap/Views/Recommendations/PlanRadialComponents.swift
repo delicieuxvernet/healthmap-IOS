@@ -240,10 +240,10 @@ struct PlanRadialScreen: View {
             MascotView(mood: .happy, size: 72)
             Text("Rien à signaler pour l'instant")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color.kiwiCharcoal)
+                .foregroundStyle(Color.dsTexte)
             Text("Ton plan s'enrichira au fil de tes bilans et de tes scans.")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
         }
         .padding(24)
@@ -949,8 +949,8 @@ extension PlanTopic {
     var radialRing: Color {
         switch kind {
         case .symptome: return Color(hex: "2F6FE0")
-        case .objectif: return Color.kiwiGreen
-        case .apport: return apportColor ?? Color.kiwiGreen
+        case .objectif: return Color.dsAccent
+        case .apport: return apportColor ?? Color.dsAccent
         }
     }
 

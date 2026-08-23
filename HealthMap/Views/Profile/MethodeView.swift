@@ -4,7 +4,7 @@ import SwiftUI
 struct MethodeView: View {
     var body: some View {
         ZStack {
-            Color.healthMapBackground.ignoresSafeArea()
+            Color.dsFond.ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: Theme.spacingLG) {
@@ -34,19 +34,19 @@ struct MethodeView: View {
         VStack(spacing: Theme.spacingSM) {
             Image(systemName: "brain.head.profile")
                 .font(.system(size: 40))
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.dsAccent)
                 .frame(width: 72, height: 72)
-                .background(Color.healthMapBlue.opacity(0.12))
+                .background(Color.dsAccent.opacity(0.12))
                 .clipShape(Circle())
 
             Text("Comment ça marche ?")
                 .font(Theme.titleFont)
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
 
             Text("Transparence totale sur notre algorithme")
                 .font(Theme.bodyFont)
-                .foregroundStyle(Color.healthMapSecondary)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, Theme.spacingLG)
@@ -64,7 +64,7 @@ struct MethodeView: View {
                     title: "Questionnaire",
                     icon: "clipboard.fill",
                     description: "Tu réponds à des questions sur ton alimentation, ton mode de vie et ta santé.",
-                    color: .healthMapBlue,
+                    color: .dsAccent,
                     isLast: false
                 )
                 stepCard(
@@ -93,9 +93,9 @@ struct MethodeView: View {
                 )
             }
             .padding(Theme.cardPadding)
-            .background(Color.healthMapCard)
+            .background(Color.dsCarte)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            .shadow(color: .black.opacity(Theme.cardShadowOpacity), radius: Theme.cardShadowRadius, x: 0, y: 2)
+            // (ombre retirée, refonte 23 août 2026)
             .padding(.horizontal, Theme.spacingLG)
         }
     }
@@ -109,12 +109,12 @@ struct MethodeView: View {
                         .fill(color.opacity(0.12))
                         .frame(width: 36, height: 36)
                     Text("\(number)")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(.system(size: 14, weight: .bold, design: .default))
                         .foregroundStyle(color)
                 }
                 if !isLast {
                     Rectangle()
-                        .fill(Color.healthMapMuted.opacity(0.3))
+                        .fill(Color.dsSecondaire.opacity(0.3))
                         .frame(width: 2)
                         .frame(maxHeight: .infinity)
                 }
@@ -129,12 +129,12 @@ struct MethodeView: View {
                         .foregroundStyle(color)
                     Text(title)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.healthMapText)
+                        .foregroundStyle(Color.dsTexte)
                 }
 
                 Text(description)
                     .font(Theme.bodyFont)
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.bottom, isLast ? 0 : Theme.spacingMD)
@@ -197,23 +197,23 @@ struct MethodeView: View {
             VStack(alignment: .leading, spacing: Theme.spacingXS) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.healthMapText)
+                    .foregroundStyle(Color.dsTexte)
 
                 Text(description)
                     .font(.system(size: 13))
-                    .foregroundStyle(Color.healthMapSecondary)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(source)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.healthMapBlue)
+                    .foregroundStyle(Color.dsAccent)
             }
         }
         .padding(Theme.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.healthMapCard)
+        .background(Color.dsCarte)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(Theme.cardShadowOpacity), radius: Theme.cardShadowRadius, x: 0, y: 2)
+        // (ombre retirée, refonte 23 août 2026)
     }
 
     // MARK: - Scoring NAR
@@ -226,10 +226,10 @@ struct MethodeView: View {
                 HStack(spacing: Theme.spacingSM) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.healthMapBlue)
+                        .foregroundStyle(Color.dsAccent)
                     Text("Chaque nutriment démarre à 70/100")
                         .font(Theme.bodyFont)
-                        .foregroundStyle(Color.healthMapText)
+                        .foregroundStyle(Color.dsTexte)
                 }
 
                 // Deductions
@@ -239,7 +239,7 @@ struct MethodeView: View {
                         .foregroundStyle(Color.scoreLow)
                     Text("Des deductions sont appliquees selon ton alimentation, mode de vie et interactions")
                         .font(Theme.bodyFont)
-                        .foregroundStyle(Color.healthMapText)
+                        .foregroundStyle(Color.dsTexte)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -254,9 +254,9 @@ struct MethodeView: View {
                 }
             }
             .padding(Theme.cardPadding)
-            .background(Color.healthMapCard)
+            .background(Color.dsCarte)
             .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            .shadow(color: .black.opacity(Theme.cardShadowOpacity), radius: Theme.cardShadowRadius, x: 0, y: 2)
+            // (ombre retirée, refonte 23 août 2026)
             .padding(.horizontal, Theme.spacingLG)
         }
     }
@@ -269,13 +269,13 @@ struct MethodeView: View {
 
             Text(label)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
 
             Spacer()
 
             Text(range)
-                .font(.system(size: 13, weight: .medium, design: .rounded).monospacedDigit())
-                .foregroundStyle(Color.healthMapSecondary)
+                .font(.system(size: 13, weight: .medium, design: .default).monospacedDigit())
+                .foregroundStyle(Color.dsSecondaire)
         }
     }
 
@@ -318,7 +318,7 @@ struct MethodeView: View {
 
             Text(text)
                 .font(Theme.bodyFont)
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -328,10 +328,10 @@ struct MethodeView: View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundStyle(Color.healthMapBlue)
+                .foregroundStyle(Color.dsAccent)
             Text(title)
                 .font(Theme.headlineFont)
-                .foregroundStyle(Color.healthMapText)
+                .foregroundStyle(Color.dsTexte)
         }
         .padding(.horizontal, Theme.spacingLG)
         .padding(.bottom, Theme.spacingSM)

@@ -18,22 +18,22 @@ struct DashboardSkeletonView: View {
                 // 1. Hero Score Card skeleton (ring + label + subtitle)
                 HStack(spacing: Theme.spacingMD) {
                     Circle()
-                        .fill(Color.healthMapBlue.opacity(0.15))
+                        .fill(Color.dsAccent.opacity(0.15))
                         .frame(width: 88, height: 88)
 
                     VStack(alignment: .leading, spacing: 8) {
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.healthMapMuted.opacity(0.2))
+                            .fill(Color.dsSecondaire.opacity(0.2))
                             .frame(height: 14)
                             .frame(maxWidth: 140)
 
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.healthMapMuted.opacity(0.15))
+                            .fill(Color.dsSecondaire.opacity(0.15))
                             .frame(height: 10)
                             .frame(maxWidth: 180)
 
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.healthMapMuted.opacity(0.1))
+                            .fill(Color.dsSecondaire.opacity(0.1))
                             .frame(height: 10)
                             .frame(maxWidth: 100)
                     }
@@ -48,14 +48,14 @@ struct DashboardSkeletonView: View {
                     ForEach(0..<4, id: \.self) { _ in
                         VStack(alignment: .leading, spacing: 8) {
                             Circle()
-                                .fill(Color.healthMapMuted.opacity(0.15))
+                                .fill(Color.dsSecondaire.opacity(0.15))
                                 .frame(width: 28, height: 28)
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.healthMapMuted.opacity(0.2))
+                                .fill(Color.dsSecondaire.opacity(0.2))
                                 .frame(height: 12)
                                 .frame(maxWidth: 60)
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.healthMapMuted.opacity(0.1))
+                                .fill(Color.dsSecondaire.opacity(0.1))
                                 .frame(height: 10)
                                 .frame(maxWidth: 90)
                         }
@@ -71,15 +71,15 @@ struct DashboardSkeletonView: View {
                     ForEach(0..<3, id: \.self) { _ in
                         HStack(spacing: Theme.spacingSM) {
                             Circle()
-                                .fill(Color.healthMapMuted.opacity(0.15))
+                                .fill(Color.dsSecondaire.opacity(0.15))
                                 .frame(width: 36, height: 36)
                             VStack(alignment: .leading, spacing: 6) {
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.healthMapMuted.opacity(0.2))
+                                    .fill(Color.dsSecondaire.opacity(0.2))
                                     .frame(height: 12)
                                     .frame(maxWidth: 120)
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.healthMapMuted.opacity(0.12))
+                                    .fill(Color.dsSecondaire.opacity(0.12))
                                     .frame(height: 6)
                             }
                             Spacer(minLength: 0)
@@ -126,5 +126,5 @@ struct DashboardSkeletonView: View {
 
 #Preview {
     DashboardSkeletonView()
-        .background(Color.healthMapBackground)
+        .background(Color.dsFond)
 }
