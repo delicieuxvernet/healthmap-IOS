@@ -61,32 +61,46 @@ struct SuiviView: View {
     /// symptômes (qui relisent les ressentis persistés à la volée).
     @State private var checkinTick = 0
 
+    /// Segment du graphe « Besoins et apports ».
+    @State private var segment: ProgresSegment = .calories
+
+    /// Fiche d'un apport ouverte depuis la liste « Apports à renforcer ».
+    @State private var selectedNutrient: EnrichedNutrient?
+
     var body: some View {
         // Le moteur de score hebdo tournait TROIS fois par passe de rendu :
-        // `stats` est lu deux fois dans cette pile, et `paliers` le relisait une
-        // troisième. Un seul calcul, passé aux trois cartes. L'onglet étant
-        // monté en permanence, ce coût se payait aussi hors écran.
-        let mesures = stats
+        // un seul calcul, passé à toutes les cartes. L'onglet étant monté en
+        // permanence, ce coût se payait aussi hors écran.
+        let semaine = weekScore
+        let mesures = SuiviEngineV4.stats(weekScore: semaine, stepsToday: stepsToday)
         let prochainsPaliers = paliers(mesures)
         return NavigationStack {
             ZStack {
-                WarmBackground()
-                // Lavis Suivi : or, le rythme des jours (matin / midi / soir).
-                TabWashBackground(tint: .macroCarb)
+                DSPageBackground()
 
                 ScrollView {
-                    VStack(spacing: 14) {
-                        titleBlock.kiwiEntrance(0)
-                        SuiviStatsRow(stats: mesures).kiwiEntrance(1)
-                        macroCarousel.kiwiEntrance(2)
-                        microCarousel.kiwiEntrance(3)
-                        symptomCarousel.kiwiEntrance(4)
+                    VStack(spacing: 0) {
+                        // 1. Vue d'ensemble : deux cartes.
+                        DSSectionHeader(titre: "Vue d'ensemble")
+                            .padding(.top, -DS.avantSection + 4)
+                        vueDEnsemble(semaine)
 
-                        // Découverte (V12c) : sous les carrousels d'exemple,
-                        // la porte vers le bilan — la même que sur le Bilan et
-                        // le Plan (BilanDoorButton). Uniquement sans bilan ;
-                        // l'onglet ne déclenche par ailleurs AUCUN appel IA
-                        // (moteurs déterministes, cf. en-tête du fichier).
+                        if aucunRepas {
+                            // État premier jour : 5 blocs vides → 1.
+                            ProgresPremierJourCard { ouvrirAjout() }
+                                .padding(.top, 26)
+                        } else {
+                            // 2. Besoins et apports : segmented, conclusion, graphe.
+                            DSSectionHeader(titre: "Besoins et apports")
+                            besoinsEtApports(semaine)
+
+                            // 3. Apports à renforcer : liste groupée.
+                            DSSectionHeader(titre: "Apports à renforcer")
+                            apportsARenforcer
+                        }
+
+                        // Découverte (V12c) : la porte vers le bilan. Uniquement
+                        // sans bilan ; l'onglet ne déclenche AUCUN appel IA.
                         if !dashboardVM.bilanComplete {
                             BilanDoorButton(
                                 title: BilanDoorButton.Libelle.suivi,
@@ -95,38 +109,37 @@ struct SuiviView: View {
                             ) {
                                 dashboardVM.demarrerBilan()
                             }
-                            .kiwiEntrance(5)
+                            .padding(.top, 26)
                         }
+
+                        // 4. Ce que tu ressens : check-in quotidien et courbes
+                        // par symptôme (fonction conservée telle quelle).
+                        DSSectionHeader(titre: "Ce que tu ressens")
+                        symptomCarousel
+
+                        // 5. Repères de la semaine (conseils, paliers).
                         SuiviNeedsCard(delta: mesures.besoinsDuJourDeltaPct,
                                        stepsToday: stepsToday,
                                        tips: weeklyTips,
                                        isPremium: subscriptionService.isPremium)
-                            .kiwiEntrance(5)
-                        SuiviPaliersCard(paliers: prochainsPaliers).kiwiEntrance(6)
+                            .padding(.top, DS.avantSection)
+                        SuiviPaliersCard(paliers: prochainsPaliers)
+                            .padding(.top, DS.interCarte)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                    .padding(.horizontal, DS.marge)
                     .padding(.bottom, 24)
                     // Verrou anti-dérive horizontale : la largeur du contenu est
-                    // épinglée à celle du ScrollView → plus de slide latéral vers
-                    // une marge vide (l'écran ne bouge plus qu'en vertical).
+                    // épinglée à celle du ScrollView.
                     .containerRelativeFrame(.horizontal)
                 }
             }
             .kiwiTabBarBottomInset()
-            .navigationBarTitleDisplayMode(.inline)
-            .kiwiNavigationBarBackground()
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        NotificationCenter.default.post(name: .healthmapOpenProfile, object: nil)
-                    } label: {
-                        Image(systemName: "person.crop.circle")
-                            .font(.system(size: 22))
-                            .foregroundStyle(Color.kiwiGreen)
-                    }
-                    .accessibilityLabel("Profil")
-                }
+            // Grand titre natif : se replie en titre inline au défilement.
+            .navigationTitle("Progrès")
+            .navigationBarTitleDisplayMode(.large)
+            .sheet(item: $selectedNutrient) { nutrient in
+                NutrientDetailSheet(nutrient: nutrient)
+                    .healthMapSheet(.large)
             }
             // Pop-up check-in « 2 questions rapides » à l'arrivée.
             .overlay {
@@ -190,154 +203,186 @@ struct SuiviView: View {
         }
     }
 
-    // MARK: - 1. Titre « Mon suivi »
-    private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Mon suivi")
-                .font(Theme.screenTitleFont)
-                .tracking(Theme.screenTitleTracking)
-                .foregroundStyle(Color.kiwiCharcoal)
-            Text("Mis à jour tout seul, d'après tes scans et Santé")
-                .font(Theme.dataSecondaryFont)
-                .foregroundStyle(Color.healthMapSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 4)
-        .padding(.top, 4)
-    }
+    // MARK: - 1. Vue d'ensemble
 
-    // MARK: - Fenêtre réellement mesurée
-    /// Nombre de jours à tracer : du premier repas scanné à aujourd'hui.
-    ///
-    /// Avant le 21 août 2026, tant que 3 jours CONSÉCUTIFS n'étaient pas
-    /// scannés, les carrousels affichaient une courbe d'EXEMPLE à la place des
-    /// vraies données. Intention louable (éviter les graphiques à trous), effet
-    /// inverse : on scanne, la courbe ne bouge pas, on conclut que l'app est
-    /// cassée. On montre désormais la vraie mesure dès le premier repas, sur un
-    /// axe calé sur ce qui existe — donc sans trou d'amorce et sans invention.
-    private var fenetreMesuree: Int {
-        SuiviEngineV4.fenetreMesuree(fortnight: journal.fortnight)
-    }
-
-    /// Aucun repas scanné : on le dit, on n'illustre pas.
-    private var aucunScan: Bool { fenetreMesuree == 0 }
-
-    // MARK: - 3. Carrousel MACROS (vraies grammes/kcal par jour, scannées)
-    @ViewBuilder
-    private var macroCarousel: some View {
-        if aucunScan {
-            emptyMacroCard
-        } else {
-            macroCarouselMesure
-        }
-    }
-
-    private var macroCarouselMesure: some View {
-        let kinds = SuiviEngineV4.MacroKind.allCases
-        return SuiviCarouselBlock(
-            title: "Macros du jour",
-            systemIcon: "flame.fill",
-            tint: Color.kiwiGreen,
-            // Le vert d'aplat ne tient pas 4.5:1 en texte sur la carte crème :
-            // le titre prend l'encre verte du même domaine.
-            titleInk: Color.kiwiGreenInk,
-            pageTitles: kinds.map(\.label),
-            pageHeight: 178
-        ) { i in
-            let kind = kinds[i]
-            let series = SuiviEngineV4.macroDailySeries(
-                fortnight: journal.fortnight, macro: kind, days: fenetreMesuree
+    private func vueDEnsemble(_ semaine: WeekScoreEngine.WeekScore) -> some View {
+        HStack(alignment: .top, spacing: DS.interCarte) {
+            ProgresStatCard(
+                libelle: "Besoins couverts",
+                valeur: semaine.score.map { DS.pourcent($0) },
+                detail: detailCouverture(semaine),
+                detailCouleur: couleurCouverture(semaine),
+                detailSymbole: symboleCouverture(semaine)
             )
-            VStack(alignment: .leading, spacing: 10) {
-                SuiviValueChart(points: series, color: macroColor(kind), fixedPercent: false)
-                    .frame(height: 112)
-                // Une tendance calculée sur un seul point n'en est pas une.
-                if SuiviEngineV4.joursMesures(series) < 2 {
-                    SuiviPremierJourNote()
-                } else {
-                    SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: kind.unit)
-                }
-            }
+            ProgresStatCard(
+                libelle: "Repas suivis",
+                valeur: "\(semaine.mealCount)",
+                detail: "cette semaine"
+            )
         }
     }
 
-    // MARK: - 4. Carrousel MICROS (couverture % AJR par jour, apports à renforcer)
+    private func detailCouverture(_ semaine: WeekScoreEngine.WeekScore) -> String {
+        guard semaine.score != nil else { return "après ton 1er repas" }
+        guard let delta = semaine.delta else { return "première semaine suivie" }
+        if delta > 0 { return "+\(delta) cette semaine" }
+        if delta < 0 { return "\(delta) cette semaine" }
+        return "stable cette semaine"
+    }
+
+    private func couleurCouverture(_ semaine: WeekScoreEngine.WeekScore) -> Color {
+        guard semaine.score != nil else { return .dsTertiaire }
+        if let delta = semaine.delta, delta > 0 { return .dsAccent }
+        return .dsSecondaire
+    }
+
+    private func symboleCouverture(_ semaine: WeekScoreEngine.WeekScore) -> String? {
+        guard let delta = semaine.delta, semaine.score != nil else { return nil }
+        if delta > 0 { return "arrow.up.right" }
+        if delta < 0 { return "arrow.down.right" }
+        return nil
+    }
+
+    /// Aucun repas sur la fenêtre chargée : on le dit, on n'illustre pas.
+    private var aucunRepas: Bool { journal.fortnight.isEmpty }
+
+    /// Ouvre la feuille d'ajout du Journal (le `+`).
+    private func ouvrirAjout() {
+        HapticService.shared.tap()
+        NotificationCenter.default.post(
+            name: .healthmapNavigateToTab,
+            object: NavCardDestination.scanner.rawValue
+        )
+    }
+
+    // MARK: - 2. Besoins et apports (lundi → dimanche de la semaine courante)
+
+    private static let initialesJours = ["L", "M", "M", "J", "V", "S", "D"]
+
+    private var joursSemaine: [Date] {
+        let cal = WeekScoreEngine.mondayFirst
+        let debut = WeekScoreEngine.currentWeekInterval(containing: Date()).start
+        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: debut) }
+    }
+
+    /// Somme par jour d'une grandeur du journal ; nil = aucun repas ce jour-là
+    /// (un trou honnête, jamais un zéro fabriqué).
+    private func totauxParJour(_ valeur: (MealJournalService.MealMacros) -> Double) -> [Double?] {
+        let cal = WeekScoreEngine.mondayFirst
+        return joursSemaine.map { jour in
+            let repas = journal.fortnight.filter { cal.isDate($0.consumedAt, inSameDayAs: jour) }
+            guard !repas.isEmpty else { return nil }
+            return repas.reduce(0.0) { $0 + valeur($1.macros) }
+        }
+    }
+
+    /// Besoin de la vue courante : objectif du profil (kcal, protéines) ou
+    /// 100 % pour les micros. nil = inconnu → pas de ligne, pas de verdict.
+    private var besoinCourant: Double? {
+        switch segment {
+        case .calories: return dashboardVM.physicalMetrics.macros.map { Double($0.calories) }
+        case .macros: return dashboardVM.physicalMetrics.macros.map { Double($0.protein) }
+        case .micros: return 100
+        }
+    }
+
+    /// Un jour est hors cible à plus de 15 % de l'objectif (kcal, protéines),
+    /// ou sous 60 % de couverture (micros, le seuil « couvert » de l'app).
+    private func horsCible(_ valeur: Double, besoin: Double?) -> Bool {
+        guard let besoin, besoin > 0 else { return false }
+        if segment == .micros { return valeur < 60 }
+        return abs(valeur - besoin) / besoin > 0.15
+    }
+
+    private func pointsGraphe(_ semaine: WeekScoreEngine.WeekScore) -> [ProgresBarPoint] {
+        let valeurs: [Double?]
+        switch segment {
+        case .calories: valeurs = totauxParJour { Double($0.calories) }
+        case .macros: valeurs = totauxParJour { $0.proteins }
+        case .micros: valeurs = semaine.days.map { $0.score.map { Double($0) } }
+        }
+        let besoin = besoinCourant
+        let aujourdHui = WeekScoreEngine.mondayFirst.startOfDay(for: Date())
+        return joursSemaine.enumerated().map { index, jour in
+            let valeur = index < valeurs.count ? valeurs[index] : nil
+            return ProgresBarPoint(
+                id: index,
+                libelle: Self.initialesJours[index],
+                valeur: valeur,
+                horsCible: valeur.map { horsCible($0, besoin: besoin) } ?? false,
+                futur: jour > aujourdHui
+            )
+        }
+    }
+
+    private func conclusion(_ points: [ProgresBarPoint]) -> String {
+        let mesures = points.filter { $0.valeur != nil }
+        guard !mesures.isEmpty else { return "Pas encore de repas cette semaine." }
+        guard besoinCourant != nil else {
+            return "Complète ton profil pour connaître tes besoins."
+        }
+        let dansLaCible = mesures.filter { !$0.horsCible }.count
+        let total = mesures.count
+        let sujet: String
+        switch segment {
+        case .calories: sujet = "dans ta cible"
+        case .macros: sujet = "dans ta cible de protéines"
+        case .micros: sujet = "avec tes besoins couverts"
+        }
+        return "\(Self.enLettres(dansLaCible).capitalized) jour\(dansLaCible > 1 ? "s" : "") sur \(Self.enLettres(total)) \(sujet)."
+    }
+
+    /// Les petits nombres s'écrivent en lettres dans une phrase.
+    private static func enLettres(_ n: Int) -> String {
+        let mots = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept"]
+        return n >= 0 && n < mots.count ? mots[n] : "\(n)"
+    }
+
+    private func besoinsEtApports(_ semaine: WeekScoreEngine.WeekScore) -> some View {
+        let points = pointsGraphe(semaine)
+        return ProgresBesoinsCard(
+            segment: $segment,
+            points: points,
+            besoin: besoinCourant,
+            conclusion: conclusion(points)
+        )
+    }
+
+    // MARK: - 3. Apports à renforcer (couverture 7 jours, liste groupée)
+
     @ViewBuilder
-    private var microCarousel: some View {
-        let ids = microIds
-        if aucunScan || ids.isEmpty {
-            emptyMicroCard
+    private var apportsARenforcer: some View {
+        let lignes = coverage.map { ProgresApportsList.Ligne(id: $0.id, nom: $0.nom, pct: $0.pct) }
+        if lignes.isEmpty {
+            Text("Suis quelques repas pour voir la part de tes besoins couverte cette semaine.")
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(DS.paddingCarte)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .dsCard()
+        } else if dashboardVM.premiumVisible {
+            // Verrou (et porte) seulement une fois le bilan fait : la liste
+            // reste lisible derrière le voile, l'ouverture attend l'abonnement.
+            VStack(spacing: DS.interCarte) {
+                GatedOverlay(intensity: .locked) {
+                    ProgresApportsList(lignes: lignes) { _ in }
+                }
+                UnlockDoor(
+                    icon: "chart.xyaxis.line",
+                    title: "Débloque la tendance de tes apports",
+                    subtitle: "Visualise leur évolution jour après jour",
+                    zone: "suivi_micros"
+                )
+            }
         } else {
-            VStack(spacing: 12) {
-                SuiviCarouselBlock(
-                    title: "Micros à renforcer",
-                    systemIcon: "flask.fill",
-                    tint: Color(hex: "C9A227"),
-                    // Or foncé du même domaine : l'or d'aplat est trop clair
-                    // pour porter du texte sur crème (contraste 2.2:1).
-                    titleInk: Color(hex: "7A5C10"),
-                    pageTitles: ids.map { NutrientData.definition(for: $0)?.label ?? $0 },
-                    pageHeight: 178,
-                    // `premiumVisible` : verrou (et porte) seulement une fois
-                    // le bilan fait — avant, les courbes sont des exemples.
-                    isLocked: dashboardVM.premiumVisible
-                ) { i in
-                    let id = ids[i]
-                    let series = SuiviEngineV4.microDailySeries(
-                        fortnight: journal.fortnight, id: id, days: fenetreMesuree
-                    )
-                    VStack(alignment: .leading, spacing: 10) {
-                        SuiviValueChart(points: series, color: microColor(id), fixedPercent: true)
-                            .frame(height: 112)
-                        if SuiviEngineV4.joursMesures(series) < 2 {
-                            SuiviPremierJourNote()
-                        } else {
-                            SuiviCurveInsight(summary: SuiviEngineV4.seriesSummary(series), unit: "%")
-                        }
-                    }
-                }
-
-                if dashboardVM.premiumVisible {
-                    UnlockDoor(
-                        icon: "chart.xyaxis.line",
-                        title: "Débloque la tendance de tes apports",
-                        subtitle: "Visualise leur évolution jour après jour",
-                        zone: "suivi_micros"
-                    )
-                }
+            ProgresApportsList(lignes: lignes) { ligne in
+                guard let nutrient = dashboardVM.nutrients.first(where: { $0.id == ligne.id }) else { return }
+                HapticService.shared.tap()
+                selectedNutrient = nutrient
             }
         }
-    }
-
-    private var emptyMacroCard: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "flame")
-                .font(.system(size: 18))
-                .foregroundStyle(Color.healthMapMuted)
-            Text("Scanne ton premier repas pour voir tes courbes.")
-                .font(Theme.dataSecondaryFont)
-                .foregroundStyle(Color.healthMapSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .kiwiCard()
-    }
-
-    private var emptyMicroCard: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "flask")
-                .font(.system(size: 18))
-                .foregroundStyle(Color.healthMapMuted)
-            Text("Scanne des repas pour suivre tes apports à renforcer.")
-                .font(Theme.dataSecondaryFont)
-                .foregroundStyle(Color.healthMapSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .kiwiCard()
     }
 
     // MARK: - 5. Carrousel SYMPTÔMES (cumulé +/- PAR symptôme, indépendant)
