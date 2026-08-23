@@ -13,13 +13,20 @@ struct MethodeView: View {
                     interactionsSection
                     scoringSection
                     limitationsSection
+                    // Sources scientifiques (ANSES, EFSA, OMS, Ciqual) + mention
+                    // « ne remplace pas un avis médical » : obligatoires (App
+                    // Review 1.4.1), au bout de la page « Notre méthode et nos
+                    // sources » des Réglages (refonte 23 août 2026).
+                    SourcesSection()
+                        .padding(.horizontal, DS.marge)
                 }
                 .padding(.vertical, Theme.spacingMD)
                 .padding(.bottom, Theme.spacingXL)
             }
         }
-        .navigationTitle("Notre methode")
+        .navigationTitle("Notre méthode")
         .navigationBarTitleDisplayMode(.inline)
+        .kiwiNavigationBarBackground()
     }
 
     // MARK: - Header
