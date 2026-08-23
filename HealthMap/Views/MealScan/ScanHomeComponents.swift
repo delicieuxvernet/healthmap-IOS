@@ -498,19 +498,17 @@ struct ScanTutorialOverlay: View {
     }
 
     private let bulles: [Bulle] = [
-        Bulle(icone: "mic.fill",
-              titre: "Dicte ou photographie ton repas",
-              texte: "Les deux gros boutons en haut. Maintiens le micro pour dicter, ou prends ton assiette en photo."),
+        Bulle(icone: "plus",
+              titre: "Ajoute ton repas avec le bouton +",
+              texte: "En bas à droite. Dicte ton repas, photographie ton assiette, cherche un produit ou scanne son code-barres."),
         // Formulée au FUTUR : le tutoriel ne se joue qu'à la toute première
-        // visite, donc avant le moindre repas — et la carte « Mangé
-        // aujourd'hui » ne s'affiche pas tant que la journée est vide
-        // (`if !trie.isEmpty`). Décrire une carte absente était un contresens.
+        // visite, donc avant le moindre repas.
         Bulle(icone: "fork.knife",
-              titre: "Tes aliments s'ajouteront ici",
-              texte: "Dès ton premier repas enregistré, la carte « Mangé aujourd'hui » apparaîtra sous la recherche et ouvrira ta journée complète."),
-        Bulle(icone: "leaf.fill",
-              titre: "Et tes apports du jour se mettent à jour là",
-              texte: "Plus bas, la carte des apports montre ce que tu as déjà couvert et ce qu'il reste à renforcer."),
+              titre: "Tes repas s'ajouteront dans Aujourd'hui",
+              texte: "Petit-déjeuner, déjeuner, dîner, collation : chaque ligne compte ses calories et ouvre ta journée complète."),
+        Bulle(icone: "leaf",
+              titre: "Et tes apports à renforcer se mettent à jour",
+              texte: "Juste au-dessus : ce que ton assiette couvre, ce qui te manque, et les habitudes qui se gênent."),
     ]
 
     private var derniere: Bool { etape == bulles.count - 1 }
@@ -538,7 +536,7 @@ struct ScanTutorialOverlay: View {
         }
         .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97)))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Découverte de l'onglet Scan, étape \(etape + 1) sur \(bulles.count)")
+        .accessibilityLabel("Découverte du Journal, étape \(etape + 1) sur \(bulles.count)")
     }
 
     private var carte: some View {
@@ -608,8 +606,8 @@ struct ScanTutorialOverlay: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color.kiwiCharcoal)
+            RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                .fill(Color.dsEncre)
         )
     }
 }
