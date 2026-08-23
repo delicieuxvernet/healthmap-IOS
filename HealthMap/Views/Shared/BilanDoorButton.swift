@@ -55,6 +55,9 @@ extension BilanDoorButton {
     enum Libelle {
         /// Bilan, zone apports (libellé historique de #217, inchangé).
         static let bilanApports = "Voir MES apports · bilan 3 min"
+        /// Journal avant questionnaire (refonte 23 août 2026) : la porte de
+        /// la carte « On ne connaît pas encore tes besoins ».
+        static let journal = "Répondre au questionnaire"
         /// Plan (couronne radiale en mode découverte).
         static let plan = "Construire MON plan · bilan 3 min"
         /// Suivi (sous les carrousels d'exemple).
