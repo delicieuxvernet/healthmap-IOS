@@ -248,7 +248,12 @@ struct MainTabView: View {
 
     /// Tab tour — shown once after the user completes the questionnaire.
     @AppStorage("hasSeenTabTour") private var hasSeenTabTour = false
-    @State private var showTabTour = false
+    /// Tutoriel du premier lancement (maquette du 23 août) : remplace l'ancien
+    /// tour d'onglets et les 3 bulles du Journal. `hasSeenTabTour` reste lu :
+    /// un compte qui a déjà vu l'ancien tour ne reçoit pas le tutoriel
+    /// d'office (relançable depuis Réglages), et les captures d'écran le
+    /// neutralisent par le même argument de lancement qu'avant.
+    @ObservedObject private var tutoriel = TutorielService.partage
 
     /// Récap animé : la séquence qui délivre le bilan juste après le
     /// questionnaire. Les slides sont construits UNE fois, au moment de
@@ -261,9 +266,8 @@ struct MainTabView: View {
     /// posée en `.overlay` sur `mainInterface`, donc elle se dessine par-dessus
     /// tout ce que l'onglet contient. Monté dans l'onglet, son voile sombre
     /// laissait la barre et le bouton d'ajout en pleine lumière, et tappables.
-    /// Même placement que `TabTourOverlay`, pour la même raison.
+    /// Même placement que la surcouche du tutoriel, pour la même raison.
     @AppStorage("hasSeenScanTour") private var scanTourVu = false
-    @State private var montreTutoScan = false
 
     /// Identifiant d'onglet. Refonte du 23 août 2026 : cinq onglets qui
     /// nomment des OBJETS, pas des concepts. Le Bilan a fusionné dans le
@@ -413,10 +417,7 @@ struct MainTabView: View {
                 name: .healthmapTabDidChange,
                 object: nouvel.route
             )
-            // Retour sur le Journal sans avoir vu ses 3 bulles : on les montre
-            // (une seule fois dans la vie du compte). Jamais par-dessus le
-            // tour d'onglets.
-            if nouvel == .journal { armerTutoJournal() }
+            tutoriel.ongletChange()
         }
         .ignoresSafeArea(.keyboard)
         .tint(Color.dsAccent)
@@ -439,6 +440,7 @@ struct MainTabView: View {
                 selected: $selectedTab,
                 estompes: dashboardVM.bilanComplete ? [] : [.progres, .plan, .complements]
             )
+            .cibleTutoriel(.barreOnglets)
         }
         // Overlay de célébrations gamification (« Badge débloqué / Niveau
         // supérieur ») retiré le 28 juin 2026 : feedback jugé « cheap ».
@@ -486,8 +488,7 @@ struct MainTabView: View {
             // before SwiftUI has built this view).
             consumePendingRoute()
 
-            armerTourOnglets()
-            armerTutoJournal()
+            armerTutoriel()
         }
         .sheet(isPresented: $showPaywallFromDeepLink) {
             PaywallView()
@@ -505,33 +506,20 @@ struct MainTabView: View {
                 .environmentObject(dashboardVM)
                 .healthMapFullSheet()
         }
-        // Les deux coach marks sont posés ICI, APRÈS `mainInterface` : leur
-        // voile couvre donc AUSSI la barre d'onglets flottante (elle-même en
-        // overlay de `mainInterface`). Ne jamais les remonter dans un onglet.
-        .overlay {
-            if montreTutoScan && !showTabTour {
-                ScanTutorialOverlay {
-                    scanTourVu = true
-                    withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
-                        montreTutoScan = false
-                    }
-                }
-            }
-        }
-        .overlay {
-            if showTabTour {
-                TabTourOverlay(isShowing: $showTabTour)
-            }
-        }
-        .onChange(of: showTabTour) { _, newValue in
-            if !newValue && !hasSeenTabTour {
-                hasSeenTabTour = true
+        // Le tutoriel est posé ICI, APRÈS `mainInterface` : son voile couvre
+        // donc AUSSI la barre d'onglets flottante (elle-même en overlay de
+        // `mainInterface`). Ne jamais le remonter dans un onglet. Les cibles
+        // (bouton +, carte apports, barre d'onglets) remontent par préférence.
+        .overlayPreferenceValue(TutorielCibleKey.self) { ancres in
+            GeometryReader { proxy in
+                TutorielOverlayPrincipal(service: tutoriel, ancres: ancres, proxy: proxy,
+                                         journalVisible: selectedTab == .journal)
             }
         }
         // Fix: onAppear doesn't re-fire when the questionnaire is completed
         // inside MainTabView (Bilan tab). This onChange catches the transition.
         .onChange(of: dashboardVM.hasCompletedQuestionnaire) { _, _ in
-            armerTourOnglets()
+            armerTutoriel()
         }
         // Le tour d'onglets attend que le bilan soit RÉELLEMENT à l'écran : tant
         // que `analysisV2` est nil, `AnalysisGateView` couvre tout en plein
@@ -539,7 +527,7 @@ struct MainTabView: View {
         // bilan apparaissait enfin — et le recouvrait.
         .onChange(of: dashboardVM.analysisV2 == nil) { _, _ in
             preparerRecap()
-            armerTourOnglets()
+            armerTutoriel()
         }
         .onChange(of: pushService.pendingRoute) { _, newValue in
             // Consume routes arriving while the view is already alive
@@ -587,7 +575,7 @@ struct MainTabView: View {
             RecapView(slides: slidesRecap) {
                 afficheRecap = false
                 // Le tour d'onglets attendait la fin du récap : il peut passer.
-                armerTourOnglets()
+                armerTutoriel()
             }
         }
         // BLOCAGE pendant la 1re analyse IA (retour test 20 juin) : tant que le
@@ -644,27 +632,30 @@ struct MainTabView: View {
     /// il y a quelque chose à commenter : questionnaire fait ET bilan affiché
     /// (la gate d'analyse refermée). Appelé depuis les trois endroits qui
     /// peuvent réunir ces conditions ; les appels en trop sont sans effet.
-    private func armerTourOnglets() {
+    /// Arme le tutoriel du premier lancement quand le Journal est réellement
+    /// à l'écran : bilan chargé, récap passé, onglet Journal sélectionné.
+    private func armerTutoriel() {
         guard dashboardVM.hasCompletedQuestionnaire,
               dashboardVM.analysisV2 != nil,
-              // Le récap passe AVANT le tour : deux surcouches en même temps,
-              // et on ne lit ni l'une ni l'autre.
+              // Le récap passe AVANT le tutoriel : deux surcouches en même
+              // temps, et on ne lit ni l'une ni l'autre.
               !dashboardVM.recapArme,
               !afficheRecap,
-              !hasSeenTabTour,
-              !showTabTour else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            guard !hasSeenTabTour else { return }
-            showTabTour = true
+              selectedTab == .journal else { return }
+        #if DEBUG
+        // Captures d'écran : `-captureTutoriel` rejoue le tutoriel même sur le
+        // compte d'audit (qui a « déjà vu » l'ancien tour).
+        if ProcessInfo.processInfo.arguments.contains("-captureTutoriel") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                tutoriel.relancerPourCaptures()
+            }
+            return
         }
-    }
-
-    /// Les 3 bulles du Journal : une seule fois dans la vie du compte, quand
-    /// le Journal est à l'écran, jamais par-dessus le tour d'onglets.
-    private func armerTutoJournal() {
-        guard selectedTab == .journal, !scanTourVu, !montreTutoScan, !showTabTour else { return }
-        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.25)) {
-            montreTutoScan = true
+        #endif
+        let dejaVu = hasSeenTabTour || scanTourVu
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            guard !afficheRecap else { return }
+            tutoriel.armer(ancienTourVu: dejaVu)
         }
     }
 

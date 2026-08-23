@@ -978,9 +978,9 @@ extension PlanTopic {
     }
 
     private func assembledCause(from text: String) -> String {
-        let sentence = PlanTopicText.firstSentence(text)
+        let sentence = KiwiProse.phrase(PlanTopicText.firstSentence(KiwiProse.lisible(text)))
         guard !scoreEvidence.isEmpty else { return sentence }
-        return sentence.isEmpty ? scoreEvidence : "\(scoreEvidence). \(sentence)"
+        return sentence.isEmpty ? "\(scoreEvidence)." : "\(scoreEvidence). \(sentence)"
     }
 
     /// « Vitamine B12 à 35 % · Fer à 48 % » — les apports attachés à ce nœud.

@@ -144,10 +144,14 @@ struct JournalView: View {
                         .environmentObject(dashboardVM)
                         .healthMapFullSheet()
                 }
-                .sheet(isPresented: $showAjout, onDismiss: executerActionAjout) {
+                .sheet(isPresented: $showAjout, onDismiss: {
+                    if actionAjout == nil { TutorielService.partage.feuilleAjoutFermeeSansChoix() }
+                    executerActionAjout()
+                }) {
                     AjoutSheet(
                         compteur: compteurScans,
                         onChoisir: { action in
+                            if action == .dicter { TutorielService.partage.dicterChoisi() }
                             actionAjout = action
                             showAjout = false
                         }
@@ -319,9 +323,11 @@ struct JournalView: View {
         .overlay(alignment: .bottomTrailing) {
             DSAddButton {
                 HapticService.shared.tap()
+                TutorielService.partage.plusTape()
                 slotCible = nil
                 showAjout = true
             }
+            .cibleTutoriel(.boutonAjout)
             .padding(.trailing, DS.marge)
             .padding(.bottom, 32)
             .confirmationDialog(
@@ -515,6 +521,7 @@ struct JournalView: View {
                     isPremium: subscriptionService.isPremium,
                     onApport: { apport in
                         HapticService.shared.tap()
+                        TutorielService.partage.apportOuvert()
                         selectedApport = apport
                     },
                     onRemonter: {
@@ -525,6 +532,7 @@ struct JournalView: View {
                         )
                     }
                 )
+                .cibleTutoriel(.carteApports)
             }
         case .attente:
             JournalApportsAttenteCard(

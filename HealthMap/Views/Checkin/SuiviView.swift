@@ -55,7 +55,9 @@ struct SuiviView: View {
     /// Le vrai suivi est-il démarré ? Faux → les courbes sont des EXEMPLES badgés
     /// avec un bandeau « Commencer mon suivi ». Vrai → courbes nourries UNIQUEMENT
     /// par les check-ins réels. Initialisé depuis SuiviTrackingStore à l'affichage.
-    @State private var isTracking = false
+    // Toujours vrai depuis le 23 août (le suivi démarre tout seul) — l'état
+    // reste pour éviter un flash « exemple » au premier rendu, avant le .task.
+    @State private var isTracking = true
 
     /// Incrémenté après chaque check-in pour forcer le recalcul des courbes
     /// symptômes (qui relisent les ressentis persistés à la volée).
@@ -73,7 +75,6 @@ struct SuiviView: View {
         // permanence, ce coût se payait aussi hors écran.
         let semaine = weekScore
         let mesures = SuiviEngineV4.stats(weekScore: semaine, stepsToday: stepsToday)
-        let prochainsPaliers = paliers(mesures)
         return NavigationStack {
             ZStack {
                 DSPageBackground()
@@ -123,8 +124,6 @@ struct SuiviView: View {
                                        tips: weeklyTips,
                                        isPremium: subscriptionService.isPremium)
                             .padding(.top, DS.avantSection)
-                        SuiviPaliersCard(paliers: prochainsPaliers)
-                            .padding(.top, DS.interCarte)
                     }
                     .padding(.horizontal, DS.marge)
                     .padding(.bottom, 24)
@@ -153,9 +152,12 @@ struct SuiviView: View {
                             // saveToday a pu démarrer le suivi (1er check-in) :
                             // on relit l'état pour que les courbes basculent
                             // en réel dès cette réponse, sans autre geste.
-                            isTracking = SuiviTrackingStore.isStarted()
+                            isTracking = true
                             checkinTick += 1
                             HapticService.shared.success()
+                            // Rappels quotidiens proposés ICI, au moment de
+                            // valeur (1re réponse) — jamais au lancement.
+                            Task { await LocalNotificationService.enableReminders() }
                         },
                         onLater: {
                             SuiviCheckinStore.snoozeToday()
@@ -168,11 +170,13 @@ struct SuiviView: View {
                 }
             }
             .task {
-                // Migration : des check-ins existent mais le suivi n'a jamais
-                // été « démarré » (bandeau jamais tapé) → on le démarre, ancré
-                // au premier check-in. Les réponses déjà données comptent.
+                // Le suivi démarre tout seul à la première visite (retour
+                // d'Arthur du 23 août : plus de courbes « exemple », des vrais
+                // points dès le premier jour). Un compte avec d'anciens
+                // check-ins garde son ancrage au premier d'entre eux.
                 SuiviTrackingStore.startFromExistingCheckinsIfNeeded()
-                isTracking = SuiviTrackingStore.isStarted()
+                SuiviTrackingStore.start()
+                isTracking = true
                 // Suivi déjà démarré → on (re)planifie les rappels en silence
                 // (idempotent, sans redemander la permission). Couvre ceux qui
                 // suivaient déjà avant l'arrivée des rappels quotidiens.
@@ -405,9 +409,6 @@ struct SuiviView: View {
         )
         if !evolutions.isEmpty {
             VStack(spacing: 10) {
-                if !isTracking {
-                    SuiviStartBanner(action: startTracking)
-                }
                 SuiviCarouselBlock(
                     title: "Symptômes",
                     systemIcon: "heart.text.square",
@@ -487,17 +488,6 @@ struct SuiviView: View {
 
     /// Bascule vers le VRAI suivi : fige la date de début et recharge la série
     /// réelle. À partir de là, les courbes ne reflètent que les check-ins réels.
-    private func startTracking() {
-        SuiviTrackingStore.start()
-        isTracking = true
-        checkinHistory = SuiviCheckinHistory.recentFeelings()
-        HapticService.shared.success()
-        // Active les 2 rappels quotidiens (12 h 30 « photographie ton repas » +
-        // 19 h 30 « suis l'évolution de tes symptômes »). La permission
-        // notifications est demandée ICI, au moment de valeur — jamais au
-        // lancement (règle App Store). Refus → le suivi marche quand même, sans rappel.
-        Task { await LocalNotificationService.enableReminders() }
-    }
 
     // MARK: - Dérivés déterministes (aucun appel réseau)
 
@@ -531,10 +521,6 @@ struct SuiviView: View {
         SuiviEngineV4.weeklyTips(coverage: coverage)
     }
 
-    private func paliers(_ stats: SuiviEngineV4.SuiviStats) -> SuiviEngineV4.NextPaliers {
-        SuiviEngineV4.nextPaliers(streak: gamification.currentStreak,
-                                  besoinsCouvertsPct: stats.besoinsCouvertsPct)
-    }
 
     // MARK: - Apple Santé (lecture des pas du jour, hors main pour ne pas bloquer)
     private static func loadSteps() async -> Int? {
@@ -632,52 +618,6 @@ private struct SuiviNoSymptomCard: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 20)
         .kiwiCard()
-    }
-}
-
-// MARK: - Bandeau « Commencer mon suivi » (uniquement en mode exemple)
-/// Bandeau UNIQUE posé en tête de la section symptômes tant que le vrai suivi
-/// n'est pas démarré : explique que les courbes sont un exemple et propose un
-/// seul bouton pour basculer vers un suivi nourri par les vrais check-ins.
-private struct SuiviStartBanner: View {
-    let action: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 11) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Color.dsTexte)
-                    .padding(.top, 1)
-                // Conclusion du bandeau : c'est elle le pic, pas le bouton qui la
-                // sert (règle 2).
-                Text("Ces courbes sont un exemple. Démarre ton suivi pour les remplir avec tes vraies données.")
-                    .font(Theme.conclusionFont)
-                    .tracking(Theme.conclusionTracking)
-                    .foregroundStyle(Color.dsTexte)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }
-
-            Button(action: action) {
-                Text("Commencer mon suivi")
-                    .font(Theme.ctaFont)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            .fill(Color.dsAccent)
-                    )
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityHint("Bascule tes courbes vers un vrai suivi nourri par tes réponses")
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.dsRemplissage))
     }
 }
 
@@ -1019,7 +959,7 @@ private struct SuiviNeedsCard: View {
                 Text(isPremium ? "POUR FAIRE MIEUX LA SEMAINE PROCHAINE" : "CE QUI A MANQUÉ CETTE SEMAINE")
                     .font(.system(size: 10.5, weight: .bold))
                     .tracking(0.5)
-                    .foregroundStyle(Color(hex: "2F6FE0"))
+                    .foregroundStyle(Color.dsSecondaire)
                     .padding(.top, 14)
                     .padding(.horizontal, 2)
 
@@ -1154,112 +1094,6 @@ private enum SuiviTipIcon {
     }
 }
 
-
-// MARK: - 6. Carte « Tes prochains paliers »
-private struct SuiviPaliersCard: View {
-    let paliers: SuiviEngineV4.NextPaliers
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "target")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.dsTexte)
-                Text("Tes prochains paliers")
-                    .font(Theme.sectionLabelFont)
-                    .foregroundStyle(Color.dsTexte)
-            }
-            .padding(.horizontal, 2)
-
-            // Prochain fruit de la récolte
-            HStack(spacing: 13) {
-                Fluent3DIcon(name: paliers.fruitAsset, size: 38)
-                VStack(alignment: .leading, spacing: 7) {
-                    fruitTitle
-                    GaugeBar(fraction: fruitFraction)
-                    Text("en continuant à scanner tes repas")
-                        .font(Theme.chromeFont)
-                        .foregroundStyle(Color.dsSecondaire)
-                }
-            }
-            .padding(.top, 14)
-
-            // Projection besoins couverts
-            HStack(spacing: 13) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.dsRemplissage)
-                        .frame(width: 38, height: 38)
-                    Image(systemName: "trophy")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Color.dsTexte)
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(paliers.projectionText)
-                        .font(Theme.insightFont)
-                        .foregroundStyle(Color.dsTexte)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("en suivant ton plan, tu es sur la bonne trajectoire")
-                        .font(Theme.chromeFont)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.top, 14)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(Color.dsTexte.opacity(0.06))
-                    .frame(height: 1)
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity)
-        .kiwiCard()
-    }
-
-    private var fruitTitle: some View {
-        Group {
-            if paliers.joursRestants > 0 {
-                // Le nombre de jours restants est la donnée de la ligne : il
-                // garde l'encre du domaine et les chiffres à chasse fixe.
-                (Text("\(paliers.fruitName) débloqué dans ")
-                    + Text("\(paliers.joursRestants) j")
-                        .font(Theme.heroValueRowFont)
-                        .foregroundStyle(Color.dsTexte))
-            } else {
-                Text("\(paliers.fruitName) débloqué\u{00A0}!")
-            }
-        }
-        .font(Theme.insightFont)
-        .foregroundStyle(Color.dsTexte)
-    }
-
-    /// Progression vers le prochain fruit : plus il reste de jours, moins la
-    /// jauge est remplie (repère visuel, bornée 8-95 %).
-    private var fruitFraction: CGFloat {
-        guard paliers.joursRestants > 0 else { return 1 }
-        // 0 jour restant = plein ; au-delà d'une quinzaine on plafonne bas.
-        let remaining = min(14, paliers.joursRestants)
-        return max(0.08, min(0.95, 1 - CGFloat(remaining) / 15))
-    }
-}
-
-// MARK: - Jauge pleine (progression d'un palier)
-private struct GaugeBar: View {
-    let fraction: CGFloat
-
-    var body: some View {
-        GeometryReader { g in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color(hex: "E3DFD5")).frame(height: 6)
-                Capsule().fill(Color.dsAccent)
-                    .frame(width: max(6, g.size.width * max(0, min(1, fraction))), height: 6)
-            }
-        }
-        .frame(height: 6)
-    }
-}
 
 // MARK: - 0. Pop-up check-in « 2 questions rapides » (à l'arrivée)
 /// Modale légère (une fois par jour) : 2 questions à gros boutons-icônes (ongles

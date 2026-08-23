@@ -72,6 +72,64 @@ struct ApportV2DetailSheet: View {
     /// défloute les sections gatées en direct, sans réouverture.
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
+    // Le « + » d'un aliment de « Ce qui le remonte » ajoute VRAIMENT au journal
+    // (retour d'Arthur du 23 août : il ne faisait rien). Le nom du contrat est
+    // résolu par la recherche, la quantité se choisit dans la fiche portion
+    // (en unités quand l'aliment se compte), l'écriture suit le même chemin
+    // que la recherche du Journal.
+    /// Nom en cours de résolution (le « + » de sa ligne devient un spinner).
+    @State private var alimentEnRecherche: String?
+    /// Fiche résolue → la fiche portion s'ouvre dessus.
+    @State private var alimentTrouve: MealJournalService.FoodDetail?
+    /// Confirmation ou impasse, affichée sous la carte quelques secondes.
+    @State private var messageAjout: (texte: String, erreur: Bool)?
+
+    /// Résout le nom du contrat en fiche aliment (premier résultat de la
+    /// recherche unifiée) et ouvre la fiche portion dessus.
+    private func ajouter(_ nomAliment: String) {
+        guard alimentEnRecherche == nil, !nomAliment.isEmpty else { return }
+        HapticService.shared.selection()
+        alimentEnRecherche = nomAliment
+        messageAjout = nil
+        Task { @MainActor in
+            defer { alimentEnRecherche = nil }
+            do {
+                let hits = try await MealJournalService.shared.searchFoods(query: nomAliment, limit: 1)
+                guard let hit = hits.first else {
+                    messageAjout = ("Pas de fiche exacte pour « \(nomAliment) » : passe par la recherche du Journal.", true)
+                    return
+                }
+                let detail = try await MealJournalService.shared.foodDetail(id: hit.id)
+                guard detail.kcal100g != nil else {
+                    messageAjout = ("La fiche de « \(hit.name) » est incomplète : passe par la recherche du Journal.", true)
+                    return
+                }
+                alimentTrouve = detail
+            } catch {
+                messageAjout = ("La recherche n'a pas répondu. Réessaie dans un instant.", true)
+            }
+        }
+    }
+
+    /// Écrit l'aliment au journal du jour (créneau déduit de l'heure) — même
+    /// chemin que l'ajout depuis la recherche du Journal.
+    private func enregistrer(_ detail: MealJournalService.FoodDetail, grammes: Double) async -> Bool {
+        guard let userId = AuthService.shared.cachedCurrentUserIdString,
+              let entry = MealJournalService.entry(for: detail, grams: grammes) else { return false }
+        let slot = MealJournalService.MealSlot.from(date: Date())
+        do {
+            try await MealJournalService.shared.insertFood(userId: userId, entry: entry, slot: slot)
+            MealJournalViewModel.signalerEcriture()
+            NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
+            let kcal = Int(((detail.kcal100g ?? 0) * grammes / 100).rounded())
+            messageAjout = ("\(detail.name) ajouté à ta journée · \(kcal)\(DS.fine)kcal", false)
+            return true
+        } catch {
+            messageAjout = ("L'ajout n'a pas abouti. Réessaie dans un instant.", true)
+            return false
+        }
+    }
+
     private var pct: Int { min(100, max(0, apport.pctBesoin ?? 0)) }
     private var statut: StatutV2 { apport.statut }
     private var definition: NutrientDefinition? {
@@ -140,6 +198,20 @@ struct ApportV2DetailSheet: View {
                         // floutée ; la porte est épinglée en bas de la feuille.
                         GatedOverlay(intensity: .teaser) { remonteCard }
                     }
+                    if let message = messageAjout {
+                        HStack(spacing: 7) {
+                            Image(systemName: message.erreur ? "info.circle" : "checkmark.circle.fill")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(message.erreur ? Color.dsSecondaire : Color.dsAccent)
+                                .accessibilityHidden(true)
+                            Text(message.texte)
+                                .font(.dsLegendeMoyenne)
+                                .foregroundStyle(message.erreur ? Color.dsSecondaire : Color.dsTexte)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 10)
+                        .transition(.opacity)
+                    }
                 }
 
                 if subscriptionService.isPremium || !hasGatedContent {
@@ -153,6 +225,7 @@ struct ApportV2DetailSheet: View {
             .padding(.horizontal, DS.marge)
             .padding(.top, 12)
             .padding(.bottom, 30)
+            .animation(.default, value: messageAjout?.texte)
         }
         .safeAreaInset(edge: .bottom) {
             if !subscriptionService.isPremium, hasGatedContent {
@@ -167,6 +240,17 @@ struct ApportV2DetailSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
+        // Fiche portion de l'aliment resolu par le « + » : meme fiche que la
+        // recherche du Journal (unites quand l'aliment se compte).
+        .sheet(item: $alimentTrouve) { detail in
+            PortionSheet(mode: .add(detail: detail,
+                                    slot: MealJournalService.MealSlot.from(date: Date())),
+                         onAdd: { grammes in
+                             await enregistrer(detail, grammes: grammes)
+                         })
+            .presentationDetents([.height(460)])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     // MARK: En-tête
@@ -305,12 +389,25 @@ struct ApportV2DetailSheet: View {
         VStack(spacing: 0) {
             ForEach(Array(aliments.prefix(3).enumerated()), id: \.offset) { index, aliment in
                 if index > 0 { DSSeparator() }
-                DSRow(titre: aliment.nom ?? "") {
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color.dsAccent)
-                        .accessibilityHidden(true)
+                let nomAliment = aliment.nom ?? ""
+                Button {
+                    ajouter(nomAliment)
+                } label: {
+                    DSRow(titre: nomAliment) {
+                        if alimentEnRecherche == nomAliment {
+                            ProgressView()
+                                .tint(Color.dsSecondaire)
+                        } else {
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(Color.dsAccent)
+                                .accessibilityHidden(true)
+                        }
+                    }
                 }
+                .buttonStyle(.dsPress)
+                .disabled(alimentEnRecherche != nil)
+                .accessibilityLabel("Ajouter \(nomAliment) à ma journée")
             }
             if hasTip {
                 if !aliments.isEmpty { DSSeparator(retrait: DS.retraitSeparateurIcone) }

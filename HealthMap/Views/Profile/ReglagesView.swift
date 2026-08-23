@@ -380,6 +380,20 @@ struct ReglagesView: View {
             .tint(Color.dsAccent)
             .padding(.horizontal, DS.paddingCarte)
             .padding(.vertical, 12)
+
+            DSSeparator(retrait: DS.retraitSeparateurIcone)
+
+            Button {
+                HapticService.shared.tap()
+                TutorielService.partage.relancer()
+                // Le tutoriel commence sur le Journal : on y va.
+                NotificationCenter.default.post(name: .healthmapNavigateToTab,
+                                                object: MainTabView.Tab.journal.route)
+            } label: {
+                DSRow(icone: "hand.tap", titre: "Revoir le tutoriel",
+                      sousTitre: "Les cinq gestes du premier lancement")
+            }
+            .buttonStyle(.dsPress)
         }
     }
 

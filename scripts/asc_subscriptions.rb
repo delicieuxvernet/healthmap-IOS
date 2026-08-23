@@ -1016,6 +1016,8 @@ if MODE == "new-version"
 
     Un nouveau design, plus calme et plus lisible : fond neutre, cartes blanches, chiffres alignés, un seul vert pour ce qui se touche. Cinq onglets pour tout retrouver : Journal, Progrès, Plan, Compléments, Réglages.
 
+    Un tutoriel de trente secondes t'accueille : tu dictes ton premier repas et tu vois ce qu'il couvre de tes besoins, avant même de chercher où appuyer.
+
     Journal : ta journée d'un coup d'œil, calories et macros dans deux cartes, tes apports à renforcer juste dessous, et un bouton + pour dicter, scanner ou rechercher un repas.
 
     Quantités en unités : un œuf petit, moyen ou gros, une banane, deux tranches de pain. Plus besoin de peser ce qui se compte, les grammes sont calculés pour toi.

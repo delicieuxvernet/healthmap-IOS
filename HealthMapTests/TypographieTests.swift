@@ -105,6 +105,30 @@ final class TypographieTests: XCTestCase {
         XCTAssertEqual(KiwiProse.lisible("7"), "7")
     }
 
+    /// Renforts du 23 août (retour d'Arthur sur les pavés du Plan) : gras
+    /// markdown retiré, apartés savants entre parenthèses supprimés, fragments
+    /// recollés en vraies phrases.
+    func testKiwiProseVulgariseLesPavesDuPlan() {
+        XCTAssertEqual(KiwiProse.lisible("Ton **fer héminique** est bas."), "Ton fer héminique est bas.")
+        // Aparté long et sans chiffre : retiré.
+        XCTAssertEqual(
+            KiwiProse.lisible("Le fer (cofacteur essentiel de la synthèse de l'hémoglobine) est bas."),
+            "Le fer est bas."
+        )
+        // Repère court ou chiffré : conservé.
+        XCTAssertEqual(KiwiProse.lisible("Prends-le le matin (à jeun)."), "Prends-le le matin (à jeun).")
+        XCTAssertEqual(KiwiProse.lisible("Deux kiwis (80 mg de vitamine C environ) par jour."),
+                       "Deux kiwis (80 mg de vitamine C environ) par jour.")
+
+        XCTAssertEqual(
+            KiwiProse.phrases(["régime végétarien sans fer animal", "règles abondantes qui aggravent tes pertes"]),
+            "Régime végétarien sans fer animal. Règles abondantes qui aggravent tes pertes."
+        )
+        XCTAssertEqual(KiwiProse.phrase("ton besoin est couvert"), "Ton besoin est couvert.")
+        XCTAssertEqual(KiwiProse.phrase("Déjà ponctué !"), "Déjà ponctué !")
+        XCTAssertEqual(KiwiProse.phrases([]), "")
+    }
+
     // MARK: - Accents
 
     /// Mots français qui N'EXISTENT PAS sans accent. Les rencontrer dans une

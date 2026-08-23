@@ -466,7 +466,10 @@ struct RecommendationsContentView: View {
     // MARK: - Textes d'intro
     private func symptomeIntro(_ s: SymptomeAnalyse) -> String {
         if let causes = s.causesProbables, !causes.isEmpty {
-            return causes.prefix(2).joined(separator: " ")
+            // Deux causes recollées par un espace donnaient un pavé sans point
+            // (« …énergie cellulaire Règles abondantes… ») : chaque cause
+            // devient une phrase, majuscule et point compris.
+            return KiwiProse.phrases(Array(causes.prefix(2)))
         }
         return "On regarde ce qui pourrait l'expliquer sur ton profil."
     }
