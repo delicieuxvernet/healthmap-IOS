@@ -71,6 +71,8 @@ struct AuthSecureField: View {
                     .font(.system(size: 14))
                     .foregroundStyle(Color.dsSecondaire)
             }
+            .accessibilityLabel(showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe")
+            .accessibilityIdentifier("auth.togglePassword")
         }
         .padding(.horizontal, Theme.spacingMD)
         .frame(height: 50)

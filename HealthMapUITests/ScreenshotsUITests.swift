@@ -231,7 +231,7 @@ final class ScreenshotsUITests: XCTestCase {
         // Le questionnaire : porte « Répondre au questionnaire ».
         let porte = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "questionnaire")).firstMatch
         if porte.waitForExistence(timeout: 5) {
-            porte.tap()
+            porte.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             sleep(2)
             snap("70-questionnaire-intro")
             if app.buttons["C'est parti"].firstMatch.waitForExistence(timeout: 5) {
@@ -262,23 +262,64 @@ final class ScreenshotsUITests: XCTestCase {
     /// `SCREENSHOT_PASSWORD` dans AuthViewModel) : on attend d'abord la barre
     /// d'onglets. La saisie au clavier n'est qu'un repli.
     private func connecterSiBesoin() {
+        let identifiant = app.launchEnvironment["SCREENSHOT_EMAIL"] ?? ""
+        let motDePasse = app.launchEnvironment["SCREENSHOT_PASSWORD"] ?? ""
+        NSLog("captures: identifiants transmis à l'app — email %d caractères, mot de passe %d caractères", identifiant.count, motDePasse.count)
         fermerAlerteApple()
-        if app.buttons["Progrès"].waitForExistence(timeout: 45) { return }
+        if app.buttons["Progrès"].waitForExistence(timeout: 45) { autoriserSante(); return }
         guard app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 10) else { return }
         app.buttons["J'ai déjà un compte"].tap()
         let email = app.textFields["auth.email"]
         XCTAssertTrue(email.waitForExistence(timeout: 10), "Champ email introuvable")
         email.tap()
         email.typeText(app.launchEnvironment["SCREENSHOT_EMAIL"] ?? "")
-        let password = app.secureTextFields["auth.password"]
+        let oeil = app.buttons["auth.togglePassword"]
+        if oeil.waitForExistence(timeout: 3) { oeil.tap() }
+        let password = app.textFields["auth.password"].exists
+            ? app.textFields["auth.password"] : app.secureTextFields["auth.password"]
         password.tap()
-        password.typeText(app.launchEnvironment["SCREENSHOT_PASSWORD"] ?? "")
+        password.typeText(motDePasse)
+        sleep(1)
         app.buttons["Se connecter"].firstMatch.tap()
     }
 
     /// Laisse le temps au Journal de charger ses données (journal, bilan).
     private func attendreChargement() {
+        autoriserSante()
         sleep(4)
+    }
+
+    /// Première ouverture du Journal : iOS présente la feuille « Health
+    /// Access » (Apple Santé). On autorise tout, comme le ferait une personne
+    /// qui installe l'app, pour que les captures montrent l'état connecté.
+    /// La feuille est hébergée par un autre processus : on interroge l'app
+    /// ET Springboard.
+    private func autoriserSante() {
+        let hotes = [app!]
+        guard hotes.contains(where: { $0.staticTexts["Health Access"].waitForExistence(timeout: 2) }) else { return }
+        for hote in hotes {
+            for element in [hote.buttons["Turn On All"], hote.cells["Turn On All"],
+                            hote.staticTexts["Turn On All"], hote.buttons["Tout activer"]] where element.exists {
+                element.tap()
+                sleep(1)
+                break
+            }
+        }
+        for hote in hotes {
+            for bouton in [hote.buttons["Allow"], hote.buttons["Autoriser"]] where bouton.exists && bouton.isEnabled {
+                bouton.tap()
+                sleep(2)
+                return
+            }
+        }
+        // Rien d'activable : on refuse plutôt que de rester bloqué.
+        for hote in hotes {
+            for bouton in [hote.buttons["Don't Allow"], hote.buttons["Ne pas autoriser"]] where bouton.exists {
+                bouton.tap()
+                sleep(1)
+                return
+            }
+        }
     }
 
     /// Sur simulateur, StoreKit déclenche au lancement l'alerte Springboard
