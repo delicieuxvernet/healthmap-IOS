@@ -135,7 +135,7 @@ final class ScreenshotsUITests: XCTestCase {
 
         // Bilan complet (« Tout afficher »).
         if app.buttons["Tout afficher"].waitForExistence(timeout: 5) {
-            app.buttons["Tout afficher"].tap()
+            app.buttons["Tout afficher"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             sleep(2)
             snap("14-bilan-complet")
             fermerFeuille()
@@ -160,7 +160,7 @@ final class ScreenshotsUITests: XCTestCase {
         snap("30-plan")
         let noeud = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@", "symptôme", "objectif", "apport")).firstMatch
         if noeud.waitForExistence(timeout: 5) {
-            noeud.tap()
+            noeud.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             sleep(2)
             snap("31-plan-noeud")
             fermerFeuille()
@@ -317,7 +317,11 @@ final class ScreenshotsUITests: XCTestCase {
                 format: "label BEGINSWITH %@ AND NOT (label BEGINSWITH %@)", "Ajouter ", "Ajouter un repas")).firstMatch
             if ajouter.waitForExistence(timeout: 6) {
                 ajouter.tap()
-                sleep(3)
+                // L'ajout est réseau : la fiche ne se referme qu'une fois
+                // l'écriture faite. Fermer la recherche avant, c'est taper
+                // dans le vide sous la fiche encore ouverte.
+                _ = ajouter.waitForNonExistence(withTimeout: 20)
+                sleep(1)
             } else {
                 app.swipeDown(velocity: .fast)
             }
