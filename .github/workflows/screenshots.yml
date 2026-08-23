@@ -93,6 +93,10 @@ jobs:
           # réglage. Sans lui, XCUITest attend jusqu'à 60 s « que l'app soit au
           # repos » avant CHAQUE geste (mesuré : 3 min pour deux captures).
           xcrun simctl spawn "$UDID" defaults write com.apple.Accessibility ReduceMotionEnabled -bool true
+          # Tutoriel clavier « Speed up your typing » : il recouvre le clavier à
+          # la première saisie et a fait perdre le mot de passe tapé (23 août).
+          xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
+          xcrun simctl spawn "$UDID" defaults write com.apple.Preferences DidShowContinuousPathIntroduction -bool true
           xcrun simctl shutdown "$UDID"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b

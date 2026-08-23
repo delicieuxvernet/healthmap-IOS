@@ -526,6 +526,13 @@ if MODE == "app-audit"
         entry = { locale: l.dig("attributes", "locale"),
                   hasDescription: !l.dig("attributes", "description").to_s.empty?,
                   hasKeywords: !l.dig("attributes", "keywords").to_s.empty? }
+        # Textes complets pour la version la plus récente seulement : c'est la
+        # fiche qu'on relit avant de soumettre (onglets renommés, etc.).
+        if ver.equal?(report[:versions].first)
+          %w[description keywords promotionalText whatsNew supportUrl marketingUrl].each do |k|
+            entry[k.to_sym] = l.dig("attributes", k)
+          end
+        end
         sets = get_all("/v1/appStoreVersionLocalizations/#{l["id"]}/appScreenshotSets?limit=20")
         entry[:screenshotSets] = sets.map do |s|
           shots = get_all("/v1/appScreenshotSets/#{s["id"]}/appScreenshots?limit=20")
@@ -607,27 +614,31 @@ if MODE == "apply-app"
     notes: <<~NOTES.strip,
       Kiwio is a French nutrition app. Demo account: audit-b@test.com
 
-      IMPORTANT - the app has NO "Profil" tab. The profile opens as a sheet from
-      the profile icon (person symbol) at the TOP-RIGHT of the Bilan tab.
+      NAVIGATION (new design in this version): five tabs at the bottom -
+      Journal, Progres, Plan, Complements, Reglages (= Settings). There is no
+      "Profil" tab: the profile and every account setting live in the Reglages
+      tab (last tab).
 
       HOW TO FIND THE IN-APP PURCHASES (2.1(b)) - two paths:
-      1. Bilan tab (first tab) > tap the "Kiwio Premium" card visible on the
-         screen > the paywall opens.
-      2. Bilan tab > profile icon (top-right) > "Passer a Premium".
+      1. Reglages tab (last tab) > "Kiwio Premium" card at the top > tap its
+         button ("Essayer 7 jours gratuits" / "Decouvrir Kiwio Premium") >
+         the paywall opens.
+      2. Reglages tab > "Mon abonnement" > "Decouvrir Kiwio Premium".
       The paywall displays the auto-renewable subscriptions of group Kiwio
       Premium with their names, durations and prices: Annual (30 EUR) and
-      Weekly (0.99 EUR). Both subscriptions (Weekly and Annual) are submitted
-      with this version. The Monthly subscription is NOT part of this
-      submission and is not displayed in the app.
+      Weekly (0.99 EUR). Both subscriptions are already approved and on sale;
+      this submission contains the app version only. The Monthly subscription
+      is not displayed in the app.
 
-      HEALTHKIT (2.5.1): Apple Health is read-only. Path: Bilan tab > profile
-      icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports
-      weight, steps and sleep). The Scanner tab also reads active energy (kcal).
+      HEALTHKIT (2.5.1): Apple Health is read-only. Path: Reglages tab > "Mon
+      profil et mes objectifs" > "Apple Sante" card (imports weight, steps and
+      sleep). The Journal tab also reads active energy (kcal), shown as
+      "depensees" in the calories card.
 
-      A screen recording captured on a physical iPhone is attached to this
-      section: it begins on the Home Screen, launches the app, signs in with
-      the demo account, walks through the core features, opens the paywall and
-      completes a successful sandbox purchase.
+      A screen recording captured on a physical iPhone (previous design, same
+      flows) is attached to this section: it begins on the Home Screen,
+      launches the app, signs in with the demo account, walks through the core
+      features, opens the paywall and completes a successful sandbox purchase.
 
       Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
       Privacy Policy: https://healthmap.fr/privacy
@@ -984,7 +995,7 @@ end
 # pas à repasser en review (contrairement à la 1.0, cf. l'épisode des 4 refus).
 # VERSION_STRING (défaut 1.0.1) · WHATS_NEW (défaut : les notes ci-dessous).
 if MODE == "new-version"
-  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.2" : ENV["VERSION_STRING"]
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.3" : ENV["VERSION_STRING"]
 
   existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
     .find { |v| v.dig("attributes", "versionString") == vs }
@@ -1001,17 +1012,19 @@ if MODE == "new-version"
   end
 
   notes = ENV["WHATS_NEW"].to_s.empty? ? <<~NOTES.strip : ENV["WHATS_NEW"]
-    Ton bilan se raconte, maintenant.
+    Kiwio fait peau neuve.
 
-    À la fin du questionnaire, ton bilan se dévoile étape par étape : ton score qui monte, ce que tu fais déjà bien, puis tes apports à renforcer un par un, avec la part de ton besoin couverte qui se remplit sous tes yeux. Tu peux le revoir quand tu veux depuis ton profil, ou le lire en liste si tu préfères.
+    Un nouveau design, plus calme et plus lisible : fond neutre, cartes blanches, chiffres alignés, un seul vert pour ce qui se touche. Cinq onglets pour tout retrouver : Journal, Progrès, Plan, Compléments, Réglages.
 
-    Suivi : tes courbes affichent tes vraies données dès ton premier repas scanné. Plus d'exemple à la place de tes chiffres.
+    Journal : ta journée d'un coup d'œil, calories et macros dans deux cartes, tes apports à renforcer juste dessous, et un bouton + pour dicter, scanner ou rechercher un repas.
 
-    Abonnement : l'offre annuelle passe à 30 euros. Le paywall met le prix en avant et affiche l'équivalent par mois, pour comparer les deux formules d'un coup d'œil.
+    Quantités en unités : un œuf petit, moyen ou gros, une banane, deux tranches de pain. Plus besoin de peser ce qui se compte, les grammes sont calculés pour toi.
 
-    Codes promo : la saisie d'un code dit enfin où elle en est, confirme l'activation et affiche jusqu'à quand ton accès est ouvert.
+    Compléments : ton rituel du jour, moment par moment, avec ce que chaque complément vient renforcer.
 
-    Et des corrections d'affichage un peu partout.
+    Progrès : tes courbes et une conclusion claire, apport par apport.
+
+    Et des dizaines de retouches partout : questionnaire, accueil, réglages, fiches apports.
   NOTES
 
   get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20").each do |l|
@@ -1759,26 +1772,31 @@ if MODE == "fix-meta"
   notes = <<~NOTES.strip
     Kiwio is a French nutrition app. Demo account: audit-b@test.com
 
-    IMPORTANT - the app has NO "Profil" tab. The profile opens as a sheet from
-    the profile icon (person symbol) at the TOP-RIGHT of the Bilan tab.
+    NAVIGATION (new design in this version): five tabs at the bottom -
+    Journal, Progres, Plan, Complements, Reglages (= Settings). There is no
+    "Profil" tab: the profile and every account setting live in the Reglages
+    tab (last tab).
 
     HOW TO FIND THE IN-APP PURCHASES (2.1(b)) - two paths:
-    1. Bilan tab (first tab) > tap the "Kiwio Premium" card visible on the
-       screen > the paywall opens.
-    2. Bilan tab > profile icon (top-right) > "Passer a Premium".
-    The paywall lists the auto-renewable subscriptions of group Kiwio Premium:
-    Annual (30 EUR) and Weekly (0.99 EUR) - names, durations and prices are
-    displayed. Both are submitted with this version. The Monthly subscription
-    is NOT part of this submission and is not displayed in the app.
+    1. Reglages tab (last tab) > "Kiwio Premium" card at the top > tap its
+       button ("Essayer 7 jours gratuits" / "Decouvrir Kiwio Premium") >
+       the paywall opens.
+    2. Reglages tab > "Mon abonnement" > "Decouvrir Kiwio Premium".
+    The paywall displays the auto-renewable subscriptions of group Kiwio
+    Premium with their names, durations and prices: Annual (30 EUR) and
+    Weekly (0.99 EUR). Both subscriptions are already approved and on sale;
+    this submission contains the app version only. The Monthly subscription
+    is not displayed in the app.
 
-    HEALTHKIT (2.5.1): Apple Health is read-only. Path: Bilan tab > profile
-    icon (top-right) > "Modifier mon profil" > "Apple Sante" card (imports
-    weight, steps and sleep). The Scanner tab also reads active energy (kcal).
+    HEALTHKIT (2.5.1): Apple Health is read-only. Path: Reglages tab > "Mon
+    profil et mes objectifs" > "Apple Sante" card (imports weight, steps and
+    sleep). The Journal tab also reads active energy (kcal), shown as
+    "depensees" in the calories card.
 
-    A screen recording captured on a physical iPhone is attached to this
-    section: it begins on the Home Screen, launches the app, signs in with
-    the demo account, walks through the core features, opens the paywall and
-    completes a successful sandbox purchase.
+    A screen recording captured on a physical iPhone (previous design, same
+    flows) is attached to this section: it begins on the Home Screen,
+    launches the app, signs in with the demo account, walks through the core
+    features, opens the paywall and completes a successful sandbox purchase.
 
     Terms of Use (EULA): #{terms_url}
     Privacy Policy: #{privacy_url}

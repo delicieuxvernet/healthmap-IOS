@@ -38,6 +38,8 @@ final class ScreenshotsUITests: XCTestCase {
         app.launchArguments += ["-hasSeenOnboarding", "NO", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
         app.launch()
 
+        fermerAlerteApple()
+
         // Onboarding : page de garde + première page feature.
         if app.buttons["Passer"].waitForExistence(timeout: 15) {
             snap("01-onboarding-garde")
@@ -85,6 +87,36 @@ final class ScreenshotsUITests: XCTestCase {
             sleep(1)
             snap("12-ajout")
             fermerFeuille()
+        }
+
+        // Recherche → fiche portion d'un aliment qui se compte (œuf) : la
+        // quantité se saisit en unités (Petit / Moyen / Gros, « 1 œuf »).
+        if app.buttons["Ajouter un repas"].waitForExistence(timeout: 5) {
+            app.buttons["Ajouter un repas"].tap()
+            if app.buttons["Rechercher"].waitForExistence(timeout: 5) {
+                app.buttons["Rechercher"].tap()
+                let champ = app.textFields["Rechercher un aliment"]
+                if champ.waitForExistence(timeout: 8) {
+                    champ.tap()
+                    fermerTutorielClavier()
+                    champ.typeText("oeuf")
+                    sleep(4)
+                    snap("15-recherche")
+                    let resultat = app.buttons.matching(NSPredicate(
+                        format: "(label CONTAINS[c] %@ OR label CONTAINS[c] %@) AND NOT (label BEGINSWITH %@)",
+                        "oeuf", "œuf", "Ajouter")).firstMatch
+                    if resultat.waitForExistence(timeout: 5) {
+                        resultat.tap()
+                        sleep(3)
+                        snap("16-fiche-portion-unites")
+                        app.swipeDown(velocity: .fast)
+                        sleep(1)
+                    }
+                }
+                fermerFeuille()
+            } else {
+                fermerFeuille()
+            }
         }
 
         // Fiche apport (première ligne de « Apports à renforcer »).
@@ -225,8 +257,14 @@ final class ScreenshotsUITests: XCTestCase {
     // MARK: - Outils
 
     /// Se connecte si la page de garde est affichée (session absente).
+    ///
+    /// L'app se connecte d'elle-même (hook DEBUG `SCREENSHOT_EMAIL` /
+    /// `SCREENSHOT_PASSWORD` dans AuthViewModel) : on attend d'abord la barre
+    /// d'onglets. La saisie au clavier n'est qu'un repli.
     private func connecterSiBesoin() {
-        guard app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 20) else { return }
+        fermerAlerteApple()
+        if app.buttons["Progrès"].waitForExistence(timeout: 45) { return }
+        guard app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 10) else { return }
         app.buttons["J'ai déjà un compte"].tap()
         let email = app.textFields["auth.email"]
         XCTAssertTrue(email.waitForExistence(timeout: 10), "Champ email introuvable")
@@ -241,6 +279,29 @@ final class ScreenshotsUITests: XCTestCase {
     /// Laisse le temps au Journal de charger ses données (journal, bilan).
     private func attendreChargement() {
         sleep(4)
+    }
+
+    /// Sur simulateur, StoreKit déclenche au lancement l'alerte Springboard
+    /// « Sign in to Apple Account ». Elle resterait sur les captures : on la
+    /// ferme tout de suite (le moniteur d'interruption ne joue qu'au premier
+    /// geste, pas pendant une simple attente).
+    private func fermerAlerteApple() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let alerte = springboard.alerts.firstMatch
+        guard alerte.waitForExistence(timeout: 8) else { return }
+        for titre in ["Not Now", "Cancel", "Plus tard", "Annuler"] {
+            let bouton = alerte.buttons[titre]
+            if bouton.exists { bouton.tap(); sleep(1); return }
+        }
+    }
+
+    /// Tutoriel clavier du simulateur (« Speed up your typing… », bouton
+    /// Continue) : il recouvre le clavier à la première saisie.
+    private func fermerTutorielClavier() {
+        for application in [app!, XCUIApplication(bundleIdentifier: "com.apple.springboard")] {
+            let continuer = application.buttons["Continue"]
+            if continuer.waitForExistence(timeout: 2) { continuer.tap(); sleep(1); return }
+        }
     }
 
     private func fermerFeuille() {

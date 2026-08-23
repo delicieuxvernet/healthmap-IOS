@@ -90,7 +90,7 @@ struct DailyMealJournalView: View {
                         Task { await vm.delete(row) }
                     }
                 )
-                .presentationDetents([.height(row.isQuantityEditable ? 440 : 320)])
+                .presentationDetents([.height(row.isQuantityEditable ? 480 : 320)])
                 .presentationDragIndicator(.visible)
             }
         }

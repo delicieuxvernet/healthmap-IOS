@@ -55,6 +55,16 @@
 >   objectifs, abonnement, Apple Santé) · transparence · mon bilan · progression · préférences ·
 >   déconnexion. Sous-pages : abonnement, données (RGPD).
 >
+> **Quantités en unités** (demande d'Arthur, 23 août) : partout où une quantité est demandée
+> (dictée `VoiceMealSheet`, recherche / code-barres / édition `PortionSheet`), un aliment qui se
+> compte se saisit en unités, jamais en grammes d'abord : chips de taille quand ça a un sens
+> (œuf Petit 42 g · Moyen 50 g · Gros 60 g ; banane Petite · Moyenne · Grosse ; assiette Petite ·
+> Moyenne · Grande), compteur « − 2 œufs + » avec grammes et kcal dessous, question « Combien
+> d'œufs ? », lien « Saisir en grammes » ↔ « Compter en œufs ». Le « + » rapide de la recherche
+> ajoute 1 unité. Source : `Core/UnitPortionCatalog.swift` (≈130 motifs ordonnés par priorité,
+> poids alignés sur `PORTION_PIECE_DEFAUT` du serveur vocal ; repli sur la portion « 1 … » de
+> `get_food`). La valeur enregistrée reste le grammage.
+>
 > **Non appliqué (décisions produit à trancher, pas du design)** : le verrouillage par nœud du Plan
 > (2 nets / 3 floutés) ; « Mes aliments » et « Activité » comme saisie (remplacés par le journal complet
 > et l'énergie active Apple Santé). Le gating premium existant est inchangé partout.

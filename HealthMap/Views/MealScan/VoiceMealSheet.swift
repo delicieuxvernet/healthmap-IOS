@@ -28,6 +28,13 @@ struct VoiceMealSheet: View {
     @State private var items: [VoiceMealService.Item] = []
     @State private var grams: [Int: Double] = [:]      // index item → grammes retenus
     @State private var removed: Set<Int> = []
+    // Quantités en unités (« 2 œufs », « 1 banane ») — voir UnitPortionCatalog.
+    // Les grammes restent la seule valeur enregistrée ; l'unité n'est qu'une
+    // façon de les choisir. `tailles` = index de la taille retenue (petit /
+    // moyen / gros), `enGrammes` = aliments que l'utilisateur préfère peser.
+    @State private var unites: [Int: UnitPortionCatalog.Unite] = [:]
+    @State private var tailles: [Int: Int] = [:]
+    @State private var enGrammes: Set<Int> = []
     /// Index de la seule carte déployée. Le design impose « une seule question
     /// ouverte à la fois » : deux cartes ouvertes, et on ne sait plus à laquelle
     /// répondre.
@@ -142,10 +149,16 @@ struct VoiceMealSheet: View {
                     VoiceItemRow(
                         item: item,
                         grams: grams[item.index],
+                        unite: enGrammes.contains(item.index) ? nil : unites[item.index],
+                        taille: tailles[item.index],
+                        peutBasculer: unites[item.index] != nil,
                         deployee: deployee == item.index,
                         onTap: { basculer(item.index) },
                         onPick: { choisir($0, pour: item.index) },
                         onAjuster: { ajuster($0, pour: item.index) },
+                        onTaille: { choisirTaille($0, pour: item.index) },
+                        onCompter: { compter($0, pour: item.index) },
+                        onBasculerUnite: { basculerUnite(item.index) },
                         onRemove: {
                             removed.insert(item.index)
                             if deployee == item.index { deployee = prochainManquant() }
@@ -359,6 +372,35 @@ struct VoiceMealSheet: View {
         grams[index] = max(5, min(2000, actuel + delta))
     }
 
+    // MARK: Unités
+
+    /// Taille choisie (petit / moyen / gros) : on garde le nombre d'unités
+    /// déjà retenu (au moins 1) et on recalcule les grammes. Comme une portion
+    /// tapée, une taille choisie referme la question et ouvre la suivante.
+    private func choisirTaille(_ taille: Int, pour index: Int) {
+        guard let unite = unites[index] else { return }
+        let actuel = UnitPortionCatalog.nombre(grammes: grams[index] ?? 0,
+                                               poidsUnite: unite.poids(taille: tailles[index]))
+        let nombre = max(1, actuel.rounded())
+        tailles[index] = taille
+        choisir(min(2000, nombre * unite.poids(taille: taille)), pour: index)
+    }
+
+    /// « + » / « − » une unité. Depuis « quantité ? », le premier « + » pose 1.
+    private func compter(_ delta: Int, pour index: Int) {
+        guard let unite = unites[index] else { return }
+        let poids = unite.poids(taille: tailles[index])
+        let actuel = UnitPortionCatalog.nombre(grammes: grams[index] ?? 0, poidsUnite: poids)
+        let nombre = UnitPortionCatalog.nombreSuivant(actuel, delta: delta)
+        grams[index] = min(2000, nombre * poids)
+    }
+
+    /// Unités ↔ grammes pour un aliment : les grammes retenus ne bougent pas,
+    /// seule la façon de les choisir change.
+    private func basculerUnite(_ index: Int) {
+        if enGrammes.contains(index) { enGrammes.remove(index) } else { enGrammes.insert(index) }
+    }
+
     private func prochainManquant() -> Int? {
         visibleItems.first { (grams[$0.index] ?? 0) <= 0 }?.index
     }
@@ -444,6 +486,13 @@ struct VoiceMealSheet: View {
             grams = Dictionary(uniqueKeysWithValues: analysis.aliments.compactMap { item in
                 item.grammes.map { (item.index, $0) }
             })
+            unites = Dictionary(uniqueKeysWithValues: analysis.aliments.compactMap { item in
+                UnitPortionCatalog.unite(pourNom: item.nom,
+                                         portions: item.portions.map { (label: $0.label, grammes: $0.grammes) })
+                    .map { (item.index, $0) }
+            })
+            tailles = unites.compactMapValues { $0.tailleParDefaut }
+            enGrammes = []
             slot = VoiceMealService.slot(fromServeur: analysis.repas)
             alimentsIgnoresServeur = analysis.alimentsIgnores ?? 0
             phase = .results
@@ -611,13 +660,41 @@ private struct MacroPill: View {
 private struct VoiceItemRow: View {
     let item: VoiceMealService.Item
     let grams: Double?
+    /// Unité de saisie (« œuf », « tranche »…) ; nil = on saisit en grammes.
+    let unite: UnitPortionCatalog.Unite?
+    /// Index de la taille retenue dans `unite.tailles`.
+    let taille: Int?
+    /// Vrai quand l'aliment a une unité : le lien unités ↔ grammes s'affiche.
+    let peutBasculer: Bool
     let deployee: Bool
     let onTap: () -> Void
     let onPick: (Double) -> Void
     let onAjuster: (Double) -> Void
+    let onTaille: (Int) -> Void
+    let onCompter: (Int) -> Void
+    let onBasculerUnite: () -> Void
     let onRemove: () -> Void
 
     private var manque: Bool { (grams ?? 0) <= 0 }
+
+    /// Nombre d'unités retenu (0 tant que la quantité manque).
+    private var nombre: Double {
+        guard let unite else { return 0 }
+        return UnitPortionCatalog.nombre(grammes: grams ?? 0, poidsUnite: unite.poids(taille: taille))
+    }
+
+    /// Lu par VoiceOver : « 2 œufs, 100 grammes, 150 kilocalories ».
+    private var resume: String {
+        if let unite { return "\(unite.libelle(nombre: nombre)), \(Int(grams ?? 0)) grammes, \(kcalAffichees) kilocalories" }
+        return "\(Int(grams ?? 0)) grammes, \(kcalAffichees) kilocalories"
+    }
+
+    /// Unité connue pour cet aliment, même quand on saisit en grammes (lien
+    /// « Compter en œufs »).
+    private var uniteConnue: UnitPortionCatalog.Unite? {
+        unite ?? UnitPortionCatalog.unite(pourNom: item.nom,
+                                          portions: item.portions.map { (label: $0.label, grammes: $0.grammes) })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -645,13 +722,16 @@ private struct VoiceItemRow: View {
                                 .font(Theme.insightFont)
                                 .foregroundStyle(Kiwio.ambre)
                         } else {
-                            // Grammes en vert kiwi, chiffres en chasse fixe : la
+                            // Quantité en vert kiwi, chiffres en chasse fixe : la
                             // ligne ne saute pas quand la valeur change sous les yeux.
+                            // En unités : « 2 œufs · 100 g · 150 kcal ».
                             HStack(spacing: 0) {
-                                Text("\(Int(grams ?? 0)) g")
+                                Text(unite.map { $0.libelle(nombre: nombre) } ?? "\(Int(grams ?? 0)) g")
                                     .font(.kiwioMono(12, .bold))
                                     .foregroundStyle(Color.dsAccent)
-                                Text(" · \(kcalAffichees) kcal")
+                                Text(unite == nil
+                                     ? " · \(kcalAffichees) kcal"
+                                     : " · \(Int(grams ?? 0)) g · \(kcalAffichees) kcal")
                                     .font(.kiwioMono(12, .regular))
                                     .foregroundStyle(Color.dsSecondaire)
                             }
@@ -674,57 +754,31 @@ private struct VoiceItemRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(manque
                                 ? "\(item.nom), quantité à préciser"
-                                : "\(item.nom), \(Int(grams ?? 0)) grammes, \(kcalAffichees) kilocalories")
+                                : "\(item.nom), \(resume)")
             .accessibilityHint("Toucher pour ajuster la quantité")
 
             if deployee {
                 VStack(alignment: .leading, spacing: 12) {
                     if manque {
-                        Text("Quelle quantité as-tu mangée ?")
+                        Text(unite?.question ?? "Quelle quantité as-tu mangée ?")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Color.dsTexte)
                     }
 
-                    if !item.portions.isEmpty {
-                        HStack(spacing: 7) {
-                            ForEach(item.portions, id: \.self) { p in
-                                Button { onPick(p.grammes) } label: {
-                                    VStack(spacing: 2) {
-                                        Text(p.label)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .lineLimit(1)
-                                        Text("\(Int(p.grammes)) g")
-                                            .font(.kiwioMono(11, .bold))
-                                    }
-                                    .frame(maxWidth: .infinity, minHeight: 44)
-                                }
-                                .buttonStyle(.plain)
-                                .background(
-                                    grams == p.grammes ? Color.dsAccent : Color.dsRemplissage,
-                                    in: RoundedRectangle(cornerRadius: 10)
-                                )
-                                .foregroundStyle(grams == p.grammes ? .white : Color.dsTexte)
-                            }
-                        }
+                    if let unite {
+                        controlesUnite(unite)
+                    } else {
+                        controlesGrammes
                     }
 
-                    // Ajustement fin par pas de 5 g : les portions proposées
-                    // couvrent le cas courant, ce curseur couvre le reste sans
-                    // obliger à taper un nombre au clavier.
-                    HStack(spacing: 14) {
-                        BoutonPas(symbole: "minus", actif: (grams ?? 0) > 5) { onAjuster(-5) }
-
-                        VStack(spacing: 0) {
-                            Text("\(Int(grams ?? 0)) g")
-                                .font(.kiwioMono(20, .bold))
-                                .foregroundStyle(manque ? Color.dsTertiaire : Color.dsAccent)
-                            Text("\(kcalAffichees) kcal")
-                                .font(.kiwioMono(12, .regular))
-                                .foregroundStyle(Color.dsSecondaire)
+                    if peutBasculer {
+                        Button(action: onBasculerUnite) {
+                            Text(unite == nil ? (uniteConnue?.lienCompter ?? "Compter en unités") : "Saisir en grammes")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Color.dsAccent)
+                                .frame(maxWidth: .infinity, minHeight: 44)
                         }
-                        .frame(maxWidth: .infinity)
-
-                        BoutonPas(symbole: "plus", actif: true) { onAjuster(5) }
+                        .buttonStyle(.plain)
                     }
 
                     Button(action: onRemove) {
@@ -746,6 +800,105 @@ private struct VoiceItemRow: View {
         )
     }
 
+    // MARK: Saisie en unités
+
+    /// Tailles (petit / moyen / gros) si l'unité en a, puis « − 2 œufs + » avec
+    /// les grammes et les kcal dessous : on compte, l'app pèse.
+    private func controlesUnite(_ unite: UnitPortionCatalog.Unite) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !unite.tailles.isEmpty {
+                HStack(spacing: 7) {
+                    ForEach(Array(unite.tailles.enumerated()), id: \.offset) { index, t in
+                        let choisie = !manque && taille == index
+                        Button { onTaille(index) } label: {
+                            VStack(spacing: 2) {
+                                Text(t.libelle)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                                Text("\(Int(t.grammes)) g")
+                                    .font(.kiwioMono(11, .bold))
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .background(choisie ? Color.dsAccent : Color.dsRemplissage,
+                                    in: RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(choisie ? .white : Color.dsTexte)
+                        .accessibilityLabel("\(t.libelle), \(Int(t.grammes)) grammes")
+                        .accessibilityAddTraits(choisie ? .isSelected : [])
+                    }
+                }
+            }
+
+            HStack(spacing: 14) {
+                BoutonPas(symbole: "minus", actif: nombre > 1,
+                          libelle: "Retirer une unité") { onCompter(-1) }
+
+                VStack(spacing: 0) {
+                    Text(unite.libelle(nombre: nombre))
+                        .font(.kiwioMono(20, .bold))
+                        .foregroundStyle(manque ? Color.dsTertiaire : Color.dsAccent)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text("\(Int(grams ?? 0)) g · \(kcalAffichees) kcal")
+                        .font(.kiwioMono(12, .regular))
+                        .foregroundStyle(Color.dsSecondaire)
+                }
+                .frame(maxWidth: .infinity)
+
+                BoutonPas(symbole: "plus", actif: true,
+                          libelle: "Ajouter une unité") { onCompter(1) }
+            }
+        }
+    }
+
+    // MARK: Saisie en grammes
+
+    @ViewBuilder
+    private var controlesGrammes: some View {
+        if !item.portions.isEmpty {
+            HStack(spacing: 7) {
+                ForEach(item.portions, id: \.self) { p in
+                    Button { onPick(p.grammes) } label: {
+                        VStack(spacing: 2) {
+                            Text(p.label)
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(1)
+                            Text("\(Int(p.grammes)) g")
+                                .font(.kiwioMono(11, .bold))
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .background(
+                        grams == p.grammes ? Color.dsAccent : Color.dsRemplissage,
+                        in: RoundedRectangle(cornerRadius: 10)
+                    )
+                    .foregroundStyle(grams == p.grammes ? .white : Color.dsTexte)
+                }
+            }
+        }
+
+        // Ajustement fin par pas de 5 g : les portions proposées
+        // couvrent le cas courant, ce curseur couvre le reste sans
+        // obliger à taper un nombre au clavier.
+        HStack(spacing: 14) {
+            BoutonPas(symbole: "minus", actif: (grams ?? 0) > 5) { onAjuster(-5) }
+
+            VStack(spacing: 0) {
+                Text("\(Int(grams ?? 0)) g")
+                    .font(.kiwioMono(20, .bold))
+                    .foregroundStyle(manque ? Color.dsTertiaire : Color.dsAccent)
+                Text("\(kcalAffichees) kcal")
+                    .font(.kiwioMono(12, .regular))
+                    .foregroundStyle(Color.dsSecondaire)
+            }
+            .frame(maxWidth: .infinity)
+
+            BoutonPas(symbole: "plus", actif: true) { onAjuster(5) }
+        }
+    }
+
     /// kcal pour la quantité retenue, calculées depuis les valeurs pour 100 g.
     ///
     /// Anciennement dérivées du ratio `kcal / grammes` renvoyé par le serveur —
@@ -763,6 +916,7 @@ private struct VoiceItemRow: View {
 private struct BoutonPas: View {
     let symbole: String
     let actif: Bool
+    var libelle: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -775,7 +929,7 @@ private struct BoutonPas: View {
         }
         .buttonStyle(.plain)
         .disabled(!actif)
-        .accessibilityLabel(symbole == "plus" ? "Ajouter 5 grammes" : "Retirer 5 grammes")
+        .accessibilityLabel(libelle ?? (symbole == "plus" ? "Ajouter 5 grammes" : "Retirer 5 grammes"))
     }
 }
 
