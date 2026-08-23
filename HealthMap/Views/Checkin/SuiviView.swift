@@ -597,58 +597,6 @@ struct SymptomTrend {
     }
 }
 
-// MARK: - 2. Bandeau de 3 stats glanceables
-private struct SuiviStatsRow: View {
-    let stats: SuiviEngineV4.SuiviStats
-
-    var body: some View {
-        HStack(spacing: 10) {
-            statCard(label: "Besoins couverts",
-                     value: "\(stats.besoinsCouvertsPct)",
-                     suffix: "%",
-                     color: Color.kiwiGreenInk)
-            statCard(label: "Repas scannés",
-                     value: "\(stats.repasScannesCount)",
-                     suffix: "· 7 j",
-                     color: Color(hex: "D9820A"))
-            statCard(label: "Besoins du jour",
-                     value: signed(stats.besoinsDuJourDeltaPct),
-                     suffix: "%",
-                     color: Color(hex: "2F6FE0"))
-        }
-    }
-
-    private func signed(_ v: Int) -> String { v > 0 ? "+\(v)" : "\(v)" }
-
-    private func statCard(label: String, value: String, suffix: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            // Le libellé annonce, le chiffre répond : l'un est habillage, l'autre
-            // est la donnée-héros de la carte. L'unité reste sous les deux.
-            Text(label)
-                .font(Theme.chromeFont)
-                .foregroundStyle(Color.healthMapMuted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value)
-                    .font(Theme.heroValueFont)
-                    .foregroundStyle(color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text(suffix)
-                    .font(Theme.dataSecondaryFont)
-                    .foregroundStyle(Color.healthMapMuted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 13)
-        .padding(.vertical, 14)
-        .kiwiCard(radius: 20)
-    }
-}
-
 // MARK: - Bilan pas encore chargé / aucun symptôme — états vides honnêtes
 private struct SuiviLoadingCard: View {
     let text: String
@@ -1546,7 +1494,7 @@ private struct SuiviCheckinPopup: View {
 }
 
 // MARK: - Maths partagées des courbes (lissage Catmull-Rom → Bézier)
-// Interne (pas `private`) : réutilisé par `SuiviValueChart` (autre fichier).
+// Interne (pas `private`) : partagé avec d'autres courbes du Suivi.
 enum SuiviCurveMath {
     static func smoothPath(_ p: [CGPoint]) -> Path {
         var path = Path()

@@ -418,34 +418,6 @@ private struct PlanRadialArrowShaft: Shape {
     }
 }
 
-/// La pointe triangulaire, qui voyage avec l'extrémité du fût.
-private struct PlanRadialArrowHead: Shape {
-    var progress: CGFloat
-    let from: CGPoint
-    let to: CGPoint
-
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        guard progress > 0.02 else { return p }
-        let dx = to.x - from.x, dy = to.y - from.y
-        let len = max(sqrt(dx * dx + dy * dy), 0.001)
-        let ux = dx / len, uy = dy / len
-        let tip = CGPoint(x: from.x + dx * progress, y: from.y + dy * progress)
-        let back = CGPoint(x: tip.x - ux * 7, y: tip.y - uy * 7)
-        let nx = -uy, ny = ux
-        p.move(to: tip)
-        p.addLine(to: CGPoint(x: back.x + nx * 3.5, y: back.y + ny * 3.5))
-        p.addLine(to: CGPoint(x: back.x - nx * 3.5, y: back.y - ny * 3.5))
-        p.closeSubpath()
-        return p
-    }
-}
-
 // MARK: - La carte radiale
 
 struct PlanRadialMap: View {
@@ -609,29 +581,6 @@ private struct PlanRadialNodeView: View {
         .buttonStyle(.dsPress)
         .accessibilityLabel("\(topic.kicker.lowercased()) : \(topic.name)")
         .accessibilityHint("Ouvre les solutions")
-    }
-}
-
-// MARK: - Légende symptôme / objectif
-
-struct PlanRadialLegend: View {
-    var body: some View {
-        HStack(spacing: 16) {
-            item(color: Color(hex: "2F6FE0"), text: "symptôme")
-            item(color: Color.kiwiGreen, text: "objectif")
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func item(color: Color, text: String) -> some View {
-        HStack(spacing: 5) {
-            Circle()
-                .stroke(color, lineWidth: 2)
-                .frame(width: 9, height: 9)
-            Text(text)
-                .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(Color(hex: "6B7280"))
-        }
     }
 }
 
