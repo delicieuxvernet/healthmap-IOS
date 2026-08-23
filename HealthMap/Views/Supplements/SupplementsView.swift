@@ -44,6 +44,8 @@ struct SupplementsView: View {
 
     /// Carte dépliée — UNE seule à la fois, `nil` = tout est replié.
     @State private var openChainID: String?
+    /// Feuille « Ma sélection » (qualité des formes + cases à cocher).
+    @State private var showSelection = false
     /// Amorçage fait une seule fois quand les chaînes arrivent : première carte
     /// ouverte (sinon personne ne découvre que ça s'ouvre) + panier pré-rempli
     /// avec le plan proposé (la recommandation EST le plan par défaut).
@@ -252,58 +254,50 @@ struct SupplementsView: View {
     private var mainContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                header.kiwiEntrance(0)
+                // La bascule pilote toute la page : en tête, contrôle natif.
+                ComplementsVoieSwitch(voie: $voie)
+                    .padding(.top, 4)
+                    .kiwiEntrance(0)
 
                 // Première visite de l'onglet : l'engagement mérite un vrai
                 // bloc, une fois. Ensuite il descend en ligne de pied de page.
                 if engagementEnGrand {
-                    ComplementsEngagementCard().padding(.top, 14).kiwiEntrance(1)
-                }
-
-                // La synthèse répond en 2 secondes, avant toute lecture.
-                if voie == .complements, !chains.isEmpty {
-                    ComplementsSummaryCard(
-                        premium: $premium,
-                        gelules: chiffrableChains.count,
-                        assiette: chains.count - chiffrableChains.count,
-                        totalLabel: cartTotalLabel
-                    )
-                    .padding(.top, engagementEnGrand ? 12 : 14)
-                    .kiwiEntrance(2)
+                    ComplementsEngagementCard().padding(.top, 16).kiwiEntrance(1)
                 }
 
                 // Le rituel n'a de sens que dans la voie « compléments ».
                 if voie == .complements, let rituel {
                     ComplementsRituelStrip(rituel: rituel) { toggleRituel($0) }
-                        .padding(.top, 10)
-                        .kiwiEntrance(3)
+                        .padding(.top, DS.interCarte)
+                        .kiwiEntrance(2)
                 }
 
-                chainHeader.padding(.top, 20).kiwiEntrance(4)
+                DSSectionHeader(titre: voie == .complements ? "Recommandés pour toi" : "Par l'assiette")
+                    .padding(.top, -4)
+                    .kiwiEntrance(3)
 
                 if chains.isEmpty {
-                    aiFallbackSection.padding(.top, 12).kiwiEntrance(5)
+                    aiFallbackSection.kiwiEntrance(4)
                 } else {
-                    VStack(spacing: 10) {
+                    VStack(spacing: DS.interCarte) {
                         ForEach(Array(chains.enumerated()), id: \.element.id) { index, chain in
-                            let tete = reponse(for: chain)
-                            ChainCollapsibleCard(
-                                chain: chain,
-                                kicker: tete.kicker,
-                                reponse: tete.reponse,
-                                precision: tete.precision,
-                                prixLabel: headPrice(for: chain),
-                                isOpen: openChainID == chain.id,
-                                onToggle: { toggleOpen(chain.id) }
-                            ) {
-                                chainCard(for: chain)
-                            }
-                            .kiwiEntrance(5 + index)
+                            carteRefonte(for: chain)
+                                .kiwiEntrance(4 + index)
                         }
                     }
-                    .padding(.top, 12)
 
                     footerBlock.padding(.top, 16)
+
+                    // Le panier, derrière : une ligne discrète vers la sélection.
+                    if voie == .complements, !chiffrableChains.isEmpty {
+                        ComplementsSelectionLine(
+                            nombre: takenChains.count,
+                            totalLabel: "\(cartTotalLabel)\(DS.fine)€"
+                        ) {
+                            HapticService.shared.tap()
+                            showSelection = true
+                        }
+                    }
                 }
 
                 if !engagementEnGrand {
@@ -311,23 +305,113 @@ struct SupplementsView: View {
                 }
                 infoCard.padding(.top, engagementEnGrand ? 18 : 10)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DS.marge)
             .padding(.top, 4)
             .padding(.bottom, 16)
             // Le contenu fait EXACTEMENT la largeur du conteneur, jamais plus.
-            // C'est la seule garantie qui tienne : `scrollBounceBehavior` ne
-            // suffit pas, `.basedOnSize` laisse justement rebondir quand le
-            // contenu est plus large. Ici un enfant trop large se comprime au
-            // lieu d'élargir la zone défilable, donc la page ne peut plus
-            // glisser de côté ni laisser voir de marge vide.
             .containerRelativeFrame(.horizontal, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        // Le sélecteur est FIGÉ : `safeAreaInset` réserve sa place, donc le
-        // budget mensuel ne passe jamais dessous.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            ComplementsVoieSwitch(voie: $voie)
+        .sheet(isPresented: $showSelection) {
+            ComplementsSelectionSheet(
+                premium: $premium,
+                produits: chiffrableChains.compactMap { chain in
+                    guard let rec = chain.rec, let prod = product(for: rec) else { return nil }
+                    return ComplementsSelectionSheet.Produit(
+                        id: chain.id,
+                        nom: prod.name,
+                        apport: "\(chain.nom) · \(precisionLabel(for: prod))",
+                        prixLabel: priceLabel(for: rec),
+                        pris: taken.contains(chain.id)
+                    )
+                },
+                totalLabel: "\(cartTotalLabel)\(DS.fine)€",
+                onToggle: { toggleCart($0) }
+            )
         }
+    }
+
+    // MARK: - Carte d'une chaîne (refonte) : titre, précision, lignes d'action
+
+    /// Voie compléments : le produit à chercher en titre, l'apport + dose +
+    /// moment en secondaire, puis « Pourquoi celui-là », « Précautions » et
+    /// « Ma sélection ». Voie assiette : l'aliment en titre, l'apport et les
+    /// alternatives en secondaire, puis « Pourquoi cet aliment » et la fiche.
+    private func carteRefonte(for chain: ComplementChain) -> some View {
+        var lignes: [ChainCardRefonte.Ligne] = []
+        let titre: String
+        let sousTitre: String?
+        let symbole: String
+
+        switch voie {
+        case .complements:
+            let rec = chain.rec
+            let prod = rec.flatMap { product(for: $0) }
+            symbole = prod == nil ? "fork.knife" : "pills"
+            if let prod {
+                titre = prod.name
+                sousTitre = "\(chain.nom) · \(precisionLabel(for: prod))"
+            } else {
+                titre = "L'assiette suffit"
+                sousTitre = "\(chain.nom) · ton écart est petit"
+            }
+            if let why = whyExplanation(for: chain, product: prod) {
+                lignes.append(.init(id: "why", titre: prod == nil ? "Pourquoi pas de gélule" : "Pourquoi celui-là", vert: true) {
+                    HapticService.shared.selection()
+                    explanation = why
+                })
+            }
+            if let rec {
+                let precautions = SupplementsV4.precautions(for: rec, warnings: engineResult?.warnings ?? [])
+                if !precautions.isEmpty {
+                    lignes.append(.init(id: "care", titre: "Précautions",
+                                        valeur: "\(precautions.count) à connaître") {
+                        HapticService.shared.selection()
+                        precautionRec = rec
+                    })
+                }
+                if prod != nil {
+                    lignes.append(.init(id: "cart", titre: "Ma sélection",
+                                        valeur: priceLabel(for: rec),
+                                        coche: taken.contains(chain.id)) {
+                        toggleCart(chain.id)
+                    })
+                }
+            }
+        case .assiette:
+            let foods = foodList(for: chain)
+            symbole = "fork.knife"
+            if let food = foods.first {
+                titre = food.label.capitalizedFirstLetter
+                let autres = foods.dropFirst().map(\.label)
+                sousTitre = autres.isEmpty ? chain.nom : "\(chain.nom) · aussi : \(autres.joined(separator: ", "))"
+            } else {
+                titre = "Par l'assiette"
+                sousTitre = chain.nom
+            }
+            if let why = foodExplanation(for: chain) {
+                lignes.append(.init(id: "why", titre: "Pourquoi cet aliment", vert: true) {
+                    HapticService.shared.selection()
+                    explanation = why
+                })
+            }
+            if let nutrient = nutrientDetail(for: chain.id) {
+                lignes.append(.init(id: "fiche", titre: "Voir la fiche",
+                                    valeur: "aliments, quantités, moments") {
+                    HapticService.shared.selection()
+                    assietteNutrient = nutrient
+                })
+            }
+        }
+
+        return ChainCardRefonte(
+            tint: chain.tint,
+            symbole: symbole,
+            titre: titre,
+            sousTitre: sousTitre,
+            lignes: lignes,
+            accessibilite: "\(chain.nom), \(chain.statutLabel). \(titre). \(sousTitre ?? "")"
+        )
     }
 
     /// Le titre « Compléments » est porté par la barre de navigation (grand

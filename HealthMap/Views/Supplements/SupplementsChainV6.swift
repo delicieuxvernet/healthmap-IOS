@@ -134,42 +134,31 @@ struct ComplementChain: Identifiable {
 /// Argument de confiance : il mérite un vrai bloc la première fois qu'on ouvre
 /// l'onglet. Ensuite il a été lu, et il coûtait un écran à chaque visite : les
 /// visites suivantes affichent `ComplementsEngagementLine` en pied de page.
+/// Refonte 23 août 2026 : carte blanche, bouclier vert, headline + secondaire.
 struct ComplementsEngagementCard: View {
     var body: some View {
-        HStack(spacing: 13) {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.kiwiGreen)
-                .frame(width: 44, height: 44)
-                .overlay(
-                    Image(systemName: "hand.raised.fill")
-                        .font(.system(size: 21, weight: .semibold))
-                        .foregroundStyle(.white)
-                )
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                // Charte : cette promesse était le plus gros texte de l'onglet,
-                // au-dessus du nutriment et de l'aliment. C'est un titre de
-                // section, pas une réponse : 13 / bold, couleur du domaine.
-                Text("Kiwio ne gagne rien sur ces compléments")
-                    .font(Theme.sectionLabelFont)
-                    .foregroundStyle(Color(hex: "27510A"))
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("Aucune marque partenaire, aucune commission.")
-                    .font(Theme.dataSecondaryFont)
-                    .lineSpacing(2)
-                    .foregroundStyle(Color.kiwiGreenInk)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 11) {
+                Image(systemName: "checkmark.shield")
+                    .font(.system(size: 24, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.dsAccent)
+                    .accessibilityHidden(true)
+                Text("Kiwio ne gagne rien sur ces compléments.")
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Aucune commission, aucun partenariat. On te dit quoi chercher, tu achètes où tu veux.")
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 15)
-        .padding(.vertical, 14)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.kiwiGreenSoft)
-        )
+        .dsCard()
         .accessibilityElement(children: .combine)
     }
 }
@@ -180,137 +169,121 @@ struct ComplementsEngagementCard: View {
 struct ComplementsEngagementLine: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "hand.raised.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.kiwiGreenInk)
+            Image(systemName: "checkmark.shield")
+                .font(.system(size: 14, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsSecondaire)
                 .padding(.top, 1)
                 .accessibilityHidden(true)
-            Text("Kiwio ne gagne rien sur ces compléments. Aucune marque partenaire, aucune commission.")
-                .font(.system(size: 11.5, weight: .medium))
-                .lineSpacing(2)
-                .foregroundStyle(Color.healthMapSecondary)
+            Text("Kiwio ne gagne rien sur ces compléments. Aucune commission, aucun partenariat.")
+                .font(.dsLegende)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
         .accessibilityElement(children: .combine)
     }
 }
 
-// MARK: - Rituel du jour, version compacte (une seule ligne)
-/// Remplace l'ancien bloc d'un tiers d'écran : anneau de progression, phrase
-/// courte, et les prises du jour en pastilles cochables.
+// MARK: - Rituel du jour (carte : libellé, compte, trois moments)
+/// Refonte 23 août 2026 : une carte blanche, « Ton rituel du jour » en
+/// secondaire, le compte pris / total, puis trois puces (matin · midi · soir)
+/// qui portent le nombre de prises restantes du moment. Un tap sur une puce
+/// coche (ou décoche) toutes les prises de ce moment ; la persistance locale
+/// est inchangée (`SuiviEngineV4.toggleRituel`).
 struct ComplementsRituelStrip: View {
     let rituel: SuiviEngineV4.ComplementsRituel
     let onToggle: (String) -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var progress: Double {
-        guard rituel.total > 0 else { return 0 }
-        return Double(rituel.doneCount) / Double(rituel.total)
-    }
+    private static let moments: [(id: String, symbole: String, libelle: String)] = [
+        ("matin", "sunrise", "matin"),
+        ("midi", "sun.max", "midi"),
+        ("soir", "moon", "soir"),
+    ]
 
     var body: some View {
-        HStack(spacing: 12) {
-            ring
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 1) {
-                // Titre de section : jamais neutre, jamais gros (charte).
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
                 Text("Ton rituel du jour")
-                    .font(Theme.sectionLabelFont)
-                    .foregroundStyle(Color.kiwiGreenInk)
-                    .lineLimit(1)
-                Text(rituel.insight)
-                    .font(Theme.dataSecondaryFont)
-                    .foregroundStyle(Color.healthMapSecondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+                Spacer(minLength: 6)
+                if !rituel.isEmpty {
+                    Text("\(rituel.doneCount)/\(rituel.total)")
+                        .font(.dsValeurLigne)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .contentTransition(.numericText())
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
-            if !rituel.isEmpty {
-                // 4 pastilles au maximum. Chaque case a une zone tactile
-                // RIGIDE de 44 pt : au-delà de 4 prises, la ligne dépassait la
-                // largeur de l'écran et toute la page se mettait à rebondir
-                // horizontalement. L'anneau porte déjà le compte complet.
-                let visibles = Array(rituel.items.prefix(4))
-                let reste = rituel.items.count - visibles.count
-                HStack(spacing: 5) {
-                    ForEach(visibles) { item in
-                        RituelPastille(item: item, reduceMotion: reduceMotion) {
-                            onToggle(item.id)
-                        }
-                    }
-                    if reste > 0 {
-                        Text("+\(reste)")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.healthMapMuted)
-                            .accessibilityLabel("et \(reste) autre\(reste > 1 ? "s" : "")")
+            if rituel.isEmpty {
+                Text(rituel.insight)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTertiaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                HStack(spacing: 10) {
+                    ForEach(Self.moments, id: \.id) { moment in
+                        puce(moment)
                     }
                 }
-                .layoutPriority(1)
             }
         }
-        // Dé-carté (v7) : bloc non interactif dans son ensemble (seules les
-        // pastilles se cochent), la carte blanche laissait croire à une carte
-        // d'apport — le contenu se pose directement sur le fond. L'alignement
-        // horizontal suit le header de page (padding 2), plus le retrait
-        // interne d'une carte.
-        .padding(.horizontal, 2)
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .accessibilityElement(children: .contain)
     }
 
-    private var ring: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.kiwiGreen.opacity(0.16), lineWidth: 5)
-            Circle()
-                .trim(from: 0, to: max(0.001, progress))
-                .stroke(Color.kiwiGreen, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text("\(rituel.doneCount)/\(rituel.total)")
-                .font(.system(size: 10.5, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(Color.kiwiCharcoal)
-        }
-        .frame(width: 38, height: 38)
-    }
-}
-
-// MARK: - Pastille cochable du rituel compact
-/// Visuel 26 pt mais zone tactile élargie à 44 pt (règle d'accessibilité).
-private struct RituelPastille: View {
-    let item: SuiviEngineV4.RituelItem
-    let reduceMotion: Bool
-    let onToggle: () -> Void
-
-    private var momentIcon: String {
-        switch item.moment {
-        case "matin": return "sunrise.fill"
-        case "midi": return "sun.max.fill"
-        case "soir": return "moon.fill"
-        default: return "pills.fill"
-        }
+    private func items(_ moment: String) -> [SuiviEngineV4.RituelItem] {
+        rituel.items.filter { $0.moment == moment }
     }
 
-    var body: some View {
-        Button(action: onToggle) {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(item.done ? Color.kiwiGreenSoft : Color.kiwiCharcoal.opacity(0.07))
-                .frame(width: 26, height: 26)
-                .overlay(
-                    Image(systemName: item.done ? "checkmark" : momentIcon)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(item.done ? Color.kiwiGreenInk : Color(hex: "9CA3AF"))
-                )
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+    private func puce(_ moment: (id: String, symbole: String, libelle: String)) -> some View {
+        let prises = items(moment.id)
+        let restantes = prises.filter { !$0.done }.count
+        let complet = !prises.isEmpty && restantes == 0
+        return Button {
+            guard !prises.isEmpty else { return }
+            HapticService.shared.selection()
+            for item in prises { onToggle(item.id) }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: moment.symbole)
+                    .font(.system(size: 17, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .accessibilityHidden(true)
+                if complet {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.dsAccent)
+                        .accessibilityHidden(true)
+                } else {
+                    Text("\(restantes)")
+                        .font(.dsSousTitreFort.monospacedDigit())
+                        .foregroundStyle(prises.isEmpty ? Color.dsTertiaire : Color.dsTexte)
+                        .contentTransition(.numericText())
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.dsFond))
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.healthMapPressed)
-        .accessibilityLabel("\(item.nom), \(item.moment)")
-        .accessibilityValue(item.done ? "pris" : "à prendre")
-        .accessibilityAddTraits(item.done ? [.isButton, .isSelected] : .isButton)
+        .buttonStyle(.dsPress)
+        .disabled(prises.isEmpty)
+        .accessibilityLabel(prises.isEmpty
+            ? "Rien à prendre le \(moment.libelle)"
+            : (complet ? "Prises du \(moment.libelle) faites" : "\(restantes) prise\(restantes > 1 ? "s" : "") restante\(restantes > 1 ? "s" : "") le \(moment.libelle)"))
+        .accessibilityHint(prises.isEmpty ? "" : "Coche ou décoche les prises de ce moment")
     }
 }
 
@@ -676,64 +649,28 @@ struct ComplementsTeaserCard: View {
     }
 }
 
-// MARK: - Sélecteur de voie — figé au-dessus de la tab bar
-/// Présent UNE seule fois et atteignable pendant tout le scroll : la bascule
-/// pilote TOUTE la page, pas une carte.
+// MARK: - Sélecteur de voie (contrôle segmenté natif, en tête de page)
+/// Présent UNE seule fois : la bascule pilote TOUTE la page, pas une carte.
 struct ComplementsVoieSwitch: View {
     @Binding var voie: ComplementsVoie
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(ComplementsVoie.allCases) { item in
-                let active = voie == item
-                Button {
-                    guard !active else { return }
-                    HapticService.shared.selection()
-                    withAnimation(reduceMotion ? .none : .easeOut(duration: 0.18)) {
-                        voie = item
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: item.icon)
-                            .font(.system(size: 14, weight: .semibold))
-                        Text(item.label)
-                            .font(.system(size: 13, weight: .bold))
-                    }
-                    .foregroundStyle(active ? Color.kiwiCharcoal : Color.healthMapSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 38)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(active ? Color.white : .clear)
-                            .shadow(color: active ? Color.kiwiCharcoal.opacity(0.12) : .clear,
-                                    radius: 3, x: 0, y: 1)
-                    )
-                    .contentShape(Rectangle())
+        Picker("Voie", selection: Binding(
+            get: { voie },
+            set: { nouvelle in
+                guard nouvelle != voie else { return }
+                HapticService.shared.selection()
+                withAnimation(reduceMotion ? .none : .easeOut(duration: 0.18)) {
+                    voie = nouvelle
                 }
-                .buttonStyle(.healthMapPressed)
-                .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+            }
+        )) {
+            ForEach(ComplementsVoie.allCases) { item in
+                Text(item.label).tag(item)
             }
         }
-        .padding(3)
-        // Verre dépoli (v7) : plus de voile crème quasi opaque par-dessus le
-        // matériau — le contenu défile dessous en transparence floutée. Le
-        // flou du matériau garde le texte lisible (couleurs inchangées, et le
-        // segment actif reste sur pastille blanche opaque).
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.ultraThinMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.kiwiCharcoal.opacity(0.06), lineWidth: 1)
-        )
-        // (ombre retirée, refonte 23 août 2026)
-        .padding(.horizontal, 20)
-        // Le bouton Scan de la tab bar est surélevé : il déborde de 17 pt
-        // au-dessus de la barre (+ son anneau crème de 5 pt). Sous 24 pt de
-        // marge, le sélecteur passait derrière lui. 32 pt laissent l'air
-        // nécessaire pour que les deux se lisent séparément.
-        .padding(.bottom, 32)
+        .pickerStyle(.segmented)
         .accessibilityLabel("Voie choisie")
     }
 }
