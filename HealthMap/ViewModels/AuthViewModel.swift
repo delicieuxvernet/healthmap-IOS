@@ -80,6 +80,28 @@ final class AuthViewModel: ObservableObject {
     init() {
         listenToAuthChanges()
 
+        #if DEBUG
+        // Captures d'écran (workflow screenshots.yml) : connexion automatique
+        // avec le compte passé dans l'environnement de lancement, sans passer
+        // par le clavier du simulateur (qui perdait la saisie du mot de passe
+        // dans un champ sécurisé, run du 23 août). Le bloc n'existe pas dans
+        // le binaire App Store.
+        let captures = ProcessInfo.processInfo.environment
+        if let email = captures["SCREENSHOT_EMAIL"], !email.isEmpty,
+           let password = captures["SCREENSHOT_PASSWORD"], !password.isEmpty {
+            Task { @MainActor [weak self] in
+                // Laisse la restauration de session se terminer d'abord.
+                for _ in 0..<80 {
+                    guard let self, self.isLoading else { break }
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+                guard let self, !self.isAuthenticated else { return }
+                AppLogger.auth.notice("Captures : connexion automatique avec le compte d'audit")
+                await self.signIn(email: email, password: password)
+            }
+        }
+        #endif
+
         // Safety net: if the Supabase SDK never emits an auth event (e.g.
         // broken config, SDK internal error), the user would be stuck on
         // LaunchScreenView forever. After 10 seconds, force the loading
