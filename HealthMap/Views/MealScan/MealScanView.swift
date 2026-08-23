@@ -130,7 +130,9 @@ struct JournalView: View {
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        if !gamification.isZenMode {
+                        // La série ne s'affiche que lorsqu'elle existe : un
+                        // « 0 » dans une pill n'encourage personne.
+                        if !gamification.isZenMode, gamification.currentStreak > 0 {
                             seriePill
                         }
                     }
