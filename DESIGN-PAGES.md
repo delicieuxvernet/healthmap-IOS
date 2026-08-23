@@ -65,6 +65,21 @@
 > poids alignés sur `PORTION_PIECE_DEFAUT` du serveur vocal ; repli sur la portion « 1 … » de
 > `get_food`). La valeur enregistrée reste le grammage.
 >
+> **Tutoriel premier lancement** (maquette « Kiwio - Tutoriel », 23 août au soir) : six étapes qui
+> FONT FAIRE sur les vraies commandes — bienvenue (carte), « + » (découpe circulaire), « Dicter mon
+> repas » (dans la feuille d'ajout), « on ne te demande que ce qui manque » (dictée), carte des
+> apports, barre d'onglets (« Reviens demain » + « J'ai compris »). Voile encre 64 % découpé par
+> `destinationOut`, bulle blanche r14 (5 points de progression, « Passer » 15/500), un seul geste
+> par étape, étape persistée (reprise après kill), relançable via Réglages → « Revoir le tutoriel ».
+> Source : `Views/Shared/TutorielPremierLancement.swift`. Remplace l'ancien tour d'onglets et les
+> 3 bulles du Journal.
+>
+> **Retours du 23 août au soir (appliqués)** : le « + » de « Ce qui le remonte » (fiche apport)
+> ajoute vraiment l'aliment (recherche → fiche portion → journal) ; Progrès sans « prochains
+> paliers » (fruits à débloquer) ; courbes symptômes réelles dès le premier jour (le suivi démarre
+> tout seul, plus de mode « exemple ») ; pavés du Plan nettoyés par KiwiProse (gras markdown,
+> apartés savants ≥ 25 car. sans chiffre, causes recollées en phrases).
+>
 > **Non appliqué (décisions produit à trancher, pas du design)** : le verrouillage par nœud du Plan
 > (2 nets / 3 floutés) ; « Mes aliments » et « Activité » comme saisie (remplacés par le journal complet
 > et l'énergie active Apple Santé). Le gating premium existant est inchangé partout.
