@@ -477,7 +477,9 @@ struct TutorielOverlayPrincipal: View {
     /// au-dessus de la cible, jamais dessus.
     private func distanceSousLaCible(_ trou: CGRect?, defaut: CGFloat) -> CGFloat {
         guard let trou else { return defaut }
-        return max(20, proxy.size.height - trou.minY + 16)
+        // 36 pt : la découpe circulaire déborde du cadre de la cible
+        // (côté = max(l, h) + 2 × marge), la bulle ne doit pas la chevaucher.
+        return max(20, proxy.size.height - trou.minY + 36)
     }
 }
 

@@ -87,8 +87,8 @@ final class ScreenshotsUITests: XCTestCase {
         app.swipeDown()
 
         // Feuille d'ajout.
-        if app.buttons["Ajouter un repas"].waitForExistence(timeout: 5) {
-            app.buttons["Ajouter un repas"].tap()
+        if app.buttons["journal.plus"].waitForExistence(timeout: 5) {
+            app.buttons["journal.plus"].tap()
             sleep(1)
             snap("12-ajout")
             fermerFeuille()
@@ -96,8 +96,8 @@ final class ScreenshotsUITests: XCTestCase {
 
         // Recherche → fiche portion d'un aliment qui se compte (œuf) : la
         // quantité se saisit en unités (Petit / Moyen / Gros, « 1 œuf »).
-        if app.buttons["Ajouter un repas"].waitForExistence(timeout: 5) {
-            app.buttons["Ajouter un repas"].tap()
+        if app.buttons["journal.plus"].waitForExistence(timeout: 5) {
+            app.buttons["journal.plus"].tap()
             if app.buttons["Rechercher"].waitForExistence(timeout: 5) {
                 app.buttons["Rechercher"].tap()
                 let champ = app.textFields["recherche.champ"]
@@ -283,10 +283,11 @@ final class ScreenshotsUITests: XCTestCase {
             sleep(1)
             // Étape 2 : découpe sur le « + ».
             snap("81-tutoriel-bouton")
-            if app.buttons["Ajouter un repas"].waitForExistence(timeout: 5) {
-                taper(app.buttons["Ajouter un repas"])
-                sleep(1)
+            if app.buttons["journal.plus"].waitForExistence(timeout: 5) {
+                taper(app.buttons["journal.plus"])
                 // Étape 3 : découpe sur « Dicter mon repas » dans la feuille.
+                _ = app.buttons["Dicter mon repas"].waitForExistence(timeout: 6)
+                sleep(1)
                 snap("82-tutoriel-dicter")
                 if app.buttons["Passer"].firstMatch.exists {
                     taper(app.buttons["Passer"].firstMatch)
@@ -330,8 +331,8 @@ final class ScreenshotsUITests: XCTestCase {
     /// la première ligne de résultats (1 unité pour un aliment qui se compte,
     /// 100 g sinon). Sans effet si la recherche ne répond pas.
     private func ajouterRapide(_ aliment: String) {
-        guard app.buttons["Ajouter un repas"].waitForExistence(timeout: 5) else { return }
-        app.buttons["Ajouter un repas"].tap()
+        guard app.buttons["journal.plus"].waitForExistence(timeout: 5) else { return }
+        app.buttons["journal.plus"].tap()
         guard app.buttons["Rechercher"].waitForExistence(timeout: 5) else { fermerFeuille(); return }
         app.buttons["Rechercher"].tap()
         let champ = app.textFields["recherche.champ"]

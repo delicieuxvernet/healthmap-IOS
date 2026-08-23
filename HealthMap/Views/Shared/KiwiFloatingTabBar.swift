@@ -121,6 +121,7 @@ struct DSAddButton: View {
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel("Ajouter un repas")
+        .accessibilityIdentifier("journal.plus")
         .accessibilityHint("Ouvre la feuille d'ajout : dicter, scanner, rechercher, code-barres.")
     }
 }
