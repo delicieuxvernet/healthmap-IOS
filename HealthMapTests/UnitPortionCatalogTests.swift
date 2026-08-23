@@ -81,7 +81,19 @@ final class UnitPortionCatalogTests: XCTestCase {
         XCTAssertNil(unite("Lardons"))
         XCTAssertNil(unite("Champignon de Paris"))
         XCTAssertNil(unite("Farine de blé"))
+        XCTAssertNil(unite("Gaufrette"), "« gaufrette » n'est pas une gaufre")
         XCTAssertNil(unite(""))
+    }
+
+    /// Pièges de sous-chaînes : un motif sans frontière de mot attrape des
+    /// aliments qui n'ont rien à voir (« macaroni » ≠ « macaron »).
+    func testSousChainesPiegees() {
+        XCTAssertEqual(unite("Macaroni, cuits")?.singulier, "assiette")
+        XCTAssertEqual(unite("Edamame, cuit")?.singulier, "portion")
+        XCTAssertEqual(unite("Sucre glace")?.singulier, "cuillère")
+        XCTAssertEqual(unite("Gâteau sec")?.singulier, "biscuit")
+        XCTAssertEqual(unite("Pâte à tartiner aux noisettes")?.singulier, "cuillère")
+        XCTAssertEqual(unite("Tartine de pain beurrée")?.singulier, "tartine")
     }
 
     // MARK: - Repli sur la portion « 1 … » du serveur
