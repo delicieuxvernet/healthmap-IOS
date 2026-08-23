@@ -186,19 +186,21 @@ enum TutorielDecoupe {
 /// touches, et quatre bloqueurs transparents entourent la découpe — le voile
 /// ne bloque que ce qui n'est pas la cible.
 struct TutorielVoile: View {
-    /// Cadre de la cible dans le repère de la surcouche ; nil = voile plein.
+    /// Cadre de la cible en coordonnées GLOBALES (écran) ; nil = voile plein.
     var trou: CGRect?
     var forme: TutorielDecoupe = .cercle
     /// Marge autour de la cible, pour que la découpe respire.
     var marge: CGFloat = 6
 
-    private var trouElargi: CGRect? {
-        trou?.insetBy(dx: -marge, dy: -marge)
-    }
-
     var body: some View {
         GeometryReader { geo in
             let plein = CGRect(origin: .zero, size: geo.size)
+            // Global → repère du voile (qui ignore les safe areas ; dans une
+            // feuille, son origine est celle de la feuille, pas de l'écran).
+            let origine = geo.frame(in: .global).origin
+            let trouElargi = trou?
+                .offsetBy(dx: -origine.x, dy: -origine.y)
+                .insetBy(dx: -marge, dy: -marge)
             ZStack {
                 // Visuel : voile + découpe (destinationOut dans un
                 // compositingGroup, comme spécifié par la maquette).
@@ -395,7 +397,16 @@ struct TutorielOverlayPrincipal: View {
     var journalVisible: Bool = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Cadre de la cible en coordonnées globales (pour le voile).
     private func cadre(_ cible: TutorielCible) -> CGRect? {
+        ancres[cible].map { rect in
+            let base = proxy.frame(in: .global).origin
+            return proxy[rect].offsetBy(dx: base.x, dy: base.y)
+        }
+    }
+
+    /// Cadre de la cible dans le repère de la surcouche (pour poser la bulle).
+    private func cadreLocal(_ cible: TutorielCible) -> CGRect? {
         ancres[cible].map { proxy[$0] }
     }
 
@@ -421,9 +432,9 @@ struct TutorielOverlayPrincipal: View {
             }
 
         case .bouton:
-            let trou = cadre(.boutonAjout)
+            let trou = cadreLocal(.boutonAjout)
             ZStack(alignment: .bottom) {
-                TutorielVoile(trou: trou, forme: .cercle, marge: 8)
+                TutorielVoile(trou: cadre(.boutonAjout), forme: .cercle, marge: 8)
                 TutorielBulle(
                     etape: etape,
                     titre: "Tout part de ce bouton",
@@ -435,9 +446,9 @@ struct TutorielOverlayPrincipal: View {
             }
 
         case .valeur:
-            let trou = cadre(.carteApports)
+            let trou = cadreLocal(.carteApports)
             ZStack(alignment: .top) {
-                TutorielVoile(trou: trou, forme: .arrondi(DS.rayonCarte), marge: 4)
+                TutorielVoile(trou: cadre(.carteApports), forme: .arrondi(DS.rayonCarte), marge: 4)
                 TutorielBulle(
                     etape: etape,
                     titre: "Voilà pourquoi tu es là",
@@ -449,9 +460,9 @@ struct TutorielOverlayPrincipal: View {
             }
 
         case .suite:
-            let trou = cadre(.barreOnglets)
+            let trou = cadreLocal(.barreOnglets)
             ZStack(alignment: .bottom) {
-                TutorielVoile(trou: trou, forme: .arrondi(32), marge: 4)
+                TutorielVoile(trou: cadre(.barreOnglets), forme: .arrondi(32), marge: 4)
                 TutorielBulle(
                     etape: etape,
                     titre: "Reviens demain",
@@ -492,7 +503,8 @@ struct TutorielOverlayAjout: View {
 
     var body: some View {
         if service.etape == .dicter {
-            let trou = ancres[.tuileDicter].map { proxy[$0] }
+            let base = proxy.frame(in: .global).origin
+            let trou = ancres[.tuileDicter].map { proxy[$0].offsetBy(dx: base.x, dy: base.y) }
             ZStack(alignment: .bottom) {
                 TutorielVoile(trou: trou, forme: .arrondi(22), marge: 6)
                 TutorielBulle(
