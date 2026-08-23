@@ -230,10 +230,13 @@ struct DashboardView: View {
                     .staggeredAppear(index: 0)
 
                 // Z2 · Score du jour (anneau compact + tendance de la semaine)
+                // `scoreInsight` commente le score GLOBAL du bilan (« 52/100 »),
+                // pas le score du jour de l'anneau (couverture du journal) : les
+                // deux côte à côte se contredisaient (audit captures 23 août).
                 BilanV7ScoreCard(
                     score: scoreDuJour,
                     delta: semaine.delta,
-                    insight: v2.bilan?.scoreInsight
+                    insight: nil
                 ) {
                     HapticService.shared.tap()
                     showScoreDetail = true
