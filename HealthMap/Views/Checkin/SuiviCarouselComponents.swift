@@ -37,13 +37,14 @@ struct SuiviCarouselBlock<Content: View>: View {
             // la courbe (17 / heavy) qui, lui, est la donnée.
             HStack(spacing: 8) {
                 Image(systemName: systemIcon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(ink)
+                    .font(.system(size: 15, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.dsSecondaire)
                     .frame(width: 26, height: 26)
-                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(tint.opacity(0.14)))
+                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.dsRemplissage))
                 Text(title)
                     .font(Theme.sectionLabelFont)
-                    .foregroundStyle(ink)
+                    .foregroundStyle(Color.dsTexte)
                 Spacer(minLength: 8)
                 if count > 1 {
                     arrow("chevron.left", delta: -1)
@@ -63,7 +64,7 @@ struct SuiviCarouselBlock<Content: View>: View {
                     HStack(spacing: 4) {
                         ForEach(0..<count, id: \.self) { i in
                             Capsule()
-                                .fill(i == index ? tint : Color(hex: "E4DDD0"))
+                                .fill(i == index ? Color.dsTexte : Color.dsTrait)
                                 .frame(width: i == index ? 16 : 6, height: 6)
                         }
                     }

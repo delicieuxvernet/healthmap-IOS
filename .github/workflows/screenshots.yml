@@ -104,6 +104,10 @@ jobs:
           xcrun simctl ui "$UDID" appearance light
           echo "Simulateur $DEVICE = $UDID"
 
+      # Signature ad hoc (« - ») et non CODE_SIGNING_ALLOWED=NO : sans signature,
+      # les entitlements ne sont pas embarqués et le trousseau du simulateur
+      # refuse toute écriture (errSecMissingEntitlement, -34018) — la session
+      # Supabase ne pouvait pas être stockée, donc aucune connexion ne tenait.
       - name: Run screenshot UI tests
         timeout-minutes: 40
         # xcodebuild ne transmet au test runner QUE les variables préfixées
@@ -114,6 +118,8 @@ jobs:
           TEST_RUNNER_SCREENSHOT_PASSWORD: ${{ secrets.DEMO_ACCOUNT_PASSWORD }}
         run: |
           set -o pipefail
+          # Diagnostic (valeurs jamais affichées) : longueur des identifiants transmis.
+          echo "email=${#TEST_RUNNER_SCREENSHOT_EMAIL} caractères, mot de passe=${#TEST_RUNNER_SCREENSHOT_PASSWORD} caractères"
           xcodebuild test \
             -project HealthMap.xcodeproj \
             -scheme HealthMapScreenshots \
@@ -121,7 +127,7 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/Screenshots.xcresult" \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 600 \
-            CODE_SIGNING_ALLOWED=NO || echo "::warning::Des tests UI ont échoué, les captures disponibles sont tout de même publiées"
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO || echo "::warning::Des tests UI ont échoué, les captures disponibles sont tout de même publiées"
 
       - name: Extract screenshots from xcresult
         if: always()

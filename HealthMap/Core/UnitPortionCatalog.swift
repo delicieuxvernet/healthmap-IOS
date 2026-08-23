@@ -229,7 +229,9 @@ enum UnitPortionCatalog {
         .init(motif: #"\bbieres?\b"#, singulier: "verre", pluriel: "verres", grammes: 250, tailles: tailles(("Demi", "Bouteille", "Pinte"), 250, 330, 500)),
         .init(motif: #"\bvins?\b|champagne|prosecco|cremant|\bcidre\b"#, singulier: "verre", pluriel: "verres", grammes: 120, tailles: tailles(contenantM, 100, 120, 150)),
         .init(motif: #"\bjus\b|\bnectar\b|smoothie"#, singulier: "verre", pluriel: "verres", grammes: 200, tailles: tailles(contenantM, 150, 200, 300)),
-        .init(motif: #"^lait\b|\blait (entier|demi|ecreme|cru|de (chevre|brebis|vache|soja|coco|riz|amande|avoine)|d'amande|d'avoine)|boisson vegetale|boisson (au|a la) soja"#, singulier: "verre", pluriel: "verres", grammes: 200, tailles: tailles(contenantM, 150, 200, 300)),
+        // « Yaourt nature au lait entier » est un yaourt, pas un verre de lait :
+        // tout produit laitier ou dessert nommant son lait passe son tour ici.
+        .init(motif: #"^lait\b|\blait (entier|demi|ecreme|cru|de (chevre|brebis|vache|soja|coco|riz|amande|avoine)|d'amande|d'avoine)|boisson vegetale|boisson (au|a la) soja"#, sauf: #"yaourt|fromage|\bcreme\b|dessert|chocolat|gateau|glace|flan|brioche|\bpain\b|\briz\b|semoule|skyr|kefir|petit"#, singulier: "verre", pluriel: "verres", grammes: 200, tailles: tailles(contenantM, 150, 200, 300)),
         .init(motif: #"^eaux?\b|eau (gazeuse|minerale|plate|de source|petillante)"#, singulier: "verre", pluriel: "verres", grammes: 200, tailles: tailles(contenantM, 150, 200, 500)),
         .init(motif: #"\bsoupes?\b|veloute|potage|gaspacho|bouillon"#, singulier: "bol", pluriel: "bols", grammes: 250, tailles: tailles(contenantM, 200, 250, 350)),
 

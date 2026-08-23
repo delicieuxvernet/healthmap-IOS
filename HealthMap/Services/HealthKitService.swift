@@ -54,6 +54,12 @@ final class HealthKitService {
     /// accordé (HealthKit masque le détail des accès en lecture).
     func requestAuthorization() async -> Bool {
         guard isAvailable else { return false }
+        #if DEBUG
+        // Captures d'écran (workflow screenshots.yml, argument -kiwioCaptures) :
+        // la feuille système « Health Access » recouvrirait toutes les captures
+        // et fige les tests UI. On se comporte comme si Santé n'était pas lié.
+        if ProcessInfo.processInfo.arguments.contains("-kiwioCaptures") { return false }
+        #endif
         return await withCheckedContinuation { continuation in
             store.requestAuthorization(toShare: [], read: readTypes) { granted, _ in
                 continuation.resume(returning: granted)

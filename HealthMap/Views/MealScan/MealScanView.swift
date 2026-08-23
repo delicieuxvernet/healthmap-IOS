@@ -416,8 +416,10 @@ struct JournalView: View {
                 repasList
             }
 
-            // Bas de page : l'espace du bouton flottant.
-            Color.clear.frame(height: 60)
+            // Bas de page : l'espace du bouton flottant (64 pt + 32 de marge),
+            // pour que la dernière ligne « Collation » et son « + » passent
+            // au-dessus en fin de défilement (audit captures du 23 août).
+            Color.clear.frame(height: 104)
         }
         .padding(.horizontal, DS.marge)
         .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.8), value: dicteeEnCours)
@@ -1329,6 +1331,7 @@ struct JournalView: View {
                     .foregroundStyle(Color.dsSecondaire)
                 TextField("Rechercher un aliment…", text: $viewModel.searchQuery)
                     .font(Theme.bodyFont)
+                    .accessibilityIdentifier("recherche.champ")
                     .autocorrectionDisabled()
                     .onChange(of: viewModel.searchQuery) { _, _ in
                         Task { await viewModel.searchFoods() }

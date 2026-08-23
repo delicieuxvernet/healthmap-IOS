@@ -139,7 +139,7 @@ extension QuestionnaireSection {
         // AVANT le prénom — c'est le motif de venue qui compte en premier.
         Question(
             id: "symptoms",
-            text: "Qu'est-ce qui t'amene ?",
+            text: "Qu'est-ce qui t'amène ?",
             type: .multiChoice,
             options: [
                 .init("none", "Aucun"),

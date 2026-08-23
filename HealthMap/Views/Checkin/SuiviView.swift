@@ -411,7 +411,9 @@ struct SuiviView: View {
                 SuiviCarouselBlock(
                     title: "Symptômes",
                     systemIcon: "heart.text.square",
-                    tint: Color(hex: "5B49B5"),
+                    // Violet de l'ancienne DA retiré : l'en-tête est neutre, comme
+                    // les autres sections de la refonte (audit captures 23 août).
+                    tint: Color.dsSecondaire,
                     pageTitles: evolutions.map { capitalized($0.nom) },
                     // La conclusion de la page passe en 17 : on lui laisse de
                     // quoi tenir sur trois lignes sans rogner la courbe.

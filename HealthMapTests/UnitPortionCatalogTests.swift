@@ -58,6 +58,15 @@ final class UnitPortionCatalogTests: XCTestCase {
         XCTAssertEqual(unite("Tomate, crue")?.singulier, "tomate")
     }
 
+    func testYaourtAuLaitEntierEstUnPot() {
+        // Vu sur simulateur le 23 août : « Yaourt nature au lait entier »
+        // tombait sur « verre » (lait) au lieu de « pot ».
+        XCTAssertEqual(unite("Yaourt nature au lait entier nature")?.singulier, "pot")
+        XCTAssertEqual(unite("Fromage blanc au lait entier")?.singulier, "pot")
+        XCTAssertEqual(unite("Lait entier")?.singulier, "verre")
+        XCTAssertEqual(unite("Lait demi-écrémé UHT")?.singulier, "verre")
+    }
+
     func testCompoteEtJusNeSontPasDesFruitsALaPiece() {
         XCTAssertEqual(unite("Compote de pomme")?.singulier, "pot")
         XCTAssertEqual(unite("Jus d'orange")?.singulier, "verre")

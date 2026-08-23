@@ -80,10 +80,12 @@ struct KiwiFloatingTabBar: View {
                 Text(item.label)
                     .font(.dsOnglet(actif: actif))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    // « Compléments » actif (semibold) dépassait son cinquième
+                    // de barre et s'affichait « Complém… » (audit captures).
+                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(actif ? Color.dsAccent : (estompes.contains(item.tab) ? Color.dsTertiaire : Color.dsSecondaire))
-            .padding(.horizontal, actif ? 14 : 8)
+            .padding(.horizontal, actif ? 10 : 8)
             .padding(.vertical, 6)
             .background(
                 Capsule().fill(actif ? Color.dsRemplissage : Color.clear)
@@ -94,6 +96,7 @@ struct KiwiFloatingTabBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(item.label)
+        .accessibilityIdentifier("tab.\(String(describing: item.tab))")
         .accessibilityAddTraits(actif ? [.isButton, .isSelected] : .isButton)
     }
 }

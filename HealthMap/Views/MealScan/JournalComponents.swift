@@ -548,7 +548,7 @@ struct AjoutSheet: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(Color.dsSecondaire)
                         .accessibilityHidden(true)
-                    Text("Tes repas restent sur ton téléphone.")
+                    Text("Tes repas restent privés.")
                         .font(.dsLegende)
                         .tracking(DSTracking.legende)
                         .foregroundStyle(Color.dsSecondaire)
@@ -564,7 +564,7 @@ struct AjoutSheet: View {
             .padding(.bottom, 8)
         }
         .padding(.horizontal, DS.marge)
-        .presentationDetents([.height(compteur == nil ? 430 : 452)])
+        .presentationDetents([.height(compteur == nil ? 404 : 426)])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.dsFond)
         .presentationCornerRadius(34)
