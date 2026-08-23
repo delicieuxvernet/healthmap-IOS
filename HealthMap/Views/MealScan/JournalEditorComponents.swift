@@ -602,6 +602,7 @@ struct FoodSearchSheet: View {
                 .foregroundStyle(Color.dsSecondaire)
             TextField("Rechercher un aliment", text: $vm.query)
                 .font(Theme.bodyFont)
+                .accessibilityIdentifier("recherche.champ")
                 .autocorrectionDisabled()
                 .onChange(of: vm.query) { _, _ in vm.search() }
             if !vm.query.isEmpty {

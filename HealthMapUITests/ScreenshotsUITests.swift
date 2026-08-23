@@ -100,7 +100,7 @@ final class ScreenshotsUITests: XCTestCase {
             app.buttons["Ajouter un repas"].tap()
             if app.buttons["Rechercher"].waitForExistence(timeout: 5) {
                 app.buttons["Rechercher"].tap()
-                let champ = app.textFields["Rechercher un aliment"]
+                let champ = app.textFields["recherche.champ"]
                 if champ.waitForExistence(timeout: 8) {
                     champ.tap()
                     fermerTutorielClavier()
@@ -300,7 +300,7 @@ final class ScreenshotsUITests: XCTestCase {
         app.buttons["Ajouter un repas"].tap()
         guard app.buttons["Rechercher"].waitForExistence(timeout: 5) else { fermerFeuille(); return }
         app.buttons["Rechercher"].tap()
-        let champ = app.textFields["Rechercher un aliment"]
+        let champ = app.textFields["recherche.champ"]
         guard champ.waitForExistence(timeout: 8) else { fermerFeuille(); return }
         champ.tap()
         fermerTutorielClavier()
