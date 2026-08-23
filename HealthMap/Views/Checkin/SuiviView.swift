@@ -771,10 +771,10 @@ private struct SuiviSymptomPage: View {
                 HStack(spacing: 5) {
                     if let icon = pillIcon {
                         Image(systemName: icon)
-                            .font(.system(size: 10.5, weight: .heavy))
+                            .font(.system(size: 10.5, weight: .bold))
                     }
                     Text(pillText)
-                        .font(.system(size: 10.5, weight: .heavy))
+                        .font(.system(size: 10.5, weight: .bold))
                 }
                 .foregroundStyle(pillColor)
                 .padding(.horizontal, 11)
@@ -920,7 +920,7 @@ private struct SuiviPosedChart: View {
                 if reelPts.count > 1 {
                     ctx.draw(
                         Text(evolution.labelToi)
-                            .font(.system(size: 11.5, weight: .heavy))
+                            .font(.system(size: 11.5, weight: .bold))
                             .foregroundStyle(Color.kiwiGreenInk),
                         at: CGPoint(x: tip.x - 4, y: max(12, tip.y - 14)),
                         anchor: .trailing
@@ -928,7 +928,7 @@ private struct SuiviPosedChart: View {
                 } else {
                     ctx.draw(
                         Text(evolution.labelToi)
-                            .font(.system(size: 11.5, weight: .heavy))
+                            .font(.system(size: 11.5, weight: .bold))
                             .foregroundStyle(Color.kiwiGreenInk),
                         at: CGPoint(x: tip.x + 10, y: max(12, tip.y - 14)),
                         anchor: .leading
@@ -1015,7 +1015,7 @@ private struct SuiviNeedsCard: View {
                 // Kicker : il ouvre la liste, il ne rivalise pas avec les gestes
                 // qu'elle contient.
                 Text(isPremium ? "POUR FAIRE MIEUX LA SEMAINE PROCHAINE" : "CE QUI A MANQUÉ CETTE SEMAINE")
-                    .font(.system(size: 10.5, weight: .heavy))
+                    .font(.system(size: 10.5, weight: .bold))
                     .tracking(0.5)
                     .foregroundStyle(Color(hex: "2F6FE0"))
                     .padding(.top, 14)
@@ -1394,7 +1394,7 @@ private struct SuiviCheckinPopup: View {
             ZStack {
                 Circle().fill(Color.kiwiGreenSoft).frame(width: 72, height: 72)
                 Image(systemName: "checkmark")
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(Color.kiwiGreen)
             }
             Text("C'est enregistré\u{00A0}!")
@@ -1444,7 +1444,7 @@ private struct SuiviCheckinPopup: View {
                 // La sélection se lit à la graisse et à l'encre, pas à un gras
                 // permanent qui mettrait les trois options au même niveau.
                 Text(label)
-                    .font(.system(size: 11.5, weight: isSelected ? .heavy : .medium))
+                    .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
                     .foregroundStyle(isSelected ? Color.kiwiGreenInk : Color.healthMapSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)

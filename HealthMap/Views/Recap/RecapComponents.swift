@@ -61,7 +61,7 @@ struct RecapCompteur: View {
 
     var body: some View {
         Text("\(Int(affiche.rounded()))")
-            .font(.system(size: taille, weight: .heavy, design: .rounded))
+            .font(.system(size: taille, weight: .bold, design: .rounded))
             .monospacedDigit()
             .foregroundStyle(couleur)
             .contentTransition(.numericText())

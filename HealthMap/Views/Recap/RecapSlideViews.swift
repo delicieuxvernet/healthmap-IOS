@@ -54,7 +54,7 @@ struct RecapSlideView: View {
                 .recapApparition(0)
 
             Text(prenom.map { "\($0)," } ?? "C'est prêt.")
-                .font(.system(size: 30, weight: .heavy, design: .rounded))
+                .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.kiwiCharcoal)
                 .recapApparition(1)
 
@@ -205,7 +205,7 @@ struct RecapSlideView: View {
             // Le NOM est masqué quand c'est réservé ; le statut, lui, reste
             // visible — on masque le contenu, jamais l'existence.
             Text(apport.verrouille ? "Réservé à Premium" : apport.nom)
-                .font(.system(size: 30, weight: .heavy, design: .rounded))
+                .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundStyle(apport.verrouille ? Color.kiwiCharcoal.opacity(0.35) : Color.kiwiCharcoal)
                 .recapApparition(1)
 
@@ -263,7 +263,7 @@ struct RecapSlideView: View {
 
             if interaction.verrouille {
                 Text("Une autre interaction t'attend")
-                    .font(.system(size: 26, weight: .heavy, design: .rounded))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.kiwiCharcoal.opacity(0.4))
                     .fixedSize(horizontal: false, vertical: true)
                     .recapApparition(1)
@@ -277,7 +277,7 @@ struct RecapSlideView: View {
                     .recapApparition(3)
             } else {
                 Text(interaction.titre)
-                    .font(.system(size: 26, weight: .heavy, design: .rounded))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.kiwiCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
                     .recapApparition(1)
@@ -303,7 +303,7 @@ struct RecapSlideView: View {
                 .recapApparition(0)
 
             Text(symptome.nom)
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .font(.system(size: 28, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.kiwiCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(1)
@@ -341,7 +341,7 @@ struct RecapSlideView: View {
                 .recapApparition(0)
 
             Text(aliments.vedette)
-                .font(.system(size: 30, weight: .heavy, design: .rounded))
+                .font(.system(size: 30, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.kiwiCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(1)
@@ -406,7 +406,7 @@ struct RecapSlideView: View {
                 .recapApparition(0)
 
             Text("Ton bilan complet t'attend")
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .font(.system(size: 28, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.kiwiCharcoal)
                 .fixedSize(horizontal: false, vertical: true)
                 .recapApparition(1)
@@ -447,7 +447,7 @@ struct RecapSlideView: View {
                 .recapApparition(0)
 
             Text("Tout est ouvert")
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .font(.system(size: 28, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.kiwiCharcoal)
                 .recapApparition(1)
 
@@ -529,7 +529,7 @@ struct RecapCartePartage: View {
             HStack {
                 KiwiContourMark(size: 30, color: .kiwiGreen)
                 Text("Kiwio")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.kiwiCharcoal)
                 Spacer()
             }
@@ -542,7 +542,7 @@ struct RecapCartePartage: View {
                 }
                 HStack(alignment: .lastTextBaseline, spacing: 4) {
                     Text("\(carte.score)")
-                        .font(.system(size: 64, weight: .heavy, design: .rounded))
+                        .font(.system(size: 64, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(HealthScale.color(for: carte.score))
                     Text("/ 100")
@@ -576,7 +576,7 @@ struct RecapCartePartage: View {
     private func chiffre(_ valeur: Int, _ legende: String, _ couleur: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("\(valeur)")
-                .font(.system(size: 26, weight: .heavy, design: .rounded))
+                .font(.system(size: 26, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(couleur)
             Text(legende)

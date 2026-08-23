@@ -159,7 +159,7 @@ private struct OnboardingCoverPageView: View {
             // Wordmark — "Map" en gradient brand, comme le logo du site
             (Text("Kiwi").foregroundStyle(Color.healthMapText)
              + Text("o").foregroundStyle(LinearGradient.healthMapBrand))
-                .font(.system(.largeTitle, design: .rounded).weight(.black))
+                .font(.system(.largeTitle, design: .rounded).weight(.bold))
                 .brandTitleKerning()
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 16)

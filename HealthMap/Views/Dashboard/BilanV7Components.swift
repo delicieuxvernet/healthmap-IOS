@@ -133,7 +133,7 @@ struct BilanV7SectionLabel: View {
 struct BilanV7PremiumBadge: View {
     var body: some View {
         Text("PREMIUM")
-            .font(.system(size: 10, weight: .heavy))
+            .font(.system(size: 10, weight: .bold))
             .tracking(0.3)
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
@@ -203,7 +203,7 @@ struct BilanV7ScoreRing: View {
                 .stroke(Color.kiwiGreen, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(score == nil ? "—" : "\(shown)")
-                .font(.system(size: 19, weight: .heavy, design: .rounded).monospacedDigit())
+                .font(.system(size: 19, weight: .bold, design: .rounded).monospacedDigit())
                 .tracking(-0.8)
                 .foregroundStyle(BilanV7.ink)
                 .monospacedDigit()
@@ -732,7 +732,7 @@ struct BilanV7SymptomesCard: View {
                         .foregroundStyle(.white)
                     if solutionsCount > 0 {
                         Text("\(solutionsCount)")
-                            .font(.system(size: 11.5, weight: .heavy, design: .rounded).monospacedDigit())
+                            .font(.system(size: 11.5, weight: .bold, design: .rounded).monospacedDigit())
                             .foregroundStyle(.white)
                             .frame(minWidth: 20, minHeight: 20)
                             .background(BilanV7.blue, in: Capsule())
@@ -813,7 +813,7 @@ struct BilanV7SerieCard: View {
                         // sous 15 pt et dans l'encre la plus foncée du bloc.
                         (Text("\(streak)").font(Theme.heroValueRowFont)
                             + Text(streak > 1 ? " jours d'affilée" : " jour d'affilée")
-                                .font(.system(.subheadline).weight(.heavy)))
+                                .font(.system(.subheadline).weight(.bold)))
                             .tracking(-0.2)
                             .foregroundStyle(BilanV7.ink)
 
@@ -948,7 +948,7 @@ struct BilanV7ScoreTeaserCard: View {
                         style: StrokeStyle(lineWidth: 7, lineCap: .round, dash: [2, 8])
                     )
                 Text("?")
-                    .font(.system(size: 19, weight: .heavy, design: .rounded))
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
                     .tracking(-0.8)
                     .foregroundStyle(BilanV7.ink)
             }

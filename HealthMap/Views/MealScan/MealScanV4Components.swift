@@ -681,7 +681,7 @@ struct ScanNeedTile: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Text(status)
-                        .font(.system(size: 10.5, weight: .heavy))
+                        .font(.system(size: 10.5, weight: .bold))
                         .foregroundStyle(ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)

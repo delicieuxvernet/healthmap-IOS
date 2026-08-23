@@ -37,7 +37,7 @@ struct LandingView: View {
             VStack(spacing: 0) {
                 // Wordmark en haut
                 (Text("kiwi").foregroundStyle(ink) + Text("o").foregroundStyle(kiwi))
-                    .font(.system(size: 24, weight: .black))
+                    .font(.system(size: 24, weight: .bold))
                     .brandTitleKerning()
                     .padding(.top, Theme.spacingSM)
                     .opacity(appeared ? 1 : 0)
@@ -57,7 +57,7 @@ struct LandingView: View {
                     .animation(staged(0.12), value: appeared)
 
                 Text("Découvre la cause de tes symptômes.")
-                    .font(.system(size: 33, weight: .heavy))
+                    .font(.system(size: 33, weight: .bold))
                     .foregroundStyle(ink)
                     .multilineTextAlignment(.center)
                     .lineSpacing(2)
@@ -152,7 +152,7 @@ struct LandingView: View {
     private var badge: some View {
         HStack(spacing: 8) {
             Image(systemName: "sparkles").font(.system(size: 14))
-            Text("Bilan nutritionnel personnalisé").font(.system(size: 13, weight: .heavy))
+            Text("Bilan nutritionnel personnalisé").font(.system(size: 13, weight: .bold))
         }
         .foregroundStyle(greenDeep)
         .padding(.horizontal, 16)
@@ -171,7 +171,7 @@ struct LandingView: View {
                     Text("C'est parti")
                     Image(systemName: "arrow.right").font(.system(size: 17, weight: .semibold))
                 }
-                .font(.system(size: 17, weight: .heavy))
+                .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
