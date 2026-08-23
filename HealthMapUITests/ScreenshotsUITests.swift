@@ -231,7 +231,7 @@ final class ScreenshotsUITests: XCTestCase {
         // Le questionnaire : porte « Répondre au questionnaire ».
         let porte = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "questionnaire")).firstMatch
         if porte.waitForExistence(timeout: 5) {
-            porte.tap()
+            porte.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             sleep(2)
             snap("70-questionnaire-intro")
             if app.buttons["C'est parti"].firstMatch.waitForExistence(timeout: 5) {
@@ -295,9 +295,8 @@ final class ScreenshotsUITests: XCTestCase {
     /// La feuille est hébergée par un autre processus : on interroge l'app
     /// ET Springboard.
     private func autoriserSante() {
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let hotes = [app!, springboard]
-        guard hotes.contains(where: { $0.staticTexts["Health Access"].waitForExistence(timeout: 3) }) else { return }
+        let hotes = [app!]
+        guard hotes.contains(where: { $0.staticTexts["Health Access"].waitForExistence(timeout: 2) }) else { return }
         for hote in hotes {
             for element in [hote.buttons["Turn On All"], hote.cells["Turn On All"],
                             hote.staticTexts["Turn On All"], hote.buttons["Tout activer"]] where element.exists {
