@@ -127,7 +127,7 @@ final class ScreenshotsUITests: XCTestCase {
         // Fiche apport (première ligne de « Apports à renforcer »).
         let apport = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "pour cent de tes besoins")).firstMatch
         if apport.waitForExistence(timeout: 5) {
-            apport.tap()
+            apport.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).tap()
             sleep(2)
             snap("13-fiche-apport")
             fermerFeuille()
@@ -311,7 +311,10 @@ final class ScreenshotsUITests: XCTestCase {
             format: "label CONTAINS[c] %@ AND NOT (label BEGINSWITH %@)", aliment, "Ajouter")).firstMatch
         if premier.waitForExistence(timeout: 5) {
             premier.tap()
-            let ajouter = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ajouter ")).firstMatch
+            // CTA de la fiche portion : « Ajouter le midi » / « le matin » /
+            // « le soir » / « en encas » — jamais le « + » flottant (« Ajouter un repas »).
+            let ajouter = app.buttons.matching(NSPredicate(
+                format: "label BEGINSWITH %@ AND NOT (label BEGINSWITH %@)", "Ajouter ", "Ajouter un repas")).firstMatch
             if ajouter.waitForExistence(timeout: 6) {
                 ajouter.tap()
                 sleep(3)
