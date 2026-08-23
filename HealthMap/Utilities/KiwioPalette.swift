@@ -26,10 +26,10 @@ enum Kiwio {
 
     // MARK: - Fonds
 
-    /// Fond d'écran crème.
-    static let fond = Color(hex: "F7F3EA")
-    /// Fond des bottom-sheets (légèrement plus clair).
-    static let fondSheet = Color(hex: "FBF6EF")
+    /// Fond d'écran : neutre depuis la refonte du 23 août 2026 (plus de crème).
+    static let fond = Color(uiColor: .systemGroupedBackground)
+    /// Fond des bottom-sheets : le même gris groupé.
+    static let fondSheet = Color(uiColor: .systemGroupedBackground)
     /// Cartes blanches.
     static let carte = Color.white
 

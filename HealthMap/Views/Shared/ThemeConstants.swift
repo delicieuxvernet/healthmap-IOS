@@ -18,15 +18,18 @@ enum Theme {
 
     // Card
     static let cardPadding: CGFloat = 16
-    static let cardShadowRadius: CGFloat = 8
-    static let cardShadowOpacity: Double = 0.04
+    // Refonte 23 août 2026 : les cartes n'ont plus d'ombre. Les deux tokens
+    // restent pour les appelants, à zéro.
+    static let cardShadowRadius: CGFloat = 0
+    static let cardShadowOpacity: Double = 0
 
     // Font Styles — utilisent les semantic text styles pour respecter Dynamic Type
     // (l'utilisateur peut augmenter la taille système via Réglages → Accessibilité).
     // Design `.rounded` préservé pour cohérence visuelle brand.
-    static let titleFont: Font = .system(.title, design: .rounded).weight(.bold)
-    static let headlineFont: Font = .system(.headline, design: .rounded).weight(.semibold)
-    static let subheadlineFont: Font = .system(.subheadline, design: .rounded).weight(.medium)
+    // Refonte 23 août 2026 : SF Pro standard partout (plus de `.rounded`).
+    static let titleFont: Font = .system(.title, design: .default).weight(.bold)
+    static let headlineFont: Font = .system(.headline, design: .default).weight(.semibold)
+    static let subheadlineFont: Font = .system(.subheadline, design: .default).weight(.medium)
     static let bodyFont: Font = .system(.body)
     static let captionFont: Font = .system(.caption)
     static let captionBoldFont: Font = .system(.caption).weight(.semibold)
@@ -53,8 +56,10 @@ enum Theme {
     // `docs/DESIGN-SYSTEM.md`.
 
     /// Titre d'écran : le nom de l'onglet, une fois par page.
-    /// 28 / heavy / rounded · encre neutre · `screenTitleTracking`.
-    static let screenTitleFont: Font = .system(.title, design: .rounded).weight(.heavy)
+    /// 28 / bold · encre neutre · `screenTitleTracking`.
+    /// Refonte 23 août 2026 : gras plafonné à 700 (aucun écran système ne
+    /// dépasse le bold) et SF Pro standard (le `.rounded` a sauté).
+    static let screenTitleFont: Font = .system(.title, design: .default).weight(.bold)
 
     /// Titre de sheet : l'en-tête d'une feuille ouverte par un tap.
     /// 20 / bold · `kiwiCharcoal`.
@@ -69,9 +74,10 @@ enum Theme {
     static let subLabelFont: Font = .system(size: 11.5, weight: .bold)
 
     /// Conclusion : ce que les données veulent dire, le pic de sa carte.
-    /// 17 / heavy · encre la plus foncée · `conclusionTracking` · JAMAIS de
+    /// 17 / semibold · encre la plus foncée · `conclusionTracking` · JAMAIS de
     /// `lineLimit` (règle 2 : aucun texte de la carte ne doit la dépasser).
-    static let conclusionFont: Font = .system(.body).weight(.heavy)
+    /// Refonte 23 août 2026 : c'est le `headline` iOS (17 / 600).
+    static let conclusionFont: Font = .system(.body).weight(.semibold)
 
     /// Conclusion secondaire : le verdict d'une ligne, d'une courbe, d'un item.
     /// 15 / semibold · encre foncée.
@@ -79,21 +85,21 @@ enum Theme {
 
     /// Donnée-héros chiffrée d'une carte : LE chiffre que la carte existe pour
     /// montrer. 28 / bold / rounded / chiffres à chasse fixe · encre du statut.
-    static let heroValueFont: Font = .system(.title, design: .rounded)
+    static let heroValueFont: Font = .system(.title, design: .default)
         .weight(.bold)
         .monospacedDigit()
 
     /// Donnée-héros chiffrée d'une ligne de liste. 15 / heavy / rounded /
     /// chiffres à chasse fixe. Plancher absolu : une donnée-héros ne descend
     /// jamais sous 15 pt (règle 3).
-    static let heroValueRowFont: Font = .system(.subheadline, design: .rounded)
-        .weight(.heavy)
+    static let heroValueRowFont: Font = .system(.subheadline, design: .default)
+        .weight(.bold)
         .monospacedDigit()
 
     /// Donnée-héros textuelle : l'aliment, le produit, le geste recommandé.
-    /// 17 / heavy · `kiwiCharcoal`. Elle porte la plus grande taille ET
+    /// 17 / semibold · `kiwiCharcoal`. Elle porte la plus grande taille ET
     /// l'encre la plus foncée de son bloc.
-    static let heroTextFont: Font = .system(.body).weight(.heavy)
+    static let heroTextFont: Font = .system(.body).weight(.semibold)
 
     /// Donnée secondaire : libellé, dose, quantité qui complète le héros sans
     /// lui disputer la place. 12 / medium · `healthMapSecondary`.

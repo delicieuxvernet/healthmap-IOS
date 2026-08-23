@@ -46,24 +46,12 @@ extension View {
     }
 }
 
+/// Refonte 23 août 2026 : le fond chaud n'existe plus. `WarmBackground` rend
+/// désormais le fond NEUTRE du DS (gris groupé) coiffé du voile de marque sur
+/// 240 pt, c'est-à-dire `DSPageBackground`. Le nom reste pour les appelants.
 struct WarmBackground: View {
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color.healthMapWarm, Color.healthMapBackground],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            RadialGradient(
-                colors: [Color.healthMapWarmGlow.opacity(0.55), Color.healthMapWarmGlow.opacity(0)],
-                center: UnitPoint(x: 0.5, y: 0.16),
-                startRadius: 0,
-                endRadius: 380
-            )
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        DSPageBackground()
     }
 }
 
