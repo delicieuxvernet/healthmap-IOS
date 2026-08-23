@@ -33,6 +33,14 @@ struct PortionSheet: View {
 
     @State private var grams: Int
     @State private var isWorking = false
+    /// Unité de saisie (« œuf », « tranche »…) pour les aliments que personne
+    /// ne pèse ; nil = grammes. Voir `UnitPortionCatalog`. Les grammes restent
+    /// la valeur persistée : l'unité n'est qu'une façon de les choisir.
+    private let unite: UnitPortionCatalog.Unite?
+    /// Index de la taille retenue (petit / moyen / gros) dans `unite.tailles`.
+    @State private var taille: Int?
+    /// L'utilisateur a demandé à saisir en grammes malgré l'unité.
+    @State private var enGrammes = false
     @Environment(\.dismiss) private var dismiss
 
     init(mode: Mode,
@@ -43,9 +51,23 @@ struct PortionSheet: View {
         self.onAdd = onAdd
         self.onSave = onSave
         self.onDelete = onDelete
+        let unite: UnitPortionCatalog.Unite?
+        switch mode {
+        case .add(let detail, _):
+            unite = UnitPortionCatalog.unite(pourNom: detail.name,
+                                             portions: detail.portions.map { (label: $0.label, grammes: $0.grammes) })
+        case .edit(let row):
+            unite = UnitPortionCatalog.unite(pourNom: row.name)
+        case .info:
+            unite = nil
+        }
+        self.unite = unite
+        _taille = State(initialValue: unite?.tailleParDefaut)
         switch mode {
         case .add:
-            _grams = State(initialValue: 100)
+            // Un aliment à l'unité démarre à UNE unité (« 1 œuf » = 50 g),
+            // pas à 100 g : c'est la quantité que la personne a en tête.
+            _grams = State(initialValue: Int((unite?.grammes ?? 100).rounded()))
         case .edit(let row):
             _grams = State(initialValue: Int((row.grams ?? 100).rounded()))
         case .info:
@@ -119,6 +141,109 @@ struct PortionSheet: View {
 
     private var editorControls: some View {
         VStack(spacing: Theme.spacingMD) {
+            if let unite, !enGrammes {
+                controlesUnite(unite)
+            } else {
+                controlesGrammes
+            }
+
+            VStack(spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("\(scaled.kcal)")
+                        .font(.system(size: 22, weight: .semibold, design: .default))
+                        .foregroundStyle(Color.dsTexte)
+                        .contentTransition(.numericText())
+                    Text("kcal")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.dsSecondaire)
+                }
+                HStack(spacing: Theme.spacingMD) {
+                    macroDot("P", scaled.p, color: .macroProtein)
+                    macroDot("G", scaled.c, color: .macroCarb)
+                    macroDot("L", scaled.f, color: .macroFat)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .animation(.default, value: grams)
+
+            // Unités ↔ grammes : les grammes retenus ne bougent pas, seule la
+            // façon de les choisir change.
+            if let unite {
+                Button {
+                    HapticService.shared.selection()
+                    enGrammes.toggle()
+                } label: {
+                    Text(enGrammes ? unite.lienCompter : "Saisir en grammes")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.dsAccent)
+                        .frame(maxWidth: .infinity, minHeight: 32)
+                }
+                .buttonStyle(.healthMapPressed)
+            }
+        }
+    }
+
+    // MARK: Saisie en unités (« 1 œuf », « 2 tranches »)
+
+    /// Nombre d'unités correspondant aux grammes retenus (arrondi au demi).
+    private func nombre(_ unite: UnitPortionCatalog.Unite) -> Double {
+        UnitPortionCatalog.nombre(grammes: Double(grams), poidsUnite: unite.poids(taille: taille))
+    }
+
+    /// Tailles (petit / moyen / gros) si l'unité en a, puis « − 2 œufs + » avec
+    /// les grammes dessous : on compte, l'app pèse.
+    private func controlesUnite(_ unite: UnitPortionCatalog.Unite) -> some View {
+        VStack(spacing: Theme.spacingMD) {
+            if !unite.tailles.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(Array(unite.tailles.enumerated()), id: \.offset) { index, t in
+                        pill(t.libelle, sous: "\(Int(t.grammes)) g", choisie: taille == index) {
+                            let n = max(1, nombre(unite).rounded())
+                            taille = index
+                            grams = min(1500, max(1, Int((n * t.grammes).rounded())))
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: Theme.spacingMD) {
+                stepUnite("minus", unite: unite, delta: -1)
+                VStack(spacing: 2) {
+                    Text(unite.libelle(nombre: nombre(unite)))
+                        .font(.system(size: 22, weight: .semibold, design: .default))
+                        .foregroundStyle(Color.dsTexte)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .contentTransition(.numericText())
+                    Text("\(grams) g")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.dsSecondaire)
+                }
+                .frame(minWidth: 120, minHeight: 44)
+                .accessibilityElement(children: .combine)
+                stepUnite("plus", unite: unite, delta: 1)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func stepUnite(_ symbol: String, unite: UnitPortionCatalog.Unite, delta: Int) -> some View {
+        Button {
+            HapticService.shared.selection()
+            let n = UnitPortionCatalog.nombreSuivant(nombre(unite), delta: delta)
+            grams = min(1500, max(1, Int((n * unite.poids(taille: taille)).rounded())))
+        } label: {
+            stepLabel(symbol)
+        }
+        .buttonStyle(.healthMapPressed)
+        .disabled(delta < 0 && nombre(unite) <= 1)
+        .accessibilityLabel(delta > 0 ? "Ajouter une unité" : "Retirer une unité")
+    }
+
+    // MARK: Saisie en grammes (presets + stepper + saisie libre)
+
+    private var controlesGrammes: some View {
+        VStack(spacing: Theme.spacingMD) {
             HStack(spacing: 8) {
                 presetPill("Petite", 80)
                 presetPill("Moyenne", 150)
@@ -150,53 +275,45 @@ struct PortionSheet: View {
                 stepButton("plus", delta: 10)
             }
             .frame(maxWidth: .infinity)
-
-            VStack(spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(scaled.kcal)")
-                        .font(.system(size: 22, weight: .semibold, design: .default))
-                        .foregroundStyle(Color.dsTexte)
-                        .contentTransition(.numericText())
-                    Text("kcal")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.dsSecondaire)
-                }
-                HStack(spacing: Theme.spacingMD) {
-                    macroDot("P", scaled.p, color: .macroProtein)
-                    macroDot("G", scaled.c, color: .macroCarb)
-                    macroDot("L", scaled.f, color: .macroFat)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .animation(.default, value: grams)
         }
     }
 
     private func presetPill(_ label: String, _ value: Int) -> some View {
+        pill(label, sous: "\(value) g", choisie: grams == value) { grams = value }
+    }
+
+    /// Chip de choix (portion ou taille) : libellé + grammes, bordure accent
+    /// quand elle est retenue.
+    private func pill(_ label: String, sous: String, choisie: Bool,
+                      action: @escaping () -> Void) -> some View {
         Button {
             HapticService.shared.selection()
-            grams = value
+            action()
         } label: {
             VStack(spacing: 2) {
                 Text(label)
                     .font(.system(size: 13, weight: .semibold))
-                Text("\(value) g")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(sous)
                     .font(.system(size: 11, design: .default))
             }
-            .foregroundStyle(grams == value ? Color.dsTexte : Color.dsSecondaire)
+            .foregroundStyle(choisie ? Color.dsTexte : Color.dsSecondaire)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(grams == value ? Color.dsRemplissage : Color.dsCarte)
+                    .fill(choisie ? Color.dsRemplissage : Color.dsCarte)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(grams == value ? Color.dsAccent : Color.dsTexte.opacity(0.08),
+                            .stroke(choisie ? Color.dsAccent : Color.dsTexte.opacity(0.08),
                                     lineWidth: 1)
                     )
             )
         }
         .buttonStyle(.healthMapPressed)
+        .accessibilityLabel("\(label), \(sous)")
+        .accessibilityAddTraits(choisie ? .isSelected : [])
     }
 
     private func stepButton(_ symbol: String, delta: Int) -> some View {
@@ -204,21 +321,25 @@ struct PortionSheet: View {
             HapticService.shared.selection()
             grams = min(1500, max(1, grams + delta))
         } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.dsTexte)
-                .frame(width: 44, height: 44)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.dsCarte)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.dsTexte.opacity(0.08), lineWidth: 1)
-                        )
-                )
+            stepLabel(symbol)
         }
         .buttonStyle(.healthMapPressed)
         .accessibilityLabel(delta > 0 ? "Plus 10 grammes" : "Moins 10 grammes")
+    }
+
+    private func stepLabel(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Color.dsTexte)
+            .frame(width: 44, height: 44)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.dsCarte)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.dsTexte.opacity(0.08), lineWidth: 1)
+                    )
+            )
     }
 
     private var gramsBinding: Binding<String> {
@@ -470,7 +591,7 @@ struct FoodSearchSheet: View {
                              if ok { showConfirmation(for: detail, grams: grams) }
                              return ok
                          })
-            .presentationDetents([.height(420)])
+            .presentationDetents([.height(460)])
             .presentationDragIndicator(.visible)
         }
     }

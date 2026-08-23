@@ -664,9 +664,13 @@ final class MealJournalService {
         let fiber100g: Double?
         let micros100g: [MicroPct]
         let microsIncomplets: Bool
+        /// Portions humaines de la fiche (« 1 tranche », « 1 pot »…), telles que
+        /// `get_food` les renvoie déjà. Servent à proposer la quantité en unités
+        /// (`UnitPortionCatalog`) ; vide si la fiche n'en a pas.
+        let portions: [FoodPortion]
 
         enum CodingKeys: String, CodingKey {
-            case id, source, micros
+            case id, source, micros, portions
             case name = "nom"
             case brand = "marque"
             case kcal100g = "kcal_100g"
@@ -690,12 +694,14 @@ final class MealJournalService {
             fiber100g = try? c.decode(Double.self, forKey: .fiber100g)
             micros100g = (try? c.decode([MicroPct].self, forKey: .micros)) ?? []
             microsIncomplets = (try? c.decode(Bool.self, forKey: .microsIncomplets)) ?? false
+            portions = (try? c.decode([FoodPortion].self, forKey: .portions)) ?? []
         }
 
         init(id: String, source: String, name: String, brand: String? = nil,
              kcal100g: Double?, proteins100g: Double? = nil, carbs100g: Double? = nil,
              fats100g: Double? = nil, fiber100g: Double? = nil,
-             micros100g: [MicroPct] = [], microsIncomplets: Bool = false) {
+             micros100g: [MicroPct] = [], microsIncomplets: Bool = false,
+             portions: [FoodPortion] = []) {
             self.id = id
             self.source = source
             self.name = name
@@ -707,7 +713,14 @@ final class MealJournalService {
             self.fiber100g = fiber100g
             self.micros100g = micros100g
             self.microsIncomplets = microsIncomplets
+            self.portions = portions
         }
+    }
+
+    /// Portion « humaine » d'une fiche aliment (`get_food`) : « 1 tranche » = 30 g.
+    struct FoodPortion: Decodable, Equatable, Hashable {
+        let label: String
+        let grammes: Double
     }
 
     /// Recherche unifiée `search_foods` (CIQUAL ∪ OFF, 103k produits, scoring

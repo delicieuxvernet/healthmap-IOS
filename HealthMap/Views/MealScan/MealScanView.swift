@@ -1449,7 +1449,7 @@ struct JournalView: View {
                          }
                          return ok
                      })
-        .presentationDetents([.height(420)])
+        .presentationDetents([.height(460)])
         .presentationDragIndicator(.visible)
     }
 
