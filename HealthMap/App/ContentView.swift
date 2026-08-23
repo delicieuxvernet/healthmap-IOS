@@ -642,6 +642,16 @@ struct MainTabView: View {
               !dashboardVM.recapArme,
               !afficheRecap,
               selectedTab == .journal else { return }
+        #if DEBUG
+        // Captures d'écran : `-captureTutoriel` rejoue le tutoriel même sur le
+        // compte d'audit (qui a « déjà vu » l'ancien tour).
+        if ProcessInfo.processInfo.arguments.contains("-captureTutoriel") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                tutoriel.relancerPourCaptures()
+            }
+            return
+        }
+        #endif
         let dejaVu = hasSeenTabTour || scanTourVu
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             guard !afficheRecap else { return }

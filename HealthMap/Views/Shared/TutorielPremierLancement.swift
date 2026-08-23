@@ -94,6 +94,17 @@ final class TutorielService: ObservableObject {
     /// Réglages → « Revoir le tutoriel ».
     func relancer() { aller(.bienvenue) }
 
+    #if DEBUG
+    /// Captures d'écran (`-captureTutoriel`) : rejoue le tutoriel une seule
+    /// fois par lancement, même marqué terminé. Absent du binaire App Store.
+    private var relancePourCapturesFaite = false
+    func relancerPourCaptures() {
+        guard !relancePourCapturesFaite, etape == nil else { return }
+        relancePourCapturesFaite = true
+        aller(.bienvenue)
+    }
+    #endif
+
     // MARK: Événements du parcours (chacun ne réagit qu'à SON étape)
 
     func commencer() { if etape == .bienvenue { aller(.bouton) } }

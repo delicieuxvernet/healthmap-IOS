@@ -263,6 +263,40 @@ final class ScreenshotsUITests: XCTestCase {
         }
     }
 
+    // MARK: - 4. Tutoriel du premier lancement (hook DEBUG `-captureTutoriel`)
+
+    func test04_Tutoriel() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES", "-captureTutoriel", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120))
+
+        // Étape 1 : la carte de bienvenue.
+        if app.buttons["Commencer"].waitForExistence(timeout: 15) {
+            snap("80-tutoriel-bienvenue")
+            taper(app.buttons["Commencer"])
+            sleep(1)
+            // Étape 2 : découpe sur le « + ».
+            snap("81-tutoriel-bouton")
+            if app.buttons["Ajouter un repas"].waitForExistence(timeout: 5) {
+                taper(app.buttons["Ajouter un repas"])
+                sleep(1)
+                // Étape 3 : découpe sur « Dicter mon repas » dans la feuille.
+                snap("82-tutoriel-dicter")
+                if app.buttons["Passer"].firstMatch.exists {
+                    taper(app.buttons["Passer"].firstMatch)
+                    sleep(1)
+                }
+                fermerFeuille()
+            }
+        }
+    }
+
     // MARK: - Outils
 
     /// Se connecte si la page de garde est affichée (session absente).
