@@ -14,21 +14,20 @@ struct TabTourOverlay: View {
     @State private var currentStep = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Les cinq onglets, dans l'ORDRE de la barre : Bilan · Suivi · Scan ·
-    /// Plan · Compléments. Le 5e n'est plus « Profil » depuis que celui-ci est
-    /// passé en feuille (P6) : décrire un onglet qui n'existe pas était la
-    /// première chose que lisait un compte neuf.
+    /// Les cinq onglets, dans l'ORDRE de la barre (refonte 23 août 2026) :
+    /// Journal · Progrès · Plan · Compléments · Réglages. Des objets, pas des
+    /// concepts : c'est ce qu'un compte neuf doit lire en premier.
     private let steps: [TourStep] = [
-        TourStep(tabIndex: 0, icon: "heart.text.square", title: "Bilan",
-                 description: "Ton bilan complet en un coup d'œil : score global, apports à renforcer et points d'attention personnalisés."),
-        TourStep(tabIndex: 1, icon: "checkmark.circle", title: "Suivi",
-                 description: "Enregistre tes habitudes quotidiennes (sommeil, hydratation, énergie) et suis ta progression semaine après semaine."),
-        TourStep(tabIndex: 2, icon: "camera", title: "Scan",
-                 description: "Maintiens le micro pour dicter ton repas, ou photographie ton assiette : tes calories et tes apports se comptent tout seuls."),
-        TourStep(tabIndex: 3, icon: "list.clipboard", title: "Plan",
-                 description: "Découvre les apports qui te manquent, avec des solutions alimentaires concrètes."),
-        TourStep(tabIndex: 4, icon: "pills", title: "Compléments",
+        TourStep(tabIndex: 0, icon: "book.closed", title: "Journal",
+                 description: "Ta journée en un regard : calories, macros, apports à renforcer et tes repas. Le bouton + ajoute un repas à la voix, en photo ou par recherche."),
+        TourStep(tabIndex: 1, icon: "chart.xyaxis.line", title: "Progrès",
+                 description: "Tes besoins couverts semaine après semaine, tes apports face à tes besoins et l'évolution de ce que tu ressens."),
+        TourStep(tabIndex: 2, icon: "map", title: "Plan",
+                 description: "Ce que tu veux régler, avec ses causes et ses solutions : nutrition, compléments, habitudes."),
+        TourStep(tabIndex: 3, icon: "pills", title: "Compléments",
                  description: "Ce qu'il te faut vraiment : par l'assiette d'abord, en gélule si besoin, avec la bonne dose et le bon moment."),
+        TourStep(tabIndex: 4, icon: "gearshape", title: "Réglages",
+                 description: "Ton profil, ton abonnement, tes données et notre méthode, toujours au même endroit."),
     ]
 
     private var isLastStep: Bool { currentStep == steps.count - 1 }

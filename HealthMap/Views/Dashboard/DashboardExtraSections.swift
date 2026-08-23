@@ -12,6 +12,9 @@ enum NavCardDestination: String {
 
 extension Notification.Name {
     static let healthmapNavigateToTab = Notification.Name("healthmapNavigateToTab")
+    /// Ouvre la feuille d'ajout du Journal (ex-onglet Scan) : émise par le
+    /// routage quand une destination « scanner » est demandée.
+    static let healthmapOuvrirAjout = Notification.Name("healthmapOuvrirAjout")
     static let healthmapOpenProfile = Notification.Name("healthmapOpenProfile")
     /// Rejouer le récap animé. La demande part du profil mais la séquence est
     /// présentée par `MainTabView` : une feuille plein écran ouverte DEPUIS une
