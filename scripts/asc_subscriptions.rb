@@ -1015,9 +1015,11 @@ end
 # Demande fondateur (18 août) : un code partageable sur LinkedIn/aux amis, qui
 # ouvre le Premium 7 jours. Posé sur l'HEBDO (0,99 €/sem) et non sur l'annuel :
 # si un testeur oublie de résilier, il risque 0,99 € et non 50 €.
-# TESTER_CODE (défaut HAPPYTESTER2026) · TESTER_REDEMPTIONS (défaut 500).
+# TESTER_CODE (défaut HAPPYTESTER) · TESTER_REDEMPTIONS (défaut 500).
+# HAPPYTESTER2026 a été minté le 18 août et reste valable : le mode est
+# idempotent par chaîne, relancer ajoute HAPPYTESTER sans toucher à l'autre.
 if MODE == "tester-code"
-  code = (ENV["TESTER_CODE"].to_s.empty? ? "HAPPYTESTER2026" : ENV["TESTER_CODE"]).upcase
+  code = (ENV["TESTER_CODE"].to_s.empty? ? "HAPPYTESTER" : ENV["TESTER_CODE"]).upcase
   redemptions = (ENV["TESTER_REDEMPTIONS"].to_s.empty? ? "500" : ENV["TESTER_REDEMPTIONS"]).to_i
   weekly = nil
   get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
@@ -1058,9 +1060,24 @@ if MODE == "tester-code"
     exit 1 unless ok
   end
 
+  # Un custom code peut exister tout en étant DÉSACTIVÉ : la saisie échoue alors
+  # côté testeur sans le moindre message. `active` est interdit à la création,
+  # on relit donc l'état réel et on le remet à true si besoin.
+  final = get_all("/v1/subscriptionOfferCodes/#{oc_id}/customCodes?limit=200")
+          .find { |c| c.dig("attributes", "customCode").to_s.upcase == code }
+  if final && final.dig("attributes", "active") == false
+    write("réactivation du code « #{code} »", :patch,
+      "/v1/subscriptionOfferCodeCustomCodes/#{final["id"]}",
+      { data: { type: "subscriptionOfferCodeCustomCodes", id: final["id"],
+                attributes: { active: true } } })
+    final = get_all("/v1/subscriptionOfferCodes/#{oc_id}/customCodes?limit=200")
+            .find { |c| c.dig("attributes", "customCode").to_s.upcase == code }
+  end
+
   puts "
 ===== CODE TESTEURS PRÊT ====="
   puts "Code           : #{code}"
+  puts "Actif          : #{final ? final.dig("attributes", "active") : "code introuvable en relecture"}"
   puts "Offre          : 1 semaine de Premium offerte (puis 0,99 €/sem si non résilié)"
   puts "Utilisations   : #{redemptions} · expire le #{expiration}"
   puts "Lien direct    : https://apps.apple.com/redeem?ctx=offercodes&id=#{app_id}&code=#{code}"
@@ -1092,19 +1109,19 @@ if MODE == "offers"
   # Expiration des codes ~18 mois (Time.now = vrai Ruby CI, pas le sandbox Workflow).
   expiration = (Time.now + 550 * 24 * 3600).strftime("%Y-%m-%d")
 
-  # Nettoyage : LANCEMENT50 était sur le mensuel ; le code passe sur l'annuel
-  # (aucun code redeemable minté → suppression sûre, best-effort).
+  # Nettoyage : LANCEMENT50 ET NAIA étaient adossés au mensuel, produit qui
+  # n'est plus vendu depuis le 18 août. Tant que l'ancienne campagne existe elle
+  # RETIENT la chaîne du code — les custom codes sont uniques à l'échelle de
+  # l'app — et la re-création sur hebdo/annuel repart en doublon. Best-effort :
+  # un refus d'Apple (codes déjà utilisés) est signalé, il n'arrête pas le mode.
   legacy = {}
   if monthly
     get_all("/v1/subscriptions/#{monthly}/offerCodes?limit=200").each { |o| legacy[o.dig("attributes", "name")] = o["id"] }
   end
-  if (old_id = legacy["LANCEMENT50 - -50% 3 mois"])
-    uri = URI(BASE + "/v1/subscriptionOfferCodes/#{old_id}")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-    del = Net::HTTP::Delete.new(uri)
-    del["Authorization"] = "Bearer #{token}"
-    puts "Nettoyage ancienne LANCEMENT50 (mensuel) -> HTTP #{http.request(del).code}"
+  ["LANCEMENT50 - -50% 3 mois", "NAIA - 3 mois offerts"].each do |old_name|
+    next unless (old_id = legacy[old_name])
+    write("nettoyage ancienne campagne « #{old_name} » (mensuel)", :delete,
+      "/v1/subscriptionOfferCodes/#{old_id}", nil)
   end
 
   offers = [
@@ -1168,6 +1185,12 @@ if MODE == "offers"
     (body["included"] || []).select { |i| i["type"] == "subscriptionOfferCodeCustomCodes" }.each do |c|
       a = c["attributes"]
       puts "  code=#{a["customCode"]} usages=#{a["numberOfCodes"]} expire=#{a["expirationDate"]} actif=#{a["active"]}"
+      # Constater qu'un code est inactif ne suffisait pas : on le réactive.
+      next unless a["active"] == false
+      write("réactivation du code « #{a["customCode"]} »", :patch,
+        "/v1/subscriptionOfferCodeCustomCodes/#{c["id"]}",
+        { data: { type: "subscriptionOfferCodeCustomCodes", id: c["id"],
+                  attributes: { active: true } } })
     end
   end
   puts "\n===== RÉSUMÉ ====="
