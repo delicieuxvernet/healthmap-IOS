@@ -12,7 +12,7 @@ on:
         required: true
         default: audit
         type: choice
-        options: [audit, apply, app-audit, deep-audit, fix-subs, apply-app, offers, screenshots, submit, fix-meta, attach-video, trim-monthly, cancel-submission, stage-version, stage-subs, send-submission, set-availability, tester-code, new-version]
+        options: [audit, apply, app-audit, deep-audit, fix-subs, apply-app, offers, screenshots, submit, fix-meta, attach-video, trim-monthly, cancel-submission, stage-version, stage-subs, send-submission, set-availability, tester-code, naia-code, new-version]
       display_type:
         description: "screenshots : type d'écran Apple (APP_IPHONE_67 = 1290x2796)"
         required: false
@@ -45,6 +45,11 @@ on:
         type: string
       submission_id:
         description: "cancel-submission : id de la reviewSubmission à annuler"
+        required: false
+        default: ""
+        type: string
+      promo_code:
+        description: "tester-code / naia-code : forcer la chaine du code (vide = HAPPYTESTER / NAIA)"
         required: false
         default: ""
         type: string
@@ -115,4 +120,6 @@ jobs:
           SUBMISSION_ID: ${{ inputs.submission_id }}
           RELEASE_TYPE: ${{ inputs.release_type }}
           SCREENS_DIR: ${{ inputs.screens_dir }}
+          TESTER_CODE: ${{ inputs.promo_code }}
+          NAIA_CODE: ${{ inputs.promo_code }}
         run: ruby scripts/asc_subscriptions.rb

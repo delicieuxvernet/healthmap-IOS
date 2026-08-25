@@ -1085,6 +1085,96 @@ if MODE == "tester-code"
   exit 0
 end
 
+# ── MODE naia-code : « 3 mois offerts » (NAIA) posé sur l'HEBDO ─────────────
+# Mode dédié, séparé d'`offers` : ce dernier traite aussi LANCEMENT50 et le
+# nettoyage des anciennes campagnes, si bien qu'un échec sur l'un enterrait
+# l'autre. Ici NAIA vit sa vie. NAIA_CODE (défaut NAIA) · NAIA_REDEMPTIONS (20).
+if MODE == "naia-code"
+  code = (ENV["NAIA_CODE"].to_s.empty? ? "NAIA" : ENV["NAIA_CODE"]).upcase
+  redemptions = (ENV["NAIA_REDEMPTIONS"].to_s.empty? ? "20" : ENV["NAIA_REDEMPTIONS"]).to_i
+
+  subs = {}
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      subs[s.dig("attributes", "productId")] = s["id"]
+    end
+  end
+  weekly = subs["healthmap_weekly"]
+  abort_with("naia-code", 0, "healthmap_weekly introuvable") unless weekly
+  puts "Abonnement support : healthmap_weekly (#{weekly})"
+
+  offer_name = "NAIA - 3 mois offerts"
+
+  # La campagne homonyme sur le mensuel RETIENT la chaîne du code (les custom
+  # codes sont uniques à l'échelle de l'app) : on la libère d'abord. Best-effort,
+  # un refus d'Apple est signalé et la suite le rattrape.
+  if (monthly = subs["healthmap_monthly"])
+    get_all("/v1/subscriptions/#{monthly}/offerCodes?limit=200").each do |o|
+      next unless o.dig("attributes", "name") == offer_name
+      write("libération de l'ancienne campagne « #{offer_name} » (mensuel)", :delete,
+        "/v1/subscriptionOfferCodes/#{o["id"]}", nil)
+    end
+  end
+
+  existing = {}
+  get_all("/v1/subscriptions/#{weekly}/offerCodes?limit=200").each { |x| existing[x.dig("attributes", "name")] = x["id"] }
+  oc_id = existing[offer_name]
+
+  if oc_id
+    puts "Campagne déjà présente sur l'hebdo (#{oc_id})"
+  else
+    grid, = offer_price_grid(weekly, TARGETS["healthmap_weekly"][:price])
+    abort_with("naia-code", 0, "aucun point de prix pour la grille") if grid.empty?
+    puts "Grille de prix : #{grid.size} territoires"
+    ok, resp = create_offer_code(weekly, offer_name,
+      { offerMode: "FREE_TRIAL", duration: "THREE_MONTHS", numberOfPeriods: 1,
+        customerEligibilities: %w[NEW EXISTING EXPIRED],
+        offerEligibility: "STACK_WITH_INTRO_OFFERS" }, grid)
+    exit 1 unless ok
+    oc_id = resp.dig("data", "id")
+  end
+
+  # Expiration ~18 mois (Time.now = vrai Ruby CI).
+  expiration = (Time.now + 550 * 24 * 3600).strftime("%Y-%m-%d")
+  already = get_all("/v1/subscriptionOfferCodes/#{oc_id}/customCodes?limit=200")
+  hit = already.find { |c| c.dig("attributes", "customCode").to_s.upcase == code }
+  if hit
+    puts "Custom code « #{code} » déjà créé (#{hit["id"]}), expire le #{hit.dig("attributes", "expirationDate")}"
+  else
+    okc, = create_custom_code(oc_id, code, redemptions, expiration)
+    unless okc
+      puts ""
+      puts "La chaîne « #{code} » est vraisemblablement encore retenue par une"
+      puts "ancienne campagne qu'Apple refuse de supprimer (codes déjà utilisés)."
+      puts "Relancer ce mode avec promo_code = #{code}2026 pour trancher."
+      exit 1
+    end
+  end
+
+  # Un custom code peut exister tout en étant DÉSACTIVÉ : la saisie échoue alors
+  # sans le moindre message côté utilisateur.
+  final = get_all("/v1/subscriptionOfferCodes/#{oc_id}/customCodes?limit=200")
+          .find { |c| c.dig("attributes", "customCode").to_s.upcase == code }
+  if final && final.dig("attributes", "active") == false
+    write("réactivation du code « #{code} »", :patch,
+      "/v1/subscriptionOfferCodeCustomCodes/#{final["id"]}",
+      { data: { type: "subscriptionOfferCodeCustomCodes", id: final["id"],
+                attributes: { active: true } } })
+    final = get_all("/v1/subscriptionOfferCodes/#{oc_id}/customCodes?limit=200")
+            .find { |c| c.dig("attributes", "customCode").to_s.upcase == code }
+  end
+
+  puts "
+===== CODE NAIA PRÊT ====="
+  puts "Code           : #{code}"
+  puts "Actif          : #{final ? final.dig("attributes", "active") : "code introuvable en relecture"}"
+  puts "Offre          : 3 mois de Premium offerts (puis 0,99 €/sem si non résilié)"
+  puts "Utilisations   : #{redemptions} · expire le #{expiration}"
+  puts "Lien direct    : https://apps.apple.com/redeem?ctx=offercodes&id=#{app_id}&code=#{code}"
+  puts "Dans l'app     : paywall > « J'ai un code » (presentCodeRedemptionSheet)"
+  exit 0
+end
+
 # ── MODE offers : codes promo (NAIA = 3 mois offerts / hebdo, LANCEMENT50 = -50% 1re année / annuel) ──
 # NAIA était adossé au mensuel ; ce produit n'étant pas vendu (décision du
 # 18 août 2026 : hebdo + annuel uniquement), l'offre passe sur l'HEBDO à durée
