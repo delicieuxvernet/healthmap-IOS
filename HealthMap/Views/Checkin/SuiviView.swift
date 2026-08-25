@@ -261,12 +261,21 @@ struct SuiviView: View {
 
     // MARK: - 2. Besoins et apports (lundi → dimanche de la semaine courante)
 
-    private static let initialesJours = ["L", "M", "M", "J", "V", "S", "D"]
+    /// Initiale du jour d'une date (D L M M J V S, indexée par weekday 1-7).
+    private static let initialesParWeekday = ["D", "L", "M", "M", "J", "V", "S"]
 
+    private static func initiale(_ jour: Date) -> String {
+        let weekday = WeekScoreEngine.mondayFirst.component(.weekday, from: jour)
+        return initialesParWeekday[(weekday - 1) % 7]
+    }
+
+    /// Fenêtre GLISSANTE : les 7 derniers jours, aujourd'hui en dernier.
+    /// (La semaine calendaire vidait tout l'historique chaque lundi matin —
+    /// « hier j'avais des datas, aujourd'hui elles n'y sont plus », 24 août.)
     private var joursSemaine: [Date] {
         let cal = WeekScoreEngine.mondayFirst
-        let debut = WeekScoreEngine.currentWeekInterval(containing: Date()).start
-        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: debut) }
+        let aujourdHui = cal.startOfDay(for: Date())
+        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0 - 6, to: aujourdHui) }
     }
 
     /// Somme par jour d'une grandeur du journal ; nil = aucun repas ce jour-là
@@ -299,29 +308,34 @@ struct SuiviView: View {
     }
 
     private func pointsGraphe(_ semaine: WeekScoreEngine.WeekScore) -> [ProgresBarPoint] {
+        let jours = joursSemaine
         let valeurs: [Double?]
         switch segment {
         case .calories: valeurs = totauxParJour { Double($0.calories) }
         case .macros: valeurs = totauxParJour { $0.proteins }
-        case .micros: valeurs = semaine.days.map { $0.score.map { Double($0) } }
+        case .micros:
+            // Fenêtre glissante : les scores se calculent sur CES jours-là,
+            // pas sur la semaine calendaire du moteur.
+            valeurs = WeekScoreEngine.scoresQuotidiens(meals: journal.fortnight,
+                                                       weakNutrients: weakNutrientIds,
+                                                       jours: jours).map { $0.map(Double.init) }
         }
         let besoin = besoinCourant
-        let aujourdHui = WeekScoreEngine.mondayFirst.startOfDay(for: Date())
-        return joursSemaine.enumerated().map { index, jour in
+        return jours.enumerated().map { index, jour in
             let valeur = index < valeurs.count ? valeurs[index] : nil
             return ProgresBarPoint(
                 id: index,
-                libelle: Self.initialesJours[index],
+                libelle: Self.initiale(jour),
                 valeur: valeur,
                 horsCible: valeur.map { horsCible($0, besoin: besoin) } ?? false,
-                futur: jour > aujourdHui
+                futur: false
             )
         }
     }
 
     private func conclusion(_ points: [ProgresBarPoint]) -> String {
         let mesures = points.filter { $0.valeur != nil }
-        guard !mesures.isEmpty else { return "Pas encore de repas cette semaine." }
+        guard !mesures.isEmpty else { return "Pas encore de repas sur les sept derniers jours." }
         guard besoinCourant != nil else {
             return "Complète ton profil pour connaître tes besoins."
         }

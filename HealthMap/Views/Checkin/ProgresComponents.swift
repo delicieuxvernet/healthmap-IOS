@@ -193,7 +193,7 @@ struct ProgresBarChart: View {
             guard let v = p.valeur else { return nil }
             return "\(p.libelle) \(Int(v.rounded()))\(p.horsCible ? ", hors cible" : "")"
         }
-        guard !jours.isEmpty else { return "Aucun repas suivi cette semaine." }
+        guard !jours.isEmpty else { return "Aucun repas suivi sur les sept derniers jours." }
         return jours.joined(separator: ", ")
     }
 }

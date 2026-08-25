@@ -104,6 +104,24 @@ enum WeekScoreEngine {
                          topMover: topMover(current: currentMeals, previous: previousMeals, targets: targets, calendar: calendar))
     }
 
+    /// Scores quotidiens sur des JOURS ARBITRAIRES — la fenêtre GLISSANTE du
+    /// graphe « Besoins et apports » (24 août : la semaine calendaire vidait
+    /// l'historique chaque lundi matin). Même règle de couverture que la
+    /// semaine ; nil = jour sans repas chiffrable.
+    static func scoresQuotidiens(meals: [MealJournalService.MealRecord],
+                                 weakNutrients: [String],
+                                 jours: [Date],
+                                 calendar: Calendar = mondayFirst) -> [Int?] {
+        var targets = weakNutrients
+        if targets.isEmpty {
+            targets = Array(Set(meals.flatMap { $0.micros.map(\.id) })).sorted()
+        }
+        return jours.map { jour in
+            let dayMeals = meals.filter { calendar.isDate($0.consumedAt, inSameDayAs: jour) }
+            return dayScore(meals: dayMeals, targets: targets)
+        }
+    }
+
     // MARK: - Briques internes
 
     /// Couverture moyenne d'un jour sur les nutriments cibles ; nil si aucun
