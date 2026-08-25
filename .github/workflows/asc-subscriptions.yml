@@ -48,6 +48,12 @@ on:
         required: false
         default: ""
         type: string
+      offer_duration:
+        description: "naia-code : duree offerte (Apple n a pas de 3 semaines) - defaut ONE_MONTH"
+        required: false
+        default: ""
+        type: choice
+        options: ["", THREE_DAYS, ONE_WEEK, TWO_WEEKS, ONE_MONTH, TWO_MONTHS, THREE_MONTHS, SIX_MONTHS, ONE_YEAR]
       promo_code:
         description: "tester-code / naia-code : forcer la chaine du code (vide = HAPPYTESTER / NAIA)"
         required: false
@@ -122,4 +128,5 @@ jobs:
           SCREENS_DIR: ${{ inputs.screens_dir }}
           TESTER_CODE: ${{ inputs.promo_code }}
           NAIA_CODE: ${{ inputs.promo_code }}
+          NAIA_DURATION: ${{ inputs.offer_duration }}
         run: ruby scripts/asc_subscriptions.rb
