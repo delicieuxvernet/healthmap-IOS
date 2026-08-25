@@ -1172,25 +1172,19 @@ private struct SuiviCheckinPopup: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.dsTexte.opacity(0.4)
+            // Même voile que le tutoriel (encre 64 %) : c'est le langage des
+            // surcouches de la refonte.
+            Color(hex: "1C1C1E").opacity(0.64)
                 .ignoresSafeArea()
                 .onTapGesture { dismissLater() }
 
             card
-                .padding(.horizontal, 14)
-                .padding(.top, 56)
+                .padding(.horizontal, 20)
         }
     }
 
     private var card: some View {
         VStack(spacing: 0) {
-            // Poignée
-            Capsule()
-                .fill(Color.dsTexte.opacity(0.16))
-                .frame(width: 38, height: 5)
-                .padding(.top, 14)
-                .padding(.bottom, 16)
-
             if confirmed {
                 confirmationView
             } else {
@@ -1198,35 +1192,36 @@ private struct SuiviCheckinPopup: View {
             }
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 24)
+        .padding(.top, 22)
+        .padding(.bottom, 20)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.dsFond))
-        // (ombre retirée, refonte 23 août 2026)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.dsCarte))
     }
 
     private var questionsView: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Comment tu te sens ?")
-                        .font(Theme.sheetTitleFont)
+                        .font(.system(size: 22, weight: .bold))
+                        .tracking(-0.6)
                         .foregroundStyle(Color.dsTexte)
-                    Text("Un tap par symptôme, ça met tes courbes à jour")
-                        .font(Theme.dataSecondaryFont)
+                    Text("Un tap par symptôme, ça met tes courbes à jour.")
+                        .font(.system(size: 15))
                         .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer()
-                // Action secondaire : jamais de fond coloré, jamais le poids du
-                // bouton qu'elle esquive.
+                Spacer(minLength: 8)
+                // Action secondaire : même voix que le « Passer » du tutoriel.
                 Button { dismissLater() } label: {
                     Text("Plus tard")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Color.dsSecondaire)
-                        .padding(8)
+                        .padding(.vertical, 8)
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.healthMapPressed)
+                .buttonStyle(.plain)
                 .accessibilityLabel("Plus tard")
             }
 
@@ -1258,16 +1253,15 @@ private struct SuiviCheckinPopup: View {
 
             Button { validate() } label: {
                 Text("C'est noté")
-                    .font(Theme.ctaFont)
+                    .font(.system(size: 17, weight: .semibold))
+                    .tracking(-0.4)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(anyAnswered ? Color.dsAccent : Color.dsSecondaire)
-                    )
+                    .frame(height: 50)
+                    .background(Capsule().fill(Color.dsAccent))
+                    .opacity(anyAnswered ? 1 : 0.35)
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
             .disabled(!anyAnswered)
             .padding(.top, 16)
             .accessibilityHint(anyAnswered ? "Enregistre tes réponses" : "Réponds à au moins un symptôme")
@@ -1277,7 +1271,7 @@ private struct SuiviCheckinPopup: View {
     private var confirmationView: some View {
         VStack(spacing: 12) {
             ZStack {
-                Circle().fill(Color.dsRemplissage).frame(width: 72, height: 72)
+                Circle().fill(Color.dsAccentPale).frame(width: 72, height: 72)
                 Image(systemName: "checkmark")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(Color.dsAccent)
@@ -1297,12 +1291,14 @@ private struct SuiviCheckinPopup: View {
 
     private func questionBlock(icon: String, title: String, better: String, worse: String, selection: Binding<Int?>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.dsTexte)
+                    .font(.system(size: 15, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .accessibilityHidden(true)
                 Text(title)
-                    .font(Theme.insightFont)
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -1324,27 +1320,28 @@ private struct SuiviCheckinPopup: View {
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(isSelected ? Color.dsTexte : Color.dsSecondaire)
+                    .font(.system(size: 22, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(isSelected ? Color.dsAccent : Color.dsSecondaire)
                 // La sélection se lit à la graisse et à l'encre, pas à un gras
                 // permanent qui mettrait les trois options au même niveau.
                 Text(label)
-                    .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
                     .foregroundStyle(isSelected ? Color.dsTexte : Color.dsSecondaire)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity)
             .frame(minHeight: 44)
-            .padding(.vertical, 13)
+            .padding(.vertical, 12)
             .padding(.horizontal, 4)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isSelected ? Color.dsRemplissage : Color.dsCarte)
+                RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                    .fill(isSelected ? Color.dsRemplissage : Color.dsFond)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(isSelected ? Color.dsAccent : Color.dsTexte.opacity(0.07),
+                RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                    .stroke(isSelected ? Color.dsAccent : Color.dsTexte.opacity(0.06),
                             lineWidth: isSelected ? 1.5 : 1)
             )
             .contentShape(Rectangle())
