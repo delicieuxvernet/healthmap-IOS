@@ -195,7 +195,14 @@ final class SpeechCaptureService: ObservableObject {
         }
 
         let requete = SFSpeechURLRecognitionRequest(url: url)
-        requete.shouldReportPartialResults = false
+        // ⚠️ Partiels OBLIGATOIRES — c'est le correctif du 24 août : en
+        // reconnaissance SUR APPAREIL, le recognizer repart de zéro à chaque
+        // silence, et son résultat « final » ne couvre que la DERNIÈRE phrase.
+        // Une longue dictée avec des pauses perdait tout sauf la fin (signalé
+        // sur appareil). On suit donc les partiels, on archive chaque segment
+        // quand la transcription redémarre, et on recolle le tout à la fin
+        // (`TranscriptionCumul`, testé unitairement).
+        requete.shouldReportPartialResults = true
         // Sur appareil quand c'est possible : ce qu'on mange reste privé, et ça
         // marche sans réseau. iOS retombe sur le service Apple si le modèle
         // français n'est pas installé localement.
@@ -203,16 +210,54 @@ final class SpeechCaptureService: ObservableObject {
             requete.requiresOnDeviceRecognition = true
         }
 
+        let dureeAudio = max(10, duree)
         let texte: String = await withCheckedContinuation { suite in
+            let cumul = TranscriptionCumul()
+            let file = DispatchQueue(label: "kiwio.dictee.cumul")
+            var minuterie: DispatchWorkItem?
             var repris = false
+
+            func conclure() {
+                file.async {
+                    guard !repris else { return }
+                    repris = true
+                    minuterie?.cancel()
+                    suite.resume(returning: cumul.texteFinal())
+                }
+            }
+            func armerFenetre(_ delai: TimeInterval) {
+                file.async {
+                    guard !repris else { return }
+                    minuterie?.cancel()
+                    let travail = DispatchWorkItem { conclure() }
+                    minuterie = travail
+                    file.asyncAfter(deadline: .now() + delai, execute: travail)
+                }
+            }
+
+            // Garde-fou global : quoi qu'il arrive, on rend la main.
+            armerFenetre(min(90, dureeAudio * 2))
+
             recognizer.recognitionTask(with: requete) { resultat, erreur in
-                guard !repris else { return }
-                if let resultat, resultat.isFinal {
-                    repris = true
-                    suite.resume(returning: resultat.bestTranscription.formattedString)
-                } else if erreur != nil {
-                    repris = true
-                    suite.resume(returning: "")
+                file.async {
+                    guard !repris else { return }
+                    if let resultat {
+                        cumul.integrer(resultat.bestTranscription.formattedString,
+                                       final: resultat.isFinal)
+                    }
+                    if erreur != nil {
+                        // La tâche s'arrête (fin de fichier comprise) : ce
+                        // qu'on a cumulé EST la transcription.
+                        conclure()
+                    } else if resultat?.isFinal == true {
+                        // Peut-être le dernier segment, mais un autre peut
+                        // suivre après un silence : courte fenêtre avant de
+                        // conclure.
+                        armerFenetre(1.2)
+                    } else {
+                        // Un partiel : tant que ça avance, on attend.
+                        armerFenetre(4.0)
+                    }
                 }
             }
         }
@@ -263,5 +308,62 @@ final class SpeechCaptureService: ObservableObject {
         if let url = fichier { try? FileManager.default.removeItem(at: url) }
         fichier = nil
         recorder = nil
+    }
+}
+
+
+// MARK: - Recollage des segments de transcription
+
+/// Recolle les segments d'une transcription de fichier.
+///
+/// Le recognizer SUR APPAREIL redémarre sa transcription après chaque silence :
+/// les partiels grandissent, puis repartent presque de zéro sur la phrase
+/// suivante, et le « final » ne couvre que la dernière. Cette classe archive le
+/// segment courant dès que le texte cesse d'être une révision du précédent
+/// (il devient nettement plus court : nouveau départ), puis recolle le tout.
+/// Le chemin SERVEUR (partiels cumulés sur tout le fichier, un seul final)
+/// traverse sans doublon : chaque nouveau texte y prolonge le précédent.
+final class TranscriptionCumul: @unchecked Sendable {
+    private var segments: [String] = []
+    private var courant: String = ""
+
+    /// Un nouveau texte du recognizer (partiel ou final).
+    func integrer(_ texte: String, final: Bool) {
+        let propre = texte.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !propre.isEmpty else {
+            if final { archiverCourant() }
+            return
+        }
+        // Redémarrage : le texte retombe à moins de la moitié du courant —
+        // une révision garde une longueur comparable, un nouveau départ non.
+        if courant.count > 12, propre.count * 2 < courant.count {
+            archiverCourant()
+        }
+        courant = propre
+        if final { archiverCourant() }
+    }
+
+    /// Le texte recollé. Un final cumulatif (serveur) qui répète le segment
+    /// précédent en préfixe le remplace au lieu de le dupliquer.
+    func texteFinal() -> String {
+        var tous = segments
+        if !courant.isEmpty { tous.append(courant) }
+        var sortie: [String] = []
+        for segment in tous {
+            if let dernier = sortie.last, segment.hasPrefix(dernier) {
+                sortie[sortie.count - 1] = segment
+            } else if let dernier = sortie.last, dernier == segment || dernier.hasSuffix(segment) {
+                continue
+            } else {
+                sortie.append(segment)
+            }
+        }
+        return sortie.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func archiverCourant() {
+        guard !courant.isEmpty else { return }
+        segments.append(courant)
+        courant = ""
     }
 }
