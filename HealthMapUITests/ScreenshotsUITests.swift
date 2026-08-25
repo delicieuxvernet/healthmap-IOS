@@ -145,6 +145,7 @@ final class ScreenshotsUITests: XCTestCase {
         app.buttons["tab.progres"].tap()
         sleep(2)
         if app.buttons["Plus tard"].waitForExistence(timeout: 3) {
+            snap("19-checkin-popup")
             taper(app.buttons["Plus tard"])
             sleep(1)
         }

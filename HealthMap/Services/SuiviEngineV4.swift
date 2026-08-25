@@ -102,13 +102,26 @@ enum SuiviEngineV4 {
         let labelSansKiwio: String  // « sans Kiwio »
         let labelHaut: String       // pôle haut de l'axe (ex. « plus cassants »)
         let labelBas: String        // pôle bas de l'axe (ex. « moins cassants »)
+        /// Série QUOTIDIENNE (24 août) : un point par JOUR de la fenêtre de
+        /// suivi — le niveau ne bouge qu'aux jours répondus, mais chaque jour
+        /// avance d'un cran sur l'axe. C'est elle que la courbe trace ;
+        /// `reel` reste la série par réponse (verdict, variation, tests).
+        var jours: [PointJour] = []
 
         static func == (lhs: SymptomEvolution, rhs: SymptomEvolution) -> Bool {
             lhs.id == rhs.id && lhs.verdict == rhs.verdict
                 && lhs.variationPct == rhs.variationPct && lhs.improving == rhs.improving
                 && lhs.isExample == rhs.isExample
                 && lhs.reel == rhs.reel && lhs.sansKiwio == rhs.sansKiwio
+                && lhs.jours == rhs.jours
         }
+    }
+
+    /// Un jour de la série quotidienne d'un symptôme.
+    struct PointJour: Equatable {
+        let jour: Date      // début de journée
+        let niveau: Int     // 0-100
+        let repondu: Bool   // un check-in ce jour-là → point dessiné
     }
 
     /// Construit une carte d'évolution par symptôme déclaré.
@@ -257,6 +270,74 @@ enum SuiviEngineV4 {
             out.append(level)
         }
         return out
+    }
+
+    /// Série QUOTIDIENNE du niveau : un point par JOUR depuis `depart`
+    /// (bornée aux `fenetre` derniers jours). Le niveau ne bouge qu'aux jours
+    /// répondus — mais CHAQUE jour avance d'un cran sur l'axe : deux réponses
+    /// à deux jours différents font deux points distincts, jamais superposés
+    /// (retour d'appareil du 24 août : « les points vont sur le même endroit »).
+    /// Plusieurs réponses le même jour : la dernière fait foi.
+    static func serieQuotidienne(depart: Date,
+                                 reponses: [(jour: Date, ressenti: Int)],
+                                 dir: SymptomDir,
+                                 baseline: Int = 50,
+                                 step: Int = 3,
+                                 fenetre: Int = 14,
+                                 now: Date = Date(),
+                                 calendar: Calendar = .current) -> [PointJour] {
+        let debut = calendar.startOfDay(for: min(depart, now))
+        let fin = calendar.startOfDay(for: now)
+        guard fin >= debut else { return [] }
+        var parJour: [Date: Int] = [:]
+        for r in reponses {
+            parJour[calendar.startOfDay(for: r.jour)] = r.ressenti
+        }
+        var niveau = max(0, min(100, baseline))
+        var tous: [PointJour] = []
+        var jour = debut
+        while jour <= fin {
+            if let f = parJour[jour] {
+                let versLeMieux: Int
+                switch f {
+                case 0: versLeMieux = 1
+                case 2: versLeMieux = -1
+                default: versLeMieux = 0
+                }
+                let signe = (dir == .lowerBetter ? -versLeMieux : versLeMieux) * step
+                niveau = max(0, min(100, niveau + signe))
+                tous.append(PointJour(jour: jour, niveau: niveau, repondu: true))
+            } else {
+                tous.append(PointJour(jour: jour, niveau: niveau, repondu: false))
+            }
+            guard let suivant = calendar.date(byAdding: .day, value: 1, to: jour) else { break }
+            jour = suivant
+        }
+        return Array(tous.suffix(fenetre))
+    }
+
+    /// Variante QUOTIDIENNE de `symptomEvolutions` : mêmes verdicts (calculés
+    /// sur les réponses), plus la série `jours` que la courbe trace.
+    static func symptomEvolutionsQuotidiennes(symptomes: [SymptomeV2]?,
+                                              reponsesById: [String: [(jour: Date, ressenti: Int)]],
+                                              depart: Date,
+                                              step: Int = 3,
+                                              now: Date = Date(),
+                                              calendar: Calendar = .current) -> [SymptomEvolution] {
+        guard let symptomes, !symptomes.isEmpty else { return [] }
+        return symptomes.compactMap { s in
+            guard let nom = s.nom, !nom.isEmpty else { return nil }
+            let sid = s.id ?? nom
+            let trend = SymptomTrend.make(from: nom)
+            let reponses = reponsesById[sid] ?? []
+            var evo = evolution(id: sid, nom: nom, trend: trend,
+                                tracking: .real(feelings: reponses.map { $0.ressenti }),
+                                step: step)
+            evo.jours = serieQuotidienne(depart: depart, reponses: reponses,
+                                         dir: trend.dir, step: step,
+                                         now: now, calendar: calendar)
+            return evo
+        }
     }
 
     /// Variation exprimée dans le SENS de l'amélioration : négative si un
@@ -682,6 +763,34 @@ enum SuiviCheckinHistory {
             guard let d = calendar.date(byAdding: .day, value: -k, to: now) else { continue }
             let dict = UserDefaults.standard.dictionary(forKey: dayKey(dayString(d))) as? [String: Int]
             if let v = dict?[feelKey] { out.append(v) }
+        }
+        return out
+    }
+
+    /// Ressentis PAR symptôme avec leur JOUR — même parcours que
+    /// `feelingsById`, mais chaque réponse garde sa date (série quotidienne).
+    static func reponsesParJour(symptomIds: [String],
+                                since start: Date,
+                                now: Date = Date(),
+                                calendar: Calendar = .current) -> [String: [(jour: Date, ressenti: Int)]] {
+        let from = calendar.startOfDay(for: start)
+        let to = calendar.startOfDay(for: now)
+        let dayCount = calendar.dateComponents([.day], from: from, to: to).day ?? 0
+        guard dayCount >= 0, !symptomIds.isEmpty else { return [:] }
+        let primary = symptomIds.first
+        var out: [String: [(jour: Date, ressenti: Int)]] = [:]
+        for k in 0...dayCount {
+            guard let d = calendar.date(byAdding: .day, value: k, to: from),
+                  let dict = UserDefaults.standard.dictionary(forKey: dayKey(dayString(d))) as? [String: Int]
+            else { continue }
+            let jour = calendar.startOfDay(for: d)
+            for sid in symptomIds {
+                if let v = dict[feelKeyFor(sid)] {
+                    out[sid, default: []].append((jour: jour, ressenti: v))
+                } else if sid == primary, let legacy = dict[feelKey] {
+                    out[sid, default: []].append((jour: jour, ressenti: legacy))
+                }
+            }
         }
         return out
     }

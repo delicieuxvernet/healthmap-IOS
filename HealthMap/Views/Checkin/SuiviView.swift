@@ -261,12 +261,21 @@ struct SuiviView: View {
 
     // MARK: - 2. Besoins et apports (lundi → dimanche de la semaine courante)
 
-    private static let initialesJours = ["L", "M", "M", "J", "V", "S", "D"]
+    /// Initiale du jour d'une date (D L M M J V S, indexée par weekday 1-7).
+    private static let initialesParWeekday = ["D", "L", "M", "M", "J", "V", "S"]
 
+    private static func initiale(_ jour: Date) -> String {
+        let weekday = WeekScoreEngine.mondayFirst.component(.weekday, from: jour)
+        return initialesParWeekday[(weekday - 1) % 7]
+    }
+
+    /// Fenêtre GLISSANTE : les 7 derniers jours, aujourd'hui en dernier.
+    /// (La semaine calendaire vidait tout l'historique chaque lundi matin —
+    /// « hier j'avais des datas, aujourd'hui elles n'y sont plus », 24 août.)
     private var joursSemaine: [Date] {
         let cal = WeekScoreEngine.mondayFirst
-        let debut = WeekScoreEngine.currentWeekInterval(containing: Date()).start
-        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: debut) }
+        let aujourdHui = cal.startOfDay(for: Date())
+        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0 - 6, to: aujourdHui) }
     }
 
     /// Somme par jour d'une grandeur du journal ; nil = aucun repas ce jour-là
@@ -299,29 +308,34 @@ struct SuiviView: View {
     }
 
     private func pointsGraphe(_ semaine: WeekScoreEngine.WeekScore) -> [ProgresBarPoint] {
+        let jours = joursSemaine
         let valeurs: [Double?]
         switch segment {
         case .calories: valeurs = totauxParJour { Double($0.calories) }
         case .macros: valeurs = totauxParJour { $0.proteins }
-        case .micros: valeurs = semaine.days.map { $0.score.map { Double($0) } }
+        case .micros:
+            // Fenêtre glissante : les scores se calculent sur CES jours-là,
+            // pas sur la semaine calendaire du moteur.
+            valeurs = WeekScoreEngine.scoresQuotidiens(meals: journal.fortnight,
+                                                       weakNutrients: weakNutrientIds,
+                                                       jours: jours).map { $0.map(Double.init) }
         }
         let besoin = besoinCourant
-        let aujourdHui = WeekScoreEngine.mondayFirst.startOfDay(for: Date())
-        return joursSemaine.enumerated().map { index, jour in
+        return jours.enumerated().map { index, jour in
             let valeur = index < valeurs.count ? valeurs[index] : nil
             return ProgresBarPoint(
                 id: index,
-                libelle: Self.initialesJours[index],
+                libelle: Self.initiale(jour),
                 valeur: valeur,
                 horsCible: valeur.map { horsCible($0, besoin: besoin) } ?? false,
-                futur: jour > aujourdHui
+                futur: false
             )
         }
     }
 
     private func conclusion(_ points: [ProgresBarPoint]) -> String {
         let mesures = points.filter { $0.valeur != nil }
-        guard !mesures.isEmpty else { return "Pas encore de repas cette semaine." }
+        guard !mesures.isEmpty else { return "Pas encore de repas sur les sept derniers jours." }
         guard besoinCourant != nil else {
             return "Complète ton profil pour connaître tes besoins."
         }
@@ -396,16 +410,14 @@ struct SuiviView: View {
         // (les ressentis sont relus depuis UserDefaults à la volée).
         let _ = checkinTick
         let ids = checkinSymptomIds
-        // Mode réel dès le suivi démarré : chaque courbe ne réagit qu'aux
-        // check-ins réels de SON symptôme (`feelingsById`). Sinon EXEMPLE badgé.
-        let feelingsById = isTracking
-            ? SuiviCheckinHistory.feelingsById(symptomIds: ids,
-                                               since: SuiviTrackingStore.startDate() ?? Date())
-            : [:]
-        let evolutions = SuiviEngineV4.symptomEvolutions(
+        // Série QUOTIDIENNE (24 août) : un point par JOUR répondu, l'axe
+        // avance jour après jour — deux réponses à deux jours différents ne
+        // se superposent plus jamais.
+        let depart = SuiviTrackingStore.startDate() ?? Date()
+        let evolutions = SuiviEngineV4.symptomEvolutionsQuotidiennes(
             symptomes: dashboardVM.analysisV2?.bilan?.symptomes,
-            feelingsById: feelingsById,
-            isTracking: isTracking
+            reponsesById: SuiviCheckinHistory.reponsesParJour(symptomIds: ids, since: depart),
+            depart: depart
         )
         if !evolutions.isEmpty {
             VStack(spacing: 10) {
@@ -746,12 +758,39 @@ private struct SuiviSymptomPage: View {
                     .frame(height: 132)
                     .padding(.top, 10)
             }
+
+            // L'axe est désormais le TEMPS : ses bornes s'écrivent.
+            if evolution.jours.count >= 2,
+               let premier = evolution.jours.first?.jour,
+               let dernier = evolution.jours.last?.jour {
+                HStack {
+                    Text(Self.jourCourt(premier))
+                    Spacer(minLength: 8)
+                    Text("aujourd'hui")
+                        .accessibilityLabel(Self.jourCourt(dernier))
+                }
+                .font(Theme.chromeFont)
+                .foregroundStyle(Color.dsTertiaire)
+                .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             if reduceMotion { progress = 1 }
             else { withAnimation(.easeOut(duration: 1.0).delay(0.1)) { progress = 1 } }
         }
+    }
+
+    /// « 17 août » — cache : le formatter est coûteux, la page se redessine.
+    private static let formatJour: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "fr_FR")
+        f.dateFormat = "d MMM"
+        return f
+    }()
+
+    private static func jourCourt(_ date: Date) -> String {
+        formatJour.string(from: date)
     }
 
     private var capitalizedNom: String {
@@ -820,13 +859,30 @@ private struct SuiviPosedChart: View {
             // « toi » — plein vert + aire, animée par `progress`. En EXEMPLE, tracé
             // fondu + tirets ; sinon plein. Avec un seul point (jour 0), on ne
             // trace pas de ligne, juste le point.
-            let reelPts = reelPoints(reel)
+            // Série QUOTIDIENNE disponible → l'axe des x est le TEMPS : un
+            // point par jour, disque sur les jours répondus.
+            let jours = evolution.jours
+            let reelPts: [CGPoint]
+            var reponduPts: [CGPoint] = []
+            if jours.count >= 2 {
+                func pxJour(_ i: Int) -> CGFloat {
+                    padL + (w - padL) * CGFloat(i) / CGFloat(jours.count - 1)
+                }
+                reelPts = jours.enumerated().map {
+                    CGPoint(x: pxJour($0.offset), y: py(Double($0.element.niveau)))
+                }
+                reponduPts = jours.enumerated().compactMap {
+                    $0.element.repondu ? CGPoint(x: pxJour($0.offset), y: py(Double($0.element.niveau))) : nil
+                }
+            } else {
+                reelPts = reelPoints(reel)
+            }
             let toiColor = Color.dsAccent
             let toiOpacity: Double = evolution.isExample ? 0.42 : 1.0
             let toiDash: [CGFloat] = evolution.isExample ? [7, 5] : []
 
             if reelPts.count > 1 {
-                let visible = max(2, Int(ceil(CGFloat(n) * progress)))
+                let visible = max(2, Int(ceil(CGFloat(reelPts.count) * progress)))
                 let drawn = Array(reelPts.prefix(visible))
                 let line = SuiviCurveMath.smoothPath(drawn)
                 if !evolution.isExample {
@@ -840,7 +896,14 @@ private struct SuiviPosedChart: View {
                 ctx.stroke(line, with: .color(toiColor.opacity(toiOpacity)),
                            style: StrokeStyle(lineWidth: 3.4, lineCap: .round, lineJoin: .round, dash: toiDash))
 
-                if let p = drawn.last {
+                // Chaque jour RÉPONDU porte son disque : la réponse du jour
+                // se voit se poser sur la courbe (retour du 24 août).
+                for p in reponduPts.dropLast() where p.x <= (drawn.last?.x ?? 0) {
+                    let r: CGFloat = 3
+                    let dot = Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
+                    ctx.fill(dot, with: .color(toiColor.opacity(toiOpacity)))
+                }
+                if let p = reponduPts.last ?? drawn.last {
                     let r: CGFloat = 4.5
                     let dot = Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
                     ctx.fill(dot, with: .color(toiColor.opacity(toiOpacity)))
@@ -1123,25 +1186,19 @@ private struct SuiviCheckinPopup: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.dsTexte.opacity(0.4)
+            // Même voile que le tutoriel (encre 64 %) : c'est le langage des
+            // surcouches de la refonte.
+            Color(hex: "1C1C1E").opacity(0.64)
                 .ignoresSafeArea()
                 .onTapGesture { dismissLater() }
 
             card
-                .padding(.horizontal, 14)
-                .padding(.top, 56)
+                .padding(.horizontal, 20)
         }
     }
 
     private var card: some View {
         VStack(spacing: 0) {
-            // Poignée
-            Capsule()
-                .fill(Color.dsTexte.opacity(0.16))
-                .frame(width: 38, height: 5)
-                .padding(.top, 14)
-                .padding(.bottom, 16)
-
             if confirmed {
                 confirmationView
             } else {
@@ -1149,35 +1206,36 @@ private struct SuiviCheckinPopup: View {
             }
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 24)
+        .padding(.top, 22)
+        .padding(.bottom, 20)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Color.dsFond))
-        // (ombre retirée, refonte 23 août 2026)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.dsCarte))
     }
 
     private var questionsView: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Comment tu te sens ?")
-                        .font(Theme.sheetTitleFont)
+                        .font(.system(size: 22, weight: .bold))
+                        .tracking(-0.6)
                         .foregroundStyle(Color.dsTexte)
-                    Text("Un tap par symptôme, ça met tes courbes à jour")
-                        .font(Theme.dataSecondaryFont)
+                    Text("Un tap par symptôme, ça met tes courbes à jour.")
+                        .font(.system(size: 15))
                         .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer()
-                // Action secondaire : jamais de fond coloré, jamais le poids du
-                // bouton qu'elle esquive.
+                Spacer(minLength: 8)
+                // Action secondaire : même voix que le « Passer » du tutoriel.
                 Button { dismissLater() } label: {
                     Text("Plus tard")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Color.dsSecondaire)
-                        .padding(8)
+                        .padding(.vertical, 8)
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.healthMapPressed)
+                .buttonStyle(.plain)
                 .accessibilityLabel("Plus tard")
             }
 
@@ -1209,16 +1267,15 @@ private struct SuiviCheckinPopup: View {
 
             Button { validate() } label: {
                 Text("C'est noté")
-                    .font(Theme.ctaFont)
+                    .font(.system(size: 17, weight: .semibold))
+                    .tracking(-0.4)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(anyAnswered ? Color.dsAccent : Color.dsSecondaire)
-                    )
+                    .frame(height: 50)
+                    .background(Capsule().fill(Color.dsAccent))
+                    .opacity(anyAnswered ? 1 : 0.35)
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
             .disabled(!anyAnswered)
             .padding(.top, 16)
             .accessibilityHint(anyAnswered ? "Enregistre tes réponses" : "Réponds à au moins un symptôme")
@@ -1228,7 +1285,7 @@ private struct SuiviCheckinPopup: View {
     private var confirmationView: some View {
         VStack(spacing: 12) {
             ZStack {
-                Circle().fill(Color.dsRemplissage).frame(width: 72, height: 72)
+                Circle().fill(Color.dsAccentPale).frame(width: 72, height: 72)
                 Image(systemName: "checkmark")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(Color.dsAccent)
@@ -1248,12 +1305,14 @@ private struct SuiviCheckinPopup: View {
 
     private func questionBlock(icon: String, title: String, better: String, worse: String, selection: Binding<Int?>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.dsTexte)
+                    .font(.system(size: 15, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .accessibilityHidden(true)
                 Text(title)
-                    .font(Theme.insightFont)
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -1275,27 +1334,28 @@ private struct SuiviCheckinPopup: View {
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(isSelected ? Color.dsTexte : Color.dsSecondaire)
+                    .font(.system(size: 22, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(isSelected ? Color.dsAccent : Color.dsSecondaire)
                 // La sélection se lit à la graisse et à l'encre, pas à un gras
                 // permanent qui mettrait les trois options au même niveau.
                 Text(label)
-                    .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
                     .foregroundStyle(isSelected ? Color.dsTexte : Color.dsSecondaire)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity)
             .frame(minHeight: 44)
-            .padding(.vertical, 13)
+            .padding(.vertical, 12)
             .padding(.horizontal, 4)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isSelected ? Color.dsRemplissage : Color.dsCarte)
+                RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                    .fill(isSelected ? Color.dsRemplissage : Color.dsFond)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(isSelected ? Color.dsAccent : Color.dsTexte.opacity(0.07),
+                RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                    .stroke(isSelected ? Color.dsAccent : Color.dsTexte.opacity(0.06),
                             lineWidth: isSelected ? 1.5 : 1)
             )
             .contentShape(Rectangle())
