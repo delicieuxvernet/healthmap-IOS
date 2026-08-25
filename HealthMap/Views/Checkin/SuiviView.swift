@@ -396,16 +396,14 @@ struct SuiviView: View {
         // (les ressentis sont relus depuis UserDefaults à la volée).
         let _ = checkinTick
         let ids = checkinSymptomIds
-        // Mode réel dès le suivi démarré : chaque courbe ne réagit qu'aux
-        // check-ins réels de SON symptôme (`feelingsById`). Sinon EXEMPLE badgé.
-        let feelingsById = isTracking
-            ? SuiviCheckinHistory.feelingsById(symptomIds: ids,
-                                               since: SuiviTrackingStore.startDate() ?? Date())
-            : [:]
-        let evolutions = SuiviEngineV4.symptomEvolutions(
+        // Série QUOTIDIENNE (24 août) : un point par JOUR répondu, l'axe
+        // avance jour après jour — deux réponses à deux jours différents ne
+        // se superposent plus jamais.
+        let depart = SuiviTrackingStore.startDate() ?? Date()
+        let evolutions = SuiviEngineV4.symptomEvolutionsQuotidiennes(
             symptomes: dashboardVM.analysisV2?.bilan?.symptomes,
-            feelingsById: feelingsById,
-            isTracking: isTracking
+            reponsesById: SuiviCheckinHistory.reponsesParJour(symptomIds: ids, since: depart),
+            depart: depart
         )
         if !evolutions.isEmpty {
             VStack(spacing: 10) {
@@ -746,12 +744,39 @@ private struct SuiviSymptomPage: View {
                     .frame(height: 132)
                     .padding(.top, 10)
             }
+
+            // L'axe est désormais le TEMPS : ses bornes s'écrivent.
+            if evolution.jours.count >= 2,
+               let premier = evolution.jours.first?.jour,
+               let dernier = evolution.jours.last?.jour {
+                HStack {
+                    Text(Self.jourCourt(premier))
+                    Spacer(minLength: 8)
+                    Text("aujourd'hui")
+                        .accessibilityLabel(Self.jourCourt(dernier))
+                }
+                .font(Theme.chromeFont)
+                .foregroundStyle(Color.dsTertiaire)
+                .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             if reduceMotion { progress = 1 }
             else { withAnimation(.easeOut(duration: 1.0).delay(0.1)) { progress = 1 } }
         }
+    }
+
+    /// « 17 août » — cache : le formatter est coûteux, la page se redessine.
+    private static let formatJour: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "fr_FR")
+        f.dateFormat = "d MMM"
+        return f
+    }()
+
+    private static func jourCourt(_ date: Date) -> String {
+        formatJour.string(from: date)
     }
 
     private var capitalizedNom: String {
@@ -820,13 +845,30 @@ private struct SuiviPosedChart: View {
             // « toi » — plein vert + aire, animée par `progress`. En EXEMPLE, tracé
             // fondu + tirets ; sinon plein. Avec un seul point (jour 0), on ne
             // trace pas de ligne, juste le point.
-            let reelPts = reelPoints(reel)
+            // Série QUOTIDIENNE disponible → l'axe des x est le TEMPS : un
+            // point par jour, disque sur les jours répondus.
+            let jours = evolution.jours
+            let reelPts: [CGPoint]
+            var reponduPts: [CGPoint] = []
+            if jours.count >= 2 {
+                func pxJour(_ i: Int) -> CGFloat {
+                    padL + (w - padL) * CGFloat(i) / CGFloat(jours.count - 1)
+                }
+                reelPts = jours.enumerated().map {
+                    CGPoint(x: pxJour($0.offset), y: py(Double($0.element.niveau)))
+                }
+                reponduPts = jours.enumerated().compactMap {
+                    $0.element.repondu ? CGPoint(x: pxJour($0.offset), y: py(Double($0.element.niveau))) : nil
+                }
+            } else {
+                reelPts = reelPoints(reel)
+            }
             let toiColor = Color.dsAccent
             let toiOpacity: Double = evolution.isExample ? 0.42 : 1.0
             let toiDash: [CGFloat] = evolution.isExample ? [7, 5] : []
 
             if reelPts.count > 1 {
-                let visible = max(2, Int(ceil(CGFloat(n) * progress)))
+                let visible = max(2, Int(ceil(CGFloat(reelPts.count) * progress)))
                 let drawn = Array(reelPts.prefix(visible))
                 let line = SuiviCurveMath.smoothPath(drawn)
                 if !evolution.isExample {
@@ -840,7 +882,14 @@ private struct SuiviPosedChart: View {
                 ctx.stroke(line, with: .color(toiColor.opacity(toiOpacity)),
                            style: StrokeStyle(lineWidth: 3.4, lineCap: .round, lineJoin: .round, dash: toiDash))
 
-                if let p = drawn.last {
+                // Chaque jour RÉPONDU porte son disque : la réponse du jour
+                // se voit se poser sur la courbe (retour du 24 août).
+                for p in reponduPts.dropLast() where p.x <= (drawn.last?.x ?? 0) {
+                    let r: CGFloat = 3
+                    let dot = Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
+                    ctx.fill(dot, with: .color(toiColor.opacity(toiOpacity)))
+                }
+                if let p = reponduPts.last ?? drawn.last {
                     let r: CGFloat = 4.5
                     let dot = Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
                     ctx.fill(dot, with: .color(toiColor.opacity(toiOpacity)))
