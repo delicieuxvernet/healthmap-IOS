@@ -5,6 +5,7 @@ import XCTest
 /// « les points vont sur le même endroit, on a une droite »). Un point par
 /// JOUR : deux réponses à deux jours différents avancent sur l'axe, une
 /// deuxième réponse le même jour remplace la première.
+@MainActor
 final class SerieQuotidienneTests: XCTestCase {
 
     private let calendrier = Calendar(identifier: .gregorian)
