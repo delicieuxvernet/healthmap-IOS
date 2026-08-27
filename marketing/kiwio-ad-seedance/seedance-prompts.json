@@ -1,0 +1,181 @@
+{
+  "project": "Kiwio — publicité SaaS 20 s (LinkedIn + Instagram)",
+  "created": "2026-08-27",
+  "model": "seedance_2_5",
+  "status": "prompts prêts — génération non lancée (crédits insuffisants sur le compte MCP, voir README.md)",
+
+  "pipeline": [
+    {
+      "step": 0,
+      "name": "Verrou d'identité (fortement recommandé)",
+      "why": "Cinq plans générés indépendamment donnent cinq visages différents. Un portrait de référence unique passé à chaque plan tient la continuité.",
+      "how": "generate_image (nano_banana ou seedream) avec le prompt 'character_reference_prompt' ci-dessous, puis passer le job_id résultant à chaque plan vidéo dans medias[] avec role 'image_references', et basculer params.mode sur 'omni_reference'.",
+      "character_reference_prompt": "Editorial portrait photograph of a woman in her early thirties, shoulder-length dark brown hair loosely tied back with a few strands loose, light olive skin, freckles across the nose, no makeup, calm tired expression, wearing a plain oatmeal-coloured ribbed knit sweater. Neutral pale grey seamless background, soft north-facing window light from the left, 85mm lens, shallow depth of field. Photorealistic, natural unretouched skin texture with visible pores, no beauty filter, no text, no logos."
+    },
+    {
+      "step": 1,
+      "name": "Génération des plans",
+      "how": "generate_video_batch avec les 5 entrées de 'instagram_9x16', puis jobs_wait, puis show_generation_by_ids. Répéter avec 'linkedin_16x9'."
+    },
+    {
+      "step": 2,
+      "name": "Post-production",
+      "how": "Incruster les captures réelles de scripts/appstore_screens_v3/ dans l'écran du téléphone (tracking 4 points), puis ajouter cartons de texte, sous-titres brûlés, logo et mention légale. Voir storyboard.md."
+    }
+  ],
+
+  "shared": {
+    "character": "a woman in her early thirties, shoulder-length dark brown hair loosely tied back, light olive skin, freckles, no makeup, wearing a plain oatmeal-coloured ribbed knit sweater",
+    "location": "a bright contemporary European apartment kitchen with pale oak cabinets, a neutral stone worktop and a large window with sheer curtains",
+    "grade": "naturalistic warm daylight grade, soft contrast, gentle film grain, no teal-and-orange look",
+    "hard_constraints": "The phone screen stays dark or shows only a soft neutral glow — no readable interface, no app UI, no icons. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture, no beauty filter, no slow-motion, no lens flare."
+  },
+
+  "instagram_9x16": [
+    {
+      "index": 1,
+      "beat": "Accroche — le problème",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "9:16",
+        "generate_audio": false,
+        "prompt": "Late afternoon in a bright contemporary European apartment kitchen with pale oak cabinets, a neutral stone worktop and a large window with sheer curtains. A woman in her early thirties, shoulder-length dark brown hair loosely tied back, light olive skin, freckles, no makeup, wearing a plain oatmeal-coloured ribbed knit sweater, finishes a plate of food at the counter. She sets her fork down, leans back and rubs the back of her neck, exhaling. She is not ill, she is depleted. Warm low backlight through the window, visible dust in the light beam. Camera performs a slow steady push-in on her face, 35mm lens, shallow depth of field, handheld with almost no movement. Naturalistic warm daylight grade, soft contrast, gentle film grain, no teal-and-orange look. No phone in frame. The scene is calm and unhurried. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture, no beauty filter, no slow-motion, no lens flare."
+      }
+    },
+    {
+      "index": 2,
+      "beat": "Révélation produit",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "9:16",
+        "generate_audio": false,
+        "prompt": "Same late-afternoon kitchen, same woman in her early thirties with shoulder-length dark brown hair loosely tied back and an oatmeal-coloured knit sweater. She reaches across the stone worktop and picks up a modern black smartphone lying face down. She turns it over and the screen wakes, casting a soft cool green glow across her fingers and the underside of her chin. Camera glides from behind her right shoulder and settles into a clean flat over-the-shoulder framing on the phone held in her hands, the phone occupying the central third of the vertical frame. 35mm lens, shallow depth of field, the kitchen falling out of focus behind. Naturalistic warm daylight grade with the cool screen glow as the only cold light. The phone screen shows only a soft featureless neutral glow — no readable interface, no app UI, no icons. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture, no beauty filter."
+      }
+    },
+    {
+      "index": 3,
+      "beat": "Feature — entrée du repas",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "9:16",
+        "generate_audio": false,
+        "prompt": "Fast three-part montage in the same bright kitchen, same woman with shoulder-length dark brown hair and oatmeal knit sweater. First beat: tight close-up of her hands holding a modern black smartphone near her mouth as she speaks a short sentence into it, her lips clearly moving, relaxed and casual. Second beat: macro shot of her thumb tapping once decisively on the lower part of the phone screen. Third beat: crisp overhead top-down shot of a real meal on the stone worktop, a bowl of white rice, two soft-boiled eggs cut open and a handful of wilted spinach, steam rising. Hard cuts between the three beats, a quick whip-pan between the first and the second. 50mm macro feel on the food shot, shallow depth of field throughout. Bright even daylight, naturalistic warm grade, gentle film grain. The phone screen shows only a soft featureless neutral glow — no readable interface, no app UI, no icons. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture."
+      }
+    },
+    {
+      "index": 4,
+      "beat": "Feature — apports à renforcer (pic du film)",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "9:16",
+        "generate_audio": false,
+        "prompt": "The same modern black smartphone now fills almost the entire vertical frame, held in both hands by the same woman, her thumbs resting at the edges. The background kitchen collapses into heavy bokeh. The camera performs a very slight vertical tilt down the length of the phone, with the faintest natural hand tremor rather than a stabilised glide. Her face is visible only as a soft out-of-focus shape at the top edge of the frame. Cool screen light rims her fingers. 35mm lens held close, extremely shallow depth of field. Naturalistic warm daylight grade with cool screen glow. The phone screen shows only a soft featureless neutral glow, brightening slightly during the shot — no readable interface, no app UI, no icons, no charts, no bars. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture, no beauty filter."
+      }
+    },
+    {
+      "index": 5,
+      "beat": "Feature — plan + sortie CTA",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "9:16",
+        "generate_audio": false,
+        "prompt": "Morning now, the same kitchen transformed by clean early daylight pouring through the window, pale oak cabinets and neutral stone worktop. The same woman with shoulder-length dark brown hair and oatmeal knit sweater stands at the counter, takes a single unbranded white capsule with a clear glass of water, sets the glass down, slips her phone into her pocket and walks out of frame to the right with an easy unforced half-smile. The camera holds completely still on a locked-off wide shot and stays on the empty sunlit kitchen for the final beat, the sheer curtain moving very slightly. 35mm lens, deeper focus than the previous shots. Bright optimistic naturalistic grade, soft contrast, gentle film grain. Nothing in frame is branded, the capsule and the glass are plain. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture, no beauty filter, no slow-motion."
+      }
+    }
+  ],
+
+  "linkedin_16x9": [
+    {
+      "index": 1,
+      "beat": "Accroche — le problème",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "16:9",
+        "generate_audio": false,
+        "prompt": "Late afternoon in a bright contemporary European apartment kitchen with pale oak cabinets, a neutral stone worktop and a large window with sheer curtains. A woman in her early thirties, shoulder-length dark brown hair loosely tied back, light olive skin, freckles, no makeup, wearing a plain oatmeal-coloured ribbed knit sweater, sits at the counter on the RIGHT THIRD of the wide frame having just finished a plate of food, leaving the left two thirds as clean negative space of sunlit wall and worktop. She sets her fork down, leans back and rubs the back of her neck, exhaling. Warm low backlight through the window, visible dust in the light beam. Camera performs a slow steady push-in, 35mm lens, shallow depth of field, handheld with almost no movement. Naturalistic warm daylight grade, soft contrast, gentle film grain. No phone in frame. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture, no beauty filter, no slow-motion, no lens flare."
+      }
+    },
+    {
+      "index": 2,
+      "beat": "Révélation produit",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "16:9",
+        "generate_audio": false,
+        "prompt": "Same late-afternoon kitchen, same woman in her early thirties with shoulder-length dark brown hair loosely tied back and an oatmeal-coloured knit sweater. She reaches across the stone worktop and picks up a modern black smartphone lying face down, turns it over and the screen wakes, casting a soft cool green glow across her fingers. She and the phone sit in the RIGHT THIRD of the wide frame, the left two thirds held as clean out-of-focus negative space. Camera glides from behind her right shoulder and settles into a stable over-the-shoulder framing on the phone. 35mm lens, shallow depth of field. Naturalistic warm daylight grade with the cool screen glow as the only cold light. The phone screen shows only a soft featureless neutral glow — no readable interface, no app UI, no icons. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture, no beauty filter."
+      }
+    },
+    {
+      "index": 3,
+      "beat": "Feature — entrée du repas",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "16:9",
+        "generate_audio": false,
+        "prompt": "Fast three-part montage in the same bright kitchen, same woman with shoulder-length dark brown hair and oatmeal knit sweater. First beat: tight close-up of her hands holding a modern black smartphone near her mouth as she speaks a short sentence into it, her lips clearly moving, framed to the right of the wide frame. Second beat: macro shot of her thumb tapping once decisively on the phone screen. Third beat: crisp overhead top-down shot of a real meal on the stone worktop, a bowl of white rice, two soft-boiled eggs cut open and a handful of wilted spinach, steam rising, the bowl placed right of centre with clean worktop to the left. Hard cuts between the three beats, a quick whip-pan between the first and the second. 50mm macro feel on the food shot, shallow depth of field. Bright even daylight, naturalistic warm grade, gentle film grain. The phone screen shows only a soft featureless neutral glow — no readable interface, no app UI, no icons. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture."
+      }
+    },
+    {
+      "index": 4,
+      "beat": "Feature — apports à renforcer (pic du film)",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "16:9",
+        "generate_audio": false,
+        "prompt": "The same modern black smartphone held upright in both hands by the same woman, positioned in the RIGHT THIRD of the wide frame and filling most of the frame height, the left two thirds collapsing into heavy warm bokeh of the kitchen. The camera performs a very slight vertical tilt down the length of the phone, with the faintest natural hand tremor rather than a stabilised glide. Her face is a soft out-of-focus shape behind the phone. Cool screen light rims her fingers. 35mm lens held close, extremely shallow depth of field. Naturalistic warm daylight grade with cool screen glow. The phone screen shows only a soft featureless neutral glow, brightening slightly during the shot — no readable interface, no app UI, no icons, no charts, no bars. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture, no beauty filter."
+      }
+    },
+    {
+      "index": 5,
+      "beat": "Feature — plan + sortie CTA",
+      "params": {
+        "model": "seedance_2_5",
+        "mode": "t2v",
+        "duration": 4,
+        "resolution": "1080p",
+        "aspect_ratio": "16:9",
+        "generate_audio": false,
+        "prompt": "Morning now, the same kitchen transformed by clean early daylight pouring through the window, pale oak cabinets and neutral stone worktop. The same woman with shoulder-length dark brown hair and oatmeal knit sweater stands at the counter in the right half of the wide frame, takes a single unbranded white capsule with a clear glass of water, sets the glass down, slips her phone into her pocket and walks out of frame to the right with an easy unforced half-smile. The camera holds completely still on a locked-off wide shot and stays on the empty sunlit kitchen for the final beat, the left half of the frame clean sunlit wall, the sheer curtain moving very slightly. 35mm lens, deeper focus than the previous shots. Bright optimistic naturalistic grade, soft contrast, gentle film grain. Nothing in frame is branded, the capsule and the glass are plain. Absolutely no text, letters, numbers, logos, watermarks or captions anywhere in the frame. Photorealistic, natural unretouched skin texture, no beauty filter, no slow-motion."
+      }
+    }
+  ],
+
+  "budget_credits": {
+    "note": "Coûts mesurés par get_cost le 27 août 2026, par plan de 4 s.",
+    "seedance_2_5_1080p_par_plan": 36,
+    "seedance_2_5_720p_par_plan": 26,
+    "seedance_2_0_mini_720p_par_plan": 10,
+    "seedance_2_0_mini_480p_muet_par_plan": 4,
+    "film_20s_1080p_un_format": 180,
+    "film_20s_1080p_deux_formats": 360,
+    "recommande_avec_retakes": 500,
+    "casting_economique_2_0_mini_480p_un_format": 20
+  }
+}
