@@ -305,7 +305,7 @@ struct AlternativeAssietteV2: Codable {
 
 // MARK: - Meta
 struct MetaV2: Codable {
-    var schemaVersion: String?     // "v2.0"
+    var schemaVersion: String?     // "v2.2"
     var promptVersion: String?
     var generatedAt: String?
     var model: String?
