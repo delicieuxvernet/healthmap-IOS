@@ -15,6 +15,9 @@ import SwiftUI
 struct VoiceMealSheet: View {
 
     let userId: String
+    /// Jour sur lequel écrire — celui qu'affiche le journal, pas forcément
+    /// aujourd'hui (dictée du dîner de la veille, saisie passé minuit).
+    var jour: Date = Date()
     /// Capture audio possédée par l'appelant. Elle est injectée — et non créée
     /// ici — pour que la dictée puisse DÉMARRER sur l'accueil, le doigt posé sur
     /// « Dicte ton repas », et se terminer dans cette feuille.
@@ -616,7 +619,12 @@ struct VoiceMealSheet: View {
         }
 
         do {
-            try await journal.insertFoods(userId: userId, entries: entries, slot: slot)
+            try await journal.insertFoods(
+                userId: userId,
+                entries: entries,
+                slot: slot,
+                consumedAt: MealJournalService.horodatage(jour: jour, slot: slot)
+            )
 
             // Parité avec le scan photo (MealScanViewModel) : un repas dicté est
             // un repas comme un autre. Avant le 2 août 2026, la voix ne postait

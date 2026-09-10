@@ -145,11 +145,10 @@ struct DailyMealJournalView: View {
             } label: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(vm.canGoNext ? Color.dsAccent : Color.dsTertiaire)
+                    .foregroundStyle(Color.dsAccent)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
-            .disabled(!vm.canGoNext)
             .accessibilityLabel("Jour suivant")
         }
         .padding(.horizontal, 4)
@@ -164,7 +163,6 @@ struct DailyMealJournalView: View {
                     get: { vm.selectedDay },
                     set: { nouveau in Task { await vm.allerAuJour(nouveau) } }
                 ),
-                in: ...Date(),
                 displayedComponents: .date
             )
             .datePickerStyle(.graphical)

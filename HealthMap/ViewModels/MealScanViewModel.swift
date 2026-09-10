@@ -346,6 +346,38 @@ final class MealScanViewModel: ObservableObject {
         /// "v2" -> opt-in contrat v2 : la fonction (version 10+) ajoute le
         /// bloc `scan_v2` à sa réponse (les anciennes versions l'ignorent).
         let contract: String
+        /// Jour du repas quand le journal n'affiche PAS aujourd'hui (ISO 8601).
+        /// L'Edge Function le lit déjà (`body.consumed_at`) et retombe sur
+        /// `now()` s'il est absent ou illisible : le scan du jour ne l'envoie
+        /// donc pas, et un déploiement plus ancien reste compatible.
+        let consumedAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case image, deficiencies, scores, client, contract
+            case consumedAt = "consumed_at"
+        }
+    }
+
+    /// Jour sur lequel poser le prochain scan photo — piloté par la barre de
+    /// jour du journal. `nil` (défaut) = aujourd'hui, le serveur horodate.
+    var jourDeSaisie: Date?
+
+    private static let isoSaisie: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    /// `consumed_at` à envoyer : rien pour aujourd'hui, sinon le jour choisi à
+    /// l'heure canonique de son créneau (même règle que la saisie manuelle et
+    /// la dictée — `MealJournalService.horodatage`).
+    private var consumedAtÀEnvoyer: String? {
+        guard let jourDeSaisie,
+              !Calendar.current.isDateInToday(jourDeSaisie) else { return nil }
+        let slot = MealJournalService.MealSlot.from(date: Date())
+        return Self.isoSaisie.string(
+            from: MealJournalService.horodatage(jour: jourDeSaisie, slot: slot)
+        )
     }
 
     // MARK: - Image Compression
@@ -437,7 +469,8 @@ final class MealScanViewModel: ObservableObject {
                 deficiencies: userDeficiencies,
                 scores: userScores,
                 client: "ios",
-                contract: "v2"
+                contract: "v2",
+                consumedAt: consumedAtÀEnvoyer
             )
 
             let response: EdgeMealResponse = try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in

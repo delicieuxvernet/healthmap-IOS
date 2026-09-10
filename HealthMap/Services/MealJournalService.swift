@@ -89,6 +89,41 @@ final class MealJournalService {
             default:      return .dinner
             }
         }
+
+        /// Heure de référence du créneau, au milieu de la plage que lit
+        /// `from(date:)` — pour qu'un repas daté d'un AUTRE jour retombe sur le
+        /// même créneau à la relecture.
+        var heureCanonique: (heure: Int, minute: Int) {
+            switch self {
+            case .breakfast: return (8, 0)
+            case .lunch:     return (12, 30)
+            case .snack:     return (16, 30)
+            case .dinner:    return (20, 0)
+            }
+        }
+    }
+
+    /// Horodatage à écrire pour un repas ajouté sur le jour AFFICHÉ du journal.
+    ///
+    /// Aujourd'hui → l'instant présent, comme avant (l'heure réelle du repas
+    /// vaut mieux qu'une heure de convention). Un autre jour → le jour choisi à
+    /// l'heure canonique du créneau : sans ça, saisir le dîner de la veille à
+    /// 00h30 posait « 00h30 » sur ce jour-là, et la relecture le rangeait au
+    /// créneau `dinner` du mauvais bout de journée.
+    static func horodatage(
+        jour: Date,
+        slot: MealSlot,
+        maintenant: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Date {
+        if calendar.isDate(jour, inSameDayAs: maintenant) { return maintenant }
+        let h = slot.heureCanonique
+        return calendar.date(
+            bySettingHour: h.heure,
+            minute: h.minute,
+            second: 0,
+            of: calendar.startOfDay(for: jour)
+        ) ?? calendar.startOfDay(for: jour)
     }
 
     /// Apport d'un repas à UN nutriment, persisté dans la colonne jsonb

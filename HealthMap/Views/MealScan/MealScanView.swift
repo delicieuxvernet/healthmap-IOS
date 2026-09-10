@@ -38,6 +38,8 @@ struct JournalView: View {
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
     @State private var showJournal = false
+    /// Calendrier plein écran de la barre de jour (aucune date interdite).
+    @State private var montreCalendrier = false
     /// Recherche d'aliment présentée en bottom-sheet.
     @State private var showSearch = false
     /// Scanner de code-barres.
@@ -144,6 +146,7 @@ struct JournalView: View {
                         .environmentObject(dashboardVM)
                         .healthMapFullSheet()
                 }
+                .sheet(isPresented: $montreCalendrier) { feuilleCalendrier }
                 .sheet(isPresented: $showAjout, onDismiss: {
                     if actionAjout == nil { TutorielService.partage.feuilleAjoutFermeeSansChoix() }
                     executerActionAjout()
@@ -177,6 +180,7 @@ struct JournalView: View {
                     if let uid = AuthService.shared.cachedCurrentUserIdString {
                         VoiceMealSheet(
                             userId: uid,
+                            jour: journal.selectedDay,
                             speech: speech
                         ) { count, kcal in
                             voiceConfirmation = "\(count) aliment\(count > 1 ? "s" : "") ajouté\(count > 1 ? "s" : "") · \(kcal) kcal"
@@ -363,10 +367,123 @@ struct JournalView: View {
         .accessibilityLabel("Série : \(gamification.currentStreak) jours")
     }
 
+    // MARK: - Barre de jour (navigation par date)
+
+    /// Deux chevrons et la date, en tête de page. La date ouvre un calendrier
+    /// SANS borne : on remonte aussi loin qu'on a mangé, on avance sur les
+    /// jours à venir. Demandé le 11 sept. 2026 — celui qui note son dîner à
+    /// 00h30 doit pouvoir le poser sur la veille, et préparer la suite.
+    private var barreDeJour: some View {
+        HStack(spacing: 2) {
+            boutonJour(icone: "chevron.left", libelle: "Jour précédent") {
+                journal.goPrevDay()
+            }
+
+            Spacer(minLength: 0)
+
+            Button {
+                HapticService.shared.tap()
+                montreCalendrier = true
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.dsAccent)
+                    VStack(spacing: 1) {
+                        Text(journal.dayLabel)
+                            .font(.dsHeadline)
+                            .foregroundStyle(Color.dsTexte)
+                        Text(journal.daySub)
+                            .font(.dsLegende)
+                            .foregroundStyle(Color.dsSecondaire)
+                    }
+                    if journal.chargeLArchive {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .frame(width: 14, height: 14)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Choisir une date. Jour affiché : \(journal.dayLabel)")
+
+            Spacer(minLength: 0)
+
+            boutonJour(icone: "chevron.right", libelle: "Jour suivant") {
+                journal.goNextDay()
+            }
+        }
+        .padding(.horizontal, 4)
+        .dsCard()
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: journal.selectedDay)
+    }
+
+    private func boutonJour(icone: String, libelle: String, action: @escaping () -> Void) -> some View {
+        Button {
+            HapticService.shared.tap()
+            action()
+        } label: {
+            Image(systemName: icone)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.dsAccent)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(libelle)
+    }
+
+    /// Calendrier plein, sans date interdite (`in:` volontairement absent).
+    private var feuilleCalendrier: some View {
+        NavigationStack {
+            VStack(spacing: DS.interCarte) {
+                DatePicker(
+                    "Jour",
+                    selection: Binding(
+                        get: { journal.selectedDay },
+                        set: { nouveau in Task { await journal.allerAuJour(nouveau) } }
+                    ),
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .tint(Color.dsAccent)
+
+                Button("Revenir à aujourd'hui") {
+                    Task { await journal.allerAuJour(Date()) }
+                    montreCalendrier = false
+                }
+                .font(.dsSousTitre)
+                .foregroundStyle(Color.dsAccent)
+                .frame(minHeight: 44)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, DS.marge)
+            .background(Color.dsFond.ignoresSafeArea())
+            .navigationTitle("Aller à une date")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("OK") { montreCalendrier = false }
+                        .foregroundStyle(Color.dsAccent)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
     // MARK: - Contenu
 
     private var journalContent: some View {
         VStack(spacing: 0) {
+            // Le jour affiché, tout en haut : c'est lui qui commande la page
+            // entière (jauges, apports, repas) ET la date des ajouts.
+            barreDeJour
+                .padding(.top, 8)
+
             // La dictée mains libres et la photo en attente d'analyse vivent
             // ici, sous le titre : visibles, jamais par-dessus la page.
             if dicteeEnCours {
@@ -417,7 +534,7 @@ struct JournalView: View {
 
                 apportsSection
 
-                DSSectionHeader(titre: "Aujourd'hui")
+                DSSectionHeader(titre: journal.dayLabel)
                     .padding(.top, 2)
                 repasList
             }
@@ -791,6 +908,8 @@ struct JournalView: View {
             }
 
             DSCapsuleButton(titre: "Analyser ce repas") {
+                // Le scan suit le jour affiché, comme la recherche et la dictée.
+                viewModel.jourDeSaisie = journal.selectedDay
                 Task { await viewModel.analyzePhoto() }
             }
         }

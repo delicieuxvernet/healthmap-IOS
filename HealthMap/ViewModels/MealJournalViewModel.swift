@@ -18,13 +18,19 @@ final class MealJournalViewModel: ObservableObject {
     /// aujourd'hui — cette navigation ne concerne QUE l'affichage du journal.
     @Published var selectedDay: Date = Calendar.current.startOfDay(for: Date()) { didSet { invaliderJour() } }
 
-    /// Repas ANTÉRIEURS à la quinzaine, chargés à la demande quand on remonte
-    /// le calendrier. Volontairement séparés de `fortnight` : ce dernier nourrit
-    /// le score de la semaine, qui n'a rien à voir avec la profondeur d'archive
-    /// que l'utilisateur consulte.
+    /// Repas HORS quinzaine, chargés à la demande quand on feuillette le
+    /// calendrier — en arrière comme en avant. Volontairement séparés de
+    /// `fortnight` : ce dernier nourrit le score de la semaine, qui n'a rien à
+    /// voir avec la profondeur d'archive que l'utilisateur consulte.
     @Published private(set) var archives: [MealJournalService.MealRecord] = [] { didSet { invaliderJour() } }
     /// Plus ancien jour effectivement chargé (quinzaine, puis archives).
     @Published private(set) var jourLePlusAncienCharge: Date = Calendar.current.startOfDay(for: Date())
+    /// Premier jour NON chargé après la fenêtre (borne haute, exclue). Les
+    /// repas peuvent être datés dans le futur (on prépare la journée de demain,
+    /// ou on saisit le dîner de la veille passé minuit) : sans cette borne
+    /// mobile, un repas posé au-delà de la semaine en cours disparaissait au
+    /// rechargement suivant.
+    @Published private(set) var jourLePlusRecentCharge: Date = Calendar.current.startOfDay(for: Date())
     @Published private(set) var chargeLArchive = false
 
     private let service = MealJournalService.shared
@@ -93,13 +99,20 @@ final class MealJournalViewModel: ObservableObject {
             let solSemaine = cal.date(byAdding: .day, value: -7, to: week.start) ?? week.start
             let solAxe = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: Date())) ?? solSemaine
             let from = min(solSemaine, solAxe)
-            let cle = "\(userId)|\(from.timeIntervalSince1970)|\(week.end.timeIntervalSince1970)"
+            // Borne haute : la fin de la semaine en cours, ÉTENDUE au jour
+            // affiché quand on a navigué plus loin. Un repas préparé pour
+            // après-demain doit revenir au rechargement, pas seulement rester à
+            // l'écran jusqu'au prochain `load()`.
+            let lendemainDuJour = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: selectedDay))
+                ?? cal.startOfDay(for: selectedDay)
+            let to = max(week.end, lendemainDuJour)
+            let cle = "\(userId)|\(from.timeIntervalSince1970)|\(to.timeIntervalSince1970)"
             let tache: Task<[MealJournalService.MealRecord], Error>
             if let vol = Self.volEnCours, vol.cle == cle, vol.debut > Self.derniereEcriture {
                 tache = vol.tache
             } else {
                 let service = self.service
-                tache = Task { try await service.loadRange(userId: userId, from: from, to: week.end) }
+                tache = Task { try await service.loadRange(userId: userId, from: from, to: to) }
                 Self.volEnCours = (cle, Date(), tache)
             }
             // On ne retire QUE sa propre requête : une écriture survenue
@@ -108,7 +121,8 @@ final class MealJournalViewModel: ObservableObject {
             let all = try await tache.value
             fortnight = all
             meals = all.filter { Calendar.current.isDateInToday($0.consumedAt) }
-            jourLePlusAncienCharge = min(jourLePlusAncienCharge, Calendar.current.startOfDay(for: from))
+            jourLePlusAncienCharge = min(jourLePlusAncienCharge, cal.startOfDay(for: from))
+            jourLePlusRecentCharge = max(jourLePlusRecentCharge, cal.startOfDay(for: to))
         } catch {
             AppLogger.database.warning("Journal load failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -117,11 +131,25 @@ final class MealJournalViewModel: ObservableObject {
 
     // MARK: - Mutations
 
+    /// Horodatage d'écriture pour le jour AFFICHÉ. Ajouter un aliment en
+    /// naviguant sur hier l'écrivait sur aujourd'hui : la navigation ne servait
+    /// qu'à lire. C'est justement ce qu'il fallait pour le repas du soir saisi
+    /// après minuit.
+    func horodatageDeSaisie(slot: MealJournalService.MealSlot) -> Date {
+        MealJournalService.horodatage(jour: selectedDay, slot: slot)
+    }
+
     func addManual(name: String, calories: Int, slot: MealJournalService.MealSlot) async {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let userId = AuthService.shared.cachedCurrentUserIdString else { return }
         do {
-            try await service.insertManual(userId: userId, name: trimmed, calories: max(0, calories), slot: slot)
+            try await service.insertManual(
+                userId: userId,
+                name: trimmed,
+                calories: max(0, calories),
+                slot: slot,
+                consumedAt: horodatageDeSaisie(slot: slot)
+            )
             await load()
             Self.postJournalChanged()
         } catch {
@@ -195,7 +223,12 @@ final class MealJournalViewModel: ObservableObject {
         writeInFlight = true
         defer { writeInFlight = false }
         do {
-            try await service.insertFood(userId: userId, entry: entry, slot: slot)
+            try await service.insertFood(
+                userId: userId,
+                entry: entry,
+                slot: slot,
+                consumedAt: horodatageDeSaisie(slot: slot)
+            )
             await load()
             Self.postJournalChanged()
             return true
@@ -326,99 +359,105 @@ final class MealJournalViewModel: ObservableObject {
         return ids
     }
 
-    // MARK: - Navigation jour par jour (bornée à la fenêtre `fortnight`)
+    // MARK: - Navigation jour par jour (sans borne)
 
-    /// Jour le plus ancien navigable = le SOL RÉEL de la fenêtre chargée par
-    /// `load()` : min(lundi précédent − 7 j hebdo, 14 jours glissants). Aligné
-    /// sur la même source que le chargement, pour ne jamais proposer un jour
-    /// passé « vide » alors que ses repas existent en base mais hors requête.
-    private var earliestDay: Date {
+    /// Rien ne borne plus la navigation, ni en arrière ni en avant (retour
+    /// utilisateurs du 11 sept. 2026). Deux raisons concrètes : relire une
+    /// semaine passée, et surtout saisir le repas du soir après minuit — il faut
+    /// alors pouvoir revenir d'un jour, et préparer les jours suivants.
+    /// Conservé pour les appelants historiques : il n'y a plus de jour
+    /// interdit.
+    var canGoNext: Bool { true }
+
+    func goPrevDay() { basculerSur(decale(-1)) }
+    func goNextDay() { basculerSur(decale(1)) }
+
+    private func decale(_ jours: Int) -> Date {
         let cal = Calendar.current
-        let weekStart = WeekScoreEngine.currentWeekInterval(containing: Date()).start
-        let solSemaine = cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: weekStart))
-            ?? cal.startOfDay(for: Date())
-        let solAxe = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: Date())) ?? solSemaine
-        return min(solSemaine, solAxe)
+        return cal.date(byAdding: .day, value: jours, to: selectedDay) ?? selectedDay
     }
 
-    /// Peut-on avancer d'un jour ? Faux si on est déjà sur aujourd'hui (pas de futur).
-    var canGoNext: Bool {
-        selectedDay < Calendar.current.startOfDay(for: Date())
-    }
-
-    func goPrevDay() {
-        let cal = Calendar.current
-        guard let prev = cal.date(byAdding: .day, value: -1, to: selectedDay) else { return }
-        let clamped = cal.startOfDay(for: prev)
-        if clamped >= earliestDay { selectedDay = clamped }
+    /// Change le jour AFFICHÉ tout de suite — un chevron doit répondre au doigt
+    /// — et complète la fenêtre en arrière-plan si elle ne couvre pas ce jour.
+    private func basculerSur(_ date: Date) {
+        let jour = Calendar.current.startOfDay(for: date)
+        selectedDay = jour
+        Task { [weak self] in await self?.chargerArchiveSiBesoin(pour: jour) }
     }
 
     // MARK: - Calendrier (journal du jour)
 
-    /// Va à une date quelconque du passé et charge ce qu'il faut pour l'afficher.
-    /// Le futur est refusé — on ne mange pas demain.
+    /// Va à une date QUELCONQUE et charge ce qu'il faut pour l'afficher.
     func allerAuJour(_ date: Date) async {
-        let cal = Calendar.current
-        let jour = min(cal.startOfDay(for: date), cal.startOfDay(for: Date()))
+        let jour = Calendar.current.startOfDay(for: date)
         selectedDay = jour
         await chargerArchiveSiBesoin(pour: jour)
     }
 
-    /// Charge le mois du jour demandé s'il est plus ancien que ce qu'on a déjà.
-    /// On charge par MOIS entier : le calendrier affiche un mois à la fois, et
-    /// une requête par jour feuilleté serait absurde.
+    /// Charge le mois du jour demandé s'il tombe hors de la fenêtre déjà en
+    /// main, en arrière comme en avant. On charge par MOIS entier : le
+    /// calendrier affiche un mois à la fois, et une requête par jour feuilleté
+    /// serait absurde.
     func chargerArchiveSiBesoin(pour date: Date) async {
         let cal = Calendar.current
         let jour = cal.startOfDay(for: date)
-        guard jour < jourLePlusAncienCharge else { return }
+        let versLePasse = jour < jourLePlusAncienCharge
+        let versLeFutur = jour >= jourLePlusRecentCharge
+        guard versLePasse || versLeFutur else { return }
         guard let userId = AuthService.shared.cachedCurrentUserIdString else { return }
-        guard let debutMois = cal.date(from: cal.dateComponents([.year, .month], from: jour)) else { return }
+        guard let debutMois = cal.date(from: cal.dateComponents([.year, .month], from: jour)),
+              let finMois = cal.date(byAdding: DateComponents(month: 1), to: debutMois) else { return }
+
+        // La plage demandée recouvre volontairement la fenêtre déjà chargée :
+        // le dédoublonnage par `id` s'en charge, et on évite un trou d'un jour
+        // à la jointure.
+        let from = versLePasse ? debutMois : jourLePlusRecentCharge
+        let to = versLePasse ? jourLePlusAncienCharge : finMois
+        guard from < to else { return }
 
         chargeLArchive = true
         defer { chargeLArchive = false }
         do {
-            let anciens = try await service.loadRange(
-                userId: userId,
-                from: debutMois,
-                to: jourLePlusAncienCharge
-            )
-            // Dédoublonnage : la borne haute recouvre le premier jour déjà chargé.
+            let horsFenetre = try await service.loadRange(userId: userId, from: from, to: to)
             let dejaLa = Set((fortnight + archives).map(\.id))
-            archives.append(contentsOf: anciens.filter { !dejaLa.contains($0.id) })
-            jourLePlusAncienCharge = min(jourLePlusAncienCharge, debutMois)
+            archives.append(contentsOf: horsFenetre.filter { !dejaLa.contains($0.id) })
+            if versLePasse {
+                jourLePlusAncienCharge = min(jourLePlusAncienCharge, debutMois)
+            } else {
+                jourLePlusRecentCharge = max(jourLePlusRecentCharge, finMois)
+            }
         } catch {
             AppLogger.database.warning("Archive journal indisponible: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    func goNextDay() {
-        guard canGoNext else { return }
-        let cal = Calendar.current
-        guard let next = cal.date(byAdding: .day, value: 1, to: selectedDay) else { return }
-        selectedDay = min(cal.startOfDay(for: next), cal.startOfDay(for: Date()))
-    }
-
     // MARK: - Libellés du jour
 
-    /// Libellé principal : Aujourd'hui / Hier / Avant-hier / date courte.
+    /// Libellé principal : Aujourd'hui / Hier / Avant-hier / Demain /
+    /// Après-demain / date courte.
     var dayLabel: String {
         let cal = Calendar.current
         if cal.isDateInToday(selectedDay) { return "Aujourd'hui" }
         if cal.isDateInYesterday(selectedDay) { return "Hier" }
-        if daysAgo == 2 { return "Avant-hier" }
+        if cal.isDateInTomorrow(selectedDay) { return "Demain" }
+        if ecartEnJours == -2 { return "Avant-hier" }
+        if ecartEnJours == 2 { return "Après-demain" }
         return Self.shortDayFormatter.string(from: selectedDay)
     }
 
-    /// Sous-libellé : « il y a N jours » quand le libellé est déjà une date,
-    /// sinon la date courte (ex. « dim. 5 juil. »).
+    /// Sous-libellé : « il y a N jours » / « dans N jours » quand le libellé est
+    /// déjà une date, sinon la date courte (ex. « dim. 5 juil. »).
     var daySub: String {
-        if daysAgo >= 3 { return "il y a \(daysAgo) jours" }
+        if ecartEnJours <= -3 { return "il y a \(-ecartEnJours) jours" }
+        if ecartEnJours >= 3 { return "dans \(ecartEnJours) jours" }
         return Self.shortDayFormatter.string(from: selectedDay)
     }
 
-    private var daysAgo: Int {
+    /// Écart signé entre le jour affiché et aujourd'hui : négatif dans le passé,
+    /// positif dans le futur.
+    private var ecartEnJours: Int {
         let cal = Calendar.current
-        return cal.dateComponents([.day], from: selectedDay, to: cal.startOfDay(for: Date())).day ?? 0
+        return cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: selectedDay).day ?? 0
     }
 
     private static let shortDayFormatter: DateFormatter = {
