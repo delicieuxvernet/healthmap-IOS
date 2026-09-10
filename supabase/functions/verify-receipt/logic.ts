@@ -35,10 +35,79 @@ export function entitlementActive(ent: RcEntitlement | undefined, now: Date): bo
   return Number.isFinite(exp) && exp > now.getTime();
 }
 
-/** Tier cible d'après l'entitlement « premium » RevenueCat. */
-export function targetTier(ent: RcEntitlement | undefined, now: Date): string {
-  if (!entitlementActive(ent, now)) return "free";
-  return tierFromProduct(ent?.product_identifier) ?? "monthly";
+/** Une souscription du bloc `subscriber.subscriptions` de RevenueCat. */
+export interface RcSubscription {
+  expires_date?: string | null;
+  unsubscribe_detected_at?: string | null;
+  billing_issues_detected_at?: string | null;
+  refunded_at?: string | null;
+}
+
+/**
+ * Abonnement encore couvert à l'instant `now` ? Un désabonnement programmé
+ * (`unsubscribe_detected_at`) NE ferme PAS l'accès : la période déjà payée
+ * court jusqu'à `expires_date`. Un remboursement, si.
+ */
+export function subscriptionActive(
+  sub: RcSubscription | undefined,
+  now: Date,
+): boolean {
+  if (!sub) return false;
+  if (sub.refunded_at) return false;
+  if (sub.expires_date === null || sub.expires_date === undefined) return true;
+  const exp = Date.parse(sub.expires_date);
+  return Number.isFinite(exp) && exp > now.getTime();
+}
+
+/**
+ * Produit ACHETÉ encore couvert, d'après le bloc `subscriptions` — le repli
+ * quand l'entitlement « premium » ne dit rien.
+ *
+ * Incident du 25 août 2026 : `healthmap_weekly` n'était rattaché à aucun
+ * entitlement dans le tableau de bord RevenueCat. Les 9 abonnés avaient donc
+ * `entitlements: {}` alors que `subscriptions.healthmap_weekly` courait
+ * jusqu'à leur 14e jour. Cette fonction ne lisant QUE des données validées par
+ * RevenueCat auprès d'Apple, elle n'ouvre aucune faille d'auto-promotion : le
+ * corps de la requête cliente reste ignoré.
+ */
+export function produitCouvert(
+  subscriptions: Record<string, RcSubscription> | undefined,
+  now: Date,
+): string | null {
+  if (!subscriptions) return null;
+  let meilleur: { id: string; rang: number } | null = null;
+  for (const [productId, sub] of Object.entries(subscriptions)) {
+    if (!subscriptionActive(sub, now)) continue;
+    if (!tierFromProduct(productId)) continue;
+    // À plusieurs abonnements couverts (changement de formule), on garde le
+    // plus engageant : annuel > mensuel > hebdo.
+    const rang = productId.includes("annual")
+      ? 3
+      : productId.includes("month")
+      ? 2
+      : 1;
+    if (!meilleur || rang > meilleur.rang) meilleur = { id: productId, rang };
+  }
+  return meilleur?.id ?? null;
+}
+
+/**
+ * Tier cible d'après RevenueCat : l'entitlement « premium » d'abord, puis les
+ * souscriptions réellement en cours. Ne renvoie « free » que si les DEUX
+ * sources sont muettes — un mauvais rattachement de produit ne doit jamais
+ * redescendre un payeur.
+ */
+export function targetTier(
+  ent: RcEntitlement | undefined,
+  now: Date,
+  subscriptions?: Record<string, RcSubscription>,
+): string {
+  if (entitlementActive(ent, now)) {
+    return tierFromProduct(ent?.product_identifier) ?? "monthly";
+  }
+  const achete = produitCouvert(subscriptions, now);
+  if (achete) return tierFromProduct(achete) ?? "monthly";
+  return "free";
 }
 
 /**

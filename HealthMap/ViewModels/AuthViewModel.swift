@@ -162,11 +162,24 @@ final class AuthViewModel: ObservableObject {
                         // offline queue payloads.
                         self.clearLocalCaches()
                         GamificationService.shared.reset()
-
-                        if let userId = session?.user.id.uuidString {
-                            await SubscriptionService.shared.identify(userId: userId)
-                        }
                         AnalyticsService.shared.track(.signInCompleted)
+                    }
+
+                    // Rattachement RevenueCat — APRÈS `clearLocalCaches()`, qui
+                    // efface toutes les clés `healthmap_*` (dont le filet
+                    // hors-ligne que `identify` vient d'écrire).
+                    //
+                    // Au REDÉMARRAGE de l'app (`initialSession`), rien ne
+                    // re-rattachait le compte à RevenueCat. Le SDK garde bien
+                    // son identifiant d'un lancement à l'autre — SAUF après un
+                    // `logOut()` (session expirée, jeton révoqué, suppression
+                    // de compte) : il repartait alors ANONYME, et l'abonnement
+                    // de l'utilisateur devenait invisible pour toujours, sans
+                    // qu'aucun geste dans l'app ne puisse le récupérer.
+                    // `logIn` est idempotent quand l'identifiant est déjà bon.
+                    if (event == .signedIn || event == .initialSession),
+                       let userId = session?.user.id.uuidString {
+                        await SubscriptionService.shared.identify(userId: userId)
                     }
 
                 case .signedOut:

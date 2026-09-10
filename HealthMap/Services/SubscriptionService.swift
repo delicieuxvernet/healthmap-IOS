@@ -122,6 +122,40 @@ final class SubscriptionService: ObservableObject {
         "healthmap_annual",
     ]
 
+    // MARK: - Filet StoreKit (incident du 25 août 2026)
+
+    /// Un abonnement que l'app VEND est-il actif d'après Apple, ici, maintenant ?
+    ///
+    /// Miroir local de `StoreKit.Transaction.currentEntitlements`, rafraîchi au
+    /// lancement, à chaque relecture d'abonnement et à chaque transaction
+    /// entrante. C'est un FILET, jamais une porte d'entrée : il ne peut
+    /// qu'empêcher de RETIRER l'accès à quelqu'un qui paie — jamais l'ouvrir à
+    /// quelqu'un qui n'a rien acheté sur cet appareil.
+    ///
+    /// Pourquoi il existe : du 25 août au 11 septembre 2026, le produit
+    /// `healthmap_weekly` n'était rattaché à AUCUN entitlement dans le tableau
+    /// de bord RevenueCat. Les 9 abonnés lisaient donc `entitlements: {}` —
+    /// l'achat existait chez Apple ET chez RevenueCat, mais l'app les traitait
+    /// en gratuits dès le premier retour en avant-plan (le chemin optimiste
+    /// post-achat tenait le temps d'une session, pas plus). Un réglage de
+    /// tableau de bord ne doit jamais pouvoir couper l'accès à un payeur.
+    ///
+    /// Portée : l'appareil / l'identifiant Apple, comme l'abonnement lui-même.
+    /// Deux comptes Kiwio sur un même iPhone partagent donc ce filet — c'est
+    /// exactement ce qu'Apple vend, et l'inverse (verrouiller un payeur) coûte
+    /// infiniment plus cher.
+    @Published private(set) var abonnementStoreKitActif = false
+
+    /// Fin de la période payée d'après StoreKit — persistée dans le filet
+    /// hors-ligne quand RevenueCat ne sait rien en dire.
+    private var expirationStoreKit: Date?
+
+    /// Veille sur les transactions StoreKit (achat, renouvellement,
+    /// remboursement, approbation Ask to Buy différée). Retenue pour la durée
+    /// du processus : ce service est un singleton, il n'est jamais désalloué —
+    /// pas de `deinit` à écrire (et pas d'isolation à contourner).
+    private var veilleTransactions: Task<Void, Never>?
+
     private init() {
         // Filet hors-ligne (V10 #4) : au cold start, l'état premium repart du
         // dernier état CONNU via `isPremiumWithGrace` (cache persisté, grâce
@@ -132,6 +166,49 @@ final class SubscriptionService: ObservableObject {
 
         // Listen to customer info changes
         Purchases.shared.delegate = HMPurchasesDelegate.shared
+
+        // Filet StoreKit : état initial, puis veille sur les transactions.
+        Task { [weak self] in await self?.rafraichirFiletStoreKit() }
+        veilleTransactions = Task { [weak self] in
+            for await _ in StoreKit.Transaction.updates {
+                if Task.isCancelled { return }
+                await self?.rafraichirFiletStoreKit()
+            }
+        }
+    }
+
+    /// Relit StoreKit ; si le filet a bougé, réapplique l'état premium.
+    func rafraichirFiletStoreKit() async {
+        let etat = await Self.abonnementActifSelonStoreKit()
+        guard etat.actif != abonnementStoreKitActif || etat.expiration != expirationStoreKit else { return }
+        abonnementStoreKitActif = etat.actif
+        expirationStoreKit = etat.expiration
+        // L'accès dépend maintenant du filet : on le recalcule depuis le
+        // `customerInfo` déjà en main, sans aller au réseau.
+        applyFresh(customerInfo: customerInfo)
+    }
+
+    /// Transaction active, non révoquée, sur un abonnement que l'app vend, avec
+    /// sa date de fin quand Apple la connaît. Lecture LOCALE, sans réseau
+    /// (StoreKit sert le reçu déjà mis en cache par le système).
+    static func abonnementActifSelonStoreKit(
+        maintenant: Date = Date()
+    ) async -> (actif: Bool, expiration: Date?) {
+        let vendus = Set(subscriptionProductIds)
+        var actif = false
+        var expiration: Date?
+        for await resultat in StoreKit.Transaction.currentEntitlements {
+            guard case .verified(let transaction) = resultat,
+                  transaction.revocationDate == nil,
+                  vendus.contains(transaction.productID) else { continue }
+            // `currentEntitlements` ne rend en principe que le courant ; on ne
+            // fait quand même confiance qu'à une fin non dépassée (ou absente,
+            // cas d'un achat définitif).
+            if let fin = transaction.expirationDate, fin <= maintenant { continue }
+            actif = true
+            expiration = [expiration, transaction.expirationDate].compactMap { $0 }.max()
+        }
+        return (actif, expiration)
     }
 
     // MARK: - Fresh state writes
@@ -149,10 +226,18 @@ final class SubscriptionService: ObservableObject {
         let ancienneFormule = customerInfo?.entitlements[Self.entitlementId]?.productIdentifier
         customerInfo = info
         let entitlement = info?.entitlements[Self.entitlementId]
-        isPremium = isPremiumOverride ?? (entitlement?.isActive == true)
+        // RevenueCat d'abord ; le filet StoreKit ne fait que RATTRAPER un accès
+        // que RevenueCat ne sait pas voir (produit non rattaché à l'entitlement,
+        // alias d'identité perdu, propagation en retard). Il n'ouvre rien tout
+        // seul : sans achat Apple sur cet appareil, il vaut `false`.
+        let accesRevenueCat = isPremiumOverride ?? (entitlement?.isActive == true)
+        isPremium = accesRevenueCat || abonnementStoreKitActif
         PremiumSnapshot(
             isPremium: isPremium,
-            expirationDate: isPremiumOverride == nil ? entitlement?.expirationDate : nil
+            expirationDate: Self.expirationAPersister(
+                entitlement: isPremiumOverride == nil ? entitlement?.expirationDate : nil,
+                storeKit: abonnementStoreKitActif ? expirationStoreKit : nil
+            )
         ).save()
 
         if Self.doitPrevenirLeServeur(
@@ -163,6 +248,14 @@ final class SubscriptionService: ObservableObject {
         ) {
             prevenirLeServeur()
         }
+    }
+
+    /// Date d'expiration à persister dans le filet hors-ligne : la PLUS
+    /// LOINTAINE des deux sources, faute de quoi une date RevenueCat périmée
+    /// (entitlement clos alors que StoreKit paie encore) refermerait la grâce
+    /// de 3 jours sur un abonné en cours.
+    nonisolated static func expirationAPersister(entitlement: Date?, storeKit: Date?) -> Date? {
+        [entitlement, storeKit].compactMap { $0 }.max()
     }
 
     /// Le serveur doit-il recouper l'abonnement MAINTENANT ?
@@ -258,34 +351,27 @@ final class SubscriptionService: ObservableObject {
         // le rattachement à l'entitlement RevenueCat qui manque. L'accès est
         // accordé quand même (même promesse que l'achat, V10 #3) et l'anomalie
         // est signalée : c'est un réglage de tableau de bord, pas un bug client.
-        if await Self.transactionActiveSurUnAbonnementVendu() {
-            AppLogger.subscription.error("Code promo accepté par StoreKit mais entitlement « premium » absent chez RevenueCat — vérifier le rattachement des produits à l'entitlement.")
+        await rafraichirFiletStoreKit()
+        if abonnementStoreKitActif {
+            AppLogger.subscription.error("Abonnement actif chez StoreKit mais entitlement « premium » absent chez RevenueCat — vérifier le rattachement des produits à l'entitlement.")
             CrashReportingService.shared.captureMessage(
-                "promo code redeemed but RevenueCat entitlement missing",
+                "active StoreKit subscription but RevenueCat entitlement missing",
                 level: .warning
             )
-            applyFresh(customerInfo: customerInfo, isPremiumOverride: true)
             return .active
         }
 
         return .aucuneActivation
     }
 
-    /// Une transaction StoreKit active existe-t-elle sur un des abonnements que
-    /// l'app vend ? Lecture locale, sans réseau.
-    private static func transactionActiveSurUnAbonnementVendu() async -> Bool {
-        let vendus = Set(subscriptionProductIds)
-        for await resultat in StoreKit.Transaction.currentEntitlements {
-            guard case .verified(let transaction) = resultat else { continue }
-            if transaction.revocationDate == nil, vendus.contains(transaction.productID) {
-                return true
-            }
-        }
-        return false
-    }
-
     // MARK: - Check Premium Status
     func checkPremiumStatus() async {
+        // Le filet StoreKit AVANT la lecture réseau : sans lui, une réponse
+        // RevenueCat sans entitlement retirerait l'accès à un abonné le temps
+        // d'un aller-retour (voire durablement, si RevenueCat ne le voit
+        // jamais — incident `healthmap_weekly`, 25 août 2026).
+        await rafraichirFiletStoreKit()
+
         let generation = premiumGeneration
         do {
             let info = try await Purchases.shared.customerInfo()
@@ -418,6 +504,7 @@ final class SubscriptionService: ObservableObject {
     /// absence de réseau ne dégrade pas un abonné.
     var isPremiumWithGrace: Bool {
         if isPremium { return true }
+        if abonnementStoreKitActif { return true }
         if let entitlement = customerInfo?.entitlements[Self.entitlementId] {
             return PremiumSnapshot(
                 isPremium: entitlement.isActive,
@@ -434,6 +521,12 @@ final class SubscriptionService: ObservableObject {
     /// Le filet hors-ligne est purgé aussi (`applyFresh(nil)`) — le cache
     /// d'un utilisateur ne doit jamais couvrir le suivant.
     func reset() async {
+        // Le filet StoreKit tombe aussi : à la déconnexion, l'écran ne doit
+        // rien laisser paraître de l'abonné précédent. Il se réarme tout seul
+        // à la prochaine relecture (`checkPremiumStatus`) s'il y a bien un
+        // abonnement Apple actif sur cet appareil.
+        abonnementStoreKitActif = false
+        expirationStoreKit = nil
         applyFresh(customerInfo: nil)
         offerings = nil
         do {

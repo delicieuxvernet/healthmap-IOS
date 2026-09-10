@@ -90,4 +90,9 @@ final class ReceiptValidationTests: XCTestCase {
         await ReceiptValidationService.shared.verifyIfNeeded(userId: "test-user")
         // Smoke test: should complete without error.
     }
+
+    // ⚠️ Aucun test ne traverse `Transaction.currentEntitlements` (filet
+    // StoreKit compris) : sur un simulateur CI sans App Store, l'appel PEND
+    // (même incident que ci-dessus). Les invariants du filet se testent sur ses
+    // fonctions PURES, dans `PremiumReadinessTests`.
 }
