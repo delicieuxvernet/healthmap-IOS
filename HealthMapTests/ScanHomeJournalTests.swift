@@ -82,29 +82,85 @@ final class ScanHomeJournalTests: XCTestCase {
         XCTAssertEqual(vm.dayNutrientIds, ["iron", "vitC"])
     }
 
-    // MARK: - Navigation bornée
+    // MARK: - Navigation sans borne (11 sept. 2026)
 
-    func testCanGoNext_falseOnToday() {
-        let vm = MealJournalViewModel()  // selectedDay = aujourd'hui
-        XCTAssertFalse(vm.canGoNext)
-        vm.goNextDay()                   // no-op (pas de futur)
-        XCTAssertFalse(vm.canGoNext)
-    }
-
-    func testGoPrev_clampsToLoadedWindow() {
-        // La borne basse doit être le SOL RÉEL de la fenêtre chargée par load(),
-        // DÉRIVÉ de la même règle que lui (jamais une date en dur) : union des
-        // deux besoins, min(lundi précédent − 7 j hebdo, 14 jours glissants).
-        // Sinon on proposerait des jours passés « vides » dont les repas
-        // existent en base mais hors requête — ou l'inverse.
+    func testGoNext_ouvreLesJoursAVenir() {
+        // Celui qui note son dîner à 00h30 est déjà « demain » : il doit pouvoir
+        // reculer, mais aussi préparer les jours suivants. Plus aucun jour
+        // interdit, dans un sens comme dans l'autre.
         let cal = Calendar.current
         let vm = MealJournalViewModel()
-        for _ in 0..<20 { vm.goPrevDay() }
-        let weekStart = WeekScoreEngine.currentWeekInterval(containing: Date()).start
-        let solSemaine = cal.date(byAdding: .day, value: -7, to: cal.startOfDay(for: weekStart))!
-        let solAxe = cal.date(byAdding: .day, value: -13, to: cal.startOfDay(for: Date()))!
-        XCTAssertEqual(vm.selectedDay, min(solSemaine, solAxe))
         XCTAssertTrue(vm.canGoNext)
+        vm.goNextDay()
+        XCTAssertEqual(vm.selectedDay, cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date())))
+        for _ in 0..<9 { vm.goNextDay() }
+        XCTAssertEqual(vm.selectedDay, cal.date(byAdding: .day, value: 10, to: cal.startOfDay(for: Date())))
+    }
+
+    func testGoPrev_remonteAuDelaDeLaQuinzaine() {
+        // L'ancienne borne (min(lundi précédent − 7 j, 14 jours glissants))
+        // arrêtait les chevrons au bout de deux semaines : impossible de relire
+        // un mois passé autrement qu'au calendrier.
+        let cal = Calendar.current
+        let vm = MealJournalViewModel()
+        for _ in 0..<40 { vm.goPrevDay() }
+        XCTAssertEqual(vm.selectedDay, cal.date(byAdding: .day, value: -40, to: cal.startOfDay(for: Date())))
+    }
+
+    func testLibelles_passeEtFutur() {
+        let cal = Calendar.current
+        let vm = MealJournalViewModel()
+        XCTAssertEqual(vm.dayLabel, "Aujourd'hui")
+
+        vm.goNextDay()
+        XCTAssertEqual(vm.dayLabel, "Demain")
+        vm.goNextDay()
+        XCTAssertEqual(vm.dayLabel, "Après-demain")
+        for _ in 0..<3 { vm.goNextDay() }
+        XCTAssertEqual(vm.daySub, "dans 5 jours")
+
+        vm.selectedDay = cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: Date()))!
+        XCTAssertEqual(vm.dayLabel, "Hier")
+        vm.selectedDay = cal.date(byAdding: .day, value: -2, to: cal.startOfDay(for: Date()))!
+        XCTAssertEqual(vm.dayLabel, "Avant-hier")
+        vm.selectedDay = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: Date()))!
+        XCTAssertEqual(vm.daySub, "il y a 6 jours")
+    }
+
+    // MARK: - Écriture sur le jour AFFICHÉ
+
+    func testHorodatage_aujourdhuiGardeLHeureReelle() {
+        // Sur aujourd'hui, l'heure réelle du repas vaut mieux qu'une heure de
+        // convention : rien ne change par rapport à l'existant.
+        let maintenant = Date()
+        XCTAssertEqual(
+            MealJournalService.horodatage(jour: maintenant, slot: .dinner, maintenant: maintenant),
+            maintenant
+        )
+    }
+
+    func testHorodatage_autreJourPoseLHeureCanoniqueDuCreneau() {
+        // Le dîner de la veille saisi à 00h30 doit atterrir le SOIR de la veille,
+        // pas à 00h30 — sinon la relecture (`MealSlot.from`) le range au dîner du
+        // mauvais bout de journée.
+        let cal = Calendar.current
+        let minuitTrente = cal.date(bySettingHour: 0, minute: 30, second: 0, of: Date())!
+        let veille = cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: minuitTrente))!
+
+        let ecrit = MealJournalService.horodatage(jour: veille, slot: .dinner, maintenant: minuitTrente)
+        XCTAssertTrue(cal.isDate(ecrit, inSameDayAs: veille))
+        XCTAssertEqual(cal.component(.hour, from: ecrit), 20)
+        XCTAssertEqual(MealJournalService.MealSlot.from(date: ecrit), .dinner)
+    }
+
+    func testHorodatage_tousLesCreneauxFontLAllerRetour() {
+        let cal = Calendar.current
+        let demain = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))!
+        for slot in MealJournalService.MealSlot.ordreJournal {
+            let ecrit = MealJournalService.horodatage(jour: demain, slot: slot, maintenant: Date())
+            XCTAssertTrue(cal.isDate(ecrit, inSameDayAs: demain), "\(slot) posé sur le mauvais jour")
+            XCTAssertEqual(MealJournalService.MealSlot.from(date: ecrit), slot, "\(slot) ne se relit pas")
+        }
     }
 
     // MARK: - Phrase de synthèse micros (les 2 plus bas)

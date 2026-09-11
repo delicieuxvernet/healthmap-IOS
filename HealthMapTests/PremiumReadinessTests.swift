@@ -241,4 +241,37 @@ final class PremiumReadinessTests: XCTestCase {
             XCTAssertTrue(paliers.indices.contains(index), "palier de resync hors bornes : \(index)")
         }
     }
+
+    // MARK: - Filet StoreKit (incident `healthmap_weekly`, 25 août → 11 sept. 2026)
+    //
+    // Le produit hebdomadaire n'était rattaché à AUCUN entitlement dans le
+    // tableau de bord RevenueCat : les 9 abonnés lisaient `entitlements: {}`
+    // alors que leur essai courait. L'app les traitait en gratuits dès le
+    // premier retour en avant-plan. Ces tests verrouillent la partie PURE du
+    // filet ; sa lecture StoreKit ne se teste pas ici — elle pend sur un
+    // simulateur CI sans App Store (cf. `ReceiptValidationTests`).
+
+    /// La date persistée doit être la PLUS LOINTAINE des deux sources : une
+    /// date RevenueCat périmée (entitlement clos alors que StoreKit paie
+    /// encore) refermerait sinon la grâce de 3 jours sur un abonné en cours.
+    func testExpirationAPersister_gardeLaPlusLointaine() {
+        let proche = Date(timeIntervalSince1970: 1_000_000)
+        let lointaine = Date(timeIntervalSince1970: 2_000_000)
+
+        XCTAssertEqual(
+            SubscriptionService.expirationAPersister(entitlement: proche, storeKit: lointaine),
+            lointaine
+        )
+        XCTAssertEqual(
+            SubscriptionService.expirationAPersister(entitlement: lointaine, storeKit: proche),
+            lointaine
+        )
+    }
+
+    func testExpirationAPersister_toleUneSourceAbsente() {
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertEqual(SubscriptionService.expirationAPersister(entitlement: nil, storeKit: date), date)
+        XCTAssertEqual(SubscriptionService.expirationAPersister(entitlement: date, storeKit: nil), date)
+        XCTAssertNil(SubscriptionService.expirationAPersister(entitlement: nil, storeKit: nil))
+    }
 }

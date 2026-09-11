@@ -102,14 +102,30 @@ async function verifyAuthAndResolveProfile(authHeader: string | null, admin: any
   }
 }
 
-/** Lit l'entitlement « premium » RevenueCat sous le premier app_user_id qui en
- *  porte un. iOS identifie avec `session.user.id.uuidString` (MAJUSCULES) ; les
- *  candidats couvrent aussi la casse basse et le profileId (historique). NB :
- *  GET subscribers/{id} crée un subscriber vierge si inconnu — sans effet de
- *  bord gênant (aucun achat attaché), la lecture reste fiable. */
-async function fetchRcPremium(candidates: string[]): Promise<{ ent: { expires_date: string | null; product_identifier?: string } | undefined; degraded: boolean }> {
-  if (!RC_API_KEY) return { ent: undefined, degraded: true };
+/** Lit l'abonnement RevenueCat sous le premier app_user_id qui en porte un.
+ *  iOS identifie avec `session.user.id.uuidString` (MAJUSCULES) ; les candidats
+ *  couvrent aussi la casse basse et le profileId (historique).
+ *
+ *  On rend l'entitlement « premium » ET le bloc `subscriptions` : depuis
+ *  l'incident du 25 août 2026 (produit `healthmap_weekly` rattaché à AUCUN
+ *  entitlement dans le tableau de bord), l'entitlement seul ne suffit plus à
+ *  conclure — 9 abonnés avaient `entitlements: {}` avec un essai en cours.
+ *
+ *  `connu` sépare « on lit le mauvais identifiant / ce compte n'a jamais rien
+ *  acheté » de « son abonnement a expiré ». GET subscribers/{id} CRÉE un
+ *  subscriber vierge quand l'id est inconnu : sans ce drapeau, une erreur
+ *  d'identité se lit comme une expiration et redescend un payeur en `free`. */
+async function fetchRcPremium(candidates: string[]): Promise<{
+  ent: { expires_date: string | null; product_identifier?: string } | undefined;
+  subscriptions: Record<string, Record<string, unknown>> | undefined;
+  connu: boolean;
+  degraded: boolean;
+}> {
+  if (!RC_API_KEY) {
+    return { ent: undefined, subscriptions: undefined, connu: false, degraded: true };
+  }
   let degraded = false;
+  let subscriptionsVues: Record<string, Record<string, unknown>> | undefined;
   for (const id of candidates) {
     try {
       const r = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(id)}`, {
@@ -117,14 +133,26 @@ async function fetchRcPremium(candidates: string[]): Promise<{ ent: { expires_da
       });
       if (!r.ok) { degraded = true; continue; }
       const body = await r.json();
-      const ent = body?.subscriber?.entitlements?.premium;
-      if (ent) return { ent, degraded: false };
+      const subscriber = body?.subscriber ?? {};
+      const subs = subscriber.subscriptions as
+        | Record<string, Record<string, unknown>>
+        | undefined;
+      const ent = subscriber.entitlements?.premium;
+      if (ent) return { ent, subscriptions: subs, connu: true, degraded: false };
+      // Pas d'entitlement, mais un historique d'achat : il tranche à lui seul
+      // (repli) ET prouve qu'on regarde le bon identifiant.
+      if (subs && Object.keys(subs).length > 0) subscriptionsVues = subs;
     } catch (err) {
       console.warn("revenuecat fetch failed:", String(err));
       degraded = true;
     }
   }
-  return { ent: undefined, degraded };
+  return {
+    ent: undefined,
+    subscriptions: subscriptionsVues,
+    connu: Boolean(subscriptionsVues),
+    degraded,
+  };
 }
 
 serve(async (req: Request) => {
@@ -158,7 +186,9 @@ serve(async (req: Request) => {
     const hasStripe = Boolean(resolved.linkage?.stripe_subscription_id);
     const profileHash = await hashIdForLog(resolved.profileId);
 
-    const { ent, degraded } = await fetchRcPremium(rcCandidateIds(resolved.authUserId, resolved.profileId));
+    const { ent, subscriptions, connu, degraded } = await fetchRcPremium(
+      rcCandidateIds(resolved.authUserId, resolved.profileId),
+    );
     if (degraded && !ent) {
       // RevenueCat injoignable : on ne décide rien, l'app garde le tier actuel.
       return new Response(
@@ -167,7 +197,20 @@ serve(async (req: Request) => {
       );
     }
 
-    const target = targetTier(ent, new Date());
+    // Aucun entitlement ET aucun historique d'achat sous AUCUN des identifiants
+    // essayés : on ne sait pas si ce compte n'a jamais payé ou si on regarde le
+    // mauvais identifiant RevenueCat. Dans le doute on ne DESCEND personne — un
+    // tier payant reste en place, la montée reste possible (elle vient du
+    // webhook). Le seul chemin qui écrit `free` ici est une expiration LUE.
+    if (!connu && !ent && serverTier !== "free") {
+      console.warn(`verify-receipt: identité RevenueCat muette, tier ${serverTier} conservé profile=${profileHash}`);
+      return new Response(
+        JSON.stringify({ valid: true, tier: serverTier, corrected: false, inconnu: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const target = targetTier(ent, new Date(), subscriptions as never);
     let corrected = false;
     if (shouldWriteTier(serverTier, target, hasStripe)) {
       const { error: upErr } = await supabase
