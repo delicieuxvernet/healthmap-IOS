@@ -266,6 +266,10 @@ final class AuthViewModel: ObservableObject {
         // Vignettes locales des repas scannés : données du compte, l'utilisateur
         // suivant sur cet appareil ne doit pas voir les photos du précédent.
         MealThumbnailStore.clearAll()
+        // Rappels personnalisés : ils nomment les apports du compte (« ton
+        // fer ») sur l'écran verrouillé. Ils partent avec lui ; le suivant
+        // aura les siens à sa première ouverture.
+        RappelsPersonnalises.toutAnnuler()
     }
 
     // MARK: - Sign In
