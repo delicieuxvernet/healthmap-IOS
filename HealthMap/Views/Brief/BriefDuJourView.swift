@@ -30,6 +30,17 @@ struct BriefDuJourView: View {
 
     private var estDernier: Bool { index >= slides.count - 1 }
 
+    /// Typée `AnyTransition` (comme dans le récap) : en ternaire, `.opacity`
+    /// est ambigu depuis iOS 17 (`AnyTransition` ou `Transition`).
+    private var transitionEcran: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.96)),
+                removal: .opacity
+            )
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -46,10 +57,7 @@ struct BriefDuJourView: View {
                                 .frame(maxWidth: .infinity, minHeight: max(geo.size.height - 200, 200), alignment: .topLeading)
                                 .contentShape(Rectangle())
                                 .id(slide.id)
-                                .transition(reduceMotion ? .opacity : .asymmetric(
-                                    insertion: .opacity.combined(with: .scale(scale: 0.96)),
-                                    removal: .opacity
-                                ))
+                                .transition(transitionEcran)
                                 .onTapGesture(coordinateSpace: .local) { point in
                                     if point.x < geo.size.width * Self.partRetour {
                                         precedent()

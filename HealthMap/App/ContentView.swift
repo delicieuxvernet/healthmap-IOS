@@ -345,7 +345,7 @@ struct MainTabView: View {
         // inconnu (fin du clignotement d'« écrans faux » au démarrage à froid).
         Group {
             if dashboardVM.didFinishInitialLoad {
-                mainInterface
+                mainInterfaceComplete
             } else {
                 LaunchScreenView()
             }
@@ -500,8 +500,7 @@ struct MainTabView: View {
             consumePendingRoute()
 
             armerTutoriel()
-            proposerBrief()
-            Task { await RappelsPersonnalises.replanifier(cibles: ciblesDuBilan) }
+            relancerBriefEtRappels()
         }
         .sheet(isPresented: $showPaywallFromDeepLink) {
             PaywallView()
@@ -541,31 +540,7 @@ struct MainTabView: View {
         .onChange(of: dashboardVM.analysisV2 == nil) { _, _ in
             preparerRecap()
             armerTutoriel()
-            proposerBrief()
-            // Le bilan vient d'arriver : les rappels prennent ses apports.
-            Task { await RappelsPersonnalises.replanifier(cibles: ciblesDuBilan) }
-        }
-        // Retour au premier plan : nouveau jour peut-être (brief), et les
-        // rappels se recalent sur ce qui a été noté depuis.
-        .onChange(of: scenePhase) { _, phase in
-            switch phase {
-            case .active:
-                proposerBrief()
-                Task { await RappelsPersonnalises.replanifier(cibles: ciblesDuBilan) }
-            case .background:
-                briefReporte = false
-            default:
-                break
-            }
-        }
-        // Un repas noté ce midi annule le rappel de midi du jour.
-        .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
-            Task { await RappelsPersonnalises.replanifier(cibles: ciblesDuBilan) }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .healthmapJournalAllerAuJour)) { _ in
-            withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.25)) {
-                selectedTab = .journal
-            }
+            relancerBriefEtRappels()
         }
         .onChange(of: pushService.pendingRoute) { _, newValue in
             // Consume routes arriving while the view is already alive
@@ -611,42 +586,8 @@ struct MainTabView: View {
         // rien casser.
         .fullScreenCover(isPresented: $afficheRecap) {
             RecapView(slides: slidesRecap) {
-                afficheRecap = false
-                // Le récap tient lieu de brief pour aujourd'hui.
-                BriefDuJourStore.marquerVu()
-                // Ordre : récap → invitation aux notifications → tutoriel.
-                // Deux présentations qui se croisent dans le même cycle et
-                // SwiftUI en avale une : on laisse le récap finir de sortir.
-                Task {
-                    let statut = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
-                    if statut == .notDetermined, !estModeCaptures, BriefDuJourStore.invitationAProposer() {
-                        try? await Task.sleep(for: .milliseconds(500))
-                        afficheInvitationNotifs = true
-                    } else {
-                        // Le tour d'onglets attendait la fin du récap : il peut passer.
-                        armerTutoriel()
-                    }
-                }
+                finDuRecap()
             }
-        }
-        .sheet(isPresented: $afficheInvitationNotifs, onDismiss: { armerTutoriel() }) {
-            InvitationNotificationsSheet(cible: ciblesDuBilan?.first)
-        }
-        // Brief du jour : première ouverture de chaque journée. Jamais par-dessus
-        // le récap, le tutoriel ou le questionnaire (cf. `proposerBrief`).
-        .fullScreenCover(isPresented: $afficheBrief) {
-            BriefDuJourView(
-                slides: slidesBrief,
-                onAjouterHier: {
-                    afficheBrief = false
-                    let cal = Calendar.current
-                    let hier = cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: Date())) ?? Date()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                        NotificationCenter.default.post(name: .healthmapJournalAllerAuJour, object: hier)
-                    }
-                },
-                onTerminer: { afficheBrief = false }
-            )
         }
         // BLOCAGE pendant la 1re analyse IA (retour test 20 juin) : tant que le
         // bilan n'est pas prêt, on couvre TOUTE l'app (barre d'onglets comprise)
@@ -674,6 +615,93 @@ struct MainTabView: View {
         )) {
             AnalysisGateView()
                 .environmentObject(dashboardVM)
+        }
+    }
+
+    // MARK: - Brief du jour, invitation, rappels (11 sept. 2026)
+
+    /// `mainInterface` + ce qui a trait au brief et aux rappels. Posé dans une
+    /// expression SÉPARÉE : ajoutés à la chaîne de `mainInterface`, déjà très
+    /// longue, ces modificateurs faisaient abandonner le vérificateur de types
+    /// (« unable to type-check this expression in reasonable time », CI #244).
+    private var mainInterfaceComplete: some View {
+        mainInterface
+            // Retour au premier plan : nouveau jour peut-être (brief), et les
+            // rappels se recalent sur ce qui a été noté depuis.
+            .onChange(of: scenePhase) { _, phase in
+                changementDePhase(phase)
+            }
+            // Un repas noté ce midi annule le rappel de midi du jour.
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
+                replanifierRappels()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapJournalAllerAuJour)) { _ in
+                selectedTab = .journal
+            }
+            .sheet(isPresented: $afficheInvitationNotifs, onDismiss: armerTutoriel) {
+                InvitationNotificationsSheet(cible: ciblesDuBilan?.first)
+            }
+            // Brief du jour : première ouverture de chaque journée. Jamais
+            // par-dessus le récap, le tutoriel ou le questionnaire.
+            .fullScreenCover(isPresented: $afficheBrief) {
+                BriefDuJourView(
+                    slides: slidesBrief,
+                    onAjouterHier: ajouterRepasDHier,
+                    onTerminer: { afficheBrief = false }
+                )
+            }
+    }
+
+    /// Ouverture, arrivée du bilan : on tente le brief et on recale les rappels.
+    private func relancerBriefEtRappels() {
+        proposerBrief()
+        replanifierRappels()
+    }
+
+    private func replanifierRappels() {
+        let cibles = ciblesDuBilan
+        Task { await RappelsPersonnalises.replanifier(cibles: cibles) }
+    }
+
+    private func changementDePhase(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            relancerBriefEtRappels()
+        case .background:
+            briefReporte = false
+        default:
+            break
+        }
+    }
+
+    /// « Ajouter mes repas d'hier » : on referme le brief, puis le Journal
+    /// s'ouvre sur la veille (le temps que la couverture finisse de sortir).
+    private func ajouterRepasDHier() {
+        afficheBrief = false
+        let cal = Calendar.current
+        let hier = cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: Date())) ?? Date()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            NotificationCenter.default.post(name: .healthmapJournalAllerAuJour, object: hier)
+        }
+    }
+
+    /// Fin du récap de questionnaire. Ordre : récap → invitation aux
+    /// notifications → tutoriel. Deux présentations qui se croisent dans le
+    /// même cycle et SwiftUI en avale une : on laisse le récap finir de sortir.
+    private func finDuRecap() {
+        afficheRecap = false
+        // Le récap tient lieu de brief pour aujourd'hui.
+        BriefDuJourStore.marquerVu()
+        let captures = estModeCaptures
+        Task {
+            let statut = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+            if statut == .notDetermined, !captures, BriefDuJourStore.invitationAProposer() {
+                try? await Task.sleep(for: .milliseconds(500))
+                afficheInvitationNotifs = true
+            } else {
+                // Le tour d'onglets attendait la fin du récap : il peut passer.
+                armerTutoriel()
+            }
         }
     }
 
