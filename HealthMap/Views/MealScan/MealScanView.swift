@@ -126,6 +126,12 @@ struct JournalView: View {
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
                     Task { await journal.load() }
                 }
+                // Le brief du jour propose d'ajouter les repas d'hier : le
+                // journal se positionne sur ce jour-là (les ajouts y seront datés).
+                .onReceive(NotificationCenter.default.publisher(for: .healthmapJournalAllerAuJour)) { note in
+                    guard let jour = note.object as? Date else { return }
+                    Task { await journal.allerAuJour(jour) }
+                }
                 // Grand titre natif : il se replie en titre inline au défilement,
                 // avec apparition progressive du filet de barre (§5 du document).
                 .navigationTitle("Journal")

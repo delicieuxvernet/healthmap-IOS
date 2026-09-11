@@ -21,6 +21,10 @@ extension Notification.Name {
     /// feuille, en 8e modificateur de présentation sur la même vue, ne s'ouvrait
     /// pas (bug du 21 août 2026).
     static let healthmapRejouerRecap = Notification.Name("healthmapRejouerRecap")
+    /// Ouvre le Journal sur un jour donné (`object` = `Date`). Émise par le
+    /// brief du jour (« Ajouter mes repas d'hier ») ; `MainTabView` bascule sur
+    /// le Journal, qui se positionne sur ce jour.
+    static let healthmapJournalAllerAuJour = Notification.Name("healthmapJournalAllerAuJour")
     /// Émise après un scan de repas réussi (repas persisté dans meal_scans par la
     /// fonction Edge). Les écrans en aval (Bilan → score hebdo, journal du jour
     /// « Ta journée ») rechargent leur journal à réception.

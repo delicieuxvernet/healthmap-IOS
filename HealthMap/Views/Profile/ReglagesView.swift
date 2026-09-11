@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import StoreKit
 import RevenueCat
 
@@ -353,9 +354,18 @@ struct ReglagesView: View {
 
     private var preferencesList: some View {
         DSGroupedList {
+            LigneNotifications()
+
+            DSSeparator(retrait: DS.retraitSeparateurIcone)
+
             Toggle(isOn: Binding(
                 get: { gamification.isZenMode },
-                set: { _ in gamification.toggleZenMode() }
+                set: { _ in
+                    gamification.toggleZenMode()
+                    // Le mode Zen promet « pas de notifications » : les rappels
+                    // tombent (ou reviennent) avec lui.
+                    Task { await RappelsPersonnalises.replanifier() }
+                }
             )) {
                 HStack(spacing: 12) {
                     Image(systemName: "leaf")
@@ -1013,5 +1023,59 @@ struct DonneesReglagesView: View {
             HapticService.shared.error()
             deleteErrorMessage = authViewModel.errorMessage ?? "La suppression n'a pas abouti. Réessaie ou écris au support."
         }
+    }
+}
+
+// MARK: - Ligne « Notifications »
+
+/// Dit l'état RÉEL des notifications et mène au seul geste utile : les activer
+/// si la question n'a jamais été posée, sinon ouvrir les réglages de l'iPhone —
+/// après un refus, iOS ne laisse plus l'app reposer la question.
+private struct LigneNotifications: View {
+    @ObservedObject private var gamification = GamificationService.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var statut: UNAuthorizationStatus = .notDetermined
+
+    var body: some View {
+        Button {
+            HapticService.shared.tap()
+            Task { await agir() }
+        } label: {
+            DSRow(icone: "bell", titre: "Notifications", sousTitre: sousTitre)
+        }
+        .buttonStyle(.dsPress)
+        .task { await relire() }
+        // Retour des réglages de l'iPhone : l'état a pu changer.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await relire() } }
+        }
+    }
+
+    private var sousTitre: String {
+        if gamification.isZenMode { return "Coupées par le mode Zen" }
+        switch statut {
+        case .authorized, .provisional, .ephemeral:
+            return "Midi et soir, selon tes apports à renforcer"
+        case .denied:
+            return "Désactivées dans les réglages de l'iPhone"
+        default:
+            return "Touche pour les activer"
+        }
+    }
+
+    private func relire() async {
+        statut = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    }
+
+    private func agir() async {
+        if statut == .notDetermined {
+            if await PushNotificationService.shared.requestAuthorizationIfNeeded() {
+                await RappelsPersonnalises.replanifier()
+            }
+            await relire()
+            return
+        }
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        _ = await UIApplication.shared.open(url)
     }
 }
