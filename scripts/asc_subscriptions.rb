@@ -993,9 +993,9 @@ end
 # ── MODE new-version : crée la prochaine version App Store + ses notes ──────
 # Une MISE À JOUR (1.0.1) se soumet seule : les abonnements déjà APPROVED n'ont
 # pas à repasser en review (contrairement à la 1.0, cf. l'épisode des 4 refus).
-# VERSION_STRING (défaut 1.0.1) · WHATS_NEW (défaut : les notes ci-dessous).
+# VERSION_STRING (défaut : la version en cours ci-dessous) · WHATS_NEW (défaut : les notes ci-dessous).
 if MODE == "new-version"
-  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.3" : ENV["VERSION_STRING"]
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.4" : ENV["VERSION_STRING"]
 
   existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
     .find { |v| v.dig("attributes", "versionString") == vs }
@@ -1012,21 +1012,15 @@ if MODE == "new-version"
   end
 
   notes = ENV["WHATS_NEW"].to_s.empty? ? <<~NOTES.strip : ENV["WHATS_NEW"]
-    Kiwio fait peau neuve.
+    Ton journal voyage dans le temps : deux flèches en haut du Journal pour revenir sur les jours passés ou préparer les suivants, et un calendrier pour aller où tu veux. Ce que tu ajoutes est daté du jour affiché, pratique pour noter ton dîner après minuit.
 
-    Un nouveau design, plus calme et plus lisible : fond neutre, cartes blanches, chiffres alignés, un seul vert pour ce qui se touche. Cinq onglets pour tout retrouver : Journal, Progrès, Plan, Compléments, Réglages.
+    Ton brief du jour : à ta première ouverture, Kiwio te montre ce qui t'a manqué hier, l'effort qui paie, et sur quoi miser aujourd'hui, avec des idées de repas.
 
-    Un tutoriel de trente secondes t'accueille : tu dictes ton premier repas et tu vois ce qu'il couvre de tes besoins, avant même de chercher où appuyer.
+    Des rappels qui te ressemblent : à midi et le soir, Kiwio te fait signe pour l'apport à renforcer, avec des idées concrètes. Tu choisis de les activer, et le mode Zen les coupe.
 
-    Journal : ta journée d'un coup d'œil, calories et macros dans deux cartes, tes apports à renforcer juste dessous, et un bouton + pour dicter, scanner ou rechercher un repas.
+    Premium plus fiable : ton accès reste ouvert tant que ton abonnement est actif.
 
-    Quantités en unités : un œuf petit, moyen ou gros, une banane, deux tranches de pain. Plus besoin de peser ce qui se compte, les grammes sont calculés pour toi.
-
-    Compléments : ton rituel du jour, moment par moment, avec ce que chaque complément vient renforcer.
-
-    Progrès : tes courbes et une conclusion claire, apport par apport.
-
-    Et des dizaines de retouches partout : questionnaire, accueil, réglages, fiches apports.
+    Et des corrections un peu partout.
   NOTES
 
   get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20").each do |l|
