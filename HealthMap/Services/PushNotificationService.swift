@@ -6,7 +6,6 @@ import UIKit
 /// Handles the full lifecycle of push notifications:
 /// - Requesting permission at the right moment (NOT at launch — wait for the first value-delivery screen)
 /// - Registering with APNs
-/// - Persisting the token in Supabase so the backend can target the user
 /// - Handling incoming notifications (foreground + background taps)
 ///
 /// Apple Review requirement: NEVER ask for notification permission on first launch.
@@ -19,12 +18,6 @@ final class PushNotificationService: NSObject, ObservableObject {
 
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published private(set) var deviceToken: String?
-
-    /// Tracks the in-flight push-token save task so we can cancel it if the
-    /// user signs out before the Supabase write completes — without this,
-    /// the token would land in the *previous* user's profile row, causing
-    /// notifications meant for user B to be delivered to user A's device.
-    private var tokenSaveTask: Task<Void, Never>?
 
     /// The latest deep-link requested by a notification tap.
     /// Views can observe this to route to the matching screen
@@ -135,34 +128,18 @@ final class PushNotificationService: NSObject, ObservableObject {
         self.deviceToken = tokenString
         AppLogger.push.info("APNs token received (\(tokenString.count, privacy: .public) chars)")
 
-        // Persist token in Supabase `profiles.push_token` so backend can target this device.
-        // Track the task so a sign-out can cancel an in-flight write.
-        tokenSaveTask?.cancel()
-        tokenSaveTask = Task { [weak self] in
-            do {
-                try Task.checkCancellation()
-                try await DatabaseService.shared.updatePushToken(tokenString)
-                try Task.checkCancellation()
-                CrashReportingService.shared.breadcrumb("push token saved", category: "push", level: .info)
-            } catch is CancellationError {
-                AppLogger.push.notice("push token save cancelled (sign-out)")
-            } catch {
-                AppLogger.push.report(error, context: "save push token")
-            }
-            self?.tokenSaveTask = nil
-        }
+        // The token is deliberately NOT sent to the backend: reminders are
+        // scheduled locally on the device (`LocalNotificationService`) and no
+        // server ever pushes to us (ADR 0009, 11 sept. 2026). The previous code
+        // wrote it to `profiles.push_token`, a column that does not exist in the
+        // Supabase schema — every APNs registration burned a retry loop and
+        // reported a 42703 to Sentry for nothing. If server-side push ever
+        // ships, store tokens in a dedicated `device_tokens` table (one row per
+        // device) rather than a single column on `profiles`.
     }
 
     func handleAPNsRegistrationFailure(error: Error) {
         AppLogger.push.report(error, context: "APNs registration failed")
-    }
-
-    /// Cancels any in-flight push-token Supabase write. Called from
-    /// AuthViewModel.signOut + the listener's `.signedOut` branch so the
-    /// token doesn't land on the wrong profile after a fast user-switch.
-    func cancelInFlightTokenSave() {
-        tokenSaveTask?.cancel()
-        tokenSaveTask = nil
     }
 }
 

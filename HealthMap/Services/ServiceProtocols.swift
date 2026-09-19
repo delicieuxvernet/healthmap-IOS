@@ -43,7 +43,6 @@ protocol DatabaseServiceProtocol: AnyObject {
     func saveAIAnalysisV2(userId: String, analysis: AIAnalysisV2) async throws
     func saveBaselineNutrientScores(userId: String, scores: [String: Int]) async throws
     func clearAIAnalysis(userId: String) async throws
-    func updatePushToken(_ token: String) async throws
     func deleteAllUserData(userId: String) async throws
 }
 

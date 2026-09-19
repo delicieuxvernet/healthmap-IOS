@@ -11,7 +11,6 @@ final class MockDatabaseService: DatabaseServiceProtocol {
     var analysisByUserId: [String: AIAnalysisResponse] = [:]
     var analysisV2ByUserId: [String: AIAnalysisV2] = [:]
     var baselineScoresByUserId: [String: [String: Int]] = [:]
-    var pushTokensByUserId: [String: String] = [:]
     var deletedUserIds: [String] = []
 
     // MARK: - Programmable errors
@@ -24,7 +23,6 @@ final class MockDatabaseService: DatabaseServiceProtocol {
     var saveAnalysisV2Error: Error?
     var saveBaselineError: Error?
     var clearAnalysisError: Error?
-    var updatePushTokenError: Error?
     var deleteError: Error?
 
     // MARK: - Call counters
@@ -81,13 +79,6 @@ final class MockDatabaseService: DatabaseServiceProtocol {
     func clearAIAnalysis(userId: String) async throws {
         if let clearAnalysisError { throw clearAnalysisError }
         analysisByUserId.removeValue(forKey: userId)
-    }
-
-    func updatePushToken(_ token: String) async throws {
-        if let updatePushTokenError { throw updatePushTokenError }
-        // We don't have a userId argument by design (AuthService resolves current user),
-        // so we key by a constant for test inspection.
-        pushTokensByUserId["current"] = token
     }
 
     func deleteAllUserData(userId: String) async throws {

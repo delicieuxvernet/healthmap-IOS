@@ -197,7 +197,6 @@ final class AuthViewModel: ObservableObject {
                     self.resetPasswordEmail = nil
                     self.resendAttempts = 0
                     self.pendingAppleNonce = nil
-                    PushNotificationService.shared.cancelInFlightTokenSave()
                     LoginThrottleService.shared.reset()
                     AnalyticsService.shared.track(.signOutCompleted)
                 }
@@ -470,9 +469,6 @@ final class AuthViewModel: ObservableObject {
         GamificationService.shared.reset()
         AnalyticsService.shared.reset()
         await SubscriptionService.shared.reset()
-        // Cancel any in-flight push-token Supabase write so the token
-        // doesn't get persisted onto the just-signed-out user's row.
-        PushNotificationService.shared.cancelInFlightTokenSave()
         // The local LoginThrottle is per-device, not per-user — but a
         // successful sign-in already resets it (line 230) and a sign-out
         // is by definition not an attack surface, so clearing the
