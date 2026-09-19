@@ -352,6 +352,20 @@ struct MainTabView: View {
         }
         .animation(reduceMotion ? .none : .easeInOut(duration: 0.3),
                    value: dashboardVM.didFinishInitialLoad)
+        // Le brief se tente ICI, et non dans l'interface : il n'a plus besoin
+        // du réseau, donc plus aucune raison d'attendre la fin du chargement
+        // du profil. C'est bien « la première chose qui apparaît ».
+        //
+        // La couverture est posée au même niveau, sinon elle ne s'ouvrirait
+        // qu'une fois l'écran de lancement passé — le retard qu'on corrige.
+        .task { proposerBrief() }
+        .fullScreenCover(isPresented: $afficheBrief) {
+            BriefDuJourView(
+                slides: slidesBrief,
+                onAjouterHier: ajouterRepasDHier,
+                onTerminer: { afficheBrief = false }
+            )
+        }
     }
 
     /// Conteneur d'onglets maison (remplace `TabView` depuis le 28 juillet).
@@ -641,19 +655,13 @@ struct MainTabView: View {
             .sheet(isPresented: $afficheInvitationNotifs, onDismiss: armerTutoriel) {
                 InvitationNotificationsSheet(cible: ciblesDuBilan?.first)
             }
-            // Brief du jour : première ouverture de chaque journée. Jamais
-            // par-dessus le récap, le tutoriel ou le questionnaire.
-            .fullScreenCover(isPresented: $afficheBrief) {
-                BriefDuJourView(
-                    slides: slidesBrief,
-                    onAjouterHier: ajouterRepasDHier,
-                    onTerminer: { afficheBrief = false }
-                )
-            }
     }
 
     /// Ouverture, arrivée du bilan : on tente le brief et on recale les rappels.
     private func relancerBriefEtRappels() {
+        // Le prénom sert au tout premier écran du brief, qui s'affiche avant
+        // même que le profil soit rechargé : on le garde sous la main.
+        BriefDuJourStore.memoriserPrenom(dashboardVM.firstName)
         proposerBrief()
         replanifierRappels()
     }
@@ -724,20 +732,20 @@ struct MainTabView: View {
     /// (notification, lien). Appelé à l'apparition, à l'arrivée du bilan et à
     /// chaque retour au premier plan ; les appels en trop sont sans effet.
     private func proposerBrief() {
-        guard !estModeCaptures,
-              !briefReporte,
-              !afficheBrief,
-              !afficheRecap,
-              !afficheInvitationNotifs,
-              !dashboardVM.recapArme,
-              !dashboardVM.questionnaireOuvert,
-              tutoriel.etape == nil,
-              dashboardVM.bilanComplete,
-              let apports = dashboardVM.analysisV2?.bilan?.apports,
-              !BriefDuJourStore.dejaVuAujourdhui(),
+        guard momentOpportun else { return }
+
+        // 1) Le chemin normal : tout est déjà sur le téléphone, le brief
+        //    s'affiche à l'instant même. Aucune attente, aucun réseau.
+        if let brief = BriefDuJourBuilder.depuisLeCache() {
+            presenter(brief)
+            return
+        }
+
+        // 2) Premier lancement après la mise à jour (rien n'a encore été
+        //    gardé) : on va chercher la matière, une seule fois.
+        guard let apports = dashboardVM.analysisV2?.bilan?.apports,
               let userId = AuthService.shared.cachedCurrentUserIdString else { return }
         let prenom = dashboardVM.firstName
-
         Task {
             let cal = Calendar.current
             let maintenant = Date()
@@ -753,24 +761,44 @@ struct MainTabView: View {
                 // Hors-ligne : pas de brief bancal, on retentera au prochain retour.
                 return
             }
-            let statut = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
-            let brief = BriefDuJourBuilder.construire(prenom: prenom, apports: apports, repas: repas, maintenant: maintenant)
-            let slides = BriefDuJourBuilder.slides(
-                brief: brief,
-                proposerInvitation: statut == .notDetermined && BriefDuJourStore.invitationAProposer()
-            )
-            // Re-vérifié après l'attente réseau : un récap ou un tutoriel a pu
-            // démarrer entre-temps.
-            guard slides.count >= 2,
-                  !briefReporte,
-                  !afficheBrief, !afficheRecap, !afficheInvitationNotifs,
-                  tutoriel.etape == nil,
-                  !BriefDuJourStore.dejaVuAujourdhui() else { return }
-            BriefDuJourStore.marquerVu()
-            slidesBrief = slides
-            try? await Task.sleep(for: .milliseconds(600))
-            afficheBrief = true
+            // Gardé pour les jours suivants : dès demain, ce chemin ne sert plus.
+            BriefDuJourStore.memoriserRepas(repas)
+            BriefDuJourStore.memoriserPrenom(prenom)
+            guard momentOpportun else { return }
+            presenter(BriefDuJourBuilder.construire(
+                prenom: prenom, apports: apports, repas: repas, maintenant: maintenant
+            ))
         }
+    }
+
+    /// Les conditions pour présenter le brief. Relues juste avant l'affichage :
+    /// un récap ou un tutoriel a pu démarrer entre-temps.
+    private var momentOpportun: Bool {
+        !estModeCaptures
+            && !briefReporte
+            && !afficheBrief
+            && !afficheRecap
+            && !afficheInvitationNotifs
+            && !dashboardVM.recapArme
+            && !dashboardVM.questionnaireOuvert
+            && tutoriel.etape == nil
+            && !BriefDuJourStore.dejaVuAujourdhui()
+    }
+
+    /// Monte les écrans et ouvre le brief. L'invitation aux notifications ne
+    /// s'ajoute que sur un état d'autorisation DÉJÀ observé : le brief ne peut
+    /// pas attendre la réponse d'iOS sans redevenir lent.
+    private func presenter(_ brief: BriefDuJour) {
+        let jamaisDemande = BriefDuJourStore.statutNotificationsMemorise()
+            == UNAuthorizationStatus.notDetermined.rawValue
+        let slides = BriefDuJourBuilder.slides(
+            brief: brief,
+            proposerInvitation: jamaisDemande && BriefDuJourStore.invitationAProposer()
+        )
+        guard slides.count >= 2 else { return }
+        BriefDuJourStore.marquerVu()
+        slidesBrief = slides
+        afficheBrief = true
     }
 
     /// Joue le récap animé si le questionnaire vient d'être terminé et que le
@@ -835,9 +863,14 @@ struct MainTabView: View {
     /// inside makes both paths safe no-ops when there's nothing queued.
     private func consumePendingRoute() {
         guard let route = pushService.pendingRoute else { return }
-        // Ouverture sur une intention (notification, lien) : le brief attendra
-        // la prochaine ouverture plutôt que de couvrir ce qu'on est venu faire.
-        briefReporte = true
+        // Ouverture sur une intention (scanner, check-in, offre…) : le brief
+        // attendra plutôt que de couvrir ce qu'on est venu faire.
+        //
+        // SAUF `dashboard` : c'est la route du rappel de 8h30, « Ton brief du
+        // jour est prêt ». Toucher cette notification et ne rien voir était le
+        // reproche d'Arthur du 19 sept. — ma propre règle supprimait le brief
+        // que la notification venait d'annoncer.
+        briefReporte = (route != .dashboard)
 
         switch route {
         case .dashboard:
