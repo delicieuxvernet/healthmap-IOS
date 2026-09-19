@@ -27,6 +27,13 @@ struct CibleNutritionnelle: Codable, Equatable {
 
     /// « ton fer », « ta vitamine C », « tes oméga-3 ».
     var avecPossessif: String { NomNutriment.possessif(id: id, nom: nom) }
+
+    /// Les aliments à dire : ceux du bilan (personnalisés) ou, à défaut, le
+    /// repli écrit à la main. Un apport connu n'est JAMAIS sans idée de repas —
+    /// c'est le plancher de qualité (19 sept. 2026).
+    var alimentsAffichables: [String] {
+        SourcesAlimentaires.pour(id: id, duBilan: aliments)
+    }
 }
 
 // MARK: - Grammaire des noms de nutriments
@@ -185,9 +192,43 @@ enum BriefDuJourBuilder {
 
     // MARK: Construction
 
+    /// Depuis le bilan fraîchement chargé.
     static func construire(
         prenom: String?,
         apports: [ApportV2],
+        repas: [MealJournalService.MealRecord],
+        maintenant: Date = Date(),
+        calendar: Calendar = .current
+    ) -> BriefDuJour {
+        construire(prenom: prenom, cibles: cibles(depuis: apports), repas: repas,
+                   maintenant: maintenant, calendar: calendar)
+    }
+
+    /// Le brief SANS réseau, depuis ce que le téléphone a gardé de la dernière
+    /// session (repas de la quinzaine, cibles du bilan, prénom). `nil` = pas
+    /// assez de matière — première ouverture après la mise à jour — et
+    /// l'appelant repasse alors par le réseau.
+    static func depuisLeCache(
+        maintenant: Date = Date(),
+        calendar: Calendar = .current,
+        defaults: UserDefaults = .standard
+    ) -> BriefDuJour? {
+        let cibles = RappelsPersonnalises.ciblesMemorisees(defaults: defaults)
+        guard !cibles.isEmpty else { return nil }
+        let repas = BriefDuJourStore.repasMemorises(maintenant: maintenant, defaults: defaults)
+        guard !repas.isEmpty else { return nil }
+        return construire(
+            prenom: BriefDuJourStore.prenomMemorise(defaults: defaults),
+            cibles: cibles,
+            repas: repas,
+            maintenant: maintenant,
+            calendar: calendar
+        )
+    }
+
+    static func construire(
+        prenom: String?,
+        cibles toutesLesCibles: [CibleNutritionnelle],
         repas: [MealJournalService.MealRecord],
         maintenant: Date = Date(),
         calendar: Calendar = .current
@@ -202,7 +243,6 @@ enum BriefDuJourBuilder {
         let couvertureAvantHier = couverture(jour: avantHier, repas: repas, calendar: calendar)
 
         let hierAssezNote = repasHier >= repasMinimum
-        let toutesLesCibles = cibles(depuis: apports)
 
         let manques: [BriefDuJour.Manque] = hierAssezNote
             ? toutesLesCibles
@@ -335,5 +375,91 @@ enum BriefDuJourStore {
 
     static func repousserInvitation(maintenant: Date = Date(), defaults: UserDefaults = .standard) {
         defaults.set(maintenant, forKey: cleInvitationRepoussee)
+    }
+
+    // MARK: - Ingrédients gardés sur le téléphone (brief instantané)
+    //
+    // Retour d'Arthur du 19 sept. : le brief arrivait « au bout d'une minute ».
+    // Il attendait trois allers-retours réseau en série (profil, bilan, repas).
+    // On garde donc les DEUX ingrédients dont il a besoin — les repas de la
+    // quinzaine et le prénom — à chaque fois que le journal les charge de
+    // toute façon. Au lancement suivant, le brief se calcule sans réseau.
+    //
+    // Ce sont les repas qu'on garde, pas le brief tout fait : le passage à un
+    // nouveau jour change « hier » sans rien changer aux repas, et un brief
+    // mémorisé serait périmé le lendemain matin sans qu'on puisse le savoir.
+
+    static let cleRepas = "healthmap_brief_repas"
+    static let clePrenom = "healthmap_brief_prenom"
+    static let cleStatutNotifs = "healthmap_brief_statut_notifs"
+    /// Au-delà, les repas gardés ne décrivent plus « hier » : on repasse par
+    /// le réseau plutôt que d'afficher des chiffres d'avant-hier.
+    static let fraicheurRepas: TimeInterval = 3 * 24 * 60 * 60
+
+    /// Un repas réduit à ce que le brief lit : le jour et les apports.
+    struct RepasMemorise: Codable, Equatable {
+        let jour: Date
+        let micros: [String: Int]
+    }
+
+    static func memoriserRepas(
+        _ repas: [MealJournalService.MealRecord],
+        maintenant: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) {
+        let compact = repas.map { record in
+            RepasMemorise(
+                jour: record.consumedAt,
+                micros: Dictionary(record.micros.map { ($0.id, $0.pctRDA) }, uniquingKeysWith: +)
+            )
+        }
+        guard let data = try? JSONEncoder().encode(compact) else { return }
+        defaults.set(data, forKey: cleRepas)
+        defaults.set(maintenant, forKey: cleRepas + "_date")
+    }
+
+    /// Les repas gardés, reconstruits pour le moteur du brief. Vide si rien
+    /// n'a été gardé, ou si c'est trop vieux pour parler d'hier.
+    static func repasMemorises(
+        maintenant: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) -> [MealJournalService.MealRecord] {
+        guard let ecritLe = defaults.object(forKey: cleRepas + "_date") as? Date,
+              maintenant.timeIntervalSince(ecritLe) < fraicheurRepas,
+              let data = defaults.data(forKey: cleRepas),
+              let compact = try? JSONDecoder().decode([RepasMemorise].self, from: data) else { return [] }
+        return compact.map { memo in
+            MealJournalService.MealRecord(
+                id: UUID().uuidString,
+                consumedAt: memo.jour,
+                slot: MealJournalService.MealSlot.from(date: memo.jour),
+                foods: [],
+                macros: MealJournalService.MealMacros(),
+                micros: memo.micros.map { MealJournalService.MicroPct(id: $0.key, pctRDA: $0.value) }
+            )
+        }
+    }
+
+    static func memoriserPrenom(_ prenom: String?, defaults: UserDefaults = .standard) {
+        let propre = prenom?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let propre, !propre.isEmpty else { return }
+        defaults.set(propre, forKey: clePrenom)
+    }
+
+    static func prenomMemorise(defaults: UserDefaults = .standard) -> String? {
+        defaults.string(forKey: clePrenom)
+    }
+
+    /// Dernier état connu de l'autorisation de notifications, écrit par le
+    /// planificateur de rappels (qui le lit déjà à chaque passage au premier
+    /// plan). Le brief doit décider d'afficher ou non l'invitation SANS
+    /// attendre une réponse asynchrone d'iOS.
+    static func memoriserStatutNotifications(_ brut: Int, defaults: UserDefaults = .standard) {
+        defaults.set(brut, forKey: cleStatutNotifs)
+    }
+
+    /// `nil` = jamais observé (on n'invite pas : dans le doute, on se tait).
+    static func statutNotificationsMemorise(defaults: UserDefaults = .standard) -> Int? {
+        defaults.object(forKey: cleStatutNotifs) as? Int
     }
 }

@@ -120,6 +120,11 @@ final class MealJournalViewModel: ObservableObject {
             defer { if Self.volEnCours?.tache == tache { Self.volEnCours = nil } }
             let all = try await tache.value
             fortnight = all
+            // Le brief du jour se calcule sur cette même quinzaine : on la garde
+            // sur le téléphone pour qu'il s'affiche demain matin SANS attendre
+            // le réseau (retour d'Arthur du 19 sept. : « il arrive au bout
+            // d'une minute »).
+            BriefDuJourStore.memoriserRepas(all)
             meals = all.filter { Calendar.current.isDateInToday($0.consumedAt) }
             jourLePlusAncienCharge = min(jourLePlusAncienCharge, cal.startOfDay(for: from))
             jourLePlusRecentCharge = max(jourLePlusRecentCharge, cal.startOfDay(for: to))

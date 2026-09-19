@@ -79,8 +79,8 @@ enum RappelsPersonnalises {
                 rappels.append(RappelPlanifie(
                     id: "\(prefixe)brief.\(jour)",
                     date: date,
-                    titre: "Ton brief du jour est prêt",
-                    corps: "Ce qui t'a manqué hier, et ce sur quoi miser aujourd'hui.",
+                    titre: FormulationsRappel.briefDuMatin(jour: jour).titre,
+                    corps: FormulationsRappel.briefDuMatin(jour: jour).corps,
                     ecran: "dashboard"
                 ))
             }
@@ -101,12 +101,12 @@ enum RappelsPersonnalises {
 
         // Retour au 7e jour : ne sonne que si l'app est restée fermée d'ici là.
         if let date = instant(horizonJours, Moment.midi) {
-            let quoi = cibles.first.map { NomNutriment.majusculeInitiale($0.avecPossessif) } ?? "Ton suivi"
+            let texte = FormulationsRappel.retour(cible: cibles.first)
             rappels.append(RappelPlanifie(
                 id: "\(prefixe)retour",
                 date: date,
-                titre: "\(quoi) t'attend",
-                corps: "Une semaine sans nouvelles : un repas noté suffit à relancer ton suivi.",
+                titre: texte.titre,
+                corps: texte.corps,
                 ecran: "meal_scan"
             ))
         }
@@ -122,29 +122,17 @@ enum RappelsPersonnalises {
     ) -> RappelPlanifie {
         let id = "\(prefixe)midi.\(jour)"
         guard !cibles.isEmpty else {
-            return RappelPlanifie(
-                id: id, date: date,
-                titre: "Photographie ton repas",
-                corps: "Scanne ton assiette, Kiwio s'occupe de l'analyse.",
-                ecran: "meal_scan"
-            )
+            let texte = FormulationsRappel.midiSansBilan(jour: jour)
+            return RappelPlanifie(id: id, date: date, titre: texte.titre, corps: texte.corps, ecran: "meal_scan")
         }
         let cible = cibles[jour % cibles.count]
-        var corps = ""
-        if let couvert = couvertureHier[cible.id], couvert < 100 {
-            corps = "Hier, il t'en a manqué \(100 - couvert) %. "
-        }
-        if cible.aliments.isEmpty {
-            corps += "Scanne ton assiette : Kiwio te dit ce qu'elle t'apporte."
-        } else {
-            corps += "\(NomNutriment.enumeration(cible.aliments)) ce midi ? Scanne ton assiette."
-        }
-        return RappelPlanifie(
-            id: id, date: date,
-            titre: "C'est le moment de renforcer \(cible.avecPossessif)",
-            corps: corps,
-            ecran: "meal_scan"
+        let couvert = couvertureHier[cible.id]
+        let texte = FormulationsRappel.midi(
+            cible: cible,
+            jour: jour,
+            manqueHier: couvert.map { max(0, 100 - $0) }
         )
+        return RappelPlanifie(id: id, date: date, titre: texte.titre, corps: texte.corps, ecran: "meal_scan")
     }
 
     private static func rappelSoir(
@@ -154,29 +142,13 @@ enum RappelsPersonnalises {
     ) -> RappelPlanifie {
         let id = "\(prefixe)soir.\(jour)"
         guard !cibles.isEmpty else {
-            return RappelPlanifie(
-                id: id, date: date,
-                titre: "Et ce soir, qu'y a-t-il au menu ?",
-                corps: "Note ton dîner : ta journée se complète.",
-                ecran: "meal_scan"
-            )
+            let texte = FormulationsRappel.soirSansBilan(jour: jour)
+            return RappelPlanifie(id: id, date: date, titre: texte.titre, corps: texte.corps, ecran: "meal_scan")
         }
         // Décalé d'un cran sur le midi : on alterne les apports au fil des jours.
         let cible = cibles[(jour + 1) % cibles.count]
-        let corps: String
-        if let conseil = cible.conseil {
-            corps = conseil
-        } else if !cible.aliments.isEmpty {
-            corps = "\(NomNutriment.enumeration(cible.aliments)) au dîner ? Ta journée se complète."
-        } else {
-            corps = "Note ton dîner : ta journée se complète."
-        }
-        return RappelPlanifie(
-            id: id, date: date,
-            titre: "Ce soir, pense à \(cible.avecPossessif)",
-            corps: corps,
-            ecran: "meal_scan"
-        )
+        let texte = FormulationsRappel.soir(cible: cible, jour: jour)
+        return RappelPlanifie(id: id, date: date, titre: texte.titre, corps: texte.corps, ecran: "meal_scan")
     }
 
     // MARK: - Mémoire des cibles
@@ -217,6 +189,10 @@ enum RappelsPersonnalises {
 
         let center = UNUserNotificationCenter.current()
         let reglages = await center.notificationSettings()
+        // Le brief décide d'inviter ou non aux notifications SANS attendre iOS
+        // (il doit s'afficher à l'instant où l'app s'ouvre) : on lui laisse ici
+        // le dernier état connu.
+        BriefDuJourStore.memoriserStatutNotifications(reglages.authorizationStatus.rawValue)
         guard reglages.authorizationStatus == .authorized
                 || reglages.authorizationStatus == .provisional else {
             AppLogger.push.notice("Rappels non planifiés : notifications non autorisées")
