@@ -4,33 +4,6 @@ import Supabase
 // MARK: - Protocol conformance
 extension DatabaseService: DatabaseServiceProtocol {}
 
-// MARK: - Push tokens
-extension DatabaseService {
-    /// Stores the APNs device token in `profiles.push_token` for the currently signed-in user.
-    /// Called from `PushNotificationService` after a successful APNs registration.
-    func updatePushToken(_ token: String) async throws {
-        guard let userId = await AuthService.shared.currentUser?.id.uuidString else {
-            throw HealthMapError.auth(.sessionExpired)
-        }
-        struct Row: Encodable {
-            let push_token: String
-            let push_token_updated_at: String
-        }
-        let row = Row(
-            push_token: token,
-            push_token_updated_at: ISO8601DateFormatter().string(from: Date())
-        )
-        try await NetworkService.shared.withRetry {
-            try await SupabaseService.shared.client
-                .from("profiles")
-                .update(row)
-                .eq("id", value: userId)
-                .execute()
-        }
-        AppLogger.database.info("Push token updated for user \(userId, privacy: .private(mask: .hash))")
-    }
-}
-
 // MARK: - Account deletion (RGPD + Apple requirement)
 extension DatabaseService {
     /// Full user data erasure, required by:
