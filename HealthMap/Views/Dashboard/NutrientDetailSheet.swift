@@ -279,21 +279,18 @@ struct NutrientDetailSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // La dose et le moment SONT l'ordonnance : elles étaient rendues
-            // en légende grise, deux tiers de la solution perdus en route.
-            // Une donnée-héros de ligne ne descend jamais sous 15 pt.
-            if let dosage = solution.dosage, !dosage.isEmpty {
-                Text(dosage)
-                    .font(Theme.heroValueRowFont)
-                    .foregroundStyle(Color.dsTexte)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
+            // La dose journalière ne s'affiche plus (20 septembre 2026) : on
+            // conseille le complément, la posologie appartient au fabricant et
+            // à la personne. Celle-ci était en plus GÉNÉRÉE par l'IA, donc
+            // différente d'un profil à l'autre.
+            //
+            // Le moment de prise reste, et prend la place laissée : ce n'est
+            // pas une posologie mais un conseil d'absorption, souvent ce qui
+            // sépare un complément utile d'un complément gaspillé. Une
+            // donnée-héros de ligne ne descend jamais sous 15 pt.
             if let quand = solution.quand, !quand.isEmpty {
                 Text(quand)
-                    .font(Theme.insightFont)
+                    .font(Theme.heroValueRowFont)
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(2)
                     .truncationMode(.tail)
@@ -331,7 +328,7 @@ struct NutrientDetailSheet: View {
     /// La carte solution ne s'affiche que si elle a du contenu réel
     /// (jamais de coquille vide — loi 11).
     private func hasSolutionContent(_ solution: NutrientSolutionAI) -> Bool {
-        [solution.action, solution.dosage, solution.quand, solution.delai]
+        [solution.action, solution.quand, solution.delai]
             .contains { $0?.isEmpty == false }
     }
 
