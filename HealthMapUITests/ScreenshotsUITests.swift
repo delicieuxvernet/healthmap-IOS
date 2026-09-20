@@ -183,29 +183,18 @@ final class ScreenshotsUITests: XCTestCase {
         sleep(1)
         snap("51-reglages-bas")
         app.swipeDown()
-        if app.buttons["Mon abonnement"].firstMatch.waitForExistence(timeout: 5) {
-            taper(app.buttons["Mon abonnement"].firstMatch)
-            sleep(2)
-            snap("52-abonnement")
-            retour()
-        }
-        if app.buttons["Mes données et confidentialité"].firstMatch.waitForExistence(timeout: 5) {
-            taper(app.buttons["Mes données et confidentialité"].firstMatch)
-            sleep(2)
-            snap("53-donnees")
-            retour()
-        }
-        if app.buttons["Mon profil et mes objectifs"].firstMatch.waitForExistence(timeout: 5) {
-            taper(app.buttons["Mon profil et mes objectifs"].firstMatch)
-            sleep(2)
-            snap("54-profil")
-            retour()
-        }
-        if app.buttons["Notre méthode et nos sources"].firstMatch.waitForExistence(timeout: 5) {
-            taper(app.buttons["Notre méthode et nos sources"].firstMatch)
-            sleep(2)
-            snap("55-methode")
-            retour()
+        for (identifiant, capture) in [("reglages.abonnement", "52-abonnement"),
+                                       ("reglages.compte", "53-compte"),
+                                       ("reglages.objectifs", "54-objectifs"),
+                                       ("reglages.questionnaire", "55-questionnaire"),
+                                       ("reglages.methode", "55b-methode")] {
+            let ligne = app.buttons[identifiant].firstMatch
+            if ligne.waitForExistence(timeout: 5) {
+                taper(ligne)
+                sleep(2)
+                snap(capture)
+                retour()
+            }
         }
         // Paywall depuis la carte Premium (gratuit) ou l'abonnement.
         if app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Essayer")).firstMatch.exists {

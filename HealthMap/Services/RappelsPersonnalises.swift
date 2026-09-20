@@ -169,6 +169,18 @@ enum RappelsPersonnalises {
         return cibles
     }
 
+    // MARK: - Interrupteur (Réglages → Notifications)
+
+    /// Ce que la personne VEUT, distinct de ce qu'iOS autorise. Allumé par
+    /// défaut : seul un geste dans les Réglages l'éteint. Clé préfixée
+    /// `healthmap_` → effacée au changement de compte.
+    static let cleActifs = "healthmap_rappels_actifs"
+
+    static var actifs: Bool {
+        get { UserDefaults.standard.object(forKey: cleActifs) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: cleActifs) }
+    }
+
     // MARK: - Application (UNUserNotificationCenter)
 
     /// Recalcule et remplace TOUS les rappels. Silencieux si les notifications
@@ -180,9 +192,9 @@ enum RappelsPersonnalises {
     static func replanifier(cibles: [CibleNutritionnelle]? = nil) async {
         if let cibles { memoriser(cibles) }
 
-        // Mode Zen : « Désactive les badges, les confettis et les
-        // notifications » — promesse des Réglages, tenue ici.
-        if GamificationService.shared.isZenMode {
+        // Rappels coupés dans les Réglages, ou ancien mode Zen encore actif
+        // (il promettait lui aussi le silence) : rien ne part.
+        if !actifs || GamificationService.shared.isZenMode {
             toutAnnuler()
             return
         }

@@ -103,6 +103,12 @@ final class ToastService: ObservableObject {
         show("Ton bilan animé n'est pas disponible pour l'instant.")
     }
 
+    /// Confirmation d'un geste que la personne vient de faire (« Objectifs mis
+    /// à jour ») : elle passe même en mode Zen, ce n'est pas une sollicitation.
+    func confirmer(_ message: String) {
+        show(message)
+    }
+
     // MARK: - Display & Auto-Dismiss
     private func show(_ message: String) {
         currentToast = message
