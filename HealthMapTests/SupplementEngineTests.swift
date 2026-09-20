@@ -17,7 +17,9 @@ final class SupplementEngineTests: XCTestCase {
         periodFlow: String = "na",
         indoorWork: String = "no",
         stressLevel: String = "relaxed",
-        age: String = "30"
+        age: String = "30",
+        allergies: [String] = [],
+        medicalHistory: [String] = []
     ) -> UserProfile {
         var p = UserProfile.empty
         p.completed = true
@@ -28,6 +30,8 @@ final class SupplementEngineTests: XCTestCase {
         p.stressLevel = stressLevel
         p.age = age
         p.gender = .homme
+        p.allergies = allergies
+        p.medicalHistory = medicalHistory
         return p
     }
 
@@ -449,4 +453,88 @@ final class SupplementEngineTests: XCTestCase {
             "Vegan B12 diet difficulty (\(veganB12.dietDifficulty)) should be higher than omnivore (\(omnivoreB12.dietDifficulty))"
         )
     }
+
+    // MARK: - Allergies et antécédents (20 septembre 2026)
+
+    /// Un omnivore allergique au poisson recevait l'huile de poisson : le
+    /// filtre ne regardait que le régime déclaré. L'alternative à l'algue
+    /// existe au catalogue depuis toujours.
+    func testAllergiePoisson_basculeSurLAlgue() {
+        let profil = makeProfile(allergies: ["fish_shellfish"])
+        let result = SupplementEngine.generateRecommendations(
+            scores: scoresWithDeficiency(.omega3), profile: profil
+        )
+        let omega3 = result.topRecommendations.first { $0.nutrientID == .omega3 }
+        XCTAssertNotNil(omega3, "L'oméga-3 doit rester recommandé, pas disparaître")
+        if let produit = omega3?.premiumProduct {
+            XCTAssertTrue(
+                produit.isVegan,
+                "Allergie au poisson : le produit retenu doit être celui à l'algue, reçu « \(produit.name) »"
+            )
+        }
+    }
+
+    /// Sans allergie déclarée, l'omnivore garde l'huile de poisson.
+    func testSansAllergie_omnivoreGardeLeProduitPoisson() {
+        let result = SupplementEngine.generateRecommendations(
+            scores: scoresWithDeficiency(.omega3), profile: makeProfile()
+        )
+        let omega3 = result.topRecommendations.first { $0.nutrientID == .omega3 }
+        XCTAssertEqual(omega3?.premiumProduct?.isVegan, false)
+    }
+
+    /// Hémochromatose : le fer s'accumule. Aucune dose n'est acceptable, donc
+    /// le produit sort du catalogue au lieu d'être annoté.
+    func testHemochromatose_aucunFerPropose() {
+        let profil = makeProfile(medicalHistory: ["hemochromatosis"])
+        let result = SupplementEngine.generateRecommendations(
+            scores: scoresWithDeficiency(.iron), profile: profil
+        )
+        let fer = result.topRecommendations.first { $0.nutrientID == .iron }
+        XCTAssertNil(
+            fer?.premiumProduct,
+            "Une hémochromatose ne doit recevoir aucun produit à base de fer"
+        )
+        XCTAssertNil(fer?.valueProduct)
+    }
+
+    /// Sans hémochromatose, le fer est bien proposé — le garde-fou ne doit pas
+    /// assécher le cas normal.
+    func testSansHemochromatose_leFerRestePropose() {
+        let result = SupplementEngine.generateRecommendations(
+            scores: scoresWithDeficiency(.iron), profile: makeProfile()
+        )
+        let fer = result.topRecommendations.first { $0.nutrientID == .iron }
+        XCTAssertNotNil(fer?.premiumProduct ?? fer?.valueProduct)
+    }
+
+    /// Reins fragiles : le magnésium s'évacue mal, la dose se discute.
+    func testReinsFragiles_precautionMagnesium() {
+        let profil = makeProfile(medicalHistory: ["kidney_condition"])
+        let result = SupplementEngine.generateRecommendations(
+            scores: scoresWithDeficiency(.magnesium), profile: profil
+        )
+        XCTAssertTrue(
+            result.warnings.contains { $0.nutrients.contains("kidney_condition") },
+            "Le magnésium recommandé sur des reins fragiles doit porter une précaution"
+        )
+    }
+
+    /// Pas de reins déclarés, pas de précaution rénale.
+    func testReinsSains_aucunePrecautionRenale() {
+        let result = SupplementEngine.generateRecommendations(
+            scores: scoresWithDeficiency(.magnesium), profile: makeProfile()
+        )
+        XCTAssertFalse(result.warnings.contains { $0.nutrients.contains("kidney_condition") })
+    }
+
+    /// Thyroïde déclarée sans traitement : l'iode porte quand même sa précaution.
+    func testThyroideDeclaree_precautionIode() {
+        let profil = makeProfile(medicalHistory: ["thyroid_condition"])
+        let result = SupplementEngine.generateRecommendations(
+            scores: scoresWithDeficiency(.iodine), profile: profil
+        )
+        XCTAssertTrue(result.warnings.contains { $0.nutrients.contains("thyroid_condition") })
+    }
+
 }

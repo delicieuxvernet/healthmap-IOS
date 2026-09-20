@@ -308,6 +308,7 @@ enum NutrientEngine {
             scores["iron", default: 70] -= 15; scores["vitB12", default: 70] -= 10; scores["calcium", default: 70] -= 10
             scores["zinc", default: 70] -= 10; scores["vitD", default: 70] -= 10
         }
+        applyMedicalHistoryPenalties(&scores, profile: p)
 
         // ═══════ MÉDICAMENTS ═══════
         if p.medications.contains("ppi") {
@@ -340,4 +341,89 @@ enum NutrientEngine {
             scores["vitB12", default: 70] -= 15; scores["iron", default: 70] -= 8; scores["zinc", default: 70] -= 8
         }
     }
+
+    // MARK: - Antécédents médicaux, opérations et allergies
+    //
+    // Bloc partagé avec HealthCalculator (appelé par les deux) : ces pénalités
+    // ne doivent PAS être recopiées de part et d'autre, c'est exactement comme
+    // ça que les deux moteurs ont divergé par le passé.
+    //
+    // Les valeurs suivent l'échelle déjà en place (cœliaque = -15 fer / -10 le
+    // reste). Une opération pèse plus lourd qu'une condition : un estomac
+    // dérivé supprime le facteur intrinsèque, donc la B12 tombe plus bas que
+    // sur n'importe quelle inflammation.
+    //
+    // Trois réponses ne touchent AUCUN score, volontairement : cancer, reins et
+    // hémochromatose. Elles ouvrent une alerte de suivi (RedFlagDetector) et
+    // ferment des portes côté compléments (SupplementEngine). Fabriquer un
+    // chiffre là-dessus reviendrait à faire dire au moteur ce qu'il ne sait pas.
+    static func applyMedicalHistoryPenalties(_ scores: inout [String: Int], profile p: UserProfile) {
+        let conditions = Set(p.digestiveConditions)
+        let surgeries = Set(p.surgicalHistory)
+        let history = Set(p.medicalHistory)
+        let allergies = Set(p.allergies)
+
+        // — Conditions digestives (les quatre historiques sont traitées plus haut)
+        if conditions.contains("gastritis") {
+            scores["vitB12", default: 70] -= 12; scores["iron", default: 70] -= 10
+        }
+        if conditions.contains("sibo") {
+            scores["vitB12", default: 70] -= 10; scores["iron", default: 70] -= 5
+        }
+        if conditions.contains("lactose_intolerance") {
+            scores["calcium", default: 70] -= 12; scores["vitD", default: 70] -= 5
+        }
+        if conditions.contains("pancreatic_insufficiency") {
+            scores["vitD", default: 70] -= 15; scores["omega3", default: 70] -= 10; scores["calcium", default: 70] -= 8
+        }
+        if conditions.contains("liver_condition") {
+            scores["zinc", default: 70] -= 12; scores["vitD", default: 70] -= 10
+        }
+
+        // — Opérations. Estomac réduit et estomac retiré partagent le même
+        // mécanisme (plus d'acidité, plus de facteur intrinsèque) : on ne les
+        // additionne pas si les deux sont cochées.
+        if surgeries.contains("bariatric") || surgeries.contains("gastrectomy") {
+            scores["vitB12", default: 70] -= 30; scores["iron", default: 70] -= 20
+            scores["calcium", default: 70] -= 15; scores["vitD", default: 70] -= 15
+            scores["zinc", default: 70] -= 15
+        }
+        if surgeries.contains("cholecystectomy") {
+            scores["vitD", default: 70] -= 10; scores["omega3", default: 70] -= 8
+        }
+        if surgeries.contains("small_bowel_resection") {
+            scores["vitB12", default: 70] -= 25; scores["vitD", default: 70] -= 15
+            scores["calcium", default: 70] -= 10; scores["magnesium", default: 70] -= 10
+        }
+        if surgeries.contains("colectomy") {
+            scores["magnesium", default: 70] -= 15; scores["calcium", default: 70] -= 5
+        }
+
+        // — Antécédents
+        if history.contains("diabetes") { scores["magnesium", default: 70] -= 8 }
+        if history.contains("autoimmune") { scores["vitD", default: 70] -= 8 }
+
+        // — Allergies : ce qu'on évite, on ne le mange pas.
+        if allergies.contains("nuts") {
+            scores["magnesium", default: 70] -= 10; scores["omega3", default: 70] -= 8
+            scores["zinc", default: 70] -= 5; scores["fiber", default: 70] -= 5
+        }
+        if allergies.contains("fish_shellfish") {
+            scores["omega3", default: 70] -= 20; scores["vitD", default: 70] -= 8; scores["iodine", default: 70] -= 10
+        }
+        if allergies.contains("milk") {
+            scores["calcium", default: 70] -= 15; scores["vitD", default: 70] -= 8; scores["iodine", default: 70] -= 5
+        }
+        if allergies.contains("egg") {
+            scores["vitB12", default: 70] -= 8; scores["zinc", default: 70] -= 5
+        }
+        if allergies.contains("wheat_gluten") {
+            scores["fiber", default: 70] -= 8; scores["iron", default: 70] -= 5
+            // L'iode est déjà retiré plus haut si le régime déclaré est
+            // « sans gluten » — les deux chemins disent la même chose, on ne
+            // compte la pénalité qu'une fois.
+            if p.dietType != "sans_gluten" { scores["iodine", default: 70] -= 5 }
+        }
+    }
+
 }

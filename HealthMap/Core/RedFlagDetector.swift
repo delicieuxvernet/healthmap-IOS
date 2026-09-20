@@ -72,11 +72,43 @@ enum RedFlagDetector {
             ))
         }
 
-        // Celiac / Crohn's / UC = malabsorption
-        if conditions.contains(where: { ["celiac", "crohns_uc"].contains($0) }) {
+        // Celiac / Crohn's / UC / pancreas = malabsorption
+        if conditions.contains(where: { ["celiac", "crohns_uc", "pancreatic_insufficiency"].contains($0) }) {
             flags.append(RedFlag(
                 id: .malabsorptionCondition, urgency: .routine,
                 message: "Avec un intestin fragile, le fer, la B12, le calcium, le zinc, la vitamine D et les folates passent moins bien. Un suivi médical fait la différence."
+            ))
+        }
+
+        // Opération lourde sur l'estomac ou l'intestin grêle : la B12 ne passe
+        // plus par la voie normale, et ça ne se rattrape pas par l'assiette.
+        let surgeries = profile.surgicalHistory
+        if surgeries.contains(where: { ["bariatric", "gastrectomy", "small_bowel_resection"].contains($0) }) {
+            flags.append(RedFlag(
+                id: .majorDigestiveSurgery, urgency: .soon,
+                message: "Après une opération qui touche l'estomac ou l'intestin grêle, la B12 ne s'absorbe plus comme avant, souvent pour longtemps. Un dosage régulier avec ton médecin, c'est la base."
+            ))
+        }
+
+        // Antécédents. Un traitement EN COURS ouvre une alerte ; un antécédent
+        // ancien n'en ouvre pas — on n'alarme pas quelqu'un en rémission.
+        let history = profile.medicalHistory
+        if history.contains("cancer_treatment") {
+            flags.append(RedFlag(
+                id: .cancerFollowUp, urgency: .soon,
+                message: "Pendant un traitement lourd, tes besoins bougent vite et l'appétit avec. C'est ton équipe soignante qui pilote : ce que tu lis ici ne remplace rien."
+            ))
+        }
+        if history.contains("hemochromatosis") {
+            flags.append(RedFlag(
+                id: .hemochromatosisIron, urgency: .routine,
+                message: "Avec une hémochromatose, le fer s'accumule au lieu de manquer. On ne te proposera jamais de fer, et méfie-toi des multivitamines qui en contiennent."
+            ))
+        }
+        if history.contains("kidney_condition") {
+            flags.append(RedFlag(
+                id: .kidneySupplementCaution, urgency: .routine,
+                message: "Des reins fragiles évacuent moins bien le magnésium et le potassium. Avant de te supplémenter, demande l'avis de ton médecin."
             ))
         }
 

@@ -399,6 +399,12 @@ final class QuestionnaireViewModel: ObservableObject {
             if let arr = value as? [String] { profile.digestiveConditions = arr }
         case "digestiveIssues":
             if let arr = value as? [String] { profile.digestiveIssues = arr }
+        case "surgicalHistory":
+            if let arr = value as? [String] { profile.surgicalHistory = arr }
+        case "medicalHistory":
+            if let arr = value as? [String] { profile.medicalHistory = arr }
+        case "allergies":
+            if let arr = value as? [String] { profile.allergies = arr }
         case "periodFlow":
             if let str = value as? String { profile.periodFlow = str }
         case "pregnancyStatus":
@@ -502,6 +508,9 @@ final class QuestionnaireViewModel: ObservableObject {
         case "symptoms": return profile.symptoms
         case "medications": return profile.medications
         case "digestiveConditions": return profile.digestiveConditions
+        case "surgicalHistory": return profile.surgicalHistory
+        case "medicalHistory": return profile.medicalHistory
+        case "allergies": return profile.allergies
         default: return []
         }
     }

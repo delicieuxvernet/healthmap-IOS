@@ -551,6 +551,9 @@ struct EditProfileView: View {
         case "symptoms": p.symptoms = (newValue as? [String]) ?? []
         case "medications": p.medications = (newValue as? [String]) ?? []
         case "digestiveConditions": p.digestiveConditions = (newValue as? [String]) ?? []
+        case "surgicalHistory": p.surgicalHistory = (newValue as? [String]) ?? []
+        case "medicalHistory": p.medicalHistory = (newValue as? [String]) ?? []
+        case "allergies": p.allergies = (newValue as? [String]) ?? []
         default: return
         }
 
@@ -587,6 +590,9 @@ struct EditProfileView: View {
         case "symptoms": return p.symptoms
         case "medications": return p.medications
         case "digestiveConditions": return p.digestiveConditions
+        case "surgicalHistory": return p.surgicalHistory
+        case "medicalHistory": return p.medicalHistory
+        case "allergies": return p.allergies
         default: return ""
         }
     }
@@ -659,6 +665,9 @@ struct EditProfileView: View {
             return [
                 EditableField(id: "medications", label: "Médicaments", emoji: "💊", kind: .pickerMulti(options: options("medications"))),
                 EditableField(id: "digestiveConditions", label: "Conditions digestives", emoji: "🫁", kind: .pickerMulti(options: options("digestiveConditions"))),
+                EditableField(id: "surgicalHistory", label: "Opérations", emoji: "🩹", kind: .pickerMulti(options: options("surgicalHistory"))),
+                EditableField(id: "medicalHistory", label: "Antécédents", emoji: "📋", kind: .pickerMulti(options: options("medicalHistory"))),
+                EditableField(id: "allergies", label: "Allergies", emoji: "⚠️", kind: .pickerMulti(options: options("allergies"))),
             ]
         }
     }
@@ -693,6 +702,9 @@ struct EditProfileView: View {
         case "symptoms": return p.symptoms.isEmpty ? "Aucun" : "\(p.symptoms.count) symptôme\(p.symptoms.count > 1 ? "s" : "")"
         case "medications": return p.medications.isEmpty ? "Aucun" : "\(p.medications.count)"
         case "digestiveConditions": return p.digestiveConditions.isEmpty ? "Aucune" : "\(p.digestiveConditions.count)"
+        case "surgicalHistory": return p.surgicalHistory.isEmpty ? "Aucune" : "\(p.surgicalHistory.count)"
+        case "medicalHistory": return p.medicalHistory.isEmpty ? "Aucun" : "\(p.medicalHistory.count)"
+        case "allergies": return p.allergies.isEmpty ? "Aucune" : "\(p.allergies.count)"
         default: return "-"
         }
     }

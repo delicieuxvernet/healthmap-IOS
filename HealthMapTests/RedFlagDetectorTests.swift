@@ -23,7 +23,9 @@ final class RedFlagDetectorTests: XCTestCase {
         medications: [String] = [],
         age: String = "30",
         symptoms: [String] = [],
-        gender: UserProfile.Gender = .homme
+        gender: UserProfile.Gender = .homme,
+        surgicalHistory: [String] = [],
+        medicalHistory: [String] = []
     ) -> UserProfile {
         var p = UserProfile.empty
         p.completed = true
@@ -38,6 +40,8 @@ final class RedFlagDetectorTests: XCTestCase {
         p.age = age
         p.symptoms = symptoms
         p.gender = gender
+        p.surgicalHistory = surgicalHistory
+        p.medicalHistory = medicalHistory
         return p
     }
 
@@ -184,4 +188,65 @@ final class RedFlagDetectorTests: XCTestCase {
         let flags = RedFlagDetector.detect(profile: profile)
         XCTAssertTrue(flags.isEmpty, "Healthy profile should have no red flags, got \(flags.map(\.id))")
     }
+
+    // MARK: - Opérations et antécédents (20 septembre 2026)
+
+    /// Un estomac dérivé coupe le facteur intrinsèque : la B12 ne passe plus,
+    /// et ça ne se rattrape pas à l'assiette.
+    func testOperationLourde_declencheLAlerte() {
+        for operation in ["bariatric", "gastrectomy", "small_bowel_resection"] {
+            let ids = flagIDs(for: makeProfile(surgicalHistory: [operation]))
+            XCTAssertTrue(
+                ids.contains(.majorDigestiveSurgery),
+                "« \(operation) » doit ouvrir l'alerte opération lourde"
+            )
+        }
+    }
+
+    /// Une vésicule retirée gêne les graisses, pas la B12 : pas d'alerte.
+    func testOperationLegere_neDeclenchePas() {
+        let ids = flagIDs(for: makeProfile(surgicalHistory: ["cholecystectomy"]))
+        XCTAssertFalse(ids.contains(.majorDigestiveSurgery))
+    }
+
+    /// Un traitement EN COURS ouvre l'alerte de suivi.
+    func testCancerEnCours_declencheLeSuivi() {
+        let ids = flagIDs(for: makeProfile(medicalHistory: ["cancer_treatment"]))
+        XCTAssertTrue(ids.contains(.cancerFollowUp))
+    }
+
+    /// Un antécédent ancien n'en ouvre PAS : on n'alarme pas une rémission.
+    func testCancerPasse_neDeclenchePas() {
+        let ids = flagIDs(for: makeProfile(medicalHistory: ["cancer_history"]))
+        XCTAssertFalse(
+            ids.contains(.cancerFollowUp),
+            "Un cancer passé ne doit pas rouvrir une alerte de suivi"
+        )
+    }
+
+    func testHemochromatose_declencheLAlerteFer() {
+        let ids = flagIDs(for: makeProfile(medicalHistory: ["hemochromatosis"]))
+        XCTAssertTrue(ids.contains(.hemochromatosisIron))
+    }
+
+    func testReinsFragiles_declencheLaPrecaution() {
+        let ids = flagIDs(for: makeProfile(medicalHistory: ["kidney_condition"]))
+        XCTAssertTrue(ids.contains(.kidneySupplementCaution))
+    }
+
+    /// Un pancréas fragile rejoint la famille malabsorption.
+    func testPancreasFragile_rejointMalabsorption() {
+        let ids = flagIDs(for: makeProfile(digestiveConditions: ["pancreatic_insufficiency"]))
+        XCTAssertTrue(ids.contains(.malabsorptionCondition))
+    }
+
+    /// Un profil vierge ne déclenche aucune des nouvelles alertes.
+    func testProfilVierge_aucuneNouvelleAlerte() {
+        let ids = flagIDs(for: makeProfile())
+        XCTAssertFalse(ids.contains(.majorDigestiveSurgery))
+        XCTAssertFalse(ids.contains(.cancerFollowUp))
+        XCTAssertFalse(ids.contains(.hemochromatosisIron))
+        XCTAssertFalse(ids.contains(.kidneySupplementCaution))
+    }
+
 }
