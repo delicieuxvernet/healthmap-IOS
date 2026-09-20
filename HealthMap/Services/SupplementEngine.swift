@@ -200,14 +200,35 @@ enum SupplementEngine {
             return false
         }
 
+        // Même bascule pour une allergie au poisson : le catalogue contient
+        // déjà l'oméga-3 à l'algue, il ne sortait que pour les végés. Un
+        // omnivore allergique recevait l'huile de poisson avec, pour tout
+        // garde-fou, un avertissement générique affiché à tout le monde.
+        if profile.allergies.contains("fish_shellfish")
+            && product.nutrientID == .omega3
+            && !product.isVegan {
+            return false
+        }
+
+        // Hémochromatose : le fer s'accumule, il ne manque pas. C'est la seule
+        // situation où l'on retire le produit au lieu de l'annoter — proposer
+        // du fer ici serait une erreur, pas une nuance. L'alerte
+        // `hemochromatosisIron` explique l'absence.
+        if profile.medicalHistory.contains("hemochromatosis")
+            && product.nutrientID == .iron {
+            return false
+        }
+
         return true
     }
 
-    // Les contre-indications ne sont PLUS un filtre silencieux : le profil ne
-    // capte ni allergie, ni thyroïde, ni hémochromatose. On affiche le produit
-    // AVEC une précaution (voir SupplementsV4.precautions) plutôt que de le
-    // masquer. La grossesse déclenche une note « valide avec ton médecin »
-    // (detectConditionWarnings) sans exclure le fer, dont le besoin augmente.
+    // Règle générale : une contre-indication n'est PAS un filtre silencieux. On
+    // affiche le produit AVEC une précaution (voir SupplementsV4.precautions)
+    // plutôt que de le masquer — la grossesse déclenche une note « valide avec
+    // ton médecin » sans exclure le fer, dont le besoin augmente.
+    // Deux exceptions, ci-dessus dans filterByDiet : l'allergie au poisson (il
+    // existe une alternative à l'algue, donc masquer ne prive de rien) et
+    // l'hémochromatose (aucune dose de fer n'est acceptable).
 
     /// Find matching products for a given nutrient.
     /// Le catalogue est ordonné pour que le premier produit d'un tier soit le
@@ -526,6 +547,30 @@ enum SupplementEngine {
     ) -> [InteractionWarning] {
         var warnings: [InteractionWarning] = []
         let recommendedNutrients = Set(recommendations.map { $0.nutrientID })
+
+        // Reins fragiles : le magnésium s'évacue mal, la dose se discute.
+        if profile.medicalHistory.contains("kidney_condition")
+            && recommendedNutrients.contains(.magnesium) {
+            warnings.append(InteractionWarning(
+                emoji: "🫘⚡",
+                message: "Tes reins filtrent moins bien : le magnésium peut s'accumuler. Valide la dose avec ton médecin avant de commencer.",
+                nutrients: ["magnesium", "kidney_condition"],
+                severity: .critical
+            ))
+        }
+
+        // Thyroïde déclarée. Le traitement thyroïdien est déjà couvert par
+        // detectMedicationInteractions ; ici c'est la thyroïde elle-même, que
+        // quelqu'un peut déclarer sans être sous traitement.
+        if profile.medicalHistory.contains("thyroid_condition")
+            && recommendedNutrients.contains(.iodine) {
+            warnings.append(InteractionWarning(
+                emoji: "🦋🌊",
+                message: "Avec une thyroïde qui s'emballe ou qui traîne, l'iode ne se prend pas à l'aveugle. Demande l'avis de ton médecin avant.",
+                nutrients: ["iodine", "thyroid_condition"],
+                severity: .critical
+            ))
+        }
 
         if isPregnant(profile) && recommendedNutrients.contains(.iron) {
             warnings.append(InteractionWarning(

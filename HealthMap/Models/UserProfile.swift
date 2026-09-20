@@ -84,6 +84,15 @@ struct UserProfile: Codable, Equatable {
     var medications: [String] = []
     var digestiveConditions: [String] = []
     var digestiveIssues: [String] = []
+    /// Opérations ayant touché le tube digestif (bypass, vésicule, résection…).
+    /// Ajouté le 20 septembre 2026 : c'est ce qui pèse le plus lourd sur
+    /// l'absorption, et rien ne permettait de le déclarer.
+    var surgicalHistory: [String] = []
+    /// Antécédents non digestifs (cancer, reins, thyroïde, hémochromatose…).
+    /// Sert surtout de garde-fou au moteur de compléments.
+    var medicalHistory: [String] = []
+    /// Allergies et évictions alimentaires.
+    var allergies: [String] = []
     var periodFlow: String = "na"
     var pregnancyStatus: String = "na"
 
@@ -232,6 +241,7 @@ struct UserProfile: Codable, Equatable {
         case breadType, fermentedFoods, ultraProcessedFrequency, snacking, saltLevel
         case iodizedSalt, eatLiver, lowCarbDiet, supplementsCurrent, groceries
         case symptoms, medications, digestiveConditions, digestiveIssues
+        case surgicalHistory, medicalHistory, allergies
         case periodFlow, pregnancyStatus, precisions
         // Legacy field (decoded only — never encoded)
         case supplementsLegacy = "supplements"
@@ -309,6 +319,9 @@ struct UserProfile: Codable, Equatable {
         medications = (try? c.decode([String].self, forKey: .medications)) ?? []
         digestiveConditions = (try? c.decode([String].self, forKey: .digestiveConditions)) ?? []
         digestiveIssues = (try? c.decode([String].self, forKey: .digestiveIssues)) ?? []
+        surgicalHistory = (try? c.decode([String].self, forKey: .surgicalHistory)) ?? []
+        medicalHistory = (try? c.decode([String].self, forKey: .medicalHistory)) ?? []
+        allergies = (try? c.decode([String].self, forKey: .allergies)) ?? []
         periodFlow = (try? c.decode(String.self, forKey: .periodFlow)) ?? "na"
         pregnancyStatus = (try? c.decode(String.self, forKey: .pregnancyStatus)) ?? "na"
         precisions = try? c.decode(Precisions.self, forKey: .precisions)
@@ -377,6 +390,9 @@ struct UserProfile: Codable, Equatable {
         try c.encode(medications, forKey: .medications)
         try c.encode(digestiveConditions, forKey: .digestiveConditions)
         try c.encode(digestiveIssues, forKey: .digestiveIssues)
+        try c.encode(surgicalHistory, forKey: .surgicalHistory)
+        try c.encode(medicalHistory, forKey: .medicalHistory)
+        try c.encode(allergies, forKey: .allergies)
         try c.encode(periodFlow, forKey: .periodFlow)
         try c.encode(pregnancyStatus, forKey: .pregnancyStatus)
         try c.encodeIfPresent(precisions, forKey: .precisions)

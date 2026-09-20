@@ -31,6 +31,10 @@ struct RedFlag: Identifiable, Equatable {
         case tinglingB12Risk = "tingling_b12_risk"
         case hairLossIronRisk = "hair_loss_iron_risk"
         case digestiveBleeding = "digestive_bleeding"
+        case majorDigestiveSurgery = "major_digestive_surgery"
+        case cancerFollowUp = "cancer_follow_up"
+        case hemochromatosisIron = "hemochromatosis_iron"
+        case kidneySupplementCaution = "kidney_supplement_caution"
     }
 
     enum Urgency: String {

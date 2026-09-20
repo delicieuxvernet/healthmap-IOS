@@ -417,6 +417,9 @@ enum HealthCalculator {
             scores["iron", default: 70] -= 15; scores["vitB12", default: 70] -= 10; scores["calcium", default: 70] -= 10
             scores["zinc", default: 70] -= 10; scores["vitD", default: 70] -= 10
         }
+        // Opérations, antécédents et allergies : bloc partagé avec NutrientEngine
+        // pour que les deux moteurs ne puissent pas diverger dessus.
+        NutrientEngine.applyMedicalHistoryPenalties(&scores, profile: p)
 
         // ═══════ SUPPLEMENT BOOST ═══════
         if currentSupps.contains("vitD") { scores["vitD", default: 70] += 25 }

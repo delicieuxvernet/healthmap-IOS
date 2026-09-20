@@ -518,9 +518,13 @@ extension QuestionnaireSection {
                 .init("antidiarrheal", "Anti-diarrheiques", emoji: "💊"),
             ]
         ),
+        // Étendue le 20 septembre 2026. Les quatre premières lignes existaient
+        // seules et ne couvraient qu'une fraction de ce qui gêne l'absorption :
+        // une gastrite, un pancréas ou un foie fragile pèsent autant qu'un
+        // Crohn, et personne ne pouvait les déclarer.
         Question(
             id: "digestiveConditions",
-            text: "Conditions digestives diagnostiquees ?",
+            text: "Ta digestion, aujourd'hui ?",
             type: .multiChoice,
             options: [
                 .init("none", "Aucune"),
@@ -528,6 +532,70 @@ extension QuestionnaireSection {
                 .init("crohns_uc", "Crohn / RCH"),
                 .init("ibs", "Syndrome de l'intestin irritable"),
                 .init("acid_reflux", "Reflux gastrique"),
+                .init("gastritis", "Gastrite ou H. pylori"),
+                .init("sibo", "Pullulation bactérienne (SIBO)"),
+                .init("lactose_intolerance", "Lactose mal toléré"),
+                .init("pancreatic_insufficiency", "Pancréas fragile"),
+                .init("liver_condition", "Foie fragile"),
+            ]
+        ),
+        // Les opérations : c'est le trou le plus large du questionnaire d'avant.
+        // Un bypass coupe la B12 plus fort que n'importe quelle condition de la
+        // liste ci-dessus, et rien ne permettait de le dire.
+        Question(
+            id: "surgicalHistory",
+            text: "Une opération a-t-elle touché ton système digestif ?",
+            type: .multiChoice,
+            options: [
+                .init("none", "Non"),
+                .init("bariatric", "Estomac réduit ou dérivé (bypass, sleeve)"),
+                .init("gastrectomy", "Estomac retiré, en partie ou en totalité"),
+                .init("cholecystectomy", "Vésicule biliaire retirée"),
+                .init("small_bowel_resection", "Portion d'intestin grêle retirée"),
+                .init("colectomy", "Côlon retiré ou stomie"),
+                .init("thyroidectomy", "Thyroïde retirée"),
+                .init("other_digestive_surgery", "Une autre opération digestive"),
+            ]
+        ),
+        // Antécédents non digestifs. Trois de ces réponses ne touchent AUCUN
+        // score : elles servent de garde-fou au moteur de compléments (pas de
+        // fer sur une hémochromatose) et déclenchent une alerte de suivi. On ne
+        // fabrique pas de chiffre là où on n'a rien à calculer.
+        Question(
+            id: "medicalHistory",
+            text: "Autre chose qu'on devrait savoir ?",
+            type: .multiChoice,
+            options: [
+                .init("none", "Non"),
+                .init("cancer_treatment", "Un traitement en cours pour un cancer"),
+                .init("cancer_history", "Un cancer dans mon passé"),
+                .init("kidney_condition", "Des reins fragiles"),
+                .init("thyroid_condition", "Une thyroïde qui tourne trop, ou pas assez"),
+                .init("hemochromatosis", "Une hémochromatose"),
+                .init("diabetes", "Un diabète"),
+                .init("autoimmune", "Un terrain auto-immun"),
+            ]
+        ),
+        // Allergies et évictions. « Sans gluten » vit toujours dans dietType,
+        // qui est un choix UNIQUE : on ne pouvait pas être végane ET sans
+        // gluten. La ligne blé ci-dessous lève ce blocage sans toucher aux
+        // profils déjà enregistrés (la pénalité iode est dédoublonnée côté
+        // moteur, voir NutrientEngine).
+        Question(
+            id: "allergies",
+            text: "Y a-t-il des aliments que tu ne peux pas manger ?",
+            type: .multiChoice,
+            options: [
+                .init("none", "Aucun"),
+                .init("nuts", "Fruits à coque"),
+                .init("peanut", "Arachide"),
+                .init("fish_shellfish", "Poisson et crustacés"),
+                .init("milk", "Lait de vache"),
+                .init("egg", "Œuf"),
+                .init("soy", "Soja"),
+                .init("wheat_gluten", "Blé ou gluten"),
+                .init("sesame", "Sésame"),
+                .init("sulfites", "Sulfites"),
             ]
         ),
         // Gender-specific: only displayed for users who selected `femme`. Hommes

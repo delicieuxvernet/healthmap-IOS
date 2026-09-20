@@ -23,6 +23,7 @@ final class EditProfileParityTests: XCTestCase {
         "gender", "weightTrend", "indoorWork", "sunExposure", "skinType", "strengthTraining",
         "stressLevel", "sleepHours", "wakeFeeling", "caffeineIntake", "waterIntake", "alcohol",
         "dietType", "symptoms", "medications", "digestiveConditions",
+        "surgicalHistory", "medicalHistory", "allergies",
     ]
 
     /// Un champ éditable sans options = un sélecteur vide à l'écran.
@@ -53,6 +54,24 @@ final class EditProfileParityTests: XCTestCase {
             ("crohns_uc", "digestiveConditions", "alerte malabsorption"),
             ("vegan", "dietType", "alerte B12"),
             ("vegetarien", "dietType", "alerte B12"),
+            ("pancreatic_insufficiency", "digestiveConditions", "alerte malabsorption"),
+            ("gastritis", "digestiveConditions", "pénalité B12 et fer"),
+            ("bariatric", "surgicalHistory", "alerte opération lourde + pénalités"),
+            ("gastrectomy", "surgicalHistory", "alerte opération lourde + pénalités"),
+            ("small_bowel_resection", "surgicalHistory", "alerte opération lourde + pénalités"),
+            ("cholecystectomy", "surgicalHistory", "pénalités vitD et oméga-3"),
+            ("colectomy", "surgicalHistory", "pénalité magnésium"),
+            ("cancer_treatment", "medicalHistory", "alerte suivi médical"),
+            ("hemochromatosis", "medicalHistory", "fer retiré du catalogue + alerte"),
+            ("kidney_condition", "medicalHistory", "précaution magnésium + alerte"),
+            ("thyroid_condition", "medicalHistory", "précaution iode"),
+            ("diabetes", "medicalHistory", "pénalité magnésium"),
+            ("autoimmune", "medicalHistory", "pénalité vitD"),
+            ("fish_shellfish", "allergies", "bascule oméga-3 vers l'algue + pénalités"),
+            ("nuts", "allergies", "pénalités magnésium, oméga-3, zinc, fibres"),
+            ("milk", "allergies", "pénalités calcium, vitD, iode"),
+            ("egg", "allergies", "pénalités B12 et zinc"),
+            ("wheat_gluten", "allergies", "pénalités fibres et fer"),
         ]
 
         for cas in attendues {
