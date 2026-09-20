@@ -17,6 +17,11 @@ enum SupplementEngine {
 
     private static let maxTopRecommendations = 3
 
+    /// Marqueur d'anti-interaction qui ne designe PAS un nutriment mais les
+    /// traitements en cours. Il se resout dans `detectMedicationInteractions`,
+    /// pas dans `detectInteractionWarnings` qui ne compare que des nutriments.
+    static let antiInteractionMedicaments = "medicaments"
+
     /// Base diet difficulty (1-10, 10 = hardest to fix through food alone)
     private static let baseDietDifficulty: [NutrientID: Int] = [
         .vitD: 9,
@@ -380,7 +385,7 @@ enum SupplementEngine {
 
         // Check per-product antiInteractions
         for product in products {
-            for anti in product.antiInteractions {
+            for anti in product.antiInteractions where anti != antiInteractionMedicaments {
                 if presentNutrients.contains(anti) {
                     let pair = Set([product.nutrientID.rawValue, anti])
                     let alreadyWarned = warnings.contains { Set($0.nutrients) == pair }
@@ -441,7 +446,7 @@ enum SupplementEngine {
         if medicationSet.contains("ppi") && recommendedNutrients.contains(.calcium) {
             warnings.append(InteractionWarning(
                 emoji: "💊🦴",
-                message: "IPP + calcium : les IPP réduisent l'absorption du calcium. Préfère le citrate de calcium et espace les prises.",
+                message: "IPP + calcium : ton estomac est moins acide, et le calcium en a besoin pour être absorbé. Prends-le pendant un repas, jamais à jeun.",
                 nutrients: ["calcium", "ppi"],
                 severity: .moderate
             ))
@@ -465,6 +470,44 @@ enum SupplementEngine {
                 nutrients: ["vitB12", "metformin"],
                 severity: .moderate
             ))
+        }
+
+        // Traitement thyroidien : l'iode demande un avis medical, le fer et le
+        // calcium genent l'absorption du traitement pris au meme moment.
+        // Le questionnaire capte `thyroid_med` depuis toujours sans rien en faire.
+        if medicationSet.contains("thyroid_med") {
+            if recommendedNutrients.contains(.iodine) {
+                warnings.append(InteractionWarning(
+                    emoji: "🦋🌊",
+                    message: "Traitement thyroïdien + iode : l'iode peut interférer avec ton traitement. Demande l'avis de ton médecin avant d'en prendre.",
+                    nutrients: ["iodine", "thyroid_med"],
+                    severity: .critical
+                ))
+            }
+            for nutriment in [NutrientID.iron, .calcium] where recommendedNutrients.contains(nutriment) {
+                warnings.append(InteractionWarning(
+                    emoji: "🦋💊",
+                    message: "Traitement thyroïdien + \(nutrientLabel(for: nutriment).lowercased()) : pris au même moment, il réduit l'absorption de ton traitement. Espace les prises de 4h.",
+                    nutrients: [nutriment.rawValue, "thyroid_med"],
+                    severity: .moderate
+                ))
+            }
+        }
+
+        // Produits qui genent l'absorption des medicaments (fibres). Cet
+        // avertissement depend des TRAITEMENTS, pas d'un nutriment recommande :
+        // porte par `antiInteractions`, il ne pouvait jamais sortir de
+        // `detectInteractionWarnings`, qui ne compare qu'a des nutriments.
+        if !medicationSet.subtracting(["none"]).isEmpty {
+            for produit in recommendations.compactMap({ $0.bestProduct })
+            where produit.antiInteractions.contains(antiInteractionMedicaments) {
+                warnings.append(InteractionWarning(
+                    emoji: "🌾💊",
+                    message: "\(produit.name) : les fibres ralentissent l'absorption des médicaments pris en même temps. Espace les prises de 2h.",
+                    nutrients: [produit.nutrientID.rawValue, antiInteractionMedicaments],
+                    severity: .moderate
+                ))
+            }
         }
 
         return warnings

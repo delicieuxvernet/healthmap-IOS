@@ -223,7 +223,10 @@ extension SupplementEngine {
             unitsPerPackage: 60,
             productURL: "https://www.nutripure.fr/fr/sante/68-vitamine-c.html",
             isVegan: true,
-            contraindications: [],
+            // Meme raison que la version liposomale : la vitamine C augmente
+            // l'absorption du fer. La precaution ne peut pas dependre du
+            // produit tire par le moteur.
+            contraindications: [.hemochromatose],
             antiInteractions: [],
             tier: .value,
             whyBrand: "Vitamine C Quali-C (qualité pharmaceutique européenne), sans excipient. 1 gélule/jour."
@@ -353,7 +356,7 @@ extension SupplementEngine {
             productURL: "https://nutriandco.com/fr/produits/fibres-bio",
             isVegan: true,
             contraindications: [],
-            antiInteractions: ["medicaments"],
+            antiInteractions: [antiInteractionMedicaments],
             tier: .premium,
             whyBrand: "Trio de fibres solubles certifié Low-FODMAP, compatible intestins sensibles (SII)."
         ),
@@ -370,7 +373,7 @@ extension SupplementEngine {
             productURL: "https://www.aroma-zone.com/product/complement-alimentaire-psyllium-blond-bio",
             isVegan: true,
             contraindications: [],
-            antiInteractions: ["medicaments"],
+            antiInteractions: [antiInteractionMedicaments],
             tier: .value,
             whyBrand: "Psyllium blond bio pur : fibre soluble de référence pour le transit. Toujours avec un grand verre d'eau."
         ),
