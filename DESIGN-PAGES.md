@@ -31,12 +31,20 @@
 > Réglages sont le **seul** endroit qui parle d'argent (carte Premium, prix et essai lus depuis StoreKit).
 >
 > **Écrans** :
-> - **Journal** (`MealScanView.swift` → `JournalView`, `JournalComponents.swift`) : le jour même (la
->   navigation par jour vit dans « Ma journée ») · carte calories (héros 48 + anneau 76) · macros en
->   une carte · « Apports à renforcer » (la phrase de l'interaction, 3 apports, une sortie verte) AVANT
->   · « Aujourd'hui » (4 repas) · bouton `+`. **Avant le questionnaire** : « On ne connaît pas encore
->   tes besoins » (porte), « En attendant, en France » (`TeaserStatsCatalog`, jamais un chiffre
->   inventé), « À la fin du questionnaire » ; Progrès · Plan · Compléments estompés dans la barre.
+> - **Journal** (`MealScanView.swift` → `JournalView`, `JournalComponents.swift`) — **maquette
+>   « Journal & Progrès v2 » du 20 septembre 2026** : barre de jour (chevrons + calendrier sans borne,
+>   décision du 11 septembre, conservée à la place du semainier de la maquette) · carte calories
+>   (héros + anneau 88 en dégradé + ligne **Apple Santé** qui ouvre l'activité du jour) · **macros en
+>   quatre lignes** (protéines · glucides · lipides · fibres) avec objectif et **surplus en hachures,
+>   lu selon l'objectif de la personne** (vert seulement pour les protéines de qui veut prendre du
+>   muscle, orangé sinon ; fibres : référence canonique 30 g) · **la saisie SUR la page** : « Dicter »
+>   (seule surface verte) et « Photographier », puis « Autres façons d'ajouter » qui déplie Écrire ·
+>   Rechercher · Code-barres (« Écrire » = champ compact, même analyse et même quota que la dictée) ·
+>   « Apports à renforcer » (la phrase de l'interaction, **trois anneaux** à la couleur de l'apport,
+>   une sortie verte) · le jour en **mosaïque** de quatre repas (le toucher ouvre le journal du jour).
+>   **Le bouton `+` flottant et sa feuille d'ajout ont disparu.** **Avant le questionnaire** : la
+>   saisie d'abord, puis « On ne connaît pas encore tes besoins » (porte), « En attendant, en France »
+>   (`TeaserStatsCatalog`, jamais un chiffre inventé), « À la fin du questionnaire ».
 > - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) : titre 34 + rôle · carte état
 >   (« 42 % », « 5,9 sur 18 mg » dérivé de la référence canonique, jauge) · Pourquoi · Ce qui le remonte ·
 >   capsule vers le plan. **Gratuit** : la cause en clair, « Ce qui le remonte » floutée, porte
@@ -79,7 +87,9 @@
 > poids alignés sur `PORTION_PIECE_DEFAUT` du serveur vocal ; repli sur la portion « 1 … » de
 > `get_food`). La valeur enregistrée reste le grammage.
 >
-> **Tutoriel premier lancement** (maquette « Kiwio - Tutoriel », 23 août au soir) : six étapes qui
+> **Tutoriel premier lancement** (maquette « Kiwio - Tutoriel », 23 août au soir ; **depuis le
+> 20 septembre l'étape du « + » a disparu avec lui : la découpe vise le bouton « Dicter » du Journal,
+> cinq étapes au lieu de six**) : à l'origine six étapes qui
 > FONT FAIRE sur les vraies commandes — bienvenue (carte), « + » (découpe circulaire), « Dicter mon
 > repas » (dans la feuille d'ajout), « on ne te demande que ce qui manque » (dictée), carte des
 > apports, barre d'onglets (« Reviens demain » + « J'ai compris »). Voile encre 64 % découpé par

@@ -1,9 +1,14 @@
 import SwiftUI
 
-// MARK: - Journal (refonte 23 août 2026) : sous-vues
+// MARK: - Journal : sous-vues (maquette « Journal & Progrès v2 », 20 septembre 2026)
 //
 // Habillage pur : aucune logique, aucun calcul. Les bindings et les
 // ViewModels restent dans `JournalView`. Tokens : `KiwiDS.swift`.
+//
+// Par rapport à la refonte du 23 août : la saisie revient SUR la page (Dicter ·
+// Photographier · autres façons), le bouton flottant et sa feuille d'ajout
+// disparaissent ; les macros passent à quatre lignes avec objectif et surplus ;
+// les apports à renforcer deviennent trois anneaux ; les repas, une mosaïque.
 
 // MARK: - Créneaux : libellés et symboles du Journal
 
@@ -33,10 +38,11 @@ extension MealJournalService.MealSlot {
     }
 }
 
-// MARK: - Carte calories (chiffre héros + anneau)
+// MARK: - Carte calories (chiffre héros + anneau + Apple Santé)
 
-/// Le seul chiffre héros de l'écran : les kcal restantes, 48 / 700. À droite,
-/// l'anneau 92 pt (trait 9) de la part consommée du budget.
+/// Le seul chiffre héros de l'écran : les kcal restantes. À droite, l'anneau
+/// 88 pt (trait 9) de la part consommée du budget. En pied, la pastille Apple
+/// Santé et l'énergie dépensée du jour : elle ouvre la feuille Activité.
 /// Budget = objectif du profil + énergie dépensée (Apple Santé). Sans objectif
 /// calculable : le consommé seul, sans anneau (jamais une cible inventée).
 struct JournalCaloriesCard: View {
@@ -44,6 +50,10 @@ struct JournalCaloriesCard: View {
     let objectif: Int?
     let depensees: Int?
     let isToday: Bool
+    /// Apple Santé est-il relié ? Décide du texte de la ligne de pied.
+    var santeLiee = false
+    /// Ouvre la feuille Activité ; `nil` = pas de ligne de pied.
+    var onActivite: (() -> Void)? = nil
 
     private var budget: Int { (objectif ?? 0) + (depensees ?? 0) }
     private var restantes: Int { budget - consommees }
@@ -65,51 +75,81 @@ struct JournalCaloriesCard: View {
         return depasse ? "kcal au-dessus" : "kcal restantes"
     }
 
+    private var ligneSante: String {
+        if let depensees, depensees > 0 { return "\(DS.entier(depensees)) kcal dépensées" }
+        return santeLiee ? "Rien de dépensé pour l'instant" : "Relier pour compter tes dépenses"
+    }
+
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(DS.entier(heros))
-                    .font(.dsHeros48)
-                    .tracking(DSTracking.heros48)
-                    .foregroundStyle(Color.dsTexte)
-                    .contentTransition(.numericText())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text(legende)
-                    .font(.dsSousTitre)
-                    .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
-                if let depensees, depensees > 0, isToday {
-                    Text("dont \(DS.entier(depensees)) kcal dépensées, Apple Santé")
-                        .font(.dsLegende)
-                        .tracking(DSTracking.legende)
-                        .foregroundStyle(Color.dsTertiaire)
-                        .padding(.top, 2)
-                        .fixedSize(horizontal: false, vertical: true)
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(DS.entier(heros))
+                        .font(.dsHeros48)
+                        .tracking(DSTracking.heros48)
+                        .foregroundStyle(Color.dsTexte)
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(legende)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
-            }
-            Spacer(minLength: 8)
-            if objectif != nil {
-                ZStack {
-                    DSRing(fraction: fraction, couleur: depasse ? .dsACombler : .dsCalories, taille: 76, epaisseur: 8)
-                    VStack(spacing: 0) {
-                        Text("\(min(pourcent, 999))")
+                Spacer(minLength: 8)
+                if objectif != nil {
+                    ZStack {
+                        AnneauBudget(fraction: fraction, depasse: depasse)
+                        Text(DS.pourcent(min(pourcent, 999)))
                             .font(.dsValeurAnneau)
                             .foregroundStyle(Color.dsTexte)
                             .contentTransition(.numericText())
-                        Text("%")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.dsSecondaire)
                     }
                 }
+            }
+            // Le chiffre et l'anneau se lisent d'une traite ; la ligne Apple
+            // Santé, en dessous, reste un bouton à part entière.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(libelleVocal)
+
+            if isToday, let onActivite {
+                DSSeparator(retrait: 0)
+                    .padding(.top, 14)
+                Button(action: onActivite) {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color(uiColor: .systemPink))
+                            Text("Apple Santé")
+                                .font(.dsLegende.weight(.semibold))
+                                .foregroundStyle(Color.dsTexte)
+                        }
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Color(uiColor: .systemPink).opacity(0.1)))
+                        Text(ligneSante)
+                            .font(.dsSousTitre)
+                            .tracking(DSTracking.sousTitre)
+                            .foregroundStyle(Color.dsSecondaire)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        DSChevron()
+                    }
+                    .padding(.top, 12)
+                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.dsPress)
+                .accessibilityLabel("Apple Santé. \(ligneSante)")
+                .accessibilityHint("Ouvre l'activité du jour")
             }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
         .animation(.easeOut(duration: 0.4), value: consommees)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(libelleVocal)
     }
 
     private var libelleVocal: String {
@@ -120,65 +160,209 @@ struct JournalCaloriesCard: View {
     }
 }
 
-// MARK: - Carte macros (une carte, trois colonnes : valeur 20 / 700, libellé, jauge 4 pt)
+/// L'anneau du budget : dégradé orangé tant qu'on est dedans, rouge de statut
+/// une fois dépassé. Même remplissage animé que `DSRing`.
+private struct AnneauBudget: View {
+    let fraction: Double
+    let depasse: Bool
 
-struct JournalMacrosCard: View {
-    let prot: (g: Double, cible: Int?)
-    let carb: (g: Double, cible: Int?)
-    let fat: (g: Double, cible: Int?)
+    @State private var remplie = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var cible: CGFloat { CGFloat(min(1, max(0, fraction))) }
+
+    private var trait: AnyShapeStyle {
+        depasse
+            ? AnyShapeStyle(Color.dsACombler)
+            : AnyShapeStyle(LinearGradient(
+                colors: [Color(hex: "FF8A3D"), Color(hex: "FF5A2B")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ))
+    }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            colonne("Protéines", prot, couleur: .dsProteines, delai: 0.35)
-                .padding(.trailing, 16)
-            colonne("Glucides", carb, couleur: .dsGlucides, delai: 0.40)
-                .padding(.trailing, 16)
-            colonne("Lipides", fat, couleur: .dsLipides, delai: 0.45)
+        ZStack {
+            Circle()
+                .stroke(Color.dsRemplissage, lineWidth: 9)
+            Circle()
+                .trim(from: 0, to: remplie ? cible : 0)
+                .stroke(trait, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                .rotationEffect(.degrees(-90))
         }
-        .padding(.vertical, 13)
-        .padding(.horizontal, 16)
+        .frame(width: 88, height: 88)
+        .animation(reduceMotion ? nil : DS.remplissage, value: fraction)
+        .onAppear {
+            if reduceMotion {
+                remplie = true
+            } else {
+                withAnimation(DS.remplissage.delay(0.2)) { remplie = true }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Carte macros (quatre lignes : valeur sur objectif, jauge, surplus)
+
+/// Protéines, glucides, lipides, fibres : la valeur du jour sur l'objectif, une
+/// jauge de 6 pt, et le SURPLUS en hachures quand l'objectif est dépassé.
+///
+/// Le surplus se lit selon l'objectif de la personne, jamais en alerte par
+/// défaut : dépasser ses protéines en prise de muscle est une bonne nouvelle
+/// (hachures vertes), dépasser ses glucides en perte de poids est un frein
+/// (hachures orangées). Sans objectif calculable : la valeur seule, sans jauge.
+struct JournalMacrosCard: View {
+
+    struct Ligne: Identifiable {
+        let id: String
+        let nom: String
+        let grammes: Double
+        let cible: Double?
+        /// Dégradé de la jauge, de gauche à droite.
+        let teintes: [Color]
+        /// Le dépassement de cette macro sert-il l'objectif de la personne ?
+        let surplusFavorable: Bool
+    }
+
+    let lignes: [Ligne]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(lignes.enumerated()), id: \.element.id) { index, ligne in
+                ligneVue(ligne, delai: 0.35 + Double(index) * DS.cascade)
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, DS.paddingCarte)
         .frame(maxWidth: .infinity)
         .dsCard()
     }
 
-    private func colonne(_ libelle: String, _ m: (g: Double, cible: Int?), couleur: Color, delai: Double) -> some View {
-        let grammes = Int(m.g.rounded())
-        let fraction: Double = (m.cible ?? 0) > 0 ? m.g / Double(m.cible!) : 0
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(DS.entier(grammes))
-                    .font(.system(size: 20, weight: .bold).monospacedDigit())
-                    .tracking(-0.6)
+    private func ligneVue(_ ligne: Ligne, delai: Double) -> some View {
+        let grammes = Int(ligne.grammes.rounded())
+        let ratio: Double = (ligne.cible ?? 0) > 0 ? ligne.grammes / (ligne.cible ?? 1) : 0
+        let surplus = max(0, ratio - 1)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(ligne.nom)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
-                    .contentTransition(.numericText())
-                Text("g")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.dsSecondaire)
+                Spacer(minLength: 8)
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text("\(DS.entier(grammes)) g")
+                        .font(.dsValeurLigneForte)
+                        .foregroundStyle(Color.dsTexte)
+                        .contentTransition(.numericText())
+                    if let cible = ligne.cible {
+                        Text(" / \(DS.entier(Int(cible.rounded()))) g")
+                            .font(.dsValeurLigne)
+                            .foregroundStyle(Color.dsSecondaire)
+                    }
+                }
             }
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-            Text(libelle)
-                .font(.dsLegende)
-                .tracking(DSTracking.legende)
-                .foregroundStyle(Color.dsSecondaire)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            DSGauge(fraction: fraction, couleur: couleur, delai: delai)
-                .padding(.top, 6)
+            if ligne.cible != nil {
+                BarreMacro(
+                    fraction: min(1, ratio),
+                    surplus: min(1, surplus),
+                    teintes: ligne.teintes,
+                    surplusFavorable: ligne.surplusFavorable,
+                    delai: delai
+                )
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 7)
         .animation(.easeOut(duration: 0.4), value: grammes)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(m.cible.map { "\(libelle) : \(grammes) grammes sur \($0)." } ?? "\(libelle) : \(grammes) grammes.")
+        .accessibilityLabel(libelleVocal(ligne, grammes: grammes, surplus: surplus))
+    }
+
+    private func libelleVocal(_ ligne: Ligne, grammes: Int, surplus: Double) -> String {
+        guard let cible = ligne.cible else { return "\(ligne.nom) : \(grammes) grammes." }
+        let base = "\(ligne.nom) : \(grammes) grammes sur \(Int(cible.rounded()))."
+        guard surplus > 0 else { return base }
+        return base + (ligne.surplusFavorable ? " Au-dessus de l'objectif, dans le bon sens." : " Au-dessus de l'objectif.")
     }
 }
 
-// MARK: - Apports à renforcer (l'interaction, la preuve, 3 apports, une sortie)
+/// Jauge d'une macro : le dégradé jusqu'à l'objectif, puis le surplus en
+/// hachures posé par-dessus depuis la gauche (sa largeur dit de combien on
+/// dépasse, plafonnée à une fois l'objectif).
+private struct BarreMacro: View {
+    let fraction: Double
+    let surplus: Double
+    let teintes: [Color]
+    let surplusFavorable: Bool
+    let delai: Double
+
+    @State private var remplie = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var hachures: (fond: Color, raie: Color) {
+        surplusFavorable
+            ? (Color(hex: "4E9530"), Color(hex: "6FBF43"))
+            : (Color(hex: "D9553F"), Color(hex: "F2762B"))
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let largeur = geo.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.dsRemplissage)
+                Capsule()
+                    .fill(LinearGradient(colors: teintes, startPoint: .leading, endPoint: .trailing))
+                    .frame(width: max(6, largeur * (remplie ? fraction : 0)))
+                if surplus > 0 {
+                    Hachures(fond: hachures.fond, raie: hachures.raie)
+                        .frame(width: max(6, largeur * (remplie ? surplus : 0)))
+                        .clipShape(Capsule())
+                }
+            }
+        }
+        .frame(height: 6)
+        .animation(reduceMotion ? nil : DS.remplissage, value: fraction)
+        .animation(reduceMotion ? nil : DS.remplissage, value: surplus)
+        .onAppear {
+            if reduceMotion {
+                remplie = true
+            } else {
+                withAnimation(DS.remplissage.delay(delai)) { remplie = true }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Raies obliques de 5 pt : le motif du surplus.
+private struct Hachures: View {
+    let fond: Color
+    let raie: Color
+
+    var body: some View {
+        Canvas { contexte, taille in
+            let pas: CGFloat = 5
+            var x = -taille.height
+            while x < taille.width {
+                var chemin = Path()
+                chemin.move(to: CGPoint(x: x, y: taille.height))
+                chemin.addLine(to: CGPoint(x: x + taille.height, y: 0))
+                chemin.addLine(to: CGPoint(x: x + taille.height + pas, y: 0))
+                chemin.addLine(to: CGPoint(x: x + pas, y: taille.height))
+                chemin.closeSubpath()
+                contexte.fill(chemin, with: .color(raie))
+                x += pas * 2
+            }
+        }
+        .background(fond)
+    }
+}
+
+// MARK: - Apports à renforcer (l'interaction, trois anneaux, une sortie)
 
 /// Ce que personne d'autre ne fait : détecter les interactions entre habitudes
-/// et apports. En-tête narratif (`headline`) + preuve (`subheadline`
-/// secondaire), puis 3 lignes d'apport (libellé, jauge 4 pt de 170 pt à la
-/// couleur du statut, pourcentage tabulaire, chevron), puis UNE sortie verte.
+/// et apports. La phrase de l'interaction en tête, puis les trois apports en
+/// anneaux (chacun garde sa couleur), puis UNE sortie verte vers le plan.
 struct JournalApportsCard: View {
     let bilan: BilanV2
     let isPremium: Bool
@@ -213,8 +397,6 @@ struct JournalApportsCard: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // L'interaction détectée, en une phrase : l'en-tête narratif de la
-            // carte (la preuve vit dans la fiche, au tap).
             Text(titre)
                 .font(.dsHeadline)
                 .tracking(DSTracking.corps)
@@ -223,62 +405,53 @@ struct JournalApportsCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, DS.paddingCarte)
                 .padding(.top, DS.paddingCarte)
-                .padding(.bottom, 12)
 
-            ForEach(Array(apports.enumerated()), id: \.offset) { index, apport in
-                DSSeparator()
-                ligne(apport, delai: 0.5 + Double(index) * DS.cascade)
+            if !apports.isEmpty {
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Array(apports.enumerated()), id: \.offset) { index, apport in
+                        anneau(apport, delai: 0.5 + Double(index) * DS.cascade)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
             }
 
             DSSeparator()
-            DSLinkRow(titre: "Voir comment les remonter", action: onRemonter)
+            DSLinkRow(titre: "Renforcer mes apports", action: onRemonter)
         }
         .dsCard()
     }
 
-    private func ligne(_ apport: ApportV2, delai: Double) -> some View {
+    private func anneau(_ apport: ApportV2, delai: Double) -> some View {
         let pct = max(0, min(100, apport.pctBesoin ?? 0))
         let nom = apport.nom ?? apport.id.flatMap { NutrientData.definition(for: $0)?.label } ?? "Apport"
+        let couleur = apport.id.map { Color.nutrientColor(for: $0) } ?? Color.dsSecondaire
         return Button {
             onApport(apport)
         } label: {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(nom)
-                        .font(.dsCorps)
-                        .tracking(DSTracking.corps)
+            VStack(spacing: 8) {
+                ZStack {
+                    DSRing(fraction: Double(pct) / 100, couleur: couleur, taille: 74, epaisseur: 7, delai: delai)
+                    Text(DS.pourcent(pct))
+                        .font(.system(size: 16, weight: .semibold).monospacedDigit())
                         .foregroundStyle(Color.dsTexte)
-                        .fixedSize(horizontal: false, vertical: true)
-                    DSGauge(fraction: Double(pct) / 100, couleur: couleur(apport, pct: pct), delai: delai)
-                        .frame(width: 170)
+                        .contentTransition(.numericText())
                 }
-                Spacer(minLength: 8)
-                Text(DS.pourcent(pct))
-                    .font(.dsValeurLigne)
-                    .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
-                DSChevron()
+                Text(nom)
+                    .font(.dsLegendeMoyenne)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsTexte)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, DS.paddingCarte)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
+            .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(.dsPress)
         // VoiceOver : la valeur, jamais la couleur.
         .accessibilityLabel("\(nom), \(pct) pour cent de tes besoins")
         .accessibilityHint("Ouvre la fiche de cet apport")
-    }
-
-    /// Couleur de statut de la jauge : le statut du contrat fait foi, les
-    /// seuils de pourcentage ne servent qu'au statut neutre.
-    private func couleur(_ apport: ApportV2, pct: Int) -> Color {
-        switch apport.statut {
-        case .couvre: return .dsAccent
-        case .aRenforcer: return .dsARenforcer
-        case .aCombler: return .dsACombler
-        case .neutre: return Color.dsStatut(pct)
-        }
     }
 }
 
@@ -474,108 +647,392 @@ struct JournalFinQuestionnaireCard: View {
     }
 }
 
-// MARK: - Feuille d'ajout (toute la saisie derrière un geste)
+// MARK: - Saisie (Dicter · Photographier · autres façons d'ajouter)
 
-/// Grille 3 × 2 de cibles 68 pt. « Dicter mon repas » est la seule cible
-/// verte : c'est la fonction phare. En pied : cadenas + « Tes repas restent
-/// sur ton téléphone. » et, dès le bilan fait, le compteur de scans.
-struct AjoutSheet: View {
+/// Toute la saisie, posée sur la page : plus de bouton flottant ni de feuille
+/// intermédiaire. « Dicter » est la seule surface verte — la fonction phare —
+/// et « Photographier » une carte blanche. Un bouton teinté déplie le reste :
+/// écrire, rechercher, code-barres. « Écrire » ouvre un champ compact dont le
+/// texte suit le même chemin d'analyse que la dictée.
+struct JournalSaisieBloc: View {
+    @Binding var deplie: Bool
+    @Binding var texte: String
+    /// Compteur de scans photo (info neutre dès le bilan fait).
     let compteur: String?
-    let onChoisir: (JournalView.AjoutAction) -> Void
+    let onDicter: () -> Void
+    let onPhotographier: () -> Void
+    let onRechercher: () -> Void
+    let onCodeBarres: () -> Void
+    let onEnvoyerTexte: () -> Void
 
-    private struct Cible: Identifiable {
-        let id: JournalView.AjoutAction
-        let symbole: String
-        let titre: String
-        var phare: Bool = false
+    @State private var ecrire = false
+    @FocusState private var champActif: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var texteUtile: String {
+        texte.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private let cibles: [Cible] = [
-        Cible(id: .dicter, symbole: "mic", titre: "Dicter\nmon repas", phare: true),
-        Cible(id: .scanner, symbole: "camera", titre: "Scanner\nmon plat"),
-        Cible(id: .rechercher, symbole: "magnifyingglass", titre: "Rechercher"),
-        Cible(id: .codeBarres, symbole: "barcode.viewfinder", titre: "Code-barres"),
-        Cible(id: .journee, symbole: "list.bullet.rectangle", titre: "Ma\njournée"),
-        Cible(id: .activite, symbole: "figure.walk", titre: "Activité"),
-    ]
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                boutonDicter
+                boutonPhotographier
+            }
+            .fixedSize(horizontal: false, vertical: true)
 
-    private let colonnes = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+            Button {
+                HapticService.shared.selection()
+                withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
+                    deplie.toggle()
+                    if !deplie { ecrire = false }
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("Autres façons d'ajouter")
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
+                    Image(systemName: deplie ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(Color.kiwiGreenInk)
+                .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                .background(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous).fill(Color.dsAccentPale))
+                .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityIdentifier("journal.autres")
+            .accessibilityValue(deplie ? "déplié" : "replié")
+
+            if deplie {
+                HStack(spacing: 8) {
+                    option("pencil", "Écrire") {
+                        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.2)) { ecrire.toggle() }
+                        champActif = ecrire
+                    }
+                    option("magnifyingglass", "Rechercher", action: onRechercher)
+                    option("barcode.viewfinder", "Code-barres", action: onCodeBarres)
+                }
+                .transition(.opacity)
+
+                if ecrire {
+                    champTexte.transition(.opacity)
+                }
+            }
+
+            if let compteur {
+                Text(compteur)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsTertiaire)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    // MARK: Dicter
+
+    private var boutonDicter: some View {
+        Button(action: onDicter) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack {
+                    HaloDictee()
+                    Circle()
+                        .fill(Color.white.opacity(0.22))
+                        .overlay(Circle().strokeBorder(Color.white.opacity(0.5), lineWidth: 1))
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 46, height: 46)
+                .accessibilityHidden(true)
+
+                OndeDeVoix()
+                    .padding(.top, 10)
+
+                Text("Dicter")
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(.white)
+                    .padding(.top, 8)
+                Text("le plus rapide")
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .padding(.top, 1)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [Color(hex: "7CCC54"), Color.dsAccent, Color(hex: "428426")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    // Lumière spéculaire en haut : le rendu de base ; le verre
+                    // d'iOS 26 viendra l'enrichir sans changer la mise en page.
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(LinearGradient(
+                                colors: [Color.white.opacity(0.3), Color.white.opacity(0)],
+                                startPoint: .top,
+                                endPoint: .center
+                            ))
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .buttonStyle(.dsPress)
+        .cibleTutoriel(.boutonDicter)
+        .accessibilityLabel("Dicter mon repas")
+        .accessibilityHint("Le plus rapide : parle, on identifie tes aliments")
+        .accessibilityIdentifier("journal.dicter")
+    }
+
+    // MARK: Photographier
+
+    private var boutonPhotographier: some View {
+        Button(action: onPhotographier) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack {
+                    Circle().fill(Color.dsFond)
+                    Image(systemName: "camera")
+                        .font(.system(size: 20, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.dsTexte)
+                }
+                .frame(width: 46, height: 46)
+                .accessibilityHidden(true)
+
+                Color.clear.frame(height: 14).padding(.top, 10)
+
+                Text("Photographier")
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
+                    .padding(.top, 8)
+                Text("un plat entier")
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .padding(.top, 1)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.dsCarte))
+            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityLabel("Photographier mon plat")
+        .accessibilityIdentifier("journal.photographier")
+    }
+
+    // MARK: Autres façons
+
+    private func option(_ symbole: String, _ titre: String, action: @escaping () -> Void) -> some View {
+        Button {
+            HapticService.shared.tap()
+            action()
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: symbole)
+                    .font(.system(size: 19, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.dsTexte)
+                    .accessibilityHidden(true)
+                Text(titre)
+                    .font(.dsLegendeMoyenne)
+                    .foregroundStyle(Color.dsTexte)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+            .dsCard()
+            .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+        }
+        .buttonStyle(.dsPress)
+    }
+
+    private var champTexte: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "pencil")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Color.dsSecondaire)
+                .accessibilityHidden(true)
+            TextField("Ex. : 150 g de poulet, riz, une orange", text: $texte, axis: .vertical)
+                .font(.dsSousTitre)
+                .lineLimit(1...4)
+                .focused($champActif)
+                .submitLabel(.send)
+                .onSubmit { envoyer() }
+                .accessibilityLabel("Écris ce que tu as mangé")
+                .accessibilityIdentifier("journal.texte")
+            Button(action: envoyer) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(texteUtile.isEmpty ? Color.dsTertiaire : Color.dsAccent))
+                    .frame(width: DS.cibleTactile, height: DS.cibleTactile)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.dsPress)
+            .disabled(texteUtile.isEmpty)
+            .accessibilityLabel("Analyser ce texte")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 2)
+        .frame(minHeight: DS.cibleTactile)
+        .dsCard()
+    }
+
+    private func envoyer() {
+        guard !texteUtile.isEmpty else { return }
+        champActif = false
+        onEnvoyerTexte()
+    }
+}
+
+/// Deux anneaux qui respirent autour du micro. Gelés sous « Réduire les
+/// animations » : le bouton reste lisible sans eux.
+private struct HaloDictee: View {
+    @State private var respire = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 0) {
-            Text("Ajouter")
-                .font(.dsTitreInline)
-                .tracking(DSTracking.corps)
-                .foregroundStyle(Color.dsTexte)
-                .padding(.top, 18)
-                .accessibilityAddTraits(.isHeader)
+        ZStack {
+            anneau(delai: 0)
+            anneau(delai: 1.3)
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            respire = true
+        }
+        .accessibilityHidden(true)
+    }
 
-            LazyVGrid(columns: colonnes, spacing: 26) {
-                ForEach(cibles) { cible in
-                    Button {
-                        HapticService.shared.tap()
-                        onChoisir(cible.id)
-                    } label: {
-                        VStack(spacing: 9) {
-                            ZStack {
-                                Circle().fill(cible.phare ? Color.dsAccent : Color.dsCarte)
-                                Image(systemName: cible.symbole)
-                                    .font(.system(size: 27, weight: .medium))
-                                    .symbolRenderingMode(.hierarchical)
-                                    .foregroundStyle(cible.phare ? Color.white : Color.dsTexte)
-                            }
-                            .frame(width: 68, height: 68)
-                            .shadow(color: cible.phare ? Color.dsAccent.opacity(0.32) : .clear, radius: 9, x: 0, y: 6)
-                            Text(cible.titre)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(Color.dsTexte)
-                                .multilineTextAlignment(.center)
-                                .lineSpacing(2)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .contentShape(Rectangle())
+    private func anneau(delai: Double) -> some View {
+        Circle()
+            .strokeBorder(Color.white.opacity(0.6), lineWidth: 1.5)
+            .scaleEffect(respire ? 1.18 : 1)
+            .opacity(respire ? 0 : 0.55)
+            .animation(
+                reduceMotion ? nil : .easeInOut(duration: 2.6).repeatForever(autoreverses: false).delay(delai),
+                value: respire
+            )
+    }
+}
+
+/// Sept barres, hauteurs fixes : l'onde dit « voix » sans bouger en permanence.
+private struct OndeDeVoix: View {
+    private let hauteurs: [CGFloat] = [6, 11, 14, 9, 13, 7, 10]
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 2.5) {
+            ForEach(Array(hauteurs.enumerated()), id: \.offset) { _, hauteur in
+                Capsule()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: 2.5, height: hauteur)
+            }
+        }
+        .frame(height: 14)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Aujourd'hui, en mosaïque (les quatre repas)
+
+/// Quatre tuiles deux par deux. Un repas renseigné prend une teinte douce et
+/// un chevron ; un repas vide reste blanc, estompé — et reste touchable, pour
+/// qu'on puisse y ajouter. Le toucher ouvre le journal du jour.
+struct JournalRepasMosaique: View {
+
+    struct Repas: Identifiable {
+        let slot: MealJournalService.MealSlot
+        let kcal: Int
+        let vide: Bool
+        var id: MealJournalService.MealSlot { slot }
+    }
+
+    let repas: [Repas]
+    let onOuvrir: (MealJournalService.MealSlot) -> Void
+
+    private let colonnes = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+
+    var body: some View {
+        LazyVGrid(columns: colonnes, spacing: 10) {
+            ForEach(repas) { item in
+                tuile(item)
+            }
+        }
+    }
+
+    private func teinte(_ slot: MealJournalService.MealSlot) -> Color {
+        switch slot {
+        case .breakfast: return Color(uiColor: .systemOrange)
+        case .lunch:     return Color.dsAccent
+        case .dinner:    return Color(uiColor: .systemIndigo)
+        case .snack:     return Color(uiColor: .systemPink)
+        }
+    }
+
+    private func tuile(_ item: Repas) -> some View {
+        Button {
+            HapticService.shared.tap()
+            onOuvrir(item.slot)
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    Image(systemName: item.slot.symboleJournal)
+                        .font(.system(size: 24, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(item.vide ? Color.dsTertiaire : teinte(item.slot))
+                    Spacer(minLength: 0)
+                    if !item.vide { DSChevron() }
+                }
+                .accessibilityHidden(true)
+                Text(item.slot.label)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(item.vide ? Color.dsSecondaire : Color.dsTexte)
+                    .padding(.top, 8)
+                Text(item.vide ? "rien encore" : "\(DS.entier(item.kcal)) kcal")
+                    .font(.dsValeurLigne)
+                    .foregroundStyle(item.vide ? Color.dsTertiaire : Color.dsSecondaire)
+                    .contentTransition(.numericText())
+                    .padding(.top, 1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                ZStack {
+                    Color.dsCarte
+                    if !item.vide {
+                        LinearGradient(
+                            stops: [
+                                .init(color: teinte(item.slot).opacity(0.16), location: 0),
+                                .init(color: teinte(item.slot).opacity(0), location: 0.62),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     }
-                    .buttonStyle(.dsPress)
-                    .accessibilityLabel(cible.titre.replacingOccurrences(of: "\n", with: " "))
-                    .cibleTutoriel(.tuileDicter, si: cible.id == .dicter)
                 }
-            }
-            .padding(.top, 26)
-
-            VStack(spacing: 6) {
-                HStack(spacing: 7) {
-                    Image(systemName: "lock")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.dsSecondaire)
-                        .accessibilityHidden(true)
-                    Text("Tes repas restent privés.")
-                        .font(.dsLegende)
-                        .tracking(DSTracking.legende)
-                        .foregroundStyle(Color.dsSecondaire)
-                }
-                if let compteur {
-                    Text(compteur)
-                        .font(.dsLegende)
-                        .tracking(DSTracking.legende)
-                        .foregroundStyle(Color.dsTertiaire)
-                }
-            }
-            .padding(.top, 26)
-            .padding(.bottom, 8)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
         }
-        .padding(.horizontal, DS.marge)
-        // Étape « dicter » du tutoriel : la feuille est son propre arbre de
-        // vues, elle porte donc sa propre surcouche (voile + bulle).
-        .overlayPreferenceValue(TutorielCibleKey.self) { ancres in
-            GeometryReader { proxy in
-                TutorielOverlayAjout(service: TutorielService.partage, ancres: ancres, proxy: proxy)
-            }
-        }
-        .presentationDetents([.height(compteur == nil ? 404 : 426)])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(Color.dsFond)
-        .presentationCornerRadius(34)
+        .buttonStyle(.dsPress)
+        .accessibilityLabel(item.vide
+            ? "\(item.slot.label), rien encore"
+            : "\(item.slot.label), \(item.kcal) kilocalories")
+        .accessibilityHint("Ouvre le journal du jour")
     }
 }
 

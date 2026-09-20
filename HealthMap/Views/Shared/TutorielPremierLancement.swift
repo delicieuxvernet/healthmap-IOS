@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Tutoriel du premier lancement (maquette « Kiwio - Tutoriel », 23 août 2026)
 //
-// Cinq gestes appris en trente secondes : le tutoriel ne raconte pas
+// Quatre gestes appris en trente secondes : le tutoriel ne raconte pas
 // l'application, il FAIT FAIRE. À chaque étape, l'écran s'assombrit sauf la
 // cible (voile 64 % découpé par `.blendMode(.destinationOut)`), une bulle dit
 // quoi en attendre, et la personne touche la VRAIE commande — jamais un
@@ -16,30 +16,36 @@ import SwiftUI
 //   • l'étape franchie se marque dans UserDefaults (reprise si l'app est tuée) ;
 //   • relançable depuis Réglages.
 //
-// Les étapes 1, 2, 5 et 6 vivent en surcouche de MainTabView ; l'étape 3 dans
-// la feuille d'ajout, l'étape 4 dans la feuille de dictée (chaque feuille est
-// son propre arbre de vues, une surcouche racine ne la couvrirait pas).
+// Les étapes 1, 2, 5 et 6 vivent en surcouche de MainTabView ; l'étape 4 dans
+// la feuille de dictée (une feuille est son propre arbre de vues, une surcouche
+// racine ne la couvrirait pas).
+//
+// 20 septembre 2026 : le « + » flottant et sa feuille d'ajout ont quitté le
+// Journal, la saisie est sur la page. L'étape 2 vise donc le bouton « Dicter »
+// lui-même, et l'ancienne étape 3 (« Dicter mon repas » dans la feuille) n'est
+// plus jamais atteinte : son numéro reste réservé, parce que l'étape en cours
+// est PERSISTÉE par son numéro — la renuméroter ferait reprendre un tutoriel
+// interrompu à la mauvaise étape.
 
 // MARK: - Étapes et service
 
 enum TutorielEtape: Int {
     case bienvenue = 1   // carte centrée, sans découpe
-    case bouton          // découpe circulaire sur le « + » flottant
-    case dicter          // dans la feuille d'ajout, découpe sur « Dicter mon repas »
-    case verifier        // dans la feuille de dictée, bulle sans découpe
-    case valeur          // découpe sur la carte « Apports à renforcer »
-    case suite           // découpe sur la barre d'onglets + « J'ai compris »
+    case bouton = 2      // découpe sur le bouton « Dicter » du Journal
+    case dicter = 3      // RÉSERVÉ : ancienne étape de la feuille d'ajout, plus atteinte
+    case verifier = 4    // dans la feuille de dictée, bulle sans découpe
+    case valeur = 5      // découpe sur la carte « Apports à renforcer »
+    case suite = 6       // découpe sur la barre d'onglets + « J'ai compris »
 
     /// Position dans les points de progression (l'étape 1 n'en a pas :
     /// la carte de bienvenue porte ses propres boutons).
     var point: Int? {
         switch self {
         case .bienvenue: return nil
-        case .bouton: return 0
-        case .dicter: return 1
-        case .verifier: return 2
-        case .valeur: return 3
-        case .suite: return 4
+        case .bouton, .dicter: return 0
+        case .verifier: return 1
+        case .valeur: return 2
+        case .suite: return 3
         }
     }
 }
@@ -74,8 +80,8 @@ final class TutorielService: ObservableObject {
             }
             aller(.bienvenue)
         } else if let reprise = TutorielEtape(rawValue: stocke) {
-            // Les étapes 3 et 4 vivent dans des feuilles fermées au
-            // relancement : la reprise repart du bouton d'ajout.
+            // L'étape 4 vit dans une feuille fermée au relancement (et la 3
+            // n'existe plus) : la reprise repart du bouton « Dicter ».
             switch reprise {
             case .dicter, .verifier: aller(.bouton)
             default: aller(reprise)
@@ -108,10 +114,12 @@ final class TutorielService: ObservableObject {
     // MARK: Événements du parcours (chacun ne réagit qu'à SON étape)
 
     func commencer() { if etape == .bienvenue { aller(.bouton) } }
-    func plusTape() { if etape == .bouton { aller(.dicter) } }
-    /// Feuille d'ajout refermée sans choisir : la découpe revient sur le « + ».
-    func feuilleAjoutFermeeSansChoix() { if etape == .dicter { aller(.bouton) } }
-    func dicterChoisi() { if etape == .dicter { aller(.verifier) } }
+    /// La dictée a réellement démarré (autorisations et quota passés) : le
+    /// voile se lève, la bulle d'enregistrement prend la main.
+    func dicteeDemarree() { if etape == .bouton { aller(.verifier) } }
+    /// Enregistrement jeté ou trop court, avant toute feuille : la découpe
+    /// revient sur « Dicter ».
+    func dicteeJetee() { if etape == .verifier { aller(.bouton) } }
     func repasEnregistre() { if etape == .verifier { aller(.valeur) } }
     /// Dictée abandonnée (feuille fermée sans enregistrer) : on saute la
     /// valeur — elle n'existe pas sans repas — et on montre la suite.
@@ -130,10 +138,9 @@ final class TutorielService: ObservableObject {
 // MARK: - Ancres des cibles
 
 enum TutorielCible: Hashable {
-    case boutonAjout
+    case boutonDicter
     case carteApports
     case barreOnglets
-    case tuileDicter
 }
 
 struct TutorielCibleKey: PreferenceKey {
@@ -256,7 +263,7 @@ struct TutorielBulle: View {
     var action: (() -> Void)? = nil
     var onPasser: (() -> Void)? = nil
 
-    private static let nombreDePoints = 5
+    private static let nombreDePoints = 4
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -345,7 +352,7 @@ struct TutorielCarteBienvenue: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 16)
 
-            Text("Cinq étapes pour dicter un plat et voir ce qu'il couvre de tes besoins. Tu peux arrêter quand tu veux.")
+            Text("Quatre étapes pour dicter un plat et voir ce qu'il couvre de tes besoins. Tu peux arrêter quand tu veux.")
                 .font(.system(size: 16))
                 .lineSpacing(3)
                 .multilineTextAlignment(.center)
@@ -391,7 +398,7 @@ struct TutorielOverlayPrincipal: View {
     @ObservedObject var service: TutorielService
     let ancres: [TutorielCible: Anchor<CGRect>]
     let proxy: GeometryProxy
-    /// Les étapes qui montrent le Journal (bouton +, carte apports) ne se
+    /// Les étapes qui montrent le Journal (bouton Dicter, carte apports) ne se
     /// posent que lui à l'écran — les onglets restent tous montés, leurs
     /// ancres existent donc même hors écran.
     var journalVisible: Bool = true
@@ -432,17 +439,17 @@ struct TutorielOverlayPrincipal: View {
             }
 
         case .bouton:
-            let trou = cadreLocal(.boutonAjout)
+            let trou = cadreLocal(.boutonDicter)
             ZStack(alignment: .bottom) {
-                TutorielVoile(trou: cadre(.boutonAjout), forme: .cercle, marge: 8)
+                TutorielVoile(trou: cadre(.boutonDicter), forme: .arrondi(22), marge: 6)
                 TutorielBulle(
                     etape: etape,
-                    titre: "Tout part de ce bouton",
-                    texte: Text("Dicter, scanner, chercher un produit : une seule porte d'entrée. Appuie dessus."),
+                    titre: "Parle-lui comme à un ami",
+                    texte: Text("Touche Dicter et dis simplement : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt ». Donne les quantités si tu les connais, sinon on te les demandera."),
                     onPasser: { service.passer() }
                 )
                 .padding(.horizontal, 20)
-                .padding(.bottom, distanceSousLaCible(trou, defaut: 190))
+                .padding(.bottom, distanceSousLaCible(trou, defaut: 380))
             }
 
         case .valeur:
@@ -452,7 +459,7 @@ struct TutorielOverlayPrincipal: View {
                 TutorielBulle(
                     etape: etape,
                     titre: "Voilà pourquoi tu es là",
-                    texte: Text("Pas seulement des calories : ce que ton repas couvre de tes besoins. Touche une ligne pour savoir pourquoi elle est basse et comment la remonter."),
+                    texte: Text("Pas seulement des calories : ce que ton repas couvre de tes besoins. Touche un apport pour savoir pourquoi il est bas et comment le remonter."),
                     onPasser: { service.passer() }
                 )
                 .padding(.horizontal, 20)
@@ -488,35 +495,9 @@ struct TutorielOverlayPrincipal: View {
     /// au-dessus de la cible, jamais dessus.
     private func distanceSousLaCible(_ trou: CGRect?, defaut: CGFloat) -> CGFloat {
         guard let trou else { return defaut }
-        // 36 pt : la découpe circulaire déborde du cadre de la cible
-        // (côté = max(l, h) + 2 × marge), la bulle ne doit pas la chevaucher.
-        return max(20, proxy.size.height - trou.minY + 36)
-    }
-}
-
-// MARK: - Surcouche de la feuille d'ajout (étape 3)
-
-struct TutorielOverlayAjout: View {
-    @ObservedObject var service: TutorielService
-    let ancres: [TutorielCible: Anchor<CGRect>]
-    let proxy: GeometryProxy
-
-    var body: some View {
-        if service.etape == .dicter {
-            let base = proxy.frame(in: .global).origin
-            let trou = ancres[.tuileDicter].map { proxy[$0].offsetBy(dx: base.x, dy: base.y) }
-            ZStack(alignment: .bottom) {
-                TutorielVoile(trou: trou, forme: .arrondi(22), marge: 6)
-                TutorielBulle(
-                    etape: .dicter,
-                    titre: "Parle-lui comme à un ami",
-                    texte: Text("Dis simplement : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt ». Donne les quantités si tu les connais, sinon on te les demandera."),
-                    onPasser: { service.passer() }
-                )
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-            }
-        }
+        // 20 pt : la marge de la découpe, plus un peu d'air — la bulle ne
+        // doit jamais chevaucher la cible.
+        return max(20, proxy.size.height - trou.minY + 20)
     }
 }
 

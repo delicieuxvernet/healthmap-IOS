@@ -86,18 +86,17 @@ final class ScreenshotsUITests: XCTestCase {
         snap("11-journal-bas")
         app.swipeDown()
 
-        // Feuille d'ajout.
-        if app.buttons["journal.plus"].waitForExistence(timeout: 5) {
-            app.buttons["journal.plus"].tap()
+        // Saisie dépliée : Écrire · Rechercher · Code-barres.
+        if app.buttons["journal.autres"].waitForExistence(timeout: 5) {
+            app.buttons["journal.autres"].tap()
             sleep(1)
             snap("12-ajout")
-            fermerFeuille()
         }
 
         // Recherche → fiche portion d'un aliment qui se compte (œuf) : la
         // quantité se saisit en unités (Petit / Moyen / Gros, « 1 œuf »).
-        if app.buttons["journal.plus"].waitForExistence(timeout: 5) {
-            app.buttons["journal.plus"].tap()
+        if app.buttons["journal.autres"].waitForExistence(timeout: 5) {
+            if !app.buttons["Rechercher"].exists { app.buttons["journal.autres"].tap() }
             if app.buttons["Rechercher"].waitForExistence(timeout: 5) {
                 app.buttons["Rechercher"].tap()
                 let champ = app.textFields["recherche.champ"]
@@ -282,19 +281,14 @@ final class ScreenshotsUITests: XCTestCase {
             snap("80-tutoriel-bienvenue")
             taper(app.buttons["Commencer"])
             sleep(1)
-            // Étape 2 : découpe sur le « + ».
+            // Étape 2 : découpe sur le bouton « Dicter » du Journal. On ne le
+            // touche pas (la dictée demanderait le micro du simulateur) : la
+            // capture faite, on passe.
+            _ = app.buttons["journal.dicter"].waitForExistence(timeout: 6)
             snap("81-tutoriel-bouton")
-            if app.buttons["journal.plus"].waitForExistence(timeout: 5) {
-                taper(app.buttons["journal.plus"])
-                // Étape 3 : découpe sur « Dicter mon repas » dans la feuille.
-                _ = app.buttons["Dicter mon repas"].waitForExistence(timeout: 6)
+            if app.buttons["Passer"].firstMatch.exists {
+                taper(app.buttons["Passer"].firstMatch)
                 sleep(1)
-                snap("82-tutoriel-dicter")
-                if app.buttons["Passer"].firstMatch.exists {
-                    taper(app.buttons["Passer"].firstMatch)
-                    sleep(1)
-                }
-                fermerFeuille()
             }
         }
     }
