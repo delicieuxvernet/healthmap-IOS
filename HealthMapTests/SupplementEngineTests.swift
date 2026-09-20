@@ -306,6 +306,101 @@ final class SupplementEngineTests: XCTestCase {
         XCTAssertTrue(hasPPIiron, "IPP + Fer doit être signalé")
     }
 
+    /// Traitement thyroidien : le questionnaire le capte depuis toujours, le
+    /// moteur l'ignorait. L'iode demande un avis medical ; le fer et le calcium
+    /// doivent etre espaces du traitement.
+    func testMedicationInteractions_thyroide() {
+        var profile = makeProfile()
+        profile.medications = ["thyroid_med"]
+        let scores = scoresWithMultipleDeficiencies([(.iodine, 20), (.iron, 20), (.calcium, 20)])
+        let result = SupplementEngine.generateRecommendations(scores: scores, profile: profile)
+
+        let iode = result.warnings.first { Set($0.nutrients) == Set(["iodine", "thyroid_med"]) }
+        XCTAssertNotNil(iode, "Iode + traitement thyroidien doit etre signale")
+        XCTAssertEqual(iode?.severity, .critical)
+
+        XCTAssertTrue(
+            result.warnings.contains { Set($0.nutrients) == Set(["iron", "thyroid_med"]) },
+            "Fer + traitement thyroidien doit etre signale"
+        )
+        XCTAssertTrue(
+            result.warnings.contains { Set($0.nutrients) == Set(["calcium", "thyroid_med"]) },
+            "Calcium + traitement thyroidien doit etre signale"
+        )
+    }
+
+    /// Sans traitement thyroidien, aucune de ces notes ne doit apparaitre.
+    func testMedicationInteractions_sansThyroide_aucuneNote() {
+        let profile = makeProfile()
+        let scores = scoresWithMultipleDeficiencies([(.iodine, 20), (.iron, 20), (.calcium, 20)])
+        let result = SupplementEngine.generateRecommendations(scores: scores, profile: profile)
+        XCTAssertFalse(result.warnings.contains { $0.nutrients.contains("thyroid_med") })
+    }
+
+    // MARK: - Fibres et medicaments
+
+    /// Les fibres genent l'absorption des medicaments pris en meme temps.
+    /// L'anti-interaction est portee par le produit mais ne designe pas un
+    /// nutriment : elle ne pouvait jamais sortir de detectInteractionWarnings.
+    func testFibres_avecTraitement_avertitSurLesMedicaments() {
+        var profile = makeProfile()
+        profile.medications = ["statins"]
+        let scores = scoresWithDeficiency(.fiber, score: 20)
+        let result = SupplementEngine.generateRecommendations(scores: scores, profile: profile)
+
+        XCTAssertTrue(
+            result.warnings.contains { $0.nutrients.contains(SupplementEngine.antiInteractionMedicaments) },
+            "Fibres + traitement doit etre signale"
+        )
+    }
+
+    /// Aucun traitement declare : pas de note.
+    func testFibres_sansTraitement_pasDAvertissement() {
+        let profile = makeProfile()
+        let scores = scoresWithDeficiency(.fiber, score: 20)
+        let result = SupplementEngine.generateRecommendations(scores: scores, profile: profile)
+        XCTAssertFalse(result.warnings.contains { $0.nutrients.contains(SupplementEngine.antiInteractionMedicaments) })
+    }
+
+    /// « Aucun » n'est pas un traitement.
+    func testFibres_medicamentNone_pasDAvertissement() {
+        var profile = makeProfile()
+        profile.medications = ["none"]
+        let scores = scoresWithDeficiency(.fiber, score: 20)
+        let result = SupplementEngine.generateRecommendations(scores: scores, profile: profile)
+        XCTAssertFalse(result.warnings.contains { $0.nutrients.contains(SupplementEngine.antiInteractionMedicaments) })
+    }
+
+    // MARK: - Coherence des precautions
+
+    /// La precaution hemochromatose ne peut pas dependre du produit tire :
+    /// les deux vitamines C augmentent l'absorption du fer.
+    func testVitamineC_lesDeuxProduitsPortentLaPrecaution() {
+        let vitC = SupplementEngine.catalog.filter { $0.nutrientID == .vitC }
+        XCTAssertEqual(vitC.count, 2)
+        for produit in vitC {
+            XCTAssertTrue(
+                produit.contraindications.contains(.hemochromatose),
+                "\(produit.id) doit porter la precaution hemochromatose"
+            )
+        }
+    }
+
+    /// Le conseil calcium sous IPP doit renvoyer au repas, et non a un citrate
+    /// qui n'existe nulle part au catalogue.
+    func testCalciumSousIPP_conseilleLeRepas() {
+        var profile = makeProfile()
+        profile.medications = ["ppi"]
+        let scores = scoresWithDeficiency(.calcium, score: 20)
+        let result = SupplementEngine.generateRecommendations(scores: scores, profile: profile)
+
+        guard let note = result.warnings.first(where: { Set($0.nutrients) == Set(["calcium", "ppi"]) }) else {
+            XCTFail("IPP + calcium doit etre signale"); return
+        }
+        XCTAssertTrue(note.message.contains("repas"))
+        XCTAssertFalse(note.message.lowercased().contains("citrate"), "Aucun citrate au catalogue")
+    }
+
     // MARK: - Coût réel (prises/jour)
 
     /// Le coût mensuel doit tenir compte du nombre de prises par jour.
