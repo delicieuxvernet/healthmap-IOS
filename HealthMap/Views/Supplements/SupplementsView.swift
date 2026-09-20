@@ -458,12 +458,13 @@ struct SupplementsView: View {
         }
     }
 
-    /// « 1000 µg, le matin à jeun » : ce qui complète le produit, sous lui.
+    /// « Le matin à jeun » : ce qui complète le produit, sous lui.
+    ///
+    /// La dose n'y figure plus (20 septembre 2026) : on conseille le
+    /// complément, la posologie appartient au fabricant et à la personne. Le
+    /// moment reste — ce n'est pas une posologie mais un conseil d'absorption.
     private func precisionLabel(for product: SupplementProduct) -> String {
-        let dosage = product.dosage.trimmingCharacters(in: .whitespaces)
-        let moment = momentPhrase(product.timing)
-        guard !dosage.isEmpty else { return moment.capitalizedFirstLetter }
-        return "\(dosage), \(moment)"
+        momentPhrase(product.timing).capitalizedFirstLetter
     }
 
     /// Formulation parlée du moment de prise. `TimingSlot.label` est écrit sans
@@ -530,7 +531,7 @@ struct SupplementsView: View {
             titre: product.name,
             resume: firstSentence(brand.isEmpty ? causal : brand),
             body: body,
-            practice: "\(product.dosage), \(momentPhrase(product.timing))."
+            practice: "\(momentPhrase(product.timing).capitalizedFirstLetter)."
         )
     }
 

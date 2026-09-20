@@ -6,6 +6,13 @@ import Foundation
 //
 // Audit du 20 juillet 2026 (`verifiedAt`) : marque, forme, dosage, prix de
 // référence (hors promo), prises/jour et URL fiche officielle confirmés.
+// DOCTRINE DE SELECTION (Arthur, 20 septembre 2026) : on recommande TOUJOURS
+// la forme la mieux absorbee et la mieux supportee sur la duree — bisglycinate
+// pour le fer, le magnesium et le zinc, D3 huileuse pour la vitamine D. Le prix
+// arbitre A QUALITE EGALE, jamais contre elle : on ne veut pas d'effets
+// indesirables chez les gens. Une reference qui depasse ce que l'ANSES juge
+// prudent sort du catalogue, meme si elle est legale.
+//
 // Règle des tiers : `premium` = meilleure formulation (défaut affiché),
 // `value` = option la plus abordable — jamais un « Éco » plus cher qu'un
 // « Premium » pour un même nutriment. Le premier produit d'un tier gagne
@@ -75,7 +82,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Méthylcobalamine (brevet MecobalActive) : forme bioactive directement assimilable et stable."
+            whyBrand: "Dose élevée (1000 µg) : au-delà de quelques microgrammes, la B12 passe surtout par diffusion passive, ce qui compte quand l'absorption est réduite — âge, metformine, IPP."
         ),
         SupplementProduct(
             id: "b12-3-formes-dynveo",
@@ -92,7 +99,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [],
             tier: .value,
-            whyBrand: "Trois formes bioactives (méthyl, adénosyl, hydroxo) en une gélule, sans additifs. ~0,15 €/jour."
+            whyBrand: "Trois formes actives en une gélule, sans additifs, à ~0,15 €/jour. Les essais qui ont montré que la voie orale vaut l'injection portaient sur ces formes."
         ),
 
         // --- FER ---
@@ -134,24 +141,29 @@ extension SupplementEngine {
         ),
 
         // --- MAGNESIUM ---
-        // Premium seul : la seule alternative « sport » du marché revenait plus
-        // cher au mois que ce produit — un « Éco » plus cher serait mensonger.
+        // Le melange 3 formes a 300 mg/j est sorti le 20 septembre 2026 : le
+        // comite de l'Anses (avis du 31 juillet 2024) ecrit que la dose
+        // journaliere ne devrait pas depasser 250 mg, la limite superieure de
+        // securite. Remplace par un bisglycinate pur — la forme la mieux
+        // toleree, sans effet laxatif — a 225 mg sur la prise conseillee.
+        // Premium seul : aucune alternative de meme qualite n'est moins chere
+        // au mois, et un « Éco » plus cher serait mensonger.
         SupplementProduct(
-            id: "magnesium-3-formes-nutrico",
-            name: "Le Magnésium (3 formes)",
+            id: "magnesium-bisglycinate-dynveo",
+            name: "Magnésium Bisglycinate chélaté",
             nutrientID: .magnesium,
-            brand: "Nutri&Co",
-            dosage: "300 mg · 3 formes + B6",
+            brand: "Dynveo",
+            dosage: "75 mg de magnésium par gélule · TRAACS",
             unitsPerDay: 3,
             timing: .soirRepas,
-            price: 19.90,
-            unitsPerPackage: 120,
-            productURL: "https://nutriandco.com/fr/produits/magnesium",
+            price: 29.90,
+            unitsPerPackage: 180,
+            productURL: "https://www.dynveo.fr/products/magnesium-bisglycinate",
             isVegan: true,
             contraindications: [.insuffisanceRenaleSevere],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Trois formes de magnésium (bisglycinate, malate, liposomal) + B6 bioactive : plusieurs voies d'absorption."
+            whyBrand: "Bisglycinate TRAACS pur, sans oxyde ajouté : la forme la mieux tolérée, sans effet laxatif. Fabriqué en France, sans excipient superflu."
         ),
 
         // --- OMEGA-3 ---
@@ -271,6 +283,11 @@ extension SupplementEngine {
         ),
 
         // --- ZINC ---
+        // La reference a 15 mg est sortie le 20 septembre 2026 : le comite de
+        // l'Anses estime que la dose journaliere ne devrait pas depasser
+        // 9,7 mg, la population adulte francaise etant deja bien pourvue. Les
+        // deux references etaient des bisglycinates — seule la dose les
+        // separait, on garde la plus prudente.
         SupplementProduct(
             id: "zinc-bisglycinate-nutrico",
             name: "Zinc Bisglycinate + Liposomal",
@@ -288,24 +305,6 @@ extension SupplementEngine {
             tier: .premium,
             whyBrand: "Deux formes brevetées (bisglycinate TRAACS + Zinc Nova liposomal) + sélénium. 100% des apports de référence."
         ),
-        SupplementProduct(
-            id: "zinc-cuivre-ineldea",
-            name: "Suplezinc (Zinc + Cuivre)",
-            nutrientID: .zinc,
-            brand: "Ineldea (ISN)",
-            dosage: "15 mg zinc + 1 mg cuivre",
-            unitsPerDay: 1,
-            timing: .matinRepas,
-            price: 12.90,
-            unitsPerPackage: 60,
-            productURL: "https://www.isn-sante.com/fr/18037-suplezinc.html",
-            isVegan: true,
-            contraindications: [],
-            antiInteractions: ["iron", "calcium"],
-            tier: .value,
-            whyBrand: "Zinc bisglycinate + cuivre (ratio 15:1) : le cuivre équilibre les cures de zinc prolongées."
-        ),
-
         // --- IODE ---
         SupplementProduct(
             id: "iode-puresea-nutrico",

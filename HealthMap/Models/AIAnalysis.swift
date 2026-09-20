@@ -192,12 +192,21 @@ struct SupplementEntry: Codable, Hashable {
         case name, dose, form, reason, priority
     }
 
-    /// Texte d'affichage : « Fer (bisglycinate) — 25-30 mg » ou la chaîne brute.
+    /// Texte d'affichage : « Fer bisglycinate ».
+    ///
+    /// La dose n'y figure plus (20 septembre 2026) : on conseille le
+    /// complément, la posologie appartient au fabricant et à la personne.
+    /// Celle-ci venait en plus du modèle, donc différente d'un profil à
+    /// l'autre, et elle partait aussi dans le PDF exporté.
+    ///
+    /// `dose` reste décodé et ré-encodé tel quel : la ligne
+    /// `profiles.ai_analysis` est partagée avec le web, on ne la mutile pas.
+    /// Le nom passe devant la chaîne brute, qui peut encore porter une dose
+    /// collée au texte (payloads legacy, non découpables sans risque).
     var displayText: String {
+        if let name, !name.isEmpty { return name }
         if let rawString, !rawString.isEmpty { return rawString }
-        let base = name ?? "Complement"
-        if let dose, !dose.isEmpty { return "\(base) — \(dose)" }
-        return base
+        return "Complement"
     }
 }
 

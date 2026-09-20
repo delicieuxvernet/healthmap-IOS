@@ -216,7 +216,7 @@ private func planApportTopic(_ n: EnrichedNutrient) -> PlanTopic? {
     let strong = n.score < 45
     let complements = [PlanSupplementSolution(
         name: def.label,
-        note: n.solution?.dosage?.isEmpty == false ? n.solution!.dosage! : "À envisager si l'alimentation ne suffit pas",
+        note: n.solution?.quand?.isEmpty == false ? n.solution!.quand! : "À envisager si l'alimentation ne suffit pas",
         tag: strong ? "Prioritaire" : "Si besoin",
         strong: strong
     )]
