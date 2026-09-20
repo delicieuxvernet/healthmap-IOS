@@ -227,6 +227,33 @@ struct JournalMacrosCard: View {
 
     let lignes: [Ligne]
 
+    /// Les quatre lignes du jour, construites à UN seul endroit pour le Journal
+    /// et pour la feuille « Ma journée ». Les fibres suivent la référence
+    /// canonique (`NutrientData`, 30 g) ; les trois macros, les cibles calculées
+    /// du profil. Un dépassement n'est une bonne nouvelle que pour les protéines
+    /// de quelqu'un qui veut prendre du muscle, et pour les fibres ; partout
+    /// ailleurs il se lit comme un frein.
+    static func lignesDuJour(
+        proteines: Double, glucides: Double, lipides: Double, fibres: Double,
+        cibleProteines: Int?, cibleGlucides: Int?, cibleLipides: Int?,
+        veutDuMuscle: Bool
+    ) -> [Ligne] {
+        [
+            Ligne(id: "proteines", nom: "Protéines", grammes: proteines,
+                  cible: cibleProteines.map(Double.init),
+                  teintes: [Color(hex: "5B9BF5"), Color(hex: "2F6FE0")], surplusFavorable: veutDuMuscle),
+            Ligne(id: "glucides", nom: "Glucides", grammes: glucides,
+                  cible: cibleGlucides.map(Double.init),
+                  teintes: [Color(hex: "FFD84D"), Color(hex: "F2B705")], surplusFavorable: false),
+            Ligne(id: "lipides", nom: "Lipides", grammes: lipides,
+                  cible: cibleLipides.map(Double.init),
+                  teintes: [Color(hex: "FFA95C"), Color(hex: "FB8500")], surplusFavorable: false),
+            Ligne(id: "fibres", nom: "Fibres", grammes: fibres,
+                  cible: NutrientData.definition(for: "fiber")?.rda,
+                  teintes: [Color(hex: "8FD460"), Color.dsAccent], surplusFavorable: true),
+        ]
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ForEach(Array(lignes.enumerated()), id: \.element.id) { index, ligne in

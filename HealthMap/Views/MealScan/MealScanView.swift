@@ -209,7 +209,8 @@ struct JournalView: View {
                         kcalTarget: dashboardVM.physicalMetrics.macros?.calories,
                         protTarget: dashboardVM.physicalMetrics.macros?.protein,
                         carbTarget: dashboardVM.physicalMetrics.macros?.carbs,
-                        fatTarget: dashboardVM.physicalMetrics.macros?.fat
+                        fatTarget: dashboardVM.physicalMetrics.macros?.fat,
+                        veutDuMuscle: veutDuMuscle
                     )
                 }
                 // Résultat du scan en bottom-sheet (contenu immersif inchangé).
@@ -652,27 +653,16 @@ struct JournalView: View {
 
     // MARK: - Macros (quatre lignes, surplus lu selon l'objectif)
 
-    /// Les fibres suivent la référence canonique (`NutrientData`, 30 g) ; les
-    /// trois macros, les cibles calculées du profil. Un dépassement n'est une
-    /// bonne nouvelle que pour les protéines de quelqu'un qui veut prendre du
-    /// muscle ; partout ailleurs il se lit comme un frein.
+    private var veutDuMuscle: Bool { dashboardVM.profile.goals.contains("muscle") }
+
     private var lignesMacros: [JournalMacrosCard.Ligne] {
         let macros = dashboardVM.physicalMetrics.macros
-        let veutDuMuscle = dashboardVM.profile.goals.contains("muscle")
-        return [
-            .init(id: "proteines", nom: "Protéines", grammes: journal.dayProteins,
-                  cible: macros.map { Double($0.protein) },
-                  teintes: [Color(hex: "5B9BF5"), Color(hex: "2F6FE0")], surplusFavorable: veutDuMuscle),
-            .init(id: "glucides", nom: "Glucides", grammes: journal.dayCarbs,
-                  cible: macros.map { Double($0.carbs) },
-                  teintes: [Color(hex: "FFD84D"), Color(hex: "F2B705")], surplusFavorable: false),
-            .init(id: "lipides", nom: "Lipides", grammes: journal.dayFats,
-                  cible: macros.map { Double($0.fat) },
-                  teintes: [Color(hex: "FFA95C"), Color(hex: "FB8500")], surplusFavorable: false),
-            .init(id: "fibres", nom: "Fibres", grammes: journal.dayFiber,
-                  cible: NutrientData.definition(for: "fiber")?.rda,
-                  teintes: [Color(hex: "8FD460"), Color.dsAccent], surplusFavorable: true),
-        ]
+        return JournalMacrosCard.lignesDuJour(
+            proteines: journal.dayProteins, glucides: journal.dayCarbs,
+            lipides: journal.dayFats, fibres: journal.dayFiber,
+            cibleProteines: macros?.protein, cibleGlucides: macros?.carbs, cibleLipides: macros?.fat,
+            veutDuMuscle: veutDuMuscle
+        )
     }
 
     // MARK: - Le jour, en mosaïque (les quatre repas)
