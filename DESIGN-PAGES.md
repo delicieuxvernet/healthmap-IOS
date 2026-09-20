@@ -41,11 +41,25 @@
 >   (« 42 % », « 5,9 sur 18 mg » dérivé de la référence canonique, jauge) · Pourquoi · Ce qui le remonte ·
 >   capsule vers le plan. **Gratuit** : la cause en clair, « Ce qui le remonte » floutée, porte
 >   épinglée en bas (`UnlockDoor` : cadenas, titre honnête, précision, capsule d'essai StoreKit).
-> - **Compléments** (`SupplementsView.swift`, `SupplementsRefonteComponents.swift`) : segmented natif
->   Compléments · Par l'assiette, carte d'engagement (première visite) puis ligne, « Ton rituel du
->   jour » (matin · midi · soir, un tap coche le moment), « Recommandés pour toi » (une carte par
->   apport : produit, dose et moment, Pourquoi celui-là, Précautions, Ma sélection), ligne « Ma
->   sélection · N compléments · X € par mois » → feuille (qualité des formes + cases).
+> - **Compléments** (`SupplementsView.swift`, `AnneauDeCause.swift`, `FicheApport.swift`) — **l'anneau
+>   de cause, maquette du 20 septembre 2026** : précision « Kiwio ne gagne rien sur ce qu'il te
+>   recommande » · « Ton rituel du jour » (trois tuiles matin · midi · soir qui disent QUOI prendre,
+>   un tap coche le moment ; visible dans les deux voies) · segmented natif Compléments · Par
+>   l'assiette · **mosaïque** : 1 héros pleine largeur (anneau 112 + les 3 freins les plus lourds et
+>   leur poids) puis des tuiles deux par deux (anneau 64), une tuile restante passe en ligne pleine
+>   largeur, jamais de trou. **Ni dose, ni prix, ni marque sur une tuile.** Ligne « Ma sélection »
+>   (budget mensuel) sous la mosaïque. Au toucher, la **fiche en six blocs** : ce que ça peut
+>   expliquer chez toi (la phrase de la table déterministe `SymptomesApports`, jamais le texte libre
+>   du bilan ; le score a décidé, le symptôme éclaire) · comment on l'a vu (**cascade** : point de départ 70,
+>   freins, appuis, « ramené dans l'échelle » si le total sort de 0-100 ; toucher une ligne allume
+>   sa part sur l'anneau) · ce que ça fait · comment le prendre (**la forme et le moment, jamais la
+>   dose** : doctrine du 20 septembre) · précautions et interactions ·
+>   l'autre voie. **Le chiffre est le score déterministe du registre** (`Core/NutrientLedger.swift`,
+>   même arithmétique que `analyzeNutrientScores`) : part couverte dans la couleur de l'apport,
+>   freins en trois gris décroissants, « autres facteurs » en piste inactive, parts qui ferment
+>   toujours à 100. Le pourcentage rédigé par le bilan n'est plus affiché dans cet onglet. Voie
+>   assiette : l'aliment en titre, **aucun pourcentage ni portion par aliment** (la donnée n'existe
+>   pas) ; quantités et moments restent dans la fiche nutriment existante, liée depuis la fiche.
 > - **Progrès** (`SuiviView.swift`, `ProgresComponents.swift`) : vue d'ensemble (2 cartes) · besoins et
 >   apports (segmented natif, conclusion, barres + pointillé) · apports à renforcer · état premier jour
 >   en une carte ; check-in et courbes symptômes conservés.

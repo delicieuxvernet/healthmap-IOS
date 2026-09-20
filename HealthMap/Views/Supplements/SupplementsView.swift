@@ -1,42 +1,38 @@
 import SwiftUI
 
-// MARK: - Supplements View (onglet « Compléments » — design « v7 »)
+// MARK: - Supplements View (onglet « Compléments » — l'anneau de cause)
 //
-// L'écran part des APPORTS DU BILAN et descend vers la recommandation : une
-// carte REPLIABLE par apport. Les chaînes sont générées depuis le bilan, jamais
-// depuis une liste de produits figée : si un apport disparaît du bilan, sa
-// carte disparaît.
+// Maquette « Compléments anneau de cause » (20 septembre 2026). L'écran part
+// des APPORTS DU BILAN : une tuile par apport, jamais une liste de produits
+// figée — si un apport disparaît du bilan, sa tuile disparaît.
 //
-// Divulgation progressive (cf. `SupplementsChainV6.swift`) : la carte repliée
-// répond à « qu'est-ce que je prends ? » ; le tap déplie le pourquoi (bleu),
-// les précautions (ambre) et la ligne panier. UNE carte ouverte à la fois, la
-// première s'ouvre seule au premier affichage. La synthèse « En un coup d'œil »
-// ouvre la page ; l'engagement transparence est gros à la première visite de
-// l'onglet, puis rétrogradé en ligne de pied de page.
+//   • le rituel du jour en tête : c'est l'action quotidienne ;
+//   • la bascule Compléments / Par l'assiette, qui pilote toute la page ;
+//   • la mosaïque : un héros pleine largeur (l'anneau et ses freins nommés),
+//     puis des tuiles deux par deux. Ni dose, ni prix, ni marque sur une tuile ;
+//   • la fiche, au toucher : six blocs, dont la cascade du calcul.
 //
-// Un SEUL sélecteur, figé au-dessus de la tab bar, bascule toute la page entre
-// « Compléments » et « Par l'assiette ».
+// Le chiffre affiché est le SCORE DÉTERMINISTE du registre
+// (`HealthCalculator.registreApports`) : le seul dont les parts de l'anneau
+// ferment à 100 et dont on sait montrer le calcul ligne à ligne. Le pourcentage
+// rédigé par le bilan (`ApportV2.pctBesoin`) n'est plus affiché ici — il ne
+// sert que de dernier repli quand aucun score local n'existe.
 //
-// Sources INCHANGÉES : `SupplementEngine` (score, whyText, produits, prix,
-// interactions) et le bilan v2 déjà chargé (`AIAnalysisV2`). Aucun nouvel appel.
+// Sources INCHANGÉES : `SupplementEngine` (produits, prix, interactions) et le
+// bilan v2 déjà chargé (`AIAnalysisV2`). Aucun nouvel appel.
 struct SupplementsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.openURL) private var openURL
 
-    /// Voie affichée — pilote TOUTE la page (chaînes + pied de page + rituel).
+    /// Voie affichée — pilote TOUTE la page (mosaïque + fiche + note de pied).
     @State private var voie: ComplementsVoie = .complements
     /// Qualité des produits chiffrés dans le budget mensuel.
     @State private var premium = true
     /// Compléments mis au panier (ids de nutriment).
     @State private var taken: Set<String> = []
 
-    /// Explication ouverte en bottom sheet (carte bleue « pourquoi »).
-    @State private var explanation: ChainExplanation?
-    /// Recommandation dont les précautions sont ouvertes (carte ambre).
-    @State private var precautionRec: SupplementRecommendation?
-    /// Apport dont la fiche « comment le couvrir par l'assiette » est ouverte.
-    @State private var assietteNutrient: EnrichedNutrient?
+    /// Fiche ouverte au toucher d'une tuile.
+    @State private var fiche: FicheApportContexte?
 
     /// Rituel du jour — dérivé du bilan v2 de façon déterministe, coche
     /// persistée localement. Aucun appel réseau / IA.
@@ -44,14 +40,9 @@ struct SupplementsView: View {
 
     /// Feuille « Ma sélection » (qualité des formes + cases à cocher).
     @State private var showSelection = false
-    /// Amorçage fait une seule fois quand les chaînes arrivent : première carte
-    /// ouverte (sinon personne ne découvre que ça s'ouvre) + panier pré-rempli
-    /// avec le plan proposé (la recommandation EST le plan par défaut).
+    /// Amorçage fait une seule fois quand les chaînes arrivent : panier
+    /// pré-rempli avec le plan proposé (la recommandation EST le plan par défaut).
     @State private var defaultsSeeded = false
-    /// L'engagement transparence a déjà été montré en grand une fois.
-    @AppStorage("complementsEngagementSeen") private var engagementSeen = false
-    /// Cette visite-ci est la première : le bloc reste en grand toute la visite.
-    @State private var engagementEnGrand = false
 
     private var complementsV2: ComplementsV2? { dashboardVM.analysisV2?.complements }
 
@@ -100,8 +91,6 @@ struct SupplementsView: View {
                 return ComplementChain(
                     id: id,
                     nom: apport.nom ?? rec?.nutrientLabel ?? id,
-                    pct: apport.pctBesoin,
-                    statut: apport.statut,
                     symbol: Fluent3D.symbol(for: id),
                     tint: Color.nutrientColor(for: id),
                     rec: rec,
@@ -114,8 +103,6 @@ struct SupplementsView: View {
             ComplementChain(
                 id: rec.id,
                 nom: rec.nutrientLabel,
-                pct: rec.score,
-                statut: Self.statut(forScore: rec.score),
                 symbol: Fluent3D.symbol(for: rec.nutrientID.rawValue),
                 tint: rec.nutrientColor,
                 rec: rec,
@@ -124,23 +111,53 @@ struct SupplementsView: View {
         }
     }
 
-    /// Repli de statut quand le bilan v2 n'a pas encore répondu. Mêmes paliers
-    /// que le reste de l'app (< 40 à combler, < 70 à renforcer).
-    private static func statut(forScore score: Int) -> StatutV2 {
-        if score < 40 { return .aCombler }
-        if score < 70 { return .aRenforcer }
-        return .couvre
+    // MARK: - Les tuiles (chaîne + détail du registre)
+
+    /// Une tuile prête à dessiner : la chaîne, et le calcul de son apport.
+    private struct Tuile: Identifiable {
+        let chain: ComplementChain
+        let detail: DetailApport
+        var id: String { chain.id }
+    }
+
+    /// Le registre donne le score ET ses facteurs nommés. Quand il se tait
+    /// (profil hors bornes), on garde le score connu, sans facteur nommé :
+    /// l'anneau se réduit à « couvert » + « autres facteurs ». Sans aucun
+    /// score, pas de tuile — on n'affiche pas un zéro inventé.
+    private var tuiles: [Tuile] {
+        let registre = HealthCalculator.registreApports(profile: dashboardVM.profile)
+        return chains.compactMap { chain -> Tuile? in
+            if let detail = registre[chain.id] {
+                return Tuile(chain: chain, detail: detail)
+            }
+            guard let score = dashboardVM.nutrientScores[chain.id]
+                    ?? chain.rec?.score
+                    ?? chain.apport?.pctBesoin else { return nil }
+            return Tuile(chain: chain, detail: DetailApport(contributions: [], score: max(0, min(100, score))))
+        }
+    }
+
+    /// Le mot du statut, calé sur le score AFFICHÉ (le même que l'anneau).
+    /// Mêmes paliers que le reste de l'onglet : < 40 à combler, < 70 à renforcer.
+    private static func statutMot(forScore score: Int) -> String {
+        if score < 40 { return "à combler" }
+        if score < 70 { return "à renforcer" }
+        return "couvre le besoin"
     }
 
     // MARK: - Panier
 
-    /// Chaînes réellement chiffrables et cochées (une chaîne sans produit n'a
-    /// pas de ligne panier — cas « plutôt par l'assiette »).
-    private var takenChains: [ComplementChain] {
+    /// Chaînes avec un produit chiffrable — le panier en dérive.
+    private var chiffrableChains: [ComplementChain] {
         chains.filter { chain in
-            guard let rec = chain.rec, product(for: rec) != nil else { return false }
-            return taken.contains(chain.id)
+            guard let rec = chain.rec else { return false }
+            return product(for: rec) != nil
         }
+    }
+
+    /// Chaînes chiffrables ET cochées.
+    private var takenChains: [ComplementChain] {
+        chiffrableChains.filter { taken.contains($0.id) }
     }
 
     private var cartTotal: Double {
@@ -165,13 +182,11 @@ struct SupplementsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Refonte 23 août 2026 : fond neutre + voile de marque.
                 DSPageBackground()
 
                 if !dashboardVM.bilanComplete {
-                    // Mode découverte (V12c) : pas de bilan → la liste serait
-                    // vide. À l'emplacement des chaînes : la carte d'exemple
-                    // + la porte bilan. Rituel masqué (aucune donnée).
+                    // Mode découverte (V12c) : pas de bilan → la mosaïque serait
+                    // vide. À sa place : la carte d'exemple + la porte bilan.
                     discoveryContent
                 } else if hasContent {
                     mainContent
@@ -190,44 +205,28 @@ struct SupplementsView: View {
             .onAppear {
                 refreshRituel()
                 seedDefaults()
-                // L'engagement transparence ne se « consomme » qu'une fois
-                // réellement montré : en découverte (pas de bilan), le bloc
-                // n'est pas rendu — on ne brûle pas sa première visite.
-                if dashboardVM.bilanComplete, !engagementSeen {
-                    engagementSeen = true
-                    engagementEnGrand = true
-                }
             }
             .onChange(of: complementsSignature) { _, _ in refreshRituel() }
             .onChange(of: chainsSignature) { _, _ in seedDefaults() }
-            // Grand titre natif (se replie en inline au défilement). Les
-            // Réglages sont un onglet : plus de bouton Profil dans la barre.
+            // Grand titre natif (se replie en inline au défilement).
             .navigationTitle("Compléments")
             .navigationBarTitleDisplayMode(.large)
-            .sheet(item: $explanation) { item in
-                ChainExplanationSheet(explanation: item) { explanation = nil }
-            }
-            .sheet(item: $precautionRec) { rec in
-                let warnings = engineResult?.warnings ?? []
-                let items = SupplementsV4.precautions(for: rec, warnings: warnings)
-                SupplementPrecautionsSheet(rec: rec, items: items, tip: SupplementsV4.tip(for: items))
-            }
-            // La MÊME fiche que depuis le Bilan : quels aliments couvrent cet
-            // apport, en quelle quantité, à quel moment.
-            .sheet(item: $assietteNutrient) { nutrient in
-                // Premium : la fiche observe elle-même SubscriptionService.
-                NutrientDetailSheet(nutrient: nutrient)
+            .sheet(item: $fiche) { contexte in
+                FicheApportSheet(
+                    contexte: contexte,
+                    nutrimentDetail: nutrientDetail(for: contexte.id),
+                    surAlternative: { basculerVoie() }
+                )
             }
         }
     }
 
     // MARK: - Mode découverte (V12c — pas encore de bilan)
 
-    /// L'onglet garde son en-tête et l'emplacement des chaînes ; à la place
-    /// des cartes d'apports : la carte d'exemple (`ComplementsTeaserCard`) et
-    /// la porte bilan. Ni sélecteur de voie, ni synthèse, ni rituel, ni
-    /// engagement : tout ça n'existe qu'adossé à de vraies données. La
-    /// mention « ne remplace pas l'avis d'un médecin » reste, elle, posée.
+    /// L'onglet garde son en-tête et l'emplacement de la mosaïque ; à sa
+    /// place : la carte d'exemple (`ComplementsTeaserCard`) et la porte bilan.
+    /// Ni bascule, ni rituel : tout ça n'existe qu'adossé à de vraies données.
+    /// La mention « ne remplace pas l'avis d'un médecin » reste, elle, posée.
     private var discoveryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -238,7 +237,7 @@ struct SupplementsView: View {
                     .kiwiEntrance(2)
                 infoCard.padding(.top, 18)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, DS.marge)
             .padding(.top, 4)
             .padding(.bottom, 16)
             // Même verrou anti-dérive horizontale que mainContent.
@@ -250,41 +249,39 @@ struct SupplementsView: View {
     // MARK: - Contenu principal
 
     private var mainContent: some View {
-        ScrollView {
+        let items = tuiles
+        return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // La bascule pilote toute la page : en tête, contrôle natif.
-                ComplementsVoieSwitch(voie: $voie)
-                    .padding(.top, 4)
-                    .kiwiEntrance(0)
+                header.kiwiEntrance(0)
 
-                // Première visite de l'onglet : l'engagement mérite un vrai
-                // bloc, une fois. Ensuite il descend en ligne de pied de page.
-                if engagementEnGrand {
-                    ComplementsEngagementCard().padding(.top, 16).kiwiEntrance(1)
-                }
-
-                // Le rituel n'a de sens que dans la voie « compléments ».
-                if voie == .complements, let rituel {
+                // Le rituel reste en tête dans les deux voies : c'est l'action
+                // du jour, et la bascule ne doit pas sauter sous le doigt.
+                if let rituel {
                     ComplementsRituelStrip(rituel: rituel) { toggleRituel($0) }
-                        .padding(.top, DS.interCarte)
-                        .kiwiEntrance(2)
+                        .padding(.top, 14)
+                        .kiwiEntrance(1)
                 }
 
-                DSSectionHeader(titre: voie == .complements ? "Recommandés pour toi" : "Par l'assiette")
-                    .padding(.top, -4)
-                    .kiwiEntrance(3)
+                ComplementsVoieSwitch(voie: $voie)
+                    .padding(.top, 18)
+                    .kiwiEntrance(2)
 
-                if chains.isEmpty {
-                    aiFallbackSection.kiwiEntrance(4)
+                if items.isEmpty {
+                    aiFallbackSection
+                        .padding(.top, 18)
+                        .kiwiEntrance(3)
                 } else {
-                    VStack(spacing: DS.interCarte) {
-                        ForEach(Array(chains.enumerated()), id: \.element.id) { index, chain in
-                            carteRefonte(for: chain)
-                                .kiwiEntrance(4 + index)
-                        }
-                    }
+                    enTeteMosaique(nombre: items.count).kiwiEntrance(3)
 
-                    footerBlock.padding(.top, 16)
+                    mosaique(items).padding(.top, 11)
+
+                    Text(noteMosaique(items))
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 12)
+                        .padding(.horizontal, 2)
 
                     // Le panier, derrière : une ligne discrète vers la sélection.
                     if voie == .complements, !chiffrableChains.isEmpty {
@@ -295,13 +292,11 @@ struct SupplementsView: View {
                             HapticService.shared.tap()
                             showSelection = true
                         }
+                        .padding(.top, 6)
                     }
                 }
 
-                if !engagementEnGrand {
-                    ComplementsEngagementLine().padding(.top, 18)
-                }
-                infoCard.padding(.top, engagementEnGrand ? 18 : 10)
+                infoCard.padding(.top, 18)
             }
             .padding(.horizontal, DS.marge)
             .padding(.top, 4)
@@ -329,118 +324,27 @@ struct SupplementsView: View {
         }
     }
 
-    // MARK: - Carte d'une chaîne (refonte) : titre, précision, lignes d'action
-
-    /// Voie compléments : le produit à chercher en titre, l'apport + dose +
-    /// moment en secondaire, puis « Pourquoi celui-là », « Précautions » et
-    /// « Ma sélection ». Voie assiette : l'aliment en titre, l'apport et les
-    /// alternatives en secondaire, puis « Pourquoi cet aliment » et la fiche.
-    private func carteRefonte(for chain: ComplementChain) -> some View {
-        var lignes: [ChainCardRefonte.Ligne] = []
-        let titre: String
-        let sousTitre: String?
-        let symbole: String
-
-        switch voie {
-        case .complements:
-            let rec = chain.rec
-            let prod = rec.flatMap { product(for: $0) }
-            symbole = prod == nil ? "fork.knife" : "pills"
-            if let prod {
-                titre = prod.name
-                sousTitre = "\(chain.nom) · \(precisionLabel(for: prod))"
-            } else {
-                titre = "L'assiette suffit"
-                sousTitre = "\(chain.nom) · ton écart est petit"
-            }
-            if let why = whyExplanation(for: chain, product: prod) {
-                lignes.append(.init(id: "why", titre: prod == nil ? "Pourquoi pas de gélule" : "Pourquoi celui-là", vert: true) {
-                    HapticService.shared.selection()
-                    explanation = why
-                })
-            }
-            if let rec {
-                let precautions = SupplementsV4.precautions(for: rec, warnings: engineResult?.warnings ?? [])
-                if !precautions.isEmpty {
-                    lignes.append(.init(id: "care", titre: "Précautions",
-                                        valeur: "\(precautions.count) à connaître") {
-                        HapticService.shared.selection()
-                        precautionRec = rec
-                    })
-                }
-                if prod != nil {
-                    lignes.append(.init(id: "cart", titre: "Ma sélection",
-                                        valeur: priceLabel(for: rec),
-                                        coche: taken.contains(chain.id)) {
-                        toggleCart(chain.id)
-                    })
-                }
-            }
-        case .assiette:
-            let foods = foodList(for: chain)
-            symbole = "fork.knife"
-            if let food = foods.first {
-                titre = food.label.capitalizedFirstLetter
-                let autres = foods.dropFirst().map(\.label)
-                sousTitre = autres.isEmpty ? chain.nom : "\(chain.nom) · aussi : \(autres.joined(separator: ", "))"
-            } else {
-                titre = "Par l'assiette"
-                sousTitre = chain.nom
-            }
-            if let why = foodExplanation(for: chain) {
-                lignes.append(.init(id: "why", titre: "Pourquoi cet aliment", vert: true) {
-                    HapticService.shared.selection()
-                    explanation = why
-                })
-            }
-            if let nutrient = nutrientDetail(for: chain.id) {
-                lignes.append(.init(id: "fiche", titre: "Voir la fiche",
-                                    valeur: "aliments, quantités, moments") {
-                    HapticService.shared.selection()
-                    assietteNutrient = nutrient
-                })
-            }
-        }
-
-        return ChainCardRefonte(
-            tint: chain.tint,
-            symbole: symbole,
-            titre: titre,
-            sousTitre: sousTitre,
-            lignes: lignes,
-            accessibilite: "\(chain.nom), \(chain.statutLabel). \(titre). \(sousTitre ?? "")"
-        )
-    }
+    // MARK: - En-têtes
 
     /// Le titre « Compléments » est porté par la barre de navigation (grand
-    /// titre natif) ; ici, seule la précision, en 17 secondaire.
+    /// titre natif) ; ici, l'engagement de transparence, en secondaire.
     private var header: some View {
-        Text(subtitle)
-            .font(.dsCorps)
-            .tracking(DSTracking.corps)
+        Text("Kiwio ne gagne rien sur ce qu'il te recommande")
+            .font(.dsSousTitre)
+            .tracking(DSTracking.sousTitre)
             .foregroundStyle(Color.dsSecondaire)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var subtitle: String {
-        let count = chains.count
-        guard count > 0 else { return "Calé sur ton bilan" }
-        return "Calé sur \(count == 1 ? "ton apport" : "tes \(count) apports") à renforcer"
-    }
-
-    /// Kicker seul : la grande phrase d'explication du v6 doublait ce que
-    /// chaque carte repliée dit déjà — un titre de section suffit.
+    /// Kicker de la carte d'exemple (mode découverte).
     private var chainHeader: some View {
         HStack(spacing: 6) {
             Image(systemName: "arrow.triangle.branch")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.dsTexte)
                 .accessibilityHidden(true)
-            // Titre de section : couleur du domaine (le vert de l'onglet),
-            // jamais l'encre neutre, et rangé sous le contenu par sa taille.
-            Text(voie == .complements ? "Tes apports → tes compléments"
-                                      : "Tes apports → ton assiette")
+            Text("Tes apports → tes compléments")
                 .font(Theme.sectionLabelFont)
                 .foregroundStyle(Color.dsTexte)
         }
@@ -448,14 +352,227 @@ struct SupplementsView: View {
         .padding(.horizontal, 2)
     }
 
-    // MARK: - Chaînes chiffrables
-
-    /// Chaînes avec un produit chiffrable — la synthèse et le panier en dérivent.
-    private var chiffrableChains: [ComplementChain] {
-        chains.filter { chain in
-            guard let rec = chain.rec else { return false }
-            return product(for: rec) != nil
+    private func enTeteMosaique(nombre: Int) -> some View {
+        let unite = voie == .complements ? "apport" : "aliment"
+        return HStack(alignment: .firstTextBaseline) {
+            Text(voie == .complements ? "Recommandés pour toi" : "Par l'assiette")
+                .font(.dsSection)
+                .tracking(DSTracking.section)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Text("\(nombre) \(unite)\(nombre > 1 ? "s" : "")")
+                .font(.dsLegende)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
         }
+        .padding(.top, 18)
+        .padding(.horizontal, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: - La mosaïque (1 héros, puis deux par deux)
+
+    /// Trois apports : un héros et une rangée de deux. Deux apports : un héros
+    /// et une tuile pleine largeur, en ligne. Un seul : le héros. Jamais de trou.
+    private func mosaique(_ items: [Tuile]) -> some View {
+        let reste = Array(items.dropFirst())
+        let rangs = Array(stride(from: 0, to: reste.count, by: 2))
+        return VStack(spacing: 10) {
+            if let premier = items.first {
+                heros(premier).kiwiEntrance(4)
+            }
+            ForEach(rangs, id: \.self) { rang in
+                if rang + 1 < reste.count {
+                    HStack(alignment: .top, spacing: 10) {
+                        tuile(reste[rang])
+                        tuile(reste[rang + 1])
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .kiwiEntrance(5 + rang / 2)
+                } else {
+                    tuile(reste[rang], enLigne: true)
+                        .kiwiEntrance(5 + rang / 2)
+                }
+            }
+        }
+    }
+
+    private func heros(_ item: Tuile) -> some View {
+        TuileApportHero(
+            nom: titre(item),
+            symbole: symbole(item),
+            couleur: item.chain.tint,
+            statutLigne: statutLigne(item, complet: true),
+            parts: item.detail.parts,
+            score: item.detail.score,
+            lignes: lignesHeros(item),
+            cta: ctaHeros(item)
+        ) { ouvrir(item) }
+    }
+
+    private func tuile(_ item: Tuile, enLigne: Bool = false) -> some View {
+        TuileApport(
+            nom: titre(item),
+            symbole: symbole(item),
+            couleur: item.chain.tint,
+            statutLigne: statutLigne(item, complet: false),
+            parts: item.detail.parts,
+            score: item.detail.score,
+            enLigne: enLigne
+        ) { ouvrir(item) }
+    }
+
+    /// Voie compléments : l'apport. Voie assiette : le premier aliment qui le couvre.
+    private func titre(_ item: Tuile) -> String {
+        guard voie == .assiette, let aliment = aliments(for: item.chain).first else {
+            return item.chain.nom
+        }
+        return aliment.capitalizedFirstLetter
+    }
+
+    private func symbole(_ item: Tuile) -> String {
+        voie == .assiette ? "fork.knife" : item.chain.symbol
+    }
+
+    /// « à combler · 3 causes » sur une tuile, « … causes nommées » sur le
+    /// héros ; en voie assiette, l'apport que l'aliment sert.
+    private func statutLigne(_ item: Tuile, complet: Bool) -> String {
+        guard voie == .complements else { return "pour \(item.chain.avecArticle)" }
+        let mot = Self.statutMot(forScore: item.detail.score)
+        let causes = item.detail.freins.count
+        switch causes {
+        case 0: return "\(mot) · sans cause nommée"
+        case 1: return "\(mot) · 1 cause\(complet ? " nommée" : "")"
+        default: return "\(mot) · \(causes) causes\(complet ? " nommées" : "")"
+        }
+    }
+
+    /// Les trois freins les plus lourds, puis le premier appui : au-delà, la
+    /// carte deviendrait la fiche. Le compte exact reste dans la ligne de statut.
+    private func lignesHeros(_ item: Tuile) -> [LigneCauseTuile] {
+        let freins = item.detail.freins.prefix(3).enumerated().map { rang, frein in
+            LigneCauseTuile(id: frein.id, libelle: frein.libelle, delta: frein.delta, teinte: AnneauTeintes.cause(rang: rang))
+        }
+        let appuis = item.detail.appuis.prefix(1).map { appui in
+            LigneCauseTuile(id: appui.id, libelle: appui.libelle, delta: appui.delta, teinte: item.chain.tint)
+        }
+        return freins + appuis
+    }
+
+    private func ctaHeros(_ item: Tuile) -> String {
+        if voie == .assiette { return "Comment l'intégrer" }
+        return item.detail.contributions.isEmpty ? "Voir la fiche" : "Voir le calcul"
+    }
+
+    private func noteMosaique(_ items: [Tuile]) -> String {
+        if voie == .assiette {
+            return "Aucun aliment ne se compte en pourcentage : c'est la régularité qui remonte un apport."
+        }
+        return items.contains { !$0.detail.freins.isEmpty }
+            ? "Le creux de l'anneau, ce sont tes réponses. Touche un apport pour voir le calcul."
+            : "Touche un apport pour voir comment le renforcer."
+    }
+
+    // MARK: - La fiche (contexte assemblé depuis les sources existantes)
+
+    private func ouvrir(_ item: Tuile) {
+        HapticService.shared.selection()
+        fiche = contexte(for: item)
+    }
+
+    private func contexte(for item: Tuile) -> FicheApportContexte {
+        let chain = item.chain
+        let produit = chain.rec.flatMap { product(for: $0) }
+        let aliments = aliments(for: chain)
+        let enAssiette = voie == .assiette
+
+        let specs: [FicheApportContexte.Spec]
+        let note: String?
+        let precautions: [SupplementPrecaution]
+        let alternatives: [FicheApportContexte.Alternative]
+        let cta: String?
+
+        if enAssiette {
+            // Pas de portion ni de pourcentage par aliment : la donnée n'existe
+            // pas. On donne les autres aliments et le conseil rédigé du bilan ;
+            // quantités et moments vivent dans la fiche existante, liée depuis ici.
+            let autres = aliments.dropFirst().map(\.capitalizedFirstLetter)
+            specs = autres.isEmpty
+                ? []
+                : [FicheApportContexte.Spec(cle: "aussi", valeur: autres.joined(separator: ", "))]
+            let pratique = practiceText(for: chain)
+            let pourquoi = KiwiProse.lisible(chain.apport?.why ?? "")
+            note = [pratique, pourquoi].first { !$0.isEmpty }
+            precautions = []
+            if let produit {
+                alternatives = [FicheApportContexte.Alternative(
+                    id: produit.id,
+                    symbole: "pills",
+                    nom: produit.name,
+                    sousTitre: precisionLabel(for: produit)
+                )]
+                cta = "Voir le complément"
+            } else {
+                alternatives = []
+                cta = nil
+            }
+        } else {
+            if let produit {
+                // La forme et le moment, jamais la dose : on conseille le
+                // complément, la posologie appartient au fabricant et à la
+                // personne (doctrine du 20 septembre 2026). La maquette prévoyait
+                // une colonne « dose » : elle n'est pas reprise.
+                specs = [
+                    FicheApportContexte.Spec(cle: "forme", valeur: produit.name),
+                    FicheApportContexte.Spec(cle: "prise", valeur: precisionLabel(for: produit)),
+                ]
+                // Pourquoi CETTE forme. Le « pourquoi toi » du moteur n'est pas
+                // repris ici : la cascade (bloc 02) et l'éclairage (bloc 01) le
+                // disent déjà, et il porte la même phrase sur les symptômes.
+                let forme = KiwiProse.lisible(produit.whyBrand)
+                note = forme.isEmpty ? nil : forme
+            } else {
+                specs = []
+                note = "Ton écart est petit : l'alimentation le comble seule, sans gélule."
+            }
+            precautions = chain.rec.map {
+                SupplementsV4.precautions(for: $0, warnings: engineResult?.warnings ?? [])
+            } ?? []
+            alternatives = aliments.map {
+                FicheApportContexte.Alternative(id: $0, symbole: "fork.knife", nom: $0.capitalizedFirstLetter, sousTitre: nil)
+            }
+            cta = "Voir la voie par l'assiette"
+        }
+
+        return FicheApportContexte(
+            id: chain.id,
+            voie: enAssiette ? .assiette : .complements,
+            titre: titre(item),
+            apportAvecArticle: chain.avecArticle,
+            symbole: symbole(item),
+            couleur: chain.tint,
+            statutMot: Self.statutMot(forScore: item.detail.score),
+            detail: item.detail,
+            eclairage: eclairage(for: chain.id),
+            role: ApportRole.role(for: chain.id),
+            specs: specs,
+            noteDePrise: note,
+            precautions: precautions,
+            conseilPrecautions: precautions.isEmpty ? nil : SupplementsV4.tip(for: precautions),
+            alternatives: alternatives,
+            ctaAlternative: cta
+        )
+    }
+
+    /// Ce que les symptômes déclarés permettent d'éclairer sur cet apport bas,
+    /// d'après la table déterministe `SymptomesApports` — jamais le texte libre
+    /// du bilan. Le score a déjà décidé ; la phrase explique, et se tait quand
+    /// rien de solide ne se dit.
+    private func eclairage(for id: String) -> String? {
+        guard let nutriment = NutrientID(rawValue: id) else { return nil }
+        return SymptomesApports.explication(pour: nutriment, symptomes: dashboardVM.profile.symptoms)
     }
 
     /// « Le matin à jeun » : ce qui complète le produit, sous lui.
@@ -481,113 +598,29 @@ struct SupplementsView: View {
         }
     }
 
-    private struct ChainFood {
-        let icon: String?
-        let label: String
-    }
-
     /// Aliments de l'apport : ceux du bilan v2 (personnalisés) en priorité,
     /// sinon les sources canoniques du catalogue. Aucune donnée inventée.
-    private func foodList(for chain: ComplementChain) -> [ChainFood] {
+    private func aliments(for chain: ComplementChain) -> [String] {
         if let aliments = chain.apport?.aliments, !aliments.isEmpty {
-            return aliments.compactMap { aliment in
+            return aliments.compactMap { aliment -> String? in
                 guard let nom = aliment.nom, !nom.isEmpty else { return nil }
-                return ChainFood(icon: aliment.icone, label: nom)
+                return nom
             }
         }
-        return Fluent3D.foodSources(for: chain.id).map {
-            ChainFood(icon: $0.asset, label: $0.label)
-        }
+        return Fluent3D.foodSources(for: chain.id).map(\.label)
     }
 
-    // MARK: - Explications
-
-    /// « Pourquoi ce format ? » — construit sur le texte du catalogue (la forme
-    /// choisie) et la raison causale du moteur. Sans produit : pourquoi l'assiette
-    /// suffit, expliqué par le bilan.
-    private func whyExplanation(for chain: ComplementChain, product: SupplementProduct?) -> ChainExplanation? {
-        guard let product else {
-            guard let why = chain.apport?.why, !why.isEmpty else { return nil }
-            return ChainExplanation(
-                id: "\(chain.id)-nopill",
-                kind: .why,
-                kicker: "POURQUOI PAS DE GÉLULE",
-                titre: "L'assiette suffit pour cet apport",
-                resume: "Ton écart est petit, l'alimentation le comble seule.",
-                body: KiwiProse.lisible(why),
-                practice: practiceText(for: chain)
-            )
-        }
-
-        let brand = KiwiProse.lisible(product.whyBrand)
-        let causal = KiwiProse.lisible(chain.rec?.whyText ?? "")
-        let body = [causal, brand].filter { !$0.isEmpty }.joined(separator: "\n\n")
-        guard !body.isEmpty else { return nil }
-
-        return ChainExplanation(
-            id: "\(chain.id)-why",
-            kind: .why,
-            kicker: "POURQUOI CE FORMAT",
-            titre: product.name,
-            resume: firstSentence(brand.isEmpty ? causal : brand),
-            body: body,
-            practice: "\(momentPhrase(product.timing).capitalizedFirstLetter)."
-        )
-    }
-
-    /// « Pourquoi cet aliment ? » — uniquement du texte réel du bilan.
-    private func foodExplanation(for chain: ComplementChain) -> ChainExplanation? {
-        guard let apport = chain.apport,
-              let why = apport.why, !why.isEmpty,
-              let food = foodList(for: chain).first else { return nil }
-        return ChainExplanation(
-            id: "\(chain.id)-food",
-            kind: .why,
-            kicker: "POURQUOI CET ALIMENT",
-            titre: food.label.capitalizedFirstLetter,
-            resume: firstSentence(KiwiProse.lisible(why)),
-            body: KiwiProse.lisible(why),
-            practice: practiceText(for: chain)
-        )
-    }
-
-    /// Bloc « EN PRATIQUE » du bilan (conseil court + suite), sans rien inventer.
+    /// Bloc « en pratique » du bilan (conseil court + suite), sans rien inventer.
     private func practiceText(for chain: ComplementChain) -> String {
         let bold = KiwiProse.lisible(chain.apport?.tipBold ?? "")
         let rest = KiwiProse.lisible(chain.apport?.tipRest ?? "")
         return [bold, rest].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
-    /// Résumé de la carte ambre : combien d'interactions, et laquelle en premier.
-    private func careSummary(for rec: SupplementRecommendation) -> (title: String, resume: String)? {
-        let items = SupplementsV4.precautions(for: rec, warnings: engineResult?.warnings ?? [])
-        guard let first = items.first else { return nil }
-        let title = items.count > 1
-            ? "\(items.count) précautions à connaître"
-            : "1 précaution à connaître"
-        return (title, firstSentence(first.note.isEmpty ? first.title : first.note))
-    }
-
-    /// Accroche de carte : la première phrase, plafonnée. La carte n'a la place
-    /// que d'une accroche, pas d'un paragraphe ; on coupe sur un mot entier.
-    private func firstSentence(_ text: String, limite: Int = 90) -> String {
-        let propre = KiwiProse.lisible(text)
-        let phrase = propre.firstIndex(of: ".").map { String(propre[...$0]) } ?? propre
-        guard phrase.count > limite else { return phrase }
-        let coupe = phrase.prefix(limite)
-        guard let espace = coupe.lastIndex(of: " ") else { return String(coupe) + "…" }
-        return String(coupe[..<espace]) + "…"
-    }
-
-    // MARK: - Pied de page (selon la voie)
-    // Voie « compléments » : plus rien ici — le budget vit dans la synthèse
-    // « En un coup d'œil », en tête de page.
-
-    @ViewBuilder
-    private var footerBlock: some View {
-        if voie == .assiette {
-            ComplementsAssietteZeroCard()
-        }
+    /// Fiche détaillée de l'apport (aliments, quantités, moments), si l'analyse
+    /// l'a produite. `nil` → la fiche ne propose pas le lien.
+    private func nutrientDetail(for id: String) -> EnrichedNutrient? {
+        dashboardVM.nutrients.first { $0.id == id }
     }
 
     // MARK: - Actions
@@ -619,10 +652,12 @@ struct SupplementsView: View {
         }
     }
 
-    /// Fiche détaillée de l'apport, si l'analyse l'a produite. `nil` → on
-    /// n'ouvre rien plutôt que d'afficher une coquille.
-    private func nutrientDetail(for id: String) -> EnrichedNutrient? {
-        dashboardVM.nutrients.first { $0.id == id }
+    /// Le lien de fin de fiche : on referme, et la page passe sur l'autre voie.
+    private func basculerVoie() {
+        fiche = nil
+        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.18)) {
+            voie = voie == .complements ? .assiette : .complements
+        }
     }
 
     // MARK: - Repli planning IA (rare : moteur vide mais analyse présente)

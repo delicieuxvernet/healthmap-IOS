@@ -1,24 +1,16 @@
 import SwiftUI
 
-// MARK: - Compléments « v7 » — une carte repliée répond, le détail attend le tap
+// MARK: - Compléments — les pièces de l'onglet (hors anneau et fiche)
 //
-// Évolution du « v6 » (chaînes toutes dépliées) : la page cumulait ~35 blocs
-// d'information et 7 cartes colorées avant le premier scroll. Personne n'avait
-// rien demandé encore. Règle « v7 » : divulgation progressive.
+// Maquette « Compléments anneau de cause » (20 septembre 2026). L'onglet est une
+// mosaïque : le rituel du jour en tête (l'action quotidienne), la bascule
+// Compléments / Par l'assiette, puis un héros et des tuiles (la consultation).
+// Toute la profondeur — calcul, prise, précautions, autre voie — vit dans la
+// fiche, ouverte au toucher d'une tuile (`FicheApport.swift`).
 //
-// HIÉRARCHIE IMPOSÉE, dans cet ordre — c'est la règle qui arbitre tout :
-//   1. la carte REPLIÉE répond à « qu'est-ce que je prends ? » :
-//      nutriment + statut + produit, dose, moment + prix. Rien d'autre.
-//   2. le tap déplie : le pourquoi (carte bleue) puis les précautions (ambre).
-//      UNE seule carte ouverte à la fois ; la première s'ouvre seule au premier
-//      affichage, sinon personne ne découvre que ça s'ouvre.
-//   3. la synthèse « En un coup d'œil » (gélules / assiette / total mensuel)
-//      ouvre la page : elle répond en 2 secondes avant toute lecture.
-//   (hors hiérarchie) l'ajout au panier — ligne texte discrète, jamais un bouton.
-//
-// La couleur reste rare : page repliée = pastilles nutriment + pills de statut,
-// et c'est tout. Le rail pointillé du v6 a disparu : la ligne de tête de la
-// carte repliée porte déjà le lien bilan → recommandation.
+// Ce fichier porte ce qui entoure la mosaïque : la voie, la chaîne bilan →
+// recommandation, le rituel, la carte d'exemple avant le bilan, la bascule.
+// L'anneau et les tuiles sont dans `AnneauDeCause.swift`.
 
 // MARK: - Voie choisie (un seul sélecteur, figé, pilote toute la page)
 enum ComplementsVoie: String, CaseIterable, Identifiable {
@@ -33,55 +25,7 @@ enum ComplementsVoie: String, CaseIterable, Identifiable {
         case .assiette: return "Par l'assiette"
         }
     }
-
-    var icon: String {
-        switch self {
-        case .complements: return "pills.fill"
-        case .assiette: return "carrot"
-        }
-    }
 }
-
-// MARK: - Palette locale de l'écran
-/// Teintes propres aux deux explications. Ce sont les seules couleurs
-/// non-vertes de l'écran : elles hiérarchisent « pourquoi » (bleu) et
-/// « précaution » (ambre), et n'existent pas ailleurs dans le thème.
-/// Les fonds et bordures de ces blocs ont disparu avec la charte du 17 août
-/// (les portes sont devenues des lignes) : il ne reste que l'accent et l'encre.
-enum ComplementsChainPalette {
-    static let whyAccent = Color(hex: "2F6FE0")
-    static let whyInk = Color(hex: "1B4FA8")
-
-    static let careAccent = Color(hex: "FF9500")
-    static let careInk = Color(hex: "8A4B00")
-}
-
-// MARK: - Explication (alimente le bottom sheet)
-struct ChainExplanation: Identifiable, Equatable {
-    enum Kind: Equatable { case why, care }
-
-    let id: String
-    let kind: Kind
-    let kicker: String
-    let titre: String
-    /// La ligne visible sur la carte (1 phrase).
-    let resume: String
-    /// Le mécanisme, 2-4 phrases.
-    let body: String
-    /// Bloc « EN PRATIQUE » : quoi faire concrètement.
-    let practice: String
-
-    /// Le corps découpé en paragraphes : un pavé de quatre phrases ne se lit
-    /// pas sur un téléphone, deux blocs courts si.
-    var paragraphes: [String] {
-        body.components(separatedBy: "\n\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
-}
-
-// KiwiProse a déménagé dans Views/Shared/KiwiProse.swift le 2 août 2026 :
-// tout texte affiché doit pouvoir y passer, pas seulement l'écran Compléments.
 
 extension String {
     /// Première lettre en capitale, le reste intact (`capitalized` casserait
@@ -95,127 +39,79 @@ extension String {
 // MARK: - Une chaîne = un apport du bilan + sa recommandation
 /// Générée DEPUIS les apports du bilan — jamais une liste de produits figée.
 /// Si un apport disparaît du bilan, sa chaîne disparaît.
+///
+/// La chaîne ne porte ni score ni statut : l'onglet affiche le score
+/// déterministe du registre (`HealthCalculator.registreApports`), le seul dont
+/// les parts ferment à 100 et dont on sait montrer le calcul.
 struct ComplementChain: Identifiable {
     let id: String
     let nom: String
-    let pct: Int?
-    let statut: StatutV2
     let symbol: String
     let tint: Color
     /// `nil` → aucun complément pertinent : cas « plutôt par l'assiette ».
     let rec: SupplementRecommendation?
     let apport: ApportV2?
 
-    /// Le mot du statut, sans son chiffre. La pastille dit l'état ; le chiffre
-    /// vit à côté d'elle, en donnée-héros de ligne (charte : jamais sous 15 pt).
-    var statutMot: String {
-        switch statut {
-        case .aCombler: return "à combler"
-        case .aRenforcer: return "à renforcer"
-        case .couvre: return "couvre le besoin"
-        case .neutre: return "à suivre"
+    /// « le fer », « la vitamine D » : l'apport dans une phrase.
+    var avecArticle: String {
+        switch id {
+        case "vitD": return "la vitamine D"
+        case "vitB12": return "la vitamine B12"
+        case "iron": return "le fer"
+        case "magnesium": return "le magnésium"
+        case "omega3": return "les oméga-3"
+        case "vitC": return "la vitamine C"
+        case "calcium": return "le calcium"
+        case "zinc": return "le zinc"
+        case "iodine": return "l'iode"
+        case "fiber": return "les fibres"
+        default: return nom.lowercased()
         }
-    }
-
-    /// « 38 % » — le chiffre du bilan qui justifie la carte.
-    var pctLabel: String? {
-        guard let pct else { return nil }
-        return "\(pct)\u{202F}%"
-    }
-
-    /// Statut complet, pour la voix de synthèse.
-    var statutLabel: String {
-        guard let pctLabel else { return statutMot }
-        return "\(statutMot) · \(pctLabel)"
-    }
-}
-
-// MARK: - Bloc d'engagement (transparence) — gros à la PREMIÈRE visite seulement
-/// Argument de confiance : il mérite un vrai bloc la première fois qu'on ouvre
-/// l'onglet. Ensuite il a été lu, et il coûtait un écran à chaque visite : les
-/// visites suivantes affichent `ComplementsEngagementLine` en pied de page.
-/// Refonte 23 août 2026 : carte blanche, bouclier vert, headline + secondaire.
-struct ComplementsEngagementCard: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 11) {
-                Image(systemName: "checkmark.shield")
-                    .font(.system(size: 24, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(Color.dsAccent)
-                    .accessibilityHidden(true)
-                Text("Kiwio ne gagne rien sur ces compléments.")
-                    .font(.dsHeadline)
-                    .tracking(DSTracking.corps)
-                    .foregroundStyle(Color.dsTexte)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Text("Aucune commission, aucun partenariat. On te dit quoi chercher, tu achètes où tu veux.")
-                .font(.dsSousTitre)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dsCard()
-        .accessibilityElement(children: .combine)
-    }
-}
-
-// MARK: - Engagement, version pied de page (visites suivantes)
-/// La même promesse que `ComplementsEngagementCard`, une fois qu'elle a été lue :
-/// une ligne posée à côté du disclaimer, plus un bloc en tête de page.
-struct ComplementsEngagementLine: View {
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "checkmark.shield")
-                .font(.system(size: 14, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.dsSecondaire)
-                .padding(.top, 1)
-                .accessibilityHidden(true)
-            Text("Kiwio ne gagne rien sur ces compléments. Aucune commission, aucun partenariat.")
-                .font(.dsLegende)
-                .tracking(DSTracking.legende)
-                .foregroundStyle(Color.dsSecondaire)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 4)
-        .accessibilityElement(children: .combine)
     }
 }
 
 // MARK: - Rituel du jour (carte : libellé, compte, trois moments)
-/// Refonte 23 août 2026 : une carte blanche, « Ton rituel du jour » en
-/// secondaire, le compte pris / total, puis trois puces (matin · midi · soir)
-/// qui portent le nombre de prises restantes du moment. Un tap sur une puce
-/// coche (ou décoche) toutes les prises de ce moment ; la persistance locale
-/// est inchangée (`SuiviEngineV4.toggleRituel`).
+/// Trois tuiles — matin · midi · soir — qui disent QUOI prendre à ce moment.
+/// Un tap coche (ou décoche) toutes les prises du moment ; la persistance
+/// locale est inchangée (`SuiviEngineV4.toggleRituel`). Un moment sans prise
+/// n'a pas de case : on ne propose pas de cocher ce qui n'existe pas.
 struct ComplementsRituelStrip: View {
     let rituel: SuiviEngineV4.ComplementsRituel
     let onToggle: (String) -> Void
 
-    private static let moments: [(id: String, symbole: String, libelle: String)] = [
-        ("matin", "sunrise", "matin"),
-        ("midi", "sun.max", "midi"),
-        ("soir", "moon", "soir"),
+    private struct Moment: Identifiable {
+        let id: String
+        let symbole: String
+        let libelle: String
+        let teinte: Color
+    }
+
+    private static let moments: [Moment] = [
+        Moment(id: "matin", symbole: "sunrise", libelle: "Matin", teinte: Color(uiColor: .systemOrange)),
+        Moment(id: "midi", symbole: "sun.max", libelle: "Midi", teinte: Color(uiColor: .systemYellow)),
+        Moment(id: "soir", symbole: "moon", libelle: "Soir", teinte: Color(uiColor: .systemIndigo)),
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline) {
                 Text("Ton rituel du jour")
-                    .font(.dsSousTitre)
-                    .tracking(DSTracking.sousTitre)
+                    .font(.dsLegende.weight(.semibold))
+                    .tracking(DSTracking.legende)
                     .foregroundStyle(Color.dsSecondaire)
                 Spacer(minLength: 6)
                 if !rituel.isEmpty {
-                    Text("\(rituel.doneCount)/\(rituel.total)")
-                        .font(.dsValeurLigne)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .contentTransition(.numericText())
+                    HStack(spacing: 0) {
+                        Text("\(rituel.doneCount)")
+                            .font(.dsLegende.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(Color.dsTexte)
+                            .contentTransition(.numericText())
+                        Text(" / \(rituel.total)")
+                            .font(.dsLegende.monospacedDigit())
+                            .foregroundStyle(Color.dsSecondaire)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(rituel.doneCount) sur \(rituel.total)")
                 }
             }
 
@@ -226,63 +122,75 @@ struct ComplementsRituelStrip: View {
                     .foregroundStyle(Color.dsTertiaire)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                HStack(spacing: 10) {
-                    ForEach(Self.moments, id: \.id) { moment in
-                        puce(moment)
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(Self.moments) { moment in
+                        tuile(moment)
                     }
                 }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DS.paddingCarte)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
         .accessibilityElement(children: .contain)
     }
 
-    private func items(_ moment: String) -> [SuiviEngineV4.RituelItem] {
+    private func prisesDu(_ moment: String) -> [SuiviEngineV4.RituelItem] {
         rituel.items.filter { $0.moment == moment }
     }
 
-    private func puce(_ moment: (id: String, symbole: String, libelle: String)) -> some View {
-        let prises = items(moment.id)
+    private func tuile(_ moment: Moment) -> some View {
+        let prises = prisesDu(moment.id)
         let restantes = prises.filter { !$0.done }.count
         let complet = !prises.isEmpty && restantes == 0
+        let quoi = prises.isEmpty ? "Rien à prendre" : prises.map(\.nom).joined(separator: " + ")
         return Button {
             guard !prises.isEmpty else { return }
             HapticService.shared.selection()
             for item in prises { onToggle(item.id) }
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: moment.symbole)
-                    .font(.system(size: 17, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .accessibilityHidden(true)
-                if complet {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.dsAccent)
-                        .accessibilityHidden(true)
-                } else {
-                    Text("\(restantes)")
-                        .font(.dsSousTitreFort.monospacedDigit())
-                        .foregroundStyle(prises.isEmpty ? Color.dsTertiaire : Color.dsTexte)
-                        .contentTransition(.numericText())
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Image(systemName: moment.symbole)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(moment.teinte)
+                    Spacer(minLength: 0)
+                    if !prises.isEmpty {
+                        Image(systemName: complet ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(complet ? Color.dsAccent : Color.dsTertiaire)
+                    }
                 }
-                Spacer(minLength: 0)
+                .accessibilityHidden(true)
+                Text(moment.libelle)
+                    .font(.dsLegende.weight(.semibold))
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                    .padding(.top, 8)
+                Text(quoi)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.dsSecondaire)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 1)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.dsFond))
-            .contentShape(Rectangle())
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, maxHeight: .infinity, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(complet ? Color.dsAccentPale : Color.dsFond)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.dsPress)
         .disabled(prises.isEmpty)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(prises.isEmpty
-            ? "Rien à prendre le \(moment.libelle)"
-            : (complet ? "Prises du \(moment.libelle) faites" : "\(restantes) prise\(restantes > 1 ? "s" : "") restante\(restantes > 1 ? "s" : "") le \(moment.libelle)"))
+            ? "\(moment.libelle) : rien à prendre"
+            : "\(moment.libelle) : \(quoi)")
+        .accessibilityValue(prises.isEmpty ? "" : (complet ? "fait" : "\(restantes) prise\(restantes > 1 ? "s" : "") restante\(restantes > 1 ? "s" : "")"))
         .accessibilityHint(prises.isEmpty ? "" : "Coche ou décoche les prises de ce moment")
     }
 }
@@ -299,7 +207,7 @@ struct ComplementsTeaserCard: View {
     /// Ids d'exemple — catalogue canonique uniquement (testés hors UI).
     static let exempleIds = ["iron", "vitB12", "magnesium"]
     /// Sous-titre générique de chaque exemple : la promesse, jamais un chiffre.
-    static let sousTitreExemple = "Dose et moment personnalisés après ton bilan"
+    static let sousTitreExemple = "Quoi prendre et à quel moment, après ton bilan"
 
     /// Lance (ou reprend) le bilan — `DashboardViewModel.demarrerBilan()`.
     let onStart: () -> Void
@@ -389,148 +297,5 @@ struct ComplementsVoieSwitch: View {
         }
         .pickerStyle(.segmented)
         .accessibilityLabel("Voie choisie")
-    }
-}
-
-// MARK: - Carte « tout par l'assiette » (mode assiette)
-struct ComplementsAssietteZeroCard: View {
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "basket.fill")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.dsTexte)
-                .padding(.top, 1)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 4) {
-                // La conclusion est le plus gros texte de sa carte.
-                Text("Tout par l'assiette : 0 € de complément")
-                    .font(Theme.conclusionFont)
-                    .tracking(Theme.conclusionTracking)
-                    .foregroundStyle(Color.dsTexte)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("Ces aliments couvrent tes besoins. Compte un mois pour sentir la différence.")
-                    .font(Theme.dataSecondaryFont)
-                    .lineSpacing(2)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(15)
-        .frame(maxWidth: .infinity)
-        .kiwiCard(radius: 16)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-// MARK: - Bottom sheet explicatif (pourquoi / précaution)
-struct ChainExplanationSheet: View {
-    let explanation: ChainExplanation
-    let onDismiss: () -> Void
-
-    private var accent: Color {
-        explanation.kind == .care
-            ? ComplementsChainPalette.careAccent
-            : ComplementsChainPalette.whyAccent
-    }
-
-    private var kickerColor: Color {
-        explanation.kind == .care
-            ? ComplementsChainPalette.careInk
-            : ComplementsChainPalette.whyAccent
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 11) {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .fill(accent.opacity(0.12))
-                        .frame(width: 40, height: 40)
-                        .overlay(
-                            Image(systemName: explanation.kind == .care
-                                  ? "exclamationmark.triangle.fill" : "lightbulb.fill")
-                                .font(.system(size: 19, weight: .semibold))
-                                .foregroundStyle(accent)
-                        )
-                        .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(explanation.kicker)
-                            .font(.system(size: 11, weight: .bold))
-                            .tracking(0.35)
-                            .foregroundStyle(kickerColor)
-                        Text(explanation.titre)
-                            .font(.system(size: 18, weight: .bold))
-                            .tracking(-0.4)
-                            .foregroundStyle(Color.dsTexte)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                // Le mécanisme, aéré en paragraphes courts.
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(explanation.paragraphes.enumerated()), id: \.offset) { _, paragraphe in
-                        Text(paragraphe)
-                            .font(.system(.subheadline).weight(.medium))
-                            .lineSpacing(5)
-                            .foregroundStyle(Color(hex: "3A3833"))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .padding(15)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white)
-                )
-                .padding(.top, 14)
-
-                // Ce qu'on en fait concrètement.
-                if !explanation.practice.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("EN PRATIQUE")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.dsTexte)
-                        // Le geste concret : c'est la raison d'être de la
-                        // sheet, il passe devant le bouton qui la referme.
-                        Text(explanation.practice)
-                            .font(Theme.insightFont)
-                            .lineSpacing(4)
-                            .foregroundStyle(Color.dsTexte)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(15)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white)
-                    )
-                    .padding(.top, 10)
-                }
-
-                Button(action: onDismiss) {
-                    Text("J'ai compris")
-                        .font(Theme.ctaFont)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.dsAccent)
-                        )
-                }
-                .buttonStyle(.healthMapPressed)
-                .padding(.top, 16)
-            }
-            .padding(.horizontal, 22)
-            .padding(.top, 18)
-            .padding(.bottom, 28)
-        }
-        .background(WarmBackground())
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
     }
 }
