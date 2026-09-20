@@ -76,6 +76,13 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
 
 ### 2.1 — Code & calculs
 1. **`HealthCalculator.swift` = miroir de `health.js`**. Pas de logique calcul propre à iOS.
+   Depuis le 20 septembre 2026, l'arithmétique des **scores d'apports** vit dans
+   `Core/NutrientLedger.swift` (`registreApports`) : chaque pénalité ou bonus y porte son
+   libellé et sa section du questionnaire, et `analyzeNutrientScores` n'en est plus que la
+   projection (`.mapValues(\.score)`). **Toute nouvelle pénalité s'écrit dans le registre, avec
+   son libellé** — c'est lui qui alimente l'anneau de cause et la cascade de l'onglet
+   Compléments. Le bloc partagé `NutrientEngine.applyMedicalHistoryPenalties` y est exécuté tel
+   quel (jamais recopié). `CrossRepoParityTests` reste l'oracle de parité avec le web.
 2. **`NutrientData.swift` = source canonique** des labels/emojis nutriments (jamais l'IA).
 3. **`AIAnalysisService` doit utiliser `temperature=0`** côté Edge Function (déjà géré server-side, mais ne pas paramétrer autrement).
 4. **Circuit breaker actif** sur `AIAnalysisService` (3 fails → open 5 min). Ne pas le désactiver.
