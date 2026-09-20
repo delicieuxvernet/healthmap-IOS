@@ -1,16 +1,12 @@
 import SwiftUI
 
-// MARK: - Compléments : socle partagé (données de précaution + feuille)
+// MARK: - Compléments : socle partagé (précautions et choix du produit)
 //
-// Ce qui reste de commun à l'onglet Compléments une fois la refonte v6 en
-// place (`SupplementsChainV6.swift` porte l'écran) :
 //   • `SupplementPrecaution` : modèle d'affichage d'une précaution ;
-//   • `SupplementsV4` : les helpers de mapping moteur → affichage ;
-//   • `SupplementPrecautionsSheet` : la feuille ouverte par la carte ambre.
+//   • `SupplementsV4` : les helpers de mapping moteur → affichage.
 //
-// Les composants de l'ancien écran v4 (carte de complément, encart de
-// transparence, toggle Premium/Éco, panier, pop-up « Pourquoi pour toi ») ont
-// été supprimés le 1er août 2026 : plus rendus depuis la v6.
+// Les précautions s'affichent dans le bloc 05 de la fiche d'un apport
+// (`FicheApport.swift`) : plus de feuille dédiée depuis le 20 septembre 2026.
 //
 // ⚠️ L'enum garde le nom historique `SupplementsV4` : il est appelé depuis
 // l'écran et le renommer est un refactor à part entière, pas du nettoyage.
@@ -22,8 +18,9 @@ import SwiftUI
 struct SupplementPrecaution: Identifiable {
     let id = UUID()
     let icon: String      // SF Symbol
-    let bg: Color
-    let color: Color
+    /// Interaction critique : la seule précaution qui garde une couleur
+    /// d'alerte dans la fiche (une sécurité ne se fond pas dans le gris).
+    let critique: Bool
     let title: String
     let note: String
 }
@@ -55,8 +52,7 @@ enum SupplementsV4 {
             let critical = w.severity == .critical
             items.append(SupplementPrecaution(
                 icon: critical ? "exclamationmark.octagon.fill" : "arrow.left.arrow.right",
-                bg: critical ? Color.scoreDeficient.opacity(0.14) : Color.scoreLow.opacity(0.16),
-                color: critical ? Color.scoreDeficient : Color.scoreLow,
+                critique: critical,
                 title: precautionTitle(w, nutrientID: rec.nutrientID),
                 note: w.message
             ))
@@ -70,8 +66,7 @@ enum SupplementsV4 {
                 if !already && NutrientID(rawValue: anti) != nil {
                     items.append(SupplementPrecaution(
                         icon: "clock.fill",
-                        bg: Color.scoreLow.opacity(0.16),
-                        color: Color.scoreLow,
+                        critique: false,
                         title: "À distance de \(antiLabel)",
                         note: "Sépare les prises de 2 h pour ne pas gêner l'absorption."
                     ))
@@ -82,8 +77,7 @@ enum SupplementsV4 {
             for ci in product.contraindications {
                 items.append(SupplementPrecaution(
                     icon: "cross.case.fill",
-                    bg: Color.scoreLow.opacity(0.16),
-                    color: Color.scoreLow,
+                    critique: false,
                     title: ci.title,
                     note: ci.warningLabel
                 ))
@@ -109,124 +103,9 @@ enum SupplementsV4 {
     }
 
     static func tip(for items: [SupplementPrecaution]) -> String {
-        if items.contains(where: { $0.color == Color.scoreDeficient }) {
+        if items.contains(where: \.critique) {
             return "Parles-en à ton médecin avant de commencer cette cure."
         }
         return "Décale simplement les prises dans la journée, c'est suffisant."
-    }
-}
-
-// MARK: - Pop-up « Précautions »
-struct SupplementPrecautionsSheet: View {
-    let rec: SupplementRecommendation
-    let items: [SupplementPrecaution]
-    let tip: String
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 13) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            .fill(Color.scoreDeficient.opacity(0.12))
-                            .frame(width: 48, height: 48)
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(Color.scoreDeficient)
-                    }
-                    .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("PRÉCAUTIONS")
-                            .font(.system(size: 11, weight: .bold))
-                            .tracking(0.4)
-                            .foregroundStyle(Color(hex: "C0322A"))
-                        Text(rec.nutrientLabel)
-                            .font(.system(size: 19, weight: .bold))
-                            .foregroundStyle(Color.dsTexte)
-                    }
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.dsSecondaire)
-                            .frame(width: 34, height: 34)
-                            .background(Circle().fill(Color(hex: "EFEBE2")))
-                    }
-                    .buttonStyle(.healthMapPressed)
-                    .accessibilityLabel("Fermer")
-                }
-
-                Text("Interactions détectées sur ton profil")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.dsTexte)
-                    .padding(.top, 18)
-                    .padding(.bottom, 11)
-
-                VStack(spacing: 10) {
-                    ForEach(items) { item in
-                        HStack(alignment: .top, spacing: 12) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                    .fill(item.bg)
-                                    .frame(width: 34, height: 34)
-                                Image(systemName: item.icon)
-                                    .font(.system(size: 17))
-                                    .foregroundStyle(item.color)
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title)
-                                    .font(.system(size: 13.5, weight: .bold))
-                                    .foregroundStyle(Color.dsTexte)
-                                Text(item.note)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(Color.dsSecondaire)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(14)
-                        .frame(maxWidth: .infinity)
-                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white))
-                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.dsTexte.opacity(0.04), lineWidth: 1))
-                        // (ombre retirée, refonte 23 août 2026)
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Color.dsTexte)
-                    Text(tip)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.dsTexte)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 13)
-                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsRemplissage))
-                .padding(.top, 16)
-
-                Button { dismiss() } label: {
-                    Text("J'ai compris")
-                        .font(.system(size: 14.5, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 50)
-                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsTexte))
-                }
-                .buttonStyle(.healthMapPressed)
-                .padding(.top, 20)
-            }
-            .padding(.horizontal, 22)
-            .padding(.top, 14)
-            .padding(.bottom, 30)
-        }
-        .background(Color.dsFond)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(30)
     }
 }
