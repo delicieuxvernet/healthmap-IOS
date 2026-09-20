@@ -183,6 +183,13 @@ enum SupplementEngine {
             why += " Sans poisson, l'apport en oméga-3 marins est presque nul."
         }
 
+        // « Comment on l'a vu » : ce que les symptômes déclarés permettent
+        // d'éclairer. Jamais l'inverse — le score a déjà décidé, la phrase
+        // explique. Voir SymptomesApports pour le principe et la table.
+        if let signale = SymptomesApports.explication(pour: nutrientID, symptomes: profile.symptoms) {
+            why += " " + signale
+        }
+
         return why
     }
 
