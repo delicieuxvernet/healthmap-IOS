@@ -75,7 +75,7 @@ struct JournalCaloriesCard: View {
         return depasse ? "kcal au-dessus" : "kcal restantes"
     }
 
-    private var ligneSante: String {
+    private var ligneDepense: String {
         if let depensees, depensees > 0 { return "\(DS.entier(depensees)) kcal dépensées" }
         return santeLiee ? "Rien de dépensé pour l'instant" : "Relier pour compter tes dépenses"
     }
@@ -128,7 +128,7 @@ struct JournalCaloriesCard: View {
                         .padding(.horizontal, 11)
                         .padding(.vertical, 6)
                         .background(Capsule().fill(Color(uiColor: .systemPink).opacity(0.1)))
-                        Text(ligneSante)
+                        Text(ligneDepense)
                             .font(.dsSousTitre)
                             .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsSecondaire)
@@ -142,7 +142,7 @@ struct JournalCaloriesCard: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.dsPress)
-                .accessibilityLabel("Apple Santé. \(ligneSante)")
+                .accessibilityLabel("Apple Santé. \(ligneDepense)")
                 .accessibilityHint("Ouvre l'activité du jour")
             }
         }
