@@ -26,6 +26,13 @@ enum NutrientEngine {
 
     /// Scores par nutriment (0-100), déterministes, à partir du caddie.
     static func nutrientScores(profile p: UserProfile) -> [String: Int] {
+        scoresBruts(profile: p).mapValues { max(0, min(100, $0)) }
+    }
+
+    /// Les mêmes scores AVANT d'être ramenés dans l'échelle 0-100 : c'est sur
+    /// eux que le registre (`NutrientEngineLedger.swift`) vérifie que ses
+    /// facteurs nommés retombent exactement sur le calcul.
+    static func scoresBruts(profile p: UserProfile) -> [String: Int] {
         // Mêmes garde-fous que HealthCalculator.
         let w = p.weightDouble, h = p.heightDouble, a = p.ageInt
         guard w >= 20, w <= 300, h >= 80, h <= 250, a >= 1, a <= 120 else { return [:] }
@@ -39,10 +46,10 @@ enum NutrientEngine {
         }
 
         // ── 2. Modificateurs NON alimentaires (portés de HealthCalculator) ──
+        // ⚠️ Toute ligne ajoutée ici s'ajoute AUSSI, nommée, dans
+        // `NutrientEngineLedger.swift` — sinon l'anneau de cause affiche une
+        // ligne « Autres facteurs de ton profil » et son test échoue.
         applyNonFoodModifiers(&scores, profile: p)
-
-        // ── 3. Clamp ──
-        for key in scores.keys { scores[key] = max(0, min(100, scores[key]!)) }
         return scores
     }
 
@@ -131,7 +138,7 @@ enum NutrientEngine {
     }
 
     /// Contribution alimentaire bornée [-30 ; +18], courbe saturante vs cible.
-    private static func foodDelta(_ p: UserProfile, _ nutrient: GroceryNutrient) -> Int {
+    static func foodDelta(_ p: UserProfile, _ nutrient: GroceryNutrient) -> Int {
         let servings = weeklyServings(p, nutrient)
         if servings == 0 { return -30 }
         let target = Double(max(1, targets[nutrient] ?? 5))

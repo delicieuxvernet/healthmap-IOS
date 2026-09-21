@@ -81,6 +81,9 @@ enum CauseApport {
 
     /// Les familles de facteurs, dans l'ordre où on les reconnaît.
     private static let familles: [(mots: [String], pourquoi: String, geste: String)] = [
+        (["courses"],
+         "Tes courses habituelles contiennent peu d'aliments qui apportent cet apport. C'est la première source, avant tout le reste : c'est souvent là qu'il y a le plus de points à regagner.",
+         "Ajoute à tes courses deux ou trois aliments qui en sont riches, et garde-les d'une semaine sur l'autre."),
         (["cafe", "the pendant"],
          "Les tanins du café et du thé se lient au fer pendant la digestion : une partie du fer du repas n'est pas absorbée. Le magnésium est touché aussi, dans une moindre mesure.",
          "Garde ton café ou ton thé, mais à distance des repas : une heure après suffit."),
