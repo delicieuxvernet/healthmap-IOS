@@ -762,11 +762,14 @@ enum PremiumOffre {
         let toutes = options(offerings: offerings, produits: produits)
         guard !toutes.isEmpty else { return .enAttente }
 
-        func montant(_ unite: SubscriptionPeriod.Unit, _ suffixe: String) -> String? {
-            toutes.first { $0.periodUnit == unite }.map { "\($0.localizedPriceString)/\(suffixe)" }
+        // La formule se choisit par un prédicat : nommer le type de la période
+        // est ambigu dans ce fichier (StoreKit et RevenueCat en ont un chacun).
+        func montant(_ estLaBonne: (PlanOption) -> Bool, _ suffixe: String) -> String? {
+            toutes.first(where: estLaBonne).map { "\($0.localizedPriceString)/\(suffixe)" }
         }
-        var montants = [montant(.year, "an"), montant(.week, "sem.")].compactMap { $0 }
-        if montants.isEmpty, let mensuel = montant(.month, "mois") { montants = [mensuel] }
+        var montants = [montant({ $0.periodUnit == .year }, "an"),
+                        montant({ $0.periodUnit == .week }, "sem.")].compactMap { $0 }
+        if montants.isEmpty, let mensuel = montant({ $0.periodUnit == .month }, "mois") { montants = [mensuel] }
         if montants.isEmpty, let premiere = toutes.first { montants = [premiere.localizedPriceString] }
 
         let avecEssai = essai(formule(offerings: offerings, produits: produits)) != nil
