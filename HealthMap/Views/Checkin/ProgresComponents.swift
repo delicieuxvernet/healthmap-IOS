@@ -1,68 +1,21 @@
 import SwiftUI
 
-// MARK: - Progrès (refonte 23 août 2026, ex-Suivi) : sous-vues
+// MARK: - Progrès : le graphe à barres et l'état du premier jour
 //
 // Habillage pur, aucun calcul : les séries viennent de `SuiviView`
-// (`WeekScoreEngine`, journal, profil). Tokens : `KiwiDS.swift`.
-
-// MARK: - Carte de vue d'ensemble (libellé, valeur héros 34 / 700, détail)
-
-struct ProgresStatCard: View {
-    let libelle: String
-    /// nil = rien à afficher honnêtement (« après ton 1er repas »).
-    let valeur: String?
-    let detail: String
-    var detailCouleur: Color = .dsSecondaire
-    var detailSymbole: String? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(libelle)
-                .font(.dsSousTitre)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            Text(valeur ?? "\u{2014}")
-                .font(.dsHeros34)
-                .tracking(DSTracking.heros34)
-                .foregroundStyle(valeur == nil ? Color.dsTertiaire : Color.dsTexte)
-                .contentTransition(.numericText())
-                .padding(.top, 2)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            HStack(spacing: 4) {
-                if let detailSymbole {
-                    Image(systemName: detailSymbole)
-                        .font(.system(size: 13, weight: .semibold))
-                        .accessibilityHidden(true)
-                }
-                Text(detail)
-                    .font(.dsLegendeMoyenne)
-                    .tracking(DSTracking.legende)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-            }
-            .foregroundStyle(detailCouleur)
-        }
-        .padding(DS.paddingCarte)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dsCard()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(libelle) : \(valeur ?? "pas encore de valeur"). \(detail)")
-    }
-}
+// (`WeekScoreEngine`, journal, profil). Les sous-vues de la maquette v3
+// vivent dans `ProgresV3Components.swift`. Tokens : `KiwiDS.swift`.
 
 // MARK: - Segment du graphe
 
 enum ProgresSegment: String, CaseIterable, Identifiable {
-    case calories, macros, micros
+    case symptomes, apports, calories
     var id: Self { self }
     var libelle: String {
         switch self {
+        case .symptomes: return "Symptômes"
+        case .apports: return "Apports"
         case .calories: return "Calories"
-        case .macros: return "Macros"
-        case .micros: return "Micros"
         }
     }
 }
@@ -75,51 +28,6 @@ struct ProgresBarPoint: Identifiable {
     let valeur: Double?
     let horsCible: Bool
     let futur: Bool
-}
-
-// MARK: - Carte « Besoins et apports » (segmented, conclusion, barres + pointillé)
-
-struct ProgresBesoinsCard: View {
-    @Binding var segment: ProgresSegment
-    let points: [ProgresBarPoint]
-    /// Ligne de besoins (pointillé noir) ; nil = besoin inconnu, pas de ligne.
-    let besoin: Double?
-    let conclusion: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Picker("Vue", selection: $segment) {
-                ForEach(ProgresSegment.allCases) { s in
-                    Text(s.libelle).tag(s)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            Text(conclusion)
-                .font(.dsHeadline)
-                .tracking(DSTracking.corps)
-                .foregroundStyle(Color.dsTexte)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 14)
-                .animation(nil, value: segment)
-
-            ProgresBarChart(points: points, besoin: besoin)
-                .frame(height: 132)
-                .padding(.top, 10)
-
-            HStack(spacing: 16) {
-                Text("Barres : tes apports")
-                Text("Pointillé : tes besoins")
-            }
-            .font(.dsLegende)
-            .tracking(DSTracking.legende)
-            .foregroundStyle(Color.dsSecondaire)
-            .padding(.top, 4)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dsCard()
-    }
 }
 
 // MARK: - Graphe à barres (gris = apports, orange = jour hors cible, pointillé = besoins)
@@ -253,56 +161,5 @@ struct ProgresPremierJourCard: View {
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity)
         .dsCard()
-    }
-}
-
-// MARK: - Liste « Apports à renforcer » (libellé, jauge, pourcentage, chevron)
-
-struct ProgresApportsList: View {
-    struct Ligne: Identifiable {
-        let id: String
-        let nom: String
-        let pct: Int
-    }
-
-    let lignes: [Ligne]
-    let onLigne: (Ligne) -> Void
-
-    var body: some View {
-        DSGroupedList {
-            ForEach(Array(lignes.enumerated()), id: \.element.id) { index, ligne in
-                if index > 0 { DSSeparator() }
-                Button {
-                    onLigne(ligne)
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(ligne.nom)
-                                .font(.dsCorps)
-                                .tracking(DSTracking.corps)
-                                .foregroundStyle(Color.dsTexte)
-                                .fixedSize(horizontal: false, vertical: true)
-                            DSGauge(fraction: Double(ligne.pct) / 100,
-                                    couleur: Color.dsStatut(ligne.pct),
-                                    delai: 0.4 + Double(index) * DS.cascade)
-                                .frame(width: 180)
-                        }
-                        Spacer(minLength: 8)
-                        Text(DS.pourcent(ligne.pct))
-                            .font(.dsValeurLigne)
-                            .tracking(DSTracking.sousTitre)
-                            .foregroundStyle(Color.dsSecondaire)
-                        DSChevron()
-                    }
-                    .padding(.horizontal, DS.paddingCarte)
-                    .padding(.vertical, 13)
-                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.dsPress)
-                .accessibilityLabel("\(ligne.nom), \(ligne.pct) pour cent de tes besoins")
-                .accessibilityHint("Ouvre la fiche de cet apport")
-            }
-        }
     }
 }

@@ -68,9 +68,15 @@
 >   toujours à 100. Le pourcentage rédigé par le bilan n'est plus affiché dans cet onglet. Voie
 >   assiette : l'aliment en titre, **aucun pourcentage ni portion par aliment** (la donnée n'existe
 >   pas) ; quantités et moments restent dans la fiche nutriment existante, liée depuis la fiche.
-> - **Progrès** (`SuiviView.swift`, `ProgresComponents.swift`) : vue d'ensemble (2 cartes) · besoins et
->   apports (segmented natif, conclusion, barres + pointillé) · apports à renforcer · état premier jour
->   en une carte ; check-in et courbes symptômes conservés.
+> - **Progrès v3** (`SuiviView.swift` + `ProgresV3Components.swift`, maquette du 20 sept. 2026) : le
+>   **verdict d'abord** — « Cette semaine, en trois lignes » (un symptôme, un apport, les calories ;
+>   phrases de `ProgresVerdict`, pur et testé) — puis **un seul graphe** à la fois (segmented
+>   Symptômes · Apports · Calories). Courbe d'un symptôme : une ligne, trois paliers nommés en mots,
+>   **le haut est toujours le mieux**, point du jour plein, pilule « +2 niveaux ». Puis « Depuis ton
+>   premier jour » (avant → après + écart), puis « Voir mon récap du jour ». Check-in : feuille, **un
+>   symptôme par écran**, question dans le sens du mieux, toucher = choisir ET avancer (350 ms),
+>   proposé à l'arrivée sur l'onglet (jamais au lancement). Frontière Premium inchangée : tendance
+>   des symptômes et des apports derrière leurs portes ; en gratuit le verdict nomme le sujet seul.
 > - **Plan** (`PlanRadialComponents.swift`) : traits fins `#D1D1D6`, disques blancs sans ombre, symboles
 >   noirs, carte de pied ; feuille de nœud (cause → 3 leviers → délai → capsule).
 > - **Réglages v3** (`ReglagesView.swift` + `ReglagesSousPages.swift`, maquette du 20 sept. 2026) :

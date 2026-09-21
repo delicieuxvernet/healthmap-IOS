@@ -738,7 +738,7 @@ enum SuiviEngineV4 {
 // « toi », sans dupliquer la logique d'écriture (l'écriture reste dans SuiviView).
 @MainActor
 enum SuiviCheckinHistory {
-    /// Clé de ressenti du symptôme du jour (miroir de `SuiviView.symptomFeelKey`).
+    /// Clé de ressenti du symptôme du jour (miroir de `SuiviCheckinStore.symptomFeelKey`).
     static let feelKey = "symptome_today"
 
     private static var uid: String {

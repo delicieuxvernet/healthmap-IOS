@@ -160,7 +160,7 @@ final class SuiviCourbesReellesTests: XCTestCase {
             let jour = cal.date(byAdding: .day, value: -k, to: Date())!
             ecrireCheckinPasse(jour: jour, feels: ["fatigue": 0])
         }
-        SuiviCheckinStore.saveToday(symptomFeels: ["fatigue": 0], energyFeel: nil)
+        SuiviCheckinStore.saveToday(symptomFeels: ["fatigue": 0])
 
         // Répondre au pop-up doit démarrer le suivi (promesse « ça met tes
         // courbes à jour ») — sans autre geste.
