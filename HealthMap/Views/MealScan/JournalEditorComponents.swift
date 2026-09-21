@@ -522,7 +522,7 @@ final class FoodSearchViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
             do {
-                let results = try await MealJournalService.shared.searchFoods(query: q)
+                let results = try await MealJournalService.shared.searchFoodsVisuel(query: q)
                 guard !Task.isCancelled else { return }
                 hits = results
             } catch {
@@ -567,8 +567,14 @@ struct FoodSearchSheet: View {
                                 .foregroundStyle(Color.dsSecondaire)
                                 .padding(.top, Theme.spacingLG)
                         } else {
-                            ForEach(vm.hits) { hit in
-                                hitRow(hit)
+                            ForEach(RechercheVisuelle.sections(vm.hits, source: \.source, score: \.score)) { section in
+                                RechercheSectionTitre(titre: section.titre)
+                                ForEach(section.lignes) { hit in
+                                    hitRow(hit)
+                                }
+                            }
+                            if vm.hits.contains(where: { $0.source == "off" }) {
+                                RechercheCreditPhotos()
                             }
                         }
                     }
@@ -656,27 +662,7 @@ struct FoodSearchSheet: View {
             Button {
                 openDetail(hit)
             } label: {
-                HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.dsRemplissage)
-                            .frame(width: 40, height: 40)
-                        Image(systemName: hit.source == "off" ? "barcode" : "fork.knife")
-                            .font(.system(size: 16))
-                            .foregroundStyle(Color.dsAccent)
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(hit.name)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.dsTexte)
-                            .lineLimit(1)
-                        Text(hitSub(hit))
-                            .font(.system(size: 13, design: .default))
-                            .foregroundStyle(Color.dsSecondaire)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 4)
-                }
+                FoodHitContenu(hit: hit)
             }
             .buttonStyle(.healthMapPressed)
 
@@ -709,14 +695,6 @@ struct FoodSearchSheet: View {
                         .stroke(Color.dsTexte.opacity(0.05), lineWidth: 1)
                 )
         )
-    }
-
-    private func hitSub(_ hit: MealJournalService.FoodHit) -> String {
-        var parts = [hit.brand ?? "Générique"]
-        if let kcal = hit.kcal100g {
-            parts.append("\(Int(kcal.rounded())) kcal / 100 g")
-        }
-        return parts.joined(separator: " · ")
     }
 
     /// Tap sur la ligne → fiche portion (fetch `get_food` d'abord).

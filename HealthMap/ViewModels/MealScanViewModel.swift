@@ -689,7 +689,7 @@ final class MealScanViewModel: ObservableObject {
                 // RPC unifiée `search_foods` (CIQUAL ∪ Open Food Facts,
                 // scoring server-side) — remplace l'ancien ilike sur
                 // `ciqual_foods` seul : les produits de marque arrivent d'OFF.
-                let results = try await MealJournalService.shared.searchFoods(query: query)
+                let results = try await MealJournalService.shared.searchFoodsVisuel(query: query)
 
                 guard !Task.isCancelled else { return }
                 searchResults = results

@@ -1621,43 +1621,37 @@ struct JournalView: View {
                     .tint(Color.dsAccent)
                     .padding()
             } else {
-                ForEach(viewModel.searchResults) { hit in
-                    Button {
-                        openSearchDetail(hit)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: hit.source == "off" ? "barcode" : "fork.knife")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Color.dsAccent)
-                            // Même grammaire que la ligne de recherche du
-                            // journal (JournalEditorComponents) : c'est la même
-                            // ligne, elle s'écrivait de deux façons.
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(hit.name)
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(Color.dsTexte)
-                                    .lineLimit(1)
-                                Text(searchHitSub(hit))
-                                    .font(.system(size: 13, design: .default))
-                                    .foregroundStyle(Color.dsSecondaire)
-                                    .lineLimit(1)
+                // La même ligne à vignette que la recherche du journal
+                // (`FoodHitContenu`), rangée dans les deux mêmes sections.
+                ForEach(RechercheVisuelle.sections(viewModel.searchResults, source: \.source, score: \.score)) { section in
+                    RechercheSectionTitre(titre: section.titre)
+                        .padding(.horizontal, Theme.spacingLG)
+                    ForEach(section.lignes) { hit in
+                        Button {
+                            openSearchDetail(hit)
+                        } label: {
+                            HStack(spacing: 10) {
+                                FoodHitContenu(hit: hit)
+                                if isAddingFood {
+                                    ProgressView().tint(Color.dsAccent).scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Color.dsSecondaire)
+                                }
                             }
-                            Spacer()
-                            if isAddingFood {
-                                ProgressView().tint(Color.dsAccent).scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Color.dsSecondaire)
-                            }
+                            .padding(Theme.spacingSM)
+                            .background(Color.dsCarte)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
-                        .padding(Theme.spacingSM)
-                        .background(Color.dsCarte)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .buttonStyle(.healthMapPressed)
+                        .disabled(isAddingFood)
+                        .padding(.horizontal, Theme.spacingLG)
                     }
-                    .buttonStyle(.healthMapPressed)
-                    .disabled(isAddingFood)
-                    .padding(.horizontal, Theme.spacingLG)
+                }
+                if viewModel.searchResults.contains(where: { $0.source == "off" }) {
+                    RechercheCreditPhotos()
+                        .padding(.horizontal, Theme.spacingLG)
                 }
             }
         }
@@ -1689,14 +1683,6 @@ struct JournalView: View {
                      })
         .presentationDetents([.height(460)])
         .presentationDragIndicator(.visible)
-    }
-
-    private func searchHitSub(_ hit: MealJournalService.FoodHit) -> String {
-        var parts = [hit.brand ?? "Générique"]
-        if let kcal = hit.kcal100g {
-            parts.append("\(Int(kcal.rounded())) kcal / 100 g")
-        }
-        return parts.joined(separator: " · ")
     }
 
     /// Résout un code-barres par le MÊME chemin que la recherche texte :
