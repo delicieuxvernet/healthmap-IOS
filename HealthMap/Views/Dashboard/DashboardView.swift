@@ -75,10 +75,7 @@ struct DashboardView: View {
             // Pop-up détail d'un apport (contrat v2). .sheet(item:) garantit que
             // la feuille reçoit toujours l'apport courant.
             .sheet(item: $selectedApport) { apport in
-                ApportV2DetailSheet(apport: apport) {
-                    selectedApport = nil
-                    openTab(.plan)
-                }
+                ApportV2DetailSheet(apport: apport)
             }
             // Pop-up détail d'un point d'attention (maquette V2a) : le tap
             // ouvre une sheet limpide au lieu de basculer sèchement vers Plan.

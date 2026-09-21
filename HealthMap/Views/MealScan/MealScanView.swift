@@ -205,13 +205,7 @@ struct JournalView: View {
                     )
                 }
                 .sheet(item: $selectedApport) { apport in
-                    ApportV2DetailSheet(apport: apport) {
-                        selectedApport = nil
-                        NotificationCenter.default.post(
-                            name: .healthmapNavigateToTab,
-                            object: NavCardDestination.plan.rawValue
-                        )
-                    }
+                    ApportV2DetailSheet(apport: apport)
                 }
                 .sheet(isPresented: $showVoice) {
                     if let uid = AuthService.shared.cachedCurrentUserIdString {
