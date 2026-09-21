@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import RevenueCat
 
 // MARK: - Bilan « v6 — vivant » (contrat API v2, juillet 2026)
 //
@@ -52,91 +51,42 @@ struct SafeFluent3DIcon: View {
 
 
 // MARK: - Bottom sheet : détail d'un apport (contrat v2)
-/// Fiche d'un apport, au design de l'anneau de cause (21 septembre 2026) — la
-/// même lecture que dans l'onglet Compléments, d'où qu'on vienne (Journal,
-/// Bilan, Progrès) :
-///   1. l'anneau de cause 148 + le nom + « à combler · 3 causes nommées » et la
-///      quantité (« 5,9 sur 14 mg », dérivée de la référence canonique) ;
-///   2. « À quoi ça répond chez toi » : la table déterministe `SymptomesApports` ;
-///   3. « Comment on l'a vu » : la cascade du registre — toucher une ligne
-///      allume sa part sur l'anneau ;
-///   4. « Pourquoi il est bas » : l'explication du contrat v2 ;
-///   5. « Ce que ça fait » : le rôle de l'apport ;
-///   6. « Ce qui le remonte » : les aliments du contrat, qu'on ajoute au
-///      journal d'un toucher (réservé au premium : voile + porte calme) ;
-///   7. bouton capsule vers le plan.
-/// Règle d'écriture : la cause avant la solution. Aucun chiffre inventé.
+/// Fiche d'un apport, RÉORDONNÉE (maquette validée par Arthur le 21 septembre
+/// 2026 : « on ne sait pas où regarder en premier »). D'où qu'on vienne
+/// (Journal, Bilan, Progrès), elle répond aux questions dans l'ordre où on se
+/// les pose :
+///   1. LE VERDICT : l'anneau de cause, le nom, UNE phrase (« Ton fer est bas.
+///      Première cause : règles abondantes. ») et la quantité ;
+///   2. CE QUI PÈSE LE PLUS : les trois premiers freins du registre, à la teinte
+///      de leur part de l'anneau, avec leur poids — toucher ouvre la cause
+///      (`CauseApportSheet`) et allume sa part ;
+///   3. CE QUE TU PEUX FAIRE, DÈS AUJOURD'HUI : un geste par facteur qui se
+///      change, et ce qu'il rendrait (« jusqu'à +12 points » — le même calcul,
+///      rejoué sans lui). Réservé au premium ;
+///   4. OÙ LE TROUVER : les aliments, en pastilles. On les MONTRE, on ne les
+///      ajoute plus au journal d'ici (le « + » est retiré : ajouter un repas se
+///      fait dans le Journal) ;
+///   5. EN SAVOIR PLUS, replié : à quoi il sert, tes signes, ce que dit ton
+///      bilan, le détail du calcul.
+/// Aucune redirection vers un autre onglet. Aucun chiffre inventé : tout ce
+/// qui se calcule vient de `LectureApport`.
 struct ApportV2DetailSheet: View {
     let apport: ApportV2
-    let onSeePlan: () -> Void
 
     /// Le profil nourrit le registre (les causes) et la table des symptômes.
-    /// Les deux présentateurs (Journal, Bilan, Progrès) le portent déjà.
+    /// Les trois présentateurs (Journal, Bilan, Progrès) le portent déjà.
     @EnvironmentObject private var dashboardVM: DashboardViewModel
     @Environment(\.dismiss) private var dismiss
-    /// Part de l'anneau allumée par la cascade.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Part de l'anneau allumée (par une cause touchée, ou par la cascade).
     @State private var surligne: String?
+    @State private var causeOuverte: CauseOuverte?
+    @State private var enSavoirPlus = false
+    /// Les barres de poids se remplissent à l'arrivée de la fiche.
+    @State private var rempli = false
     /// Source unique premium (loi 11), OBSERVÉE : un achat depuis la fiche
     /// défloute les sections gatées en direct, sans réouverture.
     @ObservedObject private var subscriptionService = SubscriptionService.shared
-
-    // Le « + » d'un aliment de « Ce qui le remonte » ajoute VRAIMENT au journal
-    // (retour d'Arthur du 23 août : il ne faisait rien). Le nom du contrat est
-    // résolu par la recherche, la quantité se choisit dans la fiche portion
-    // (en unités quand l'aliment se compte), l'écriture suit le même chemin
-    // que la recherche du Journal.
-    /// Nom en cours de résolution (le « + » de sa ligne devient un spinner).
-    @State private var alimentEnRecherche: String?
-    /// Fiche résolue → la fiche portion s'ouvre dessus.
-    @State private var alimentTrouve: MealJournalService.FoodDetail?
-    /// Confirmation ou impasse, affichée sous la carte quelques secondes.
-    @State private var messageAjout: (texte: String, erreur: Bool)?
-
-    /// Résout le nom du contrat en fiche aliment (premier résultat de la
-    /// recherche unifiée) et ouvre la fiche portion dessus.
-    private func ajouter(_ nomAliment: String) {
-        guard alimentEnRecherche == nil, !nomAliment.isEmpty else { return }
-        HapticService.shared.selection()
-        alimentEnRecherche = nomAliment
-        messageAjout = nil
-        Task { @MainActor in
-            defer { alimentEnRecherche = nil }
-            do {
-                let hits = try await MealJournalService.shared.searchFoods(query: nomAliment, limit: 1)
-                guard let hit = hits.first else {
-                    messageAjout = ("Pas de fiche exacte pour « \(nomAliment) » : passe par la recherche du Journal.", true)
-                    return
-                }
-                let detail = try await MealJournalService.shared.foodDetail(id: hit.id)
-                guard detail.kcal100g != nil else {
-                    messageAjout = ("La fiche de « \(hit.name) » est incomplète : passe par la recherche du Journal.", true)
-                    return
-                }
-                alimentTrouve = detail
-            } catch {
-                messageAjout = ("La recherche n'a pas répondu. Réessaie dans un instant.", true)
-            }
-        }
-    }
-
-    /// Écrit l'aliment au journal du jour (créneau déduit de l'heure) — même
-    /// chemin que l'ajout depuis la recherche du Journal.
-    private func enregistrer(_ detail: MealJournalService.FoodDetail, grammes: Double) async -> Bool {
-        guard let userId = AuthService.shared.cachedCurrentUserIdString,
-              let entry = MealJournalService.entry(for: detail, grams: grammes) else { return false }
-        let slot = MealJournalService.MealSlot.from(date: Date())
-        do {
-            try await MealJournalService.shared.insertFood(userId: userId, entry: entry, slot: slot)
-            MealJournalViewModel.signalerEcriture()
-            NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
-            let kcal = Int(((detail.kcal100g ?? 0) * grammes / 100).rounded())
-            messageAjout = ("\(detail.name) ajouté à ta journée · \(kcal)\(DS.fine)kcal", false)
-            return true
-        } catch {
-            messageAjout = ("L'ajout n'a pas abouti. Réessaie dans un instant.", true)
-            return false
-        }
-    }
 
     private var pct: Int { min(100, max(0, apport.pctBesoin ?? 0)) }
     private var statut: StatutV2 { apport.statut }
@@ -144,8 +94,9 @@ struct ApportV2DetailSheet: View {
         apport.id.flatMap { NutrientData.definition(for: $0) }
     }
     private var nom: String { apport.nom ?? definition?.label ?? "Apport" }
+    private var avecArticle: String { NomApport.avecArticle(id: apport.id ?? "", repli: nom) }
     private var aliments: [AlimentV2] {
-        (apport.aliments ?? []).filter { $0.nom?.isEmpty == false }
+        Array((apport.aliments ?? []).filter { $0.nom?.isEmpty == false }.prefix(4))
     }
 
     private var couleurStatut: Color {
@@ -157,127 +108,16 @@ struct ApportV2DetailSheet: View {
         }
     }
 
-    private var titrePourquoi: String {
-        switch statut {
-        case .couvre: return "Pourquoi c'est couvert"
-        case .aRenforcer, .aCombler: return "Pourquoi il est bas"
-        case .neutre: return "Ce qu'on observe"
-        }
+    private var couleurApport: Color {
+        apport.id.map { Color.nutrientColor(for: $0) } ?? couleurStatut
     }
 
-    /// « 5,9 sur 14 mg » : part couverte × référence canonique. nil si le
-    /// nutriment n'est pas au catalogue (on n'invente pas d'unité).
+    /// « 5,9 sur 14 mg par jour » : part couverte × référence canonique. nil si
+    /// le nutriment n'est pas au catalogue (on n'invente pas d'unité).
     private var quantite: String? {
         guard let definition else { return nil }
         let absolu = definition.rda * Double(pct) / 100
-        return "\(DS.decimal(absolu)) sur \(DS.decimal(definition.rda))\(DS.fine)\(definition.unit)"
-    }
-
-    var body: some View {
-        let detail = self.detail
-
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Spacer(minLength: 0)
-                    DSCloseButton { dismiss() }
-                }
-
-                enTete(detail)
-
-                if let eclairage, !eclairage.isEmpty {
-                    FicheBloc(titre: "À quoi ça répond chez toi", rang: 1) { FicheTexteCarte(texte: eclairage) }
-                }
-
-                if !detail.contributions.isEmpty {
-                    FicheBloc(titre: "Comment on l'a vu", note: "touche une ligne", rang: 2) {
-                        CascadeApport(detail: detail, couleur: couleurApport,
-                                      apportAvecArticle: NomApport.avecArticle(id: apport.id ?? "", repli: nom),
-                                      surligne: $surligne)
-                            .padding(.horizontal, DS.paddingCarte)
-                            .padding(.vertical, 4)
-                            .dsCard()
-                    }
-                }
-
-                if let why = apport.why, !why.isEmpty {
-                    FicheBloc(titre: titrePourquoi, rang: 3) { pourquoiCard(why) }
-                }
-
-                if let id = apport.id, let role = ApportRole.role(for: id) {
-                    FicheBloc(titre: "Ce que ça fait", rang: 4) { FicheTexteCarte(texte: role) }
-                }
-
-                if hasGatedContent {
-                    FicheBloc(titre: "Ce qui le remonte", rang: 5) {
-                        if subscriptionService.isPremium {
-                            remonteCard
-                        } else {
-                            // Gratuit : la cause reste en clair, l'ordonnance est
-                            // floutée ; la porte est épinglée en bas de la feuille.
-                            GatedOverlay(intensity: .teaser) { remonteCard }
-                        }
-                    }
-                    if let message = messageAjout {
-                        HStack(spacing: 7) {
-                            Image(systemName: message.erreur ? "info.circle" : "checkmark.circle.fill")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(message.erreur ? Color.dsSecondaire : Color.dsAccent)
-                                .accessibilityHidden(true)
-                            Text(message.texte)
-                                .font(.dsLegendeMoyenne)
-                                .foregroundStyle(message.erreur ? Color.dsSecondaire : Color.dsTexte)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.top, 10)
-                        .transition(.opacity)
-                    }
-                }
-
-                if subscriptionService.isPremium || !hasGatedContent {
-                    DSCapsuleButton(titre: "Voir dans mon plan") {
-                        HapticService.shared.tap()
-                        onSeePlan()
-                    }
-                    .padding(.top, DS.marge)
-                }
-            }
-            .padding(.horizontal, DS.marge)
-            .padding(.top, 8)
-            .padding(.bottom, 30)
-            .animation(.default, value: messageAjout?.texte)
-            .containerRelativeFrame(.horizontal, alignment: .leading)
-        }
-        .safeAreaInset(edge: .bottom) {
-            if !subscriptionService.isPremium, hasGatedContent {
-                UnlockDoor(icon: "lock", title: doorTitle, subtitle: doorSubtitle, zone: "fiche_apport_bilan")
-                    .padding(.horizontal, DS.marge)
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
-                    .background(Color.dsFond)
-            }
-        }
-        .background(Color.dsFond)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(34)
-        // Fiche portion de l'aliment resolu par le « + » : meme fiche que la
-        // recherche du Journal (unites quand l'aliment se compte).
-        .sheet(item: $alimentTrouve) { detail in
-            PortionSheet(mode: .add(detail: detail,
-                                    slot: MealJournalService.MealSlot.from(date: Date())),
-                         onAdd: { grammes in
-                             await enregistrer(detail, grammes: grammes)
-                         })
-            .presentationDetents([.height(460)])
-            .presentationDragIndicator(.visible)
-        }
-    }
-
-    // MARK: En-tête : l'anneau de cause, le nom, l'état
-
-    private var couleurApport: Color {
-        apport.id.map { Color.nutrientColor(for: $0) } ?? couleurStatut
+        return "\(DS.decimal(absolu)) sur \(DS.decimal(definition.rda))\(DS.fine)\(definition.unit) par jour"
     }
 
     /// Le registre donne le score ET ses causes nommées. Quand il se tait
@@ -298,176 +138,389 @@ struct ApportV2DetailSheet: View {
         return SymptomesApports.explication(pour: nutriment, symptomes: dashboardVM.profile.symptoms)
     }
 
-    private func enTete(_ detail: DetailApport) -> some View {
-        VStack(spacing: 2) {
-            AnneauDeCause(parts: detail.parts, score: detail.score, couleur: couleurApport,
-                          taille: .fiche, surligne: surligne)
-            HStack(spacing: 8) {
-                if let id = apport.id {
-                    Image(systemName: Fluent3D.symbol(for: id))
-                        .font(.system(size: 20, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(couleurApport)
-                        .accessibilityHidden(true)
-                }
-                Text(nom)
-                    .font(.system(size: 24, weight: .bold))
-                    .tracking(-0.7)
-                    .foregroundStyle(Color.dsTexte)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.top, 10)
-            Text(FicheApportContexte.sousTitre(
-                statutMot: FicheApportContexte.statutMot(forScore: detail.score),
-                causes: detail.freins.count))
-                .font(.dsSousTitre)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .multilineTextAlignment(.center)
-            if let quantite {
-                Text(quantite)
-                    .font(.dsLegende.monospacedDigit())
-                    .tracking(DSTracking.legende)
-                    .foregroundStyle(Color.dsTertiaire)
-                    .padding(.top, 2)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, -8)
-        .accessibilityElement(children: .combine)
+    private var hasTip: Bool {
+        (apport.tipBold?.isEmpty == false) || (apport.tipRest?.isEmpty == false)
     }
 
-    // MARK: Pourquoi
+    var body: some View {
+        let detail = self.detail
+        let causes = LectureApport.causesPrincipales(detail)
+        let gestes = LectureApport.gestes(detail)
+        let aDesGestes = !gestes.isEmpty || hasTip
+        let estGate = aDesGestes || !aliments.isEmpty
+        let premium = subscriptionService.isPremium
 
-    /// La première phrase porte la cause, le reste l'explique : une seule
-    /// ligne avec titre + mécanisme, comme les lignes de la maquette.
-    private func pourquoiCard(_ why: String) -> some View {
-        let cause = PlanTopicText.firstSentence(why)
-        let reste = why.dropFirst(cause.count).trimmingCharacters(in: .whitespacesAndNewlines)
-        return HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "text.quote")
-                .font(.system(size: 21, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(couleurStatut)
-                .frame(width: 21)
-                .padding(.top, 2)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(cause.isEmpty ? why : cause)
-                    .font(.dsCorps)
-                    .tracking(DSTracking.corps)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Spacer(minLength: 0)
+                    DSCloseButton { dismiss() }
+                }
+
+                verdictCarte(detail)
+                    .kiwiEntrance(0)
+
+                if !causes.isEmpty {
+                    FicheBloc(titre: "Ce qui pèse le plus", note: "touche pour comprendre", rang: 1) {
+                        causesCarte(causes)
+                    }
+                }
+
+                if aDesGestes {
+                    FicheBloc(titre: "Ce que tu peux faire, dès aujourd'hui", rang: 2) {
+                        if premium {
+                            gestesCarte(gestes)
+                        } else {
+                            // Gratuit : les causes restent en clair, les gestes sont
+                            // floutés ; la porte est épinglée en bas de la feuille.
+                            GatedOverlay(intensity: .teaser) { gestesCarte(gestes) }
+                        }
+                    }
+                }
+
+                if !aliments.isEmpty {
+                    FicheBloc(titre: "Où le trouver", rang: 3) {
+                        if premium {
+                            alimentsPastilles
+                        } else {
+                            GatedOverlay(intensity: .teaser) { alimentsPastilles }
+                        }
+                    }
+                }
+
+                enSavoirPlusBloc(detail)
+            }
+            .padding(.horizontal, DS.marge)
+            .padding(.top, 8)
+            .padding(.bottom, 30)
+            .containerRelativeFrame(.horizontal, alignment: .leading)
+        }
+        .safeAreaInset(edge: .bottom) {
+            if !premium, estGate {
+                UnlockDoor(icon: "lock",
+                           title: titreDeLaPorte(gestes: gestes.count + (hasTip ? 1 : 0)),
+                           subtitle: sousTitreDeLaPorte(aDesGestes: aDesGestes),
+                           zone: "fiche_apport_bilan")
+                    .padding(.horizontal, DS.marge)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
+                    .background(Color.dsFond)
+            }
+        }
+        .background(Color.dsFond)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(34)
+        .sheet(item: $causeOuverte, onDismiss: { surligne = nil }) { cause in
+            CauseApportSheet(cause: cause, detail: detail,
+                             apportAvecArticle: avecArticle, couleur: couleurApport)
+        }
+        .onAppear {
+            guard !rempli else { return }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.7).delay(0.25)) { rempli = true }
+        }
+    }
+
+    // MARK: 1 · Le verdict
+
+    private func verdictCarte(_ detail: DetailApport) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            AnneauDeCause(parts: detail.parts, score: detail.score, couleur: couleurApport,
+                          taille: .heros, surligne: surligne)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(nom)
+                    .font(.system(size: 22, weight: .bold))
+                    .tracking(-0.6)
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(LectureApport.verdict(id: apport.id ?? "", nom: nom, detail: detail))
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
-                if !reste.isEmpty, !cause.isEmpty {
-                    Text(reste)
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
+                if let quantite {
+                    Text(quantite)
+                        .font(.dsLegende.monospacedDigit())
+                        .tracking(DSTracking.legende)
                         .foregroundStyle(Color.dsSecondaire)
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 1)
                 }
             }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, DS.paddingCarte)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
+        .padding(.top, 4)
+        .accessibilityElement(children: .combine)
     }
 
-    // MARK: Ce qui le remonte (premium)
+    // MARK: 2 · Ce qui pèse le plus
 
-    /// Le tip existe-t-il ? (même condition qu'avant le gating)
-    private var hasTip: Bool {
-        (apport.tipBold?.isEmpty == false) || (apport.tipRest?.isEmpty == false)
-    }
-
-    /// Au moins une des deux sections premium a du contenu réel, sinon ni
-    /// flou ni porte (jamais de coquille vide).
-    private var hasGatedContent: Bool {
-        !aliments.isEmpty || hasTip
-    }
-
-    /// Wording de la porte : toujours un bénéfice spécifique à l'apport,
-    /// jamais un « Passe Premium » générique. Le compte annoncé est celui des
-    /// lignes réellement floutées, rien de plus.
-    private var doorTitle: String {
-        let n = aliments.prefix(3).count + (hasTip ? 1 : 0)
-        let mots = ["", "Une", "Deux", "Trois", "Quatre"]
-        let nombre = n < mots.count ? mots[n] : "\(n)"
-        return n == 1 ? "\(nombre) clé t'attend" : "\(nombre) clés t'attendent"
-    }
-
-    private var doorSubtitle: String {
-        let quoi: String
-        if !aliments.isEmpty && hasTip {
-            quoi = "Où le trouver, et l'interaction à connaître avec tes habitudes."
-        } else if aliments.isEmpty {
-            quoi = "L'interaction à connaître avec tes habitudes."
-        } else {
-            quoi = "Les aliments qui couvrent ce besoin."
-        }
-        return quoi + " La cause, elle, reste toujours gratuite."
-    }
-
-    private var remonteCard: some View {
+    private func causesCarte(_ causes: [LectureApport.CausePesee]) -> some View {
         VStack(spacing: 0) {
-            ForEach(Array(aliments.prefix(3).enumerated()), id: \.offset) { index, aliment in
-                if index > 0 { DSSeparator() }
-                let nomAliment = aliment.nom ?? ""
+            ForEach(Array(causes.enumerated()), id: \.element.id) { rang, ligne in
+                if rang > 0 { DSSeparator(retrait: 0) }
+                let teinte = AnneauTeintes.cause(rang: rang)
                 Button {
-                    ajouter(nomAliment)
+                    HapticService.shared.selection()
+                    // La part reste allumée derrière la feuille : le lien entre
+                    // la ligne et sa zone de l'anneau se voit encore au retour.
+                    surligne = ligne.cause.id
+                    causeOuverte = CauseOuverte(contribution: ligne.cause, teinte: teinte)
                 } label: {
-                    DSRow(titre: nomAliment) {
-                        if alimentEnRecherche == nomAliment {
-                            ProgressView()
-                                .tint(Color.dsSecondaire)
-                        } else {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(Color.dsAccent)
-                                .accessibilityHidden(true)
+                    HStack(alignment: .center, spacing: 12) {
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(teinte)
+                            .frame(width: 10, height: 10)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(ligne.cause.libelle)
+                                .font(.dsSousTitre)
+                                .tracking(DSTracking.sousTitre)
+                                .foregroundStyle(Color.dsTexte)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(AnneauTeintes.piste)
+                                    Capsule().fill(teinte)
+                                        .frame(width: max(5, geo.size.width * (rempli ? ligne.poids : 0)))
+                                }
+                            }
+                            .frame(height: 5)
+                            .accessibilityHidden(true)
                         }
+                        Text(PointsApport.signe(ligne.cause.delta))
+                            .font(.dsSousTitreFort.monospacedDigit())
+                            .tracking(DSTracking.sousTitre)
+                            .foregroundStyle(Color.dsTexte)
+                        DSChevron()
                     }
+                    .padding(.vertical, 12)
+                    .frame(minHeight: DS.cibleTactile)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.dsPress)
-                .disabled(alimentEnRecherche != nil)
-                .accessibilityLabel("Ajouter \(nomAliment) à ma journée")
+                .accessibilityLabel("\(ligne.cause.libelle), \(PointsApport.signe(ligne.cause.delta)) points")
+                .accessibilityHint("Ouvre le détail de cette cause")
+            }
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 2)
+        .dsCard()
+    }
+
+    // MARK: 3 · Ce que tu peux faire (premium)
+
+    private func gestesCarte(_ gestes: [LectureApport.Geste]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(gestes.enumerated()), id: \.element.id) { rang, geste in
+                if rang > 0 { DSSeparator(retrait: 0) }
+                HStack(alignment: .top, spacing: 12) {
+                    Text(DS.entier(rang + 1))
+                        .font(.dsLegende.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(Color.kiwiGreenInk)
+                        .frame(width: 30, height: 30)
+                        .background(Color.dsAccent.opacity(0.16), in: Circle())
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(geste.texte)
+                            .font(.dsSousTitre)
+                            .tracking(DSTracking.sousTitre)
+                            .foregroundStyle(Color.dsTexte)
+                            .lineSpacing(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(sousLigne(geste))
+                            .font(.dsLegende)
+                            .tracking(DSTracking.legende)
+                            .foregroundStyle(Color.dsSecondaire)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 12)
+                .accessibilityElement(children: .combine)
             }
             if hasTip {
-                if !aliments.isEmpty { DSSeparator(retrait: DS.retraitSeparateurIcone) }
+                if !gestes.isEmpty { DSSeparator(retrait: 0) }
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "lightbulb")
-                        .font(.system(size: 21, weight: .medium))
+                        .font(.system(size: 17, weight: .medium))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(Color.dsSecondaire)
-                        .frame(width: 21)
-                        .padding(.top, 2)
+                        .frame(width: 30, height: 30)
                         .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         if let bold = apport.tipBold, !bold.isEmpty {
                             Text(bold)
-                                .font(.dsCorps)
-                                .tracking(DSTracking.corps)
+                                .font(.dsSousTitre)
+                                .tracking(DSTracking.sousTitre)
                                 .foregroundStyle(Color.dsTexte)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         if let rest = apport.tipRest, !rest.isEmpty {
                             Text(rest)
-                                .font(.dsSousTitre)
-                                .tracking(DSTracking.sousTitre)
+                                .font(.dsLegende)
+                                .tracking(DSTracking.legende)
                                 .foregroundStyle(Color.dsSecondaire)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.horizontal, DS.paddingCarte)
-                .padding(.vertical, 14)
+                .padding(.vertical, 12)
+                .accessibilityElement(children: .combine)
             }
         }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 2)
         .dsCard()
+    }
+
+    /// « jusqu'à +12 points · café pendant les repas » : ce que le geste rendrait,
+    /// et le facteur auquel il répond.
+    private func sousLigne(_ geste: LectureApport.Geste) -> String {
+        let cause = geste.cause.prefix(1).lowercased() + geste.cause.dropFirst()
+        guard let regain = LectureApport.libelleRegain(geste.regain) else { return "répond à : \(cause)" }
+        return "\(regain) · \(cause)"
+    }
+
+    // MARK: 4 · Où le trouver (premium)
+
+    private var alimentsPastilles: some View {
+        DSFlow(espacement: 8) {
+            ForEach(Array(aliments.enumerated()), id: \.offset) { _, aliment in
+                HStack(spacing: 7) {
+                    SafeFluent3DIcon(name: aliment.icone, size: 22)
+                    Text(aliment.nom ?? "")
+                        .font(.dsLegendeMoyenne)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsTexte)
+                        .lineLimit(1)
+                }
+                .padding(.leading, 9)
+                .padding(.trailing, 13)
+                .frame(height: 38)
+                .background(Color.dsCarte, in: Capsule())
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: 5 · En savoir plus (replié)
+
+    private func enSavoirPlusBloc(_ detail: DetailApport) -> some View {
+        let role = apport.id.flatMap { ApportRole.role(for: $0) }
+        let why = apport.why.flatMap { $0.isEmpty ? nil : $0 }
+        let signes = eclairage.flatMap { $0.isEmpty ? nil : $0 }
+        let aDuContenu = role != nil || why != nil || signes != nil || !detail.contributions.isEmpty
+
+        return Group {
+            if aDuContenu {
+                VStack(alignment: .leading, spacing: 0) {
+                    Button {
+                        HapticService.shared.selection()
+                        withAnimation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.86)) {
+                            enSavoirPlus.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("En savoir plus")
+                                    .font(.dsSousTitreFort)
+                                    .tracking(DSTracking.sousTitre)
+                                    .foregroundStyle(Color.dsTexte)
+                                Text(resumeDuReplie(role: role != nil, signes: signes != nil,
+                                                    calcul: !detail.contributions.isEmpty))
+                                    .font(.dsLegende)
+                                    .tracking(DSTracking.legende)
+                                    .foregroundStyle(Color.dsSecondaire)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.dsTertiaire)
+                                .rotationEffect(.degrees(enSavoirPlus ? 180 : 0))
+                                .accessibilityHidden(true)
+                        }
+                        .padding(.horizontal, DS.paddingCarte)
+                        .padding(.vertical, 12)
+                        .frame(minHeight: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.dsPress)
+                    .dsCard()
+                    .accessibilityValue(enSavoirPlus ? "déplié" : "replié")
+
+                    if enSavoirPlus {
+                        VStack(alignment: .leading, spacing: 0) {
+                            if let role {
+                                FicheBloc(titre: "À quoi ça sert", rang: 0) { FicheTexteCarte(texte: role) }
+                            }
+                            if let signes {
+                                FicheBloc(titre: "À quoi ça répond chez toi", rang: 0) { FicheTexteCarte(texte: signes) }
+                            }
+                            if let why {
+                                FicheBloc(titre: "Ce que dit ton bilan", rang: 0) { FicheTexteCarte(texte: why) }
+                            }
+                            if !detail.contributions.isEmpty {
+                                FicheBloc(titre: "Le détail du calcul", note: "touche une ligne", rang: 0) {
+                                    CascadeApport(detail: detail, couleur: couleurApport,
+                                                  apportAvecArticle: avecArticle, surligne: $surligne)
+                                        .padding(.horizontal, DS.paddingCarte)
+                                        .padding(.vertical, 4)
+                                        .dsCard()
+                                }
+                            }
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
+                .padding(.top, 22)
+                .kiwiEntrance(4)
+            }
+        }
+    }
+
+    /// « à quoi il sert, tes signes, le détail du calcul » — seulement ce qui
+    /// s'y trouve vraiment.
+    private func resumeDuReplie(role: Bool, signes: Bool, calcul: Bool) -> String {
+        var morceaux: [String] = []
+        if role { morceaux.append("à quoi ça sert") }
+        if signes { morceaux.append("tes signes") }
+        if calcul { morceaux.append("le détail du calcul") }
+        if morceaux.isEmpty { return "Ce que dit ton bilan" }
+        return NomNutriment.majusculeInitiale(morceaux.joined(separator: ", "))
+    }
+
+    // MARK: La porte (gratuit)
+
+    /// Wording de la porte : toujours un bénéfice propre à l'apport, jamais un
+    /// « Passe Premium » générique. Le compte annoncé est celui des gestes
+    /// réellement floutés, rien de plus.
+    private func titreDeLaPorte(gestes n: Int) -> String {
+        guard n > 0 else { return "Où trouver \(avecArticle)" }
+        let mots = ["", "Un", "Deux", "Trois", "Quatre"]
+        let nombre = n < mots.count ? mots[n] : "\(n)"
+        return n == 1 ? "\(nombre) geste t'attend" : "\(nombre) gestes t'attendent"
+    }
+
+    private func sousTitreDeLaPorte(aDesGestes: Bool) -> String {
+        let quoi: String
+        if aDesGestes && !aliments.isEmpty {
+            quoi = "Ce que tu peux faire dès aujourd'hui, et où le trouver."
+        } else if aDesGestes {
+            quoi = "Ce que tu peux faire dès aujourd'hui."
+        } else {
+            quoi = "Les aliments qui couvrent ce besoin."
+        }
+        return quoi + " Les causes, elles, restent toujours gratuites."
     }
 }
 

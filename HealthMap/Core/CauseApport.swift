@@ -128,6 +128,10 @@ enum CauseApport {
          "Pense aux oléagineux et aux légumineuses les jours d'entraînement."),
     ]
 
+    /// Le geste rendu quand aucune famille ne reconnaît le facteur : il renvoie
+    /// au questionnaire. La fiche d'un apport ne le liste pas parmi ses gestes.
+    static let gesteDeRepli = "Reprends cette réponse dans ton questionnaire si elle a changé : le calcul se refait aussitôt."
+
     static func explication(pour contribution: ContributionApport) -> Explication {
         // Ce qui joue en ta faveur.
         guard contribution.delta < 0 else {
@@ -159,7 +163,7 @@ enum CauseApport {
             }
             return Explication(
                 pourquoi: "Ce facteur vient de tes réponses au questionnaire : il retire des points à cet apport dans notre calcul.",
-                geste: "Reprends cette réponse dans ton questionnaire si elle a changé : le calcul se refait aussitôt.",
+                geste: gesteDeRepli,
                 avis: nil)
         }
     }

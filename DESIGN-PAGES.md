@@ -61,19 +61,31 @@
 >   haut en bas (`FicheBloc(rang:)` → `kiwiEntrance`, plafonné, coupé sous Reduce Motion) ; les
 >   cartes « À quoi c'est relié » arrivent de gauche à droite ; la carte de gratification REDESCEND
 >   avant que « Modifier » n'ouvre la fiche du repas ; le bandeau du Plan suit la sélection en fondu.
-> - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) — **au design de l'anneau de
->   cause depuis le 21 sept. 2026, d'où qu'on vienne** (Journal, Bilan, Progrès) : anneau 148 + nom +
->   « à combler · 3 causes nommées » + quantité (« 5,9 sur 18 mg », dérivée de la référence canonique)
->   · À quoi ça répond chez toi (table `SymptomesApports`) · **Comment on l'a vu** (cascade du registre,
->   toucher une ligne allume sa part de l'anneau **et ouvre la cause**, `CauseApportSheet` : ce
->   qu'elle pèse, ce qu'on regagnerait sans elle — le même calcul rejoué, borné, « une estimation,
->   pas une mesure » —, pourquoi elle pèse, où elle a été déclarée, et « Par où commencer » pour ce
->   qui se change, réservé Premium ; santé et traitements renvoient vers un professionnel, jamais
->   vers un arrêt de traitement) · Pourquoi · Ce que ça fait · Ce qui le remonte
->   (le « + » ajoute au journal) · capsule vers le plan. Briques partagées avec la fiche Compléments :
->   `FicheBloc`, `FicheTexteCarte`, `CascadeApport`, `AnneauDeCause`. Un apport hors des trois du
->   bilan s'ouvre aussi (`ApportV2.pourLaFiche`). **Gratuit** : la cause en clair, « Ce qui le
->   remonte » floutée, porte épinglée en bas (`UnlockDoor`).
+> - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) — **réordonnée le 21 sept.
+>   2026** (retour d'Arthur : « on ne sait pas où regarder en premier »), la même d'où qu'on vienne
+>   (Journal, Bilan, Progrès). Elle répond dans l'ordre des questions, et tout ce qui s'y calcule
+>   vient de `Core/LectureApport.swift` :
+>   1. **le verdict** : carte anneau de cause 112 (avec ses zones grises) + nom + UNE phrase
+>      accordée (« Ton fer est bas. Première cause : règles abondantes. ») + quantité (« 5,9 sur
+>      18 mg par jour », dérivée de la référence canonique) ;
+>   2. **Ce qui pèse le plus · touche pour comprendre** : les 3 premiers freins du registre, carré à
+>      la teinte de leur part de l'anneau, barre de poids (relative au plus lourd), points, chevron →
+>      `CauseApportSheet` (ce qu'elle pèse, ce qu'on regagnerait sans elle, pourquoi, où elle a été
+>      déclarée ; santé et traitements renvoient vers un professionnel, jamais vers un arrêt de
+>      traitement), la part reste allumée sur l'anneau ;
+>   3. **Ce que tu peux faire, dès aujourd'hui** : un geste numéroté par facteur QUI SE CHANGE
+>      (habitudes, assiette), un seul par famille, 3 au plus, avec « jusqu'à +N points » = le même
+>      calcul rejoué sans ce facteur (aucun chiffre quand l'échelle est saturée) ; le conseil du
+>      bilan (`tipBold`/`tipRest`) ferme la carte ;
+>   4. **Où le trouver** : les aliments en pastilles à illustration 3D. **On les montre, on ne les
+>      ajoute plus au journal d'ici : le « + » est retiré**, comme la capsule « Voir dans mon plan »
+>      (aucune redirection vers un autre onglet depuis la fiche) ;
+>   5. **En savoir plus**, replié : à quoi ça sert · à quoi ça répond chez toi (table
+>      `SymptomesApports`) · ce que dit ton bilan · le détail du calcul (`CascadeApport`).
+>   Briques partagées avec la fiche Compléments : `FicheBloc`, `FicheTexteCarte`, `CascadeApport`,
+>   `AnneauDeCause`. Un apport hors des trois du bilan s'ouvre aussi (`ApportV2.pourLaFiche`).
+>   **Gratuit** : le verdict et les causes en clair ; les gestes et « Où le trouver » floutés, porte
+>   épinglée en bas (`UnlockDoor`, zone `fiche_apport_bilan`) qui annonce le vrai nombre de gestes.
 > - **Compléments** (`SupplementsView.swift`, `AnneauDeCause.swift`, `FicheApport.swift`) — **l'anneau
 >   de cause, maquette du 20 septembre 2026** : précision « Kiwio ne gagne rien sur ce qu'il te
 >   recommande » · « Ton rituel du jour » (trois tuiles matin · midi · soir qui disent QUOI prendre,
