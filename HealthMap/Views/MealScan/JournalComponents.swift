@@ -227,8 +227,7 @@ struct JournalMacrosCard: View {
 
     let lignes: [Ligne]
 
-    /// Les quatre lignes du jour, construites à UN seul endroit pour le Journal
-    /// et pour la feuille « Ma journée ». Les fibres suivent la référence
+    /// Les quatre lignes du jour. Les fibres suivent la référence
     /// canonique (`NutrientData`, 30 g) ; les trois macros, les cibles calculées
     /// du profil. Un dépassement n'est une bonne nouvelle que pour les protéines
     /// de quelqu'un qui veut prendre du muscle, et pour les fibres ; partout
