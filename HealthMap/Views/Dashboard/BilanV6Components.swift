@@ -191,7 +191,9 @@ struct ApportV2DetailSheet: View {
 
                 if !detail.contributions.isEmpty {
                     FicheBloc(titre: "Comment on l'a vu", note: "touche une ligne") {
-                        CascadeApport(detail: detail, couleur: couleurApport, surligne: $surligne)
+                        CascadeApport(detail: detail, couleur: couleurApport,
+                                      apportAvecArticle: NomApport.avecArticle(id: apport.id ?? "", repli: nom),
+                                      surligne: $surligne)
                             .padding(.horizontal, DS.paddingCarte)
                             .padding(.vertical, 4)
                             .dsCard()

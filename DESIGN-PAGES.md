@@ -58,7 +58,11 @@
 >   cause depuis le 21 sept. 2026, d'où qu'on vienne** (Journal, Bilan, Progrès) : anneau 148 + nom +
 >   « à combler · 3 causes nommées » + quantité (« 5,9 sur 18 mg », dérivée de la référence canonique)
 >   · À quoi ça répond chez toi (table `SymptomesApports`) · **Comment on l'a vu** (cascade du registre,
->   toucher une ligne allume sa part de l'anneau) · Pourquoi · Ce que ça fait · Ce qui le remonte
+>   toucher une ligne allume sa part de l'anneau **et ouvre la cause**, `CauseApportSheet` : ce
+>   qu'elle pèse, ce qu'on regagnerait sans elle — le même calcul rejoué, borné, « une estimation,
+>   pas une mesure » —, pourquoi elle pèse, où elle a été déclarée, et « Par où commencer » pour ce
+>   qui se change, réservé Premium ; santé et traitements renvoient vers un professionnel, jamais
+>   vers un arrêt de traitement) · Pourquoi · Ce que ça fait · Ce qui le remonte
 >   (le « + » ajoute au journal) · capsule vers le plan. Briques partagées avec la fiche Compléments :
 >   `FicheBloc`, `FicheTexteCarte`, `CascadeApport`, `AnneauDeCause`. Un apport hors des trois du
 >   bilan s'ouvre aussi (`ApportV2.pourLaFiche`). **Gratuit** : la cause en clair, « Ce qui le

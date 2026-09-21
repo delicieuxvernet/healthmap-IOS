@@ -53,21 +53,7 @@ struct ComplementChain: Identifiable {
     let apport: ApportV2?
 
     /// « le fer », « la vitamine D » : l'apport dans une phrase.
-    var avecArticle: String {
-        switch id {
-        case "vitD": return "la vitamine D"
-        case "vitB12": return "la vitamine B12"
-        case "iron": return "le fer"
-        case "magnesium": return "le magnésium"
-        case "omega3": return "les oméga-3"
-        case "vitC": return "la vitamine C"
-        case "calcium": return "le calcium"
-        case "zinc": return "le zinc"
-        case "iodine": return "l'iode"
-        case "fiber": return "les fibres"
-        default: return nom.lowercased()
-        }
-    }
+    var avecArticle: String { NomApport.avecArticle(id: id, repli: nom) }
 }
 
 // MARK: - Rituel du jour (carte : libellé, compte, trois moments)
