@@ -91,6 +91,9 @@ struct JournalView: View {
 
     /// « Autres façons d'ajouter » déplié (Écrire · Rechercher · Code-barres).
     @State private var autresFacons = false
+    /// Le premier chargement est passé : avant lui, TOUS les repas sembleraient
+    /// nouveaux, et l'app fêterait l'ouverture.
+    @State private var journalCharge = false
     /// Ce que la personne a écrit dans le champ « Écrire ».
     @State private var texteSaisi = ""
     /// Feuille d'analyse ouverte sur un texte écrit (même feuille que la dictée).
@@ -101,6 +104,46 @@ struct JournalView: View {
     /// Bilan complet (ex-onglet), présenté par « Tout afficher ».
     @State private var showBilanComplet = false
     @AppStorage("healthkit_linked") private var healthLinked = false
+
+    // MARK: - Gratification après un ajout
+
+    /// Une feuille de saisie est encore à l'écran : la gratification attend
+    /// qu'elle soit redescendue, sinon elle jouerait cachée derrière.
+    private var saisieOuverte: Bool {
+        showVoice || showTexte || showSearch || showBarcode || showJournal
+            || barcodeDetail != nil || selectedFood != nil || viewModel.analysisResult != nil
+    }
+
+    /// `.healthmapMealScanned` veut dire « journal modifié » : ajout, retrait ou
+    /// quantité corrigée. On ne fête qu'un AJOUT — un repas que le jour affiché
+    /// ne connaissait pas —, aujourd'hui, hors tutoriel et hors mode Zen.
+    private func rechargerEtCelebrer() async {
+        let connus = Set(journal.dayMeals.map(\.id))
+        await journal.load()
+
+        guard journalCharge,
+              Calendar.current.isDateInToday(journal.selectedDay),
+              TutorielService.partage.etape == nil,
+              !GamificationService.shared.isZenMode else { return }
+        let nouveaux = journal.dayMeals.filter { !connus.contains($0.id) }
+        guard nouveaux.count == 1, let nouveau = nouveaux.first,
+              let gratification = GratificationRepas.calculer(
+                nouveau: nouveau,
+                repasDuJour: journal.dayMeals,
+                apportsARenforcer: dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id),
+                quinzaine: journal.fortnight
+              ) else { return }
+
+        // Au plus six secondes d'attente : au-delà (recherche laissée ouverte
+        // pour ajouter autre chose), le moment est passé.
+        for _ in 0..<30 where saisieOuverte {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        guard !saisieOuverte else { return }
+        // La feuille finit de descendre avant que la carte ne monte.
+        try? await Task.sleep(for: .milliseconds(450))
+        GratificationCentre.partage.courante = gratification
+    }
 
     /// Le résultat du scan est présenté en bottom-sheet : ouvert dès qu'une
     /// analyse est prête, fermé → `reset()`.
@@ -115,9 +158,10 @@ struct JournalView: View {
         NavigationStack {
             scaffold
                 .kiwiTabBarBottomInset()
-                // Recharge le journal du jour dès qu'un scan est persisté.
+                // Recharge le journal du jour dès qu'un repas est persisté — et,
+                // si c'est un AJOUT, dépose de quoi le célébrer.
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
-                    Task { await journal.load() }
+                    Task { await rechargerEtCelebrer() }
                 }
                 // Le brief du jour propose d'ajouter les repas d'hier : le
                 // journal se positionne sur ce jour-là (les ajouts y seront datés).
@@ -536,6 +580,7 @@ struct JournalView: View {
         .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.8), value: dicteeEnCours)
         .task {
             await journal.load()
+            journalCharge = true
             // Énergie active du jour (Apple Santé) pour élargir le budget.
             // Entrée libre (V12a) : sans bilan, on NE présente PAS la feuille
             // HealthKit à froid, on attend que le Journal soit réellement
