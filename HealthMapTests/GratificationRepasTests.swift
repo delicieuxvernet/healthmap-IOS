@@ -123,6 +123,14 @@ final class GratificationRepasTests: XCTestCase {
         }
     }
 
+    /// Le fer porte la goutte de sang de la maquette ; chaque repas a la sienne.
+    func testLesIllustrationsDeLaMaquette() {
+        XCTAssertEqual(Fluent3D.asset(for: "iron"), Fluent3D.blood)
+        let repas = MealJournalService.MealSlot.allCases.map { Fluent3D.asset(pour: $0) }
+        XCTAssertEqual(Set(repas).count, MealJournalService.MealSlot.allCases.count)
+        XCTAssertEqual(Fluent3D.asset(pour: .lunch), Fluent3D.plate)
+    }
+
     // MARK: La série
 
     func testSerieDeJoursSuivis() {
