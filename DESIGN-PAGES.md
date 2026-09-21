@@ -92,9 +92,15 @@
 >   **calculées, pas simulées** (leviers tirés vers ceux qu'ils touchent, puis écartés en une passe).
 >   Les nœuds dérivent de 2 à 3 pt, une pulsation parcourt les liens du nœud choisi ; le reste
 >   s'estompe à 35 %. **L'horloge est en pause hors de l'onglet** et sous Reduce Motion. Ni zoom ni
->   déplacement. Bandeau du nœud choisi (état, jamais un geste) → feuille de solutions
->   (`PlanSolutionsComponents.swift` : cause → 3 leviers → délai → capsule) ; une habitude ouvre sa
->   feuille à elle (la cause et ce qu'elle freine). Le sélecteur « Objectifs et symptômes / Apports »
+>   déplacement. Bandeau du nœud choisi (état, jamais un geste) → **la feuille du nœud**
+>   (`PlanNoeudSheet`, 21 sept.) : pastille + sur-titre coloré + nom · la cause · **« À quoi c'est
+>   relié »** (rangée de cartes : état du voisin — « 42 % », « −22 points » — et force du lien, lisible
+>   en gratuit) · **« Quoi changer dans ton assiette »** (pastilles à illustration 3D, `DSFlow` ; en
+>   toucher une la déplie : combien, quand, comment, l'astuce) · **« Tes habitudes »** · **« En
+>   complément »** (nom + étiquette, **jamais de dose** : `PlanTopicText.sansDose`, lien vers l'onglet
+>   Compléments) · délai · « C'est noté ». Gratuit : cause et liens en clair, les trois blocs de
+>   solutions voilés, porte `plan_solutions`. Une habitude ouvre sa feuille à elle (la cause et ce
+>   qu'elle freine). Le sélecteur « Objectifs et symptômes / Apports »
 >   et la ligne « focus de la semaine » ont disparu : le graphe montre les deux lectures à la fois.
 > - **Réglages v3** (`ReglagesView.swift` + `ReglagesSousPages.swift`, maquette du 20 sept. 2026) :
 >   bloc Premium (carte sobre sur voile, une promesse, 3 lignes en symboles gris, prix lus chez Apple

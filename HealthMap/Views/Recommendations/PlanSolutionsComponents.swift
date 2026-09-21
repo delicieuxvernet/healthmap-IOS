@@ -3,9 +3,9 @@ import SwiftUI
 // MARK: - Plan : les icônes des nœuds et la feuille de solutions
 //
 // Le graphe vit dans `PlanGraphComponents.swift` (vue) et `Core/PlanGraph.swift`
-// (modèle et placement). Ici, ce qui s'ouvre DERRIÈRE un nœud : la cause en une
-// phrase citant les vraies valeurs du bilan, trois leviers de deux puces, le
-// délai d'effet. Le contenu est dérivé de l'analyse, tronqué au format court
+// (modèle et placement). Ici, ce qui s'ouvre DERRIÈRE un nœud (`PlanNoeudSheet`) :
+// la cause, à quoi c'est relié, quoi changer dans l'assiette, les habitudes,
+// un complément en dernier, le délai d'effet. Le contenu est dérivé de l'analyse, tronqué au format court
 // (1 phrase de cause, 3 leviers × 2 puces de 12 mots max).
 
 // MARK: - Icône d'un nœud (symptôme ou objectif)
@@ -63,49 +63,91 @@ enum PlanNodeIcon {
     }
 }
 
-// MARK: - Pop-up « solutions » (une porte ouverte)
+// MARK: - La feuille d'un nœud (maquette « Plan · graphe de liens », 20 sept. 2026)
 
-/// Format court de la maquette : la cause en une phrase citant les vraies
-/// valeurs du bilan, puis 3 leviers de 2 puces chacun, le délai d'effet, un
-/// seul bouton. Rien de plus — le détail long vit sur l'onglet Compléments.
-struct PlanSolutionsSheetV7: View {
+/// Un voisin du nœud sur le graphe, prêt à s'afficher : son état et la force du
+/// lien. Un ÉTAT, jamais un geste — cette rangée est lisible en gratuit.
+struct PlanLienCarte: Identifiable {
+    let id: String
+    let nom: String
+    let teinte: Color
+    /// « 42 % », « −22 points », « suivi ».
+    let etat: String
+    let etatTeinte: Color
+    /// Ce qui relie les deux, en quelques mots.
+    let comment: String
+    /// 1 faible · 2 moyen · 3 fort.
+    let force: Int
+}
+
+/// Ce qui s'ouvre derrière un nœud. L'ordre est celui des questions qu'on se
+/// pose : pourquoi, à quoi c'est relié, quoi changer dans l'assiette, quelles
+/// habitudes, et seulement ensuite un complément. Tout vient de l'analyse et du
+/// graphe — rien n'est inventé ; aucune dose (doctrine du 20 septembre).
+///
+/// Gratuit : la cause et les liens restent en clair (le bilan est gratuit) ;
+/// les trois blocs de solutions sont voilés, la porte est dessous.
+struct PlanNoeudSheet: View {
     let topic: PlanTopic
-    /// Ouvre l'onglet Compléments (depuis le levier « Par les compléments »).
+    let liens: [PlanLienCarte]
+    /// Ouvre l'onglet Compléments (depuis le bloc « En complément »).
     let onSeeSupplements: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var showSources = false
+    /// L'aliment dont la pastille est dépliée.
+    @State private var alimentOuvert: UUID?
+
+    private var genre: PlanGraph.Genre {
+        switch topic.kind {
+        case .objectif: return .objectif
+        case .symptome: return .symptome
+        case .apport: return .apport
+        }
+    }
+
+    private var surTitre: String {
+        switch topic.kind {
+        case .objectif: return "Ton objectif"
+        case .symptome: return "Symptôme suivi"
+        case .apport: return "Apport à renforcer"
+        }
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                header
+                enTete
 
-                // La cause, en une phrase, avec les vraies valeurs du bilan.
-                // Rien à dire honnêtement → aucune amorce vide. Gratuit : si
+                // La cause, avec les vraies valeurs du bilan. Gratuit : si
                 // l'intro d'origine est un levier actionnable, la variante
                 // teasing (nomme le problème) la remplace.
                 let cause = subscriptionService.isPremium ? topic.radialCause : topic.radialCauseFree
                 if !cause.isEmpty {
                     Text(cause)
-                        .font(.dsHeadline)
+                        .font(.dsCorps)
                         .tracking(DSTracking.corps)
-                        .foregroundStyle(Color.dsTexte)
-                        .lineSpacing(2)
+                        .foregroundStyle(Color.dsTexte.opacity(0.75))
+                        .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(DS.paddingCarte)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .dsCard()
-                        .padding(.top, 18)
+                        .padding(.top, 16)
                 }
 
-                // Les 3 leviers. Gratuit : la silhouette reste lisible sous le
-                // flou (le bilan est gratuit, l'ordonnance est Premium).
+                if !liens.isEmpty {
+                    titre("point.3.connected.trianglepath.dotted", "À quoi c'est relié",
+                          "\(liens.count) lien\(liens.count > 1 ? "s" : "") sur ton graphe",
+                          teinte: Color.dsAccent)
+                    rangeeDeLiens
+                }
+
+                // Les solutions. Gratuit : la silhouette reste lisible sous le
+                // voile (le bilan est gratuit, l'ordonnance est Premium).
                 if subscriptionService.isPremium {
-                    leviers
+                    solutions
                 } else {
-                    GatedOverlay(intensity: .locked) { leviers }
+                    GatedOverlay(intensity: .locked) { solutions }
                     UnlockDoor(
                         icon: "lock.fill",
                         title: "Débloque tes solutions pour « \(topic.name) »",
@@ -117,11 +159,11 @@ struct PlanSolutionsSheetV7: View {
 
                 // Le délai d'effet attendu, affiché seulement s'il vient de l'analyse.
                 if let delai = topic.radialDelai, subscriptionService.isPremium {
-                    HStack(spacing: 8) {
+                    HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "clock")
                             .font(.system(size: 15, weight: .medium))
-                            .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.dsSecondaire)
+                            .padding(.top, 1)
                             .accessibilityHidden(true)
                         Text(delai)
                             .font(.dsLegende)
@@ -130,11 +172,10 @@ struct PlanSolutionsSheetV7: View {
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                     }
-                    .padding(.top, 14)
+                    .padding(.top, 16)
                     .padding(.horizontal, 4)
                 }
 
-                // Un seul bouton.
                 DSCapsuleButton(titre: "C'est noté") {
                     HapticService.shared.tap()
                     dismiss()
@@ -156,12 +197,13 @@ struct PlanSolutionsSheetV7: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, DS.marge)
-            .padding(.top, 12)
+            .padding(.top, 22)
             .padding(.bottom, 26)
+            .containerRelativeFrame(.horizontal, alignment: .leading)
         }
         .scrollIndicators(.hidden)
         .background(Color.dsFond.ignoresSafeArea())
-        .presentationDetents([.fraction(0.82), .large])
+        .presentationDetents([.fraction(0.92), .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
         .sheet(isPresented: $showSources) {
@@ -176,165 +218,273 @@ struct PlanSolutionsSheetV7: View {
 
     // MARK: En-tête
 
-    private var header: some View {
-        // Refonte 23 août 2026 : titre 34 / 700 + rôle en une ligne secondaire,
-        // bouton fermer circulaire 32 pt à droite. Plus de tuile teintée.
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
+    private var enTete: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .fill(PlanGraphTeintes.fond(genre))
+                Image(systemName: topic.radialSymbolRefonte)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(PlanGraphTeintes.encre(genre))
+            }
+            .frame(width: 48, height: 48)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(surTitre)
+                    .font(.dsLegende.weight(.semibold))
+                    .foregroundStyle(PlanGraphTeintes.encre(genre))
                 Text(topic.name)
-                    .font(.dsGrandTitre)
-                    .tracking(DSTracking.grandTitre)
+                    .font(.system(.title2, design: .default).weight(.bold))
+                    .tracking(-0.7)
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(topic.kicker.capitalized)
-                    .font(.dsSousTitre)
-                    .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
             DSCloseButton { dismiss() }
         }
+        .accessibilityElement(children: .contain)
     }
 
-    // MARK: Les 3 leviers
-
-    private var leviers: some View {
-        VStack(spacing: DS.interCarte) {
-            PlanLevierCard(
-                symbol: "leaf",
-                tint: Color.dsCarte,
-                iconColor: Color.dsSecondaire,
-                title: "Nutrition",
-                titleColor: Color.dsTexte,
-                bulletColor: Color.dsTertiaire,
-                lines: topic.radialNutrition,
-                action: nil
-            )
-            PlanLevierCard(
-                symbol: "pills",
-                tint: Color.dsCarte,
-                iconColor: Color.dsSecondaire,
-                title: "Compléments",
-                titleColor: Color.dsTexte,
-                bulletColor: Color.dsTertiaire,
-                lines: topic.radialComplements,
-                // Le seul chemin de sortie de la pop-up : la chaîne vers
-                // l'onglet Compléments. Coupé quand la zone est gatée.
-                action: subscriptionService.isPremium ? onSeeSupplements : nil
-            )
-            PlanLevierCard(
-                symbol: "sun.max",
-                tint: Color.dsCarte,
-                iconColor: Color.dsSecondaire,
-                title: "Habitudes",
-                titleColor: Color.dsTexte,
-                bulletColor: Color.dsTertiaire,
-                // Le geste est déjà la seule chose que porte une habitude :
-                // rien à ranger sous lui, il tient la ligne à lui seul.
-                lines: topic.radialHabitudes.map { PlanLevierLine(texte: $0) },
-                action: nil
-            )
+    /// Un titre de bloc : pastille 30, titre 17 gras, sous-titre.
+    private func titre(_ symbole: String, _ texte: String, _ sousTitre: String, teinte: Color) -> some View {
+        HStack(spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(teinte.opacity(0.12))
+                Image(systemName: symbole)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(teinte)
+            }
+            .frame(width: 30, height: 30)
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(texte)
+                    .font(.dsHeadline.weight(.bold))
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
+                Text(sousTitre)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(.top, DS.interCarte)
+        .padding(.top, 22)
+        .padding(.bottom, 10)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
-}
 
-// MARK: - Un levier (nutrition / compléments / habitudes)
+    // MARK: À quoi c'est relié
 
-/// Une carte de levier : un kicker de catégorie + 2 puces. Rendue vide quand la
-/// source ne fournit rien pour ce levier — on ne pose pas de carte creuse.
-///
-/// Hiérarchie (charte du 17 août 2026) : « Par la nutrition » n'est qu'une
-/// CATÉGORIE, elle annonce en kicker discret ; ce sont les puces qui portent la
-/// réponse (« Lentilles ») et prennent donc la plus grande taille et l'encre la
-/// plus foncée de la carte. Avant, le rapport était inversé : le titre était
-/// 0,5 pt plus gros, deux crans plus gras et posé sur une tuile teintée.
-private struct PlanLevierCard: View {
-    let symbol: String
-    let tint: Color
-    let iconColor: Color
-    let title: String
-    let titleColor: Color
-    let bulletColor: Color
-    let lines: [PlanLevierLine]
-    /// Rend la carte tappable quand un chemin existe (Compléments).
-    let action: (() -> Void)?
+    private var rangeeDeLiens: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(liens) { lien in
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 7) {
+                            Circle().fill(lien.teinte).frame(width: 9, height: 9)
+                            Text(lien.nom)
+                                .font(.system(.footnote, design: .default).weight(.semibold))
+                                .foregroundStyle(Color.dsTexte)
+                                .lineLimit(1)
+                        }
+                        Text(lien.etat)
+                            .font(.system(.title3, design: .default).weight(.bold).monospacedDigit())
+                            .tracking(-0.6)
+                            .foregroundStyle(lien.etatTeinte)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .padding(.top, 6)
+                        Text(lien.comment)
+                            .font(.system(.caption, design: .default))
+                            .foregroundStyle(Color.dsSecondaire)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 3)
+                        Spacer(minLength: 8)
+                        HStack(spacing: 4) {
+                            Capsule().fill(Self.teinteForce(lien.force)).frame(width: 14, height: 3)
+                            Text(PlanHabitudeSheet.libelleForce(lien.force))
+                                .font(.system(.caption2, design: .default).weight(.semibold))
+                                .foregroundStyle(Self.teinteForce(lien.force))
+                        }
+                    }
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 12)
+                    .frame(width: 150, alignment: .leading)
+                    .frame(minHeight: 128, alignment: .top)
+                    .dsCard()
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .padding(.horizontal, DS.marge)
+        }
+        // La rangée défile bord à bord ; le reste de la feuille garde ses marges.
+        .padding(.horizontal, -DS.marge)
+    }
+
+    static func teinteForce(_ force: Int) -> Color {
+        force >= 3 ? .kiwiGreenInk : (force == 2 ? Color(hex: "B36B00") : .dsSecondaire)
+    }
+
+    // MARK: Les solutions (assiette, habitudes, complément)
 
     @ViewBuilder
-    var body: some View {
-        if lines.isEmpty {
-            EmptyView()
-        } else if let action {
-            Button {
-                HapticService.shared.tap()
-                action()
-            } label: {
-                card.contentShape(Rectangle())
-            }
-            .buttonStyle(.dsPress)
-            .accessibilityHint("Ouvre tes compléments")
-        } else {
-            card
+    private var solutions: some View {
+        if !topic.nutrition.isEmpty {
+            titre("fork.knife", "Quoi changer dans ton assiette", "ajoute-les quand tu peux, sans compter",
+                  teinte: Color.dsAccent)
+            assiette
         }
+
+        if !topic.habitudes.isEmpty {
+            titre("repeat", "Tes habitudes", "ce qui bloque ou aide, sans rien acheter",
+                  teinte: PlanGraphTeintes.symptome)
+            habitudes
+        }
+
+        titre("pills", "En complément",
+              topic.complements.isEmpty ? "l'assiette suffit" : "Kiwio ne gagne rien dessus",
+              teinte: Color(hex: "5856D6"))
+        complements
     }
 
-    private var card: some View {
-        // Refonte 23 août 2026 : carte blanche, icône hiérarchique secondaire,
-        // catégorie en secondaire, deux puces en corps 17 avec détail 15.
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 9) {
-                Image(systemName: symbol)
-                    .font(.system(size: 17, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(iconColor)
-                    .frame(width: 21)
-                    .accessibilityHidden(true)
-                Text(title)
-                    .font(.dsSousTitre)
-                    .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
-                Spacer(minLength: 0)
-                if action != nil {
-                    DSChevron()
+    /// Des pastilles : l'aliment seul, sans grammage. En toucher une la déplie —
+    /// combien, quand, comment le préparer, l'astuce.
+    private var assiette: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DSFlow(espacement: 8) {
+                ForEach(topic.nutrition) { aliment in
+                    let ouverte = alimentOuvert == aliment.id
+                    Button {
+                        HapticService.shared.selection()
+                        let cible: UUID? = ouverte ? nil : aliment.id
+                        if reduceMotion { alimentOuvert = cible }
+                        else { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { alimentOuvert = cible } }
+                    } label: {
+                        HStack(spacing: 8) {
+                            SafeFluent3DIcon(name: aliment.asset, size: 26)
+                            Text(aliment.label)
+                                .font(.system(.subheadline, design: .default).weight(.semibold))
+                                .foregroundStyle(Color.dsTexte)
+                                .lineLimit(1)
+                        }
+                        .padding(.leading, 9)
+                        .padding(.trailing, 13)
+                        .frame(minHeight: DS.cibleTactile)
+                        .background(Capsule().fill(Color.dsCarte))
+                        .overlay(Capsule().stroke(ouverte ? Color.dsAccent : Color.clear, lineWidth: 1.5))
+                    }
+                    .buttonStyle(.dsPress)
+                    .accessibilityAddTraits(ouverte ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityHint("Affiche comment l'intégrer")
                 }
             }
 
-            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                HStack(alignment: .top, spacing: 8) {
-                    Circle()
-                        .fill(bulletColor)
-                        .frame(width: 5, height: 5)
-                        .padding(.top, 9)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(alignment: .firstTextBaseline, spacing: 7) {
-                            Text(line.texte)
-                                .font(.dsCorps)
-                                .tracking(DSTracking.corps)
-                                .foregroundStyle(Color.dsTexte)
-                                .fixedSize(horizontal: false, vertical: true)
-                            if let tag = line.tag {
-                                pastille(tag, strong: line.tagStrong)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        if !line.detail.isEmpty {
-                            Text(line.detail)
+            if let aliment = topic.nutrition.first(where: { $0.id == alimentOuvert }) {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Self.details(aliment), id: \.cle) { detail in
+                        HStack(alignment: .top, spacing: 10) {
+                            Text(detail.cle)
+                                .font(.dsLegende)
+                                .foregroundStyle(Color.dsSecondaire)
+                                .frame(width: 64, alignment: .leading)
+                            Text(detail.valeur)
                                 .font(.dsSousTitre)
                                 .tracking(DSTracking.sousTitre)
-                                .foregroundStyle(Color.dsSecondaire)
+                                .foregroundStyle(Color.dsTexte)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        if !line.astuce.isEmpty {
-                            Text(line.astuce)
+                    }
+                }
+                .padding(DS.paddingCarte)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .dsCard()
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    /// Ce que l'analyse a rédigé pour cet aliment — les champs vides sont sautés.
+    static func details(_ aliment: PlanNutritionSolution) -> [(cle: String, valeur: String)] {
+        [("combien", aliment.qty), ("quand", aliment.moment), ("comment", aliment.cuisson),
+         ("astuce", aliment.astuce), ("note", aliment.note)]
+            .filter { !$0.1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .map { (cle: $0.0, valeur: $0.1) }
+    }
+
+    private var habitudes: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(topic.habitudes.enumerated()), id: \.element.id) { index, habitude in
+                if index > 0 {
+                    Rectangle().fill(Color.dsSeparateur).frame(height: 0.5)
+                }
+                HStack(alignment: .top, spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.dsAccent.opacity(0.12))
+                        Image(systemName: habitude.symbol)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Color.kiwiGreenInk)
+                    }
+                    .frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(habitude.text)
+                            .font(.dsCorps)
+                            .tracking(DSTracking.corps)
+                            .foregroundStyle(Color.dsTexte)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if !habitude.note.isEmpty {
+                            Text(habitude.note)
                                 .font(.dsLegende)
                                 .tracking(DSTracking.legende)
-                                .foregroundStyle(Color.dsTertiaire)
+                                .foregroundStyle(Color.dsSecondaire)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.top, index == 0 ? 12 : 10)
+                .padding(.vertical, 12)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .frame(maxWidth: .infinity)
+        .dsCard()
+    }
+
+    private var complements: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if topic.complements.isEmpty {
+                ligneComplement(nom: "Aucun complément nécessaire", etiquette: "assiette d'abord", forte: true,
+                                note: "L'assiette et les habitudes suffisent ici. Kiwio ne recommande un complément que quand l'alimentation ne peut pas combler l'écart.")
+            } else {
+                ForEach(Array(topic.complementsSansDose.enumerated()), id: \.element.id) { index, complement in
+                    if index > 0 {
+                        Rectangle().fill(Color.dsSeparateur).frame(height: 0.5).padding(.vertical, 12)
+                    }
+                    ligneComplement(nom: complement.name, etiquette: complement.tag,
+                                    forte: complement.strong, note: complement.note)
+                }
+                // La forme et le moment vivent sur l'onglet Compléments —
+                // jamais la dose (doctrine du 20 septembre 2026).
+                Button {
+                    HapticService.shared.tap()
+                    onSeeSupplements()
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Voir la forme et le moment de prise")
+                        Image(systemName: "arrow.right").font(.system(size: 12, weight: .semibold))
+                    }
+                    .font(.system(.subheadline, design: .default).weight(.medium))
+                    .foregroundStyle(Color.dsAccent)
+                    .frame(minHeight: DS.cibleTactile)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 6)
             }
         }
         .padding(DS.paddingCarte)
@@ -342,19 +492,33 @@ private struct PlanLevierCard: View {
         .dsCard()
     }
 
-    /// Pastille de priorité : capsule grise, texte secondaire (« Prioritaire »
-    /// prend l'encre principale). Aucun fond coloré.
-    private func pastille(_ texte: String, strong: Bool) -> some View {
-        let encre = strong ? Color.dsTexte : Color.dsSecondaire
-        return Text(texte)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(encre)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-            .layoutPriority(1)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(Color.dsRemplissage))
+    private func ligneComplement(nom: String, etiquette: String, forte: Bool, note: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(nom)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                if !etiquette.isEmpty {
+                    Text(etiquette.lowercased())
+                        .font(.system(.caption, design: .default).weight(.semibold))
+                        .foregroundStyle(forte ? Color.kiwiGreenInk : Color.dsSecondaire)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(forte ? Color.dsAccent.opacity(0.12) : Color(uiColor: .systemGray5)))
+                }
+            }
+            if !note.isEmpty {
+                Text(note)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -422,40 +586,13 @@ extension PlanTopic {
             .joined(separator: " · ")
     }
 
-    /// 2 puces « Par la nutrition ». L'aliment tient la ligne ; les repères
-    /// déjà calculés par le builder (combien, quand, avec quoi l'associer) le
-    /// suivent au lieu d'être jetés — ils étaient calculés puis perdus.
-    /// `cuisson` reste hors puce : c'est la même phrase pour tous les aliments,
-    /// elle n'apprend rien (cf. rapport d'audit, cas 18).
-    var radialNutrition: [PlanLevierLine] {
-        nutrition.prefix(2).map { food in
-            PlanLevierLine(
-                texte: food.label,
-                detail: PlanTopicText.joined([food.qty, food.moment.lowercased()]),
-                astuce: PlanTopicText.clip(food.astuce)
-            )
-        }
-    }
-
-    /// 2 puces « Par les compléments ». Le complément tient la ligne, son
-    /// dosage suit, et la priorité calculée au bilan (« Prioritaire » sous 45,
-    /// « Si besoin » au-dessus) s'affiche enfin en pastille.
-    var radialComplements: [PlanLevierLine] {
-        complements.prefix(2).map { supplement in
-            PlanLevierLine(
-                texte: supplement.name,
-                detail: PlanTopicText.clip(supplement.note),
-                tag: supplement.tag.trimmingCharacters(in: .whitespaces).isEmpty ? nil : supplement.tag,
-                tagStrong: supplement.strong
-            )
-        }
-    }
-
-    /// 2 puces « Par les habitudes ».
-    var radialHabitudes: [String] {
-        habitudes.prefix(2).map { habit in
-            let note = PlanTopicText.clip(habit.note)
-            return note.isEmpty ? PlanTopicText.clip(habit.text) : note
+    /// La note d'un complément, sans jamais de dose : la posologie appartient
+    /// au fabricant et à la personne (doctrine du 20 septembre 2026). Une note
+    /// qui en porte une n'est pas affichée du tout — on ne la réécrit pas.
+    var complementsSansDose: [PlanSupplementSolution] {
+        complements.map { complement in
+            PlanSupplementSolution(name: complement.name, note: PlanTopicText.sansDose(complement.note),
+                                   tag: complement.tag, strong: complement.strong)
         }
     }
 
@@ -470,6 +607,18 @@ extension PlanTopic {
 /// Coupe éditoriale du format court : 1 phrase de cause, des puces de 12 mots.
 enum PlanTopicText {
 
+    /// Une quantité suivie d'une unité de dose : « 14 mg », « 2,5 µg », « 1000 UI ».
+    private static let motifDose = try? NSRegularExpression(
+        pattern: "\\d+(?:[.,]\\d+)?\\s?(?:mg|µg|mcg|ug|UI|IU|g)\\b", options: [.caseInsensitive])
+
+    /// Le texte s'il ne porte aucune dose, sinon rien.
+    static func sansDose(_ texte: String) -> String {
+        guard let motifDose else { return texte }
+        let etendue = NSRange(texte.startIndex..., in: texte)
+        return motifDose.firstMatch(in: texte, options: [], range: etendue) == nil ? texte : ""
+    }
+
+
     /// Première phrase d'un texte libre (l'analyse en renvoie parfois trois).
     static func firstSentence(_ text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -480,24 +629,5 @@ enum PlanTopicText {
             if sentence.split(separator: " ").count >= 3 { return sentence }
         }
         return trimmed
-    }
-
-    /// Assemble des repères courts en une ligne, en ignorant ceux qui sont
-    /// vides : une puce ne porte jamais un séparateur suspendu.
-    static func joined(_ parts: [String], separator: String = " · ") -> String {
-        parts
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: separator)
-    }
-
-    /// Tronque à 12 mots — la règle de rédaction de la maquette. Si l'analyse
-    /// en renvoie plus, on coupe plutôt que de laisser déborder la puce.
-    static func clip(_ text: String, maxWords: Int = 12) -> String {
-        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleaned.isEmpty else { return "" }
-        let words = cleaned.split(separator: " ")
-        guard words.count > maxWords else { return cleaned }
-        return words.prefix(maxWords).joined(separator: " ") + "…"
     }
 }
