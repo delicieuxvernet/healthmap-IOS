@@ -579,6 +579,14 @@ struct MainTabView: View {
                 selectedTab = .reglages
             }
         }
+        // Le brief du matin, à la demande (onglet Progrès). Il se rejoue depuis
+        // ce que le téléphone a gardé : « déjà vu aujourd'hui » ne s'applique
+        // pas à quelqu'un qui le redemande.
+        .onReceive(NotificationCenter.default.publisher(for: .healthmapRevoirBrief)) { _ in
+            guard !afficheBrief, !afficheRecap,
+                  let brief = BriefDuJourBuilder.depuisLeCache() else { return }
+            presenter(brief)
+        }
         // Relecture demandée depuis les Réglages (onglet, plus une feuille) :
         // la séquence est présentée ICI, par la racine, jamais depuis l'onglet.
         .onReceive(NotificationCenter.default.publisher(for: .healthmapRejouerRecap)) { _ in

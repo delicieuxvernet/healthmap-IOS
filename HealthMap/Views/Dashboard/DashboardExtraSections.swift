@@ -21,6 +21,9 @@ extension Notification.Name {
     /// feuille, en 8e modificateur de présentation sur la même vue, ne s'ouvrait
     /// pas (bug du 21 août 2026).
     static let healthmapRejouerRecap = Notification.Name("healthmapRejouerRecap")
+    /// Revoir le brief du matin (« Voir mon récap du jour », onglet Progrès).
+    /// Présenté par `MainTabView`, pour la même raison que le récap animé.
+    static let healthmapRevoirBrief = Notification.Name("healthmapRevoirBrief")
     /// Ouvre le Journal sur un jour donné (`object` = `Date`). Émise par le
     /// brief du jour (« Ajouter mes repas d'hier ») ; `MainTabView` bascule sur
     /// le Journal, qui se positionne sur ce jour.
