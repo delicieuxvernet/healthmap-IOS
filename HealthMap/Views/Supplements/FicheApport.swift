@@ -265,7 +265,8 @@ struct FicheApportSheet: View {
 
     private var cascadeCarte: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CascadeApport(detail: detail, couleur: contexte.couleur, surligne: $surligne)
+            CascadeApport(detail: detail, couleur: contexte.couleur,
+                          apportAvecArticle: contexte.apportAvecArticle, surligne: $surligne)
                 .padding(.horizontal, DS.paddingCarte)
                 .padding(.vertical, 4)
                 .dsCard()
@@ -489,11 +490,15 @@ struct CascadeApport: View {
 
     let detail: DetailApport
     let couleur: Color
+    /// « le fer », « la vitamine D » : donné, chaque cause s'ouvre au toucher
+    /// (`CauseApportSheet`). `nil` → la ligne ne fait qu'allumer sa part.
+    var apportAvecArticle: String? = nil
     /// Part de l'anneau allumée (`PartAnneau.id`).
     @Binding var surligne: String?
     /// Ligne touchée. Distincte de `surligne` : plusieurs appuis allument la
     /// même part couverte, une seule ligne doit paraître sélectionnée.
     @State private var ligneActive: String?
+    @State private var causeOuverte: CauseOuverte?
 
     private struct Ligne: Identifiable {
         let id: String
@@ -504,6 +509,8 @@ struct CascadeApport: View {
         /// Part de l'anneau à allumer au toucher ; `nil` → ligne non touchable.
         let cible: String?
         var contourSeul = false
+        /// Le facteur derrière la ligne (absent pour le départ et le bornage).
+        var contribution: ContributionApport? = nil
     }
 
     private var lignes: [Ligne] {
@@ -524,7 +531,8 @@ struct CascadeApport: View {
                 sousTitre: frein.provenance,
                 delta: PointsApport.signe(frein.delta),
                 teinte: AnneauTeintes.cause(rang: rang),
-                cible: frein.id
+                cible: frein.id,
+                contribution: frein
             ))
         }
         for appui in detail.appuis {
@@ -534,7 +542,8 @@ struct CascadeApport: View {
                 sousTitre: appui.provenance,
                 delta: PointsApport.signe(appui.delta),
                 teinte: couleur,
-                cible: DetailApport.idCouvert
+                cible: DetailApport.idCouvert,
+                contribution: appui
             ))
         }
         if detail.estBorne {
@@ -574,16 +583,40 @@ struct CascadeApport: View {
             }
             .padding(.vertical, 12)
             .accessibilityElement(children: .combine)
+
+            // Là où il y a des points à aller chercher : ce qui se change.
+            if apportAvecArticle != nil, detail.pointsModifiables < 0 {
+                DSSeparator(retrait: 0)
+                Text("Tes habitudes et ton assiette pèsent \(PointsApport.signe(detail.pointsModifiables)) points : c'est là que tu peux en regagner. Touche une ligne pour voir comment.")
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 12)
+            }
+        }
+        .sheet(item: $causeOuverte) { cause in
+            CauseApportSheet(cause: cause, detail: detail,
+                             apportAvecArticle: apportAvecArticle ?? "cet apport", couleur: couleur)
         }
     }
 
     private func ligneVue(_ ligne: Ligne) -> some View {
         let actif = ligneActive == ligne.id
+        let ouvrable = apportAvecArticle != nil && ligne.contribution != nil
         return Button {
             guard let cible = ligne.cible else { return }
             HapticService.shared.selection()
-            ligneActive = actif ? nil : ligne.id
-            surligne = actif ? nil : cible
+            if ouvrable, let contribution = ligne.contribution {
+                // La part reste allumée derrière la feuille : le lien entre le
+                // chiffre et sa cause se voit encore quand on la referme.
+                ligneActive = ligne.id
+                surligne = cible
+                causeOuverte = CauseOuverte(contribution: contribution, teinte: ligne.teinte ?? couleur)
+            } else {
+                ligneActive = actif ? nil : ligne.id
+                surligne = actif ? nil : cible
+            }
         } label: {
             HStack(alignment: .center, spacing: 12) {
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
@@ -612,6 +645,7 @@ struct CascadeApport: View {
                 Text(ligne.delta)
                     .font(.dsSousTitreFort.monospacedDigit())
                     .foregroundStyle(Color.dsTexte)
+                if ouvrable { DSChevron() }
             }
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
@@ -627,6 +661,6 @@ struct CascadeApport: View {
         .disabled(ligne.cible == nil)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(ligne.cible == nil ? [] : .isButton)
-        .accessibilityHint(ligne.cible == nil ? "" : "Allume cette part sur l'anneau")
+        .accessibilityHint(ligne.cible == nil ? "" : (ouvrable ? "Allume cette part sur l'anneau et ouvre le détail" : "Allume cette part sur l'anneau"))
     }
 }
