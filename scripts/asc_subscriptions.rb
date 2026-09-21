@@ -644,10 +644,10 @@ if MODE == "apply-app"
       weight, steps and sleep). The Journal tab also reads active energy
       (kcal), shown as "kcal depensees" in the calories card.
 
-      A screen recording captured on a physical iPhone (previous design, same
-      flows) is attached to this section: it begins on the Home Screen,
-      launches the app, signs in with the demo account, walks through the core
-      features, opens the paywall and completes a successful sandbox purchase.
+      A screen recording captured on a physical iPhone was provided with
+      version 1.0 (approved): Home Screen, sign-in with the demo account, core
+      features, paywall and a successful sandbox purchase. The purchase flow
+      is unchanged in this update, and both subscriptions are already approved.
 
       Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
       Privacy Policy: https://healthmap.fr/privacy
@@ -1807,10 +1807,10 @@ if MODE == "fix-meta"
     weight, steps and sleep). The Journal tab also reads active energy
     (kcal), shown as "kcal depensees" in the calories card.
 
-    A screen recording captured on a physical iPhone (previous design, same
-    flows) is attached to this section: it begins on the Home Screen,
-    launches the app, signs in with the demo account, walks through the core
-    features, opens the paywall and completes a successful sandbox purchase.
+    A screen recording captured on a physical iPhone was provided with
+    version 1.0 (approved): Home Screen, sign-in with the demo account, core
+    features, paywall and a successful sandbox purchase. The purchase flow
+    is unchanged in this update, and both subscriptions are already approved.
 
     Terms of Use (EULA): #{terms_url}
     Privacy Policy: #{privacy_url}
