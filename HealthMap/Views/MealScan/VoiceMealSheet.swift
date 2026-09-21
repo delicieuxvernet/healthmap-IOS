@@ -18,9 +18,11 @@ struct VoiceMealSheet: View {
     /// Jour sur lequel écrire — celui qu'affiche le journal, pas forcément
     /// aujourd'hui (dictée du dîner de la veille, saisie passé minuit).
     var jour: Date = Date()
-    /// Texte ÉCRIT par la personne (« Écrire » du Journal). Quand il est là, la
-    /// feuille saute la transcription et analyse ce texte tel quel.
-    var texteSaisi: String? = nil
+    /// « Écrire » du Journal : la feuille s'ouvre sur un champ de texte, clavier
+    /// levé, et analyse ce qui y est écrit — aucune transcription. La saisie vit
+    /// ICI et non sur la page : l'app ignore la zone du clavier à sa racine, un
+    /// champ posé sur la page finissait caché derrière lui, sans sortie.
+    var saisieAuClavier = false
     /// Capture audio possédée par l'appelant. Elle est injectée — et non créée
     /// ici — pour que la dictée puisse DÉMARRER sur l'accueil, le doigt posé sur
     /// « Dicte ton repas », et se terminer dans cette feuille.
@@ -31,6 +33,8 @@ struct VoiceMealSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var phase: Phase = .analyzing
+    @State private var texteEcrit = ""
+    @FocusState private var champActif: Bool
     @State private var items: [VoiceMealService.Item] = []
     @State private var grams: [Int: Double] = [:]      // index item → grammes retenus
     @State private var removed: Set<Int> = []
@@ -80,13 +84,14 @@ struct VoiceMealSheet: View {
     // repas », bulle façon WhatsApp). La feuille ne s'ouvre qu'avec un audio
     // déjà capté et enchaîne directement transcription → analyse. L'ancien
     // mode écoute (le « popup » ouvert par un appui simple) est supprimé.
-    enum Phase { case analyzing, results, failed }
+    enum Phase { case saisie, analyzing, results, failed }
 
     // MARK: - Corps
 
     var body: some View {
         Group {
-            switch phase {
+            switch phaseAffichee {
+            case .saisie:    saisieView
             case .analyzing: analyzingView
             case .results:   resultsView
             case .failed:    errorView
@@ -117,10 +122,75 @@ struct VoiceMealSheet: View {
     }
 
     private var hauteurs: Set<PresentationDetent> {
-        switch phase {
+        switch phaseAffichee {
         case .analyzing: return [.height(300)]
-        case .results, .failed: return [.large]
+        case .saisie, .results, .failed: return [.large]
         }
+    }
+
+    /// Saisie au clavier : tant que rien n'a été envoyé, la feuille montre le
+    /// champ — dès sa première image, sans passer par « analyse en cours ».
+    private var phaseAffichee: Phase {
+        saisieAuClavier && phase == .analyzing && dernierTranscript.isEmpty ? .saisie : phase
+    }
+
+    // MARK: - 1. Saisie au clavier
+
+    private var texteUtile: String {
+        texteEcrit.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var saisieView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Écris ton repas")
+                        .font(.system(.title2, design: .default).weight(.bold))
+                        .tracking(-0.7)
+                        .foregroundStyle(Color.dsTexte)
+                    Text("Comme tu le dirais : on identifie les aliments et les quantités.")
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                DSCloseButton { dismiss() }
+            }
+
+            TextField("Ex. : 150 g de poulet, du riz, une orange", text: $texteEcrit, axis: .vertical)
+                .font(.dsCorps)
+                .lineLimit(3...8)
+                .focused($champActif)
+                .padding(DS.paddingCarte)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .dsCard()
+                .padding(.top, 18)
+                .accessibilityLabel("Écris ce que tu as mangé")
+                .accessibilityIdentifier("journal.texte")
+
+            DSCapsuleButton(titre: "Analyser") {
+                envoyerLeTexte()
+            }
+            .disabled(texteUtile.isEmpty)
+            .opacity(texteUtile.isEmpty ? 0.5 : 1)
+            .padding(.top, 14)
+            .accessibilityIdentifier("journal.texte.analyser")
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.marge)
+        .padding(.top, 22)
+        .onAppear { champActif = true }
+    }
+
+    private func envoyerLeTexte() {
+        let texte = texteUtile
+        guard !texte.isEmpty else { return }
+        HapticService.shared.primary()
+        champActif = false
+        dernierTranscript = texte
+        Task { await analyser(texte) }
     }
 
     // MARK: - 2. Analyse
@@ -475,15 +545,10 @@ struct VoiceMealSheet: View {
 
     // MARK: - Actions
 
-    /// Un texte écrit s'analyse directement ; sinon, on transcrit l'audio.
+    /// Saisie au clavier : la feuille attend le texte. Sinon, on transcrit l'audio.
     private func demarrer() async {
-        let texte = (texteSaisi ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !texte.isEmpty else {
-            await finishListening()
-            return
-        }
-        dernierTranscript = texte
-        await analyser(texte)
+        guard !saisieAuClavier else { return }
+        await finishListening()
     }
 
     private func finishListening() async {
