@@ -517,6 +517,14 @@ if MODE == "app-audit"
       vid = ver["id"]
       code, rd = req(:get, "/v1/appStoreVersions/#{vid}/appStoreReviewDetail")
       ver["reviewDetail"] = code == 200 && rd["data"] ? rd["data"]["attributes"] : "absent (HTTP #{code})"
+      # Pièces jointes App Review (la vidéo sandbox) : les notes en parlent, on
+      # vérifie donc qu'elle est bien là avant d'envoyer.
+      if code == 200 && rd["data"]
+        acode, att = req(:get, "/v1/appStoreReviewDetails/#{rd["data"]["id"]}/appStoreReviewAttachments?limit=20")
+        ver["reviewAttachments"] = acode == 200 ? att["data"].map { |a|
+          "#{a.dig("attributes", "fileName")} (#{a.dig("attributes", "fileSize")} o, #{a.dig("attributes", "assetDeliveryState", "state")})"
+        } : "HTTP #{acode}"
+      end
 
       code, bld = req(:get, "/v1/appStoreVersions/#{vid}/build?fields[builds]=version,processingState")
       ver["buildAttached"] = code == 200 && bld["data"] ? bld["data"]["attributes"] : "aucun (HTTP #{code})"
