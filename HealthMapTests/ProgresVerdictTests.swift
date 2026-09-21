@@ -8,6 +8,8 @@ import XCTest
 // ne donne JAMAIS la tendance (c'est ce que vendent les portes), et un apport
 // ne se juge pas sur deux repas.
 
+// `SuiviEngineV4` est isolé sur le MainActor : la classe de test aussi.
+@MainActor
 final class ProgresVerdictTests: XCTestCase {
 
     private func evolution(_ nom: String, ressentis: [Int]) -> SuiviEngineV4.SymptomEvolution {
