@@ -66,18 +66,80 @@ struct FicheApportContexte: Identifiable {
 
     var nombreDeCauses: Int { detail.freins.count }
 
+    /// Le mot du statut, calé sur le score AFFICHÉ (le même que l'anneau) :
+    /// < 40 à combler, < 70 à renforcer. Partagé par toutes les fiches.
+    static func statutMot(forScore score: Int) -> String {
+        if score < 40 { return "à combler" }
+        if score < 70 { return "à renforcer" }
+        return "couvre le besoin"
+    }
+
+    /// « à combler · 3 causes nommées »
+    static func sousTitre(statutMot: String, causes: Int) -> String {
+        switch causes {
+        case 0: return "\(statutMot) · sans cause nommée"
+        case 1: return "\(statutMot) · 1 cause nommée"
+        default: return "\(statutMot) · \(causes) causes nommées"
+        }
+    }
+
     /// « à combler · 3 causes nommées » / « Par l'assiette · pour le fer ».
     var sousTitre: String {
         switch voie {
         case .assiette:
             return "Par l'assiette · pour \(apportAvecArticle)"
         case .complements:
-            switch nombreDeCauses {
-            case 0: return "\(statutMot) · sans cause nommée"
-            case 1: return "\(statutMot) · 1 cause nommée"
-            default: return "\(statutMot) · \(nombreDeCauses) causes nommées"
-            }
+            return Self.sousTitre(statutMot: statutMot, causes: nombreDeCauses)
         }
+    }
+}
+
+// MARK: - Les briques d'une fiche (partagées avec la fiche d'apport du Bilan et du Journal)
+
+/// Un bloc : petit titre secondaire, note à droite, contenu dessous.
+struct FicheBloc<Contenu: View>: View {
+    let titre: String
+    var note: String? = nil
+    @ViewBuilder var contenu: () -> Contenu
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(titre)
+                    .font(.dsLegende.weight(.semibold))
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                Spacer(minLength: 8)
+                if let note {
+                    Text(note)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.dsSecondaire)
+                }
+            }
+            .padding(.horizontal, 2)
+            .accessibilityAddTraits(.isHeader)
+
+            contenu()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 22)
+    }
+}
+
+/// Un texte posé sur une carte.
+struct FicheTexteCarte: View {
+    let texte: String
+
+    var body: some View {
+        Text(texte)
+            .font(.dsSousTitre)
+            .tracking(DSTracking.sousTitre)
+            .foregroundStyle(Color.dsTexte)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, DS.paddingCarte)
+            .padding(.vertical, 14)
+            .dsCard()
     }
 }
 
@@ -190,40 +252,13 @@ struct FicheApportSheet: View {
     private func bloc<Contenu: View>(
         _ titre: String,
         note: String? = nil,
-        @ViewBuilder contenu: () -> Contenu
+        @ViewBuilder contenu: @escaping () -> Contenu
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(titre)
-                    .font(.dsLegende.weight(.semibold))
-                    .tracking(DSTracking.legende)
-                    .foregroundStyle(Color.dsSecondaire)
-                Spacer(minLength: 8)
-                if let note {
-                    Text(note)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.dsSecondaire)
-                }
-            }
-            .padding(.horizontal, 2)
-            .accessibilityAddTraits(.isHeader)
-
-            contenu()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 22)
+        FicheBloc(titre: titre, note: note, contenu: contenu)
     }
 
     private func texteCarte(_ texte: String) -> some View {
-        Text(texte)
-            .font(.dsSousTitre)
-            .tracking(DSTracking.sousTitre)
-            .foregroundStyle(Color.dsTexte)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, DS.paddingCarte)
-            .padding(.vertical, 14)
-            .dsCard()
+        FicheTexteCarte(texte: texte)
     }
 
     // MARK: 02 — la cascade

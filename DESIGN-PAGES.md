@@ -52,10 +52,15 @@
 >   jours suivis, « Continuer ». Une seule couleur héros : le vert du gain. **Jamais à vide** : rien
 >   n'a bougé d'au moins 5 points → pas de carte. Pas pendant le tutoriel, ni en mode Zen, ni sur un
 >   autre jour qu'aujourd'hui. Surcouche de la RACINE (le Journal porte déjà trop de feuilles).
-> - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) : titre 34 + rôle · carte état
->   (« 42 % », « 5,9 sur 18 mg » dérivé de la référence canonique, jauge) · Pourquoi · Ce qui le remonte ·
->   capsule vers le plan. **Gratuit** : la cause en clair, « Ce qui le remonte » floutée, porte
->   épinglée en bas (`UnlockDoor` : cadenas, titre honnête, précision, capsule d'essai StoreKit).
+> - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) — **au design de l'anneau de
+>   cause depuis le 21 sept. 2026, d'où qu'on vienne** (Journal, Bilan, Progrès) : anneau 148 + nom +
+>   « à combler · 3 causes nommées » + quantité (« 5,9 sur 18 mg », dérivée de la référence canonique)
+>   · À quoi ça répond chez toi (table `SymptomesApports`) · **Comment on l'a vu** (cascade du registre,
+>   toucher une ligne allume sa part de l'anneau) · Pourquoi · Ce que ça fait · Ce qui le remonte
+>   (le « + » ajoute au journal) · capsule vers le plan. Briques partagées avec la fiche Compléments :
+>   `FicheBloc`, `FicheTexteCarte`, `CascadeApport`, `AnneauDeCause`. Un apport hors des trois du
+>   bilan s'ouvre aussi (`ApportV2.pourLaFiche`). **Gratuit** : la cause en clair, « Ce qui le
+>   remonte » floutée, porte épinglée en bas (`UnlockDoor`).
 > - **Compléments** (`SupplementsView.swift`, `AnneauDeCause.swift`, `FicheApport.swift`) — **l'anneau
 >   de cause, maquette du 20 septembre 2026** : précision « Kiwio ne gagne rien sur ce qu'il te
 >   recommande » · « Ton rituel du jour » (trois tuiles matin · midi · soir qui disent QUOI prendre,
