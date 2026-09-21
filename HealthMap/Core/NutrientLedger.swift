@@ -174,13 +174,11 @@ extension HealthCalculator {
     /// Renvoie un dictionnaire vide pour un profil hors bornes, exactement
     /// comme le calcul de score.
     static func registreApports(profile: UserProfile) -> [String: DetailApport] {
-        // Caddie rempli : le score vient de NutrientEngine, qui ne tient pas
-        // de registre. On rend le score sans facteur nommé plutôt que d'en
-        // inventer.
+        // Caddie rempli : le score vient de NutrientEngine, qui tient son
+        // propre registre (`NutrientEngineLedger.swift`) — ce que les courses
+        // apportent, puis chaque facteur non alimentaire, nommés un par un.
         if !profile.groceries.isEmpty {
-            return NutrientEngine.nutrientScores(profile: profile).mapValues {
-                DetailApport(contributions: [], score: $0)
-            }
+            return NutrientEngine.registreApports(profile: profile)
         }
 
         let w = profile.weightDouble

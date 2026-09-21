@@ -80,6 +80,7 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
    `Core/NutrientLedger.swift` (`registreApports`) : chaque pénalité ou bonus y porte son
    libellé et sa section du questionnaire, et `analyzeNutrientScores` n'en est plus que la
    projection (`.mapValues(\.score)`). **Toute nouvelle pénalité s'écrit dans le registre, avec
+   Le moteur « caddie » (`NutrientEngine`) a son registre à lui, `Core/NutrientEngineLedger.swift` : c'est un MIROIR de `applyNonFoodModifiers`, verrouillé par `NutrientEngineLedgerTests` (aucun point sans nom). Une pénalité ajoutée au moteur s'ajoute AUSSI, nommée, dans ce fichier.
    son libellé** — c'est lui qui alimente l'anneau de cause et la cascade de l'onglet
    Compléments. Le bloc partagé `NutrientEngine.applyMedicalHistoryPenalties` y est exécuté tel
    quel (jamais recopié). `CrossRepoParityTests` reste l'oracle de parité avec le web.
