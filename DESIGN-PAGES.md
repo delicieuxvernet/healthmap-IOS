@@ -409,8 +409,19 @@ identique à la persistance) · CTA « Enregistrer » + « Retirer cet aliment �
 (ligne éditable) / note + suppression seule (entrée sans détail). Suppression
 aussi en contextMenu sur la ligne.
 ⑤ **Recherche** (« + » d'un créneau → `FoodSearchSheet`) : barre de recherche
-→ RPC unifiée `search_foods` (CIQUAL ∪ Open Food Facts, marques) · lignes
-vignette / nom / « Marque · kcal / 100 g » · **⊕ ajout rapide 100 g** avec
+→ RPC **`search_foods_visuel`** (21 sept. 2026 : enveloppe additive de `search_foods`,
+même classement ; les 12 meilleurs génériques CIQUAL + les 12 meilleurs produits
+Open Food Facts en UN aller-retour, avec photo, Nutri-Score et famille CIQUAL ;
+repli automatique sur `search_foods` si elle ne répond pas) · **un repère visuel par
+ligne** (`FoodHitContenu`, partagé avec l'onglet Recherche du scan) : **photo de
+l'emballage** sur fond blanc pour un produit de marque, **illustration de la
+famille** pour un générique (3D `fluent_*` quand elle existe, emoji sinon — la
+table vit dans `Core/RechercheVisuelle.swift`, le nom affine : une volaille n'est
+pas un steak) · nom sur DEUX lignes (les génériques ne diffèrent souvent que par
+la fin) · « Marque · kcal / 100 g » ou « Famille · kcal / 100 g » · pastille
+Nutri-Score · deux sections « Aliments » / « Produits de marque », celle qui
+porte le meilleur résultat passe devant (« nutella » montre le pot d'abord) ·
+crédit « Open Food Facts » sous la liste · **⊕ ajout rapide 100 g** avec
 bandeau de confirmation, ou tap → fiche portion « Ajouter au [repas] »
 (`get_food`, valeurs 100 g server-side re-scalées ×g/100 — jamais de recalcul
 RDA client). Produit OFF sans kcal → fiche non ajoutable (note explicite).

@@ -674,11 +674,34 @@ final class MealJournalService {
         let name: String
         let brand: String?
         let kcal100g: Double?
+        /// Photo de l'emballage (Open Food Facts). nil pour un générique CIQUAL.
+        var image: String? = nil
+        /// « A » à « E », seulement quand le produit en a un.
+        var nutriscore: String? = nil
+        /// Famille CIQUAL du générique (« produits céréaliers »).
+        var groupe: String? = nil
+        /// Sous-famille CIQUAL (« pâtes, riz et céréales »).
+        var sousGroupe: String? = nil
+        /// Score du classement serveur : départage les deux sections.
+        var score: Double? = nil
         enum CodingKeys: String, CodingKey {
-            case id, source
+            case id, source, image, nutriscore, groupe, score
             case name = "nom"
             case brand = "marque"
             case kcal100g = "kcal_100g"
+            case sousGroupe = "sous_groupe"
+        }
+
+        /// Ce que la vignette de la ligne affiche.
+        var repere: RepereAliment {
+            RechercheVisuelle.repere(source: source, image: image, nom: name,
+                                     groupe: groupe, sousGroupe: sousGroupe)
+        }
+
+        /// « Barilla · 359 kcal / 100 g » ; « Viandes crues · 131 kcal / 100 g ».
+        var sousTitre: String {
+            RechercheVisuelle.sousTitre(source: source, marque: brand, groupe: groupe,
+                                        sousGroupe: sousGroupe, kcal100g: kcal100g)
         }
     }
 
@@ -761,6 +784,8 @@ final class MealJournalService {
     /// Recherche unifiée `search_foods` (CIQUAL ∪ OFF, 103k produits, scoring
     /// FTS+trigrammes+popularité server-side). Remplace l'ancien ilike sur
     /// `ciqual_foods` seul — les produits de marque arrivent d'OFF.
+    /// Sert au repli de `searchFoodsVisuel`, et partout où l'on veut LE meilleur
+    /// résultat, toutes sources mêlées.
     func searchFoods(query: String, limit: Int = 20) async throws -> [FoodHit] {
         struct Params: Encodable {
             let q: String
@@ -774,6 +799,36 @@ final class MealJournalService {
             .rpc("search_foods", params: Params(q: query, maxResults: limit))
             .execute()
             .value
+    }
+
+    /// La recherche des écrans à vignettes : `search_foods_visuel` ramène les
+    /// meilleurs génériques ET les meilleurs produits de marque (deux sections),
+    /// avec la photo, le Nutri-Score et la famille CIQUAL. Même classement que
+    /// `search_foods`, qu'elle enveloppe. Si elle ne répond pas, on retombe sur
+    /// `search_foods` : la recherche marche, sans ses repères.
+    func searchFoodsVisuel(query: String, aliments: Int = 12, produits: Int = 12) async throws -> [FoodHit] {
+        struct Params: Encodable {
+            let q: String
+            let maxAliments: Int
+            let maxProduits: Int
+            enum CodingKeys: String, CodingKey {
+                case q
+                case maxAliments = "max_aliments"
+                case maxProduits = "max_produits"
+            }
+        }
+        do {
+            return try await client
+                .rpc("search_foods_visuel",
+                     params: Params(q: query, maxAliments: aliments, maxProduits: produits))
+                .execute()
+                .value
+        } catch {
+            // Une frappe de plus a annulé celle-ci : ne pas relancer pour rien.
+            if Task.isCancelled || error is CancellationError { throw error }
+            AppLogger.database.warning("search_foods_visuel failed, repli: \(error.localizedDescription, privacy: .public)")
+            return try await searchFoods(query: query)
+        }
     }
 
     /// Fiche 100 g d'un aliment (`get_food`), pour la fiche portion.
