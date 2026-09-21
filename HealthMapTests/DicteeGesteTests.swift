@@ -31,4 +31,22 @@ final class DicteeGesteTests: XCTestCase {
         // Vers la droite ou vers le bas : jamais d'action, quel que soit l'écart.
         XCTAssertEqual(DicteeGeste.decision(pour: CGSize(width: 200, height: 150)), .continuer)
     }
+
+    // MARK: L'appui maintenu sur « Dicter »
+
+    /// Un toucher reste un toucher : le maintien se déclare après un délai
+    /// court (on ne doit pas l'attendre) mais perceptible.
+    func testLeDelaiDeMaintienResteCourt() {
+        XCTAssertGreaterThanOrEqual(AppuiDicter.delaiDeMaintien, .milliseconds(150))
+        XCTAssertLessThanOrEqual(AppuiDicter.delaiDeMaintien, .milliseconds(300))
+    }
+
+    /// Le doigt qui fait défiler la page bouge bien plus que la tolérance, et
+    /// les seuils du geste (jeter, verrouiller) sont bien au-delà d'elle : on
+    /// ne jette pas une dictée en tremblant.
+    func testLaToleranceSepareLeToucherDuGlisser() {
+        XCTAssertLessThan(AppuiDicter.toleranceDeBouge, abs(DicteeGeste.seuilAnnulation))
+        XCTAssertLessThan(AppuiDicter.toleranceDeBouge, abs(DicteeGeste.seuilVerrou))
+        XCTAssertEqual(DicteeGeste.decision(pour: CGSize(width: -AppuiDicter.toleranceDeBouge, height: -AppuiDicter.toleranceDeBouge)), .continuer)
+    }
 }

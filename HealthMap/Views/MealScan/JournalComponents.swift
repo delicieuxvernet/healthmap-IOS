@@ -675,6 +675,21 @@ struct JournalFinQuestionnaireCard: View {
 
 // MARK: - Saisie (Dicter · Photographier · autres façons d'ajouter)
 
+
+// MARK: - L'appui maintenu sur « Dicter »
+
+/// Ce que le bouton raconte à la page pendant un appui maintenu.
+enum AppuiDicter: Equatable {
+    case debut
+    case glisse(CGSize)
+    case fin
+
+    /// En dessous, c'est un toucher : dictée mains libres.
+    static let delaiDeMaintien: Duration = .milliseconds(220)
+    /// Au-delà, le doigt fait défiler la page : ce n'est pas un appui.
+    static let toleranceDeBouge: CGFloat = 14
+}
+
 /// Toute la saisie, posée sur la page : plus de bouton flottant ni de feuille
 /// intermédiaire. « Dicter » est la seule surface verte — la fonction phare —
 /// et « Photographier » une carte blanche. Un bouton teinté déplie le reste :
@@ -685,7 +700,10 @@ struct JournalSaisieBloc: View {
     @Binding var texte: String
     /// Compteur de scans photo (info neutre dès le bilan fait).
     let compteur: String?
+    /// Un toucher bref : dictée mains libres (c'est aussi le chemin VoiceOver).
     let onDicter: () -> Void
+    /// Un appui maintenu : la bulle d'écoute vit tant que le doigt tient.
+    let onAppuiLong: (AppuiDicter) -> Void
     let onPhotographier: () -> Void
     let onRechercher: () -> Void
     let onCodeBarres: () -> Void
@@ -694,6 +712,15 @@ struct JournalSaisieBloc: View {
     @State private var ecrire = false
     @FocusState private var champActif: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Le doigt est sur « Dicter ». `@GestureState` retombe tout seul à `false`
+    /// quand le geste finit OU est annulé (le défilement qui reprend la main) :
+    /// la dictée ne peut pas rester ouverte sans doigt.
+    @GestureState private var doigtPose = false
+    /// L'appui a duré : la dictée maintenue a démarré.
+    @State private var maintenu = false
+    @State private var minuterie: Task<Void, Never>?
+    @State private var deplacement: CGSize = .zero
 
     private var texteUtile: String {
         texte.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -760,8 +787,58 @@ struct JournalSaisieBloc: View {
 
     // MARK: Dicter
 
+    /// Le doigt a posé, ou levé.
+    private func doigtChange(_ pose: Bool) {
+        if pose {
+            deplacement = .zero
+            minuterie?.cancel()
+            minuterie = Task { @MainActor in
+                try? await Task.sleep(for: AppuiDicter.delaiDeMaintien)
+                // Toujours posé, et pas en train de faire défiler la page.
+                guard !Task.isCancelled, !maintenu,
+                      abs(deplacement.width) < AppuiDicter.toleranceDeBouge,
+                      abs(deplacement.height) < AppuiDicter.toleranceDeBouge else { return }
+                maintenu = true
+                onAppuiLong(.debut)
+            }
+        } else {
+            minuterie?.cancel()
+            minuterie = nil
+            if maintenu {
+                maintenu = false
+                onAppuiLong(.fin)
+            } else if abs(deplacement.width) < AppuiDicter.toleranceDeBouge,
+                      abs(deplacement.height) < AppuiDicter.toleranceDeBouge {
+                // Un toucher bref, sans glisser : la dictée mains libres.
+                onDicter()
+            }
+        }
+    }
+
     private var boutonDicter: some View {
-        Button(action: onDicter) {
+        boutonDicterVisuel
+            .scaleEffect(doigtPose && !reduceMotion ? 0.97 : 1)
+            .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.7), value: doigtPose)
+            // Simultané : la page défile toujours si le doigt part en glissant.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .updating($doigtPose) { _, pose, _ in pose = true }
+                    .onChanged { valeur in
+                        deplacement = valeur.translation
+                        if maintenu { onAppuiLong(.glisse(valeur.translation)) }
+                    }
+            )
+            .onChange(of: doigtPose) { _, pose in doigtChange(pose) }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Dicter mon repas")
+            .accessibilityHint("Le plus rapide : parle, on identifie tes aliments. Touche pour dicter les mains libres, ou maintiens pour dicter tant que tu appuies.")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { onDicter() }
+            .accessibilityIdentifier("journal.dicter")
+    }
+
+    private var boutonDicterVisuel: some View {
+        Group {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack {
                     HaloDictee()
@@ -811,11 +888,7 @@ struct JournalSaisieBloc: View {
             )
             .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
-        .buttonStyle(.dsPress)
         .cibleTutoriel(.boutonDicter)
-        .accessibilityLabel("Dicter mon repas")
-        .accessibilityHint("Le plus rapide : parle, on identifie tes aliments")
-        .accessibilityIdentifier("journal.dicter")
     }
 
     // MARK: Photographier
