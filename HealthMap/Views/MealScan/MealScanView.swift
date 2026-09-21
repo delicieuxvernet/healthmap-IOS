@@ -63,7 +63,6 @@ struct JournalView: View {
     /// Miroir local de `speech.error` : la page ne suivant plus le service, le
     /// message d'échec est recopié ici.
     @State private var erreurDictee: SpeechCaptureService.CaptureError?
-    @State private var doigtSurMicro = false
     /// Première dictée : les deux autorisations (micro + reconnaissance vocale)
     /// se demandent AVANT d'enregistrer, jamais pendant.
     @State private var demandeAutorisationVocale = false
@@ -158,6 +157,9 @@ struct JournalView: View {
     var body: some View {
         NavigationStack {
             scaffold
+                .overlay(alignment: .top) { bulleMaintenue }
+                .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.75), value: dicteeEnCours)
+                .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8), value: dicteeVerrouillee)
                 .kiwiTabBarBottomInset()
                 // « Modifier » sur la carte de gratification : la fiche de ce repas.
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapOuvrirRepas)) { note in
@@ -374,6 +376,9 @@ struct JournalView: View {
                     // toute dérive/scroll horizontal.
                     .containerRelativeFrame(.horizontal)
             }
+            // Appui maintenu : la page ne défile pas sous le doigt qui glisse
+            // pour verrouiller ou pour jeter.
+            .scrollDisabled(dicteeEnCours && !dicteeVerrouillee)
         }
         .confirmationDialog(
             "Ajouter une photo de ton repas",
@@ -526,17 +531,12 @@ struct JournalView: View {
 
             // La dictée mains libres et la photo en attente d'analyse vivent
             // ici, sous le titre : visibles, jamais par-dessus la page.
-            if dicteeEnCours {
-                BulleDictee(
-                    speech: dicteeBox.speech,
-                    geste: dicteeBox.geste,
-                    verrouillee: dicteeVerrouillee,
-                    onAnnuler: { annulerDictee() },
-                    onTerminer: { terminerDictee() }
-                )
-                .dsCard()
-                .padding(.top, 16)
-                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            // Mains libres : la bulle vit ici. Maintenue : elle flotte au-dessus
+            // de la page (`bulleMaintenue`), visible même si on a fait défiler.
+            if dicteeEnCours, dicteeVerrouillee {
+                bulleDictee
+                    .padding(.top, 16)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
 
             if let message = messageSaisie {
@@ -761,7 +761,14 @@ struct JournalView: View {
             deplie: $autresFacons,
             texte: $texteSaisi,
             compteur: compteurScans,
-            onDicter: { demarrerDicteeMainsLibres() },
+            onDicter: { demarrerDictee(verrouillee: true) },
+            onAppuiLong: { appui in
+                switch appui {
+                case .debut: demarrerDictee(verrouillee: false)
+                case .glisse(let deplacement): glisserDictee(deplacement)
+                case .fin: relacherDictee()
+                }
+            },
             onPhotographier: {
                 HapticService.shared.tap()
                 if CameraPicker.isAvailable {
@@ -864,10 +871,60 @@ struct JournalView: View {
         )
     }
 
-    /// Démarre une dictée directement VERROUILLÉE, mains libres : la bulle et
-    /// ses boutons (jeter / analyser) prennent la main, aucun maintien requis.
-    /// C'est aussi le chemin VoiceOver (qui ne peut pas « maintenir »).
-    private func demarrerDicteeMainsLibres() {
+    private var bulleDictee: some View {
+        BulleDictee(
+            speech: dicteeBox.speech,
+            geste: dicteeBox.geste,
+            verrouillee: dicteeVerrouillee,
+            onAnnuler: { annulerDictee() },
+            onTerminer: { terminerDictee() }
+        )
+        .dsCard()
+    }
+
+    /// La bulle d'écoute de l'appui maintenu : elle surgit en haut de l'écran
+    /// (jamais sous la main) et vit tant que le doigt tient.
+    @ViewBuilder
+    private var bulleMaintenue: some View {
+        if dicteeEnCours, !dicteeVerrouillee {
+            bulleDictee
+                .shadow(color: Color.black.opacity(0.12), radius: 18, y: 8)
+                .padding(.horizontal, DS.marge)
+                .padding(.top, 8)
+                .transition(reduceMotion ? .opacity
+                            : .scale(scale: 0.7, anchor: .top).combined(with: .opacity))
+        }
+    }
+
+    /// Le doigt glisse pendant l'appui : à gauche on jette, vers le haut on
+    /// verrouille (mains libres). Mêmes seuils que la bulle (`DicteeGeste`).
+    private func glisserDictee(_ deplacement: CGSize) {
+        guard dicteeEnCours, !dicteeVerrouillee else { return }
+        glissementDictee = deplacement
+        switch DicteeGeste.decision(pour: deplacement) {
+        case .annuler:
+            annulerDictee()
+        case .verrouiller:
+            HapticService.shared.selection()
+            glissementDictee = .zero
+            dicteeVerrouillee = true
+        case .continuer:
+            break
+        }
+    }
+
+    /// Le doigt se lève : on analyse ce qui vient d'être dit. Verrouillée entre-
+    /// temps, la dictée continue mains libres.
+    private func relacherDictee() {
+        guard dicteeEnCours, !dicteeVerrouillee else { return }
+        terminerDictee()
+    }
+
+    /// Démarre une dictée. VERROUILLÉE (toucher bref, VoiceOver) : mains
+    /// libres, la bulle et ses boutons prennent la main. Non verrouillée (appui
+    /// maintenu) : elle vit tant que le doigt tient. La bulle apparaît TOUT DE
+    /// SUITE ; le micro s'ouvre derrière — aucune attente perçue.
+    private func demarrerDictee(verrouillee: Bool) {
         guard !dicteeEnCours else { return }
         guard peutDicter else {
             showPaywall = true
@@ -882,7 +939,7 @@ struct JournalView: View {
         voiceConfirmation = nil
         glissementDictee = .zero
         dicteeEnCours = true
-        dicteeVerrouillee = true
+        dicteeVerrouillee = verrouillee
         erreurDictee = nil
         HapticService.shared.primary()
         // Autorisations et quota passés : le voile du tutoriel se lève.
@@ -890,6 +947,12 @@ struct JournalView: View {
         Task {
             await speech.start()
             erreurDictee = speech.error
+            // Le doigt s'est levé pendant que le micro s'ouvrait : on ne laisse
+            // jamais un micro ouvert derrière une bulle fermée.
+            guard dicteeEnCours else {
+                if speech.state == .listening { speech.reset() }
+                return
+            }
             if speech.state != .listening {
                 dicteeEnCours = false
                 dicteeVerrouillee = false

@@ -38,7 +38,9 @@
 >   quatre lignes** (protéines · glucides · lipides · fibres) avec objectif et **surplus en hachures,
 >   lu selon l'objectif de la personne** (vert seulement pour les protéines de qui veut prendre du
 >   muscle, orangé sinon ; fibres : référence canonique 30 g) · **la saisie SUR la page** : « Dicter »
->   (seule surface verte) et « Photographier », puis « Autres façons d'ajouter » qui déplie Écrire ·
+>   (seule surface verte — **un toucher = mains libres ; un appui maintenu = la bulle d'écoute
+>   surgit en haut de l'écran et vit tant que le doigt tient, relâcher analyse, glisser à gauche
+>   jette, glisser vers le haut verrouille** ; `AppuiDicter`, seuils `DicteeGeste`) et « Photographier », puis « Autres façons d'ajouter » qui déplie Écrire ·
 >   Rechercher · Code-barres (« Écrire » = champ compact, même analyse et même quota que la dictée) ·
 >   « Apports à renforcer » (la phrase de l'interaction, **trois anneaux** à la couleur de l'apport,
 >   une sortie verte) · le jour en **mosaïque** de quatre repas (le toucher ouvre **la fiche de CE repas**, `FicheRepasSheet` : ce que tu as saisi, modifiable · « Ce qu'il t'a apporté », macro par macro avec sa part de la cible du jour · vitamines et minéraux · un constat, jamais un geste).
