@@ -74,8 +74,7 @@ struct GratificationOverlay: View {
                 .foregroundStyle(Color.dsTexte)
             Spacer(minLength: 8)
             Button {
-                HapticService.shared.tap()
-                onModifier()
+                fermer(puis: onModifier)
             } label: {
                 Text("Modifier")
                     .font(.system(.subheadline, design: .default).weight(.medium))
@@ -258,15 +257,16 @@ struct GratificationOverlay: View {
     }
 
     /// La carte redescend et le voile s'éteint, PUIS la racine retire la vue.
-    private func fermer() {
+    private func fermer(puis suite: (() -> Void)? = nil) {
         guard !ferme else { return }
         ferme = true
         HapticService.shared.selection()
-        guard !reduceMotion else { onFermer(); return }
+        let fin = suite ?? onFermer
+        guard !reduceMotion else { fin(); return }
         etape = 0
         Task {
             try? await Task.sleep(for: .milliseconds(320))
-            onFermer()
+            fin()
         }
     }
 }

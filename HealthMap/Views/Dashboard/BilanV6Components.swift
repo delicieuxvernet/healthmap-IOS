@@ -186,11 +186,11 @@ struct ApportV2DetailSheet: View {
                 enTete(detail)
 
                 if let eclairage, !eclairage.isEmpty {
-                    FicheBloc(titre: "À quoi ça répond chez toi") { FicheTexteCarte(texte: eclairage) }
+                    FicheBloc(titre: "À quoi ça répond chez toi", rang: 1) { FicheTexteCarte(texte: eclairage) }
                 }
 
                 if !detail.contributions.isEmpty {
-                    FicheBloc(titre: "Comment on l'a vu", note: "touche une ligne") {
+                    FicheBloc(titre: "Comment on l'a vu", note: "touche une ligne", rang: 2) {
                         CascadeApport(detail: detail, couleur: couleurApport,
                                       apportAvecArticle: NomApport.avecArticle(id: apport.id ?? "", repli: nom),
                                       surligne: $surligne)
@@ -201,15 +201,15 @@ struct ApportV2DetailSheet: View {
                 }
 
                 if let why = apport.why, !why.isEmpty {
-                    FicheBloc(titre: titrePourquoi) { pourquoiCard(why) }
+                    FicheBloc(titre: titrePourquoi, rang: 3) { pourquoiCard(why) }
                 }
 
                 if let id = apport.id, let role = ApportRole.role(for: id) {
-                    FicheBloc(titre: "Ce que ça fait") { FicheTexteCarte(texte: role) }
+                    FicheBloc(titre: "Ce que ça fait", rang: 4) { FicheTexteCarte(texte: role) }
                 }
 
                 if hasGatedContent {
-                    FicheBloc(titre: "Ce qui le remonte") {
+                    FicheBloc(titre: "Ce qui le remonte", rang: 5) {
                         if subscriptionService.isPremium {
                             remonteCard
                         } else {

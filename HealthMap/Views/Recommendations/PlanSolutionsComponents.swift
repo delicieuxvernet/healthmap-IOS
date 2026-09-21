@@ -133,6 +133,7 @@ struct PlanNoeudSheet: View {
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 16)
+                        .kiwiEntrance(1)
                 }
 
                 if !liens.isEmpty {
@@ -145,7 +146,7 @@ struct PlanNoeudSheet: View {
                 // Les solutions. Gratuit : la silhouette reste lisible sous le
                 // voile (le bilan est gratuit, l'ordonnance est Premium).
                 if subscriptionService.isPremium {
-                    solutions
+                    Group { solutions }.kiwiEntrance(4)
                 } else {
                     GatedOverlay(intensity: .locked) { solutions }
                     UnlockDoor(
@@ -280,7 +281,7 @@ struct PlanNoeudSheet: View {
     private var rangeeDeLiens: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: 8) {
-                ForEach(liens) { lien in
+                ForEach(Array(liens.enumerated()), id: \.element.id) { rang, lien in
                     VStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: 7) {
                             Circle().fill(lien.teinte).frame(width: 9, height: 9)
@@ -316,6 +317,8 @@ struct PlanNoeudSheet: View {
                     .frame(minHeight: 128, alignment: .top)
                     .dsCard()
                     .accessibilityElement(children: .combine)
+                    // Les cartes arrivent l'une après l'autre, de gauche à droite.
+                    .kiwiEntrance(2 + rang)
                 }
             }
             .padding(.horizontal, DS.marge)

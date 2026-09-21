@@ -58,6 +58,15 @@ struct PlanGraphView: View {
     var exemple = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// L'entrée en scène : les nœuds surgissent du centre vers l'extérieur,
+    /// les liens se révèlent ensuite. Rejouée à chaque arrivée sur l'onglet.
+    @State private var entre = false
+
+    private func jouerLEntree() {
+        guard !reduceMotion else { entre = true; return }
+        entre = false
+        DispatchQueue.main.async { entre = true }
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -72,8 +81,10 @@ struct PlanGraphView: View {
                     }
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
+                    .opacity(entre ? 1 : 0)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.5).delay(0.35), value: entre)
 
-                    ForEach(graphe.noeuds) { noeud in
+                    ForEach(Array(graphe.noeuds.enumerated()), id: \.element.id) { rang, noeud in
                         if let point = points[noeud.id] {
                             PlanGraphNoeudView(
                                 noeud: noeud,
@@ -86,6 +97,11 @@ struct PlanGraphView: View {
                                 HapticService.shared.selection()
                                 selection = noeud.id
                             }
+                            .scaleEffect(entre ? 1 : 0.4)
+                            .opacity(entre ? 1 : 0)
+                            .animation(reduceMotion ? nil
+                                       : .spring(response: 0.45, dampingFraction: 0.7).delay(Double(rang) * 0.045),
+                                       value: entre)
                             .position(point)
                         }
                     }
@@ -93,6 +109,10 @@ struct PlanGraphView: View {
             }
         }
         .opacity(exemple ? 0.55 : 1)
+        .onAppear { jouerLEntree() }
+        .onChange(of: actif) { _, visible in
+            if visible { jouerLEntree() }
+        }
     }
 
     /// Dérive sinusoïdale, déphasée par nœud.
@@ -422,8 +442,10 @@ struct PlanGraphScreen: View {
     @State private var activeTopic: PlanTopic?
     @State private var habitude: PlanGraph.Noeud?
     /// Les cinq onglets restent montés : l'horloge du graphe ne tourne que
-    /// quand le Plan est à l'écran.
-    @State private var ongletVisible = false
+    /// quand le Plan est à l'écran (posé par la racine — une vue recréée en
+    /// cours de route le sait donc aussitôt, sans attendre un changement d'onglet).
+    @Environment(\.estOngletActif) private var ongletVisible
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: Du Plan au graphe
 
@@ -576,9 +598,8 @@ struct PlanGraphScreen: View {
         .padding(.top, 4)
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onReceive(NotificationCenter.default.publisher(for: .healthmapTabDidChange)) { note in
-            ongletVisible = note.object as? String == NavCardDestination.plan.rawValue
-        }
+        // Le bandeau suit la sélection en fondu, sans à-coup.
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: noeudChoisi?.id)
         .sheet(item: $activeTopic) { topic in
             PlanNoeudSheet(topic: topic, liens: liens(de: topic, dans: graphe)) {
                 // Levier « Par les compléments » : ferme la porte et bascule sur

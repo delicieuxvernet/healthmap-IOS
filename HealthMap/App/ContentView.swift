@@ -419,6 +419,7 @@ struct MainTabView: View {
             ZStack {
                 ForEach(Tab.allCases) { tab in
                     tabContent(tab)
+                        .environment(\.estOngletActif, tab == selectedTab)
                         // Parallaxe : le sortant part à 35 % de la course, ce
                         // qui donne la profondeur (l'entrant « pousse »).
                         .offset(x: decalage(for: tab, largeur: geo.size.width))

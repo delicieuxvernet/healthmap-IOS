@@ -53,12 +53,13 @@ struct CauseApportSheet: View {
 
                 simulationCarte
                     .padding(.top, 18)
+                    .kiwiEntrance(1)
 
-                FicheBloc(titre: estUnFrein ? "Pourquoi ça pèse" : "Pourquoi ça aide") {
+                FicheBloc(titre: estUnFrein ? "Pourquoi ça pèse" : "Pourquoi ça aide", rang: 2) {
                     FicheTexteCarte(texte: explication.pourquoi)
                 }
 
-                FicheBloc(titre: "D'où ça vient") {
+                FicheBloc(titre: "D'où ça vient", rang: 3) {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("C'est ce que tu nous as \(contribution.provenance).")
                             .font(.dsSousTitre)
@@ -81,7 +82,7 @@ struct CauseApportSheet: View {
                 }
 
                 if let geste = explication.geste {
-                    FicheBloc(titre: "Par où commencer") {
+                    FicheBloc(titre: "Par où commencer", rang: 4) {
                         if subscriptionService.isPremium {
                             FicheTexteCarte(texte: geste)
                         } else {
