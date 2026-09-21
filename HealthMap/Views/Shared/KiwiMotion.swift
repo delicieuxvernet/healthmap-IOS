@@ -61,6 +61,24 @@ struct KiwiEntrance: ViewModifier {
     }
 }
 
+// MARK: - « Suis-je à l'écran ? »
+
+/// Les cinq onglets restent montés : `onAppear` ne dit pas qu'on est visible.
+/// La racine pose cette valeur sur chaque onglet ; une vue qui anime en continu
+/// (le graphe du Plan) s'en sert pour se mettre en pause hors écran, et une
+/// entrée chorégraphiée pour se rejouer à l'arrivée. Vrai par défaut : une
+/// feuille ou un aperçu est toujours « à l'écran ».
+private struct EstOngletActifKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var estOngletActif: Bool {
+        get { self[EstOngletActifKey.self] }
+        set { self[EstOngletActifKey.self] = newValue }
+    }
+}
+
 extension View {
     /// Entrée en fondu décalée. `index` = position dans la liste.
     func kiwiEntrance(_ index: Int = 0) -> some View {

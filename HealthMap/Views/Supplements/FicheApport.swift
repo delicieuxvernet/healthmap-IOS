@@ -100,6 +100,8 @@ struct FicheApportContexte: Identifiable {
 struct FicheBloc<Contenu: View>: View {
     let titre: String
     var note: String? = nil
+    /// Position dans la fiche : décale son entrée (0 = tout de suite).
+    var rang: Int = 1
     @ViewBuilder var contenu: () -> Contenu
 
     var body: some View {
@@ -123,6 +125,8 @@ struct FicheBloc<Contenu: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 22)
+        // Les blocs d'une fiche arrivent l'un après l'autre, de haut en bas.
+        .kiwiEntrance(rang)
     }
 }
 
@@ -169,27 +173,27 @@ struct FicheApportSheet: View {
                 enTete
 
                 if let eclairage = contexte.eclairage, !eclairage.isEmpty {
-                    bloc("Ce que ça peut expliquer chez toi") { texteCarte(eclairage) }
+                    bloc("Ce que ça peut expliquer chez toi", rang: 1) { texteCarte(eclairage) }
                 }
 
                 if !detail.contributions.isEmpty {
-                    bloc("Comment on l'a vu", note: "touche une ligne") { cascadeCarte }
+                    bloc("Comment on l'a vu", note: "touche une ligne", rang: 2) { cascadeCarte }
                 }
 
                 if let role = contexte.role, !role.isEmpty {
-                    bloc("Ce que ça fait") { texteCarte(role) }
+                    bloc("Ce que ça fait", rang: 3) { texteCarte(role) }
                 }
 
                 if !contexte.specs.isEmpty || contexte.noteDePrise != nil {
-                    bloc(contexte.voie == .assiette ? "Comment l'intégrer" : "Comment le prendre") { priseCarte }
+                    bloc(contexte.voie == .assiette ? "Comment l'intégrer" : "Comment le prendre", rang: 4) { priseCarte }
                 }
 
                 if !contexte.precautions.isEmpty {
-                    bloc("Précautions et interactions") { precautionsCarte }
+                    bloc("Précautions et interactions", rang: 5) { precautionsCarte }
                 }
 
                 if !contexte.alternatives.isEmpty || contexte.ctaAlternative != nil {
-                    bloc(contexte.voie == .assiette ? "Ou en complément" : "Ou par l'assiette") { alternativesCarte }
+                    bloc(contexte.voie == .assiette ? "Ou en complément" : "Ou par l'assiette", rang: 6) { alternativesCarte }
                 }
             }
             .padding(.horizontal, DS.marge)
@@ -252,9 +256,10 @@ struct FicheApportSheet: View {
     private func bloc<Contenu: View>(
         _ titre: String,
         note: String? = nil,
+        rang: Int,
         @ViewBuilder contenu: @escaping () -> Contenu
     ) -> some View {
-        FicheBloc(titre: titre, note: note, contenu: contenu)
+        FicheBloc(titre: titre, note: note, rang: rang, contenu: contenu)
     }
 
     private func texteCarte(_ texte: String) -> some View {

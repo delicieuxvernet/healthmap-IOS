@@ -56,6 +56,10 @@
 >   jours suivis, « Continuer ». Une seule couleur héros : le vert du gain. **Jamais à vide** : rien
 >   n'a bougé d'au moins 5 points → pas de carte. Pas pendant le tutoriel, ni en mode Zen, ni sur un
 >   autre jour qu'aujourd'hui. Surcouche de la RACINE (le Journal porte déjà trop de feuilles).
+> - **Enchaînements (21 sept. 2026)** : les blocs de toute feuille arrivent l'un après l'autre, de
+>   haut en bas (`FicheBloc(rang:)` → `kiwiEntrance`, plafonné, coupé sous Reduce Motion) ; les
+>   cartes « À quoi c'est relié » arrivent de gauche à droite ; la carte de gratification REDESCEND
+>   avant que « Modifier » n'ouvre la fiche du repas ; le bandeau du Plan suit la sélection en fondu.
 > - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) — **au design de l'anneau de
 >   cause depuis le 21 sept. 2026, d'où qu'on vienne** (Journal, Bilan, Progrès) : anneau 148 + nom +
 >   « à combler · 3 causes nommées » + quantité (« 5,9 sur 18 mg », dérivée de la référence canonique)
@@ -104,7 +108,10 @@
 >   libellés et mêmes points que la fiche de l'apport). Trait épais = lien fort. Positions
 >   **calculées, pas simulées** (leviers tirés vers ceux qu'ils touchent, puis écartés en une passe).
 >   Les nœuds dérivent de 2 à 3 pt, une pulsation parcourt les liens du nœud choisi ; le reste
->   s'estompe à 35 %. **L'horloge est en pause hors de l'onglet** et sous Reduce Motion. Ni zoom ni
+>   s'estompe à 35 %. **Entrée en scène à chaque arrivée sur l'onglet** : les nœuds surgissent du
+>   centre vers l'extérieur (spring, 45 ms d'écart), les liens se révèlent ensuite. **L'horloge est en
+>   pause hors de l'onglet** (`\.estOngletActif`, posé par la racine sur chaque onglet — à préférer à
+>   `onAppear`, qui ne se joue qu'au lancement) et sous Reduce Motion. Ni zoom ni
 >   déplacement. Bandeau du nœud choisi (état, jamais un geste) → **la feuille du nœud**
 >   (`PlanNoeudSheet`, 21 sept.) : pastille + sur-titre coloré + nom · la cause · **« À quoi c'est
 >   relié »** (rangée de cartes : état du voisin — « 42 % », « −22 points » — et force du lien, lisible

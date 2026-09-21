@@ -43,16 +43,25 @@ struct FicheRepasSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 entete(fiche)
 
-                titreDeBloc("Ce que tu as saisi", encre: Color.dsSecondaire)
-                saisies
+                Group {
+                    titreDeBloc("Ce que tu as saisi", encre: Color.dsSecondaire)
+                    saisies
+                }
+                .kiwiEntrance(1)
 
                 if !lignes.isEmpty {
-                    titreDeBloc("Ce qu'il t'a apporté", encre: Color.kiwiGreenInk)
-                    macros(fiche)
+                    Group {
+                        titreDeBloc("Ce qu'il t'a apporté", encre: Color.kiwiGreenInk)
+                        macros(fiche)
+                    }
+                    .kiwiEntrance(2)
 
                     if !fiche.apports.isEmpty {
-                        titreDeBloc("Vitamines et minéraux", encre: Color(hex: "B36B00"))
-                        apports(fiche)
+                        Group {
+                            titreDeBloc("Vitamines et minéraux", encre: Color(hex: "B36B00"))
+                            apports(fiche)
+                        }
+                        .kiwiEntrance(3)
                     }
 
                     if let note = fiche.note {
