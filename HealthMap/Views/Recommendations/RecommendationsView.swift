@@ -1,20 +1,20 @@
 import SwiftUI
 import Combine
 
-// MARK: - Recommendations View (« Ton plan » — carte radiale, maquette v5)
+// MARK: - Recommendations View (« Ton plan » — le graphe de liens, maquette du 20 sept. 2026)
 //
-// Refonte (maquette « Plan v5 - radial ») : plus de blocs empilés ni de scroll.
-// Le kiwi au centre, un nœud par symptôme déclaré et par objectif tout autour,
-// reliés par des flèches. Les solutions restent CACHÉES jusqu'au tap : on montre
-// les portes, pas les pièces. Un tap ouvre une pop-up courte — la cause en une
-// phrase citant les vraies valeurs du bilan, puis 3 leviers (nutrition,
+// Un graphe à trois anneaux, sans scroll : l'objectif au centre, les symptômes
+// suivis autour, les leviers (apports et habitudes) en périphérie, reliés à ce
+// qu'ils font bouger. Les solutions restent CACHÉES jusqu'au toucher : on
+// choisit un nœud, le bandeau le résume, et il ouvre la feuille — la cause en
+// une phrase citant les vraies valeurs du bilan, puis 3 leviers (nutrition,
 // compléments, habitudes) de 2 puces chacun, le délai d'effet, un seul bouton.
 //
 // Les bindings au ViewModel sont conservés : le contenu est dérivé de
 // dashboardVM.aiAnalysis (symptomesAnalyse, objectifsAnalyse, priorityActions,
 // nutriments + solutions) et du catalogue de sources d'aliments (Fluent3D).
-// La mise en page vit dans `PlanRadialScreen` (PlanRadialComponents.swift),
-// partagée avec le repli sur contrat v2.
+// La mise en page vit dans `PlanGraphScreen` (PlanGraphComponents.swift),
+// partagée avec le repli sur contrat v2 ; le modèle dans `Core/PlanGraph.swift`.
 struct RecommendationsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
 
@@ -31,18 +31,19 @@ struct RecommendationsView: View {
                 DSPageBackground()
 
                 if !dashboardVM.bilanComplete {
-                    // Mode découverte (V12c) : la MÊME couronne, en exemples
-                    // génériques canoniques — tout tap mène au bilan, la
-                    // pop-up de solutions n'existe pas ici.
-                    PlanRadialScreen(
-                        topics: planTopicsDecouverte(),
-                        focus: nil,
+                    // Mode découverte (V12c) : le MÊME graphe, en exemples
+                    // génériques canoniques — tout toucher mène au bilan, la
+                    // feuille de solutions n'existe pas ici.
+                    let exemples = planTopicsDecouverte()
+                    PlanGraphScreen(
+                        topics: exemples.filter { $0.kind != .apport },
+                        apports: exemples.filter { $0.kind == .apport },
                         decouverte: { dashboardVM.demarrerBilan() }
                     )
                     .kiwiEntrance()
                 } else if let analysis = dashboardVM.aiAnalysis {
-                    // Arrivée en fondu d'un bloc, pas en cascade : la carte
-                    // radiale est un tout, la décomposer la ferait clignoter.
+                    // Arrivée en fondu d'un bloc, pas en cascade : le graphe
+                    // est un tout, le décomposer le ferait clignoter.
                     RecommendationsContentView(analysis: analysis).kiwiEntrance()
                 } else if !v2Topics.isEmpty {
                     // Repli : le v7 (aiAnalysis) manque mais le bilan v2 a un
@@ -97,71 +98,29 @@ struct RecommendationsView: View {
 struct RecommendationsContentView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @StateObject private var vm: RecommendationsViewModel
-    /// Journal alimentaire (repas scannés de la quinzaine) — nourrit la ligne
-    /// « Focus de la semaine » sous la carte. Chargé une fois via `.task`.
-    @StateObject private var journalVM = MealJournalViewModel()
-
-    /// Choix de vue mémorisé : l'onglet retombe sur la dernière vue utilisée.
-    /// Même clé que le repli v2 (RecommendationsV2ContentView) — un seul choix,
-    /// quel que soit le flux qui alimente l'écran.
-    @AppStorage("planVueChoisie") private var planVueRaw: String = PlanVue.objectifs.rawValue
 
     init(analysis: MergedAnalysis) {
         _vm = StateObject(wrappedValue: RecommendationsViewModel(analysis: analysis))
     }
 
-    private var planVue: Binding<PlanVue> {
-        Binding(
-            get: { PlanVue(rawValue: planVueRaw) ?? .objectifs },
-            set: { planVueRaw = $0.rawValue }
-        )
-    }
-
     var body: some View {
-        PlanRadialScreen(
-            topics: planVue.wrappedValue == .apports ? apportTopics : topics,
-            focus: planFocus,
-            vue: planVue
+        PlanGraphScreen(
+            topics: topics,
+            apports: apportTopics,
+            causes: PlanGraphScreen.causes(depuis: dashboardVM.analysisV2),
+            registre: HealthCalculator.registreApports(profile: dashboardVM.profile)
         )
             .onReceive(dashboardVM.$aiAnalysis) { newAnalysis in
                 if let newAnalysis {
                     vm.updateAnalysis(newAnalysis)
                 }
             }
-            .task {
-                // Repas scannés de la quinzaine (lecture seule) pour le focus.
-                // Aucun LLM : la mission est calculée localement (SuiviEngineV4).
-                await journalVM.load()
-            }
-            // Un scan fait dans l'onglet Scanner ne relance pas ce .task : on
-            // recharge pour que le focus intègre le nouveau scan.
-            .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
-                Task { await journalVM.load() }
-            }
     }
 
-    // MARK: - Focus de la semaine (une ligne, 100 % déterministe)
-    /// Mission unique de la semaine, dérivée des repas réellement scannés :
-    /// couverture 7 jours des apports à renforcer → apport le plus à combler →
-    /// mission « 3 repas riches en X » + progrès compté sur les scans de la
-    /// semaine. `nil` s'il n'y a rien à calculer honnêtement (aucun scan) →
-    /// la carte n'est pas affichée (jamais de chiffre inventé).
-    private var planFocus: SuiviEngineV4.PlanFocus? {
-        // Apports à renforcer = ids des nutriments faibles (< 70, cf. deficiencies).
-        let focusIds = dashboardVM.deficiencies.map(\.id)
-        let coverage = SuiviEngineV4.nutrientCoverage(
-            fortnight: journalVM.fortnight,
-            focusIds: focusIds
-        )
-        // Repas de la SEMAINE courante (sous-ensemble de la quinzaine).
-        let week = WeekScoreEngine.currentWeekInterval(containing: Date())
-        let weekMeals = journalVM.fortnight.filter { week.contains($0.consumedAt) }
-        return SuiviEngineV4.planFocus(coverage: coverage, weekMeals: weekMeals)
-    }
-
-    // MARK: - Vue « Apports » (un nœud par apport à renforcer)
-    /// Même couronne, autre lecture : les apports à renforcer, scores les plus
-    /// bas d'abord (invariant 3-6 tenu par `planTopicsFromApports`). Source :
+    // MARK: - Les leviers (un nœud par apport à renforcer)
+    /// Les apports à renforcer, scores les plus bas d'abord (invariant 3-6 tenu
+    /// par `planTopicsFromApports`) ; le graphe n'affiche que ceux que le bilan
+    /// rattache à un symptôme ou à l'objectif. Source :
     /// les nutriments du bilan via le VM du Dashboard (analyse si disponible,
     /// sinon scores locaux) — labels/emojis/couleurs canoniques garantis.
     private var apportTopics: [PlanTopic] {

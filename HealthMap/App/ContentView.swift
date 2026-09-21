@@ -437,7 +437,7 @@ struct MainTabView: View {
         }
         // Les cinq onglets restent montés : `onAppear` ne se déclenche qu'une
         // fois, au lancement. Un écran qui rejoue une entrée à chaque visite
-        // (la carte radiale du Plan) a besoin de ce signal-là.
+        // (le graphe du Plan, qui met aussi son horloge en pause) a besoin de ce signal-là.
         .onChange(of: selectedTab) { _, nouvel in
             NotificationCenter.default.post(
                 name: .healthmapTabDidChange,

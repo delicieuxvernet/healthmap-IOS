@@ -2,114 +2,14 @@ import XCTest
 import SwiftUI
 @testable import HealthMap
 
-// MARK: - Carte radiale du Plan — géométrie et coupe éditoriale
+// MARK: - Feuille de solutions du Plan — coupe éditoriale et projections
 //
-// Deux garde-fous de la maquette « Plan v5 - radial » sont testés ici, parce
-// qu'ils ne se voient pas à la relecture :
-//   1. aucun nœud ne sort du cadre, quels que soient le nombre de nœuds (3 à 6)
-//      et la taille d'écran — c'est ce qui garantit qu'on ne réintroduit jamais
-//      de scroll ;
-//   2. la coupe des textes (1 phrase de cause, puces de 12 mots max).
+// Ce qui ne se voit pas à la relecture : la coupe des textes (1 phrase de
+// cause, puces de 12 mots max), les projections d'un nœud, et les bornes des
+// constructeurs de topics. La géométrie du graphe est testée dans
+// `PlanGraphTests`.
 
-final class PlanRadialLayoutTests: XCTestCase {
-
-    /// Tailles réellement rencontrées : iPhone 16 (référence maquette),
-    /// iPhone SE / mini (le cas court), et un cadre très écrasé.
-    private let boxes: [CGSize] = [
-        CGSize(width: 353, height: 412),
-        CGSize(width: 335, height: 300),
-        CGSize(width: 353, height: 240),
-    ]
-
-    // MARK: - 1. Aucun nœud ne sort du cadre
-
-    func testNodesStayInsideTheBox_forEveryCountAndScreen() {
-        for box in boxes {
-            // 1 et 2 nœuds arrivent vraiment (une seule section dans l'analyse).
-            for count in 1...6 {
-                let layout = PlanRadialLayout(size: box, count: count)
-                for index in 0..<count {
-                    let p = layout.position(index)
-                    let halfW = layout.nodeWidth / 2
-                    let halfD = layout.nodeDiameter / 2
-
-                    XCTAssertGreaterThanOrEqual(
-                        p.x - halfW, -0.5,
-                        "Nœud \(index)/\(count) déborde à gauche sur \(box)"
-                    )
-                    XCTAssertLessThanOrEqual(
-                        p.x + halfW, box.width + 0.5,
-                        "Nœud \(index)/\(count) déborde à droite sur \(box)"
-                    )
-                    XCTAssertGreaterThanOrEqual(
-                        p.y - halfD, -0.5,
-                        "Nœud \(index)/\(count) déborde en haut sur \(box)"
-                    )
-                    // En bas, le libellé compte aussi : c'est lui qui dépasse.
-                    XCTAssertLessThanOrEqual(
-                        p.y + halfD + layout.gap + layout.labelHeight, box.height + 0.5,
-                        "Le libellé du nœud \(index)/\(count) déborde en bas sur \(box)"
-                    )
-                }
-            }
-        }
-    }
-
-    /// Les bulles ne doivent jamais chevaucher le disque central.
-    func testNodesNeverOverlapTheHub() {
-        for box in boxes {
-            for count in 1...6 {
-                let layout = PlanRadialLayout(size: box, count: count)
-                XCTAssertGreaterThan(
-                    layout.radius,
-                    layout.hubDiameter / 2 + layout.nodeDiameter / 2,
-                    "Les bulles mordent le moyeu (\(count) nœuds sur \(box))"
-                )
-            }
-        }
-    }
-
-    /// Deux bulles voisines ne se chevauchent jamais — c'est l'invariant qui
-    /// impose le plafond de 6 nœuds (au-delà, la corde passe sous le diamètre).
-    func testAdjacentNodesNeverOverlap() {
-        for box in boxes {
-            for count in 2...6 {
-                let layout = PlanRadialLayout(size: box, count: count)
-                let chord = 2 * layout.radius * sin(.pi / CGFloat(count))
-                XCTAssertGreaterThanOrEqual(
-                    chord, layout.nodeDiameter,
-                    "Deux bulles voisines se chevauchent (\(count) nœuds sur \(box))"
-                )
-            }
-        }
-    }
-
-    /// Le premier nœud est en haut, puis on tourne dans le sens horaire.
-    func testFirstNodeIsOnTop() {
-        let layout = PlanRadialLayout(size: CGSize(width: 353, height: 412), count: 5)
-        let first = layout.position(0)
-        XCTAssertEqual(first.x, layout.center.x, accuracy: 0.01)
-        XCTAssertLessThan(first.y, layout.center.y, "Le premier nœud doit être au-dessus du centre")
-
-        // 5 nœuds → 72° d'écart : le deuxième part vers la droite.
-        let second = layout.position(1)
-        XCTAssertGreaterThan(second.x, layout.center.x)
-    }
-
-    /// Sur la taille de la maquette, on retrouve ses métriques (rayon 132).
-    func testReferenceBoxMatchesTheMockup() {
-        let layout = PlanRadialLayout(size: CGSize(width: 353, height: 412), count: 5)
-        XCTAssertEqual(layout.radius, 132, accuracy: 1)
-        XCTAssertEqual(layout.hubDiameter, 116, accuracy: 1)
-        XCTAssertEqual(layout.nodeDiameter, 66, accuracy: 1)
-    }
-
-    /// Un cadre plus court resserre le rayon plutôt que de déborder.
-    func testShorterBoxShrinksTheRadius() {
-        let reference = PlanRadialLayout(size: CGSize(width: 353, height: 412), count: 5)
-        let short = PlanRadialLayout(size: CGSize(width: 335, height: 300), count: 5)
-        XCTAssertLessThan(short.radius, reference.radius)
-    }
+final class PlanSolutionsTests: XCTestCase {
 
     // MARK: - 2. Coupe éditoriale
 
@@ -194,26 +94,6 @@ final class PlanRadialLayoutTests: XCTestCase {
     }
 
     // MARK: - 4. Garde-fous du nombre de nœuds
-
-    /// La liste affichable : ids uniques (un id répété casserait le ForEach)
-    /// et 6 nœuds max, en gardant la première occurrence dans l'ordre.
-    func testRadialDisplayListDedupsAndCapsAtSix() {
-        let topics = (1...9).map { i in
-            Self.makeTopic(id: i == 4 ? "t1" : "t\(i)", name: "Topic \(i)")
-        }
-        let display = topics.radialDisplayList
-
-        XCTAssertEqual(display.count, 6)
-        XCTAssertEqual(Set(display.map(\.id)).count, 6, "Les ids affichés doivent être uniques")
-        // Le doublon (t1 en 4e position) est sauté : c'est le suivant qui entre.
-        XCTAssertEqual(display.map(\.name), ["Topic 1", "Topic 2", "Topic 3", "Topic 5", "Topic 6", "Topic 7"])
-    }
-
-    func testRadialDisplayListLeavesSmallListsIntact() {
-        let topics = [Self.makeTopic(id: "a", name: "A"), Self.makeTopic(id: "b", name: "B")]
-        XCTAssertEqual(topics.radialDisplayList.map(\.id), ["a", "b"])
-        XCTAssertTrue([PlanTopic]().radialDisplayList.isEmpty)
-    }
 
     /// Le contrat v2 n'a pas de plafond côté serveur : le pont retient
     /// 3 symptômes puis 3 objectifs — la même sélection que le flux v7.

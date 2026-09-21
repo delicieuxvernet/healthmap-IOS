@@ -618,7 +618,7 @@ struct BilanV7SymptomesCard: View {
     let onSolutions: () -> Void
 
     /// Icône par famille de symptôme (mots-clés du questionnaire). Table unique
-    /// partagée avec la carte radiale du Plan : un même symptôme porte la même
+    /// partagée avec le graphe du Plan : un même symptôme porte la même
     /// icône d'un onglet à l'autre.
     private func icon(for nom: String) -> String {
         PlanNodeIcon.symptome(nom)

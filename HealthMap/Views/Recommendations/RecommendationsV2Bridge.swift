@@ -9,7 +9,7 @@ import SwiftUI
 //
 // Ce pont rend le Plan résilient : quand `aiAnalysis` manque mais que
 // `analysisV2.plan` est présent, on construit les mêmes `PlanTopic` à partir du
-// contrat v2 et on rend la MÊME carte radiale (`PlanRadialScreen`). Les repères
+// contrat v2 et on rend le MÊME graphe (`PlanGraphScreen`). Les repères
 // génériques (« au repas principal », etc.) sont EXACTEMENT ceux que le builder
 // v7 pose déjà — aucune donnée inventée de plus que l'existant.
 //
@@ -130,22 +130,12 @@ struct RecommendationsV2ContentView: View {
     /// Le VM du Dashboard porte les scores LOCAUX des nutriments — la vue
     /// « Apports » reste donc disponible même quand le flux v7 manque.
     @EnvironmentObject var dashboardVM: DashboardViewModel
-    /// Même clé que le flux v7 (RecommendationsContentView) : un seul choix
-    /// mémorisé, quel que soit le flux qui alimente l'écran.
-    @AppStorage("planVueChoisie") private var planVueRaw: String = PlanVue.objectifs.rawValue
-
-    private var planVue: Binding<PlanVue> {
-        Binding(
-            get: { PlanVue(rawValue: planVueRaw) ?? .objectifs },
-            set: { planVueRaw = $0.rawValue }
-        )
-    }
-
     var body: some View {
-        PlanRadialScreen(
-            topics: planVue.wrappedValue == .apports ? planTopicsFromApports(dashboardVM.nutrients) : topics,
-            focus: nil,
-            vue: planVue
+        PlanGraphScreen(
+            topics: topics,
+            apports: planTopicsFromApports(dashboardVM.nutrients),
+            causes: PlanGraphScreen.causes(depuis: dashboardVM.analysisV2),
+            registre: HealthCalculator.registreApports(profile: dashboardVM.profile)
         )
     }
 }
