@@ -73,9 +73,16 @@
 >   en une carte ; check-in et courbes symptômes conservés.
 > - **Plan** (`PlanRadialComponents.swift`) : traits fins `#D1D1D6`, disques blancs sans ombre, symboles
 >   noirs, carte de pied ; feuille de nœud (cause → 3 leviers → délai → capsule).
-> - **Réglages** (`ReglagesView.swift`) : avatar 64 + prénom · carte Premium · Mon compte (profil et
->   objectifs, abonnement, Apple Santé) · transparence · mon bilan · progression · préférences ·
->   déconnexion. Sous-pages : abonnement, données (RGPD).
+> - **Réglages v3** (`ReglagesView.swift` + `ReglagesSousPages.swift`, maquette du 20 sept. 2026) :
+>   bloc Premium (carte sobre sur voile, une promesse, 3 lignes en symboles gris, prix lus chez Apple
+>   avec trait gris tant qu'ils chargent ; abonné = « Premium actif » + « Gérer », aucun argumentaire)
+>   · **Compte** (identité, objectifs, abonnement, Apple Santé, export) · carte questionnaire ·
+>   **Application** (Notifications en interrupteur, tutoriel, bilan animé, méthode) · liens
+>   Restaurer · Conditions · Confidentialité · déconnexion + suppression. Deux en-têtes, deux styles
+>   de carte, pastilles à **trois sens** (gris / vert = connecté ou actif / rouge = destructif).
+>   L'interrupteur Notifications porte `RappelsPersonnalises.actifs` et lève l'ancien mode Zen,
+>   qui n'a plus d'interrupteur à l'écran. Sous-pages : compte (mot de passe si compte e-mail),
+>   objectifs, abonnement, suppression du compte (double verrou).
 >
 > **Quantités en unités** (demande d'Arthur, 23 août) : partout où une quantité est demandée
 > (dictée `VoiceMealSheet`, recherche / code-barres / édition `PortionSheet`), un aliment qui se

@@ -234,6 +234,13 @@ final class AuthService {
         _ = try await auth.update(user: UserAttributes(password: newPassword))
     }
 
+    /// « email », « apple », « google » : la façon dont ce compte se connecte,
+    /// lue dans les métadonnées Supabase Auth. `nil` sans session.
+    func fournisseurDuCompte() async -> String? {
+        guard let session = try? await auth.session else { return nil }
+        return session.user.appMetadata["provider"]?.stringValue
+    }
+
     // MARK: - Auth State Changes
     //
     // Supabase Auth expose nativement un `AsyncStream<(AuthChangeEvent, Session?)>`.

@@ -101,7 +101,7 @@ struct EditProfileView: View {
             }
             .animation(reduceMotion ? .none : .spring(response: 0.4, dampingFraction: 0.85), value: hasUnsavedChanges)
         }
-        .navigationTitle("Modifier mon profil")
+        .navigationTitle("Mon questionnaire")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if originalProfile == nil {
