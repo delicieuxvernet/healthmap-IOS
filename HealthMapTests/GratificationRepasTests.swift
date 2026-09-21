@@ -110,6 +110,19 @@ final class GratificationRepasTests: XCTestCase {
                        "Ce dîner fait bouger un de tes apports.")
     }
 
+    func testLeBandeauDitOuLeRepasAEteRange() {
+        XCTAssertEqual(calculer(repas("midi", micros: [("vitC", 60)]))?.bandeau, "Ajouté au déjeuner")
+        XCTAssertEqual(calculer(repas("encas", slot: .snack, micros: [("vitC", 60)]))?.bandeau, "Ajouté en encas")
+    }
+
+    /// Chaque apport du catalogue a son illustration 3D — jamais l'étincelle de repli.
+    func testChaqueApportASonIllustration() {
+        for definition in NutrientData.all {
+            XCTAssertNotEqual(Fluent3D.asset(for: definition.id.rawValue), Fluent3D.sparkles,
+                              "\(definition.id.rawValue) n'a pas d'illustration")
+        }
+    }
+
     // MARK: La série
 
     func testSerieDeJoursSuivis() {

@@ -159,6 +159,12 @@ struct JournalView: View {
         NavigationStack {
             scaffold
                 .kiwiTabBarBottomInset()
+                // « Modifier » sur la carte de gratification : la fiche de ce repas.
+                .onReceive(NotificationCenter.default.publisher(for: .healthmapOuvrirRepas)) { note in
+                    guard let brut = note.object as? String,
+                          let slot = MealJournalService.MealSlot(rawValue: brut) else { return }
+                    repasOuvert = slot
+                }
                 // Recharge le journal du jour dès qu'un repas est persisté — et,
                 // si c'est un AJOUT, dépose de quoi le célébrer.
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in

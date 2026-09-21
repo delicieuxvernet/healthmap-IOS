@@ -46,8 +46,10 @@
 >   saisie d'abord, puis « On ne connaît pas encore tes besoins » (porte), « En attendant, en France »
 >   (`TeaserStatsCatalog`, jamais un chiffre inventé), « À la fin du questionnaire ».
 > - **Gratification après un ajout** (`GratificationOverlay.swift`, moteur `GratificationRepas`) : une
->   carte de deux secondes qui montre **ce que le geste a changé** — coche dessinée + deux ondes,
->   « Bien joué », jusqu'à deux apports en **avant → après du jour** (l'ancien barré, le nouveau en
+>   carte de deux secondes qui montre **ce que le geste a changé** — bandeau de verre en haut
+>   (« Ajouté au déjeuner · **Modifier** » ouvre la fiche du repas), coche dessinée + deux ondes +
+>   trois étincelles 3D, « Bien joué » traversé par un éclat, illustration 3D de l'apport
+>   (`Fluent3D.asset(for:)`) qui tombe en place, reflet sur le front de la jauge, jusqu'à deux apports en **avant → après du jour** (l'ancien barré, le nouveau en
 >   vert, jauge qui se remplit, « le poulet rôti, surtout » si un aliment porte le gain), série de
 >   jours suivis, « Continuer ». Une seule couleur héros : le vert du gain. **Jamais à vide** : rien
 >   n'a bougé d'au moins 5 points → pas de carte. Pas pendant le tutoriel, ni en mode Zen, ni sur un
