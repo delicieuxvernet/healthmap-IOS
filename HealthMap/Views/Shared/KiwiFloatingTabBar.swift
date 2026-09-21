@@ -10,8 +10,8 @@ import SwiftUI
 //
 // Cinq onglets qui nomment des OBJETS, pas des concepts :
 // Journal · Progrès · Plan · Compléments · Réglages.
-// Le Scan n'est plus un onglet : toute la saisie vit derrière le bouton
-// d'ajout flottant du Journal (`DSAddButton` + `AjoutSheet`).
+// Le Scan n'est plus un onglet : toute la saisie vit sur la page du Journal
+// (`JournalSaisieBloc` : Dicter · Photographier · autres façons d'ajouter).
 //
 // Posée en overlay bas de `MainTabView`. Les écrans réservent la place
 // eux-mêmes via `.kiwiTabBarBottomInset()` (voir plus bas).
@@ -98,31 +98,6 @@ struct KiwiFloatingTabBar: View {
         .accessibilityLabel(item.label)
         .accessibilityIdentifier("tab.\(String(describing: item.tab))")
         .accessibilityAddTraits(actif ? [.isButton, .isSelected] : .isButton)
-    }
-}
-
-// MARK: - Bouton d'ajout flottant (60 pt, vert, coin bas droit)
-
-/// Le seul point d'entrée de la saisie : il ouvre la feuille d'ajout. Posé
-/// au-dessus de la tab bar, à 20 pt du bord droit. Ombre verte douce — la
-/// seule ombre autorisée de la refonte, parce que le bouton FLOTTE.
-struct DSAddButton: View {
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "plus")
-                .font(.system(size: 28, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: 60, height: 60)
-                .background(Circle().fill(Color.dsAccent))
-                .shadow(color: Color.dsAccent.opacity(0.42), radius: 11, x: 0, y: 8)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.dsPress)
-        .accessibilityLabel("Ajouter un repas")
-        .accessibilityIdentifier("journal.plus")
-        .accessibilityHint("Ouvre la feuille d'ajout : dicter, scanner, rechercher, code-barres.")
     }
 }
 

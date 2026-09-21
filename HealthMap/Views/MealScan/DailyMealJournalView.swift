@@ -13,6 +13,9 @@ struct DailyMealJournalView: View {
     var protTarget: Int?
     var carbTarget: Int?
     var fatTarget: Int?
+    /// La personne veut-elle prendre du muscle ? Décide de la lecture d'un
+    /// surplus de protéines (bonne nouvelle, ou frein).
+    var veutDuMuscle = false
 
     @StateObject private var vm = MealJournalViewModel()
     @Environment(\.dismiss) private var dismiss
@@ -40,11 +43,12 @@ struct DailyMealJournalView: View {
                         depensees: nil,
                         isToday: estAujourdhui
                     )
-                    JournalMacrosCard(
-                        prot: (g: vm.dayProteins, cible: protTarget),
-                        carb: (g: vm.dayCarbs, cible: carbTarget),
-                        fat: (g: vm.dayFats, cible: fatTarget)
-                    )
+                    JournalMacrosCard(lignes: JournalMacrosCard.lignesDuJour(
+                        proteines: vm.dayProteins, glucides: vm.dayCarbs,
+                        lipides: vm.dayFats, fibres: vm.dayFiber,
+                        cibleProteines: protTarget, cibleGlucides: carbTarget, cibleLipides: fatTarget,
+                        veutDuMuscle: veutDuMuscle
+                    ))
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)

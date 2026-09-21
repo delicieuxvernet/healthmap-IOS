@@ -1,24 +1,23 @@
 import SwiftUI
 import PhotosUI
 
-// MARK: - Journal (refonte « qualité Apple », 23 août 2026 : ex-Scan + ex-Bilan)
+// MARK: - Journal (maquette « Journal & Progrès v2 », 20 septembre 2026)
 //
-// Source maquette : `Kiwio iOS - refonte.dc.html`, écran 1 (9 blocs → 4).
 // Le tableau de bord du jour EST le journal. Ordre vertical :
 //   1. grand titre « Journal » (natif, se replie au défilement) + pill série ;
-//   2. semainier (7 colonnes L→D, jour courant en disque noir) ;
-//   3. carte calories : chiffre héros `1 021` + anneau 92 pt ;
-//   4. trois cartes macros côte à côte ;
-//   5. « Apports à renforcer » + « Tout afficher » : LE cœur de la valeur,
-//      AVANT la liste des repas (l'interaction détectée, la preuve, 3 apports,
-//      une seule sortie verte) ;
-//   6. « Aujourd'hui » : les 4 repas, kcal en secondaire, `+` vert ;
-//   7. bouton d'ajout flottant (60 pt) → feuille d'ajout à 6 entrées.
+//   2. barre de jour (chevrons + calendrier sans borne) ;
+//   3. carte calories : chiffre héros + anneau 88 pt + ligne Apple Santé ;
+//   4. carte macros : quatre lignes, objectif et surplus lu selon l'objectif ;
+//   5. la SAISIE, sur la page : Dicter (vert) · Photographier, puis « Autres
+//      façons d'ajouter » qui déplie Écrire · Rechercher · Code-barres ;
+//   6. « Apports à renforcer » + « Tout afficher » : l'interaction détectée,
+//      trois anneaux, une seule sortie verte ;
+//   7. le jour en mosaïque : quatre repas, deux par deux.
 //
-// Toute la SAISIE a quitté l'écran : dictée, photo, recherche, code-barres
-// vivent derrière le `+`. La machinerie (quota, résultat immersif du scan,
-// recherche, fiche portion, dictée mains libres) est inchangée : ce fichier
-// n'est qu'un nouvel habillage posé sur les mêmes ViewModels.
+// Le bouton d'ajout flottant et sa feuille à six entrées ont disparu : la
+// saisie se voit. La machinerie (quota, résultat immersif du scan, recherche,
+// fiche portion, dictée mains libres) est inchangée. « Écrire » emprunte le
+// chemin d'analyse de la dictée, texte en main au lieu d'un enregistrement.
 struct JournalView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @StateObject private var viewModel = MealScanViewModel()
@@ -90,24 +89,18 @@ struct JournalView: View {
     @State private var activeEnergyToday: Int?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    // Refonte : feuille d'ajout et ses suites.
-    @State private var showAjout = false
-    /// Geste choisi dans la feuille d'ajout, exécuté APRÈS sa fermeture : deux
-    /// présentations qui se croisent dans le même cycle, SwiftUI en avale une.
-    @State private var actionAjout: AjoutAction?
-    /// Créneau visé par le `+` d'une ligne repas (sinon : déduit de l'heure).
-    @State private var slotCible: MealJournalService.MealSlot?
+    /// « Autres façons d'ajouter » déplié (Écrire · Rechercher · Code-barres).
+    @State private var autresFacons = false
+    /// Ce que la personne a écrit dans le champ « Écrire ».
+    @State private var texteSaisi = ""
+    /// Feuille d'analyse ouverte sur un texte écrit (même feuille que la dictée).
+    @State private var showTexte = false
     @State private var showActivite = false
     /// Fiche apport ouverte depuis « Apports à renforcer ».
     @State private var selectedApport: ApportV2?
     /// Bilan complet (ex-onglet), présenté par « Tout afficher ».
     @State private var showBilanComplet = false
     @AppStorage("healthkit_linked") private var healthLinked = false
-
-    /// Les six entrées de la feuille d'ajout.
-    enum AjoutAction {
-        case dicter, scanner, rechercher, codeBarres, journee, activite
-    }
 
     /// Le résultat du scan est présenté en bottom-sheet : ouvert dès qu'une
     /// analyse est prête, fermé → `reset()`.
@@ -153,19 +146,6 @@ struct JournalView: View {
                         .healthMapFullSheet()
                 }
                 .sheet(isPresented: $montreCalendrier) { feuilleCalendrier }
-                .sheet(isPresented: $showAjout, onDismiss: {
-                    if actionAjout == nil { TutorielService.partage.feuilleAjoutFermeeSansChoix() }
-                    executerActionAjout()
-                }) {
-                    AjoutSheet(
-                        compteur: compteurScans,
-                        onChoisir: { action in
-                            if action == .dicter { TutorielService.partage.dicterChoisi() }
-                            actionAjout = action
-                            showAjout = false
-                        }
-                    )
-                }
                 .sheet(isPresented: $showActivite) {
                     ActiviteSheet(
                         kcalActives: activeEnergyToday,
@@ -197,6 +177,22 @@ struct JournalView: View {
                         }
                     }
                 }
+                .sheet(isPresented: $showTexte) {
+                    if let uid = AuthService.shared.cachedCurrentUserIdString {
+                        VoiceMealSheet(
+                            userId: uid,
+                            jour: journal.selectedDay,
+                            texteSaisi: texteSaisi,
+                            speech: speech
+                        ) { count, kcal in
+                            voiceConfirmation = "\(count) aliment\(count > 1 ? "s" : "") ajouté\(count > 1 ? "s" : "") · \(kcal) kcal"
+                            // Même quota que la dictée : c'est la même analyse.
+                            VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
+                            texteSaisi = ""
+                            Task { await journal.load() }
+                        }
+                    }
+                }
                 .modifier(PhotoPresentations(
                     showCamera: $showCamera,
                     showPhotoLibrary: $showPhotoLibrary,
@@ -213,7 +209,8 @@ struct JournalView: View {
                         kcalTarget: dashboardVM.physicalMetrics.macros?.calories,
                         protTarget: dashboardVM.physicalMetrics.macros?.protein,
                         carbTarget: dashboardVM.physicalMetrics.macros?.carbs,
-                        fatTarget: dashboardVM.physicalMetrics.macros?.fat
+                        fatTarget: dashboardVM.physicalMetrics.macros?.fat,
+                        veutDuMuscle: veutDuMuscle
                     )
                 }
                 // Résultat du scan en bottom-sheet (contenu immersif inchangé).
@@ -269,10 +266,9 @@ struct JournalView: View {
                          ? "Le micro ou la reconnaissance vocale sont bloqués pour Kiwio. Réactive-les dans les Réglages pour dicter tes repas."
                          : "Pour transformer ta voix en repas, Kiwio a besoin du micro et de la reconnaissance vocale. Rien ne quitte ton téléphone : l'audio est transcrit puis effacé.")
                 }
-                // Ouvert par le routage (« scanner » = le Journal + sa feuille).
+                // Ouvert par le routage (« scanner » = le Journal, saisie dépliée).
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapOuvrirAjout)) { _ in
-                    slotCible = nil
-                    showAjout = true
+                    withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) { autresFacons = true }
                 }
         }
     }
@@ -327,28 +323,14 @@ struct JournalView: View {
                     .containerRelativeFrame(.horizontal)
             }
         }
-        // Le bouton d'ajout flotte au-dessus de la barre d'onglets, coin bas
-        // droit. Le choix appareil photo / galerie lui est attaché : depuis
-        // iOS 26 la feuille émerge du contrôle qui l'a déclenchée.
-        .overlay(alignment: .bottomTrailing) {
-            DSAddButton {
-                HapticService.shared.tap()
-                TutorielService.partage.plusTape()
-                slotCible = nil
-                showAjout = true
-            }
-            .cibleTutoriel(.boutonAjout)
-            .padding(.trailing, DS.marge)
-            .padding(.bottom, 32)
-            .confirmationDialog(
-                "Ajouter une photo de ton repas",
-                isPresented: $showCaptureChoice,
-                titleVisibility: .visible
-            ) {
-                Button("Prendre une photo") { showCamera = true }
-                Button("Choisir dans la galerie") { showPhotoLibrary = true }
-                Button("Annuler", role: .cancel) {}
-            }
+        .confirmationDialog(
+            "Ajouter une photo de ton repas",
+            isPresented: $showCaptureChoice,
+            titleVisibility: .visible
+        ) {
+            Button("Prendre une photo") { showCamera = true }
+            Button("Choisir dans la galerie") { showPhotoLibrary = true }
+            Button("Annuler", role: .cancel) {}
         }
     }
 
@@ -519,36 +501,36 @@ struct JournalView: View {
             captureBlock
 
             if dashboardVM.bilanAffichage == .decouverte {
-                // Avant le questionnaire : aucune donnée perso, la population
-                // à la place (maquette « Journal · avant questionnaire »).
+                // Avant le questionnaire : la saisie d'abord (l'entrée est
+                // libre), puis la population à la place des chiffres perso.
+                saisieBloc.padding(.top, 16)
                 avantQuestionnaire
             } else {
                 JournalCaloriesCard(
                     consommees: journal.dayCalories,
                     objectif: dashboardVM.physicalMetrics.macros?.calories,
                     depensees: isTodaySelected ? activeEnergyToday : nil,
-                    isToday: isTodaySelected
+                    isToday: isTodaySelected,
+                    santeLiee: healthLinked,
+                    onActivite: {
+                        HapticService.shared.tap()
+                        showActivite = true
+                    }
                 )
                 .padding(.top, 16)
 
-                JournalMacrosCard(
-                    prot: (g: journal.dayProteins, cible: dashboardVM.physicalMetrics.macros?.protein),
-                    carb: (g: journal.dayCarbs, cible: dashboardVM.physicalMetrics.macros?.carbs),
-                    fat: (g: journal.dayFats, cible: dashboardVM.physicalMetrics.macros?.fat)
-                )
-                .padding(.top, DS.interCarte)
+                JournalMacrosCard(lignes: lignesMacros)
+                    .padding(.top, DS.interCarte)
+
+                saisieBloc.padding(.top, 14)
 
                 apportsSection
 
-                DSSectionHeader(titre: journal.dayLabel)
-                    .padding(.top, 2)
-                repasList
+                enTeteRepas
+                repasMosaique
             }
 
-            // Bas de page : l'espace du bouton flottant (64 pt + 32 de marge),
-            // pour que la dernière ligne « Collation » et son « + » passent
-            // au-dessus en fin de défilement (audit captures du 23 août).
-            Color.clear.frame(height: 104)
+            Color.clear.frame(height: 24)
         }
         .padding(.horizontal, DS.marge)
         .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.8), value: dicteeEnCours)
@@ -599,9 +581,8 @@ struct JournalView: View {
             .padding(.top, 18)
 
         if !journal.dayMeals.isEmpty {
-            DSSectionHeader(titre: "Aujourd'hui")
-                .padding(.top, 2)
-            repasList
+            enTeteRepas
+            repasMosaique
         }
     }
 
@@ -670,58 +651,88 @@ struct JournalView: View {
         }
     }
 
-    // MARK: - Aujourd'hui (les quatre repas)
+    // MARK: - Macros (quatre lignes, surplus lu selon l'objectif)
 
-    private var repasList: some View {
-        DSGroupedList {
-            ForEach(Array(MealJournalService.MealSlot.ordreJournal.enumerated()), id: \.element) { index, slot in
-                if index > 0 {
-                    DSSeparator(retrait: DS.retraitSeparateurIcone)
-                }
-                repasRow(slot)
-            }
-        }
+    private var veutDuMuscle: Bool { dashboardVM.profile.goals.contains("muscle") }
+
+    private var lignesMacros: [JournalMacrosCard.Ligne] {
+        let macros = dashboardVM.physicalMetrics.macros
+        return JournalMacrosCard.lignesDuJour(
+            proteines: journal.dayProteins, glucides: journal.dayCarbs,
+            lipides: journal.dayFats, fibres: journal.dayFiber,
+            cibleProteines: macros?.protein, cibleGlucides: macros?.carbs, cibleLipides: macros?.fat,
+            veutDuMuscle: veutDuMuscle
+        )
     }
 
-    private func repasRow(_ slot: MealJournalService.MealSlot) -> some View {
-        let kcal = journal.dayCalories(in: slot)
-        let vide = journal.dayRows(in: slot).isEmpty
-        return HStack(spacing: 0) {
-            Button {
+    // MARK: - Le jour, en mosaïque (les quatre repas)
+
+    private var enTeteRepas: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(journal.dayLabel)
+                .font(.dsSection)
+                .tracking(DSTracking.section)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            if journal.dayCalories > 0 {
+                Text("\(DS.entier(journal.dayCalories)) kcal")
+                    .font(.dsValeurLigne)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .contentTransition(.numericText())
+            }
+        }
+        .padding(.top, DS.avantSection - 8)
+        .padding(.bottom, DS.interCarte)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private var repasMosaique: some View {
+        JournalRepasMosaique(
+            repas: MealJournalService.MealSlot.ordreJournal.map { slot in
+                JournalRepasMosaique.Repas(
+                    slot: slot,
+                    kcal: journal.dayCalories(in: slot),
+                    vide: journal.dayRows(in: slot).isEmpty
+                )
+            },
+            onOuvrir: { _ in showJournal = true }
+        )
+    }
+
+    // MARK: - Saisie (sur la page)
+
+    private var saisieBloc: some View {
+        JournalSaisieBloc(
+            deplie: $autresFacons,
+            texte: $texteSaisi,
+            compteur: compteurScans,
+            onDicter: { demarrerDicteeMainsLibres() },
+            onPhotographier: {
                 HapticService.shared.tap()
-                showJournal = true
-            } label: {
-                DSRow(
-                    icone: slot.symboleJournal,
-                    titre: slot.titreJournal,
-                    sousTitre: vide ? "Rien pour l'instant" : nil,
-                    sousTitreCouleur: .dsTertiaire,
-                    valeur: vide ? nil : DS.entier(kcal)
-                ) { EmptyView() }
-                .padding(.trailing, isTodaySelected ? -DS.paddingCarte : 0)
-            }
-            .buttonStyle(.dsPress)
-            .accessibilityLabel(vide
-                ? "\(slot.titreJournal), rien pour l'instant"
-                : "\(slot.titreJournal), \(kcal) kilocalories")
-            .accessibilityHint("Ouvre le journal du jour")
-
-            if isTodaySelected {
-                Button {
-                    HapticService.shared.tap()
-                    slotCible = slot
-                    showAjout = true
-                } label: {
-                    DSPlusIcon()
+                if CameraPicker.isAvailable {
+                    showCaptureChoice = true
+                } else {
+                    showPhotoLibrary = true
                 }
-                .buttonStyle(.dsPress)
-                .padding(.trailing, 4)
-                .accessibilityLabel("Ajouter \(slot.complementDeTemps)")
-            }
-        }
+            },
+            onRechercher: { showSearch = true },
+            onCodeBarres: { showBarcode = true },
+            onEnvoyerTexte: { analyserTexte() }
+        )
     }
 
-    // MARK: - Feuille d'ajout : suites
+    /// « Écrire » : le texte suit l'analyse de la dictée, donc son quota aussi.
+    private func analyserTexte() {
+        guard !texteSaisi.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard peutDicter else {
+            showPaywall = true
+            return
+        }
+        HapticService.shared.primary()
+        showTexte = true
+    }
 
     /// Compteur de scans (info neutre dès le bilan fait, premium inclus).
     private var compteurScans: String? {
@@ -731,31 +742,6 @@ struct JournalView: View {
         ), let remaining = viewModel.scansRemaining else { return nil }
         if remaining <= 0 { return "Scans du jour épuisés, ça se recharge demain." }
         return "\(remaining) scan\(remaining > 1 ? "s" : "") photo restant\(remaining > 1 ? "s" : "") aujourd'hui."
-    }
-
-    /// Exécute le geste choisi dans la feuille d'ajout, une fois celle-ci
-    /// refermée : c'est la seule façon fiable d'enchaîner deux présentations.
-    private func executerActionAjout() {
-        guard let action = actionAjout else { return }
-        actionAjout = nil
-        switch action {
-        case .dicter:
-            demarrerDicteeMainsLibres()
-        case .scanner:
-            if CameraPicker.isAvailable {
-                showCaptureChoice = true
-            } else {
-                showPhotoLibrary = true
-            }
-        case .rechercher:
-            showSearch = true
-        case .codeBarres:
-            showBarcode = true
-        case .journee:
-            showJournal = true
-        case .activite:
-            showActivite = true
-        }
     }
 
     /// Lie Apple Santé depuis la feuille Activité (même geste que le profil),
@@ -846,12 +832,15 @@ struct JournalView: View {
         dicteeVerrouillee = true
         erreurDictee = nil
         HapticService.shared.primary()
+        // Autorisations et quota passés : le voile du tutoriel se lève.
+        TutorielService.partage.dicteeDemarree()
         Task {
             await speech.start()
             erreurDictee = speech.error
             if speech.state != .listening {
                 dicteeEnCours = false
                 dicteeVerrouillee = false
+                TutorielService.partage.dicteeJetee()
             }
         }
     }
@@ -869,6 +858,7 @@ struct JournalView: View {
             HapticService.shared.warning()
             speech.reset()
             dicteeTropCourte = true
+            TutorielService.partage.dicteeJetee()
             return
         }
         HapticService.shared.strong()
@@ -885,6 +875,7 @@ struct JournalView: View {
         glissementDictee = .zero
         HapticService.shared.warning()
         speech.reset()
+        TutorielService.partage.dicteeJetee()
     }
 
     // MARK: - Capture Zone (photo choisie, en attente d'analyse)

@@ -18,6 +18,9 @@ struct VoiceMealSheet: View {
     /// Jour sur lequel écrire — celui qu'affiche le journal, pas forcément
     /// aujourd'hui (dictée du dîner de la veille, saisie passé minuit).
     var jour: Date = Date()
+    /// Texte ÉCRIT par la personne (« Écrire » du Journal). Quand il est là, la
+    /// feuille saute la transcription et analyse ce texte tel quel.
+    var texteSaisi: String? = nil
     /// Capture audio possédée par l'appelant. Elle est injectée — et non créée
     /// ici — pour que la dictée puisse DÉMARRER sur l'accueil, le doigt posé sur
     /// « Dicte ton repas », et se terminer dans cette feuille.
@@ -102,7 +105,7 @@ struct VoiceMealSheet: View {
         }
         .presentationDetents(hauteurs)
         .presentationDragIndicator(.visible)
-        .task { await finishListening() }
+        .task { await demarrer() }
         .onDisappear {
             revelation?.cancel()
             revelation = nil
@@ -471,6 +474,17 @@ struct VoiceMealSheet: View {
     }
 
     // MARK: - Actions
+
+    /// Un texte écrit s'analyse directement ; sinon, on transcrit l'audio.
+    private func demarrer() async {
+        let texte = (texteSaisi ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !texte.isEmpty else {
+            await finishListening()
+            return
+        }
+        dernierTranscript = texte
+        await analyser(texte)
+    }
 
     private func finishListening() async {
         // L'audio est transcrit MAINTENANT, en une fois, sur le fichier complet.

@@ -548,19 +548,6 @@ extension DSRow where Accessoire == DSChevron {
     }
 }
 
-// MARK: - Bouton « + » de ligne (accent)
-
-struct DSPlusIcon: View {
-    var body: some View {
-        Image(systemName: "plus")
-            .font(.system(size: 20, weight: .medium))
-            .foregroundStyle(Color.dsAccent)
-            .frame(width: DS.cibleTactile, height: DS.cibleTactile)
-            .contentShape(Rectangle())
-            .accessibilityHidden(true)
-    }
-}
-
 // MARK: - Bouton fermer circulaire (32 pt)
 
 struct DSCloseButton: View {

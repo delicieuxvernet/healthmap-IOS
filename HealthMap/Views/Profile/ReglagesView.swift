@@ -401,7 +401,7 @@ struct ReglagesView: View {
                                                 object: MainTabView.Tab.journal.route)
             } label: {
                 DSRow(icone: "hand.tap", titre: "Revoir le tutoriel",
-                      sousTitre: "Les cinq gestes du premier lancement")
+                      sousTitre: "Les gestes du premier lancement")
             }
             .buttonStyle(.dsPress)
         }
