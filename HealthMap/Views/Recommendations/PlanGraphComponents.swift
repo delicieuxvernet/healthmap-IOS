@@ -580,7 +580,7 @@ struct PlanGraphScreen: View {
             ongletVisible = note.object as? String == NavCardDestination.plan.rawValue
         }
         .sheet(item: $activeTopic) { topic in
-            PlanSolutionsSheetV7(topic: topic) {
+            PlanNoeudSheet(topic: topic, liens: liens(de: topic, dans: graphe)) {
                 // Levier « Par les compléments » : ferme la porte et bascule sur
                 // l'onglet Compléments (la chaîne bilan → recommandation).
                 activeTopic = nil
@@ -603,6 +603,50 @@ struct PlanGraphScreen: View {
                 habitude = nil
                 selection = apport.id
             }
+        }
+    }
+
+    // MARK: Les voisins, prêts pour la feuille
+
+    private func idDuNoeud(_ topic: PlanTopic, dans graphe: PlanGraph) -> String {
+        if topic.kind == .apport { return Self.idApport(topic) }
+        if graphe.noeud(topic.id) != nil { return topic.id }
+        return PlanGraph.idCentre
+    }
+
+    /// L'état de chaque voisin, et la force du lien. Un état, jamais un geste.
+    private func liens(de topic: PlanTopic, dans graphe: PlanGraph) -> [PlanLienCarte] {
+        let id = idDuNoeud(topic, dans: graphe)
+        return graphe.voisins(de: id).map { voisin in
+            let etat: String
+            let teinte: Color
+            let comment: String
+            switch voisin.genre {
+            case .apport:
+                let score = voisin.score ?? 0
+                etat = "\(score) %"
+                teinte = score < 40 ? Color(hex: "C0322A") : (score < 70 ? Color(hex: "B36B00") : Color.kiwiGreenInk)
+                comment = topic.kind == .objectif ? "un apport qui compte pour ton objectif" : "un des apports en cause"
+            case .habitude:
+                etat = "\(PointsApport.signe(voisin.points ?? 0)) points"
+                teinte = Color(hex: "C0322A")
+                comment = "pèse sur cet apport, d'après tes réponses"
+            case .symptome:
+                etat = "suivi"
+                teinte = PlanGraphTeintes.symptome
+                comment = topic.kind == .apport ? "un signe que cet apport peut expliquer" : "sur le chemin de ton objectif"
+            case .objectif:
+                etat = "objectif"
+                teinte = Color.kiwiGreenInk
+                comment = "ce vers quoi tout ça mène"
+            }
+            return PlanLienCarte(
+                id: voisin.id, nom: voisin.nom,
+                teinte: voisin.genre == .objectif ? PlanGraphTeintes.objectif
+                    : (voisin.genre == .symptome ? PlanGraphTeintes.symptome : PlanGraphTeintes.levierFonce),
+                etat: etat, etatTeinte: teinte, comment: comment,
+                force: graphe.force(entre: id, et: voisin.id) ?? 1
+            )
         }
     }
 

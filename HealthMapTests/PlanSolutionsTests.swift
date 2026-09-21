@@ -29,18 +29,6 @@ final class PlanSolutionsTests: XCTestCase {
         XCTAssertEqual(PlanTopicText.firstSentence("   "), "")
     }
 
-    func testClipTruncatesAtTwelveWords() {
-        let long = "un deux trois quatre cinq six sept huit neuf dix onze douze treize quatorze"
-        let clipped = PlanTopicText.clip(long)
-        XCTAssertTrue(clipped.hasSuffix("…"))
-        XCTAssertEqual(clipped.split(separator: " ").count, 12)
-    }
-
-    func testClipLeavesShortLinesIntact() {
-        let short = "Sardines ou œufs deux fois par semaine."
-        XCTAssertEqual(PlanTopicText.clip(short), short)
-    }
-
     // MARK: - 3. Projections d'un nœud
 
     /// La cause cite les vraies valeurs du bilan avant l'explication.
@@ -73,24 +61,34 @@ final class PlanSolutionsTests: XCTestCase {
         )
     }
 
-    /// Chaque levier est borné à 2 puces (règle : 6 puces max par pop-up).
-    func testEachLeverIsCappedAtTwoBullets() {
-        let topic = PlanTopic(
-            id: "t",
-            kind: .symptome,
-            name: "Fatigue",
-            intro: "Cause.",
-            ritual: [],
-            nutrition: (1...4).map {
-                PlanNutritionSolution(asset: "a", label: "Aliment \($0)", note: "n",
-                                      qty: "q", moment: "Au repas", cuisson: "c", astuce: "a")
-            },
-            habitudes: (1...3).map { PlanHabitSolution(symbol: "s", text: "Habitude \($0)", note: "Note \($0)") },
-            complements: (1...3).map { PlanSupplementSolution(name: "C\($0)", note: "n", tag: "t", strong: false) }
-        )
-        XCTAssertEqual(topic.radialNutrition.count, 2)
-        XCTAssertEqual(topic.radialHabitudes.count, 2)
-        XCTAssertEqual(topic.radialComplements.count, 2)
+    // MARK: - 3 bis. La feuille d'un nœud
+
+    /// Une note de complément qui porte une dose n'est pas affichée du tout :
+    /// la posologie appartient au fabricant et à la personne.
+    func testUneNoteDeComplementNePorteJamaisDeDose() {
+        XCTAssertEqual(PlanTopicText.sansDose("Le matin, à jeun"), "Le matin, à jeun")
+        XCTAssertEqual(PlanTopicText.sansDose("14 mg le matin, à jeun"), "")
+        XCTAssertEqual(PlanTopicText.sansDose("Prends 2,5 µg par jour"), "")
+        XCTAssertEqual(PlanTopicText.sansDose("1000 UI en hiver"), "")
+        // « 2 gélules » n'est pas une dose en grammes.
+        XCTAssertEqual(PlanTopicText.sansDose("2 gélules au dîner"), "2 gélules au dîner")
+    }
+
+    func testLesComplementsDeLaFeuilleSontSansDose() {
+        let topic = PlanTopic(id: "t", kind: .symptome, name: "Fatigue", intro: "Cause.", ritual: [],
+                              nutrition: [], habitudes: [],
+                              complements: [PlanSupplementSolution(name: "Fer", note: "14 mg le matin", tag: "Prioritaire", strong: true),
+                                            PlanSupplementSolution(name: "Magnésium", note: "Le soir, au dîner", tag: "Si besoin", strong: false)])
+        XCTAssertEqual(topic.complementsSansDose.map(\.note), ["", "Le soir, au dîner"])
+        XCTAssertEqual(topic.complementsSansDose.map(\.name), ["Fer", "Magnésium"])
+    }
+
+    /// La pastille d'un aliment se déplie sur ce que l'analyse a rédigé — les
+    /// champs vides sont sautés, jamais une clé sans valeur.
+    func testLeDetailDUnAlimentSauteLesChampsVides() {
+        let aliment = PlanNutritionSolution(asset: "fluent_fish", label: "Sardines", note: "",
+                                            qty: "100 g", moment: "Deux fois par semaine", cuisson: " ", astuce: "Avec un agrume")
+        XCTAssertEqual(PlanNoeudSheet.details(aliment).map(\.cle), ["combien", "quand", "astuce"])
     }
 
     // MARK: - 4. Garde-fous du nombre de nœuds
@@ -182,8 +180,9 @@ final class PlanSolutionsTests: XCTestCase {
         let topic = planTopicsFromApports([n, Self.makeNutrient(id: "iron", score: 50),
                                            Self.makeNutrient(id: "vitD", score: 55)]).first
 
-        XCTAssertEqual(topic?.radialHabitudes.count, 2)
-        XCTAssertTrue(topic?.radialHabitudes.first?.contains("amandes") == true)
+        XCTAssertEqual(topic?.habitudes.count, 2)
+        XCTAssertTrue(topic?.habitudes.first?.note.contains("amandes") == true
+                      || topic?.habitudes.first?.text.contains("amandes") == true)
     }
 
     private static func makeNutrient(id: String, score: Int) -> EnrichedNutrient {
