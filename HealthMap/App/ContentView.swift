@@ -548,9 +548,14 @@ struct MainTabView: View {
         // par-dessus la barre d'onglets. Jamais pendant les captures.
         .overlay {
             if let gratification = gratifications.courante, !estModeCaptures {
-                GratificationOverlay(gratification: gratification) {
+                GratificationOverlay(gratification: gratification, onFermer: {
                     gratifications.courante = nil
-                }
+                }, onModifier: {
+                    gratifications.courante = nil
+                    selectedTab = .journal
+                    NotificationCenter.default.post(name: .healthmapOuvrirRepas,
+                                                    object: gratification.creneau.rawValue)
+                })
                 .id(gratification.id)
                 .zIndex(70)
             }

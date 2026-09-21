@@ -31,6 +31,16 @@ struct GratificationRepas: Identifiable, Equatable {
     /// Jours d'affilée avec au moins un repas suivi ; `nil` sous deux jours.
     let serie: Int?
 
+    /// « Ajouté au déjeuner » — le bandeau du haut.
+    var bandeau: String {
+        switch creneau {
+        case .breakfast: return "Ajouté au petit-déjeuner"
+        case .lunch: return "Ajouté au déjeuner"
+        case .dinner: return "Ajouté au dîner"
+        case .snack: return "Ajouté en encas"
+        }
+    }
+
     /// « Ce déjeuner fait bouger deux de tes apports. »
     var phrase: String {
         let repas: String

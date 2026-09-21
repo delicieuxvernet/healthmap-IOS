@@ -62,6 +62,26 @@ enum Fluent3D {
         }
     }
 
+    // MARK: - Illustration 3D par apport (gratification, fiches)
+    /// L'illustration du bundle qui évoque le mieux l'apport — le soleil pour
+    /// la vitamine D, l'éclair pour le magnésium, sinon sa source la plus
+    /// parlante. Toujours un imageset présent (cf. la liste ci-dessus).
+    static func asset(for nutrientId: String) -> String {
+        switch nutrientId {
+        case "vitD":      return sun
+        case "vitB12":    return egg
+        case "iron":      return meat
+        case "magnesium": return voltage
+        case "omega3":    return fish
+        case "vitC":      return tangerine
+        case "calcium":   return milk
+        case "zinc":      return oyster
+        case "iodine":    return fish
+        case "fiber":     return leafyGreen
+        default:          return sparkles
+        }
+    }
+
     // MARK: - Icône SF Symbol par apport (en-tête de la fiche)
     /// Symbole de ligne pour l'en-tête de la fiche d'un apport. Un nom inconnu
     /// rend simplement vide (jamais de crash) — on garde des symboles sûrs.
