@@ -697,7 +697,6 @@ enum AppuiDicter: Equatable {
 /// texte suit le même chemin d'analyse que la dictée.
 struct JournalSaisieBloc: View {
     @Binding var deplie: Bool
-    @Binding var texte: String
     /// Compteur de scans photo (info neutre dès le bilan fait).
     let compteur: String?
     /// Un toucher bref : dictée mains libres (c'est aussi le chemin VoiceOver).
@@ -707,10 +706,9 @@ struct JournalSaisieBloc: View {
     let onPhotographier: () -> Void
     let onRechercher: () -> Void
     let onCodeBarres: () -> Void
-    let onEnvoyerTexte: () -> Void
+    /// « Écrire » : ouvre la feuille de saisie (le clavier y est chez lui).
+    let onEcrire: () -> Void
 
-    @State private var ecrire = false
-    @FocusState private var champActif: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Le doigt est sur « Dicter ». `@GestureState` retombe tout seul à `false`
@@ -721,10 +719,6 @@ struct JournalSaisieBloc: View {
     @State private var maintenu = false
     @State private var minuterie: Task<Void, Never>?
     @State private var deplacement: CGSize = .zero
-
-    private var texteUtile: String {
-        texte.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -738,7 +732,6 @@ struct JournalSaisieBloc: View {
                 HapticService.shared.selection()
                 withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
                     deplie.toggle()
-                    if !deplie { ecrire = false }
                 }
             } label: {
                 HStack(spacing: 7) {
@@ -761,18 +754,11 @@ struct JournalSaisieBloc: View {
 
             if deplie {
                 HStack(spacing: 8) {
-                    option("pencil", "Écrire") {
-                        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.2)) { ecrire.toggle() }
-                        champActif = ecrire
-                    }
+                    option("pencil", "Écrire", action: onEcrire)
                     option("magnifyingglass", "Rechercher", action: onRechercher)
                     option("barcode.viewfinder", "Code-barres", action: onCodeBarres)
                 }
                 .transition(.opacity)
-
-                if ecrire {
-                    champTexte.transition(.opacity)
-                }
             }
 
             if let compteur {
@@ -955,45 +941,6 @@ struct JournalSaisieBloc: View {
             .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
         }
         .buttonStyle(.dsPress)
-    }
-
-    private var champTexte: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "pencil")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.dsSecondaire)
-                .accessibilityHidden(true)
-            TextField("Ex. : 150 g de poulet, riz, une orange", text: $texte, axis: .vertical)
-                .font(.dsSousTitre)
-                .lineLimit(1...4)
-                .focused($champActif)
-                .submitLabel(.send)
-                .onSubmit { envoyer() }
-                .accessibilityLabel("Écris ce que tu as mangé")
-                .accessibilityIdentifier("journal.texte")
-            Button(action: envoyer) {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(texteUtile.isEmpty ? Color.dsTertiaire : Color.dsAccent))
-                    .frame(width: DS.cibleTactile, height: DS.cibleTactile)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.dsPress)
-            .disabled(texteUtile.isEmpty)
-            .accessibilityLabel("Analyser ce texte")
-        }
-        .padding(.leading, 14)
-        .padding(.trailing, 2)
-        .frame(minHeight: DS.cibleTactile)
-        .dsCard()
-    }
-
-    private func envoyer() {
-        guard !texteUtile.isEmpty else { return }
-        champActif = false
-        onEnvoyerTexte()
     }
 }
 

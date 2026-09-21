@@ -94,8 +94,6 @@ struct JournalView: View {
     /// Le premier chargement est passé : avant lui, TOUS les repas sembleraient
     /// nouveaux, et l'app fêterait l'ouverture.
     @State private var journalCharge = false
-    /// Ce que la personne a écrit dans le champ « Écrire ».
-    @State private var texteSaisi = ""
     /// Feuille d'analyse ouverte sur un texte écrit (même feuille que la dictée).
     @State private var showTexte = false
     @State private var showActivite = false
@@ -235,13 +233,12 @@ struct JournalView: View {
                         VoiceMealSheet(
                             userId: uid,
                             jour: journal.selectedDay,
-                            texteSaisi: texteSaisi,
+                            saisieAuClavier: true,
                             speech: speech
                         ) { count, kcal in
                             voiceConfirmation = "\(count) aliment\(count > 1 ? "s" : "") ajouté\(count > 1 ? "s" : "") · \(kcal) kcal"
                             // Même quota que la dictée : c'est la même analyse.
                             VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
-                            texteSaisi = ""
                             Task { await journal.load() }
                         }
                     }
@@ -759,7 +756,6 @@ struct JournalView: View {
     private var saisieBloc: some View {
         JournalSaisieBloc(
             deplie: $autresFacons,
-            texte: $texteSaisi,
             compteur: compteurScans,
             onDicter: { demarrerDictee(verrouillee: true) },
             onAppuiLong: { appui in
@@ -779,13 +775,12 @@ struct JournalView: View {
             },
             onRechercher: { showSearch = true },
             onCodeBarres: { showBarcode = true },
-            onEnvoyerTexte: { analyserTexte() }
+            onEcrire: { ecrireUnRepas() }
         )
     }
 
     /// « Écrire » : le texte suit l'analyse de la dictée, donc son quota aussi.
-    private func analyserTexte() {
-        guard !texteSaisi.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    private func ecrireUnRepas() {
         guard peutDicter else {
             showPaywall = true
             return
