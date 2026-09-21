@@ -137,14 +137,6 @@ struct SupplementsView: View {
         }
     }
 
-    /// Le mot du statut, calé sur le score AFFICHÉ (le même que l'anneau).
-    /// Mêmes paliers que le reste de l'onglet : < 40 à combler, < 70 à renforcer.
-    private static func statutMot(forScore score: Int) -> String {
-        if score < 40 { return "à combler" }
-        if score < 70 { return "à renforcer" }
-        return "couvre le besoin"
-    }
-
     // MARK: - Panier
 
     /// Chaînes avec un produit chiffrable — le panier en dérive.
@@ -440,7 +432,7 @@ struct SupplementsView: View {
     /// héros ; en voie assiette, l'apport que l'aliment sert.
     private func statutLigne(_ item: Tuile, complet: Bool) -> String {
         guard voie == .complements else { return "pour \(item.chain.avecArticle)" }
-        let mot = Self.statutMot(forScore: item.detail.score)
+        let mot = FicheApportContexte.statutMot(forScore: item.detail.score)
         let causes = item.detail.freins.count
         switch causes {
         case 0: return "\(mot) · sans cause nommée"
@@ -553,7 +545,7 @@ struct SupplementsView: View {
             apportAvecArticle: chain.avecArticle,
             symbole: symbole(item),
             couleur: chain.tint,
-            statutMot: Self.statutMot(forScore: item.detail.score),
+            statutMot: FicheApportContexte.statutMot(forScore: item.detail.score),
             detail: item.detail,
             eclairage: eclairage(for: chain.id),
             role: ApportRole.role(for: chain.id),

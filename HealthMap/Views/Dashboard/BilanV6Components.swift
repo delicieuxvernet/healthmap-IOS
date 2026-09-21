@@ -52,22 +52,30 @@ struct SafeFluent3DIcon: View {
 
 
 // MARK: - Bottom sheet : détail d'un apport (contrat v2)
-/// Fiche apport de la refonte (23 août 2026, §4.3 du document) : le
-/// « pourquoi », puis les clés. Feuille sur fond neutre :
-///   1. titre 34 + rôle en une ligne, bouton fermer 32 pt ;
-///   2. carte état : `42` (48 pt) + ` %`, « 5,9 sur 14 mg », jauge 6 pt,
-///      une phrase d'état ;
-///   3. « Pourquoi il est bas » : l'explication du contrat v2 ;
-///   4. « Ce qui le remonte » : les aliments du contrat + l'interaction à
-///      connaître (réservé au premium, comme avant : voile + porte calme) ;
-///   5. bouton capsule vers le plan.
-/// Règle d'écriture : la cause avant la solution. Aucun chiffre inventé : la
-/// quantité absolue dérive du pourcentage et de la référence canonique.
+/// Fiche d'un apport, au design de l'anneau de cause (21 septembre 2026) — la
+/// même lecture que dans l'onglet Compléments, d'où qu'on vienne (Journal,
+/// Bilan, Progrès) :
+///   1. l'anneau de cause 148 + le nom + « à combler · 3 causes nommées » et la
+///      quantité (« 5,9 sur 14 mg », dérivée de la référence canonique) ;
+///   2. « À quoi ça répond chez toi » : la table déterministe `SymptomesApports` ;
+///   3. « Comment on l'a vu » : la cascade du registre — toucher une ligne
+///      allume sa part sur l'anneau ;
+///   4. « Pourquoi il est bas » : l'explication du contrat v2 ;
+///   5. « Ce que ça fait » : le rôle de l'apport ;
+///   6. « Ce qui le remonte » : les aliments du contrat, qu'on ajoute au
+///      journal d'un toucher (réservé au premium : voile + porte calme) ;
+///   7. bouton capsule vers le plan.
+/// Règle d'écriture : la cause avant la solution. Aucun chiffre inventé.
 struct ApportV2DetailSheet: View {
     let apport: ApportV2
     let onSeePlan: () -> Void
 
+    /// Le profil nourrit le registre (les causes) et la table des symptômes.
+    /// Les deux présentateurs (Journal, Bilan, Progrès) le portent déjà.
+    @EnvironmentObject private var dashboardVM: DashboardViewModel
     @Environment(\.dismiss) private var dismiss
+    /// Part de l'anneau allumée par la cascade.
+    @State private var surligne: String?
     /// Source unique premium (loi 11), OBSERVÉE : un achat depuis la fiche
     /// défloute les sections gatées en direct, sans réouverture.
     @ObservedObject private var subscriptionService = SubscriptionService.shared
@@ -157,15 +165,6 @@ struct ApportV2DetailSheet: View {
         }
     }
 
-    private var phraseEtat: String {
-        switch statut {
-        case .couvre: return "Ton besoin est couvert."
-        case .aRenforcer: return "Un peu sous ton besoin."
-        case .aCombler: return "Nettement sous ton besoin."
-        case .neutre: return "À suivre sur tes prochains repas."
-        }
-    }
-
     /// « 5,9 sur 14 mg » : part couverte × référence canonique. nil si le
     /// nutriment n'est pas au catalogue (on n'invente pas d'unité).
     private var quantite: String? {
@@ -175,28 +174,47 @@ struct ApportV2DetailSheet: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                header
+        let detail = self.detail
 
-                etatCard
-                    .padding(.top, 18)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Spacer(minLength: 0)
+                    DSCloseButton { dismiss() }
+                }
+
+                enTete(detail)
+
+                if let eclairage, !eclairage.isEmpty {
+                    FicheBloc(titre: "À quoi ça répond chez toi") { FicheTexteCarte(texte: eclairage) }
+                }
+
+                if !detail.contributions.isEmpty {
+                    FicheBloc(titre: "Comment on l'a vu", note: "touche une ligne") {
+                        CascadeApport(detail: detail, couleur: couleurApport, surligne: $surligne)
+                            .padding(.horizontal, DS.paddingCarte)
+                            .padding(.vertical, 4)
+                            .dsCard()
+                    }
+                }
 
                 if let why = apport.why, !why.isEmpty {
-                    DSSectionHeader(titre: titrePourquoi)
-                        .padding(.top, -4)
-                    pourquoiCard(why)
+                    FicheBloc(titre: titrePourquoi) { pourquoiCard(why) }
+                }
+
+                if let id = apport.id, let role = ApportRole.role(for: id) {
+                    FicheBloc(titre: "Ce que ça fait") { FicheTexteCarte(texte: role) }
                 }
 
                 if hasGatedContent {
-                    DSSectionHeader(titre: "Ce qui le remonte")
-                        .padding(.top, -4)
-                    if subscriptionService.isPremium {
-                        remonteCard
-                    } else {
-                        // Gratuit : la cause reste en clair, l'ordonnance est
-                        // floutée ; la porte est épinglée en bas de la feuille.
-                        GatedOverlay(intensity: .teaser) { remonteCard }
+                    FicheBloc(titre: "Ce qui le remonte") {
+                        if subscriptionService.isPremium {
+                            remonteCard
+                        } else {
+                            // Gratuit : la cause reste en clair, l'ordonnance est
+                            // floutée ; la porte est épinglée en bas de la feuille.
+                            GatedOverlay(intensity: .teaser) { remonteCard }
+                        }
                     }
                     if let message = messageAjout {
                         HStack(spacing: 7) {
@@ -223,9 +241,10 @@ struct ApportV2DetailSheet: View {
                 }
             }
             .padding(.horizontal, DS.marge)
-            .padding(.top, 12)
+            .padding(.top, 8)
             .padding(.bottom, 30)
             .animation(.default, value: messageAjout?.texte)
+            .containerRelativeFrame(.horizontal, alignment: .leading)
         }
         .safeAreaInset(edge: .bottom) {
             if !subscriptionService.isPremium, hasGatedContent {
@@ -237,7 +256,7 @@ struct ApportV2DetailSheet: View {
             }
         }
         .background(Color.dsFond)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(34)
         // Fiche portion de l'aliment resolu par le « + » : meme fiche que la
@@ -253,63 +272,68 @@ struct ApportV2DetailSheet: View {
         }
     }
 
-    // MARK: En-tête
+    // MARK: En-tête : l'anneau de cause, le nom, l'état
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(nom)
-                    .font(.dsGrandTitre)
-                    .tracking(DSTracking.grandTitre)
-                    .foregroundStyle(Color.dsTexte)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let id = apport.id, let role = ApportRole.role(for: id) {
-                    Text(role)
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: 0)
-            DSCloseButton { dismiss() }
-        }
+    private var couleurApport: Color {
+        apport.id.map { Color.nutrientColor(for: $0) } ?? couleurStatut
     }
 
-    // MARK: État
+    /// Le registre donne le score ET ses causes nommées. Quand il se tait
+    /// (apport hors catalogue, profil hors bornes), l'anneau se réduit au
+    /// score du bilan, sans cause nommée — jamais un zéro inventé.
+    private var detail: DetailApport {
+        if let id = apport.id,
+           let connu = HealthCalculator.registreApports(profile: dashboardVM.profile)[id] {
+            return connu
+        }
+        return DetailApport(contributions: [], score: pct)
+    }
 
-    private var etatCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("\(pct)")
-                    .font(.dsHeros48)
-                    .tracking(DSTracking.heros48)
-                    .foregroundStyle(Color.dsTexte)
-                    .contentTransition(.numericText())
-                Text("%")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.dsSecondaire)
-                Spacer(minLength: 8)
-                if let quantite {
-                    Text(quantite)
-                        .font(.dsValeurLigne)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
+    /// Ce que les symptômes déclarés éclairent sur cet apport — la table
+    /// déterministe, jamais le texte libre du bilan.
+    private var eclairage: String? {
+        guard let nutriment = apport.id.flatMap({ NutrientID(rawValue: $0) }) else { return nil }
+        return SymptomesApports.explication(pour: nutriment, symptomes: dashboardVM.profile.symptoms)
+    }
+
+    private func enTete(_ detail: DetailApport) -> some View {
+        VStack(spacing: 2) {
+            AnneauDeCause(parts: detail.parts, score: detail.score, couleur: couleurApport,
+                          taille: .fiche, surligne: surligne)
+            HStack(spacing: 8) {
+                if let id = apport.id {
+                    Image(systemName: Fluent3D.symbol(for: id))
+                        .font(.system(size: 20, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(couleurApport)
+                        .accessibilityHidden(true)
                 }
+                Text(nom)
+                    .font(.system(size: 24, weight: .bold))
+                    .tracking(-0.7)
+                    .foregroundStyle(Color.dsTexte)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            DSGauge(fraction: Double(pct) / 100, couleur: couleurStatut, hauteur: 6, delai: 0.3)
-                .padding(.top, 14)
-            Text(phraseEtat)
+            .padding(.top, 10)
+            Text(FicheApportContexte.sousTitre(
+                statutMot: FicheApportContexte.statutMot(forScore: detail.score),
+                causes: detail.freins.count))
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
-                .padding(.top, 10)
+                .multilineTextAlignment(.center)
+            if let quantite {
+                Text(quantite)
+                    .font(.dsLegende.monospacedDigit())
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsTertiaire)
+                    .padding(.top, 2)
+            }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dsCard()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(nom), \(pct) pour cent de ton besoin. \(quantite ?? "") \(phraseEtat)")
+        .frame(maxWidth: .infinity)
+        .padding(.top, -8)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Pourquoi
@@ -442,6 +466,24 @@ struct ApportV2DetailSheet: View {
             }
         }
         .dsCard()
+    }
+}
+
+// MARK: - Un apport prêt pour la fiche, d'où qu'on vienne
+
+extension ApportV2 {
+    /// Le bilan ne rédige que ses trois apports prioritaires. Pour les autres
+    /// (Progrès, scores locaux), la fiche s'ouvre quand même : le score
+    /// déterministe, et les sources d'aliments du catalogue canonique — le
+    /// « pourquoi » rédigé manque, la cascade du registre le remplace.
+    static func pourLaFiche(_ nutriment: EnrichedNutrient, bilan: BilanV2?) -> ApportV2 {
+        if let redige = bilan?.apports?.first(where: { $0.id == nutriment.id }) {
+            return redige
+        }
+        let statut: StatutV2 = nutriment.score < 40 ? .aCombler : (nutriment.score < 70 ? .aRenforcer : .couvre)
+        let aliments = Fluent3D.foodSources(for: nutriment.id).map { AlimentV2(nom: $0.label, icone: $0.asset) }
+        return ApportV2(id: nutriment.id, nom: nutriment.label, statut: statut,
+                        pctBesoin: nutriment.score, aliments: aliments)
     }
 }
 

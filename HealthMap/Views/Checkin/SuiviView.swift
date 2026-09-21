@@ -121,8 +121,14 @@ struct SuiviView: View {
             .navigationTitle("Progrès")
             .navigationBarTitleDisplayMode(.large)
             .sheet(item: $selectedNutrient) { nutrient in
-                NutrientDetailSheet(nutrient: nutrient)
-                    .healthMapSheet(.large)
+                // La même fiche que depuis le Journal ou le Bilan.
+                ApportV2DetailSheet(apport: .pourLaFiche(nutrient, bilan: dashboardVM.analysisV2?.bilan)) {
+                    selectedNutrient = nil
+                    NotificationCenter.default.post(
+                        name: .healthmapNavigateToTab,
+                        object: NavCardDestination.plan.rawValue
+                    )
+                }
             }
             .sheet(isPresented: $showCheckin) {
                 CheckinSymptomesSheet(
