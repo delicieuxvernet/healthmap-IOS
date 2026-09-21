@@ -38,6 +38,10 @@ enum Fluent3D {
     static let sleeping = "fluent_sleeping"    // sommeil (suivi)
     static let sun = "fluent_sun"              // matin (scan — Ta journée)
     static let moon = "fluent_moon"            // soir (scan — Ta journée)
+    // Maquette du 20 sept. 2026 (Fluent Emoji de Microsoft, licence MIT)
+    static let blood = "fluent_blood"          // fer (gratification, fiches)
+    static let fire = "fluent_fire"            // série de jours suivis
+    static let plate = "fluent_plate"          // un repas (bandeau, fiche du déjeuner)
     static let loupe = "fluent_loupe"          // carrefour symptômes (questionnaire)
     static let pill = "fluent_pill"            // carrefour médical (questionnaire)
 
@@ -70,7 +74,7 @@ enum Fluent3D {
         switch nutrientId {
         case "vitD":      return sun
         case "vitB12":    return egg
-        case "iron":      return meat
+        case "iron":      return blood
         case "magnesium": return voltage
         case "omega3":    return fish
         case "vitC":      return tangerine
@@ -79,6 +83,18 @@ enum Fluent3D {
         case "iodine":    return fish
         case "fiber":     return leafyGreen
         default:          return sparkles
+        }
+    }
+
+    // MARK: - Illustration 3D par repas
+
+    /// Le soleil du matin, l'assiette du déjeuner, la lune du dîner, le fruit de l'encas.
+    static func asset(pour creneau: MealJournalService.MealSlot) -> String {
+        switch creneau {
+        case .breakfast: return sun
+        case .lunch: return plate
+        case .dinner: return moon
+        case .snack: return kiwi
         }
     }
 

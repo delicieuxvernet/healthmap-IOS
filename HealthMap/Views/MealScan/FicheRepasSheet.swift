@@ -125,9 +125,7 @@ struct FicheRepasSheet: View {
 
     private func entete(_ fiche: FicheRepas) -> some View {
         HStack(alignment: .center, spacing: 12) {
-            Text(slot.emoji)
-                .font(.system(size: 30))
-                .accessibilityHidden(true)
+            Fluent3DIcon(name: Fluent3D.asset(pour: slot), size: 38)
             VStack(alignment: .leading, spacing: 1) {
                 Text(slot.titreJournal)
                     .font(.system(.title2, design: .default).weight(.bold))

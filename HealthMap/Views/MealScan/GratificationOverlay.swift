@@ -65,9 +65,7 @@ struct GratificationOverlay: View {
 
     private var bandeau: some View {
         HStack(spacing: 10) {
-            Text(gratification.creneau.emoji)
-                .font(.system(size: 20))
-                .accessibilityHidden(true)
+            Fluent3DIcon(name: Fluent3D.plate, size: 24)
             Text(gratification.bandeau)
                 .font(.system(.subheadline, design: .default).weight(.semibold))
                 .tracking(-0.2)
@@ -129,10 +127,10 @@ struct GratificationOverlay: View {
 
             if let serie = gratification.libelleSerie {
                 HStack(spacing: 8) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Color.dsCalories)
-                        .accessibilityHidden(true)
+                    Fluent3DIcon(name: Fluent3D.fire, size: 22)
+                        .scaleEffect(etape >= 7 && !reduceMotion ? 1 : 0.8)
+                        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.45).delay(0.25),
+                                   value: etape >= 7)
                     Text(serie)
                         .font(.dsSousTitre.monospacedDigit())
                         .tracking(DSTracking.sousTitre)
