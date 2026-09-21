@@ -36,7 +36,8 @@ struct JournalView: View {
     @State private var showPaywall = false
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
-    @State private var showJournal = false
+    /// Repas ouvert depuis la mosaïque (« Midi » → la fiche du déjeuner).
+    @State private var repasOuvert: MealJournalService.MealSlot?
     /// Calendrier plein écran de la barre de jour (aucune date interdite).
     @State private var montreCalendrier = false
     /// Recherche d'aliment présentée en bottom-sheet.
@@ -110,7 +111,7 @@ struct JournalView: View {
     /// Une feuille de saisie est encore à l'écran : la gratification attend
     /// qu'elle soit redescendue, sinon elle jouerait cachée derrière.
     private var saisieOuverte: Bool {
-        showVoice || showTexte || showSearch || showBarcode || showJournal
+        showVoice || showTexte || showSearch || showBarcode || repasOuvert != nil
             || barcodeDetail != nil || selectedFood != nil || viewModel.analysisResult != nil
     }
 
@@ -246,15 +247,16 @@ struct JournalView: View {
                 .sheet(isPresented: $showPaywall) {
                     PaywallView().healthMapFullSheet()
                 }
-                .sheet(isPresented: $showJournal) {
-                    // Cibles réelles du profil — le journal ne doit JAMAIS
-                    // afficher d'objectif inventé (nil = dégradation honnête).
-                    DailyMealJournalView(
-                        kcalTarget: dashboardVM.physicalMetrics.macros?.calories,
-                        protTarget: dashboardVM.physicalMetrics.macros?.protein,
-                        carbTarget: dashboardVM.physicalMetrics.macros?.carbs,
-                        fatTarget: dashboardVM.physicalMetrics.macros?.fat,
-                        veutDuMuscle: veutDuMuscle
+                .sheet(item: $repasOuvert) { slot in
+                    // La fiche de CE repas. Cibles réelles du profil : jamais
+                    // d'objectif inventé (nil = les grammes seuls).
+                    FicheRepasSheet(
+                        slot: slot,
+                        journal: journal,
+                        cibleProteines: dashboardVM.physicalMetrics.macros?.protein,
+                        cibleGlucides: dashboardVM.physicalMetrics.macros?.carbs,
+                        cibleLipides: dashboardVM.physicalMetrics.macros?.fat,
+                        apportsARenforcer: dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id)
                     )
                 }
                 // Résultat du scan en bottom-sheet (contenu immersif inchangé).
@@ -742,7 +744,7 @@ struct JournalView: View {
                     vide: journal.dayRows(in: slot).isEmpty
                 )
             },
-            onOuvrir: { _ in showJournal = true }
+            onOuvrir: { slot in repasOuvert = slot }
         )
     }
 

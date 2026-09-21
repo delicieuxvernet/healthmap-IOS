@@ -41,7 +41,7 @@
 >   (seule surface verte) et « Photographier », puis « Autres façons d'ajouter » qui déplie Écrire ·
 >   Rechercher · Code-barres (« Écrire » = champ compact, même analyse et même quota que la dictée) ·
 >   « Apports à renforcer » (la phrase de l'interaction, **trois anneaux** à la couleur de l'apport,
->   une sortie verte) · le jour en **mosaïque** de quatre repas (le toucher ouvre le journal du jour).
+>   une sortie verte) · le jour en **mosaïque** de quatre repas (le toucher ouvre **la fiche de CE repas**, `FicheRepasSheet` : ce que tu as saisi, modifiable · « Ce qu'il t'a apporté », macro par macro avec sa part de la cible du jour · vitamines et minéraux · un constat, jamais un geste).
 >   **Le bouton `+` flottant et sa feuille d'ajout ont disparu.** **Avant le questionnaire** : la
 >   saisie d'abord, puis « On ne connaît pas encore tes besoins » (porte), « En attendant, en France »
 >   (`TeaserStatsCatalog`, jamais un chiffre inventé), « À la fin du questionnaire ».
@@ -342,6 +342,11 @@ en plus des relecteurs compilation et conformité :
 ---
 
 ## 7. JOURNAL DU JOUR (sheet de l'onglet Scan — refonte « façon Foodvisor », 10 juil. 2026)
+
+> **Retirée le 21 septembre 2026.** La feuille « Ma journée » (`DailyMealJournalView`) répétait
+> la page Journal ; elle est remplacée par la fiche d'un repas (`FicheRepasSheet`, moteur
+> `FicheRepas`). L'édition et la suppression par aliment, et l'ajout par la recherche, vivent
+> désormais dans cette fiche. Ce qui suit est conservé pour l'historique.
 
 Maquette validée par Arthur (session du 10 juil.). Livraison en 3 phases : P1
 lignes par aliment + suppression + total honnête · P2 quantité libre + ajout via
