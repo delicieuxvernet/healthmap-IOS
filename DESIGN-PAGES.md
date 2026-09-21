@@ -45,6 +45,13 @@
 >   **Le bouton `+` flottant et sa feuille d'ajout ont disparu.** **Avant le questionnaire** : la
 >   saisie d'abord, puis « On ne connaît pas encore tes besoins » (porte), « En attendant, en France »
 >   (`TeaserStatsCatalog`, jamais un chiffre inventé), « À la fin du questionnaire ».
+> - **Gratification après un ajout** (`GratificationOverlay.swift`, moteur `GratificationRepas`) : une
+>   carte de deux secondes qui montre **ce que le geste a changé** — coche dessinée + deux ondes,
+>   « Bien joué », jusqu'à deux apports en **avant → après du jour** (l'ancien barré, le nouveau en
+>   vert, jauge qui se remplit, « le poulet rôti, surtout » si un aliment porte le gain), série de
+>   jours suivis, « Continuer ». Une seule couleur héros : le vert du gain. **Jamais à vide** : rien
+>   n'a bougé d'au moins 5 points → pas de carte. Pas pendant le tutoriel, ni en mode Zen, ni sur un
+>   autre jour qu'aujourd'hui. Surcouche de la RACINE (le Journal porte déjà trop de feuilles).
 > - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) : titre 34 + rôle · carte état
 >   (« 42 % », « 5,9 sur 18 mg » dérivé de la référence canonique, jauge) · Pourquoi · Ce qui le remonte ·
 >   capsule vers le plan. **Gratuit** : la cause en clair, « Ce qui le remonte » floutée, porte

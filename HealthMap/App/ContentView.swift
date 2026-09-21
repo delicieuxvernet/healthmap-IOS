@@ -255,6 +255,7 @@ struct MainTabView: View {
     /// d'office (relançable depuis Réglages), et les captures d'écran le
     /// neutralisent par le même argument de lancement qu'avant.
     @ObservedObject private var tutoriel = TutorielService.partage
+    @ObservedObject private var gratifications = GratificationCentre.partage
 
     /// Récap animé : la séquence qui délivre le bilan juste après le
     /// questionnaire. Les slides sont construits UNE fois, au moment de
@@ -540,6 +541,18 @@ struct MainTabView: View {
             GeometryReader { proxy in
                 TutorielOverlayPrincipal(service: tutoriel, ancres: ancres, proxy: proxy,
                                          journalVisible: selectedTab == .journal)
+            }
+        }
+        // La gratification après un ajout : surcouche de la racine (le Journal
+        // porte déjà trop de feuilles pour en ouvrir une de plus), donc
+        // par-dessus la barre d'onglets. Jamais pendant les captures.
+        .overlay {
+            if let gratification = gratifications.courante, !estModeCaptures {
+                GratificationOverlay(gratification: gratification) {
+                    gratifications.courante = nil
+                }
+                .id(gratification.id)
+                .zIndex(70)
             }
         }
         // Fix: onAppear doesn't re-fire when the questionnaire is completed
