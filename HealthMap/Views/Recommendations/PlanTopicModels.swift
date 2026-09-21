@@ -143,7 +143,7 @@ struct PlanLevierLine {
 /// Invariant 3-6 tenu ICI : les apports sous 70 (le seuil « à renforcer » du
 /// Bilan, cf. DashboardViewModel.deficiencies) d'abord, plafonnés à 6 ; s'ils
 /// sont moins de 3, on complète avec les apports suivants par ordre de score
-/// croissant. `radialDisplayList` reste le garde-fou final en aval.
+/// croissant. Le graphe (`PlanGraph.construire`) borne ensuite ce qu'il affiche.
 func planTopicsFromApports(_ nutrients: [EnrichedNutrient]) -> [PlanTopic] {
     // Tri croissant : le plus faible d'abord. Ids canoniques uniquement — un id
     // inconnu ne peut pas produire de nœud (pas de libellé/emoji défendables).
@@ -238,22 +238,6 @@ private func planApportTopic(_ n: EnrichedNutrient) -> PlanTopic? {
     )
 }
 
-extension Array where Element == PlanTopic {
-    /// Ce que la couronne radiale accepte d'afficher : des ids uniques (un id
-    /// répété casserait le ForEach) et 6 nœuds au plus — au-delà, les bulles et
-    /// leurs libellés se chevauchent. Les builders sélectionnent déjà 3 symptômes
-    /// + 3 objectifs ; ce garde-fou tient l'invariant quelle que soit la source.
-    var radialDisplayList: [PlanTopic] {
-        var seen = Set<String>()
-        var out: [PlanTopic] = []
-        for topic in self where seen.insert(topic.id).inserted {
-            out.append(topic)
-            if out.count == 6 { break }
-        }
-        return out
-    }
-}
-
 // MARK: - Mode découverte (V12c) — la couronne d'exemple avant le bilan
 
 /// Les nœuds d'EXEMPLE de la couronne quand le bilan n'est pas fait : des cas
@@ -261,7 +245,7 @@ extension Array where Element == PlanTopic {
 /// (options du questionnaire pour symptôme/objectif, catalogue NutrientData
 /// pour les apports) — jamais inventés, jamais personnalisés. Les solutions
 /// restent vides : en découverte la pop-up ne s'ouvre pas, tout tap mène au
-/// bilan (cf. `PlanRadialScreen.decouverte`).
+/// bilan (cf. `PlanGraphScreen.decouverte`).
 func planTopicsDecouverte() -> [PlanTopic] {
     var topics: [PlanTopic] = []
 

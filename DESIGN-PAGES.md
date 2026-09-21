@@ -84,8 +84,18 @@
 >   symptôme par écran**, question dans le sens du mieux, toucher = choisir ET avancer (350 ms),
 >   proposé à l'arrivée sur l'onglet (jamais au lancement). Frontière Premium inchangée : tendance
 >   des symptômes et des apports derrière leurs portes ; en gratuit le verdict nomme le sujet seul.
-> - **Plan** (`PlanRadialComponents.swift`) : traits fins `#D1D1D6`, disques blancs sans ombre, symboles
->   noirs, carte de pied ; feuille de nœud (cause → 3 leviers → délai → capsule).
+> - **Plan en graphe** (`PlanGraphComponents.swift`, modèle `Core/PlanGraph.swift`, maquette du 20 sept.
+>   2026) : **trois anneaux, trois couleurs qui portent le sens** — vert = l'objectif (centre), bleu =
+>   les symptômes suivis (anneau 1, quatre au plus), gris = les leviers (anneau 2 : apports que le
+>   bilan rattache à ce qui est affiché, et **habitudes tirées du registre des apports**, mêmes
+>   libellés et mêmes points que la fiche de l'apport). Trait épais = lien fort. Positions
+>   **calculées, pas simulées** (leviers tirés vers ceux qu'ils touchent, puis écartés en une passe).
+>   Les nœuds dérivent de 2 à 3 pt, une pulsation parcourt les liens du nœud choisi ; le reste
+>   s'estompe à 35 %. **L'horloge est en pause hors de l'onglet** et sous Reduce Motion. Ni zoom ni
+>   déplacement. Bandeau du nœud choisi (état, jamais un geste) → feuille de solutions
+>   (`PlanSolutionsComponents.swift` : cause → 3 leviers → délai → capsule) ; une habitude ouvre sa
+>   feuille à elle (la cause et ce qu'elle freine). Le sélecteur « Objectifs et symptômes / Apports »
+>   et la ligne « focus de la semaine » ont disparu : le graphe montre les deux lectures à la fois.
 > - **Réglages v3** (`ReglagesView.swift` + `ReglagesSousPages.swift`, maquette du 20 sept. 2026) :
 >   bloc Premium (carte sobre sur voile, une promesse, 3 lignes en symboles gris, prix lus chez Apple
 >   avec trait gris tant qu'ils chargent ; abonné = « Premium actif » + « Gérer », aucun argumentaire)
