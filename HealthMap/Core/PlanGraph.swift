@@ -123,6 +123,17 @@ extension PlanGraph {
         let score: Int
     }
 
+    /// Une habitude déclarée et ce qu'elle retire, apport par apport.
+    private struct Habitude {
+        struct Effet {
+            let apport: String
+            let points: Int
+        }
+        let libelle: String
+        var effets: [Effet]
+        var total: Int { effets.reduce(0) { $0 + $1.points } }
+    }
+
     static let symptomesAffiches = 4
     static let apportsAffiches = 4
     static let habitudesAffichees = 2
@@ -169,10 +180,12 @@ extension PlanGraph {
         for id in candidats where parId[id] != nil && !cites.contains(id) {
             cites.append(id)
         }
-        let retenus = cites
-            .compactMap { parId[$0] }
-            .sorted { $0.score == $1.score ? $0.id < $1.id : $0.score < $1.score }
-            .prefix(apportsAffiches)
+        var classes: [Apport] = cites.compactMap { parId[$0] }
+        classes.sort { a, b in
+            if a.score != b.score { return a.score < b.score }
+            return a.id < b.id
+        }
+        let retenus: [Apport] = Array(classes.prefix(apportsAffiches))
 
         for apport in retenus {
             noeuds.append(Noeud(id: apport.id, genre: .apport, nom: apport.nom, anneau: 2, angle: 0, score: apport.score))
@@ -187,18 +200,24 @@ extension PlanGraph {
 
         // Les habitudes : ce que la personne a déclaré et qui pèse sur ces
         // apports-là. Même libellé, mêmes points que dans la fiche de l'apport.
-        var habitudes: [String: [(apport: String, points: Int)]] = [:]
+        var habitudes: [Habitude] = []
         for apport in retenus {
-            for frein in registre[apport.id]?.freins ?? []
-            where frein.section == .modeDeVie || frein.section == .nutrition {
-                habitudes[frein.libelle, default: []].append((apport.id, frein.delta))
+            let freins: [ContributionApport] = registre[apport.id]?.freins ?? []
+            for frein in freins where frein.section == .modeDeVie || frein.section == .nutrition {
+                let effet = Habitude.Effet(apport: apport.id, points: frein.delta)
+                if let rang = habitudes.firstIndex(where: { $0.libelle == frein.libelle }) {
+                    habitudes[rang].effets.append(effet)
+                } else {
+                    habitudes.append(Habitude(libelle: frein.libelle, effets: [effet]))
+                }
             }
         }
-        let classees = habitudes
-            .map { (libelle: $0.key, effets: $0.value, total: $0.value.reduce(0) { $0 + $1.points }) }
-            .sorted { $0.total == $1.total ? $0.libelle < $1.libelle : $0.total < $1.total }
-            .prefix(habitudesAffichees)
-        for habitude in classees {
+        // Les plus lourdes d'abord (le total est négatif).
+        habitudes.sort { a, b in
+            if a.total != b.total { return a.total < b.total }
+            return a.libelle < b.libelle
+        }
+        for habitude in habitudes.prefix(habitudesAffichees) {
             let id = "habitude.\(habitude.libelle)"
             noeuds.append(Noeud(id: id, genre: .habitude, nom: habitude.libelle, anneau: 2, angle: 0, points: habitude.total))
             for effet in habitude.effets {
@@ -291,11 +310,14 @@ extension PlanGraph {
     }
 
     func position(de noeud: Noeud, dans taille: CGSize) -> CGPoint {
-        let echelle = Self.echelle(pour: taille)
-        let rayon = Self.rayons[min(max(noeud.anneau, 0), 2)] * echelle
-        let angle = noeud.angle * .pi / 180
+        let echelle: CGFloat = Self.echelle(pour: taille)
+        let rayon: CGFloat = Self.rayons[min(max(noeud.anneau, 0), 2)] * echelle
+        let angle: Double = noeud.angle * Double.pi / 180
         // Le centre est remonté : les libellés vivent SOUS les nœuds.
-        return CGPoint(x: taille.width / 2 + CGFloat(cos(angle)) * rayon,
-                       y: taille.height / 2 - 8 * echelle + CGFloat(sin(angle)) * rayon)
+        let centreX: CGFloat = taille.width / 2
+        let centreY: CGFloat = taille.height / 2 - 8 * echelle
+        let dx: CGFloat = CGFloat(cos(angle)) * rayon
+        let dy: CGFloat = CGFloat(sin(angle)) * rayon
+        return CGPoint(x: centreX + dx, y: centreY + dy)
     }
 }

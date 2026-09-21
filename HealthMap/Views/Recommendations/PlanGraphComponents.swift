@@ -119,13 +119,16 @@ struct PlanGraphView: View {
             trait.move(to: depart)
             trait.addLine(to: arrivee)
             let force = CGFloat(lien.force)
-            dessin.stroke(trait, with: .color(couleur.opacity(chaud ? 0.95 : 0.55)),
-                          style: StrokeStyle(lineWidth: chaud ? 1.2 + force * 0.7 : 0.8 + force * 0.35, lineCap: .round))
+            let epaisseur: CGFloat = chaud ? 1.2 + force * 0.7 : 0.8 + force * 0.35
+            let opacite: Double = chaud ? 0.95 : 0.55
+            dessin.stroke(trait, with: .color(couleur.opacity(opacite)),
+                          style: StrokeStyle(lineWidth: epaisseur, lineCap: .round))
 
             // La pulsation part du nœud choisi vers ses voisins.
             guard chaud, t != 0 else { continue }
             let (de, vers) = lien.de == selection ? (depart, arrivee) : (arrivee, depart)
-            let avancee = CGFloat((t * 0.6 + Double(rang) * 0.17).truncatingRemainder(dividingBy: 1))
+            let phase: Double = t * 0.6 + Double(rang) * 0.17
+            let avancee = CGFloat(phase.truncatingRemainder(dividingBy: 1))
             let centre = CGPoint(x: de.x + (vers.x - de.x) * avancee, y: de.y + (vers.y - de.y) * avancee)
             dessin.fill(Path(ellipseIn: CGRect(x: centre.x - 3, y: centre.y - 3, width: 6, height: 6)),
                         with: .color(couleur.opacity(0.9)))
@@ -162,6 +165,12 @@ private struct PlanGraphNoeudView: View {
 
     /// Côté de la cible tactile (au moins 44 pt).
     private var cote: CGFloat { max(DS.cibleTactile, rayon * 2) }
+
+    /// Le nom se pose sous le disque, agrandi ou non.
+    private var decalageDuNom: CGFloat {
+        let agrandissement: CGFloat = choisi ? 1.18 : 1
+        return cote / 2 + rayon * agrandissement + 4
+    }
 
     private var remplissage: Color {
         switch noeud.genre {
@@ -206,7 +215,7 @@ private struct PlanGraphNoeudView: View {
                     .minimumScaleFactor(0.85)
                     .frame(width: 92)
                     .fixedSize()
-                    .offset(y: cote / 2 + rayon * (choisi ? 1.18 : 1) + 4)
+                    .offset(y: decalageDuNom)
             }
         }
         .buttonStyle(.plain)
