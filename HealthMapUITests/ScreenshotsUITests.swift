@@ -135,7 +135,11 @@ final class ScreenshotsUITests: XCTestCase {
             }
         }
 
-        // Fiche apport (première ligne de « Apports à renforcer »).
+        // Fiche apport (premier anneau de « Apports à renforcer »). La section
+        // est sous la ligne de saisie : on la fait monter à l'écran d'abord,
+        // sinon le tap par coordonnées tombe sur « Écrire » ou « Code-barres ».
+        app.swipeUp()
+        sleep(1)
         let apport = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "pour cent de tes besoins")).firstMatch
         if apport.waitForExistence(timeout: 5) {
             apport.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).tap()
