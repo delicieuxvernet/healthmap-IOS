@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Onboarding View (page de garde + 3 pages)
 /// Refonte premium : fond animé (blobs lents, miroir du hero du site web),
-/// page de garde avec la mascotte kiwi et le wordmark gradient, apparitions
+/// page de garde avec le signe Kiwio et son nom, apparitions
 /// douces étagées, CTA gradient avec ombre lumineuse.
 /// Reduce Motion → tout est statique (fond figé, apparitions instantanées).
 struct OnboardingView: View {
@@ -117,7 +117,7 @@ private struct OnboardingPage {
 }
 
 // MARK: - Cover Page (page de garde)
-/// Mascotte grande + wordmark gradient + promesse + marqueurs de confiance,
+/// Signe Kiwio grand + son nom + promesse + marqueurs de confiance,
 /// avec apparitions étagées douces.
 private struct OnboardingCoverPageView: View {
     @State private var appeared = false
@@ -138,17 +138,14 @@ private struct OnboardingCoverPageView: View {
             .offset(y: appeared ? 0 : 16)
             .animation(staged(0), value: appeared)
 
-            // Mascotte kiwi — grande, joyeuse
-            MascotView(mood: .happy, size: 160)
+            // Le signe Kiwio, en grand (maquette « un seul logo, partout »)
+            KiwiSigne(taille: 120)
                 .scaleEffect(appeared ? 1.0 : 0.7)
                 .opacity(appeared ? 1 : 0)
                 .animation(staged(0.08), value: appeared)
 
-            // Wordmark — "Map" en gradient brand, comme le logo du site
-            (Text("Kiwi").foregroundStyle(Color.dsTexte)
-             + Text("o").foregroundStyle(Color.dsAccent))
-                .font(.dsGrandTitre)
-                .tracking(DSTracking.grandTitre)
+            // Le nom, dessiné comme sous le signe de l'écran de chargement
+            KiwiWordmark(taille: 34)
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 16)
                 .animation(staged(0.16), value: appeared)

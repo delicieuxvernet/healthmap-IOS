@@ -185,7 +185,7 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(spacing: Theme.spacingSM) {
-            KiwiContourMark(size: 56, color: .dsAccent)
+            KiwiSigne(taille: 56)
 
             Text("Kiwio Premium")
                 .font(.dsGrandTitre)
@@ -821,17 +821,8 @@ private struct PremiumPurchaseSuccessView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.spacingMD) {
-                ZStack {
-                    Circle()
-                        .fill(Color.dsRemplissage)
-                        .frame(width: 80, height: 80)
-                    Circle()
-                        .stroke(Color.dsAccent.opacity(0.22), lineWidth: 8)
-                        .frame(width: 64, height: 64)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 28, weight: .bold, design: .default))
-                        .foregroundStyle(Color.dsAccent)
-                }
+                // La confirmation de la maquette : le signe 44 pt dans son rond.
+                KiwiConfirmation()
                 .scaleEffect(revealed ? 1 : 0.82)
                 .opacity(revealed ? 1 : 0)
                 .accessibilityHidden(true)

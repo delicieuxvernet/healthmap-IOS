@@ -808,7 +808,7 @@ struct JournalView: View {
     private var captureBlock: some View {
         if viewModel.isAnalyzing {
             VStack(spacing: Theme.spacingMD) {
-                KiwiWalkerView(size: 120)
+                KiwiLoader(size: 64)
                 Text("Analyse en cours…")
                     .font(.dsHeadline)
                     .foregroundStyle(Color.dsTexte)

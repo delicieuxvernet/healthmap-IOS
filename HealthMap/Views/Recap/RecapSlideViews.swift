@@ -50,7 +50,7 @@ struct RecapSlideView: View {
 
     private func intro(prenom: String?, réponses: Int) -> some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            KiwiContourMark(size: 52, color: .dsAccent)
+            KiwiSigne(taille: 52)
                 .recapApparition(0)
 
             Text(prenom.map { "\($0)," } ?? "C'est prêt.")
@@ -527,10 +527,7 @@ struct RecapCartePartage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacingMD) {
             HStack {
-                KiwiContourMark(size: 30, color: .dsAccent)
-                Text("Kiwio")
-                    .font(.system(size: 17, weight: .bold, design: .default))
-                    .foregroundStyle(Color.dsTexte)
+                KiwiLockupBarre()
                 Spacer()
             }
 

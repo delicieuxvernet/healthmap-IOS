@@ -133,15 +133,6 @@ extension Color {
     static let healthMapWarm = Color(uiColor: .systemGroupedBackground)
     static let healthMapWarmGlow = Color(hex: "E9F2E2")
 
-    // Mascotte kiwi (MascotView) — couleurs d'illustration, constantes entre modes
-    // (comme un asset : la mascotte garde son identité en light et dark).
-    static let mascotSkin = Color(hex: "9C7B52")          // peau brune du kiwi
-    static let mascotFlesh = Color(hex: "85C440")         // chair verte
-    static let mascotFleshLight = Color(hex: "C9E794")    // halo interne de la chair
-    static let mascotCore = Color(hex: "F7FBEA")          // cœur pâle (zone du visage)
-    static let mascotInk = Color(hex: "2F3B1D")           // pépins + traits du visage
-    static let mascotCheek = Color(hex: "FF9BB5")         // joues (à utiliser en faible opacité)
-
     // Hex initializer
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)

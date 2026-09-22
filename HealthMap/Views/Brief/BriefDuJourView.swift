@@ -178,7 +178,7 @@ struct BriefDuJourView: View {
             Spacer(minLength: Theme.spacingXL)
             HStack {
                 Spacer()
-                KiwiContourMark(size: 72, color: .dsAccent)
+                KiwiSigne(taille: 72)
                     .accessibilityHidden(true)
                 Spacer()
             }

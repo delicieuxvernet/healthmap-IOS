@@ -52,18 +52,18 @@ struct RecommendationsView: View {
                     RecommendationsV2ContentView(topics: v2Topics).kiwiEntrance()
                 } else if dashboardVM.isLoadingAnalysis || dashboardVM.isLoadingAnalysisV2 {
                     VStack(spacing: Theme.spacingMD) {
-                        // Loader signature : le kiwi qui marche remplace le
-                        // spinner nu — l'attente reste non bloquante.
-                        KiwiWalkerView(size: 140)
+                        // Loader signature : le signe Kiwio, ses pépins qui
+                        // chargent. L'attente reste non bloquante.
+                        KiwiLoader(size: 72)
                         Text("Chargement du plan…")
                             .font(Theme.bodyFont)
                             .foregroundStyle(Color.dsSecondaire)
                     }
                 } else {
                     VStack(spacing: Theme.spacingMD) {
-                        // Mascotte en réflexion plutôt qu'une icône système
-                        // froide — l'état vide reste accueillant.
-                        MascotView(mood: .thinking, size: 72)
+                        // Le signe Kiwio plutôt qu'une icône système froide :
+                        // l'état vide reste accueillant.
+                        KiwiSigne(taille: 72)
                         Text("Aucune analyse disponible")
                             .font(Theme.bodyFont)
                             .foregroundStyle(Color.dsSecondaire)

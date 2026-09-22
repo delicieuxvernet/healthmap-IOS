@@ -2,9 +2,10 @@ import SwiftUI
 
 // MARK: - Landing View (page de garde non connecté)
 /// Page de garde affichée à tout utilisateur NON connecté. Design « anneau
-/// nutritionnel » (validé par Arthur, 5 juillet) : fond crème, wordmark en
-/// haut, motif signature (anneau vert qui se remplit + leaf central + 4
-/// pastilles nutriments flottantes couleur = sens), puis le pitch et les CTA.
+/// nutritionnel » (validé par Arthur, 5 juillet) : la barre de l'app en haut
+/// (signe Kiwio + nom, maquette « Identité »), motif signature (anneau vert
+/// qui se remplit autour du signe + 4 pastilles nutriments flottantes couleur
+/// = sens), puis le pitch et les CTA.
 /// L'auth s'ouvre en sheet via « C'est parti » (inscription) ou « J'ai déjà un
 /// compte » (connexion).
 ///
@@ -29,10 +30,8 @@ struct LandingView: View {
             DSPageBackground()
 
             VStack(spacing: 0) {
-                // Wordmark en haut
-                (Text("kiwi").foregroundStyle(ink) + Text("o").foregroundStyle(kiwi))
-                    .font(.system(size: 24, weight: .bold))
-                    .brandTitleKerning()
+                // La barre de l'app : le signe 26 pt et le nom (maquette « Identité »).
+                KiwiLockupBarre()
                     .padding(.top, Theme.spacingSM)
                     .opacity(appeared ? 1 : 0)
                     .offset(y: appeared ? 0 : 16)
@@ -113,11 +112,8 @@ struct LandingView: View {
                     .trim(from: 0, to: reduceMotion ? 0.78 : ringProgress)
                     .stroke(kiwi, style: StrokeStyle(lineWidth: 9, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                Circle()
-                    .fill(.white)
-                    .frame(width: 56, height: 56)
-                    // (ombre retirée, refonte 23 août 2026)
-                    .overlay(Image(systemName: "leaf.fill").font(.system(size: 26)).foregroundStyle(kiwi))
+                // Au centre de l'anneau, le signe Kiwio (un seul logo, partout).
+                KiwiSigne(taille: 60)
                     .scaleEffect(floating && !reduceMotion ? 1.08 : 1.0)
                     .animation(reduceMotion ? nil : .easeInOut(duration: 3).repeatForever(autoreverses: true), value: floating)
             }
