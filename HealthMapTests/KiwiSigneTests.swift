@@ -1,5 +1,5 @@
 import XCTest
-import UIKit
+import ImageIO
 @testable import HealthMap
 
 // MARK: - Le signe Kiwio (maquette « Identité · un seul logo, partout »)
@@ -97,6 +97,13 @@ final class KiwiSigneTests: XCTestCase {
             .appendingPathComponent("HealthMap/Resources/Assets.xcassets")
     }
 
+    /// Lit le fichier tel quel. `UIImage(contentsOfFile:)` irait chercher la
+    /// variante @3x voisine sur un simulateur 3x : on passe par ImageIO.
+    private func image(_ url: URL) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
     /// Lit un pixel (RVB) d'une image.
     private func pixel(_ image: CGImage, x: Int, y: Int) -> (Int, Int, Int)? {
         var octets = [UInt8](repeating: 0, count: 4)
@@ -117,26 +124,24 @@ final class KiwiSigneTests: XCTestCase {
     /// L'icône Apple est le signe « sur-vert » : 1024 px, opaque, fond chair,
     /// cœur au centre, halo autour.
     func testLIconeEstLeSigneSurVert() throws {
-        let chemin = catalogue.appendingPathComponent("AppIcon.appiconset/AppIcon.png").path
-        let image = try XCTUnwrap(UIImage(contentsOfFile: chemin)?.cgImage)
-        XCTAssertEqual(image.width, 1024)
-        XCTAssertEqual(image.height, 1024)
-        XCTAssertTrue([.none, .noneSkipLast, .noneSkipFirst].contains(image.alphaInfo),
+        let icone = try XCTUnwrap(image(catalogue.appendingPathComponent("AppIcon.appiconset/AppIcon.png")))
+        XCTAssertEqual(icone.width, 1024)
+        XCTAssertEqual(icone.height, 1024)
+        XCTAssertTrue([.none, .noneSkipLast, .noneSkipFirst].contains(icone.alphaInfo),
                       "l'App Store refuse une icône avec transparence")
-        XCTAssertTrue(proche(pixel(image, x: 8, y: 8), KiwiMarque.hexChair), "fond")
-        XCTAssertTrue(proche(pixel(image, x: 512, y: 512), KiwiMarque.hexCoeur), "cœur")
+        XCTAssertTrue(proche(pixel(icone, x: 8, y: 8), KiwiMarque.hexChair), "fond")
+        XCTAssertTrue(proche(pixel(icone, x: 512, y: 512), KiwiMarque.hexCoeur), "cœur")
         // Entre le cœur (r 12,8 → 92 px) et le halo (r 22,5 → 162 px).
-        XCTAssertTrue(proche(pixel(image, x: 512 + 130, y: 512), KiwiMarque.hexHalo), "halo")
+        XCTAssertTrue(proche(pixel(icone, x: 512 + 130, y: 512), KiwiMarque.hexHalo), "halo")
     }
 
     /// L'écran de lancement statique affiche le signe, en trois résolutions.
     func testLImageDeLancementExiste() throws {
         let dossier = catalogue.appendingPathComponent("LaunchSigne.imageset")
         for (fichier, cote) in [("LaunchSigne.png", 72), ("LaunchSigne@2x.png", 144), ("LaunchSigne@3x.png", 216)] {
-            let image = try XCTUnwrap(UIImage(contentsOfFile: dossier.appendingPathComponent(fichier).path)?.cgImage,
-                                      fichier)
-            XCTAssertEqual(image.width, cote, fichier)
-            XCTAssertTrue(proche(pixel(image, x: cote / 2, y: cote / 2), KiwiMarque.hexCoeur), fichier)
+            let rendu = try XCTUnwrap(image(dossier.appendingPathComponent(fichier)), fichier)
+            XCTAssertEqual(rendu.width, cote, fichier)
+            XCTAssertTrue(proche(pixel(rendu, x: cote / 2, y: cote / 2), KiwiMarque.hexCoeur), fichier)
         }
     }
 }
