@@ -53,9 +53,11 @@ extension NutrientEngine {
         var c = Carnet()
 
         // ── 1. Les courses ──
+        // Le libellé suit ce que disent les courses (avant le poids de
+        // l'assiette) : sans poisson ni œufs, c'est « Aucune source » même si la
+        // vitamine D n'en perd que la moitié des points.
         for n in GroceryNutrient.allCases {
-            let delta = foodDelta(p, n)
-            c.note(n.rawValue, delta, libelleDesCourses(delta: delta), .nutrition)
+            c.note(n.rawValue, foodDelta(p, n), libelleDesCourses(delta: foodDeltaBrut(p, n)), .nutrition)
         }
 
         // ── 2. Les facteurs non alimentaires (miroir de `applyNonFoodModifiers`) ──
@@ -84,8 +86,8 @@ extension NutrientEngine {
         let peuDEau = "Moins d'un litre d'eau par jour"
         let nuitsCourtes = "Nuits de moins de 6 heures"
 
-        // Vitamine D
-        if p.indoorWork == "yes" { c.note("vitD", -25, "Travail en intérieur", .modeDeVie) }
+        // Vitamine D (le soleil ne se compte qu'une fois : `soleilRenseigne`)
+        if p.indoorWork == "yes" && !soleilRenseigne(p) { c.note("vitD", -25, "Travail en intérieur", .modeDeVie) }
         let soleil: [String: (Int, String)] = [
             "none": (-30, "Aucune exposition au soleil"), "very_little": (-20, "Très peu de soleil"),
             "some": (-5, "Un peu de soleil"), "moderate": (5, "Du soleil régulièrement"),

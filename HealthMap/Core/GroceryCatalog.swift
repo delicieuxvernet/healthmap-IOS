@@ -282,4 +282,166 @@ enum GroceryCatalog {
     static func items(providing nutrient: GroceryNutrient) -> [GroceryItem] {
         allItems.filter { $0.nutrients.contains(nutrient) }
     }
+
+    // MARK: Richesse (audit de personnalisation, 22 septembre 2026)
+    //
+    // Le moteur comptait toutes les portions « source » pareil : une escalope de
+    // poulet valait un steak pour la B12, un œuf valait une sardine pour la
+    // vitamine D, une pomme valait une assiette de lentilles pour les fibres.
+    //
+    // Ici, la richesse RELATIVE d'une portion courante face à une source
+    // ordinaire du même apport, d'après les teneurs Ciqual :
+    //   0,5 = source modeste · 1 = source ordinaire (défaut) · 2 = source riche.
+    // Relative et non absolue : la cible de chaque apport
+    // (`NutrientEngine.targets`) reste exprimée en portions de source ordinaire,
+    // donc l'étalonnage du moteur tient. Seuls les écarts à 1 sont écrits.
+    static let richesse: [String: [GroceryNutrient: Double]] = [
+        // Fruits
+        "bananes": [.magnesium: 0.5, .fiber: 0.5],
+        "pommes": [.fiber: 0.5],
+        "clementines": [.fiber: 0.5],
+        "oranges": [.vitC: 2],
+        "fraises": [.vitC: 2],
+        "kiwis": [.vitC: 2],
+        "raisin": [.fiber: 0.5],
+        "peches": [.vitC: 0.5, .fiber: 0.5],
+        "ananas": [.fiber: 0.5],
+        "melon": [.fiber: 0.5],
+        "citrons": [.vitC: 0.5],
+        "jus_orange": [.vitC: 2],
+        "cerises": [.vitC: 0.5],
+        "mangue": [.fiber: 0.5],
+        "pasteque": [.vitC: 0.5],
+        "framboises": [.fiber: 2],
+        "myrtilles": [.vitC: 0.5],
+        "abricots": [.fiber: 0.5],
+        "prunes": [.fiber: 0.5],
+        "nectarines": [.vitC: 0.5, .fiber: 0.5],
+        "grenade": [.vitC: 0.5],
+        "noix_coco": [.fiber: 0.5],
+        // Légumes frais
+        "tomates": [.vitC: 0.5],
+        "pommes_de_terre": [.vitC: 0.5],
+        "poivrons": [.vitC: 2],
+        "brocoli": [.vitC: 2],
+        "epinards": [.iron: 0.5, .calcium: 0.5],
+        "petits_pois": [.fiber: 2],
+        "radis": [.vitC: 0.5],
+        "courge_butternut": [.vitC: 0.5],
+        "choux_bruxelles": [.vitC: 2],
+        "artichaut": [.fiber: 2],
+        "endives": [.fiber: 0.5],
+        "blettes": [.iron: 0.5],
+        // Viandes & charcuterie
+        "escalopes_poulet": [.vitB12: 0.5, .zinc: 0.5],
+        "cotes_porc": [.vitB12: 0.5],
+        "escalopes_dinde": [.vitB12: 0.5, .zinc: 0.5],
+        "jambon_blanc": [.vitB12: 0.5, .zinc: 0.5],
+        "lardons": [.vitB12: 0.5, .zinc: 0.5],
+        "saucisses": [.vitB12: 0.5, .zinc: 0.5],
+        "cuisses_poulet": [.vitB12: 0.5, .zinc: 0.5],
+        "foie_volaille": [.iron: 2, .vitB12: 2],
+        "saucisson_sec": [.iron: 0.5, .zinc: 0.5, .vitB12: 0.5],
+        "pate_campagne": [.zinc: 0.5],
+        "cordons_bleus": [.vitB12: 0.5, .zinc: 0.5],
+        "lapin": [.vitB12: 2, .zinc: 0.5],
+        "canard": [.vitB12: 0.5],
+        "boudin_noir": [.iron: 2, .vitB12: 0.5],
+        "chorizo": [.vitB12: 0.5, .zinc: 0.5],
+        "nuggets_poulet": [.vitB12: 0.5],
+        // Poissons & fruits de mer
+        "saumon": [.omega3: 2, .vitD: 2],
+        "thon_boite": [.iodine: 0.5],
+        "cabillaud": [.vitB12: 0.5, .iodine: 2],
+        "sardines": [.omega3: 2, .vitD: 2, .vitB12: 2, .calcium: 2],
+        "maquereau": [.omega3: 2, .vitD: 2, .vitB12: 2],
+        "crevettes": [.vitB12: 0.5, .zinc: 0.5],
+        "moules": [.vitB12: 2, .iodine: 2],
+        "surimi": [.vitB12: 0.5, .iodine: 0.5],
+        "poisson_pane": [.vitB12: 0.5],
+        "truite": [.vitD: 2],
+        "huitres": [.zinc: 2, .vitB12: 2, .magnesium: 0.5],
+        "thon_frais": [.vitB12: 2, .iodine: 0.5],
+        "lieu_colin": [.iodine: 2],
+        "anchois": [.omega3: 0.5, .calcium: 0.5],
+        "hareng": [.omega3: 2, .vitD: 2, .vitB12: 2],
+        "calamars": [.vitB12: 0.5, .zinc: 0.5, .iodine: 0.5],
+        "saint_jacques": [.zinc: 0.5],
+        // Œufs & produits laitiers
+        "oeufs": [.vitD: 0.5, .iodine: 0.5],
+        "yaourt_nature": [.vitB12: 0.5, .iodine: 0.5],
+        "yaourt_grec": [.vitB12: 0.5],
+        "fromage_blanc": [.calcium: 0.5, .vitB12: 0.5],
+        "petits_suisses": [.calcium: 0.5, .vitB12: 0.5],
+        "emmental": [.zinc: 0.5],
+        "camembert": [.calcium: 0.5, .vitB12: 0.5],
+        "comte": [.vitB12: 0.5, .zinc: 0.5],
+        "mozzarella": [.vitB12: 0.5],
+        "buche_chevre": [.calcium: 0.5, .vitB12: 0.5],
+        "feta": [.calcium: 0.5, .vitB12: 0.5],
+        "yaourt_aux_fruits": [.vitB12: 0.5],
+        "skyr": [.vitB12: 0.5],
+        "kefir": [.vitB12: 0.5],
+        "fromage_rape": [.vitB12: 0.5],
+        "cheddar": [.vitB12: 0.5],
+        "raclette": [.calcium: 2],
+        "chevre_frais": [.calcium: 0.5, .vitB12: 0.5],
+        "roquefort": [.vitB12: 0.5],
+        "ricotta": [.calcium: 0.5],
+        // Féculents & légumes secs
+        "pain_complet": [.magnesium: 0.5],
+        "lentilles": [.fiber: 2],
+        "pois_chiches": [.fiber: 2],
+        "haricots_rouges": [.fiber: 2],
+        "haricots_blancs": [.fiber: 2, .calcium: 0.5],
+        "flocons_avoine": [.iron: 0.5, .zinc: 0.5],
+        "quinoa": [.iron: 0.5, .zinc: 0.5],
+        "patate_douce": [.vitC: 0.5],
+        "cereales_petit_dej": [.fiber: 0.5],
+        "pain_seigle": [.magnesium: 0.5],
+        "boulgour": [.fiber: 2],
+        "pois_casses": [.fiber: 2],
+        "feves": [.fiber: 2],
+        "muesli": [.iron: 0.5],
+        // Fruits secs, graines & grignotage
+        "cacahuetes": [.fiber: 0.5, .zinc: 0.5],
+        "beurre_cacahuete": [.magnesium: 0.5, .fiber: 0.5],
+        "amandes": [.calcium: 0.5],
+        "noix": [.omega3: 0.5, .fiber: 0.5],
+        "noix_cajou": [.iron: 0.5, .zinc: 0.5],
+        "pistaches": [.iron: 0.5, .magnesium: 0.5],
+        "graines_courge": [.magnesium: 2],
+        "graines_tournesol": [.iron: 0.5, .fiber: 0.5],
+        "chocolat_noir": [.iron: 0.5, .fiber: 0.5],
+        "raisins_secs": [.fiber: 0.5, .iron: 0.5],
+        "abricots_secs": [.iron: 0.5, .fiber: 0.5],
+        "figues_sechees": [.calcium: 0.5, .magnesium: 0.5, .iron: 0.5],
+        "dattes": [.fiber: 0.5, .magnesium: 0.5],
+        "graines_chia": [.omega3: 0.5],
+        "graines_lin": [.omega3: 0.5, .fiber: 0.5],
+        "graines_sesame": [.calcium: 0.5, .magnesium: 0.5, .iron: 0.5],
+        "noix_bresil": [.magnesium: 2, .zinc: 0.5],
+        "pignons": [.magnesium: 0.5, .zinc: 0.5],
+        "noix_pecan": [.magnesium: 0.5, .fiber: 0.5],
+        "cranberries": [.fiber: 0.5],
+        "banane_sechee": [.fiber: 0.5, .magnesium: 0.5],
+        "pop_corn": [.fiber: 0.5],
+        "barre_cereales": [.fiber: 0.5],
+        "graines_pavot": [.calcium: 0.5],
+        // Matières grasses & placard
+        "huile_colza": [.omega3: 0.5],
+        "avocat": [.fiber: 2],
+        "olives": [.fiber: 0.5],
+        "puree_amandes": [.calcium: 0.5, .magnesium: 0.5, .iron: 0.5, .fiber: 0.5],
+        "huile_noix": [.omega3: 0.5],
+        "tahini": [.calcium: 0.5, .iron: 0.5],
+        "houmous": [.iron: 0.5],
+    ]
+
+    /// Poids d'une portion de cet aliment pour cet apport : 0 s'il n'en est pas
+    /// une source notable, sa richesse sinon (1 par défaut).
+    static func poids(_ id: String, _ nutrient: GroceryNutrient) -> Double {
+        guard let item = itemsById[id], item.nutrients.contains(nutrient) else { return 0 }
+        return richesse[id]?[nutrient] ?? 1
+    }
 }
