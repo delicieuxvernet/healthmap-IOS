@@ -537,4 +537,39 @@ final class SupplementEngineTests: XCTestCase {
         XCTAssertTrue(result.warnings.contains { $0.nutrients.contains("thyroid_condition") })
     }
 
+    // MARK: - Les réponses du questionnaire sont reconnues (audit du 22 sept. 2026)
+
+    /// « Stressé » et « Au max » : les valeurs que le questionnaire enregistre
+    /// vraiment. Avant, le moteur attendait « high » et ne les voyait jamais.
+    func testLeStressDuQuestionnaireEstReconnu() {
+        let valeurs = QuestionnaireSection.optionPairs(id: "stressLevel").map { $0.0 }
+        XCTAssertTrue(valeurs.contains("very"))
+        XCTAssertTrue(valeurs.contains("explode"))
+        for valeur in ["very", "explode"] {
+            var profil = makeProfile()
+            profil.stressLevel = valeur
+            let recs = SupplementEngine.selectProducts(scores: scoresWithDeficiency(.magnesium), profile: profil)
+            let magnesium = recs.first { $0.nutrientID == .magnesium }
+            XCTAssertTrue(magnesium?.whyText.contains("stress") == true, valeur)
+        }
+        var serein = makeProfile()
+        serein.stressLevel = "zen"
+        let recs = SupplementEngine.selectProducts(scores: scoresWithDeficiency(.magnesium), profile: serein)
+        XCTAssertFalse(recs.first { $0.nutrientID == .magnesium }?.whyText.contains("stress") == true)
+    }
+
+    /// « Très abondantes » compte autant qu'« Abondantes ».
+    func testLesReglesTresAbondantesSontReconnues() {
+        let valeurs = QuestionnaireSection.optionPairs(id: "periodFlow").map { $0.0 }
+        XCTAssertTrue(valeurs.contains("very_heavy"))
+        for valeur in ["heavy", "very_heavy"] {
+            var profil = makeProfile()
+            profil.gender = .femme
+            profil.periodFlow = valeur
+            let recs = SupplementEngine.selectProducts(scores: scoresWithDeficiency(.iron), profile: profil)
+            let fer = recs.first { $0.nutrientID == .iron }
+            XCTAssertTrue(fer?.whyText.contains("règles abondantes") == true, valeur)
+        }
+    }
+
 }
