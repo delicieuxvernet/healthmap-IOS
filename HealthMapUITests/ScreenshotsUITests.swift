@@ -105,7 +105,7 @@ final class ScreenshotsUITests: XCTestCase {
                 if champ.waitForExistence(timeout: 8) {
                     champ.tap()
                     fermerTutorielClavier()
-                    champ.typeText("oeuf")
+                    champ.clearAndType("oeuf")
                     sleep(4)
                     snap("15-recherche")
                     // Seconde requête, riche en produits de marque (photos,
@@ -119,8 +119,8 @@ final class ScreenshotsUITests: XCTestCase {
                     champ.clearAndType("oeuf")
                     sleep(4)
                     let resultat = app.buttons.matching(NSPredicate(
-                        format: "(label CONTAINS[c] %@ OR label CONTAINS[c] %@) AND NOT (label BEGINSWITH %@)",
-                        "oeuf", "œuf", "Ajouter")).firstMatch
+                        format: "(label CONTAINS[c] %@ OR label CONTAINS[c] %@) AND label CONTAINS %@ AND NOT (label BEGINSWITH %@)",
+                        "oeuf", "œuf", "kcal", "Ajouter")).firstMatch
                     if resultat.waitForExistence(timeout: 5) {
                         resultat.tap()
                         sleep(3)
@@ -343,11 +343,11 @@ final class ScreenshotsUITests: XCTestCase {
         guard champ.waitForExistence(timeout: 8) else { fermerFeuille(); return }
         champ.tap()
         fermerTutorielClavier()
-        champ.typeText(aliment)
+        champ.clearAndType(aliment)
         sleep(4)
         // Première ligne de résultats → fiche portion → « Ajouter au … ».
         let premier = app.buttons.matching(NSPredicate(
-            format: "label CONTAINS[c] %@ AND NOT (label BEGINSWITH %@)", aliment, "Ajouter")).firstMatch
+            format: "label CONTAINS[c] %@ AND label CONTAINS %@ AND NOT (label BEGINSWITH %@)", aliment, "kcal", "Ajouter")).firstMatch
         if premier.waitForExistence(timeout: 5) {
             premier.tap()
             // CTA de la fiche portion (« Ajouter le midi »…) par identifiant :
