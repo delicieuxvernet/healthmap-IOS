@@ -517,6 +517,14 @@ if MODE == "app-audit"
       vid = ver["id"]
       code, rd = req(:get, "/v1/appStoreVersions/#{vid}/appStoreReviewDetail")
       ver["reviewDetail"] = code == 200 && rd["data"] ? rd["data"]["attributes"] : "absent (HTTP #{code})"
+      # Pièces jointes App Review (la vidéo sandbox) : les notes en parlent, on
+      # vérifie donc qu'elle est bien là avant d'envoyer.
+      if code == 200 && rd["data"]
+        acode, att = req(:get, "/v1/appStoreReviewDetails/#{rd["data"]["id"]}/appStoreReviewAttachments?limit=20")
+        ver["reviewAttachments"] = acode == 200 ? att["data"].map { |a|
+          "#{a.dig("attributes", "fileName")} (#{a.dig("attributes", "fileSize")} o, #{a.dig("attributes", "assetDeliveryState", "state")})"
+        } : "HTTP #{acode}"
+      end
 
       code, bld = req(:get, "/v1/appStoreVersions/#{vid}/build?fields[builds]=version,processingState")
       ver["buildAttached"] = code == 200 && bld["data"] ? bld["data"]["attributes"] : "aucun (HTTP #{code})"
@@ -623,22 +631,23 @@ if MODE == "apply-app"
       1. Reglages tab (last tab) > "Kiwio Premium" card at the top > tap its
          button ("Essayer 7 jours gratuits" / "Decouvrir Kiwio Premium") >
          the paywall opens.
-      2. Reglages tab > "Mon abonnement" > "Decouvrir Kiwio Premium".
+      2. Reglages tab > "Abonnement" row (section "Compte") > "Decouvrir
+         Kiwio Premium".
       The paywall displays the auto-renewable subscriptions of group Kiwio
       Premium with their names, durations and prices: Annual (30 EUR) and
       Weekly (0.99 EUR). Both subscriptions are already approved and on sale;
       this submission contains the app version only. The Monthly subscription
       is not displayed in the app.
 
-      HEALTHKIT (2.5.1): Apple Health is read-only. Path: Reglages tab > "Mon
-      profil et mes objectifs" > "Apple Sante" card (imports weight, steps and
-      sleep). The Journal tab also reads active energy (kcal), shown as
-      "depensees" in the calories card.
+      HEALTHKIT (2.5.1): Apple Health is read-only. Path: Reglages tab >
+      "Apple Sante" row (section "Compte") > "Apple Sante" card (imports
+      weight, steps and sleep). The Journal tab also reads active energy
+      (kcal), shown as "kcal depensees" in the calories card.
 
-      A screen recording captured on a physical iPhone (previous design, same
-      flows) is attached to this section: it begins on the Home Screen,
-      launches the app, signs in with the demo account, walks through the core
-      features, opens the paywall and completes a successful sandbox purchase.
+      A screen recording captured on a physical iPhone was provided with
+      version 1.0 (approved): Home Screen, sign-in with the demo account, core
+      features, paywall and a successful sandbox purchase. The purchase flow
+      is unchanged in this update, and both subscriptions are already approved.
 
       Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
       Privacy Policy: https://healthmap.fr/privacy
@@ -1012,15 +1021,25 @@ if MODE == "new-version"
   end
 
   notes = ENV["WHATS_NEW"].to_s.empty? ? <<~NOTES.strip : ENV["WHATS_NEW"]
-    Ton journal voyage dans le temps : deux flèches en haut du Journal pour revenir sur les jours passés ou préparer les suivants, et un calendrier pour aller où tu veux. Ce que tu ajoutes est daté du jour affiché, pratique pour noter ton dîner après minuit.
+    Kiwio fait peau neuve, et t'explique enfin le pourquoi.
 
-    Ton brief du jour : à ta première ouverture, Kiwio te montre ce qui t'a manqué hier, l'effort qui paie, et sur quoi miser aujourd'hui, avec des idées de repas.
+    Une nouvelle identité : la tranche de kiwi, de face, partout, jusqu'à l'icône. Pendant un chargement, ses pépins s'allument un à un.
 
-    Des rappels qui te ressemblent : à midi et le soir, Kiwio te fait signe pour l'apport à renforcer, avec des idées concrètes. Tu choisis de les activer, et le mode Zen les coupe.
+    L'anneau de cause : pour chaque apport, tu vois ce qui pèse sur ton score, de combien, et ce que tu regagnerais en changeant une habitude. Touche une cause pour comprendre.
 
-    Premium plus fiable : ton accès reste ouvert tant que ton abonnement est actif.
+    Un plan qui se lit d'un coup d'œil : tes objectifs, tes symptômes et tes apports reliés entre eux. Touche un point pour voir à quoi il est lié et par où commencer.
 
-    Et des corrections un peu partout.
+    Un journal plus rapide : dicte, photographie ou écris ton repas depuis la page. Maintiens le bouton Dicter pour parler, relâche pour envoyer. Après chaque ajout, Kiwio te montre ce que ton repas a fait bouger.
+
+    Une recherche où l'on s'y retrouve : la photo du produit, son Nutri-Score, et une illustration par famille d'aliments.
+
+    Tes progrès en trois lignes : ce qui va mieux, ce qui ne bouge pas encore, et la courbe qui le montre.
+
+    Ton journal voyage dans le temps : reviens sur les jours passés ou prépare les suivants, un calendrier t'emmène où tu veux.
+
+    Ton brief du jour et des rappels qui te ressemblent : ce qui t'a manqué hier, sur quoi miser aujourd'hui, avec des idées de repas. Tu choisis de les activer.
+
+    Premium plus fiable, réglages repensés, et des corrections un peu partout.
   NOTES
 
   get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20").each do |l|
@@ -1777,22 +1796,23 @@ if MODE == "fix-meta"
     1. Reglages tab (last tab) > "Kiwio Premium" card at the top > tap its
        button ("Essayer 7 jours gratuits" / "Decouvrir Kiwio Premium") >
        the paywall opens.
-    2. Reglages tab > "Mon abonnement" > "Decouvrir Kiwio Premium".
+    2. Reglages tab > "Abonnement" row (section "Compte") > "Decouvrir
+       Kiwio Premium".
     The paywall displays the auto-renewable subscriptions of group Kiwio
     Premium with their names, durations and prices: Annual (30 EUR) and
     Weekly (0.99 EUR). Both subscriptions are already approved and on sale;
     this submission contains the app version only. The Monthly subscription
     is not displayed in the app.
 
-    HEALTHKIT (2.5.1): Apple Health is read-only. Path: Reglages tab > "Mon
-    profil et mes objectifs" > "Apple Sante" card (imports weight, steps and
-    sleep). The Journal tab also reads active energy (kcal), shown as
-    "depensees" in the calories card.
+    HEALTHKIT (2.5.1): Apple Health is read-only. Path: Reglages tab >
+    "Apple Sante" row (section "Compte") > "Apple Sante" card (imports
+    weight, steps and sleep). The Journal tab also reads active energy
+    (kcal), shown as "kcal depensees" in the calories card.
 
-    A screen recording captured on a physical iPhone (previous design, same
-    flows) is attached to this section: it begins on the Home Screen,
-    launches the app, signs in with the demo account, walks through the core
-    features, opens the paywall and completes a successful sandbox purchase.
+    A screen recording captured on a physical iPhone was provided with
+    version 1.0 (approved): Home Screen, sign-in with the demo account, core
+    features, paywall and a successful sandbox purchase. The purchase flow
+    is unchanged in this update, and both subscriptions are already approved.
 
     Terms of Use (EULA): #{terms_url}
     Privacy Policy: #{privacy_url}
