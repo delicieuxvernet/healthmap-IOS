@@ -82,7 +82,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Dose élevée (1000 µg) : au-delà de quelques microgrammes, la B12 passe surtout par diffusion passive, ce qui compte quand l'absorption est réduite — âge, metformine, IPP."
+            whyBrand: "Forme concentrée : au-delà des petites quantités, la B12 passe surtout par diffusion passive, ce qui compte quand l'absorption est réduite (âge, metformine, IPP)."
         ),
         SupplementProduct(
             id: "b12-3-formes-dynveo",
@@ -241,7 +241,7 @@ extension SupplementEngine {
             contraindications: [.hemochromatose],
             antiInteractions: [],
             tier: .value,
-            whyBrand: "Vitamine C Quali-C (qualité pharmaceutique européenne), sans excipient. 1 gélule/jour."
+            whyBrand: "Vitamine C Quali-C (qualité pharmaceutique européenne), sans excipient."
         ),
 
         // --- CALCIUM ---
@@ -303,7 +303,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: ["iron", "calcium"],
             tier: .premium,
-            whyBrand: "Deux formes brevetées (bisglycinate TRAACS + Zinc Nova liposomal) + sélénium. 100% des apports de référence."
+            whyBrand: "Deux formes brevetées (bisglycinate TRAACS + Zinc Nova liposomal) + sélénium."
         ),
         // --- IODE ---
         SupplementProduct(
