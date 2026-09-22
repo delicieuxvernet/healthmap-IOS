@@ -80,6 +80,8 @@ final class ScreenshotsUITests: XCTestCase {
         // et macros de la capture ne sont pas à zéro.
         for aliment in ["Yaourt nature", "Banane"] { ajouterRapide(aliment) }
         sleep(2)
+        app.swipeDown()
+        sleep(1)
         snap("10-journal")
         app.swipeUp()
         sleep(1)
@@ -88,7 +90,7 @@ final class ScreenshotsUITests: XCTestCase {
 
         // Saisie dépliée : Écrire · Rechercher · Code-barres.
         if app.buttons["journal.autres"].waitForExistence(timeout: 5) {
-            app.buttons["journal.autres"].tap()
+            if !app.buttons["Rechercher"].exists { taper(app.buttons["journal.autres"]) }
             sleep(1)
             snap("12-ajout")
         }
@@ -106,6 +108,16 @@ final class ScreenshotsUITests: XCTestCase {
                     champ.typeText("oeuf")
                     sleep(4)
                     snap("15-recherche")
+                    // Seconde requête, riche en produits de marque (photos,
+                    // Nutri-Score), photographiée clavier rentré.
+                    champ.clearAndType("pates")
+                    sleep(5)
+                    champ.typeText(XCUIKeyboardKey.return.rawValue)
+                    sleep(2)
+                    snap("17-recherche-photos")
+                    champ.tap()
+                    champ.clearAndType("oeuf")
+                    sleep(4)
                     let resultat = app.buttons.matching(NSPredicate(
                         format: "(label CONTAINS[c] %@ OR label CONTAINS[c] %@) AND NOT (label BEGINSWITH %@)",
                         "oeuf", "œuf", "Ajouter")).firstMatch
@@ -143,10 +155,11 @@ final class ScreenshotsUITests: XCTestCase {
         // Progrès (le check-in du jour s'ouvre à la première visite : plus tard).
         app.buttons["tab.progres"].tap()
         sleep(2)
-        if app.buttons["Plus tard"].waitForExistence(timeout: 3) {
+        let passer = app.buttons["Passer pour aujourd'hui"]
+        if passer.waitForExistence(timeout: 4) {
             snap("19-checkin-popup")
-            taper(app.buttons["Plus tard"])
-            sleep(1)
+            taper(passer)
+            sleep(2)
         }
         snap("20-progres")
         app.swipeUp()
@@ -158,7 +171,7 @@ final class ScreenshotsUITests: XCTestCase {
         app.buttons["tab.plan"].tap()
         sleep(3)
         snap("30-plan")
-        let noeud = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@", "symptôme", "objectif", "apport")).firstMatch
+        let noeud = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@ OR label BEGINSWITH[c] %@", "Symptôme", "Apport à renforcer")).firstMatch
         if noeud.waitForExistence(timeout: 5) {
             noeud.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             sleep(2)
@@ -170,6 +183,13 @@ final class ScreenshotsUITests: XCTestCase {
         app.buttons["tab.complements"].tap()
         sleep(3)
         snap("40-complements")
+        let tuile = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "sur 100")).firstMatch
+        if tuile.waitForExistence(timeout: 4) {
+            taper(tuile)
+            sleep(2)
+            snap("42-complements-fiche")
+            fermerFeuille()
+        }
         app.swipeUp()
         sleep(1)
         snap("41-complements-bas")
@@ -315,9 +335,9 @@ final class ScreenshotsUITests: XCTestCase {
     /// la première ligne de résultats (1 unité pour un aliment qui se compte,
     /// 100 g sinon). Sans effet si la recherche ne répond pas.
     private func ajouterRapide(_ aliment: String) {
-        guard app.buttons["journal.plus"].waitForExistence(timeout: 5) else { return }
-        app.buttons["journal.plus"].tap()
-        guard app.buttons["Rechercher"].waitForExistence(timeout: 5) else { fermerFeuille(); return }
+        guard app.buttons["journal.autres"].waitForExistence(timeout: 5) else { return }
+        if !app.buttons["Rechercher"].exists { taper(app.buttons["journal.autres"]) }
+        guard app.buttons["Rechercher"].waitForExistence(timeout: 5) else { return }
         app.buttons["Rechercher"].tap()
         let champ = app.textFields["recherche.champ"]
         guard champ.waitForExistence(timeout: 8) else { fermerFeuille(); return }
@@ -347,7 +367,20 @@ final class ScreenshotsUITests: XCTestCase {
         }
         fermerFeuille()
         sleep(1)
+        // La carte « Bien joué » monte une fois la recherche refermée : on la
+        // photographie (une fois), puis « Continuer ».
+        let continuer = app.buttons["Continuer"]
+        if continuer.waitForExistence(timeout: 8) {
+            if !gratificationPhotographiee {
+                snap("18-gratification")
+                gratificationPhotographiee = true
+            }
+            taper(continuer)
+            sleep(1)
+        }
     }
+
+    private var gratificationPhotographiee = false
 
     /// Laisse le temps au Journal de charger ses données (journal, bilan).
     private func attendreChargement() {
@@ -434,10 +467,22 @@ final class ScreenshotsUITests: XCTestCase {
     }
 
     private func snap(_ name: String) {
+        NSLog("captures: %@", name)
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+}
+
+private extension XCUIElement {
+    /// Efface le texte du champ puis tape `texte`.
+    func clearAndType(_ texte: String) {
+        let actuel = (value as? String) ?? ""
+        if !actuel.isEmpty, actuel != (placeholderValue ?? "") {
+            typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: actuel.count))
+        }
+        typeText(texte)
     }
 }
