@@ -87,9 +87,13 @@ enum SupplementEngine {
         return p == "pregnant" || p == "enceinte"
     }
 
+    /// Valeurs du questionnaire : « heavy » (Abondantes) et « very_heavy »
+    /// (Très abondantes). « Très abondantes » était ignorée jusqu'au 22 sept.
+    /// 2026 : la cause la plus forte ne comptait pas. Les libellés français
+    /// restent acceptés pour les anciens profils.
     private static func hasHeavyPeriods(_ profile: UserProfile) -> Bool {
         let p = profile.periodFlow.lowercased()
-        return p == "heavy" || p == "abondant" || p == "abondantes"
+        return ["heavy", "very_heavy", "abondant", "abondantes", "tres_abondantes"].contains(p)
     }
 
     private static func isIndoorWorker(_ profile: UserProfile) -> Bool {
@@ -97,9 +101,13 @@ enum SupplementEngine {
         return v == "true" || v == "yes" || v == "oui"
     }
 
+    /// Valeurs du questionnaire : « very » (Stressé) et « explode » (Au max).
+    /// Jusqu'au 22 sept. 2026 la fonction attendait « high » / « eleve », que
+    /// le questionnaire n'enregistre pas : elle n'était JAMAIS vraie. Les
+    /// anciennes valeurs restent acceptées.
     private static func hasHighStress(_ profile: UserProfile) -> Bool {
         let s = profile.stressLevel.lowercased()
-        return s == "high" || s == "eleve" || s == "tres_eleve"
+        return ["very", "explode", "high", "eleve", "tres_eleve"].contains(s)
     }
 
     private static func isSenior(_ profile: UserProfile) -> Bool {
