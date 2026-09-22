@@ -153,8 +153,8 @@ struct ScoreHistoryView: View {
     // MARK: - Empty State
     private var emptyState: some View {
         VStack(spacing: Theme.spacingMD) {
-            // Mascotte kiwi en mode "réflexion" — humanise l'état vide
-            MascotView(mood: .thinking, size: 72)
+            // Le signe Kiwio : l'état vide garde la marque
+            KiwiSigne(taille: 72)
 
             Text("Pas encore assez de données")
                 .font(Theme.headlineFont)

@@ -504,8 +504,8 @@ struct QuestionnaireContainerView: View {
     // MARK: - Submitting View
     private var submittingView: some View {
         VStack(spacing: Theme.spacingLG) {
-            // Loader signature : le kiwi qui marche (remplace le spinner nu).
-            KiwiWalkerView(size: 140)
+            // Loader signature : le signe Kiwio, ses pépins qui chargent.
+            KiwiLoader(size: 72)
 
             Text("Sauvegarde en cours…")
                 .font(.dsHeadline)

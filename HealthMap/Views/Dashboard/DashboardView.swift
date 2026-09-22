@@ -500,8 +500,8 @@ private extension View {
 }
 
 // MARK: - Écran de chargement plein (flux du 20 juin — inchangé)
-// Tant que le bilan IA n'est pas prêt, on n'affiche AUCUN résultat : juste la
-// mascotte kiwi qui marche + un message qui tourne. Référencé par
+// Tant que le bilan IA n'est pas prêt, on n'affiche AUCUN résultat : juste le
+// signe Kiwio et ses pépins qui chargent + un message qui tourne. Référencé par
 // ContentView (AnalysisGateView) : NE PAS retirer.
 struct FullAnalysisLoadingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -519,7 +519,7 @@ struct FullAnalysisLoadingView: View {
         VStack(spacing: Theme.spacingLG) {
             Spacer()
 
-            KiwiWalkerView(size: 140)
+            KiwiLoader(size: 72)
 
             VStack(spacing: Theme.spacingSM) {
                 Text("On analyse ton profil…")

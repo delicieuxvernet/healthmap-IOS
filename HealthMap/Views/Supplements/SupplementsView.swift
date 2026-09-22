@@ -184,7 +184,7 @@ struct SupplementsView: View {
                     mainContent
                 } else if dashboardVM.isLoadingAnalysis {
                     VStack(spacing: 16) {
-                        KiwiWalkerView(size: 140)
+                        KiwiLoader(size: 72)
                         Text("Chargement...")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(Color.dsSecondaire)

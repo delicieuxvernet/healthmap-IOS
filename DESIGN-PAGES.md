@@ -14,6 +14,33 @@
 
 ---
 
+## ⭐⭐⭐ Identité : un seul logo, partout (maquette finale, 22 sept. 2026)
+
+> **Source** : `Kiwio - FINAL pour codage (standalone) (1).html` (Downloads), section « Identité ».
+> **Le signe** : la tranche de kiwi de face, version 2 validée : peau `#2F5A16` · chair
+> `#5DA838` · halo `#9FD46F` · cœur `#EAF3DE` · 12 graines. Aplats nets, aucun dégradé. Dessiné
+> en SwiftUI à partir du SVG source (`Views/Shared/KiwiSigne.swift`, géométrie sur 100 tenue point
+> par point par `KiwiSigneTests`) : variantes **standard** (peau qui cerne), **sur-vert** (sur fond
+> vert kiwi, la peau disparaît : l'icône), **mono** (disque d'une encre, cœur et graines évidés).
+> **Il remplace TOUS les dessins d'avant** : `KiwiContourMark` (le kiwi au trait), `MascotView` (la
+> mascotte souriante) et `KiwiWalkerView` (le kiwi qui marche) sont **supprimés**, avec les couleurs
+> `mascot*` ; la feuille du centre de la page de garde et le kiwi 3D de l'écran de connexion aussi.
+>
+> | Emploi | Composant | Où |
+> |---|---|---|
+> | Icône Apple | `AppIcon.png`, variante sur-vert, 1024 opaque | le springboard |
+> | Écran de chargement | `LaunchScreenView` : signe 72 pt au centre EXACT de l'écran + « Kiwio » 22 pt dessous | au lancement |
+> | Lancement statique | `Info.plist` `UILaunchScreen` : fond `LaunchScreenBackground` (#F2F2F7 / noir) + image `LaunchSigne` (72 pt) | avant le premier écran SwiftUI : même place, le passage ne bouge pas |
+> | Attente | `KiwiLoader` : **les pépins qui chargent**, une traînée qui fait **un tour en 1,8 s** (partie de la couronne pleine en 0,35 s) ; Reduce Motion = signe figé | lancement, analyse, questionnaire, Plan, Compléments, scan photo, dictée, historique, Apple |
+> | En-tête | `KiwiEnTete` (signe 72 + nom 22) | connexion ; l'onboarding en grand (signe 120 + nom 34) |
+> | Barre de l'app | `KiwiLockupBarre` (signe 26 + nom 19) | haut de la page de garde, carte du récap partageable |
+> | Confirmation | `KiwiConfirmation` (signe 44 dans un rond 72 couleur cœur) | « Bienvenue dans Kiwio Premium » |
+> | Signe seul | `KiwiSigne(taille:)` | Brief du jour, paywall, ouverture du récap, états vides (Plan, historique), centre de l'anneau de la page de garde |
+> | Pied de page | `KiwiPiedDePage` (signe mono 20 + nom 16 + version) | bas des Réglages, suivi de « Ne remplace pas un avis médical » |
+>
+> Le nom : « Kiwio » en SF Pro Rounded gras, serré (-0,045 × la taille) : `KiwiWordmark`. Plus de
+> « kiwi » + « o » vert. Règle de la maquette : sous 32 pt, le signe seul.
+
 ## ⭐⭐ Refonte « qualité Apple » (direction du 23 août 2026 — socle iOS natif)
 
 > **Sources de vérité** : `Kiwio iOS - refonte.dc.html` (maquette, **10 écrans** dans sa
@@ -366,7 +393,7 @@ en plus des relecteurs compilation et conformité :
     moments forts (bilan révélé, action cochée) ; `.healthMapPressed` sur tout ce qui
     se tape ; aucune zone tappable sans feedback visuel < 100 ms.
 19. **Chaque vue déclare ses 4 états** : contenu / chargement (skeleton, jamais un
-    spinner nu) / vide (mascotte + phrase utile) / erreur (message actionnable +
+    spinner nu) / vide (le signe Kiwio + phrase utile) / erreur (message actionnable +
     réessayer). Un écran sans ses 4 états ne passe pas la revue.
 20. **Accessibilité de détail** : VoiceOver label sur chaque élément interactif,
     Dynamic Type testé au clamp max sans casse de layout, contrastes AA sur tous les

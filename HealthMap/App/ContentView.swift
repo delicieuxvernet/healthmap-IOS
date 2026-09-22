@@ -210,20 +210,25 @@ private struct OfflineBanner: View {
 }
 
 // MARK: - Launch Screen
+/// L'écran de chargement de la maquette « Identité » : le signe 72 pt, ses
+/// pépins qui chargent, et le nom dessous.
+///
+/// Le signe est au centre EXACT de l'écran, là où l'écran de lancement statique
+/// (Info.plist, image `LaunchSigne`) l'a déjà posé : le passage de l'un à
+/// l'autre ne bouge pas d'un point, les pépins se mettent simplement à charger.
+/// Le nom se pose 12 pt dessous sans décaler le signe.
 struct LaunchScreenView: View {
     var body: some View {
         ZStack {
-            WarmBackground()
-            VStack(spacing: 22) {
-                // Le logo EST l'indicateur d'attente : même dessin qu'au repos
-                // (`KiwiContourMark`), pépins qui s'allument en traînée. Le
-                // spinner sous le nom devenait redondant — il a sauté.
-                KiwiLoader(size: 104, color: .dsTexte, showFibers: true)
-                Text("Kiwio")
-                    .font(.system(size: 30, weight: .bold, design: .default))
-                    .foregroundStyle(Color.dsTexte)
-            }
+            Color.dsFond
+            KiwiLoader(size: 72)
+                .overlay(alignment: .bottom) {
+                    KiwiWordmark(taille: 22)
+                        .fixedSize()
+                        .alignmentGuide(.bottom) { dimensions in dimensions[.top] - 12 }
+                }
         }
+        .ignoresSafeArea()
     }
 }
 

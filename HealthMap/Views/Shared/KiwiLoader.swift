@@ -1,101 +1,71 @@
 import SwiftUI
 
-// MARK: - Kiwi Loader (chargement — traînée de pépins)
+// MARK: - Kiwi Loader (chargement : les pépins qui chargent)
 //
-// Le repère kiwi de `KiwiContourMark` devenu indicateur d'attente : les pépins
-// gardent leur place dans la couronne, c'est l'INTENSITÉ qui tourne. Un pépin
-// est plein, les suivants s'estompent en traînée — la même grammaire que le
-// spinner iOS qu'il remplace, mais dessinée avec le fruit de la marque.
+// Le signe Kiwio (`KiwiSigne`) devenu indicateur d'attente : les graines
+// gardent leur place, c'est leur ÉCLAT qui tourne. Une graine s'allume quand
+// la tête de la traînée passe, puis s'estompe jusqu'au tour suivant — la
+// grammaire du spinner iOS, dessinée avec le fruit de la marque (variante
+// « traînée » validée par Arthur le 27 juillet 2026, gardée avec le nouveau
+// signe). Un tour en 1,8 s, comme le dit la maquette de l'identité.
 //
-// Design validé avec Arthur (27 juil. 2026), variante « traînée » (vs
-// « remplissage » et « pépin unique », écartées).
+// Entrée : on part de la couronne pleine (le signe tel que l'affiche l'écran de
+// lancement statique) et la traînée s'installe en 0,35 s, sans saut.
 //
-// Périmètre : remplace `ProgressView()` sur les écrans d'attente BLOQUANTS
-// (splash, analyse, chargement d'une page entière). Les spinners logés DANS un
-// bouton (18 pt) restent des `ProgressView` — à cette taille la couronne
-// devient illisible. Le kiwi qui marche (`KiwiWalkerView`) garde ses écrans :
-// c'est une mascotte d'attente longue, pas un indicateur.
+// Périmètre : tous les écrans d'attente (lancement, analyse, chargement d'une
+// page). Les spinners logés DANS un bouton restent des `ProgressView` : à
+// 18 pt, douze graines deviennent illisibles.
 //
-// - Reduce Motion : couronne pleine et figée (aucune animation).
+// - Reduce Motion : le signe, plein et immobile.
 struct KiwiLoader: View {
     var size: CGFloat = 44
-    var color: Color = .dsTexte
-    var lineWidth: CGFloat = 2.3
-    /// Fibres rayonnantes de la chair — lisibles au grand format (splash),
-    /// bruit visuel en dessous de ~80 pt.
-    var showFibers: Bool = false
     /// Durée d'un tour complet de la traînée.
-    var period: Double = 1.4
+    var period: Double = KiwiLoader.periode
+
+    /// « tourne 1 tour / 1,8 s » (maquette finale, section Identité).
+    static let periode: Double = 1.8
+    /// De la couronne pleine à la traînée.
+    static let entree: Double = 0.35
+    /// Éclat de la dernière graine de la traînée.
+    static let eclatMinimum: Double = 0.15
+    /// La tête part de la graine du haut (midi), pas de celle de droite.
+    private static let depart = 9
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// Même couronne que `KiwiContourMark` — le loader doit être le logo, pas
-    /// un dessin voisin.
-    private static let seedCount = 10
-
-    /// Échelle depuis le repère de référence (110 pt) du dessin.
-    private var s: CGFloat { size / 110 }
-    private var step: Double { period / Double(Self.seedCount) }
+    @State private var debut: Date?
 
     var body: some View {
         Group {
             if reduceMotion {
-                mark(lit: nil)
+                KiwiSigne(taille: size)
             } else {
-                TimelineView(.periodic(from: .now, by: step)) { timeline in
-                    let ticks = timeline.date.timeIntervalSinceReferenceDate / step
-                    mark(lit: Int(ticks.rounded(.down)) % Self.seedCount)
+                TimelineView(.animation(minimumInterval: 1.0 / 30)) { contexte in
+                    let ecoule = debut.map { contexte.date.timeIntervalSince($0) } ?? 0
+                    KiwiSigne(taille: size, graines: Self.opacites(ecoule: ecoule, periode: period))
                 }
             }
         }
         .frame(width: size, height: size)
-        .rotationEffect(.degrees(-15))
+        .onAppear {
+            if debut == nil { debut = Date() }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Chargement en cours")
     }
 
-    /// `lit` = index du pépin plein ; `nil` = couronne figée (Reduce Motion).
-    private func mark(lit: Int?) -> some View {
-        ZStack {
-            if showFibers {
-                ForEach(0..<Self.seedCount, id: \.self) { i in
-                    Capsule()
-                        .fill(color.opacity(0.36))
-                        .frame(width: lineWidth * 0.5, height: 22 * s)
-                        .offset(y: -23 * s)
-                        .rotationEffect(.degrees(18 + Double(i) / Double(Self.seedCount) * 360))
-                }
-            }
-
-            ForEach(0..<Self.seedCount, id: \.self) { i in
-                Ellipse()
-                    .fill(color)
-                    .opacity(opacity(seed: i, lit: lit))
-                    .frame(width: 5 * s, height: 9.2 * s)
-                    .offset(y: -25 * s)
-                    .rotationEffect(.degrees(Double(i) / Double(Self.seedCount) * 360))
-            }
-
-            // Contour de la face coupée.
-            Ellipse()
-                .stroke(color, lineWidth: lineWidth)
-                .frame(width: 96 * s, height: 74 * s)
-
-            // Cœur clair au centre.
-            Ellipse()
-                .stroke(color, lineWidth: lineWidth)
-                .frame(width: 17 * s, height: 13 * s)
+    /// Éclat de chaque graine, `ecoule` secondes après l'apparition.
+    static func opacites(ecoule: TimeInterval, periode: Double = KiwiLoader.periode) -> [Double] {
+        let n = Double(KiwiMarque.nombreDeGraines)
+        let temps = max(0, ecoule)
+        let tete = (temps / max(periode, 0.1) * n + Double(depart)).truncatingRemainder(dividingBy: n)
+        let installation = min(1, temps / entree)
+        return (0..<KiwiMarque.nombreDeGraines).map { index in
+            // Distance parcourue par la tête depuis qu'elle a quitté cette graine.
+            var distance = (tete - Double(index)).truncatingRemainder(dividingBy: n)
+            if distance < 0 { distance += n }
+            let trainee = 1 - (1 - eclatMinimum) * distance / n
+            return 1 - installation * (1 - trainee)
         }
-        // Lisse le passage d'un pépin au suivant : sans ça la traînée saute.
-        .animation(.linear(duration: step), value: lit)
-    }
-
-    /// Rampe linéaire : plein sur le pépin allumé, 0.15 sur le dernier de la
-    /// traînée (un tour complet de dégradé, comme le spinner iOS).
-    private func opacity(seed index: Int, lit: Int?) -> Double {
-        guard let lit else { return 1 }
-        let distance = (index - lit + Self.seedCount) % Self.seedCount
-        return 1 - 0.85 * Double(distance) / Double(Self.seedCount - 1)
     }
 }
 
@@ -103,8 +73,8 @@ struct KiwiLoader: View {
     ZStack {
         Color.dsFond.ignoresSafeArea()
         VStack(spacing: 36) {
-            KiwiLoader(size: 104, showFibers: true)
-            KiwiLoader(size: 56)
+            KiwiLoader(size: 72)
+            KiwiLoader(size: 52)
             KiwiLoader(size: 44, period: 1.0)
         }
     }

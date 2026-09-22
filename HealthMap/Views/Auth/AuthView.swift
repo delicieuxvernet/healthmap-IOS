@@ -254,7 +254,7 @@ struct AuthView: View {
                     .transition(.opacity)
 
                 VStack(spacing: Theme.spacingMD) {
-                    KiwiLoader(size: 56, color: .white)
+                    KiwiLoader(size: 56)
                     Text("Connexion à Apple...")
                         .font(Theme.subheadlineFont)
                         .foregroundStyle(.white)
@@ -333,23 +333,12 @@ struct AuthView: View {
     }
 
     // MARK: - Header
-    /// DA actuelle (crème + kiwi vert) : le VRAI logo de l'app (le kiwi 3D
-    /// Fluent, celui de l'icône) + le wordmark « Kiwio ». L'ancien header
-    /// (mascotte plate + titre bleu, dégradé indigo) jurait avec le reste de
-    /// l'app — remplacé par le couple logo + nom, neutre et raccord. Un
-    /// sous-titre discret rappelle l'action en cours (connexion vs inscription).
+    /// Le signe Kiwio et son nom, comme sur l'écran de chargement (maquette
+    /// « Identité · un seul logo, partout »). Un sous-titre discret rappelle
+    /// l'action en cours (connexion vs inscription).
     private var headerSection: some View {
         VStack(spacing: Theme.spacingMD) {
-            Image(Fluent3D.kiwi)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 84, height: 84)
-                .accessibilityHidden(true)
-
-            (Text("kiwi").foregroundStyle(Color.dsTexte)
-             + Text("o").foregroundStyle(Color.dsAccent))
-                .font(.dsGrandTitre)
-                .tracking(DSTracking.grandTitre)
+            KiwiEnTete()
 
             Text(isSignUp
                  ? "Gratuit\u{202F}: ton bilan nutritionnel t'attend."

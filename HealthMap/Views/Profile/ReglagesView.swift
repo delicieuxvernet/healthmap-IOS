@@ -384,16 +384,20 @@ struct ReglagesView: View {
         }
     }
 
-    /// Numéro de version + build : permet de vérifier d'un coup d'œil QUEL
-    /// build TestFlight tourne réellement sur l'appareil.
+    /// Le pied de page de la maquette (signe mono, nom, version), puis la
+    /// mention médicale. Version + build : on voit d'un coup d'œil QUEL build
+    /// TestFlight tourne réellement sur l'appareil.
     private var version: some View {
-        Text("Kiwio \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?")) · Ne remplace pas un avis médical")
-            .font(.system(size: 12))
-            .foregroundStyle(Color.dsTertiaire)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity)
+        VStack(spacing: 6) {
+            KiwiPiedDePage(detail: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
+            Text("Ne remplace pas un avis médical")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.dsTertiaire)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - RGPD : export des données (Article 20)

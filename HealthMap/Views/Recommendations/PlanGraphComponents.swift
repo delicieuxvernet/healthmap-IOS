@@ -683,7 +683,7 @@ struct PlanGraphScreen: View {
     /// Aucun symptôme ni objectif exploitable dans l'analyse.
     private var emptyState: some View {
         VStack(spacing: 10) {
-            MascotView(mood: .happy, size: 72)
+            KiwiSigne(taille: 72)
             Text("Rien à signaler pour l'instant")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Color.dsTexte)
