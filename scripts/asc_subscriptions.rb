@@ -1023,6 +1023,8 @@ if MODE == "new-version"
   notes = ENV["WHATS_NEW"].to_s.empty? ? <<~NOTES.strip : ENV["WHATS_NEW"]
     Kiwio fait peau neuve, et t'explique enfin le pourquoi.
 
+    Une nouvelle identité : la tranche de kiwi, de face, partout, jusqu'à l'icône. Pendant un chargement, ses pépins s'allument un à un.
+
     L'anneau de cause : pour chaque apport, tu vois ce qui pèse sur ton score, de combien, et ce que tu regagnerais en changeant une habitude. Touche une cause pour comprendre.
 
     Un plan qui se lit d'un coup d'œil : tes objectifs, tes symptômes et tes apports reliés entre eux. Touche un point pour voir à quoi il est lié et par où commencer.
