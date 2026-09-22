@@ -249,10 +249,14 @@ final class NutrientLedgerTests: XCTestCase {
         let regles = fer.contributions.first { $0.libelle == "Règles très abondantes" }
         XCTAssertEqual(regles?.section, .sante, "les regles abondantes viennent de la section Santé")
 
+        // Léa a dit combien de soleil elle prend : sa réponse compte, seule. Le
+        // travail en intérieur ne se compte plus en plus (22 sept. 2026).
         guard let vitD = registre["vitD"] else { return XCTFail("apport vitamine D absent") }
-        let interieur = vitD.contributions.first { $0.libelle == "Travail en intérieur" }
-        XCTAssertNotNil(interieur, "la vitamine D de Léa devrait nommer son travail en intérieur")
-        XCTAssertEqual(interieur?.section, .modeDeVie)
+        let soleil = vitD.contributions.first { $0.libelle == "Très peu de soleil" }
+        XCTAssertNotNil(soleil, "la vitamine D de Léa devrait nommer son peu de soleil")
+        XCTAssertEqual(soleil?.section, .modeDeVie)
+        XCTAssertFalse(vitD.contributions.contains { $0.libelle == "Travail en intérieur" },
+                       "le soleil ne se compte qu'une fois")
     }
 
     func testLesLibellesRespectentLeVocabulaire() {

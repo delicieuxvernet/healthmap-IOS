@@ -139,7 +139,10 @@ struct DetailApport: Equatable {
 /// cache garderait les pourcentages de l'ANCIEN calcul à côté des nouveaux
 /// scores, jusqu'à ce que la personne modifie son profil.
 enum CalculApports {
-    static let version = "2026-09-22"
+    /// 2026-09-22 : étape 1 (quantités jamais posées, deux moteurs alignés).
+    /// 2026-09-22.2 : étape 2 (soleil compté une fois, richesse des aliments,
+    /// poids de l'assiette pour la vitamine D).
+    static let version = "2026-09-22.2"
 }
 
 // MARK: - Le registre
@@ -273,7 +276,11 @@ extension HealthCalculator {
         let libUltraTransformes = "Ultra-transformés fréquents"
 
         // ═══════ VITAMINE D ═══════
-        if p.indoorWork == "yes" { r.add("vitD", -25, "Travail en intérieur", .modeDeVie) }
+        // Le soleil ne se compte qu'une fois (`NutrientEngine.soleilRenseigne`) :
+        // le travail en intérieur ne parle que si l'exposition n'est pas renseignée.
+        if p.indoorWork == "yes" && !NutrientEngine.soleilRenseigne(p) {
+            r.add("vitD", -25, "Travail en intérieur", .modeDeVie)
+        }
         let sun = ["none": -30, "very_little": -20, "some": -5, "moderate": 5, "plenty": 15]
         let sunLib = [
             "none": "Jamais au soleil",
