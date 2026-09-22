@@ -316,7 +316,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
     }
 
     // MARK: - Hash Profile (same djb2 as web — excludes completed + firstName)
-    static func hashProfile(_ profile: UserProfile, calcul: String = CalculApports.version) -> String {
+    static func hashProfile(_ profile: UserProfile, calcul: String = CalculApports.version, journal: String = "") -> String {
         // Web: excludes "completed" and "firstName", sorts remaining keys
         var copy = profile
         copy.completed = false
@@ -360,6 +360,10 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         // La version du calcul : une correction des scores doit régénérer le
         // bilan (et ses pourcentages), même si le profil n'a pas bougé.
         parts.append("calcul:\(calcul)")
+        // Ce que le journal des repas change aux scores (étape 3 de l'audit,
+        // `JournalApports.signature`) : absent tant qu'il ne change rien, pour
+        // ne pas régénérer le bilan de ceux qui ne notent pas leurs repas.
+        if !journal.isEmpty { parts.append("journal:\(journal)") }
 
         let str = parts.joined(separator: "|")
 

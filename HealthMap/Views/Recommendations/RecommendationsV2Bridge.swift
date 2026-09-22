@@ -135,7 +135,7 @@ struct RecommendationsV2ContentView: View {
             topics: topics,
             apports: planTopicsFromApports(dashboardVM.nutrients),
             causes: PlanGraphScreen.causes(depuis: dashboardVM.analysisV2),
-            registre: HealthCalculator.registreApports(profile: dashboardVM.profile)
+            registre: dashboardVM.registre
         )
     }
 }

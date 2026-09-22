@@ -27,7 +27,8 @@ import Foundation
 // chiffre inventé pour combler le trou.
 
 /// Les six familles du questionnaire — la provenance affichée sous chaque
-/// ligne de la cascade (« déclaré dans Santé »).
+/// ligne de la cascade (« déclaré dans Santé ») — et le journal des repas,
+/// qui corrige les apports depuis le 22 sept. 2026 (`JournalApports`).
 enum SectionQuestionnaire: String, CaseIterable {
     case profil = "Profil"
     case modeDeVie = "Mode de vie"
@@ -35,6 +36,8 @@ enum SectionQuestionnaire: String, CaseIterable {
     case nutrition = "Nutrition"
     case symptomes = "Symptômes"
     case medical = "Médical"
+    /// Pas une réponse au questionnaire : ce que les repas notés ont montré.
+    case journal = "Journal"
 }
 
 /// Un facteur nommé et son poids, en points d'apport.
@@ -48,8 +51,11 @@ struct ContributionApport: Equatable, Identifiable {
 
     var id: String { "\(libelle)#\(delta)" }
 
-    /// « déclaré dans Mode de vie » — le sous-texte de la ligne.
-    var provenance: String { "déclaré dans \(section.rawValue)" }
+    /// « déclaré dans Mode de vie » — le sous-texte de la ligne. Le journal
+    /// n'est pas une déclaration : « noté dans ton journal ».
+    var provenance: String {
+        section == .journal ? "noté dans ton journal" : "déclaré dans \(section.rawValue)"
+    }
 }
 
 /// Une part de l'anneau. Les parts d'un apport somment toujours à 100.

@@ -15,6 +15,9 @@ final class DashboardViewModel: ObservableObject {
     @Published var isLoadingAnalysisV2 = false
     @Published var healthScore: Int = 0
     @Published var nutrientScores: [String: Int] = [:]
+    /// Ce que les repas notés des 14 derniers jours ont montré (étape 3 de
+    /// l'audit de personnalisation) ; nil tant qu'ils n'en disent pas assez.
+    @Published private(set) var observationsJournal: ObservationsJournal?
     @Published var hasCompletedQuestionnaire = false
     /// Passe à `true` une fois le PREMIER `loadProfile` terminé (succès, échec
     /// ou pas de session) — succès OU échec. Tant qu'il est `false`, la racine
@@ -306,6 +309,12 @@ final class DashboardViewModel: ObservableObject {
 
         isLoadingProfile = false
 
+        // Le journal des repas corrige les apports (étape 3) : lu AVANT le hash
+        // du bilan, qui en dépend. Un échec laisse le seul questionnaire parler.
+        if hasCompletedQuestionnaire {
+            await chargerJournal(userId: userId)
+        }
+
         // Hydrate le bilan v2 depuis le CACHE DB si le profil n'a pas changé
         // (hash identique) — AVANT de débloquer le routing et de lancer
         // l'analyse. Sinon `analysisV2` reste nil pendant le round-trip de
@@ -316,7 +325,7 @@ final class DashboardViewModel: ObservableObject {
         // différent). Lecture DB pure — aucun appel IA. `triggerAnalysis()`
         // rafraîchira ensuite en arrière-plan sans re-vider `analysisV2`.
         if hasCompletedQuestionnaire, analysisV2 == nil {
-            let hash = AIAnalysisService.hashProfile(profile)
+            let hash = hashDuBilan
             // `(try? …) ?? nil` aplatit le double-optionnel (la fonction rend déjà
             // `AIAnalysisV2?`) — même motif que dans AIAnalysisService.fetchBilanV2.
             if let cached = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil,
@@ -381,10 +390,50 @@ final class DashboardViewModel: ObservableObject {
         }
 
         healthScore = HealthCalculator.calculateHealthScore(profile: profile)
-        nutrientScores = HealthCalculator.analyzeNutrientScores(profile: profile)
+        nutrientScores = registre.mapValues(\.score)
 
         captureBaselineIfNeeded()
     }
+
+    // MARK: - Le registre, corrigé par le journal (étape 3, 22 sept. 2026)
+
+    /// Le registre des apports de la personne : son questionnaire, puis ce que
+    /// ses repas notés ont montré. TOUS les écrans le lisent ici, jamais en
+    /// rappelant `HealthCalculator.registreApports` : sinon la fiche et le
+    /// tableau de bord ne diraient pas le même chiffre.
+    var registre: [String: DetailApport] {
+        JournalApports.appliquer(HealthCalculator.registreApports(profile: profile), observations: observationsJournal)
+    }
+
+    /// Le hash du bilan : le profil, la version du calcul, et ce que le journal
+    /// change aux scores (par paliers de 5 points, pas à chaque repas noté).
+    var hashDuBilan: String {
+        let questionnaire = HealthCalculator.registreApports(profile: profile)
+        let signature = JournalApports.signature(
+            avant: questionnaire,
+            apres: JournalApports.appliquer(questionnaire, observations: observationsJournal)
+        )
+        return AIAnalysisService.hashProfile(profile, journal: signature)
+    }
+
+    /// Lit les repas notés des 14 derniers jours (aujourd'hui exclu) et en
+    /// tire les observations. Un échec réseau laisse le calcul au seul
+    /// questionnaire, sans message : le journal corrige, il ne bloque jamais.
+    func chargerJournal(userId: String) async {
+        let calendrier = Calendar.current
+        let aujourdhui = calendrier.startOfDay(for: Date())
+        guard let debut = calendrier.date(byAdding: .day, value: -JournalApports.fenetreJours, to: aujourdhui),
+              let repas = try? await MealJournalService.shared.loadRange(userId: userId, from: debut, to: aujourdhui)
+        else { return }
+        observationsJournal = JournalApports.observations(repas: repas, profil: profile)
+    }
+
+    #if DEBUG
+    /// Tests : pose des observations sans passer par le réseau.
+    func poserObservationsJournal(_ observations: ObservationsJournal?) {
+        observationsJournal = observations
+    }
+    #endif
 
     // MARK: - Capture one-time de la baseline nutriments
 
@@ -451,7 +500,9 @@ final class DashboardViewModel: ObservableObject {
             // Update scores from merged result (canonical source)
             if let merged {
                 self.healthScore = merged.healthScore
-                self.nutrientScores = merged.scores
+                // Le v7 renvoie les scores du seul questionnaire : on garde
+                // ceux du registre, corrigés par le journal.
+                self.nutrientScores = registre.mapValues(\.score)
 
                 analyticsService.track(.analysisCompleted, properties: [
                     "health_score": healthScore,
@@ -491,7 +542,7 @@ final class DashboardViewModel: ObservableObject {
                         if let retried {
                             self.aiAnalysis = retried
                             self.healthScore = retried.healthScore
-                            self.nutrientScores = retried.scores
+                            self.nutrientScores = registre.mapValues(\.score)
                             AppLogger.analysis.info("Loaded cached analysis as fallback after AI failure")
                         } else {
                             errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
@@ -528,10 +579,10 @@ final class DashboardViewModel: ObservableObject {
 
         // Entrées déterministes — mêmes sources locales que le flux v7
         // (HealthCalculator / RedFlagDetector, mirrors de health.js).
-        let localScores = HealthCalculator.analyzeNutrientScores(profile: profile)
+        let localScores = registre.mapValues(\.score)
         let localHealthScore = HealthCalculator.calculateHealthScore(profile: profile)
         let localFlags = RedFlagDetector.detect(profile: profile)
-        let profileHash = AIAnalysisService.hashProfile(profile)
+        let profileHash = hashDuBilan
 
         do {
             analysisV2 = try await aiAnalysisService.fetchBilanV2(

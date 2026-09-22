@@ -125,7 +125,7 @@ struct SupplementsView: View {
     /// l'anneau se réduit à « couvert » + « autres facteurs ». Sans aucun
     /// score, pas de tuile — on n'affiche pas un zéro inventé.
     private var tuiles: [Tuile] {
-        let registre = HealthCalculator.registreApports(profile: dashboardVM.profile)
+        let registre = dashboardVM.registre
         return chains.compactMap { chain -> Tuile? in
             if let detail = registre[chain.id] {
                 return Tuile(chain: chain, detail: detail)

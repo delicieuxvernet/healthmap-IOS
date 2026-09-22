@@ -72,8 +72,19 @@ enum CauseApport {
 
     /// Une habitude ou l'assiette : ce sur quoi on peut agir soi-même.
     static func seChange(_ section: SectionQuestionnaire) -> Bool {
-        section == .modeDeVie || section == .nutrition
+        section == .modeDeVie || section == .nutrition || section == .journal
     }
+
+    /// Le journal des repas (étape 3 de l'audit, 22 sept. 2026) : ce que la
+    /// personne a vraiment mangé corrige ce que le questionnaire laissait penser.
+    static let journalPese = Explication(
+        pourquoi: "Les repas que tu as notés ces deux dernières semaines en apportent moins que ce que ton questionnaire laissait penser. Ils corrigent ton score, sans le remplacer.",
+        geste: "Continue de noter tes repas : plus ton journal est complet, plus ce chiffre te ressemble.",
+        avis: nil)
+    static let journalAide = Explication(
+        pourquoi: "Les repas que tu as notés ces deux dernières semaines en apportent plus que ce que ton questionnaire laissait penser : ils remontent ton score.",
+        geste: nil,
+        avis: nil)
 
     private static func cle(_ texte: String) -> String {
         texte.folding(options: .diacriticInsensitive, locale: Locale(identifier: "fr_FR")).lowercased()
@@ -133,6 +144,9 @@ enum CauseApport {
     static let gesteDeRepli = "Reprends cette réponse dans ton questionnaire si elle a changé : le calcul se refait aussitôt."
 
     static func explication(pour contribution: ContributionApport) -> Explication {
+        if contribution.section == .journal {
+            return contribution.delta < 0 ? journalPese : journalAide
+        }
         // Ce qui joue en ta faveur.
         guard contribution.delta < 0 else {
             let pourquoi = contribution.libelle.hasPrefix("Tu prends déjà")
@@ -156,6 +170,8 @@ enum CauseApport {
                 pourquoi: "Certains traitements et antécédents diminuent l'absorption de cet apport, ou augmentent ses pertes. C'est connu, et ça se surveille.",
                 geste: nil,
                 avis: "Ne modifie jamais un traitement de toi-même : parles-en à ton médecin ou à ton pharmacien.")
+        case .journal:
+            return journalPese
         case .modeDeVie, .nutrition:
             let libelle = cle(contribution.libelle)
             if let famille = familles.first(where: { $0.mots.contains { libelle.contains($0) } }) {
