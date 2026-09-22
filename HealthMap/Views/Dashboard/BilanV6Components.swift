@@ -127,7 +127,7 @@ struct ApportV2DetailSheet: View {
     /// score du bilan, sans cause nommée — jamais un zéro inventé.
     private var detail: DetailApport {
         if let id = apport.id,
-           let connu = HealthCalculator.registreApports(profile: dashboardVM.profile)[id] {
+           let connu = dashboardVM.registre[id] {
             return connu
         }
         return DetailApport(contributions: [], score: pct)

@@ -108,7 +108,7 @@ struct RecommendationsContentView: View {
             topics: topics,
             apports: apportTopics,
             causes: PlanGraphScreen.causes(depuis: dashboardVM.analysisV2),
-            registre: HealthCalculator.registreApports(profile: dashboardVM.profile)
+            registre: dashboardVM.registre
         )
             .onReceive(dashboardVM.$aiAnalysis) { newAnalysis in
                 if let newAnalysis {
