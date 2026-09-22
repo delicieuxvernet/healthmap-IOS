@@ -115,6 +115,7 @@ final class CalculEtape1Tests: XCTestCase {
 
     // MARK: Le cache du bilan
 
+    @MainActor
     func testLeCacheDuBilanSuitLaVersionDuCalcul() {
         let p = adulte()
         XCTAssertEqual(AIAnalysisService.hashProfile(p), AIAnalysisService.hashProfile(p, calcul: CalculApports.version))
