@@ -286,6 +286,27 @@ enum NutrientEngine {
         if ["often", "constant", "souvent"].contains(snacking) { scores["fiber", default: 70] -= 5 }
         if waterL < 1 { scores["fiber", default: 70] -= 5 }
 
+        // ═══════ CE QUE LE CADDIE NE DIT PAS (22 sept. 2026) ═══════
+        // Le type de pain et les abats sont demandés au questionnaire, mais un
+        // caddie peut ne contenir ni pain ni abats : la réponse compte alors,
+        // avec les poids du registre. Quand le caddie en contient, c'est lui qui
+        // parle — pas de double compte. Avant, ces deux réponses ne comptaient
+        // jamais dès que les courses étaient remplies.
+        if !caddieContient(p, painsDuCaddie) {
+            if p.breadType == "white" {
+                scores["fiber", default: 70] -= 15
+            } else if ["whole_grain", "sourdough"].contains(p.breadType) {
+                scores["fiber", default: 70] += 10; scores["magnesium", default: 70] += 10
+                if p.breadType == "sourdough" { scores["zinc", default: 70] += 5 }
+            }
+        }
+        if p.eatLiver == "yes" && !caddieContient(p, abatsDuCaddie) {
+            scores["vitB12", default: 70] += 15; scores["iron", default: 70] += 10
+        }
+        // Des sources de vitamine C à la hauteur : elles aident le fer végétal
+        // (même bonus que le registre, qui le lit dans les fruits et légumes).
+        if vitamineCAideLeFer(p) { scores["iron", default: 70] += 5 }
+
         // ═══════ ULTRA-TRANSFORMÉS (habitude) ═══════
         if ["often", "daily"].contains(ultraProcessed) {
             scores["fiber", default: 70] -= 8
@@ -347,6 +368,22 @@ enum NutrientEngine {
         } else if p.dietType == "vegetarien" {
             scores["vitB12", default: 70] -= 15; scores["iron", default: 70] -= 8; scores["zinc", default: 70] -= 8
         }
+    }
+
+    // MARK: - Ce que le caddie dit déjà
+
+    /// Les pains du catalogue : s'il y en a un dans le caddie, `breadType` se tait.
+    static let painsDuCaddie = ["baguette", "pain_complet", "pain_levain", "pain_de_mie", "pain_seigle", "biscottes"]
+    /// Les abats du catalogue : s'il y en a un dans le caddie, `eatLiver` se tait.
+    static let abatsDuCaddie = ["foie_volaille", "boudin_noir"]
+
+    static func caddieContient(_ p: UserProfile, _ ids: [String]) -> Bool {
+        ids.contains { (p.groceries[$0] ?? 0) > 0 }
+    }
+
+    /// Les sources de vitamine C du caddie atteignent la cible de la semaine.
+    static func vitamineCAideLeFer(_ p: UserProfile) -> Bool {
+        weeklyServings(p, .vitC) >= (targets[.vitC] ?? 7)
     }
 
     // MARK: - Antécédents médicaux, opérations et allergies

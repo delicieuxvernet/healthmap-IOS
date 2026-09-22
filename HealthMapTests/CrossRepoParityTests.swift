@@ -133,6 +133,10 @@ final class CrossRepoParityTests: XCTestCase {
         p.alcohol = "none"; p.bloating = "no"; p.antibiotics = "no"; p.dietType = "omnivore"
         p.mealsPerDay = "3"; p.mealFrequency = "three"; p.ultraProcessedFrequency = "sometimes"
         p.snacking = "sometimes"; p.vegetableServings = "5"; p.fruitServings = "8"
+        // Le fixture a été calculé par health.js, qui lisait une quantité vide
+        // comme 0. L'iOS distingue désormais « jamais posée » de « zéro »
+        // (audit du 22 sept. 2026) : on déclare donc ces zéros explicitement.
+        p.fattyFish = "0"; p.meatPoultry = "0"; p.eggsPerWeek = "0"; p.dairyServings = "0"
         p.supplementsCurrent = []; p.symptoms = []; p.medications = []; p.digestiveConditions = []
         return p
     }

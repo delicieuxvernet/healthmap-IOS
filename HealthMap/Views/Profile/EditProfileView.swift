@@ -648,13 +648,20 @@ struct EditProfileView: View {
                 EditableField(id: "alcohol", label: "Alcool", emoji: "🍷", kind: .pickerSingle(options: options("alcohol"))),
             ]
         case .nutrition:
+            let regime = EditableField(id: "dietType", label: "Régime", emoji: "🍽️", kind: .pickerSingle(options: options("dietType")))
+            // Avec des courses remplies, le calcul lit le caddie : ces quantités
+            // n'y changeaient rien. On ne les propose que sans caddie. Les
+            // laitages se comptent par SEMAINE, comme le reste et comme le
+            // calcul (« 2 par jour » saisis en « portions/j » valaient 2 par
+            // semaine, soit « très peu de produits laitiers »).
+            guard profile.groceries.isEmpty else { return [regime] }
             return [
-                EditableField(id: "dietType", label: "Régime", emoji: "🍽️", kind: .pickerSingle(options: options("dietType"))),
+                regime,
                 EditableField(id: "vegetableServings", label: "Légumes/semaine", emoji: "🥦", kind: .number(unit: "portions", min: 0, max: 30)),
                 EditableField(id: "fruitServings", label: "Fruits/semaine", emoji: "🍎", kind: .number(unit: "portions", min: 0, max: 30)),
                 EditableField(id: "fattyFish", label: "Poisson gras/semaine", emoji: "🐟", kind: .number(unit: "portions", min: 0, max: 10)),
                 EditableField(id: "meatPoultry", label: "Viande/semaine", emoji: "🥩", kind: .number(unit: "portions", min: 0, max: 21)),
-                EditableField(id: "dairyServings", label: "Produits laitiers", emoji: "🥛", kind: .number(unit: "portions/j", min: 0, max: 10)),
+                EditableField(id: "dairyServings", label: "Produits laitiers/semaine", emoji: "🥛", kind: .number(unit: "portions", min: 0, max: 30)),
                 EditableField(id: "nutsPerWeek", label: "Noix/semaine", emoji: "🥜", kind: .number(unit: "portions", min: 0, max: 14)),
             ]
         case .symptomes:

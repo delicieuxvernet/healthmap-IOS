@@ -76,6 +76,11 @@ enum QuestionnaireSection: Int, CaseIterable, Identifiable {
         "indoorWork", "sunExposure", "strengthTraining", "skinType",
         "stressLevel", "sleepHours", "wakeFeeling", "screenBeforeBed", "caffeineIntake", "caffeineTiming", "waterIntake", "smoking", "alcohol", "bloating",
         "dietType", "groceries", "antibiotics",
+        // 22 sept. 2026 (audit de personnalisation) : une femme enceinte ou aux
+        // règles abondantes qui restait en Express n'avait ni l'ajustement du
+        // fer, de l'iode et du calcium, ni l'alerte « enceinte sans folates ».
+        // Deux questions, réservées aux femmes par leur `showIf`.
+        "periodFlow", "pregnancyStatus",
     ]
 
     /// Nombre de questions du parcours Express, calculé et non recopié.

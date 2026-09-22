@@ -316,7 +316,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
     }
 
     // MARK: - Hash Profile (same djb2 as web — excludes completed + firstName)
-    static func hashProfile(_ profile: UserProfile) -> String {
+    static func hashProfile(_ profile: UserProfile, calcul: String = CalculApports.version) -> String {
         // Web: excludes "completed" and "firstName", sorts remaining keys
         var copy = profile
         copy.completed = false
@@ -356,6 +356,10 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             .map { "\($0.key)=\($0.value)" }
             .joined(separator: ",")
         parts.append("groceries:\(groceriesStr)")
+
+        // La version du calcul : une correction des scores doit régénérer le
+        // bilan (et ses pourcentages), même si le profil n'a pas bougé.
+        parts.append("calcul:\(calcul)")
 
         let str = parts.joined(separator: "|")
 
