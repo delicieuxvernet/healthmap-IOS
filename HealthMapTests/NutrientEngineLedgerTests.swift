@@ -110,7 +110,9 @@ final class NutrientEngineLedgerTests: XCTestCase {
     func testLesCoursesOntLeurLigne() {
         let lea = profils()[1].1
         let vitD = NutrientEngine.registreApports(profile: lea)["vitD"]
-        XCTAssertTrue(vitD?.contributions.contains { $0.libelle == "Aucune source dans tes courses" && $0.delta == -30 } == true)
+        // Aucune source : le libellé le dit, mais la vitamine D n'en perd que la
+        // moitié (poids de l'assiette, 22 sept. 2026 : elle vient surtout du soleil).
+        XCTAssertTrue(vitD?.contributions.contains { $0.libelle == "Aucune source dans tes courses" && $0.delta == -15 } == true)
         XCTAssertEqual(NutrientEngine.libelleDesCourses(delta: -5), "Peu de sources dans tes courses")
         XCTAssertEqual(NutrientEngine.libelleDesCourses(delta: 18), "Tes courses en apportent beaucoup")
     }

@@ -112,12 +112,14 @@ struct ApportV2DetailSheet: View {
         apport.id.map { Color.nutrientColor(for: $0) } ?? couleurStatut
     }
 
-    /// « 5,9 sur 14 mg par jour » : part couverte × référence canonique. nil si
-    /// le nutriment n'est pas au catalogue (on n'invente pas d'unité).
+    /// « 5,9 sur 11 mg par jour » : part couverte × besoin de CETTE personne
+    /// (sexe, âge, grossesse, règles : `BesoinsDeReference`). nil si le
+    /// nutriment n'est pas au catalogue (on n'invente pas d'unité).
     private var quantite: String? {
         guard let definition else { return nil }
-        let absolu = definition.rda * Double(pct) / 100
-        return "\(DS.decimal(absolu)) sur \(DS.decimal(definition.rda))\(DS.fine)\(definition.unit) par jour"
+        let besoin = BesoinsDeReference.besoin(definition.id, profil: dashboardVM.profile)
+        let absolu = besoin * Double(pct) / 100
+        return "\(DS.decimal(absolu)) sur \(DS.decimal(besoin))\(DS.fine)\(definition.unit) par jour"
     }
 
     /// Le registre donne le score ET ses causes nommées. Quand il se tait

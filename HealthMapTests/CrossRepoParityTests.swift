@@ -37,12 +37,27 @@ final class CrossRepoParityTests: XCTestCase {
         return try JSONDecoder().decode([String: FixtureEntry].self, from: data)
     }
 
+    /// Écarts VOULUS avec health.js. Le web n'est plus maintenu : quand l'iOS
+    /// corrige son calcul, la valeur attendue s'écrit ici, avec sa raison,
+    /// plutôt que de réécrire un fixture qui dit ce que calculait health.js.
+    ///
+    /// 22 sept. 2026 (audit de personnalisation, étape 2) : le soleil ne se
+    /// compte qu'une fois. Léa et René ont dit combien de soleil ils prennent ;
+    /// leur travail en intérieur ne retire plus 25 points en plus.
+    ///   Léa  : 70 − 20 (très peu de soleil) − 3 (peau claire) − 5 (nuits courtes) = 42
+    ///   René : 70 − 30 (aucun soleil) − 10 (plus de 50 ans) − 8 (peau intermédiaire) − 5 = 17
+    private let ecartsVoulus: [String: [String: Int]] = [
+        "lea": ["vitD": 42],
+        "rene": ["vitD": 17],
+    ]
+
     private func assertParity(_ profile: UserProfile, against entry: FixtureEntry, name: String) {
         let iosScore = HealthCalculator.calculateHealthScore(profile: profile)
         XCTAssertEqual(iosScore, entry.healthScore, "\(name): healthScore iOS (\(iosScore)) != health.js (\(entry.healthScore))")
 
         let iosNutrients = HealthCalculator.analyzeNutrientScores(profile: profile)
-        for (nutrient, expected) in entry.nutrientScores {
+        for (nutrient, fige) in entry.nutrientScores {
+            let expected = ecartsVoulus[name]?[nutrient] ?? fige
             guard let actual = iosNutrients[nutrient] else {
                 XCTFail("\(name): nutriment \(nutrient) absent du resultat iOS")
                 continue

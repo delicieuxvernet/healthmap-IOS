@@ -127,9 +127,14 @@ enum NutrientEngine {
         .vitC: 7, .calcium: 10, .zinc: 5, .iodine: 5, .fiber: 14,
     ]
 
-    /// Portions/semaine cumulées des aliments du caddie sources de ce nutriment.
-    private static func weeklyServings(_ p: UserProfile, _ nutrient: GroceryNutrient) -> Int {
-        GroceryCatalog.items(providing: nutrient).reduce(0) { $0 + (p.groceries[$1.id] ?? 0) }
+    /// Portions/semaine cumulées des aliments du caddie sources de ce nutriment,
+    /// chacune pesée par sa richesse (`GroceryCatalog.richesse`, 22 sept. 2026) :
+    /// une portion de sardines compte plus qu'une portion d'œufs pour la
+    /// vitamine D, une escalope de poulet moins qu'un steak pour la B12.
+    static func weeklyServings(_ p: UserProfile, _ nutrient: GroceryNutrient) -> Double {
+        p.groceries.reduce(0.0) { somme, ligne in
+            somme + Double(max(0, ligne.value)) * GroceryCatalog.poids(ligne.key, nutrient)
+        }
     }
 
     /// Nombre d'aliments-sources DISTINCTS effectivement cochés (variété).
@@ -137,12 +142,23 @@ enum NutrientEngine {
         GroceryCatalog.items(providing: nutrient).reduce(0) { $0 + ((p.groceries[$1.id] ?? 0) > 0 ? 1 : 0) }
     }
 
-    /// Contribution alimentaire bornée [-30 ; +18], courbe saturante vs cible.
-    static func foodDelta(_ p: UserProfile, _ nutrient: GroceryNutrient) -> Int {
+    /// Le poids de l'assiette pour un apport, quand il n'est pas de 1.
+    ///
+    /// La vitamine D vient surtout du soleil (80 à 90 % selon l'ANSES) : ce que
+    /// l'on mange y pèse moitié moins que pour les autres apports. Avant ce
+    /// poids, une semaine sans poisson gras la faisait tomber aussi bas qu'une
+    /// semaine sans aucune source de fer ou de fibres, et la vitamine D sortait
+    /// en tête de presque tous les bilans (audit du 22 sept. 2026).
+    static let poidsDeLAssiette: [GroceryNutrient: Double] = [.vitD: 0.5]
+
+    /// Ce que disent les courses, en points, AVANT le poids de l'assiette pour
+    /// cet apport. Bornée [-30 ; +18], courbe saturante vs cible. C'est elle qui
+    /// choisit le libellé de la ligne (« Aucune source dans tes courses »…).
+    static func foodDeltaBrut(_ p: UserProfile, _ nutrient: GroceryNutrient) -> Int {
         let servings = weeklyServings(p, nutrient)
-        if servings == 0 { return -30 }
+        if servings <= 0 { return -30 }
         let target = Double(max(1, targets[nutrient] ?? 5))
-        let ratio = Double(servings) / target
+        let ratio = servings / target
         var delta: Int
         switch ratio {
         case ..<0.5: delta = -15
@@ -154,6 +170,13 @@ enum NutrientEngine {
         // Petit bonus de variété (sources multiples), plafond conservé.
         if distinctSources(p, nutrient) >= 3 { delta = min(18, delta + 2) }
         return delta
+    }
+
+    /// Contribution alimentaire au score, une fois le poids de l'assiette appliqué.
+    static func foodDelta(_ p: UserProfile, _ nutrient: GroceryNutrient) -> Int {
+        let brut = foodDeltaBrut(p, nutrient)
+        guard let poids = poidsDeLAssiette[nutrient] else { return brut }
+        return Int((Double(brut) * poids).rounded())
     }
 
     /// Portions/semaine cumulées d'un rayon.
@@ -206,7 +229,9 @@ enum NutrientEngine {
         let fermented = p.fermentedFoods.isEmpty ? "sometimes" : p.fermentedFoods
 
         // ═══════ VITAMIN D ═══════
-        if p.indoorWork == "yes" { scores["vitD", default: 70] -= 25 }
+        // Le soleil ne se compte qu'une fois : le travail en intérieur ne parle
+        // que si l'exposition au soleil n'est pas renseignée (voir `soleilRenseigne`).
+        if p.indoorWork == "yes" && !soleilRenseigne(p) { scores["vitD", default: 70] -= 25 }
         scores["vitD", default: 70] += ["none": -30, "very_little": -20, "some": -5, "moderate": 5, "plenty": 15][p.sunExposure] ?? 0
         if age > 70 { scores["vitD", default: 70] -= 15 } else if age > 50 { scores["vitD", default: 70] -= 10 }
         scores["vitD", default: 70] += ["very_fair": 0, "fair": -3, "medium": -8, "olive": -15, "dark": -22][p.skinType] ?? 0
@@ -383,7 +408,19 @@ enum NutrientEngine {
 
     /// Les sources de vitamine C du caddie atteignent la cible de la semaine.
     static func vitamineCAideLeFer(_ p: UserProfile) -> Bool {
-        weeklyServings(p, .vitC) >= (targets[.vitC] ?? 7)
+        weeklyServings(p, .vitC) >= Double(targets[.vitC] ?? 7)
+    }
+
+    // MARK: - Le soleil ne se compte qu'une fois (22 sept. 2026)
+    //
+    // « Travail en intérieur » et « exposition au soleil » disent la même chose :
+    // combien de soleil la peau reçoit. Les deux retiraient des points, jusqu'à
+    // -55 pour un bureau peu ensoleillé, et la vitamine D sortait en tête de
+    // 64 % des bilans. Quand la personne a dit combien de soleil elle prend, sa
+    // réponse compte seule ; le travail en intérieur ne sert qu'à défaut.
+    // Partagé par les deux moteurs et leurs registres.
+    static func soleilRenseigne(_ p: UserProfile) -> Bool {
+        ["none", "very_little", "some", "moderate", "plenty"].contains(p.sunExposure)
     }
 
     // MARK: - Antécédents médicaux, opérations et allergies
