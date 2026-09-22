@@ -132,6 +132,16 @@ struct DetailApport: Equatable {
     }
 }
 
+// MARK: - La version du calcul
+
+/// Change à chaque correction du calcul des apports. Elle entre dans le hash du
+/// cache du bilan (`AIAnalysisService.hashProfile`) : sans elle, un bilan en
+/// cache garderait les pourcentages de l'ANCIEN calcul à côté des nouveaux
+/// scores, jusqu'à ce que la personne modifie son profil.
+enum CalculApports {
+    static let version = "2026-09-22"
+}
+
 // MARK: - Le registre
 
 extension HealthCalculator {
@@ -206,6 +216,19 @@ extension HealthCalculator {
         let waterL = p.waterLiters
         let bmi = calculateBMI(weightKg: p.weightDouble, heightCm: p.heightDouble)
 
+        // Une quantité JAMAIS POSÉE n'est pas un zéro. Depuis le caddie, ces dix
+        // questions ne sont plus posées : quelqu'un qui saute l'étape des courses
+        // se voyait compter « zéro viande, zéro poisson, zéro fruit »… et 7
+        // apports sur 10 s'effondraient, quoi qu'il mange (audit du 22 sept.
+        // 2026). Seules les PÉNALITÉS dépendent de ces drapeaux : un bonus exige
+        // déjà une quantité positive, qu'une réponse absente ne donne jamais.
+        let viandeConnue = !p.meatPoultry.isEmpty
+        let poissonConnu = !p.fattyFish.isEmpty
+        let animauxConnus = viandeConnue && poissonConnu && !p.eggsPerWeek.isEmpty
+        let laitiersConnus = !p.dairyServings.isEmpty
+        let fruitsConnus = !p.fruitServings.isEmpty
+        let legumesConnus = !p.vegetableServings.isEmpty
+
         let caffeine = p.caffeineIntake.isEmpty ? "none" : p.caffeineIntake
         let caffeineWithMeals = p.caffeineWithMeals
         let screenBed = p.screenBeforeBed.isEmpty ? "short" : p.screenBeforeBed
@@ -277,8 +300,8 @@ extension HealthCalculator {
         if sleepHours < 6 { r.add("vitD", -5, libNuitsCourtes, .modeDeVie) }
 
         // ═══════ VITAMINE B12 ═══════
-        if meat == 0 && eggs == 0 && fish == 0 { r.add("vitB12", -45, "Ni viande, ni œufs, ni poisson", .nutrition) }
-        else if meat <= 2 && eggs <= 2 && fish == 0 { r.add("vitB12", -20, "Très peu de produits animaux", .nutrition) }
+        if animauxConnus && meat == 0 && eggs == 0 && fish == 0 { r.add("vitB12", -45, "Ni viande, ni œufs, ni poisson", .nutrition) }
+        else if animauxConnus && meat <= 2 && eggs <= 2 && fish == 0 { r.add("vitB12", -20, "Très peu de produits animaux", .nutrition) }
         else if meat >= 5 && eggs >= 3 { r.add("vitB12", 10, "Viande et œufs réguliers", .nutrition) }
         let alcoholB12 = ["none": 0, "rarely": 0, "moderate": -5, "regular": -15, "heavy": -25]
         let alcoholLib = [
@@ -295,9 +318,11 @@ extension HealthCalculator {
         if p.antibiotics == "yes" { r.add("vitB12", -5, "Antibiotiques récents", .sante) }
 
         // ═══════ FER ═══════
-        if meat == 0 { r.add("iron", -30, libPasViande, .nutrition) }
-        else if meat <= 3 { r.add("iron", -10, libViandeRare, .nutrition) }
-        else if meat >= 7 { r.add("iron", 8, libViandeQuotidienne, .nutrition) }
+        if viandeConnue {
+            if meat == 0 { r.add("iron", -30, libPasViande, .nutrition) }
+            else if meat <= 3 { r.add("iron", -10, libViandeRare, .nutrition) }
+            else if meat >= 7 { r.add("iron", 8, libViandeQuotidienne, .nutrition) }
+        }
         if p.gender == .femme {
             if age < 50 { r.add("iron", -15, "Femme de moins de 50 ans", .profil) }
             else { r.add("iron", -5, "Femme de plus de 50 ans", .profil) }
@@ -344,7 +369,7 @@ extension HealthCalculator {
         if fish >= 3 { r.add("omega3", 20, "Poisson gras au moins 3 fois par semaine", .nutrition) }
         else if fish >= 2 { r.add("omega3", 10, "Poisson gras 2 fois par semaine", .nutrition) }
         else if fish == 1 { r.add("omega3", 3, "Poisson gras une fois par semaine", .nutrition) }
-        else if fish == 0 { r.add("omega3", -25, "Pas de poisson gras", .nutrition) }
+        else if poissonConnu && fish == 0 { r.add("omega3", -25, "Pas de poisson gras", .nutrition) }
         if seeds >= 2 { r.add("omega3", 8, libGrainesQuotidiennes, .nutrition) }
         else if seeds >= 1 { r.add("omega3", 3, libGrainesPresque, .nutrition) }
         if nuts >= 5 { r.add("omega3", 4, libOleagineux, .nutrition) }
@@ -354,10 +379,10 @@ extension HealthCalculator {
         // ═══════ VITAMINE C ═══════
         if fruit >= 14 { r.add("vitC", 20, libFruitsQuotidiens, .nutrition) }
         else if fruit >= 7 { r.add("vitC", 5, libFruitsReguliers, .nutrition) }
-        else if fruit < 4 { r.add("vitC", -20, libPeuFruits, .nutrition) }
+        else if fruitsConnus && fruit < 4 { r.add("vitC", -20, libPeuFruits, .nutrition) }
         if vegs >= 5 { r.add("vitC", 12, libLegumesQuotidiens, .nutrition) }
         else if vegs >= 3 { r.add("vitC", 5, libLegumesReguliers, .nutrition) }
-        else if vegs < 2 { r.add("vitC", -10, libPeuLegumes, .nutrition) }
+        else if legumesConnus && vegs < 2 { r.add("vitC", -10, libPeuLegumes, .nutrition) }
         if isSmoker { r.add("vitC", -25, libTabac, .modeDeVie) }
         if ["very", "explode"].contains(p.stressLevel) { r.add("vitC", -5, "Stress élevé", .modeDeVie) }
         if ["regular", "heavy"].contains(p.alcohol) { r.add("vitC", -5, libAlcoolRegulier, .modeDeVie) }
@@ -366,7 +391,7 @@ extension HealthCalculator {
         // ═══════ CALCIUM ═══════
         if dairy >= 14 { r.add("calcium", 20, "Produits laitiers quotidiens", .nutrition) }
         else if dairy >= 7 { r.add("calcium", 5, "Produits laitiers réguliers", .nutrition) }
-        else if dairy < 3 { r.add("calcium", -25, "Très peu de produits laitiers", .nutrition) }
+        else if laitiersConnus && dairy < 3 { r.add("calcium", -25, "Très peu de produits laitiers", .nutrition) }
         if vegs >= 5 { r.add("calcium", 5, libLegumesQuotidiens, .nutrition) }
         if legumes >= 3 { r.add("calcium", 3, libLegumineuses, .nutrition) }
         if age > 50 { r.add("calcium", -8, "Plus de 50 ans", .profil) }
@@ -376,9 +401,11 @@ extension HealthCalculator {
         if isActive { r.add("calcium", 5, libSport, .modeDeVie) }
 
         // ═══════ ZINC ═══════
-        if meat == 0 { r.add("zinc", -25, libPasViande, .nutrition) }
-        else if meat <= 3 { r.add("zinc", -10, libViandeRare, .nutrition) }
-        else if meat >= 7 { r.add("zinc", 8, libViandeQuotidienne, .nutrition) }
+        if viandeConnue {
+            if meat == 0 { r.add("zinc", -25, libPasViande, .nutrition) }
+            else if meat <= 3 { r.add("zinc", -10, libViandeRare, .nutrition) }
+            else if meat >= 7 { r.add("zinc", 8, libViandeQuotidienne, .nutrition) }
+        }
         if isActive { r.add("zinc", -5, libSport, .modeDeVie) }
         if nuts >= 5 { r.add("zinc", 8, libOleagineux, .nutrition) }
         if eggs >= 5 { r.add("zinc", 5, libOeufsReguliers, .nutrition) }
@@ -408,10 +435,10 @@ extension HealthCalculator {
         else if p.breadType == "whole_grain" || p.breadType == "sourdough" { r.add("fiber", 10, libPainComplet, .nutrition) }
         if fruit >= 14 { r.add("fiber", 15, libFruitsQuotidiens, .nutrition) }
         else if fruit >= 7 { r.add("fiber", 5, libFruitsReguliers, .nutrition) }
-        else if fruit < 4 { r.add("fiber", -10, libPeuFruits, .nutrition) }
+        else if fruitsConnus && fruit < 4 { r.add("fiber", -10, libPeuFruits, .nutrition) }
         if vegs >= 5 { r.add("fiber", 12, libLegumesQuotidiens, .nutrition) }
         else if vegs >= 3 { r.add("fiber", 5, libLegumesReguliers, .nutrition) }
-        else if vegs < 2 { r.add("fiber", -10, libPeuLegumes, .nutrition) }
+        else if legumesConnus && vegs < 2 { r.add("fiber", -10, libPeuLegumes, .nutrition) }
         if legumes >= 5 { r.add("fiber", 12, "Légumineuses plusieurs fois par semaine", .nutrition) }
         else if legumes >= 2 { r.add("fiber", 5, libLegumineuses, .nutrition) }
         if wholegrain >= 7 { r.add("fiber", 10, "Céréales complètes quotidiennes", .nutrition) }

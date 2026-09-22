@@ -181,6 +181,20 @@ extension NutrientEngine {
         if grignote { c.note("fiber", -5, "Grignotage fréquent", .nutrition) }
         if eau < 1 { c.note("fiber", -5, peuDEau, .modeDeVie) }
 
+        // Ce que le caddie ne dit pas (miroir exact de `applyNonFoodModifiers`)
+        if !caddieContient(p, painsDuCaddie) {
+            if p.breadType == "white" {
+                c.note("fiber", -15, "Pain blanc", .nutrition)
+            } else if ["whole_grain", "sourdough"].contains(p.breadType) {
+                c.note([("fiber", 10), ("magnesium", 10)], "Pain complet ou au levain", .nutrition)
+                if p.breadType == "sourdough" { c.note("zinc", 5, "Pain au levain", .nutrition) }
+            }
+        }
+        if p.eatLiver == "yes" && !caddieContient(p, abatsDuCaddie) {
+            c.note([("vitB12", 15), ("iron", 10)], "Abats au menu", .nutrition)
+        }
+        if vitamineCAideLeFer(p) { c.note("iron", 5, "Fruits et légumes riches en vitamine C", .nutrition) }
+
         // Habitudes d'assiette
         if ["often", "daily"].contains(transformes) {
             c.note([("fiber", -8), ("zinc", -5)], "Produits ultra-transformés fréquents", .nutrition)
