@@ -157,6 +157,33 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertFalse(vm.nutrientScores.isEmpty, "Nutrient scores should be populated")
     }
 
+    /// Étape 3 de l'audit (22 sept. 2026) : le journal des repas corrige les
+    /// scores du tableau de bord, le registre que lisent les écrans, et le hash
+    /// du bilan, d'un seul geste.
+    func testLeJournalCorrigeLeTableauDeBordLeRegistreEtLeHash() {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.computeLocalScores()
+        let hashSansJournal = vm.hashDuBilan
+
+        // Un journal qui ne montre rien sur les dix apports : au moins l'un
+        // d'eux n'est pas déjà au plafond, donc un chiffre bouge forcément.
+        let observations = ObservationsJournal(
+            joursRetenus: 5,
+            couverture: Dictionary(uniqueKeysWithValues: NutrientID.allCases.map { ($0.rawValue, 0) })
+        )
+        vm.poserObservationsJournal(observations)
+        vm.computeLocalScores()
+
+        let attendu = JournalApports.appliquer(HealthCalculator.registreApports(profile: vm.profile), observations: observations)
+        XCTAssertEqual(vm.nutrientScores["iron"], attendu["iron"]?.score)
+        XCTAssertEqual(vm.registre["iron"], attendu["iron"])
+        XCTAssertTrue(vm.registre["vitC"]?.contributions.contains { $0.section == .journal } == true)
+        XCTAssertNotEqual(vm.hashDuBilan, hashSansJournal, "le bilan doit suivre ce que le journal change")
+
+        vm.poserObservationsJournal(nil)
+        XCTAssertEqual(vm.hashDuBilan, hashSansJournal)
+    }
+
     /// An incomplete questionnaire should reset scores to zero.
     func testComputeLocalScores_incompleteQuestionnaire_resetsToZero() {
         var incomplete = UserProfile.empty
