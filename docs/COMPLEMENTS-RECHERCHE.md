@@ -1,6 +1,7 @@
 # Compléments : doctrine, cadre et table symptômes
 
-> Document de travail interne, ouvert le 20 septembre 2026.
+> Document de travail interne, ouvert le 20 septembre 2026,
+> **à jour au 30 septembre 2026**.
 > **Ne part pas chez Claude Design.**
 >
 > Il répond à une question : quel complément recommander à qui, sous quelle
@@ -96,7 +97,32 @@ promesse thérapeutique. Recommander des marques engage notre responsabilité
 | Zinc | bisglycinate | **changé** — la référence à 15 mg est sortie |
 | Vitamine B12 | forme stable, bien absorbée | argument de vente corrigé |
 
-Catalogue : 19 → 18 produits.
+Catalogue : 19 → 18 produits le 20 septembre, puis **17 le 30 septembre**
+(l'iode Enova est sortie, en rupture chez le fabricant).
+
+### L'audit de fraîcheur du 30 septembre
+
+Les 17 fiches ont été rouvertes une par une. Neuf étaient exactes, six non.
+
+| Écart | Avant | Après |
+|---|---|---|
+| Fiche Aroma-Zone du fer | adresse en **404** | nouvelle adresse |
+| Fiche Aroma-Zone du psyllium | adresse en **404** | nouvelle adresse |
+| Vitamine C liposomale Dynveo | 21,90 € | **29,90 €** |
+| Psyllium Aroma-Zone | 6,90 € | **13,90 €** |
+| Vitamine C Quali-C Nutripure | 27,90 € | **13,90 €** |
+| Calcium Argalys | 3 prises/jour, « 500 mg » | **2 prises**, 480 mg |
+| Fibres Nutri&Co | 5,25 g/dosette | **4,5 g** |
+| Fer Nutri&Co | 19,90 € | 18,90 € |
+| Fer Aroma-Zone | 9,90 € | 9,95 € |
+
+Deux enseignements pour le prochain audit. **Les adresses meurent avant les
+prix** : une refonte de site suffit, et rien ne nous prévient. Et **l'erreur
+va dans les deux sens** — on sous-estimait un produit de 8 € par mois, on en
+surestimait un autre de moitié.
+
+Non reconfirmé : le format de l'oméga-3 Nutri&Co (sélecteur 60/120 capsules
+illisible). Valeur conservée, signalée en commentaire dans le catalogue.
 
 **Sur la B12.** La supériorité clinique de la méthylcobalamine sur la
 cyanocobalamine n'est pas établie aux doses d'entretien — ce sont les formes
@@ -141,31 +167,28 @@ supplémentation les réduit est mince.
 
 ## 5. Ce qui a été corrigé, et ce qui reste
 
-**Corrigé et mergé** — PR #248 et #250.
+**Tout ce qui était ouvert le 20 septembre est fermé.**
 
-- L'avertissement des fibres sur les médicaments ne s'affichait jamais.
-- La précaution hémochromatose manquait sur une des deux vitamines C.
-- `thyroid_med` était capté et ignoré : iode, fer et calcium sont désormais
-  signalés.
-- Le conseil « IPP + calcium » renvoyait vers un citrate absent du catalogue.
-- Les doses journalières ne s'affichent plus, aux trois endroits où elles
-  apparaissaient — y compris dans le PDF exporté.
+| Sujet | État |
+|---|---|
+| Les cinq défauts du moteur | ✅ PR #248 et #250 |
+| Les doses affichées dans l'app | ✅ PR #250 et #271, verrouillé par `ComplementsSansDoseTests` |
+| Les doses produites par le serveur | ✅ **22 septembre** — `generate-analysis` v64/v65, plus aucune dose demandée ni rendue, filet `stripDose`. **Ne pas rouvrir.** |
+| Les questions médicales manquantes | ✅ **20 septembre** — PR #249. Le questionnaire capte thyroïde, hémochromatose, reins fragiles et allergie poisson. |
+| Les contre-indications qui ne filtraient pas | ✅ **fermé** — l'allergie poisson et l'hémochromatose **écartent** désormais le produit ; les reins et la thyroïde **avertissent**. |
+| L'iode pendant la grossesse | ✅ **fermé** — le registre applique déjà −10 sur l'iode en grossesse et −8 en allaitement : le besoin accru remonte dans le score. Sourcer un 200 µg rouvrirait la sélection par profil que la doctrine a fermée, comme pour le citrate de calcium. |
+| La fraîcheur du catalogue | ✅ **30 septembre** — voir § 3. |
 
-**Reste ouvert.**
+**Ce qui reste, et c'est peu.**
 
-1. **Le prompt de `generate-analysis`** (dépôt web) demande toujours des doses
-   au modèle. Son exemple de référence contient **25 mg/j de fer**, au-dessus
-   du maximum français de 14 mg. On ne les affiche plus, on continue de les
-   produire et de les stocker. À traiter avec son propre déploiement et la
-   vérification sur les trois profils d'audit.
-2. **Les questions manquantes au questionnaire** — thyroïde, hémochromatose,
-   insuffisance rénale, allergie au poisson. Sans elles, les contre-indications
-   ne peuvent pas filtrer, seulement avertir. Décision produit : ajouter des
-   questions change l'inscription pour tout le monde.
-3. **L'iode pendant la grossesse** (§ 2.2).
-4. **Une passe complète de vérification du catalogue.** `catalogVerifiedAt`
-   reste au 20 juillet 2026 : seul le magnésium a été vérifié sur la fiche
-   officielle le 20 septembre.
+1. **Les adresses Aroma-Zone sont en anglais.** Les pages françaises du fer et
+   du psyllium n'ont pas été retrouvées après la refonte du site. Les adresses
+   enregistrées répondent et montrent le bon produit, mais dans la mauvaise
+   langue.
+2. **Le format de l'oméga-3 Nutri&Co** reste à reconfirmer (§ 3).
+3. **Le prochain audit de fraîcheur.** Le précédent a tenu deux mois et demi et
+   a trouvé six écarts sur dix-sept fiches. Un rythme trimestriel paraît le
+   minimum.
 
 ---
 
