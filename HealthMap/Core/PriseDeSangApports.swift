@@ -142,8 +142,9 @@ enum PriseDeSangApports {
     static let moisPleinEffet = 6
     /// … et au-delà de celle-ci, plus du tout.
     static let moisMaximum = 12
-    /// La mesure tire le score de cette part de l'écart…
-    static let traction = 0.7
+    /// La mesure tire le score de cette part de l'écart (en %, entier : en
+    /// flottant, 45 × 0,7 vaut 31,4999… et s'arrondirait à 31)…
+    static let tractionPourcent = 70
     /// … sans jamais le déplacer de plus de ces points.
     static let plafond = 35
     static let effetMinimum = 2
@@ -176,7 +177,7 @@ enum PriseDeSangApports {
 
     /// La correction d'un apport, en points.
     static func correction(score: Int, cible: Int, fraicheur: Double) -> Int {
-        let points = Int((Double(cible - score) * traction * fraicheur).rounded())
+        let points = Int((Double((cible - score) * tractionPourcent) / 100 * fraicheur).rounded())
         return max(-plafond, min(plafond, points))
     }
 
