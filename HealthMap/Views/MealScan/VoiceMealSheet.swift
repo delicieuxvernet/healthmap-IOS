@@ -50,7 +50,18 @@ struct VoiceMealSheet: View {
     /// répondre.
     @State private var deployee: Int?
     @State private var quotedTranscript = ""
-    @State private var slot: MealJournalService.MealSlot = .lunch
+    /// Repas choisi. `nil` tant que le vocal ne l'a pas dit ET que la personne
+    /// ne l'a pas choisi : on ne le devine plus en silence d'après l'heure
+    /// (retour d'Arthur, 30 sept. 2026 — « il faut que je puisse choisir »).
+    @State private var slot: MealJournalService.MealSlot?
+    /// Vrai quand le repas vient du vocal (« ce midi ») : on le dit sous le choix.
+    @State private var slotDit = false
+    /// Aliments « à vérifier » que la personne a tranchés (gardés ou remplacés).
+    /// Tant qu'un aliment à vérifier n'est pas tranché, il ne compte pas.
+    @State private var confirmes: Set<Int> = []
+    /// Aliment pour lequel la recherche de remplacement est ouverte.
+    @State private var remplacementPour: RemplacementCible?
+    @State private var remplacementEnCours: Int?
     @State private var errorMessage: String?
     @State private var isSaving = false
     /// Aliments extraits au-delà du plafond serveur, donc non analysés.
@@ -86,6 +97,11 @@ struct VoiceMealSheet: View {
     // mode écoute (le « popup » ouvert par un appui simple) est supprimé.
     enum Phase { case saisie, analyzing, results, failed }
 
+    struct RemplacementCible: Identifiable {
+        let index: Int
+        var id: Int { index }
+    }
+
     // MARK: - Corps
 
     var body: some View {
@@ -110,6 +126,14 @@ struct VoiceMealSheet: View {
         }
         .presentationDetents(hauteurs)
         .presentationDragIndicator(.visible)
+        .sheet(item: $remplacementPour) { cible in
+            RemplacementAlimentSheet(dit: libelleDit(cible.index)) { hit in
+                remplacementPour = nil
+                Task { await remplacer(cible.index, par: hit.id) }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .task { await demarrer() }
         .onDisappear {
             revelation?.cancel()
@@ -225,14 +249,6 @@ struct VoiceMealSheet: View {
                     .italic()
                     .foregroundStyle(Color.dsSecondaire)
 
-                Picker("Repas", selection: $slot) {
-                    ForEach(MealJournalService.MealSlot.allCases, id: \.self) { s in
-                        Text(s.label).tag(s)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.vertical, 4)
-
                 ForEach(itemsAffiches) { item in
                     VoiceItemRow(
                         item: item,
@@ -241,6 +257,11 @@ struct VoiceMealSheet: View {
                         taille: tailles[item.index],
                         peutBasculer: unites[item.index] != nil,
                         deployee: deployee == item.index,
+                        aVerifier: aVerifier(item),
+                        remplacementEnCours: remplacementEnCours == item.index,
+                        onGarder: { garder(item.index) },
+                        onRemplacer: { id in Task { await remplacer(item.index, par: id) } },
+                        onChercher: { remplacementPour = RemplacementCible(index: item.index) },
                         onTap: { basculer(item.index) },
                         onPick: { choisir($0, pour: item.index) },
                         onAjuster: { ajuster($0, pour: item.index) },
@@ -285,12 +306,57 @@ struct VoiceMealSheet: View {
                     )
                 }
 
+                choixRepas
                 totalBlock
                 ctaBlock
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
+    }
+
+    /// Choix du repas, en FIN d'écran, juste avant d'ajouter : c'est la dernière
+    /// décision, pas la première. Pré-choisi seulement si le vocal l'a dit.
+    private var choixRepas: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("C'est pour quel repas ?")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.dsTexte)
+            if slotDit {
+                Text("Tu l'as dit dans ton vocal.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.dsSecondaire)
+            }
+            HStack(spacing: 7) {
+                ForEach(MealJournalService.MealSlot.ordreJournal, id: \.self) { s in
+                    let choisi = slot == s
+                    Button {
+                        HapticService.shared.tap()
+                        slot = s
+                        slotDit = false
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: s.symboleJournal)
+                                .font(.system(size: 15, weight: .semibold))
+                                .accessibilityHidden(true)
+                            Text(s.titreJournal)
+                                .font(.system(size: 12, weight: .semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                    }
+                    .buttonStyle(.plain)
+                    .background(choisi ? Color.dsAccent : Color.dsRemplissage,
+                                in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(choisi ? .white : Color.dsTexte)
+                    .accessibilityLabel(s.titreJournal)
+                    .accessibilityAddTraits(choisi ? .isSelected : [])
+                }
+            }
+        }
+        .padding(.top, 8)
+        .accessibilityElement(children: .contain)
     }
 
     /// Avertissement de la feuille. Il porte une information que l'utilisateur
@@ -346,28 +412,16 @@ struct VoiceMealSheet: View {
                 .foregroundStyle(Color.dsTertiaire)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 8)
+        } else if let douteux = aVerifierNames.first {
+            // Un aliment incertain ne compte pas tant qu'il n'est pas tranché :
+            // un total incomplet et signalé vaut mieux qu'un total faux.
+            consigne("Vérifie l'aliment : « \(douteux) »")
         } else if let manquant = missingNames.first {
             // Bloquant tant qu'une quantité manque : on n'invente pas un grammage.
             // Un féculent varie du simple au triple selon la portion.
-            //
-            // Rendue en gris sur gris, cette instruction se lisait comme un
-            // bouton désactivé — donc comme un cul-de-sac. C'est une consigne :
-            // elle prend l'ambre de la question et un corps de conclusion.
-            HStack(spacing: 8) {
-                Image(systemName: "questionmark.circle.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .accessibilityHidden(true)
-                Text("Précise la quantité : \(manquant)")
-                    .font(Theme.insightFont)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(Kiwio.ambre)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-            .background(Kiwio.ambreFond, in: RoundedRectangle(cornerRadius: 14))
-            .accessibilityElement(children: .combine)
+            consigne("Précise la quantité : \(manquant)")
+        } else if slot == nil {
+            consigne("Choisis le repas juste au-dessus")
         } else {
             Button {
                 Task { await save() }
@@ -392,6 +446,28 @@ struct VoiceMealSheet: View {
         .font(.system(size: 14, weight: .medium))
         .foregroundStyle(Color.dsSecondaire)
         .frame(maxWidth: .infinity, minHeight: 44)
+    }
+
+    /// Ce qui manque avant de pouvoir ajouter. Rendue en gris sur gris, cette
+    /// instruction se lisait comme un bouton désactivé — donc comme un
+    /// cul-de-sac. C'est une consigne : elle prend l'ambre de la question et un
+    /// corps de conclusion.
+    private func consigne(_ texte: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "questionmark.circle.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .accessibilityHidden(true)
+            Text(texte)
+                .font(Theme.insightFont)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Kiwio.ambre)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+        .background(Kiwio.ambreFond, in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Erreur
@@ -480,7 +556,88 @@ struct VoiceMealSheet: View {
         let poids = unite.poids(taille: tailles[index])
         let actuel = UnitPortionCatalog.nombre(grammes: grams[index] ?? 0, poidsUnite: poids)
         let nombre = UnitPortionCatalog.nombreSuivant(actuel, delta: delta)
-        grams[index] = min(2000, nombre * poids)
+        grams[index] = min(2000, (nombre * poids).rounded())
+    }
+
+    // MARK: Aliment retenu
+
+    /// À vérifier et pas encore tranché : ne compte pas, bloque l'ajout.
+    private func aVerifier(_ item: VoiceMealService.Item) -> Bool {
+        item.aVerifier && !confirmes.contains(item.index)
+    }
+
+    /// Ce que la personne a dit pour cet aliment (« aiguillettes de poulet »).
+    private func libelleDit(_ index: Int) -> String {
+        guard let item = items.first(where: { $0.index == index }) else { return "" }
+        return item.libelle ?? item.nom
+    }
+
+    /// « C'est bien ça » : l'aliment proposé est gardé tel quel.
+    private func garder(_ index: Int) {
+        HapticService.shared.tap()
+        confirmes.insert(index)
+        withAnimation(.snappy(duration: 0.22)) { deployee = prochainManquant() }
+    }
+
+    /// Remplace l'aliment retenu par un autre de la base (alternative proposée
+    /// ou recherche), SANS toucher à la quantité dite : on change ce qui est
+    /// compté, pas ce qui a été mangé. Les valeurs repartent de `get_food`.
+    private func remplacer(_ index: Int, par foodId: String) async {
+        guard let pos = items.firstIndex(where: { $0.index == index }) else { return }
+        remplacementEnCours = index
+        defer { remplacementEnCours = nil }
+        do {
+            let detail = try await journal.foodDetail(id: foodId)
+            var item = items[pos]
+            item.foodId = detail.id
+            item.nom = detail.name
+            item.marque = detail.brand
+            item.portions = detail.portions.map { .init(label: $0.label, grammes: $0.grammes) }
+            item.per100 = VoiceMealService.Per100(
+                kcal: detail.kcal100g ?? 0,
+                proteines: detail.proteins100g ?? 0,
+                glucides: detail.carbs100g ?? 0,
+                lipides: detail.fats100g ?? 0,
+                fibres: detail.fiber100g ?? 0
+            )
+            item.statut = "compris"
+            items[pos] = item
+            confirmes.insert(index)
+            // L'unité suit l'aliment, sauf si elle vient de la quantité dite
+            // (« 2 c. à soupe » reste 2 c. à soupe, quel que soit l'aliment).
+            if let unite = Self.unite(pour: item) {
+                unites[index] = unite
+                tailles[index] = unite.tailleParDefaut
+            } else {
+                unites[index] = nil
+                tailles[index] = nil
+            }
+            HapticService.shared.primary()
+            withAnimation(.snappy(duration: 0.22)) { deployee = prochainManquant() }
+        } catch {
+            AppLogger.analysis.error("get_food(\(foodId, privacy: .public)) indisponible pour un remplacement")
+        }
+    }
+
+    /// Unité de saisie d'un aliment : d'abord la quantité TELLE QU'ELLE A ÉTÉ
+    /// DITE (compte + poids d'une unité fournis par le serveur), sinon le
+    /// catalogue. Pour une pièce, le catalogue donne le mot (« carré »,
+    /// « œuf ») mais le poids reste celui du serveur, sans tailles : le compte
+    /// dit × poids d'unité doit retomber exactement sur les grammes comptés.
+    static func unite(pour item: VoiceMealService.Item) -> UnitPortionCatalog.Unite? {
+        let portions = item.portions.map { (label: $0.label, grammes: $0.grammes) }
+        let catalogue = UnitPortionCatalog.unite(pourNom: item.nom, portions: portions)
+        guard let dite = item.quantiteDite, dite.poidsUniteG > 0 else { return catalogue }
+        if dite.unite == "piece" {
+            return UnitPortionCatalog.Unite(singulier: catalogue?.singulier ?? dite.singulier,
+                                            pluriel: catalogue?.pluriel ?? dite.pluriel,
+                                            grammes: dite.poidsUniteG,
+                                            tailles: [])
+        }
+        return UnitPortionCatalog.Unite(singulier: dite.singulier,
+                                        pluriel: dite.pluriel,
+                                        grammes: dite.poidsUniteG,
+                                        tailles: [])
     }
 
     /// Unités ↔ grammes pour un aliment : les grammes retenus ne bougent pas,
@@ -489,8 +646,10 @@ struct VoiceMealSheet: View {
         if enGrammes.contains(index) { enGrammes.remove(index) } else { enGrammes.insert(index) }
     }
 
+    /// Prochaine question ouverte : un aliment à vérifier d'abord, sinon une
+    /// quantité manquante.
     private func prochainManquant() -> Int? {
-        visibleItems.first { (grams[$0.index] ?? 0) <= 0 }?.index
+        visibleItems.first { aVerifier($0) || (grams[$0.index] ?? 0) <= 0 }?.index
     }
 
     // MARK: - Données dérivées
@@ -513,11 +672,15 @@ struct VoiceMealSheet: View {
     /// n'est plus jeté — le jeter faussait le total de la journée.
     private var savableItems: [VoiceMealService.Item] {
         visibleItems.filter {
-            (grams[$0.index] ?? 0) > 0 && ($0.foodId != nil || $0.per100 != nil)
+            !aVerifier($0) && (grams[$0.index] ?? 0) > 0 && ($0.foodId != nil || $0.per100 != nil)
         }
     }
     private var missingNames: [String] {
         visibleItems.filter { (grams[$0.index] ?? 0) <= 0 }.map(\.nom)
+    }
+    /// Ce que la personne a dit, pour chaque aliment encore à vérifier.
+    private var aVerifierNames: [String] {
+        visibleItems.filter { aVerifier($0) }.map { $0.libelle ?? $0.nom }
     }
     /// Vraiment inexploitables : ni fiche, ni estimation. Devenu rare.
     private var ignoredNames: [String] {
@@ -532,7 +695,7 @@ struct VoiceMealSheet: View {
     /// Total recalculé à chaque interaction, à partir des valeurs pour 100 g.
     private var totaux: (kcal: Int, proteines: Double, glucides: Double, lipides: Double) {
         var k = 0.0, p = 0.0, g = 0.0, l = 0.0
-        for item in visibleItems {
+        for item in visibleItems where !aVerifier(item) {
             guard let poids = grams[item.index], poids > 0, let cent = item.per100 else { continue }
             let f = poids / 100
             k += cent.kcal * f
@@ -581,13 +744,13 @@ struct VoiceMealSheet: View {
                 item.grammes.map { (item.index, $0) }
             })
             unites = Dictionary(uniqueKeysWithValues: analysis.aliments.compactMap { item in
-                UnitPortionCatalog.unite(pourNom: item.nom,
-                                         portions: item.portions.map { (label: $0.label, grammes: $0.grammes) })
-                    .map { (item.index, $0) }
+                Self.unite(pour: item).map { (item.index, $0) }
             })
             tailles = unites.compactMapValues { $0.tailleParDefaut }
             enGrammes = []
-            slot = VoiceMealService.slot(fromServeur: analysis.repas)
+            confirmes = []
+            slot = VoiceMealService.slotDit(analysis.repas)
+            slotDit = slot != nil
             alimentsIgnoresServeur = analysis.alimentsIgnores ?? 0
             phase = .results
             // On ouvre d'emblée la première question à laquelle il faut répondre.
@@ -645,7 +808,7 @@ struct VoiceMealSheet: View {
     }
 
     private func save() async {
-        guard !isSaving else { return }
+        guard !isSaving, let slot else { return }
         isSaving = true
         defer { isSaving = false }
 
@@ -767,6 +930,13 @@ private struct VoiceItemRow: View {
     /// Vrai quand l'aliment a une unité : le lien unités ↔ grammes s'affiche.
     let peutBasculer: Bool
     let deployee: Bool
+    /// Incertain et pas encore tranché : ne compte pas tant que la personne
+    /// n'a pas choisi.
+    let aVerifier: Bool
+    let remplacementEnCours: Bool
+    let onGarder: () -> Void
+    let onRemplacer: (String) -> Void
+    let onChercher: () -> Void
     let onTap: () -> Void
     let onPick: (Double) -> Void
     let onAjuster: (Double) -> Void
@@ -776,6 +946,9 @@ private struct VoiceItemRow: View {
     let onRemove: () -> Void
 
     private var manque: Bool { (grams ?? 0) <= 0 }
+    /// Quelque chose attend la personne sur cette ligne (aliment ou quantité).
+    private var alerte: Bool { manque || aVerifier }
+    private var dit: String { item.libelle ?? item.nom }
 
     /// Nombre d'unités retenu (0 tant que la quantité manque).
     private var nombre: Double {
@@ -802,19 +975,23 @@ private struct VoiceItemRow: View {
                 HStack(spacing: 10) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(manque ? Kiwio.ambreFond : Color.dsRemplissage)
-                        Image(systemName: manque ? "questionmark" : "fork.knife")
+                            .fill(alerte ? Kiwio.ambreFond : Color.dsRemplissage)
+                        Image(systemName: alerte ? "questionmark" : "fork.knife")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(manque ? Kiwio.ambre : Color.dsTexte)
+                            .foregroundStyle(alerte ? Kiwio.ambre : Color.dsTexte)
                     }
                     .frame(width: 38, height: 38)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.nom)
+                        Text(aVerifier ? dit : item.nom)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.dsTexte)
                             .lineLimit(1)
-                        if manque {
+                        if aVerifier {
+                            Text("à vérifier")
+                                .font(Theme.insightFont)
+                                .foregroundStyle(Kiwio.ambre)
+                        } else if manque {
                             // C'est la question qui bloque l'enregistrement :
                             // elle ne peut pas être le plus petit texte de la
                             // ligne (elle l'était, à 12 pt).
@@ -836,11 +1013,19 @@ private struct VoiceItemRow: View {
                                     .foregroundStyle(Color.dsSecondaire)
                             }
                         }
+                        if item.parDefaut && !aVerifier {
+                            // Dit vaguement : on a pris la référence la plus
+                            // consommée. On le montre, pour que ça se corrige.
+                            Text("Tu as dit « \(dit) » : le plus courant")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.dsSecondaire)
+                                .lineLimit(1)
+                        }
                     }
 
                     Spacer()
 
-                    if !manque {
+                    if !alerte {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 18))
                             .foregroundStyle(Color.dsAccent)
@@ -852,13 +1037,17 @@ private struct VoiceItemRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(manque
+            .accessibilityLabel(aVerifier
+                                ? "\(dit), aliment à vérifier"
+                                : manque
                                 ? "\(item.nom), quantité à préciser"
                                 : "\(item.nom), \(resume)")
-            .accessibilityHint("Toucher pour ajuster la quantité")
+            .accessibilityHint("Toucher pour ajuster")
 
             if deployee {
                 VStack(alignment: .leading, spacing: 12) {
+                    choixAliment
+
                     if manque {
                         Text(unite?.question ?? "Quelle quantité as-tu mangée ?")
                             .font(.system(size: 14, weight: .semibold))
@@ -896,8 +1085,74 @@ private struct VoiceItemRow: View {
         .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(manque ? Kiwio.ambreBordure : Color.clear, lineWidth: 1)
+                .stroke(alerte ? Kiwio.ambreBordure : Color.clear, lineWidth: 1)
         )
+    }
+
+    // MARK: Aliment retenu
+
+    /// À vérifier : « c'est lequel ? » + l'aliment proposé et ses alternatives.
+    /// Par défaut : les autres formes courantes, pour corriger d'un geste.
+    /// Toujours : chercher un autre aliment, sans refaire la dictée.
+    @ViewBuilder
+    private var choixAliment: some View {
+        let alternatives = item.alternatives ?? []
+        if aVerifier || (item.parDefaut && !alternatives.isEmpty) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(aVerifier
+                     ? "Tu as dit « \(dit) » : c'est lequel ?"
+                     : "Tu as dit « \(dit) ». J'ai pris le plus courant, ou :")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                if aVerifier {
+                    choixLigne(item.nom, choisi: false, action: onGarder)
+                }
+                ForEach(alternatives, id: \.self) { alt in
+                    choixLigne(alt.marque.map { "\(alt.nom) · \($0)" } ?? alt.nom, choisi: false) {
+                        onRemplacer(alt.foodId)
+                    }
+                }
+            }
+        }
+        Button(action: onChercher) {
+            HStack(spacing: 6) {
+                if remplacementEnCours {
+                    ProgressView().scaleEffect(0.7)
+                } else {
+                    Image(systemName: "magnifyingglass")
+                        .accessibilityHidden(true)
+                }
+                Text(aVerifier ? "Chercher un autre aliment" : "Ce n'est pas ça ? Changer d'aliment")
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Color.dsAccent)
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .disabled(remplacementEnCours)
+    }
+
+    private func choixLigne(_ titre: String, choisi: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(titre)
+                    .font(.system(size: 14, weight: .medium))
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.dsTertiaire)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(Color.dsRemplissage, in: RoundedRectangle(cornerRadius: 10))
+            .foregroundStyle(Color.dsTexte)
+        }
+        .buttonStyle(.plain)
+        .disabled(remplacementEnCours)
     }
 
     // MARK: Saisie en unités
@@ -1163,5 +1418,78 @@ struct Waveform: View {
             if !estActif { historique = Array(repeating: 0, count: nbBarres) }
         }
         .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Remplacer un aliment dicté
+
+/// Recherche dans la base pour remplacer l'aliment retenu d'une ligne dictée.
+/// Contrairement à `FoodSearchSheet`, rien n'est enregistré ici : on renvoie
+/// l'aliment choisi, et la ligne garde la quantité dite.
+private struct RemplacementAlimentSheet: View {
+    /// Ce que la personne a dit : sert de première recherche.
+    let dit: String
+    let onChoisir: (MealJournalService.FoodHit) -> Void
+
+    @StateObject private var vm = FoodSearchViewModel()
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(Color.dsSecondaire)
+                            .accessibilityHidden(true)
+                        TextField("Rechercher un aliment", text: $vm.query)
+                            .font(Theme.bodyFont)
+                            .autocorrectionDisabled()
+                            .accessibilityLabel("Rechercher un aliment")
+                            .onChange(of: vm.query) { _, _ in vm.search() }
+                    }
+                    .padding(Theme.spacingSM)
+                    .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                    if vm.isSearching {
+                        ProgressView().tint(Color.dsAccent).padding(.top, 20)
+                    } else if vm.hits.isEmpty && vm.query.count >= 2 {
+                        Text("Aucun résultat. Essaie un autre nom.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.dsSecondaire)
+                            .padding(.top, 20)
+                    } else {
+                        ForEach(vm.hits) { hit in
+                            Button {
+                                HapticService.shared.tap()
+                                onChoisir(hit)
+                            } label: {
+                                FoodHitContenu(hit: hit)
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            }
+                            .buttonStyle(.healthMapPressed)
+                        }
+                    }
+                }
+                .padding(.horizontal, Theme.spacingLG)
+                .padding(.vertical, Theme.spacingMD)
+            }
+            .background(Color.dsFond.ignoresSafeArea())
+            .navigationTitle("Changer d'aliment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Fermer") { dismiss() }
+                        .foregroundStyle(Color.dsTexte)
+                }
+            }
+        }
+        .onAppear {
+            guard vm.query.isEmpty else { return }
+            vm.query = dit
+            vm.search()
+        }
     }
 }
