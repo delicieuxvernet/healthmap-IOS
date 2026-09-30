@@ -72,20 +72,37 @@ final class VoiceMealService {
         let index: Int
         /// `ciqual:<code>` ou `off:<code-barres>`. `nil` = aliment hors base :
         /// affiché et compté à l'écran, mais non enregistrable en l'état.
-        let foodId: String?
-        let nom: String
-        let marque: String?
+        /// Variable : la personne peut remplacer l'aliment retenu (alternative
+        /// proposée ou recherche) sans refaire sa dictée.
+        var foodId: String?
+        var nom: String
+        var marque: String?
         /// Grammes résolus. `nil` quand la quantité n'a pas été dite.
         let grammes: Double?
         let besoinQuantite: Bool
         let confiance: Double
         let kcal: Int?
-        let portions: [Portion]
+        var portions: [Portion]
         /// Valeurs pour 100 g — permettent d'enregistrer un aliment même absent
         /// de la base (`foodId == nil`) au lieu de le jeter.
-        let per100: Per100?
+        var per100: Per100?
+        /// Ce que la personne a dit, mot pour mot (« aiguillettes de poulet »).
+        let libelle: String?
+        /// `compris` (dit précisément), `defaut` (dit vaguement : on a pris la
+        /// référence la plus consommée), `a_verifier` (incertain : la personne
+        /// tranche avant que l'aliment compte). `nil` sur les anciennes versions.
+        var statut: String?
+        /// Autres aliments plausibles, proposés pour `defaut` et `a_verifier`.
+        let alternatives: [Alternative]?
+        /// La quantité TELLE QU'ELLE A ÉTÉ DITE (« 2 c. à soupe ») et le poids
+        /// d'une unité selon le serveur. L'écran affiche ce compte et ne le
+        /// recalcule plus avec sa propre table : « deux cuillères » d'huile
+        /// s'affichait « 3 cuillères » (30 sept. 2026).
+        let quantiteDite: QuantiteDite?
 
         var id: Int { index }
+        var aVerifier: Bool { statut == "a_verifier" }
+        var parDefaut: Bool { statut == "defaut" }
 
         enum CodingKeys: String, CodingKey {
             case index, nom, marque, kcal, portions, per100
@@ -93,6 +110,34 @@ final class VoiceMealService {
             case grammes = "g"
             case besoinQuantite = "besoin_quantite"
             case confiance
+            case libelle, statut, alternatives
+            case quantiteDite = "quantite_dite"
+        }
+    }
+
+    struct Alternative: Decodable, Equatable, Hashable {
+        let foodId: String
+        let nom: String
+        let marque: String?
+        let kcal100: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case foodId, nom, marque
+            case kcal100 = "kcal_100g"
+        }
+    }
+
+    struct QuantiteDite: Decodable, Equatable {
+        let valeur: Double
+        /// Unité parlée (`cuillere_soupe`, `tranche`, `piece`…).
+        let unite: String
+        let singulier: String
+        let pluriel: String
+        let poidsUniteG: Double
+
+        enum CodingKeys: String, CodingKey {
+            case valeur, unite, singulier, pluriel
+            case poidsUniteG = "poids_unite_g"
         }
     }
 
@@ -127,6 +172,18 @@ final class VoiceMealService {
         case "diner":          return .dinner
         case "collation":      return .snack
         default:               return MealJournalService.MealSlot.from(date: date)
+        }
+    }
+
+    /// Le repas SEULEMENT s'il a été dit dans le vocal ; `nil` sinon. L'écran
+    /// vocal demande alors à la personne au lieu de deviner d'après l'heure.
+    static func slotDit(_ repas: String) -> MealJournalService.MealSlot? {
+        switch repas {
+        case "petit_dejeuner": return .breakfast
+        case "dejeuner":       return .lunch
+        case "diner":          return .dinner
+        case "collation":      return .snack
+        default:               return nil
         }
     }
 

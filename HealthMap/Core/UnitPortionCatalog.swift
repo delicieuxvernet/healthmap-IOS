@@ -322,7 +322,10 @@ enum UnitPortionCatalog {
         .init(motif: #"beurre de (cacahuete|cacahouete|cajou|amande|noix)|puree d'(amande|arachide|cacahuete|noisette)"#, singulier: "cuillère", pluriel: "cuillères", grammes: 15),
         .init(motif: #"confiture|\bmiel\b|sirop d'erable|marmelade|gelee de"#, singulier: "cuillère", pluriel: "cuillères", grammes: 20),
         .init(motif: #"\bbeurre\b|margarine"#, singulier: "noisette", pluriel: "noisettes", grammes: 10),
-        .init(motif: #"\bhuiles?\b"#, singulier: "cuillère", pluriel: "cuillères", grammes: 10),
+        // 1 c. à soupe = 15 ml × 0,92 g/ml ≈ 14 g : la MÊME cuillère que la
+        // saisie vocale (quantities.ts). À 10 g, « deux cuillères » dictées
+        // (28 g côté serveur) s'affichaient « 3 cuillères » (30 sept. 2026).
+        .init(motif: #"\bhuiles?\b"#, singulier: "cuillère", pluriel: "cuillères", grammes: 14),
         .init(motif: #"sucre (en poudre|semoule|glace|roux|de canne)|cassonade|vergeoise"#, singulier: "cuillère", pluriel: "cuillères", grammes: 5),
         .init(motif: #"\bsucre\b"#, singulier: "morceau", pluriel: "morceaux", grammes: 5),
         .init(motif: #"\bsauces?\b|ketchup|mayonnaise|moutarde|vinaigrette|aioli|pesto|tzatziki|houmous|hummus|guacamole|tapenade|tarama"#, singulier: "cuillère", pluriel: "cuillères", grammes: 15),
