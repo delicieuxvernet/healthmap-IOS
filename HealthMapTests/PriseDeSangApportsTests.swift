@@ -152,6 +152,7 @@ final class PriseDeSangApportsTests: XCTestCase {
 
     // MARK: Le bilan se régénère
 
+    @MainActor
     func testLaPriseDeSangEntreDansLeHashDuBilan() {
         let profil = UserProfile.empty
         XCTAssertEqual(AIAnalysisService.hashProfile(profil), AIAnalysisService.hashProfile(profil, sang: ""))
