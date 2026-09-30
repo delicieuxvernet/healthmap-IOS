@@ -18,6 +18,9 @@ final class DashboardViewModel: ObservableObject {
     /// Ce que les repas notés des 14 derniers jours ont montré (étape 3 de
     /// l'audit de personnalisation) ; nil tant qu'ils n'en disent pas assez.
     @Published private(set) var observationsJournal: ObservationsJournal?
+    /// La prise de sang la plus récente (Premium, 30 sept. 2026) ; nil sans
+    /// import. Elle corrige les apports APRÈS le journal (`PriseDeSangApports`).
+    @Published private(set) var priseDeSang: PriseDeSang?
     @Published var hasCompletedQuestionnaire = false
     /// Passe à `true` une fois le PREMIER `loadProfile` terminé (succès, échec
     /// ou pas de session) — succès OU échec. Tant qu'il est `false`, la racine
@@ -313,6 +316,7 @@ final class DashboardViewModel: ObservableObject {
         // du bilan, qui en dépend. Un échec laisse le seul questionnaire parler.
         if hasCompletedQuestionnaire {
             await chargerJournal(userId: userId)
+            await chargerPriseDeSang(userId: userId)
         }
 
         // Hydrate le bilan v2 depuis le CACHE DB si le profil n'a pas changé
@@ -402,18 +406,74 @@ final class DashboardViewModel: ObservableObject {
     /// rappelant `HealthCalculator.registreApports` : sinon la fiche et le
     /// tableau de bord ne diraient pas le même chiffre.
     var registre: [String: DetailApport] {
+        PriseDeSangApports.appliquer(registreSansPriseDeSang, priseDeSang: priseDeSang)
+    }
+
+    /// Questionnaire + journal, sans la prise de sang.
+    private var registreSansPriseDeSang: [String: DetailApport] {
         JournalApports.appliquer(HealthCalculator.registreApports(profile: profile), observations: observationsJournal)
     }
 
     /// Le hash du bilan : le profil, la version du calcul, et ce que le journal
-    /// change aux scores (par paliers de 5 points, pas à chaque repas noté).
+    /// puis la prise de sang changent aux scores (par paliers de 5 points).
     var hashDuBilan: String {
         let questionnaire = HealthCalculator.registreApports(profile: profile)
-        let signature = JournalApports.signature(
-            avant: questionnaire,
-            apres: JournalApports.appliquer(questionnaire, observations: observationsJournal)
+        let avecJournal = JournalApports.appliquer(questionnaire, observations: observationsJournal)
+        let signature = JournalApports.signature(avant: questionnaire, apres: avecJournal)
+        let signatureSang = JournalApports.signature(
+            avant: avecJournal,
+            apres: PriseDeSangApports.appliquer(avecJournal, priseDeSang: priseDeSang)
         )
-        return AIAnalysisService.hashProfile(profile, journal: signature)
+        return AIAnalysisService.hashProfile(profile, journal: signature, sang: signatureSang)
+    }
+
+    // MARK: - La prise de sang (Premium, 30 sept. 2026)
+
+    /// Lit la prise de sang la plus récente. Un échec laisse le calcul sans
+    /// elle, sans message : comme le journal, elle corrige, elle ne bloque pas.
+    func chargerPriseDeSang(userId: String) async {
+        guard let derniere = try? await PriseDeSangService.shared.derniere(userId: userId) else { return }
+        priseDeSang = derniere
+    }
+
+    /// Ce que la prise de sang change à chaque apport : le score sans elle,
+    /// puis avec elle. Seuls les apports qu'elle a déplacés, dans l'ordre du
+    /// canon. Vide avant le questionnaire (aucun score à corriger).
+    func effetsPriseDeSang() -> [PriseDeSangApports.Effet] {
+        guard profile.completed, priseDeSang != nil else { return [] }
+        let sans = registreSansPriseDeSang
+        let avec = registre
+        return NutrientData.all.compactMap { def in
+            let id = def.id.rawValue
+            guard let a = sans[id]?.score, let b = avec[id]?.score, a != b else { return nil }
+            return PriseDeSangApports.Effet(id: id, avant: a, apres: b)
+        }
+    }
+
+    /// Une prise de sang vient d'être lue : les scores se refont aussitôt, et
+    /// le bilan se régénère (son hash a changé) pour en tenir compte.
+    func poserPriseDeSang(_ nouvelle: PriseDeSang?) {
+        // La plus récente fait foi : un vieux bilan importé après coup ne
+        // remplace pas une mesure plus fraîche.
+        if let nouvelle, let actuelle = priseDeSang, nouvelle.id != actuelle.id, nouvelle.takenAt < actuelle.takenAt {
+            return
+        }
+        priseDeSang = nouvelle
+        computeLocalScores()
+        Task { await retryBilanV2() }
+    }
+
+    /// La personne efface sa prise de sang : la ligne disparaît du serveur,
+    /// puis du calcul.
+    func supprimerPriseDeSang() async throws {
+        guard let actuelle = priseDeSang else { return }
+        try await PriseDeSangService.shared.supprimer(id: actuelle.id)
+        priseDeSang = nil
+        if let session = await AuthService.shared.currentSession {
+            await chargerPriseDeSang(userId: session.user.id.uuidString)
+        }
+        computeLocalScores()
+        Task { await retryBilanV2() }
     }
 
     /// Lit les repas notés des 14 derniers jours (aujourd'hui exclu) et en
@@ -432,6 +492,11 @@ final class DashboardViewModel: ObservableObject {
     /// Tests : pose des observations sans passer par le réseau.
     func poserObservationsJournal(_ observations: ObservationsJournal?) {
         observationsJournal = observations
+    }
+
+    /// Tests : pose une prise de sang sans réseau ni bilan.
+    func poserPriseDeSangPourTest(_ prise: PriseDeSang?) {
+        priseDeSang = prise
     }
     #endif
 

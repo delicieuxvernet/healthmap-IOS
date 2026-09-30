@@ -101,6 +101,8 @@ struct JournalView: View {
     @State private var selectedApport: ApportV2?
     /// Bilan complet (ex-onglet), présenté par « Tout afficher ».
     @State private var showBilanComplet = false
+    /// Prise de sang (Premium) : import + « Tes repères ».
+    @State private var showPriseDeSang = false
     @AppStorage("healthkit_linked") private var healthLinked = false
 
     // MARK: - Gratification après un ajout
@@ -191,6 +193,11 @@ struct JournalView: View {
                 }
                 // Le Bilan complet garde sa propre pile de navigation : on le
                 // présente en feuille, jamais poussé (pile dans la pile).
+                .sheet(isPresented: $showPriseDeSang) {
+                    PriseDeSangSheet()
+                        .environmentObject(dashboardVM)
+                        .healthMapFullSheet()
+                }
                 .sheet(isPresented: $showBilanComplet) {
                     DashboardView()
                         .environmentObject(dashboardVM)
@@ -769,7 +776,8 @@ struct JournalView: View {
             },
             onRechercher: { showSearch = true },
             onCodeBarres: { showBarcode = true },
-            onEcrire: { ecrireUnRepas() }
+            onEcrire: { ecrireUnRepas() },
+            onPriseDeSang: { showPriseDeSang = true }
         )
     }
 

@@ -316,7 +316,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
     }
 
     // MARK: - Hash Profile (same djb2 as web — excludes completed + firstName)
-    static func hashProfile(_ profile: UserProfile, calcul: String = CalculApports.version, journal: String = "") -> String {
+    static func hashProfile(_ profile: UserProfile, calcul: String = CalculApports.version, journal: String = "", sang: String = "") -> String {
         // Web: excludes "completed" and "firstName", sorts remaining keys
         var copy = profile
         copy.completed = false
@@ -364,6 +364,9 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         // `JournalApports.signature`) : absent tant qu'il ne change rien, pour
         // ne pas régénérer le bilan de ceux qui ne notent pas leurs repas.
         if !journal.isEmpty { parts.append("journal:\(journal)") }
+        // Ce que la prise de sang change aux scores (`PriseDeSangApports`) :
+        // absent sans prise de sang, pour ne régénérer aucun autre bilan.
+        if !sang.isEmpty { parts.append("sang:\(sang)") }
 
         let str = parts.joined(separator: "|")
 

@@ -51,8 +51,15 @@ enum LectureApport {
     static func verdict(id: String, nom: String, detail: DetailApport) -> String {
         let sujet = NomNutriment.majusculeInitiale(NomApport.possessif(NomApport.avecArticle(id: id, repli: nom)))
         let constat = "\(sujet) \(etat(detail.score, accord(id)))."
-        guard detail.score < 70, let premiere = detail.freins.first else { return constat }
-        return "\(constat) Première cause : \(enCoursDePhrase(premiere.libelle))."
+        guard detail.score < 70 else { return constat }
+        // Une prise de sang n'est pas une cause : elle confirme le constat, et
+        // la première cause reste à chercher parmi les autres freins.
+        let mesure = detail.freins.first { $0.section == .priseDeSang }
+        let confirmation = mesure.map { " \($0.libelle) va dans ce sens." } ?? ""
+        guard let premiere = detail.freins.first(where: { $0.section != .priseDeSang }) else {
+            return constat + confirmation
+        }
+        return "\(constat)\(confirmation) Première cause : \(enCoursDePhrase(premiere.libelle))."
     }
 
     /// Un libellé du registre, au milieu d'une phrase : la majuscule initiale

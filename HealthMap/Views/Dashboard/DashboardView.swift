@@ -41,6 +41,7 @@ struct DashboardView: View {
     @State private var selectedAttention: InteractionV2?
     @State private var showTrophies = false
     @State private var showScoreDetail = false
+    @State private var showPriseDeSang = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -87,6 +88,11 @@ struct DashboardView: View {
                 .healthMapSheet()
             }
             // Trophées de la récolte (feuille existante, alimentée par la série).
+            .sheet(isPresented: $showPriseDeSang) {
+                PriseDeSangSheet()
+                    .environmentObject(viewModel)
+                    .healthMapFullSheet()
+            }
             .sheet(isPresented: $showTrophies) {
                 RecolteDetailSheet(streak: gamification.currentStreak)
             }
@@ -263,6 +269,13 @@ struct DashboardView: View {
                     }
                     .staggeredAppear(index: 3)
                 }
+
+                // Z3c · Ta prise de sang (Premium, 30 sept. 2026) : ce qui a
+                // été mesuré, ou l'invitation à l'importer.
+                PriseDeSangCarte(prise: viewModel.priseDeSang) {
+                    showPriseDeSang = true
+                }
+                .staggeredAppear(index: 4)
 
                 // Z4 · Tes symptômes suivis + CTA solutions
                 let rows = symptomRows(v2)
