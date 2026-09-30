@@ -101,11 +101,17 @@ struct PriseDeSang: Codable, Equatable, Identifiable {
             var c = try decoder.unkeyedContainer()
             var sortie: [MarqueurSanguin] = []
             while !c.isAtEnd {
-                if let m = try? c.decode(MarqueurSanguin.self) { sortie.append(m) } else { _ = try? c.decode(Rebut.self) }
+                if let m = try? c.decode(MarqueurSanguin.self) {
+                    sortie.append(m)
+                } else if (try? c.decode(Rebut.self)) == nil {
+                    // Ni marqueur ni objet (une chaîne, un nombre) : le curseur
+                    // n'avancerait plus, on s'arrête plutôt que de boucler.
+                    break
+                }
             }
             valeurs = sortie
         }
-        private struct Rebut: Decodable {}
+        private struct Rebut: Decodable, Equatable {}
     }
 
     private static let lecture: DateFormatter = {
@@ -205,8 +211,8 @@ enum PriseDeSangApports {
         var sortie = registre
         for (id, detail) in registre {
             guard let m = marqueur(pour: id, dans: priseDeSang),
-                  let cible = cible(m.position, code: m.code) else { continue }
-            let delta = correction(score: detail.score, cible: cible, fraicheur: poids)
+                  let vers = cible(m.position, code: m.code) else { continue }
+            let delta = correction(score: detail.score, cible: vers, fraicheur: poids)
             guard abs(delta) >= effetMinimum else { continue }
             let contributions = detail.contributions + [ContributionApport(libelle: texte, delta: delta, section: .priseDeSang)]
             let brut = DetailApport.pointDeDepart + contributions.reduce(0) { $0 + $1.delta }
