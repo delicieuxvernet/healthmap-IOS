@@ -86,6 +86,17 @@ enum CauseApport {
         geste: nil,
         avis: nil)
 
+    /// La prise de sang (30 sept. 2026) : une mesure, pas une déclaration.
+    /// Rien à « changer » : le geste passe par l'assiette, l'avis par le médecin.
+    static let priseDeSangPese = Explication(
+        pourquoi: "Ta prise de sang situe cette valeur dans le bas, ou sous le repère imprimé par ton laboratoire. Une mesure pèse plus qu'une réponse au questionnaire : elle corrige ton score.",
+        geste: nil,
+        avis: "Montre ces résultats à ton médecin : lui seul peut les interpréter avec ton histoire.")
+    static let priseDeSangAide = Explication(
+        pourquoi: "Ta prise de sang situe cette valeur dans le repère imprimé par ton laboratoire : ce que tu fais aujourd'hui suffit, et ton score le reflète.",
+        geste: nil,
+        avis: nil)
+
     private static func cle(_ texte: String) -> String {
         texte.folding(options: .diacriticInsensitive, locale: Locale(identifier: "fr_FR")).lowercased()
     }
@@ -147,6 +158,9 @@ enum CauseApport {
         if contribution.section == .journal {
             return contribution.delta < 0 ? journalPese : journalAide
         }
+        if contribution.section == .priseDeSang {
+            return contribution.delta < 0 ? priseDeSangPese : priseDeSangAide
+        }
         // Ce qui joue en ta faveur.
         guard contribution.delta < 0 else {
             let pourquoi = contribution.libelle.hasPrefix("Tu prends déjà")
@@ -172,6 +186,8 @@ enum CauseApport {
                 avis: "Ne modifie jamais un traitement de toi-même : parles-en à ton médecin ou à ton pharmacien.")
         case .journal:
             return journalPese
+        case .priseDeSang:
+            return priseDeSangPese
         case .modeDeVie, .nutrition:
             let libelle = cle(contribution.libelle)
             if let famille = familles.first(where: { $0.mots.contains { libelle.contains($0) } }) {

@@ -38,6 +38,9 @@ enum SectionQuestionnaire: String, CaseIterable {
     case medical = "Médical"
     /// Pas une réponse au questionnaire : ce que les repas notés ont montré.
     case journal = "Journal"
+    /// Pas une déclaration non plus : ce qu'une prise de sang a mesuré
+    /// (`PriseDeSangApports`, 30 sept. 2026).
+    case priseDeSang = "Prise de sang"
 }
 
 /// Un facteur nommé et son poids, en points d'apport.
@@ -54,7 +57,11 @@ struct ContributionApport: Equatable, Identifiable {
     /// « déclaré dans Mode de vie » — le sous-texte de la ligne. Le journal
     /// n'est pas une déclaration : « noté dans ton journal ».
     var provenance: String {
-        section == .journal ? "noté dans ton journal" : "déclaré dans \(section.rawValue)"
+        switch section {
+        case .journal: return "noté dans ton journal"
+        case .priseDeSang: return "mesuré dans ta prise de sang"
+        default: return "déclaré dans \(section.rawValue)"
+        }
     }
 }
 

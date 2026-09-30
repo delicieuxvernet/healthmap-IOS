@@ -173,6 +173,19 @@
 >   qui n'a plus d'interrupteur à l'écran. Sous-pages : compte (mot de passe si compte e-mail),
 >   objectifs, abonnement, suppression du compte (double verrou).
 >
+> - **Prise de sang** (Premium, 30 sept. 2026 — maquette validée le 6 juil., `Views/PriseDeSang/PriseDeSangSheet.swift`) :
+>   quatrième option de « Autres façons d'ajouter » du Journal (« Prise de sang », goutte) et carte
+>   « Ta prise de sang » du Bilan complet (entre points d'attention et symptômes). Feuille : gratuit →
+>   zone de dépôt voilée + porte `prise_de_sang` ; Premium → « Photographier la page » (capsule verte),
+>   « Choisir une photo » · « Importer un PDF », deux lignes d'info (document lu puis oublié ; liste des
+>   valeurs lues) ; lecture « Kiwio lit tes résultats… » ; **« Tes repères »** : date du prélèvement,
+>   compteurs « à optimiser » / « dans les repères », UNE précision médicale, une carte par valeur
+>   (valeur + « repère 30–100 » imprimé par le labo, pastille, « Côté assiette » ou « Continue comme ça »),
+>   puis « Ton bilan en tient compte » (score avant barré → après, par apport), « Importer une autre
+>   prise de sang », « Supprimer ». Le calcul : `Core/PriseDeSangApports.swift`, une ligne nommée du
+>   registre (« Ta prise de sang du 12 sept. », « mesuré dans ta prise de sang ») appliquée APRÈS le
+>   journal ; la fiche apport dit « … va dans ce sens » (une mesure n'est jamais une « cause »).
+>
 > **Quantités en unités** (demande d'Arthur, 23 août) : partout où une quantité est demandée
 > (dictée `VoiceMealSheet`, recherche / code-barres / édition `PortionSheet`), un aliment qui se
 > compte se saisit en unités, jamais en grammes d'abord : chips de taille quand ça a un sens
