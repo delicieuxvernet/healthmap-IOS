@@ -4,8 +4,11 @@ import Foundation
 // Catalogue produits vérifié fiche par fiche sur les sites des marques.
 // Read-only reference data — no logic here.
 //
-// Audit du 20 juillet 2026 (`verifiedAt`) : marque, forme, dosage, prix de
-// référence (hors promo), prises/jour et URL fiche officielle confirmés.
+// Audit du 30 septembre 2026 (`verifiedAt`) : marque, forme, dosage, prix de
+// référence (hors promo), prises/jour et URL fiche officielle reverifies une
+// fiche apres l'autre. Six ecarts corriges, deux URL mortes remplacees, une
+// reference retiree pour rupture. Seul le format de l'omega-3 Nutri&Co n'a pas
+// pu etre reconfirme (selecteur 60/120 capsules illisible) : valeur conservee.
 // DOCTRINE DE SELECTION (Arthur, 20 septembre 2026) : on recommande TOUJOURS
 // la forme la mieux absorbee et la mieux supportee sur la duree — bisglycinate
 // pour le fer, le magnesium et le zinc, D3 huileuse pour la vitamine D. Le prix
@@ -26,7 +29,7 @@ extension SupplementEngine {
     // STATIC PRODUCT CATALOG
     // ============================================================
 
-    static let catalogVerifiedAt = "2026-07-20"
+    static let catalogVerifiedAt = "2026-09-30"
 
     static let catalog: [SupplementProduct] = [
 
@@ -113,7 +116,7 @@ extension SupplementEngine {
             dosage: "14 mg fer + vitamine C + folate",
             unitsPerDay: 1,
             timing: .matinAJeun,
-            price: 19.90,
+            price: 18.90,
             unitsPerPackage: 30,
             productURL: "https://nutriandco.com/fr/produits/fer",
             isVegan: true,
@@ -130,9 +133,12 @@ extension SupplementEngine {
             dosage: "14 mg Ferrochel + vitamine C",
             unitsPerDay: 1,
             timing: .matinAJeun,
-            price: 9.90,
+            price: 9.95,
             unitsPerPackage: 90,
-            productURL: "https://www.aroma-zone.com/product/complement-alimentaire-bisglycinate-de-fer",
+            // L'ancienne adresse rend un 404 depuis la refonte du site : seules
+            // les pages /en/ repondent. Page anglaise faute de mieux, a
+            // remplacer des qu'on retrouve l'adresse francaise.
+            productURL: "https://www.aroma-zone.com/en/product/food-supplement-iron",
             isVegan: true,
             contraindications: [.hemochromatose],
             antiInteractions: ["calcium", "zinc"],
@@ -214,7 +220,7 @@ extension SupplementEngine {
             dosage: "1000 mg liposomale (2 gél.)",
             unitsPerDay: 2,
             timing: .matinRepas,
-            price: 21.90,
+            price: 29.90,
             unitsPerPackage: 60,
             productURL: "https://www.dynveo.fr/products/vitamine-c-liposomale",
             isVegan: true,
@@ -231,7 +237,7 @@ extension SupplementEngine {
             dosage: "750 mg Quali-C",
             unitsPerDay: 1,
             timing: .matinRepas,
-            price: 27.90,
+            price: 13.90,
             unitsPerPackage: 60,
             productURL: "https://www.nutripure.fr/fr/sante/68-vitamine-c.html",
             isVegan: true,
@@ -252,8 +258,8 @@ extension SupplementEngine {
             name: "Calcium + D3 + K2",
             nutrientID: .calcium,
             brand: "Argalys",
-            dosage: "500 mg calcium + D3 + K2 (3 gél.)",
-            unitsPerDay: 3,
+            dosage: "480 mg calcium + D3 + K2 (2 gél.)",
+            unitsPerDay: 2,
             timing: .midiRepas,
             price: 12.50,
             unitsPerPackage: 60,
@@ -306,6 +312,10 @@ extension SupplementEngine {
             whyBrand: "Deux formes brevetées (bisglycinate TRAACS + Zinc Nova liposomal) + sélénium."
         ),
         // --- IODE ---
+        // L'option eco (Enova, 365 comprimes a 25 EUR) est sortie le
+        // 30 septembre 2026 : en rupture chez le fabricant. Envoyer quelqu'un
+        // vers un produit qu'il ne peut pas acheter est pire que ne proposer
+        // qu'une reference. A remettre au prochain audit si elle revient.
         SupplementProduct(
             id: "iode-puresea-nutrico",
             name: "Iode PureSea (algue)",
@@ -323,31 +333,13 @@ extension SupplementEngine {
             tier: .premium,
             whyBrand: "Iode d'algue PureSea standardisée à dosage constant (vs kelp générique variable)."
         ),
-        SupplementProduct(
-            id: "iode-enova-budget",
-            name: "Iode 150 µg (365 comprimés)",
-            nutrientID: .iodine,
-            brand: "Enova",
-            dosage: "150 µg iodure de potassium",
-            unitsPerDay: 1,
-            timing: .matinRepas,
-            price: 25.00,
-            unitsPerPackage: 365,
-            productURL: "https://www.laboratoiresenova.com/products/iode-150-mcg-365-petits-comprimes-iode-thyroide-fabrique-en-france-iodure-de-potassium-complement-alimentaire",
-            isVegan: true,
-            contraindications: [.hyperthyroidie],
-            antiInteractions: [],
-            tier: .value,
-            whyBrand: "1 an de cure pour ~0,07 €/jour. Iodure de potassium à dosage précis, fabriqué en France."
-        ),
-
         // --- FIBRES ---
         SupplementProduct(
             id: "fibres-trio-nutrico",
             name: "Fibres Bio (Acacia + Guar + Psyllium)",
             nutrientID: .fiber,
             brand: "Nutri&Co",
-            dosage: "5,25 g fibres par dosette",
+            dosage: "4,5 g de fibres par dosette",
             unitsPerDay: 1,
             timing: .entreRepas,
             price: 19.90,
@@ -367,9 +359,11 @@ extension SupplementEngine {
             dosage: "5 g téguments de psyllium",
             unitsPerDay: 1,
             timing: .entreRepas,
-            price: 6.90,
+            price: 13.90,
             unitsPerPackage: 60,
-            productURL: "https://www.aroma-zone.com/product/complement-alimentaire-psyllium-blond-bio",
+            // Meme refonte que le fer : ancienne adresse en 404, page anglaise
+            // faute d'equivalent francais retrouvable.
+            productURL: "https://www.aroma-zone.com/en/product/food-supplement-organic-blond-psyllium",
             isVegan: true,
             contraindications: [],
             antiInteractions: [antiInteractionMedicaments],
