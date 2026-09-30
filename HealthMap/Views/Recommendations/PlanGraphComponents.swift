@@ -7,9 +7,11 @@ import SwiftUI
 // n'est écrit sur le graphe en dehors des noms : la profondeur est derrière le
 // toucher.
 //
-// Ce qui bouge : les nœuds DÉRIVENT (2 à 3 pt, périodes différentes — jamais
-// synchrones, sinon ça respire comme une machine) et une pulsation parcourt les
-// liens du nœud choisi. Rien d'autre au repos. Reduce Motion : tout est fixe.
+// Ce qui bouge : une PHYSIQUE à la façon d'Obsidian (`PlanGraphPhysique`) —
+// les bulles se repoussent, les tiges les retiennent ; on attrape une bulle, ses
+// voisines suivent, et tout revient en place quand on la lâche. Une pulsation
+// parcourt les liens du nœud choisi. Reduce Motion : le graphe est calculé une
+// fois, puis fixe, sans glisser-déposer.
 // Les cinq onglets restant montés, l'horloge est EN PAUSE hors de l'onglet.
 //
 // Pas de zoom ni de déplacement : neuf nœuds tiennent dans l'écran ; un graphe
@@ -61,6 +63,8 @@ struct PlanGraphView: View {
     /// L'entrée en scène : les nœuds surgissent du centre vers l'extérieur,
     /// les liens se révèlent ensuite. Rejouée à chaque arrivée sur l'onglet.
     @State private var entre = false
+    /// Les bulles, leurs vitesses, celle qu'on tient : vit hors du rendu.
+    @State private var physique = PlanGraphPhysique()
 
     private func jouerLEntree() {
         guard !reduceMotion else { entre = true; return }
@@ -73,6 +77,7 @@ struct PlanGraphView: View {
             TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !actif)) { contexte in
                 let t = reduceMotion ? 0 : contexte.date.timeIntervalSinceReferenceDate
                 let points = positions(dans: geo.size, t: t)
+                let echelle = PlanGraph.echelle(pour: geo.size)
                 let allumes = exemple ? Set(graphe.noeuds.map(\.id)) : graphe.voisinage(de: selection)
 
                 ZStack {
@@ -91,12 +96,27 @@ struct PlanGraphView: View {
                                 symbole: symbole(noeud),
                                 choisi: !exemple && noeud.id == selection,
                                 estompe: !allumes.contains(noeud.id),
-                                echelle: PlanGraph.echelle(pour: geo.size)
+                                echelle: echelle
                             ) {
                                 guard noeud.id != selection else { return }
                                 HapticService.shared.selection()
                                 selection = noeud.id
                             }
+                            // Un toucher bref reste au bouton (sélection) ; dès
+                            // que le doigt glisse, on tient la bulle.
+                            .highPriorityGesture(
+                                DragGesture(minimumDistance: 6, coordinateSpace: .named(Self.espace))
+                                    .onChanged { geste in
+                                        guard !exemple, !reduceMotion else { return }
+                                        if physique.tenu != noeud.id {
+                                            HapticService.shared.selection()
+                                            physique.attraper(noeud.id)
+                                        }
+                                        physique.deplacer(vers: geste.location)
+                                    }
+                                    .onEnded { _ in physique.lacher() },
+                                including: exemple || reduceMotion ? .subviews : .all
+                            )
                             .scaleEffect(entre ? 1 : 0.4)
                             .opacity(entre ? 1 : 0)
                             .animation(reduceMotion ? nil
@@ -108,6 +128,7 @@ struct PlanGraphView: View {
                 }
             }
         }
+        .coordinateSpace(.named(Self.espace))
         .opacity(exemple ? 0.55 : 1)
         .onAppear { jouerLEntree() }
         .onChange(of: actif) { _, visible in
@@ -115,19 +136,18 @@ struct PlanGraphView: View {
         }
     }
 
-    /// Dérive sinusoïdale, déphasée par nœud.
+    private static let espace = "planGraphe"
+
+    /// Les positions données par la physique. Reduce Motion : calculées une
+    /// fois jusqu'à l'équilibre, puis fixes.
     private func positions(dans taille: CGSize, t: Double) -> [String: CGPoint] {
-        var points: [String: CGPoint] = [:]
-        for (rang, noeud) in graphe.noeuds.enumerated() {
-            var point = graphe.position(de: noeud, dans: taille)
-            if t != 0 {
-                let phase = Double(rang) * 1.3
-                point.x += CGFloat(sin(t * 0.7 + phase) * 2.6)
-                point.y += CGFloat(cos(t * 0.55 + phase * 1.7) * 2.6)
-            }
-            points[noeud.id] = point
+        physique.preparer(graphe, dans: taille)
+        if reduceMotion {
+            if !physique.estStable { physique.stabiliser() }
+        } else {
+            physique.avancer(jusqua: t)
         }
-        return points
+        return physique.corps.mapValues(\.position)
     }
 
     private func tracerLesLiens(_ dessin: inout GraphicsContext, points: [String: CGPoint], t: Double) {
@@ -177,8 +197,7 @@ private struct PlanGraphNoeudView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var rayon: CGFloat {
-        let base: CGFloat = noeud.anneau == 0 ? 30 : (noeud.anneau == 1 ? 22 : 19)
-        return base * max(0.85, echelle)
+        PlanGraphPhysique.rayon(anneau: noeud.anneau, echelle: echelle)
     }
 
     private var estLevier: Bool { noeud.anneau == 2 }
