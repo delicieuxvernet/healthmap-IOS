@@ -716,7 +716,9 @@ struct MainTabView: View {
     }
 
     private func replanifierRappels() {
-        let cibles = ciblesDuBilan
+        // Le registre dit ce qui freine chaque apport d'après le questionnaire :
+        // c'est la matière du rappel « déclic » (1er oct. 2026).
+        let cibles = ciblesDuBilan.map { BriefDuJourBuilder.enrichir($0, registre: dashboardVM.registre) }
         Task { await RappelsPersonnalises.replanifier(cibles: cibles) }
     }
 

@@ -24,9 +24,17 @@ struct CibleNutritionnelle: Codable, Equatable {
     let aliments: [String]
     /// Conseil court du bilan (`tipBold`), s'il existe.
     let conseil: String?
+    /// Les habitudes alimentaires DÉCLARÉES qui pèsent sur cet apport, de la
+    /// plus lourde à la plus légère (`BriefDuJourBuilder.enrichir`). `nil` =
+    /// cibles mémorisées avant le 1er oct. 2026, ou registre pas encore lu.
+    var freins: [FreinCible]? = nil
 
     /// « ton fer », « ta vitamine C », « tes oméga-3 ».
     var avecPossessif: String { NomNutriment.possessif(id: id, nom: nom) }
+
+    /// L'emoji canonique de l'apport (`NutrientData`, jamais l'IA). Vide pour
+    /// un id hors catalogue.
+    var emoji: String { NutrientData.definition(for: id)?.emoji ?? "" }
 
     /// Les aliments à dire : ceux du bilan (personnalisés) ou, à défaut, le
     /// repli écrit à la main. Un apport connu n'est JAMAIS sans idée de repas —
@@ -36,9 +44,29 @@ struct CibleNutritionnelle: Codable, Equatable {
     }
 }
 
+/// Une ligne du registre des apports (`NutrientLedger`) réduite à ce qu'une
+/// notification peut en dire : l'habitude, et ce qu'elle coûte.
+struct FreinCible: Codable, Equatable {
+    /// Libellé du registre, tel que la fiche de l'apport l'affiche
+    /// (« Café ou thé pendant les repas »).
+    let libelle: String
+    /// Points d'apport perdus — toujours positif.
+    let points: Int
+}
+
 // MARK: - Grammaire des noms de nutriments
 
 enum NomNutriment {
+    /// « tes oméga-3 », « tes fibres » : le verbe qui suit s'accorde.
+    static func estPluriel(id: String) -> Bool {
+        id == "omega3" || id == "fiber"
+    }
+
+    /// Le verbe accordé avec l'apport : « ton fer est », « tes fibres sont ».
+    static func accord(id: String, singulier: String, pluriel: String) -> String {
+        estPluriel(id: id) ? pluriel : singulier
+    }
+
     /// Le nom avec le bon possessif. Les notifications et le brief parlent à
     /// la personne (« renforcer ton fer ») : « renforcer le Fer » sonne comme
     /// une notice.
@@ -168,6 +196,56 @@ enum BriefDuJourBuilder {
         }
     }
 
+    // MARK: Freins déclarés (pour les rappels)
+
+    /// Sous ce poids, un frein ne mérite pas une notification — même seuil
+    /// que l'effort de la semaine : moins de 5 points, c'est du bruit.
+    static let freinMinimum = 5
+    /// Deux freins par apport suffisent : les rappels alternent entre eux.
+    static let freinsParCible = 2
+
+    /// Accroche à chaque cible ce que le registre sait de ce qui la freine.
+    ///
+    /// SEULES les habitudes ALIMENTAIRES passent (section « Nutrition » du
+    /// questionnaire : « Pas de poisson gras », « Café ou thé pendant les
+    /// repas »…). Un traitement, l'âge, le tabac ou un IMC n'ont rien à faire
+    /// sur un écran verrouillé, que n'importe qui peut lire par-dessus
+    /// l'épaule.
+    static func enrichir(
+        _ cibles: [CibleNutritionnelle],
+        registre: [String: DetailApport]
+    ) -> [CibleNutritionnelle] {
+        cibles.map { cible in
+            var enrichie = cible
+            enrichie.freins = (registre[cible.id]?.freins ?? [])
+                .filter { $0.section == .nutrition && abs($0.delta) >= freinMinimum }
+                .prefix(freinsParCible)
+                .map { FreinCible(libelle: $0.libelle, points: abs($0.delta)) }
+            return enrichie
+        }
+    }
+
+    // MARK: Effort de la semaine
+
+    /// L'apport à travailler qui a le plus progressé d'une semaine sur
+    /// l'autre — seulement s'il a VRAIMENT progressé. Le brief et le rappel du
+    /// dimanche lisent ce même calcul : ils ne peuvent pas se contredire.
+    static func effort(
+        cibles: [CibleNutritionnelle],
+        repas: [MealJournalService.MealRecord],
+        maintenant: Date = Date()
+    ) -> BriefDuJour.Effort? {
+        let semaine = WeekScoreEngine.compute(
+            meals: repas,
+            weakNutrients: cibles.map(\.id),
+            now: maintenant
+        )
+        guard let mover = semaine.topMover,
+              mover.delta >= effortMinimum,
+              let definition = NutrientData.definition(for: mover.id) else { return nil }
+        return BriefDuJour.Effort(id: mover.id, nom: definition.label, points: mover.delta)
+    }
+
     // MARK: Couverture d'un jour
 
     /// Part du besoin couverte ce jour-là, par nutriment : Σ pctRDA des repas
@@ -264,17 +342,7 @@ enum BriefDuJourBuilder {
 
         // L'effort qui paie : l'apport à travailler qui a le plus progressé
         // d'une semaine sur l'autre — seulement s'il a VRAIMENT progressé.
-        let semaine = WeekScoreEngine.compute(
-            meals: repas,
-            weakNutrients: toutesLesCibles.map(\.id),
-            now: maintenant
-        )
-        let effort: BriefDuJour.Effort? = {
-            guard let mover = semaine.topMover,
-                  mover.delta >= effortMinimum,
-                  let definition = NutrientData.definition(for: mover.id) else { return nil }
-            return BriefDuJour.Effort(id: mover.id, nom: definition.label, points: mover.delta)
-        }()
+        let effortDeLaSemaine = Self.effort(cibles: toutesLesCibles, repas: repas, maintenant: maintenant)
 
         let prenomPropre = prenom?.trimmingCharacters(in: .whitespacesAndNewlines)
         return BriefDuJour(
@@ -283,7 +351,7 @@ enum BriefDuJourBuilder {
             besoinsCouvertsHier: hierAssezNote ? besoinsCouverts(couvertureHier) : nil,
             besoinsCouvertsAvantHier: repasAvantHier >= repasMinimum ? besoinsCouverts(couvertureAvantHier) : nil,
             manquesHier: manques,
-            effort: effort,
+            effort: effortDeLaSemaine,
             cible: cible
         )
     }

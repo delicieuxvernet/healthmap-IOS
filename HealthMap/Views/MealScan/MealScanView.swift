@@ -104,6 +104,8 @@ struct JournalView: View {
     @State private var showActivite = false
     /// Fiche apport ouverte depuis « Apports à renforcer ».
     @State private var selectedApport: ApportV2?
+    /// Micronutriment touché dans la carte du Journal.
+    @State private var selectedMicro: LigneMicro?
     /// Bilan complet (ex-onglet), présenté par « Tout afficher ».
     @State private var showBilanComplet = false
     /// Prise de sang (Premium) : import + « Tes repères ».
@@ -248,8 +250,13 @@ struct JournalView: View {
                         onLier: { await lierAppleSante() }
                     )
                 }
-                .sheet(item: $selectedApport) { apport in
-                    ApportV2DetailSheet(apport: apport)
+                .sheet(item: ficheJournal) { fiche in
+                    switch fiche {
+                    case .apport(let apport):
+                        ApportV2DetailSheet(apport: apport)
+                    case .micro(let ligne):
+                        MicroDuJourSheet(ligne: ligne, apportDuBilan: apportDuBilan(pour: ligne))
+                    }
                 }
                 .sheet(isPresented: $showVoice, onDismiss: { apresFeuilleVocale() }) {
                     if let uid = AuthService.shared.cachedCurrentUserIdString {
@@ -592,6 +599,14 @@ struct JournalView: View {
                 saisieBloc.padding(.top, 16)
                 avantQuestionnaire
             } else {
+                if let premiere = tableauMicros.alertes.first {
+                    JournalMicrosAlerte(alertes: tableauMicros.alertes) {
+                        HapticService.shared.tap()
+                        selectedMicro = premiere
+                    }
+                    .padding(.top, 16)
+                }
+
                 JournalCaloriesCard(
                     consommees: journal.dayCalories,
                     objectif: dashboardVM.physicalMetrics.macros?.calories,
@@ -608,6 +623,8 @@ struct JournalView: View {
 
                 JournalMacrosCard(lignes: lignesMacros)
                     .padding(.top, DS.interCarte)
+
+                microsSection
 
                 saisieBloc.padding(.top, 14)
 
@@ -689,6 +706,71 @@ struct JournalView: View {
         Calendar.current.isDateInToday(journal.selectedDay)
     }
 
+    // MARK: - Micronutriments (sous les macros : un seul chiffre par apport)
+
+    /// Ce que le calcul lit de la personne. Les scores sont ceux du registre
+    /// (questionnaire, repas notés, prise de sang) : le même chiffre que dans
+    /// Progrès et dans la fiche de l'apport.
+    private var contexteMicros: ContexteMicros {
+        let depense = Double(dashboardVM.physicalMetrics.tdee ?? Int(BesoinsMicros.depenseParDefaut))
+        return ContexteMicros(
+            besoins: BesoinsMicros.tous(profil: dashboardVM.profile, depense: depense),
+            depense: depense,
+            scores: dashboardVM.profile.completed ? dashboardVM.nutrientScores : [:],
+            couvertureJournal: dashboardVM.observationsJournal?.couverture ?? [:],
+            symptomes: dashboardVM.profile.symptoms
+        )
+    }
+
+    private var tableauMicros: TableauMicros {
+        journal.tableauMicros(contexteMicros) { dashboardVM.registre }
+    }
+
+    @ViewBuilder
+    private var microsSection: some View {
+        DSSectionHeader(titre: "Micronutriments")
+        JournalMicrosCard(tableau: tableauMicros) { ligne in
+            HapticService.shared.tap()
+            selectedMicro = ligne
+        }
+    }
+
+    /// Les deux fiches d'un apport passent par UNE seule feuille : le Journal
+    /// en porte déjà beaucoup, et une de plus ne s'ouvre pas.
+    private enum FicheJournal: Identifiable {
+        case apport(ApportV2)
+        case micro(LigneMicro)
+
+        var id: String {
+            switch self {
+            case .apport(let apport): return "apport-" + (apport.id ?? "")
+            case .micro(let ligne): return "micro-" + ligne.id
+            }
+        }
+    }
+
+    private var ficheJournal: Binding<FicheJournal?> {
+        Binding(
+            get: {
+                if let micro = selectedMicro { return FicheJournal.micro(micro) }
+                if let apport = selectedApport { return FicheJournal.apport(apport) }
+                return nil
+            },
+            set: { nouvelle in
+                guard nouvelle == nil else { return }
+                selectedMicro = nil
+                selectedApport = nil
+            }
+        )
+    }
+
+    /// La fiche des causes n'existe que pour les apports du bilan.
+    private func apportDuBilan(pour ligne: LigneMicro) -> ApportV2? {
+        guard ligne.partDuQuestionnaire,
+              let nutriment = dashboardVM.nutrients.first(where: { $0.id == ligne.id }) else { return nil }
+        return ApportV2.pourLaFiche(nutriment, bilan: dashboardVM.analysisV2?.bilan)
+    }
+
     // MARK: - Apports à renforcer (le cœur de la valeur, avant les repas)
 
     @ViewBuilder
@@ -710,6 +792,7 @@ struct JournalView: View {
             if let bilan = dashboardVM.analysisV2?.bilan {
                 JournalApportsCard(
                     bilan: bilan,
+                    scores: dashboardVM.nutrientScores,
                     isPremium: subscriptionService.isPremium,
                     onApport: { apport in
                         HapticService.shared.tap()

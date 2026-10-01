@@ -813,7 +813,7 @@ private struct LigneNotifications: View {
 
     private var sousTitre: String {
         if statut == .denied { return "Désactivées dans les réglages de l'iPhone" }
-        return allume ? "Midi et soir, selon tes apports à renforcer" : "Rappels coupés"
+        return allume ? "Dans la journée, avec tes chiffres du jour" : "Rappels coupés"
     }
 
     var body: some View {

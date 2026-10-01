@@ -33,6 +33,10 @@ final class MealJournalViewModel: ObservableObject {
     @Published private(set) var jourLePlusRecentCharge: Date = Calendar.current.startOfDay(for: Date())
     @Published private(set) var chargeLArchive = false
 
+    /// Composition pour 100 g des aliments du journal (`CompositionsStore`) :
+    /// ce qui permet de lire tous les micronutriments d'un repas déjà noté.
+    @Published private(set) var compositions: Compositions = [:] { didSet { invaliderJour() } }
+
     private let service = MealJournalService.shared
 
     // MARK: - Mémoïsation du jour affiché
@@ -49,12 +53,41 @@ final class MealJournalViewModel: ObservableObject {
     private var cacheDayTotaux: (kcal: Int, prot: Double, carb: Double, fat: Double, fiber: Double)?
     private var cacheDayNutrientIds: [String]?
     private var cacheDayMicroPct: [String: Int] = [:]
+    private var cacheMicros: (contexte: ContexteMicros, tableau: TableauMicros)?
 
     private func invaliderJour() {
         cacheDayMeals = nil
         cacheDayTotaux = nil
         cacheDayNutrientIds = nil
         cacheDayMicroPct = [:]
+        cacheMicros = nil
+    }
+
+    // MARK: - Micronutriments du jour affiché
+
+    /// Le tableau des micronutriments du jour affiché. Mémoïsé comme le reste :
+    /// le corps du Journal le relit à chaque passe. `registre` n'est évalué
+    /// qu'au recalcul (il rejoue tout le calcul des apports).
+    func tableauMicros(
+        _ contexte: ContexteMicros,
+        registre: () -> [String: DetailApport]
+    ) -> TableauMicros {
+        if let connu = cacheMicros, connu.contexte == contexte { return connu.tableau }
+        let tableau = MicrosDuJour.tableau(
+            repas: fortnight + archives,
+            jourAffiche: selectedDay,
+            compositions: compositions,
+            contexte: contexte,
+            registre: registre()
+        )
+        cacheMicros = (contexte, tableau)
+        return tableau
+    }
+
+    /// Demande à la base la composition des aliments qu'on ne connaît pas encore.
+    private func chargerCompositions() async {
+        let connues = await CompositionsStore.shared.completer(pour: fortnight + archives)
+        if connues != compositions { compositions = connues }
     }
 
     // MARK: - Chargement
@@ -132,6 +165,9 @@ final class MealJournalViewModel: ObservableObject {
             AppLogger.database.warning("Journal load failed: \(error.localizedDescription, privacy: .public)")
         }
         isLoading = false
+        // Après l'affichage des repas : les micronutriments arrivent ensuite,
+        // sans retarder le Journal.
+        await chargerCompositions()
     }
 
     // MARK: - Mutations
@@ -426,6 +462,7 @@ final class MealJournalViewModel: ObservableObject {
             let horsFenetre = try await service.loadRange(userId: userId, from: from, to: to)
             let dejaLa = Set((fortnight + archives).map(\.id))
             archives.append(contentsOf: horsFenetre.filter { !dejaLa.contains($0.id) })
+            await chargerCompositions()
             if versLePasse {
                 jourLePlusAncienCharge = min(jourLePlusAncienCharge, debutMois)
             } else {
