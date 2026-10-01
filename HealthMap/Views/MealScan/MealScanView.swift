@@ -637,6 +637,19 @@ struct JournalView: View {
 
                 poidsEtEau
 
+                // La prise de sang, sortie de « Autres façons d'ajouter » où
+                // personne ne la voyait (1er oct. 2026) : une carte à elle,
+                // juste avant les apports qu'elle corrige.
+                PriseDeSangCarte(
+                    prise: dashboardVM.priseDeSang,
+                    effets: dashboardVM.effetsPriseDeSang(),
+                    premium: subscriptionService.isPremium,
+                    identifiant: "journal.priseDeSang"
+                ) {
+                    showPriseDeSang = true
+                }
+                .padding(.top, DS.interCarte)
+
                 apportsSection
 
                 enTeteRepas
@@ -977,8 +990,7 @@ struct JournalView: View {
             },
             onRechercher: { showSearch = true },
             onCodeBarres: { showBarcode = true },
-            onEcrire: { ecrireUnRepas() },
-            onPriseDeSang: { showPriseDeSang = true }
+            onEcrire: { ecrireUnRepas() }
         )
     }
 
