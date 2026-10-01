@@ -41,9 +41,9 @@ struct PortionSheet: View {
     @State private var taille: Int?
     /// L'utilisateur a demandé à saisir en grammes malgré l'unité.
     @State private var enGrammes = false
-    /// Nombre de fois où un « − » ou un « + » a buté : la quantité fait alors
-    /// non de la tête (`kiwiSecousse`).
-    @State private var secousses = 0
+    /// Un « − » ou un « + » a buté : la quantité fait alors non de la tête
+    /// (`kiwiSecousse`), une fois par appui.
+    @State private var butee = Butee()
     @Environment(\.dismiss) private var dismiss
 
     init(mode: Mode,
@@ -185,7 +185,7 @@ struct PortionSheet: View {
         }
         // Une quantité qui change fait DÉFILER tout ce qui en dépend (unités,
         // grammes, kcal, macros) au lieu de le remplacer d'un coup.
-        .reducedMotionAnimation(.kiwiSoft, value: grams)
+        .reducedMotionAnimation(.kiwiVif, value: grams)
     }
 
     // MARK: Saisie en unités (« 1 œuf », « 2 tranches »)
@@ -227,7 +227,7 @@ struct PortionSheet: View {
                         .contentTransition(.numericText())
                 }
                 .frame(minWidth: 120, minHeight: 44)
-                .kiwiSecousse(secousses)
+                .kiwiSecousse(butee.secousses)
                 .accessibilityElement(children: .combine)
                 stepUnite("plus", unite: unite, delta: 1)
             }
@@ -236,26 +236,36 @@ struct PortionSheet: View {
     }
 
     private func stepUnite(_ symbol: String, unite: UnitPortionCatalog.Unite, delta: Int) -> some View {
-        BoutonARepetition(enButee: delta < 0 && nombre(unite) <= 1, pas: {
+        boutonPas(symbol, enButee: delta < 0 && nombre(unite) <= 1) {
             let n = UnitPortionCatalog.nombreSuivant(nombre(unite), delta: delta)
-            return allerA(Int((n * unite.poids(taille: taille)).rounded()))
-        }) {
-            stepLabel(symbol)
+            allerA(Int((n * unite.poids(taille: taille)).rounded()))
         }
         .accessibilityLabel(delta > 0 ? "Ajouter une unité" : "Retirer une unité")
     }
 
-    /// Pose une nouvelle quantité, bornée de 1 à 1 500 g. Renvoie `false` à la
-    /// butée : rien ne change, et la quantité fait non de la tête.
-    private func allerA(_ cible: Int) -> Bool {
+    /// Un « − » ou un « + ». Maintenu, il répète son pas de plus en plus vite
+    /// (comportement système, le même que le poids du Journal). À la butée il
+    /// s'estompe mais reste touchable : c'est la quantité qui répond « non ».
+    private func boutonPas(_ symbol: String, enButee: Bool,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            stepLabel(symbol)
+                .opacity(enButee ? 0.4 : 1)
+        }
+        .buttonStyle(.healthMapPressed)
+        .buttonRepeatBehavior(.enabled)
+    }
+
+    /// Pose une nouvelle quantité, bornée de 1 à 1 500 g. À la butée, rien ne
+    /// change et la quantité fait non de la tête.
+    private func allerA(_ cible: Int) {
         let bornee = min(1500, max(1, cible))
         guard bornee != grams else {
-            secousses += 1
-            return false
+            butee.toucher()
+            return
         }
         HapticService.shared.selection()
         grams = bornee
-        return true
     }
 
     // MARK: Saisie en grammes (presets + stepper + saisie libre)
@@ -290,7 +300,7 @@ struct PortionSheet: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.dsSecondaire)
                 }
-                .kiwiSecousse(secousses)
+                .kiwiSecousse(butee.secousses)
                 stepButton("plus", delta: 10)
             }
             .frame(maxWidth: .infinity)
@@ -336,10 +346,8 @@ struct PortionSheet: View {
     }
 
     private func stepButton(_ symbol: String, delta: Int) -> some View {
-        BoutonARepetition(enButee: delta < 0 ? grams <= 1 : grams >= 1500, pas: {
+        boutonPas(symbol, enButee: delta < 0 ? grams <= 1 : grams >= 1500) {
             allerA(grams + delta)
-        }) {
-            stepLabel(symbol)
         }
         .accessibilityLabel(delta > 0 ? "Plus 10 grammes" : "Moins 10 grammes")
     }

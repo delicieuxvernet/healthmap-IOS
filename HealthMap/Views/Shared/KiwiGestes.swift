@@ -7,9 +7,14 @@ import SwiftUI
 // se passer sans texte : le « + » devient une coche, le chiffre défile, la
 // butée fait non de la tête.
 //
-// Rien ici ne grossit au-delà de 1,08 : au-dessus, le geste devient un jeu.
-// Tout se tait sous « Réduire les animations » : l'état final reste lisible
-// (une coche est une coche), seul le trajet disparaît.
+// La physique vient de `KiwiMotion.swift` (ressorts `kiwiVif` / `kiwiRebond`,
+// échelles `KiwiEchelle`) : rien ici ne grossit au-delà de 1,08. Tout se tait
+// sous « Réduire les animations » : l'état final reste lisible (une coche est
+// une coche), seul le trajet disparaît.
+//
+// Le maintien d'un « − » ou d'un « + » n'a pas de composant ici : c'est le
+// comportement système (`.buttonRepeatBehavior(.enabled)`), le même que le
+// poids du Journal.
 
 // MARK: Éclats
 
@@ -49,7 +54,7 @@ struct EclatsShape: Shape {
 // MARK: Pastille d'ajout rapide
 
 /// Le rond « + » d'une ligne de recherche. Quand l'ajout a réussi, il se
-/// rétracte, revient en coche avec un léger rebond, et huit éclats partent
+/// rétracte, revient en coche sur le ressort « rebond », et huit éclats partent
 /// autour. C'est le libellé d'un bouton : le toucher reste porté par l'appelant.
 struct PastilleAjoutRapide: View {
     enum Etat: Equatable {
@@ -63,6 +68,10 @@ struct PastilleAjoutRapide: View {
 
     let etat: Etat
     var diametre: CGFloat = 32
+
+    /// Le creux d'où la coche repart : assez marqué pour se voir sur un rond
+    /// de 32 points, sans jamais dépasser sa taille au retour.
+    private static let creux: CGFloat = 0.86
 
     @State private var progresEclats: CGFloat = 0
     @State private var echelle: CGFloat = 1
@@ -102,11 +111,13 @@ struct PastilleAjoutRapide: View {
 
     private func celebrer() {
         guard !reduceMotion else { return }
-        withAnimation(.easeOut(duration: 0.09)) { echelle = 0.86 }
+        withAnimation(.kiwiVif) { echelle = Self.creux }
+        // Décoration qui s'éteint toute seule : une durée, pas un ressort (un
+        // ressort dépasserait 1 et redessinerait les traits).
         withAnimation(.easeOut(duration: 0.5)) { progresEclats = 1 }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(90))
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.5)) { echelle = 1 }
+            withAnimation(.kiwiRebond) { echelle = 1 }
         }
     }
 
@@ -121,13 +132,12 @@ struct PastilleAjoutRapide: View {
 
 // MARK: Compteur d'ajouts
 
-/// Le nombre d'aliments ajoutés depuis l'ouverture de la recherche. Il gonfle
-/// à peine (1,08) à chaque ajout : on voit que ça compte sans quitter la liste
-/// des yeux.
+/// Le nombre d'aliments ajoutés depuis l'ouverture de la recherche. Il prend
+/// l'impulsion des cartes dont la valeur vient de changer (1,035) : on voit
+/// que ça compte sans quitter la liste des yeux.
 struct CompteurAjouts: View {
     let nombre: Int
 
-    @State private var gonfle = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -139,105 +149,32 @@ struct CompteurAjouts: View {
             .padding(.horizontal, 6)
             .frame(minWidth: 26, minHeight: 26)
             .overlay(Capsule().stroke(Color.dsAccent, lineWidth: 1.5))
-            .scaleEffect(gonfle ? 1.08 : 1)
-            .onChange(of: nombre) { _, _ in
-                guard !reduceMotion else { return }
-                withAnimation(.easeOut(duration: 0.12)) { gonfle = true }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(120))
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { gonfle = false }
-                }
-            }
+            .animation(reduceMotion ? nil : .kiwiVif, value: nombre)
+            .kiwiImpulsion(nombre)
             .accessibilityLabel(nombre > 1 ? "\(nombre) aliments ajoutés" : "\(nombre) aliment ajouté")
     }
 }
 
-// MARK: Bouton à répétition
-
-/// Un « − » ou un « + » de quantité. Un toucher fait un pas ; un maintien
-/// répète, de plus en plus vite (400 ms, puis un quart de moins à chaque pas,
-/// jamais sous 80 ms). Le pas part à la pose du doigt, comme le compteur
-/// système : c'est ce qui permet d'enchaîner sans relever le doigt.
-///
-/// `pas` renvoie `false` quand la valeur n'a pas bougé (butée) : la répétition
-/// s'arrête là, et c'est à l'appelant de le faire sentir.
-struct BoutonARepetition<Etiquette: View>: View {
-    private let enButee: Bool
-    private let pas: () -> Bool
-    private let etiquette: () -> Etiquette
-
-    /// Retombe tout seul à `false` quand le geste finit OU est annulé (une
-    /// feuille qui se ferme, un geste système) : jamais de répétition orpheline.
-    @GestureState private var doigtPose = false
-    @State private var repetition: Task<Void, Never>?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// - Parameter enButee: le bouton s'estompe mais reste touchable, pour que
-    ///   la valeur puisse répondre « non » au doigt.
-    init(enButee: Bool = false,
-         pas: @escaping () -> Bool,
-         @ViewBuilder etiquette: @escaping () -> Etiquette) {
-        self.enButee = enButee
-        self.pas = pas
-        self.etiquette = etiquette
-    }
-
-    var body: some View {
-        etiquette()
-            .opacity(enButee ? 0.4 : 1)
-            .scaleEffect(doigtPose && !reduceMotion ? 0.97 : 1)
-            .brightness(doigtPose ? -0.04 : 0)
-            .animation(DS.ressortAppui, value: doigtPose)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .updating($doigtPose) { _, pose, _ in pose = true }
-            )
-            .onChange(of: doigtPose) { _, pose in
-                if pose { commencer() } else { arreter() }
-            }
-            .onDisappear { arreter() }
-            .accessibilityElement(children: .ignore)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { _ = pas() }
-    }
-
-    private func commencer() {
-        arreter()
-        guard pas() else { return }
-        repetition = Task { @MainActor in
-            var attente = CadenceRepetition.depart
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(attente))
-                if Task.isCancelled { break }
-                guard pas() else { break }
-                attente = CadenceRepetition.suivante(attente)
-            }
-        }
-    }
-
-    private func arreter() {
-        repetition?.cancel()
-        repetition = nil
-    }
-}
-
-/// Le rythme d'un maintien : il part lentement (on a le temps de relâcher
-/// après un seul pas), accélère, puis plafonne à une vitesse qu'on suit encore
-/// des yeux.
-enum CadenceRepetition {
-    /// Attente avant le deuxième pas, en secondes.
-    static let depart: Double = 0.4
-    /// Attente la plus courte entre deux pas.
-    static let plancher: Double = 0.08
-
-    /// Attente suivante : un quart de moins, jamais sous le plancher.
-    static func suivante(_ attente: Double) -> Double {
-        max(plancher, attente * 0.75)
-    }
-}
-
 // MARK: Butée
+
+/// Compte les butées à faire sentir. Un « − » ou un « + » maintenu rappelle
+/// son action en boucle (`.buttonRepeatBehavior`) : tant que les appels se
+/// suivent de près, c'est le même appui, donc une seule secousse.
+struct Butee: Equatable {
+    /// Nombre de secousses à jouer depuis l'ouverture (`kiwiSecousse`).
+    private(set) var secousses = 0
+    private var dernierAppel = Date.distantPast
+
+    /// Deux appels plus rapprochés que ça appartiennent au même appui.
+    static let memeAppui: TimeInterval = 0.6
+
+    /// Le bouton vient d'être touché alors qu'il ne peut plus bouger.
+    mutating func toucher(a maintenant: Date = Date()) {
+        defer { dernierAppel = maintenant }
+        guard maintenant.timeIntervalSince(dernierAppel) > Self.memeAppui else { return }
+        secousses += 1
+    }
+}
 
 /// La valeur fait non de la tête : deux allers-retours de quelques points.
 /// `animatableData` compte les secousses demandées ; à chaque entier, le
@@ -267,6 +204,7 @@ private struct KiwiSecousseModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .modifier(KiwiSecousse(animatableData: reduceMotion ? 0 : CGFloat(secousses)))
+            // Une oscillation jouée une fois : sa durée fait partie du geste.
             .animation(reduceMotion ? nil : .easeOut(duration: 0.32), value: secousses)
     }
 }

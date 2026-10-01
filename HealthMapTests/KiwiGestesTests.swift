@@ -3,9 +3,9 @@ import SwiftUI
 @testable import HealthMap
 
 /// Les gestes du quotidien (`KiwiGestes.swift`) reposent sur trois petites
-/// règles géométriques. Elles ne se voient qu'à l'écran quand elles cassent :
-/// un éclat qui reste dessiné, une valeur qui ne revient pas à sa place, un
-/// maintien qui s'emballe. On les verrouille ici.
+/// règles. Elles ne se voient qu'à l'écran quand elles cassent : un éclat qui
+/// reste dessiné, une valeur qui ne revient pas à sa place, une butée qui
+/// tremble sans fin sous un doigt maintenu. On les verrouille ici.
 final class KiwiGestesTests: XCTestCase {
 
     private let cadre = CGRect(x: 0, y: 0, width: 72, height: 72)
@@ -29,7 +29,7 @@ final class KiwiGestesTests: XCTestCase {
         }
     }
 
-    // MARK: Butée
+    // MARK: Secousse
 
     func testLaSecousseSeReposeExactementASaPlace() {
         for secousses in 0...4 {
@@ -47,17 +47,27 @@ final class KiwiGestesTests: XCTestCase {
         XCTAssertEqual(KiwiSecousse(amplitude: 6, animatableData: 0.125).effectValue(size: .zero).m31, 6, accuracy: 0.0001)
     }
 
-    // MARK: Maintien
+    // MARK: Butée
 
-    func testLeMaintienAccelerePuisPlafonne() {
-        var attente = CadenceRepetition.depart
-        var precedente = attente
-        for _ in 0..<30 {
-            attente = CadenceRepetition.suivante(attente)
-            XCTAssertLessThanOrEqual(attente, precedente)
-            XCTAssertGreaterThanOrEqual(attente, CadenceRepetition.plancher)
-            precedente = attente
+    func testDeuxAppuisDistinctsFontDeuxSecousses() {
+        var butee = Butee()
+        let depart = Date(timeIntervalSinceReferenceDate: 1_000)
+        butee.toucher(a: depart)
+        butee.toucher(a: depart.addingTimeInterval(1.5))
+        XCTAssertEqual(butee.secousses, 2)
+    }
+
+    /// Un doigt maintenu rappelle l'action plusieurs fois par seconde : la
+    /// valeur ne doit dire « non » qu'une fois, pas trembler tout du long.
+    func testUnMaintienNeFaitQuUneSecousse() {
+        var butee = Butee()
+        let depart = Date(timeIntervalSinceReferenceDate: 1_000)
+        for tic in 0..<30 {
+            butee.toucher(a: depart.addingTimeInterval(Double(tic) * 0.1))
         }
-        XCTAssertEqual(attente, CadenceRepetition.plancher, accuracy: 0.0001)
+        XCTAssertEqual(butee.secousses, 1)
+        // Doigt relevé, puis nouvel appui : la valeur répond de nouveau.
+        butee.toucher(a: depart.addingTimeInterval(5))
+        XCTAssertEqual(butee.secousses, 2)
     }
 }

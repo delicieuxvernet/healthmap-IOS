@@ -29,8 +29,9 @@ Trois règles portent 80 % de l'écart perçu :
 | Cartes | `.dsCard()` : blanc, rayon 14 continu, **aucune ombre, aucune bordure** |
 | Listes | `DSGroupedList` + `DSRow` + `DSSeparator(retrait: 49 avec icône / 16 sans)` |
 | Jauges | `DSGauge` (4 pt, animée 1 s easeOut, cascade 50 ms) · `DSRing` (92 pt, trait 9) |
-| Boutons | `DSCapsuleButton` (50 pt, capsule) · `DSLinkRow` (lien vert de fin de carte) · `.dsPress` (0,96 + assombrissement, ressort `kiwiVif`) |
+| Boutons | `DSCapsuleButton` (50 pt, capsule) · `DSLinkRow` (lien vert de fin de carte) · `.dsPress` (0,96 + assombrissement, ressort `kiwiVif`) : **le seul état d'appui** ; `.healthMapPressed` et `BilanV7PressStyle` en sont des alias |
 | Mouvement | `KiwiMotion.swift` : ressorts `kiwiVif` · `kiwiFluide` · `kiwiRebond` · `kiwiCompteur`, échelles `KiwiEchelle` (rien au-dessus de 1,08), `ChiffreQuiCompte`, `.kiwiImpulsion(_:)`, `.kiwiRecompense(_:)` |
+| Gestes | `KiwiGestes.swift` : `PastilleAjoutRapide` (« + » → coche à huit éclats) · `CompteurAjouts` · `.kiwiSecousse(_:)` + `Butee` (la valeur fait non de la tête, une fois par appui). Un « − / + » de quantité = `Button` + `.buttonRepeatBehavior(.enabled)` (maintien accéléré système), chiffres en `.contentTransition(.numericText())` |
 | Formats | `DS.entier(1021)` → `1 021` · `DS.pourcent(42)` → `42 %` · `DS.decimal(5.9)` → `5,9` (espace fine U+202F) |
 | Navigation | `KiwiFloatingTabBar` (capsule, 5 onglets) · `DSAddButton` (60 pt) · grands titres natifs `.large` |
 
