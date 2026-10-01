@@ -34,6 +34,10 @@ final class DashboardViewModel: ObservableObject {
     /// MainTabView). Piloté par `demarrerBilan()` ; remis à false à la
     /// fermeture (« Explorer d'abord », la croix, ou fin du questionnaire).
     @Published var questionnaireOuvert = false
+    /// Où en est un bilan commencé et pas terminé (« Étape 2 sur 4 »), pour la
+    /// carte du Journal. `nil` tant que rien n'est commencé. Posé par
+    /// `MainTabView`, qui tient le ViewModel du questionnaire.
+    @Published var repriseBilan: RepriseBilan?
     @Published var errorMessage: String?
     /// Erreur dédiée au bilan v2 (écran de chargement/gate onboarding).
     /// Distincte de `errorMessage` (v7, autre bandeau) pour ne pas faire

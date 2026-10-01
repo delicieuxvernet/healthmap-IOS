@@ -552,16 +552,32 @@ struct JournalApportsAttenteCard: View {
 /// promesse de durée. Le tap passe par `BilanDoorButton` (haptique + funnel
 /// découverte + `demarrerBilan`), comme toutes les portes bilan de l'app.
 struct JournalAvantQuestionnaireCard: View {
+    /// Où en est un bilan commencé et pas terminé. `nil` : rien n'est
+    /// commencé, la carte invite à répondre.
+    var reprise: RepriseBilan? = nil
     let onStart: () -> Void
 
     var body: some View {
+        Group {
+            if let reprise {
+                enCours(reprise)
+            } else {
+                invitation
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+    }
+
+    private var invitation: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("On ne connaît pas encore tes besoins")
                 .font(.dsSection)
                 .tracking(DSTracking.section)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Ils dépendent de ton âge, de ton poids, de ton activité et de ce que tu manges déjà. Douze questions suffisent à les calculer.")
+            Text("Ils dépendent de ton âge, de ton poids, de ton activité et de ce que tu manges déjà. Quatre étapes suffisent à les calculer.")
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
@@ -581,9 +597,38 @@ struct JournalAvantQuestionnaireCard: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 9)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dsCard()
+    }
+
+    /// Un bilan attend : où il en est, ce qu'il reste, et de quoi reprendre
+    /// là où on s'est arrêté (refonte du questionnaire, 1er octobre 2026).
+    private func enCours(_ reprise: RepriseBilan) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Ton bilan t'attend")
+                .font(.dsLegendeMoyenne)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
+            Text(reprise.titre)
+                .font(.dsSection)
+                .tracking(DSTracking.section)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 3)
+            BilanSegmentsDEtapes(avancements: reprise.avancements)
+                .padding(.top, 12)
+            Text(reprise.reste.isEmpty ? "Tes réponses sont gardées." : "Tes réponses sont gardées. \(reprise.reste)")
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+            BilanDoorButton(
+                title: BilanDoorButton.Libelle.journalReprise,
+                accessibilityText: "Reprendre mon bilan là où je me suis arrêté",
+                zone: .bilanApports,
+                action: onStart
+            )
+            .padding(.top, 16)
+        }
     }
 }
 

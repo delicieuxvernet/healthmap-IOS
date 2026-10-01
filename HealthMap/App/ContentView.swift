@@ -533,6 +533,7 @@ struct MainTabView: View {
 
             armerTutoriel()
             relancerBriefEtRappels()
+            dashboardVM.repriseBilan = questionnaireVM.repriseBilan
         }
         .sheet(isPresented: $showPaywallFromDeepLink) {
             PaywallView()
@@ -545,10 +546,16 @@ struct MainTabView: View {
         // sauvegardé en continu par QuestionnaireViewModel, la reprise se fait
         // à la question en cours. À la fermeture, l'onglet d'origine est intact.
         .sheet(isPresented: $dashboardVM.questionnaireOuvert) {
-            QuestionnaireContainerView()
+            // Refonte du 1er octobre 2026 : le parcours en quatre étapes.
+            BilanParcoursView()
                 .environmentObject(questionnaireVM)
                 .environmentObject(dashboardVM)
                 .healthMapQuestionnaireSheet()
+        }
+        // Le Journal dit où en est un bilan commencé : on le relit à chaque
+        // fermeture de la feuille, et au lancement (brouillon restauré).
+        .onChange(of: dashboardVM.questionnaireOuvert) { _, ouvert in
+            if !ouvert { dashboardVM.repriseBilan = questionnaireVM.repriseBilan }
         }
         // Quand la bulle d'écoute prend la main, TOUTE l'interface recule à
         // 0,94 (barre d'onglets comprise). Posé avant les surcouches : la

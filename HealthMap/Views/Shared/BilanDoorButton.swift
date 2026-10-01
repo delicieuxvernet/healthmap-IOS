@@ -58,6 +58,8 @@ extension BilanDoorButton {
         /// Journal avant questionnaire (refonte 23 août 2026) : la porte de
         /// la carte « On ne connaît pas encore tes besoins ».
         static let journal = "Répondre au questionnaire"
+        /// Journal, bilan commencé et pas terminé : on reprend où on en était.
+        static let journalReprise = "Reprendre"
         /// Plan (couronne radiale en mode découverte).
         static let plan = "Construire MON plan · bilan 3 min"
         /// Suivi (sous les carrousels d'exemple).

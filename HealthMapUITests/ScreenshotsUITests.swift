@@ -256,11 +256,13 @@ final class ScreenshotsUITests: XCTestCase {
             porte.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             sleep(2)
             snap("70-questionnaire-intro")
-            if app.buttons["C'est parti"].firstMatch.waitForExistence(timeout: 5) {
-                app.buttons["C'est parti"].firstMatch.tap()
+            // Refonte du 1er octobre 2026 : l'accueil du parcours, puis ses écrans.
+            if app.buttons["Commencer"].firstMatch.waitForExistence(timeout: 5) {
+                app.buttons["Commencer"].firstMatch.tap()
                 sleep(1)
                 snap("71-questionnaire-question")
-                // Quelques écrans de plus pour voir les types de réponse.
+                // « Qu'est-ce qui t'amène ? » ne bloque pas : un écran de plus.
+                // Les suivants attendent une réponse, le bouton y reste éteint.
                 for i in 0..<3 {
                     let continuer = app.buttons["Continuer"].firstMatch
                     if continuer.waitForExistence(timeout: 3), continuer.isEnabled {
@@ -272,7 +274,13 @@ final class ScreenshotsUITests: XCTestCase {
                     }
                 }
             }
-            app.swipeDown(velocity: .fast)
+            // La feuille ne se ferme plus en glissant : la croix, puis sa confirmation.
+            if app.buttons["Fermer"].firstMatch.exists {
+                app.buttons["Fermer"].firstMatch.tap()
+                let plusTard = app.buttons["Reprendre plus tard"].firstMatch
+                if plusTard.waitForExistence(timeout: 3) { plusTard.tap() }
+                sleep(1)
+            }
         }
     }
 
