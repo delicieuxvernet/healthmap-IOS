@@ -414,6 +414,18 @@ enum FormulationsRappel {
         )
     }
 
+    // MARK: La prise de sang a 6 mois
+
+    /// Sonne le jour où la prise de sang passe à demi-effet
+    /// (`PriseDeSangApports.moisPleinEffet`). Aucune valeur sur l'écran
+    /// verrouillé : seulement son âge, et ce que ça change au calcul.
+    static func priseDeSangSixMois() -> (titre: String, corps: String) {
+        (
+            "Ta prise de sang a 6 mois 🩸",
+            "Elle compte désormais moitié moins dans tes apports. Une analyse plus récente ? Importe-la pour garder des chiffres justes."
+        )
+    }
+
     // MARK: Sans bilan (l'utilisateur n'a pas encore fait son questionnaire)
 
     static func midiSansBilan(jour: Int) -> (titre: String, corps: String) {
