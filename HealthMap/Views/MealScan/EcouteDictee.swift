@@ -428,6 +428,11 @@ private struct BulleVivante: View {
         ouverte ? EcouteGeometrie.diametre / 2 : EcouteGeometrie.rayonBouton
     }
 
+    /// La courbe du trajet de la bulle (la même que celle de la scène).
+    private var courbe: Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .kiwiFluide
+    }
+
     /// Appui maintenu : la bulle suit le doigt vers la gauche et s'estompe à
     /// l'approche du seuil, on sent l'annulation venir.
     private var glisse: CGFloat {
@@ -463,6 +468,11 @@ private struct BulleVivante: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: rayon, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: rayon, style: .continuous))
+            // Le rayon et les fondus suivent le trajet de la bulle (ressort
+            // fluide), pas la courbe de 80 ms réservée à la respiration : sans
+            // ces deux lignes, celle-ci, posée plus bas, les emporterait.
+            .animation(courbe, value: ouverte)
+            .animation(courbe, value: contractee)
         }
         .buttonStyle(.dsPress)
         .disabled(!mainsLibres || !ouverte || contractee)
