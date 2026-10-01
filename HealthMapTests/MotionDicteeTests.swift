@@ -166,9 +166,9 @@ final class MotionDicteeTests: XCTestCase {
     /// 0 pastille · 160 coche · 220 onde · 320 confettis · 340 titre · 550
     /// étiquettes · 2 100 la feuille redescend.
     func testLeDerouleDeLaCelebrationSuitLaMaquette() {
-        let moments = CelebrationAjout.partition.map(\.a)
+        let moments = CelebrationAjout.partition.map { $0.a }
         XCTAssertEqual(moments, [0, 0.16, 0.22, 0.32, 0.34])
-        XCTAssertEqual(CelebrationAjout.partition.map(\.etape), [1, 2, 3, 4, 5])
+        XCTAssertEqual(CelebrationAjout.partition.map { $0.etape }, [1, 2, 3, 4, 5])
         XCTAssertEqual(CelebrationAjout.debutEtiquettes, 0.55, accuracy: 0.0001)
         XCTAssertEqual(CelebrationAjout.ecartEtiquettes, 0.07, accuracy: 0.0001)
         XCTAssertEqual(CelebrationAjout.fermeture, 2.1, accuracy: 0.0001)

@@ -164,7 +164,7 @@ final class EcouteCentre: ObservableObject {
     private func ranger() {
         rangement?.cancel()
         rangement = Task { [weak self] in
-            try? await Task.sleep(for: Self.sortie)
+            try? await Task.sleep(for: EcouteCentre.sortie)
             guard !Task.isCancelled, let self else { return }
             self.boutonCache = false
             self.phase = .repos
@@ -242,10 +242,14 @@ private struct EcouteScene: View {
 
     private var cible: CGRect { EcouteGeometrie.cadreBulle(dans: taille) }
 
-    /// Le cadre de la bulle à cet instant. Sous « Réduire les animations »,
-    /// aucun trajet : elle est déjà à sa place.
+    /// Pas de trajet : sous « Réduire les animations », ou si le cadre du
+    /// bouton n'est pas connu. La bulle est alors déjà à sa place, et c'est
+    /// toute la scène qui arrive en fondu.
+    private var sansTrajet: Bool { reduceMotion || depart == nil }
+
+    /// Le cadre de la bulle à cet instant.
     private var cadre: CGRect {
-        guard !reduceMotion, !ouverte, let depart else { return cible }
+        guard !sansTrajet, !ouverte, let depart else { return cible }
         return depart
     }
 
@@ -287,7 +291,7 @@ private struct EcouteScene: View {
             pied
         }
         .frame(width: taille.width, height: taille.height)
-        .opacity(reduceMotion && !enScene ? 0 : 1)
+        .opacity(sansTrajet && !enScene ? 0 : 1)
         .animation(courbe, value: centre.phase)
         .animation(courbe, value: centre.mainsLibres)
         .onAppear {
