@@ -391,6 +391,9 @@ private struct Hachures: View {
 /// anneaux (chacun garde sa couleur), puis UNE sortie verte vers le plan.
 struct JournalApportsCard: View {
     let bilan: BilanV2
+    /// Scores du registre : le chiffre affiché partout ailleurs. Le
+    /// pourcentage rédigé par le bilan ne sert que de repli.
+    var scores: [String: Int] = [:]
     let isPremium: Bool
     let onApport: (ApportV2) -> Void
     let onRemonter: () -> Void
@@ -450,7 +453,7 @@ struct JournalApportsCard: View {
     }
 
     private func anneau(_ apport: ApportV2, delai: Double) -> some View {
-        let pct = max(0, min(100, apport.pctBesoin ?? 0))
+        let pct = max(0, min(100, apport.id.flatMap { scores[$0] } ?? apport.pctBesoin ?? 0))
         let nom = apport.nom ?? apport.id.flatMap { NutrientData.definition(for: $0)?.label } ?? "Apport"
         let couleur = apport.id.map { Color.nutrientColor(for: $0) } ?? Color.dsSecondaire
         return Button {

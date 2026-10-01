@@ -872,7 +872,47 @@ final class MealJournalService {
             return MicroPct(id: mp.id, pctRDA: pct, amount: amount, unit: mp.unit)
         }
         let name = detail.brand.map { "\(detail.name) · \($0)" } ?? detail.name
-        return FoodEntry(name: name, portionG: grams, macros: macros, micros: micros)
+        // L'identifiant de l'aliment voyage avec l'item (`food_id`) : c'est lui
+        // qui permet de relire sa composition complète (`micros_detail_100g`).
+        return FoodEntry(name: name, portionG: grams, macros: macros, micros: micros,
+                         raw: detail.id.isEmpty ? nil : ["food_id": .string(detail.id)])
+    }
+
+    // MARK: - Composition détaillée des aliments (tous les micronutriments)
+
+    /// Composition pour 100 g des aliments demandés (`micros_detail_100g`) :
+    /// vitamines, minéraux et acides gras de la table Ciqual. Un apport non
+    /// renseigné est ABSENT de la réponse, jamais à zéro. Un aliment inconnu
+    /// revient avec une composition vide, pour ne pas être redemandé.
+    func compositions(ids: [String]) async throws -> Compositions {
+        guard !ids.isEmpty else { return [:] }
+        struct Params: Encodable {
+            let pFoodIds: [String]
+            enum CodingKeys: String, CodingKey {
+                case pFoodIds = "p_food_ids"
+            }
+        }
+        struct Ligne: Decodable {
+            let id: String
+            let amount: Double
+        }
+        struct Entree: Decodable {
+            let estime: Bool?
+            let apports: [Ligne]?
+        }
+        let brut: [String: Entree] = try await client
+            .rpc("micros_detail_100g", params: Params(pFoodIds: ids))
+            .execute()
+            .value
+        var sortie: Compositions = [:]
+        for id in ids {
+            var apports: [String: Double] = [:]
+            for ligne in brut[id]?.apports ?? [] {
+                apports[ligne.id] = ligne.amount
+            }
+            sortie[id] = CompositionAliment(estime: brut[id]?.estime ?? false, apports: apports)
+        }
+        return sortie
     }
 
     // MARK: - Suppression douce (deleted_at)
