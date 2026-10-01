@@ -96,6 +96,14 @@ struct ContentView: View {
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             handleUniversalLink(activity)
         }
+        // Un widget ou l'activité en direct a ouvert l'app sur un écran précis
+        // (`healthmap://widget/…`). Posé sur la racine pour la même raison que
+        // les liens universels : le lien attend que les onglets existent. Les
+        // autres liens du schéma (retour de connexion Google) ne sont pas lus ici.
+        .onOpenURL { url in
+            guard let lien = LienKiwio(url: url) else { return }
+            RouteurWidgets.partage.recevoir(lien)
+        }
         // Session-expiry notice. `AuthViewModel.startRefreshTimer` flips this
         // flag right before signing out when the refresh token has been
         // revoked or expired (10-minute background tick). Surfacing the
@@ -532,15 +540,15 @@ struct MainTabView: View {
         }
         // Entrée libre (V12a) : le questionnaire se lance/reprend depuis
         // n'importe quel onglet via `dashboardVM.demarrerBilan()`. Feuille
-        // plein écran (même style que l'édition du profil) : le glissement
-        // vers le bas permet de sortir à tout moment — le draft est sauvegardé
-        // en continu par QuestionnaireViewModel, la reprise se fait à la
-        // question en cours. À la fermeture, l'onglet d'origine est intact.
+        // plein écran qui ne se ferme PAS en glissant (on la quittait par
+        // accident) : la sortie passe par sa croix, qui confirme. Le draft est
+        // sauvegardé en continu par QuestionnaireViewModel, la reprise se fait
+        // à la question en cours. À la fermeture, l'onglet d'origine est intact.
         .sheet(isPresented: $dashboardVM.questionnaireOuvert) {
             QuestionnaireContainerView()
                 .environmentObject(questionnaireVM)
                 .environmentObject(dashboardVM)
-                .healthMapFullSheet()
+                .healthMapQuestionnaireSheet()
         }
         // Le tutoriel est posé ICI, APRÈS `mainInterface` : son voile couvre
         // donc AUSSI la barre d'onglets flottante (elle-même en overlay de
@@ -702,6 +710,12 @@ struct MainTabView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapJournalAllerAuJour)) { _ in
                 selectedTab = .journal
             }
+            // Un widget a demandé un écran. `@Published` émet AVANT d'écrire sa
+            // valeur : on la lit au tour suivant, une fois posée.
+            .onReceive(RouteurWidgets.partage.$enAttente) { lien in
+                guard lien != nil else { return }
+                DispatchQueue.main.async { servirLienWidget() }
+            }
             .sheet(isPresented: $afficheInvitationNotifs, onDismiss: armerTutoriel) {
                 InvitationNotificationsSheet(cible: ciblesDuBilan?.first)
             }
@@ -714,10 +728,34 @@ struct MainTabView: View {
         BriefDuJourStore.memoriserPrenom(dashboardVM.firstName)
         proposerBrief()
         replanifierRappels()
+        // Les widgets et l'activité en direct : on applique ce qui a été
+        // touché pendant que l'app dormait, puis on réécrit la journée.
+        Task { await SynchroWidgets.synchroniser(dashboardVM) }
+    }
+
+    /// Un widget a ouvert l'app sur un écran précis. Comme pour une
+    /// notification, le brief s'efface devant l'intention : on est venu dicter,
+    /// pas lire. Jamais par-dessus le questionnaire, le récap ou le tutoriel.
+    private func servirLienWidget() {
+        guard let lien = RouteurWidgets.partage.prendre() else { return }
+        guard !dashboardVM.questionnaireOuvert, !dashboardVM.recapArme, !afficheRecap,
+              tutoriel.etape == nil else { return }
+        briefReporte = true
+        let briefOuvert = afficheBrief
+        afficheBrief = false
+        let versComplements = (lien == LienKiwio.complements)
+        selectedTab = versComplements ? Tab.complements : Tab.journal
+        guard !versComplements, lien != LienKiwio.journal else { return }
+        // Le brief finit de sortir avant qu'une feuille ne monte.
+        DispatchQueue.main.asyncAfter(deadline: .now() + (briefOuvert ? 0.5 : 0.05)) {
+            RouteurWidgets.partage.confierAuJournal(lien)
+        }
     }
 
     private func replanifierRappels() {
-        let cibles = ciblesDuBilan
+        // Le registre dit ce qui freine chaque apport d'après le questionnaire :
+        // c'est la matière du rappel « déclic » (1er oct. 2026).
+        let cibles = ciblesDuBilan.map { BriefDuJourBuilder.enrichir($0, registre: dashboardVM.registre) }
         Task { await RappelsPersonnalises.replanifier(cibles: cibles) }
     }
 
@@ -848,6 +886,7 @@ struct MainTabView: View {
             && !dashboardVM.recapArme
             && !dashboardVM.questionnaireOuvert
             && tutoriel.etape == nil
+            && RouteurWidgets.partage.enAttente == nil
             && !BriefDuJourStore.dejaVuAujourdhui()
     }
 

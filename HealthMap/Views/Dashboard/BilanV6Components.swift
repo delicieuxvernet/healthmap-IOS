@@ -88,7 +88,15 @@ struct ApportV2DetailSheet: View {
     /// défloute les sections gatées en direct, sans réouverture.
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
-    private var pct: Int { min(100, max(0, apport.pctBesoin ?? 0)) }
+    /// Le chiffre du registre fait foi (questionnaire, repas notés, prise de
+    /// sang) : c'est celui du Journal et de Progrès. Le pourcentage rédigé par
+    /// le bilan ne sert que de repli, pour un apport hors catalogue.
+    private var pct: Int {
+        if let id = apport.id, let score = dashboardVM.nutrientScores[id] {
+            return min(100, max(0, score))
+        }
+        return min(100, max(0, apport.pctBesoin ?? 0))
+    }
     private var statut: StatutV2 { apport.statut }
     private var definition: NutrientDefinition? {
         apport.id.flatMap { NutrientData.definition(for: $0) }

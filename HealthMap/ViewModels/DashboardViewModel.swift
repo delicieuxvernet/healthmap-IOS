@@ -32,7 +32,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var didFinishInitialLoad = false
     /// Questionnaire présenté par-dessus les onglets (feuille plein écran de
     /// MainTabView). Piloté par `demarrerBilan()` ; remis à false à la
-    /// fermeture (« Explorer d'abord », glissement, ou fin du questionnaire).
+    /// fermeture (« Explorer d'abord », la croix, ou fin du questionnaire).
     @Published var questionnaireOuvert = false
     @Published var errorMessage: String?
     /// Erreur dédiée au bilan v2 (écran de chargement/gate onboarding).
@@ -196,8 +196,9 @@ final class DashboardViewModel: ObservableObject {
         return pepites[dayOfYear % pepites.count]
     }
 
+    /// Le prénom à afficher. Une seule lettre n'en est pas un (`Prenom`).
     var firstName: String {
-        profile.firstName.isEmpty ? "" : profile.firstName
+        Prenom.affichable(profile.firstName)
     }
 
     // MARK: - Private
@@ -294,12 +295,19 @@ final class DashboardViewModel: ObservableObject {
                     self.hasCompletedQuestionnaire = questionnaireData.completed
                 } else {
                     self.profile = .empty
-                    // Conserve le prénom déjà connu (signup email OU Sign in with
-                    // Apple → profiles.first_name) même sans questionnaire, pour ne
-                    // PAS le redemander dans l'onboarding (App Review Guideline 4).
-                    self.profile.firstName = profileRow.firstName ?? ""
                     self.hasCompletedQuestionnaire = false
                 }
+                // Le prénom déjà connu du compte (inscription par e-mail OU Sign
+                // in with Apple → `profiles.first_name`) complète le questionnaire
+                // quand celui-ci n'en porte pas, pour ne PAS le redemander (App
+                // Review Guideline 4). Posé HORS du `else` : `questionnaire_data`
+                // n'est jamais nul en base (défaut `{}`), la branche du dessus ne
+                // s'exécutait donc jamais, et le prénom de l'inscription était
+                // redemandé à tout le monde.
+                self.profile.firstName = Prenom.retenu(
+                    questionnaire: self.profile.firstName,
+                    compte: profileRow.firstName
+                )
                 // `baseline_nutrient_scores` est une colonne sœur de
                 // `questionnaire_data` (pas imbriquée dedans) : on la fusionne
                 // manuellement dans le profil en mémoire.
@@ -485,7 +493,13 @@ final class DashboardViewModel: ObservableObject {
         guard let debut = calendrier.date(byAdding: .day, value: -JournalApports.fenetreJours, to: aujourdhui),
               let repas = try? await MealJournalService.shared.loadRange(userId: userId, from: debut, to: aujourdhui)
         else { return }
-        observationsJournal = JournalApports.observations(repas: repas, profil: profile)
+        // Même mesure que le Journal : la composition exacte des aliments
+        // quand la base la connaît, ce que le repas avait enregistré sinon.
+        let compositions = await CompositionsStore.shared.completer(pour: repas)
+        observationsJournal = JournalApports.observations(
+            repas: MesuresRepas.repasPrecises(repas, compositions: compositions),
+            profil: profile
+        )
     }
 
     #if DEBUG

@@ -274,6 +274,16 @@ struct ReglagesView: View {
 
             DSSeparator(retrait: Self.retraitPastille)
 
+            NavigationLink {
+                WidgetsReglagesView()
+            } label: {
+                ReglageLigne(symbole: "square.grid.2x2", titre: "Widgets et écran verrouillé")
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityIdentifier("reglages.widgets")
+
+            DSSeparator(retrait: Self.retraitPastille)
+
             Button {
                 HapticService.shared.tap()
                 TutorielService.partage.relancer()
@@ -813,7 +823,7 @@ private struct LigneNotifications: View {
 
     private var sousTitre: String {
         if statut == .denied { return "Désactivées dans les réglages de l'iPhone" }
-        return allume ? "Midi et soir, selon tes apports à renforcer" : "Rappels coupés"
+        return allume ? "Dans la journée, avec tes chiffres du jour" : "Rappels coupés"
     }
 
     var body: some View {

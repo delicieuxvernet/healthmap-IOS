@@ -190,7 +190,22 @@
 >   de carte, pastilles à **trois sens** (gris / vert = connecté ou actif / rouge = destructif).
 >   L'interrupteur Notifications porte `RappelsPersonnalises.actifs` et lève l'ancien mode Zen,
 >   qui n'a plus d'interrupteur à l'écran. Sous-pages : compte (mot de passe si compte e-mail),
->   objectifs, abonnement, suppression du compte (double verrou).
+>   objectifs, abonnement, suppression du compte (double verrou). Depuis le 1er oct. 2026, la carte
+>   Application porte aussi « Widgets et écran verrouillé » (sous Notifications).
+>
+> - **Widgets, écran verrouillé, activité en direct** (1er oct. 2026, maquette montrée dans le chat,
+>   `Partage/VuesWidgets.swift` + `KiwioWidgets/`) : quatre widgets et une carte d'écran verrouillé
+>   qui reprennent le Journal, jamais un design à part. **Ma journée** (petit : le chiffre des kcal
+>   restantes + jauge ; moyen : le chiffre, la série, les quatre repas Matin · Midi · Soir · Encas avec
+>   leurs symboles et teintes de la mosaïque, un « + » vert sur chacun ; rectangulaire d'écran
+>   verrouillé). **Ajout rapide** (petit et rond : le micro ; moyen : quatre tuiles, Dicter en vert,
+>   Photo, l'eau, le rituel). **Eau** (les litres comme sur la carte Eau, « + 25 cl »). **Rituel du
+>   jour** (matin · midi · soir à cocher, **jamais de dose**). **Activité en direct « Ta journée »** :
+>   les quatre repas, puis Dicter · eau · rituel. Règle de geste : l'eau et le rituel se cochent sur
+>   place ; Dicter, Photo et un repas ouvrent l'app au bon endroit (un widget ne peut pas enregistrer
+>   la voix). Le vert reste réservé à ce qui se touche. Un widget suit le mode clair ou sombre du
+>   téléphone (l'app, elle, reste claire). Réglages → Widgets et écran verrouillé : l'interrupteur
+>   « Ma journée en direct », les aperçus (les vraies vues), le mode d'emploi en trois lignes.
 >
 > - **Prise de sang** (Premium, 30 sept. 2026 — maquette validée le 6 juil., `Views/PriseDeSang/PriseDeSangSheet.swift`) :
 >   quatrième option de « Autres façons d'ajouter » du Journal (« Prise de sang », goutte) et carte

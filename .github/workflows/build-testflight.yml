@@ -86,6 +86,16 @@ jobs:
           path: ${{ runner.temp }}/TestResults.xcresult
           if-no-files-found: warn
 
+      # Les widgets rendus en image par `WidgetsPartageTests` (clair et sombre) :
+      # la preuve visuelle d'un widget, sans appareil.
+      - name: Upload widget previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apercus-widgets
+          path: build/apercus-widgets
+          if-no-files-found: ignore
+
   # ── Build + déploiement TestFlight (pushes sur main uniquement) ─────────
   # needs: tests -> ne démarre QUE si le job tests ci-dessus a réussi (pas
   # juste "pas échoué" : un job needs par défaut n'attend un succès explicite,

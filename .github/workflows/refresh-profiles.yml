@@ -4,8 +4,20 @@ name: Refresh provisioning profiles (after a capability change)
 # fr.healthmap.app dans le portail Apple Developer (ex. HealthKit). Régénère le
 # provisioning profile App Store via match (force) pour qu'il intègre la
 # capability, puis le build TestFlight (match readonly) reprend le profil à jour.
+#
+# Sert aussi, UNE FOIS, à déclarer l'extension de widgets chez Apple et à créer
+# son profil : lane `bootstrap_widgets` (aucun geste dans le portail).
 on:
   workflow_dispatch:
+    inputs:
+      lane:
+        description: "Lane fastlane à lancer"
+        required: false
+        default: "refresh_profiles"
+        type: choice
+        options:
+          - refresh_profiles
+          - bootstrap_widgets
 
 jobs:
   refresh-profiles:
@@ -47,5 +59,5 @@ jobs:
       - name: Install fastlane
         run: gem install fastlane:2.235.0 multi_json --no-document
 
-      - name: Regenerate App Store provisioning profile (match force)
-        run: fastlane ios refresh_profiles
+      - name: Run the signing lane (match, en écriture)
+        run: fastlane ios ${{ inputs.lane || 'refresh_profiles' }}

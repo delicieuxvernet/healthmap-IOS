@@ -164,7 +164,11 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
     ) {
         let userInfo = response.notification.request.content.userInfo
         Task { @MainActor in
-            AnalyticsService.shared.track(.screenViewed, properties: ["from_notification": "true"])
+            // `rappel` = le type de rappel local touché (« midi », « declic »…) :
+            // sans lui, impossible de savoir lequel fait revenir.
+            var proprietes: [String: any Sendable] = ["from_notification": "true"]
+            if let rappel = userInfo["rappel"] as? String { proprietes["rappel"] = rappel }
+            AnalyticsService.shared.track(.screenViewed, properties: proprietes)
             AppLogger.push.info("User tapped notification: \(String(describing: userInfo), privacy: .private)")
 
             // Deep-link routing: map userInfo["screen"] → DeepLinkRoute

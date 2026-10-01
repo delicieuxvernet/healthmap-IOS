@@ -22,6 +22,14 @@ final class QuestionnaireViewModel: ObservableObject {
     /// AUCUNE présélection sur une question à choix unique tant que l'utilisateur
     /// n'a pas choisi (fini le « Homme » déjà coché).
     @Published private(set) var interactedQuestionIds: Set<String> = []
+    /// Le compte connaît déjà le prénom (inscription par e-mail, Sign in with
+    /// Apple) : la question « prénom » n'est pas posée (App Review, Gl. 4).
+    ///
+    /// Figé à l'ouverture du questionnaire par `adopterPrenomDuCompte`, jamais
+    /// dérivé du champ en cours de saisie : sinon la question disparaît à la
+    /// première lettre tapée. Non persisté dans le draft, recalculé à chaque
+    /// ouverture.
+    @Published private(set) var prenomConnuDuCompte = false
     @Published var isSubmitting = false
     @Published var errorMessage: String?
 
@@ -101,7 +109,29 @@ final class QuestionnaireViewModel: ObservableObject {
                 return false
             }
 
+            // Le prénom n'est pas redemandé quand le compte le connaît déjà.
+            if question.id == "firstName" && prenomConnuDuCompte {
+                return false
+            }
+
             return true
+        }
+    }
+
+    /// Reprend le prénom que le compte connaît déjà et retire la question
+    /// correspondante du parcours. Appelé à l'ouverture du questionnaire.
+    ///
+    /// Le prénom du compte l'emporte sur celui d'un draft : la question étant
+    /// masquée, la personne n'a aucun moyen de corriger une valeur restée là
+    /// (une lettre seule, typiquement), et c'est elle qui partirait en base.
+    func adopterPrenomDuCompte(_ prenom: String) {
+        let courante = currentQuestion?.id
+        profile.firstName = prenom
+        guard !prenomConnuDuCompte else { return }
+        prenomConnuDuCompte = true
+        // La liste visible vient de perdre une question : on reste sur la même.
+        if let courante, let index = visibleQuestions.firstIndex(where: { $0.id == courante }) {
+            currentQuestionIndex = index
         }
     }
 
