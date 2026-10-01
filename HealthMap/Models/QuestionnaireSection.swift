@@ -156,14 +156,14 @@ extension QuestionnaireSection {
                 .init("brain_fog", "Brouillard mental", emoji: "🌫️"),
                 .init("bleeding_gums", "Saignement des gencives", emoji: "🩸"),
                 .init("feeling_cold", "Toujours froid", emoji: "🥶"),
-                .init("mouth_ulcers", "Aphtes frequents", emoji: "😣"),
-                .init("dry_skin", "Peau seche", emoji: "🏜️"),
-                .init("bloating_frequent", "Ballonnements frequents", emoji: "🎈"),
+                .init("mouth_ulcers", "Aphtes fréquents", emoji: "😣"),
+                .init("dry_skin", "Peau sèche", emoji: "🏜️"),
+                .init("bloating_frequent", "Ballonnements fréquents", emoji: "🎈"),
                 .init("slow_digestion", "Digestion lente", emoji: "🐌"),
-                .init("acid_reflux_feeling", "Remontees acides", emoji: "🔥"),
+                .init("acid_reflux_feeling", "Remontées acides", emoji: "🔥"),
                 .init("low_mood", "Baisse de moral", emoji: "😔"),
                 .init("low_motivation", "Manque de motivation", emoji: "🪫"),
-                .init("skin_breakouts", "Poussees d'acne", emoji: "😬"),
+                .init("skin_breakouts", "Poussées d'acné", emoji: "😬"),
                 // Manquait cote iOS alors que RedFlagDetector le teste depuis
                 // toujours : l'alerte la plus urgente de l'app (urgency
                 // .immediate) ne pouvait donc JAMAIS se declencher. Present
@@ -192,7 +192,7 @@ extension QuestionnaireSection {
         // qui lit le champ que la question remplit la fait disparaître à la
         // première lettre tapée (bug du 17 juil. au 1er oct. 2026).
         Question(id: "firstName", text: "Comment tu t'appelles ?", type: .textInput(placeholder: "Prénom")),
-        Question(id: "age", text: "Quel age as-tu ?", type: .numericInput(placeholder: "25", suffix: "ans")),
+        Question(id: "age", text: "Quel âge as-tu ?", type: .numericInput(placeholder: "25", suffix: "ans")),
         Question(
             id: "gender",
             text: "Tu es...",
@@ -221,7 +221,7 @@ extension QuestionnaireSection {
     static let modeDeVieQuestions: [Question] = [
         Question(
             id: "indoorWork",
-            text: "Tu travailles principalement en interieur ?",
+            text: "Tu travailles principalement en intérieur ?",
             type: .singleChoice,
             options: [.init("yes", "Oui"), .init("no", "Non")]
         ),
@@ -246,17 +246,17 @@ extension QuestionnaireSection {
                 .init("fair", "Claire"),
                 .init("medium", "Moyenne"),
                 .init("olive", "Mate"),
-                .init("dark", "Foncee"),
+                .init("dark", "Foncée"),
             ]
         ),
         Question(
             id: "strengthTraining",
-            text: "Ton niveau d'activite physique ?",
+            text: "Ton niveau d'activité physique ?",
             type: .singleChoice,
             options: [
                 .init("none", "Sédentaire", emoji: "🛋️"),
-                .init("light", "Leger (1-2x/sem)", emoji: "🚶"),
-                .init("moderate", "Modere (3-4x/sem)", emoji: "🏃"),
+                .init("light", "Léger (1-2x/sem)", emoji: "🚶"),
+                .init("moderate", "Modéré (3-4x/sem)", emoji: "🏃"),
                 .init("regular", "Régulier (4-5x/sem)", emoji: "🏋️"),
                 .init("intense", "Intense (6+/sem)", emoji: "🔥"),
             ]
@@ -273,9 +273,9 @@ extension QuestionnaireSection {
             type: .singleChoice,
             options: [
                 .init("zen", "Zen", emoji: "🧘"),
-                .init("relaxed", "Detendu", emoji: "😌"),
+                .init("relaxed", "Détendu", emoji: "😌"),
                 .init("somewhat", "Moyen", emoji: "😐"),
-                .init("very", "Stresse", emoji: "😰"),
+                .init("very", "Stressé", emoji: "😰"),
                 .init("explode", "Au max", emoji: "🤯"),
             ]
         ),
@@ -296,13 +296,13 @@ extension QuestionnaireSection {
                 .init("great", "En pleine forme", emoji: "💪"),
                 .init("good", "Bien", emoji: "😊"),
                 .init("ok", "Moyen", emoji: "😐"),
-                .init("bad", "Fatigue", emoji: "😩"),
-                .init("terrible", "Epuise", emoji: "😵"),
+                .init("bad", "Fatigué", emoji: "😩"),
+                .init("terrible", "Épuisé", emoji: "😵"),
             ]
         ),
         Question(
             id: "screenBeforeBed",
-            text: "Ecrans avant de dormir ?",
+            text: "Écrans avant de dormir ?",
             type: .singleChoice,
             options: [
                 .init("none", "Aucun"), .init("short", "< 30 min"),
@@ -311,13 +311,13 @@ extension QuestionnaireSection {
         ),
         Question(
             id: "caffeineIntake",
-            text: "Ta consommation de cafeine ?",
+            text: "Ta consommation de caféine ?",
             type: .singleChoice,
             options: [
                 .init("none", "Aucune", emoji: "🚫"),
-                .init("light", "1-2 cafes/jour", emoji: "☕"),
-                .init("moderate", "3-4 cafes/jour", emoji: "☕☕"),
-                .init("heavy", "5+ cafes/jour", emoji: "☕☕☕"),
+                .init("light", "1-2 cafés/jour", emoji: "☕"),
+                .init("moderate", "3-4 cafés/jour", emoji: "☕☕"),
+                .init("heavy", "5+ cafés/jour", emoji: "☕☕☕"),
             ]
         ),
         Question(
@@ -348,7 +348,7 @@ extension QuestionnaireSection {
             type: .singleChoice,
             options: [
                 .init("none", "Jamais"), .init("rarely", "Rarement"),
-                .init("moderate", "Modérée"), .init("regular", "Reguliere"), .init("heavy", "Importante"),
+                .init("moderate", "Modérée"), .init("regular", "Régulière"), .init("heavy", "Importante"),
             ]
         ),
         Question(
@@ -359,7 +359,7 @@ extension QuestionnaireSection {
         ),
         Question(
             id: "antibiotics",
-            text: "As-tu pris des antibiotiques recemment ?",
+            text: "As-tu pris des antibiotiques récemment ?",
             type: .singleChoice,
             options: [.init("no", "Non"), .init("yes", "Oui")]
         ),
@@ -376,7 +376,7 @@ extension QuestionnaireSection {
             options: [
                 .init("omnivore", "Omnivore", emoji: "🥩"),
                 .init("flexitarian", "Flexitarien", emoji: "🥗"),
-                .init("vegetarien", "Vegetarien", emoji: "🥚"),
+                .init("vegetarien", "Végétarien", emoji: "🥚"),
                 .init("vegan", "Vegan", emoji: "🌱"),
                 .init("sans_gluten", "Sans gluten", emoji: "🌾"),
                 .init("halal", "Halal", emoji: "🍖"),
@@ -395,7 +395,7 @@ extension QuestionnaireSection {
             type: .singleChoice,
             options: [
                 .init("almost_all", "100%"), .init("mostly", "Majoritairement"),
-                .init("half", "50/50"), .init("mostly_out", "Surtout exterieur"),
+                .init("half", "50/50"), .init("mostly_out", "Surtout extérieur"),
                 .init("rarely", "Rarement"),
             ]
         ),
@@ -405,8 +405,8 @@ extension QuestionnaireSection {
             type: .singleChoice,
             options: [
                 .init("raw", "Cru"), .init("steamed", "Vapeur"),
-                .init("sauteed", "Poele/saute"), .init("boiled", "Bouilli"),
-                .init("mixed", "Varie"),
+                .init("sauteed", "Poêle/sauté"), .init("boiled", "Bouilli"),
+                .init("mixed", "Varié"),
             ]
         ),
         // Flux "Faites vos courses" : remplace les 10 anciennes questions de
@@ -424,7 +424,7 @@ extension QuestionnaireSection {
         ),
         Question(
             id: "fermentedFoods",
-            text: "Aliments fermentes ?",
+            text: "Aliments fermentés ?",
             type: .singleChoice,
             options: [
                 .init("never", "Jamais"), .init("rarely", "Rarement"),
@@ -433,7 +433,7 @@ extension QuestionnaireSection {
         ),
         Question(
             id: "ultraProcessedFrequency",
-            text: "Aliments ultra-transformes ?",
+            text: "Aliments ultra-transformés ?",
             type: .singleChoice,
             options: [
                 .init("never", "Jamais"), .init("rarely", "Rarement"),
@@ -453,11 +453,11 @@ extension QuestionnaireSection {
             id: "saltLevel",
             text: "Ton niveau de sel ?",
             type: .singleChoice,
-            options: [.init("none", "Aucun"), .init("little", "Peu"), .init("moderate", "Modere"), .init("a_lot", "Beaucoup")]
+            options: [.init("none", "Aucun"), .init("little", "Peu"), .init("moderate", "Modéré"), .init("a_lot", "Beaucoup")]
         ),
         Question(
             id: "iodizedSalt",
-            text: "Tu utilises du sel iode ?",
+            text: "Tu utilises du sel iodé ?",
             type: .singleChoice,
             options: [.init("yes", "Oui"), .init("no", "Non"), .init("unknown", "Je ne sais pas")]
         ),
@@ -475,11 +475,11 @@ extension QuestionnaireSection {
         ),
         Question(
             id: "supplementsCurrent",
-            text: "Complements que tu prends actuellement ?",
+            text: "Compléments que tu prends actuellement ?",
             type: .multiChoice,
             options: [
                 .init("none", "Aucun"), .init("vitD", "Vitamine D", emoji: "☀️"),
-                .init("omega3", "Omega-3", emoji: "🐟"), .init("magnesium", "Magnesium", emoji: "⚡"),
+                .init("omega3", "Oméga-3", emoji: "🐟"), .init("magnesium", "Magnésium", emoji: "⚡"),
                 .init("iron", "Fer", emoji: "🩸"), .init("b12", "Vitamine B12", emoji: "🔴"),
                 .init("zinc", "Zinc", emoji: "🛡️"), .init("folate", "Folate", emoji: "🧬"),
                 .init("probiotics", "Probiotiques", emoji: "🦠"), .init("multivitamin", "Multivitamine", emoji: "💊"),
@@ -510,20 +510,20 @@ extension QuestionnaireSection {
     static let medicalQuestions: [Question] = [
         Question(
             id: "medications",
-            text: "Prends-tu des medicaments ?",
+            text: "Prends-tu des médicaments ?",
             type: .multiChoice,
             options: [
                 .init("none", "Aucun"),
                 .init("ppi", "IPP (anti-acide)", emoji: "💊"),
                 .init("metformin", "Metformine", emoji: "💉"),
                 .init("oral_contraceptive", "Contraceptif oral", emoji: "💊"),
-                .init("diuretics", "Diuretiques", emoji: "💧"),
+                .init("diuretics", "Diurétiques", emoji: "💧"),
                 .init("statins", "Statines", emoji: "❤️"),
                 .init("anticoagulant", "Anticoagulant", emoji: "🩸"),
                 .init("thyroid_med", "Thyroïde", emoji: "🦋"),
                 .init("laxatives", "Laxatifs", emoji: "💊"),
                 .init("antispasmodics", "Antispasmodiques", emoji: "💊"),
-                .init("antidiarrheal", "Anti-diarrheiques", emoji: "💊"),
+                .init("antidiarrheal", "Anti-diarrhéiques", emoji: "💊"),
             ]
         ),
         // Étendue le 20 septembre 2026. Les quatre premières lignes existaient
@@ -614,9 +614,9 @@ extension QuestionnaireSection {
             text: "Abondance de tes règles ?",
             type: .singleChoice,
             options: [
-                .init("light", "Legeres"), .init("normal", "Normales"),
+                .init("light", "Légères"), .init("normal", "Normales"),
                 .init("heavy", "Abondantes"), .init("very_heavy", "Très abondantes"),
-                .init("na", "Non concerne"),
+                .init("na", "Non concernée"),
             ],
             showIf: { $0.gender == .femme }
         ),
@@ -625,7 +625,7 @@ extension QuestionnaireSection {
             text: "Situation de grossesse ?",
             type: .singleChoice,
             options: [
-                .init("na", "Non concerne"),
+                .init("na", "Non concernée"),
                 .init("trying_to_conceive", "Projet de grossesse"),
                 .init("pregnant", "Enceinte"),
                 .init("breastfeeding", "Allaitement"),
