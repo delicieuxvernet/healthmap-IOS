@@ -6,6 +6,18 @@ import Foundation
 // compte vit sur le téléphone, par compte et par jour : rien ne part au
 // serveur. Clé préfixée `healthmap_` : `AuthViewModel.clearLocalCaches()`
 // l'efface à la déconnexion, comme les autres données locales du compte.
+//
+// C'est le SEUL point d'accès au compteur, hors de toute vue : le Journal, et
+// tout ce qui ajoute de l'eau depuis ailleurs (un widget qui dépose des
+// gobelets en attente, appliqués au retour au premier plan), passent par ici.
+// Chaque écriture poste `.healthmapEauChange` ; qui affiche le compteur s'y
+// abonne. À appeler sur le fil principal.
+
+extension Notification.Name {
+    /// Le compteur d'eau d'un jour a changé. `userInfo` : `gobelets` (Int) et
+    /// `jour` (Date).
+    static let healthmapEauChange = Notification.Name("healthmapEauChange")
+}
 
 enum SuiviEau {
 
@@ -44,6 +56,23 @@ enum SuiviEau {
             parJour = parJour.filter { $0.key >= plancher }
         }
         defaults.set(parJour, forKey: cle(userId))
+        NotificationCenter.default.post(
+            name: .healthmapEauChange,
+            object: nil,
+            userInfo: ["gobelets": borne, "jour": jour]
+        )
+    }
+
+    /// Ajoute `nombre` gobelets au jour donné (aujourd'hui par défaut), sans
+    /// dépasser l'objectif, et rend le nouveau compte. Un nombre négatif en
+    /// retire.
+    @discardableResult
+    static func ajouter(_ nombre: Int, userId: String, jour: Date = Date(), defaults: UserDefaults = .standard) -> Int {
+        let actuel = gobelets(userId: userId, jour: jour, defaults: defaults)
+        let nouveau = min(gobeletsParJour, max(0, actuel + nombre))
+        guard nouveau != actuel else { return actuel }
+        noter(nouveau, userId: userId, jour: jour, defaults: defaults)
+        return nouveau
     }
 
     private static func cle(_ userId: String) -> String {

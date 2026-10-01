@@ -743,10 +743,18 @@ struct JournalView: View {
 
         JournalEauCard(bus: gobeletsEau, onToucher: { rang in noterEau(rang) })
             .padding(.top, DS.interCarte)
-            .task(id: journal.selectedDay) {
-                guard let uid = AuthService.shared.cachedCurrentUserIdString else { return }
-                gobeletsEau = SuiviEau.gobelets(userId: uid, jour: journal.selectedDay)
+            .task(id: journal.selectedDay) { relireEau() }
+            // De l'eau ajoutée ailleurs que sur cette carte (un widget) : la
+            // carte relit le compteur du jour affiché.
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapEauChange)) { _ in
+                relireEau()
             }
+    }
+
+    private func relireEau() {
+        guard let uid = AuthService.shared.cachedCurrentUserIdString else { return }
+        let lus = SuiviEau.gobelets(userId: uid, jour: journal.selectedDay)
+        if lus != gobeletsEau { gobeletsEau = lus }
     }
 
     /// Un pas sur l'un des deux poids. L'écriture attend que le geste soit

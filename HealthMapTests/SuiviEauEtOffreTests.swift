@@ -57,6 +57,24 @@ final class SuiviEauTests: XCTestCase {
         XCTAssertEqual(SuiviEau.gobelets(userId: "a", jour: jour, defaults: defaults), 0)
     }
 
+    func testAjouterDepuisAilleursPasseParLeMemeCompteur() {
+        let jour = Date()
+        XCTAssertEqual(SuiviEau.ajouter(2, userId: "a", jour: jour, defaults: defaults), 2)
+        XCTAssertEqual(SuiviEau.ajouter(1, userId: "a", jour: jour, defaults: defaults), 3)
+        XCTAssertEqual(SuiviEau.gobelets(userId: "a", jour: jour, defaults: defaults), 3)
+        // Jamais au-delà de l'objectif, jamais sous zéro.
+        XCTAssertEqual(SuiviEau.ajouter(20, userId: "a", jour: jour, defaults: defaults), SuiviEau.gobeletsParJour)
+        XCTAssertEqual(SuiviEau.ajouter(-20, userId: "a", jour: jour, defaults: defaults), 0)
+    }
+
+    func testChaqueEcritureLeFaitSavoir() {
+        let attente = expectation(forNotification: .healthmapEauChange, object: nil) { note in
+            note.userInfo?["gobelets"] as? Int == 4
+        }
+        SuiviEau.noter(4, userId: "a", jour: Date(), defaults: defaults)
+        wait(for: [attente], timeout: 1)
+    }
+
     func testLesJoursTropAnciensSontOublies() throws {
         let ancien = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: -200, to: Date()))
         SuiviEau.noter(5, userId: "a", jour: ancien, defaults: defaults)
