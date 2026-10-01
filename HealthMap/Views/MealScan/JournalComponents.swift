@@ -54,6 +54,12 @@ struct JournalCaloriesCard: View {
     var santeLiee = false
     /// Ouvre la feuille Activité ; `nil` = pas de ligne de pied.
     var onActivite: (() -> Void)? = nil
+    /// Compteur d'ajouts : chaque repas qui vient d'entrer dans la journée fait
+    /// gonfler la carte à 1,035 puis revenir. Un changement de jour, lui, ne
+    /// la fait pas réagir.
+    var impulsion = 0
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var budget: Int { (objectif ?? 0) + (depensees ?? 0) }
     private var restantes: Int { budget - consommees }
@@ -84,11 +90,11 @@ struct JournalCaloriesCard: View {
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(DS.entier(heros))
+                    // Le chiffre COMPTE jusqu'à sa nouvelle valeur.
+                    ChiffreQuiCompte(valeur: Double(heros))
                         .font(.dsHeros48)
                         .tracking(DSTracking.heros48)
                         .foregroundStyle(Color.dsTexte)
-                        .contentTransition(.numericText())
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Text(legende)
@@ -100,10 +106,9 @@ struct JournalCaloriesCard: View {
                 if objectif != nil {
                     ZStack {
                         AnneauBudget(fraction: fraction, depasse: depasse)
-                        Text(DS.pourcent(min(pourcent, 999)))
+                        ChiffreQuiCompte(valeur: Double(min(pourcent, 999)), format: { DS.pourcent($0) })
                             .font(.dsValeurAnneau)
                             .foregroundStyle(Color.dsTexte)
-                            .contentTransition(.numericText())
                     }
                 }
             }
@@ -149,7 +154,8 @@ struct JournalCaloriesCard: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
-        .animation(.easeOut(duration: 0.4), value: consommees)
+        .animation(reduceMotion ? nil : .kiwiCompteur, value: consommees)
+        .kiwiImpulsion(impulsion)
     }
 
     private var libelleVocal: String {
@@ -191,7 +197,8 @@ private struct AnneauBudget: View {
                 .rotationEffect(.degrees(-90))
         }
         .frame(width: 88, height: 88)
-        .animation(reduceMotion ? nil : DS.remplissage, value: fraction)
+        // Un repas vient d'entrer : l'anneau reprend sa course en ressort.
+        .animation(reduceMotion ? nil : .kiwiFluide, value: fraction)
         .onAppear {
             if reduceMotion {
                 remplie = true
@@ -226,6 +233,8 @@ struct JournalMacrosCard: View {
     }
 
     let lignes: [Ligne]
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Les quatre lignes du jour. Les fibres suivent la référence
     /// canonique (`NutrientData`, 30 g) ; les trois macros, les cibles calculées
@@ -277,10 +286,10 @@ struct JournalMacrosCard: View {
                     .foregroundStyle(Color.dsTexte)
                 Spacer(minLength: 8)
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    Text("\(DS.entier(grammes)) g")
+                    // La valeur COMPTE jusqu'à ce que le repas vient d'ajouter.
+                    ChiffreQuiCompte(valeur: Double(grammes), format: { "\(DS.entier($0)) g" })
                         .font(.dsValeurLigneForte)
                         .foregroundStyle(Color.dsTexte)
-                        .contentTransition(.numericText())
                     if let cible = ligne.cible {
                         Text(" / \(DS.entier(Int(cible.rounded()))) g")
                             .font(.dsValeurLigne)
@@ -299,7 +308,7 @@ struct JournalMacrosCard: View {
             }
         }
         .padding(.vertical, 7)
-        .animation(.easeOut(duration: 0.4), value: grammes)
+        .animation(reduceMotion ? nil : .kiwiCompteur, value: grammes)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(libelleVocal(ligne, grammes: grammes, surplus: surplus))
     }
@@ -347,8 +356,10 @@ private struct BarreMacro: View {
             }
         }
         .frame(height: 6)
-        .animation(reduceMotion ? nil : DS.remplissage, value: fraction)
-        .animation(reduceMotion ? nil : DS.remplissage, value: surplus)
+        // La jauge suit le repas ajouté en ressort ; son premier remplissage, à
+        // l'ouverture de la page, garde la courbe longue (`DS.remplissage`).
+        .animation(reduceMotion ? nil : .kiwiFluide, value: fraction)
+        .animation(reduceMotion ? nil : .kiwiFluide, value: surplus)
         .onAppear {
             if reduceMotion {
                 remplie = true
@@ -716,6 +727,9 @@ struct JournalSaisieBloc: View {
     var onPriseDeSang: (() -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// La scène d'écoute : c'est elle qui dit quand le bouton est « parti »
+    /// en bulle. Ne publie qu'aux changements de phase, jamais au rythme du micro.
+    @ObservedObject private var ecoute = EcouteCentre.partage
 
     /// Le doigt est sur « Dicter ». `@GestureState` retombe tout seul à `false`
     /// quand le geste finit OU est annulé (le défilement qui reprend la main) :
@@ -812,79 +826,43 @@ struct JournalSaisieBloc: View {
     }
 
     private var boutonDicter: some View {
-        boutonDicterVisuel
-            .scaleEffect(doigtPose && !reduceMotion ? 0.97 : 1)
-            .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.7), value: doigtPose)
-            // Simultané : la page défile toujours si le doigt part en glissant.
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .updating($doigtPose) { _, pose, _ in pose = true }
-                    .onChanged { valeur in
-                        deplacement = valeur.translation
-                        if maintenu { onAppuiLong(.glisse(valeur.translation)) }
-                    }
-            )
-            .onChange(of: doigtPose) { _, pose in doigtChange(pose) }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Dicter mon repas")
-            .accessibilityHint("Le plus rapide : parle, on identifie tes aliments. Touche pour dicter les mains libres, ou maintiens pour dicter tant que tu appuies.")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { onDicter() }
-            .accessibilityIdentifier("journal.dicter")
+        ZStack {
+            // La bulle d'écoute porte la forme du bouton : il s'efface d'un
+            // coup sous elle, et revient d'un coup quand elle s'y repose.
+            boutonDicterVisuel
+                .opacity(ecoute.boutonCache ? 0 : 1)
+                .animation(nil, value: ecoute.boutonCache)
+            // La cible du geste ne dépend PAS du visuel : une vue invisible
+            // n'est plus touchable, et l'appui maintenu serait coupé à
+            // l'instant où le bouton s'efface sous la bulle.
+            Color.clear
+                .contentShape(RoundedRectangle(cornerRadius: EcouteGeometrie.rayonBouton, style: .continuous))
+        }
+        .scaleEffect(doigtPose && !reduceMotion ? KiwiEchelle.appui : 1)
+        .animation(reduceMotion ? nil : .kiwiVif, value: doigtPose)
+        // Simultané : la page défile toujours si le doigt part en glissant.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .updating($doigtPose) { _, pose, _ in pose = true }
+                .onChanged { valeur in
+                    deplacement = valeur.translation
+                    if maintenu { onAppuiLong(.glisse(valeur.translation)) }
+                }
+        )
+        .onChange(of: doigtPose) { _, pose in doigtChange(pose) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Dicter mon repas")
+        .accessibilityHint("Le plus rapide : parle, on identifie tes aliments. Touche pour dicter les mains libres, ou maintiens pour dicter tant que tu appuies.")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { onDicter() }
+        .accessibilityIdentifier("journal.dicter")
     }
 
     private var boutonDicterVisuel: some View {
-        Group {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack {
-                    HaloDictee()
-                    Circle()
-                        .fill(Color.white.opacity(0.22))
-                        .overlay(Circle().strokeBorder(Color.white.opacity(0.5), lineWidth: 1))
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 46, height: 46)
-                .accessibilityHidden(true)
-
-                OndeDeVoix()
-                    .padding(.top, 10)
-
-                Text("Dicter")
-                    .font(.dsHeadline)
-                    .tracking(DSTracking.corps)
-                    .foregroundStyle(.white)
-                    .padding(.top, 8)
-                Text("le plus rapide")
-                    .font(.dsLegende)
-                    .foregroundStyle(Color.white.opacity(0.85))
-                    .padding(.top, 1)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [Color(hex: "7CCC54"), Color.dsAccent, Color(hex: "428426")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    // Lumière spéculaire en haut : le rendu de base ; le verre
-                    // d'iOS 26 viendra l'enrichir sans changer la mise en page.
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .fill(LinearGradient(
-                                colors: [Color.white.opacity(0.3), Color.white.opacity(0)],
-                                startPoint: .top,
-                                endPoint: .center
-                            ))
-                    )
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        }
-        .cibleTutoriel(.boutonDicter)
+        FaceBoutonDicter()
+            .background(FondBoutonDicter(rayon: EcouteGeometrie.rayonBouton))
+            .contentShape(RoundedRectangle(cornerRadius: EcouteGeometrie.rayonBouton, style: .continuous))
+            .cibleTutoriel(.boutonDicter)
     }
 
     // MARK: Photographier
@@ -951,6 +929,72 @@ struct JournalSaisieBloc: View {
             .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
         }
         .buttonStyle(.dsPress)
+    }
+}
+
+// MARK: - Le bouton Dicter, en deux morceaux
+//
+// La bulle d'écoute (`EcouteDictee.swift`) PART de ce bouton et y REVIENT :
+// elle dessine le même fond et la même face, pour que le passage de l'un à
+// l'autre ne se voie pas.
+
+/// Le fond vert du bouton : dégradé de marque et lumière en haut. Son rayon
+/// s'anime (22 pt pour le bouton, un cercle pour la bulle).
+struct FondBoutonDicter: View {
+    let rayon: CGFloat
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: rayon, style: .continuous)
+            .fill(LinearGradient(
+                colors: [Color(hex: "7CCC54"), Color.dsAccent, Color(hex: "428426")],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ))
+            // Lumière spéculaire en haut : le rendu de base ; le verre
+            // d'iOS 26 viendra l'enrichir sans changer la mise en page.
+            .overlay(
+                RoundedRectangle(cornerRadius: rayon, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [Color.white.opacity(0.3), Color.white.opacity(0)],
+                        startPoint: .top,
+                        endPoint: .center
+                    ))
+            )
+    }
+}
+
+/// La face du bouton : micro, onde, « Dicter », « le plus rapide ».
+struct FaceBoutonDicter: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack {
+                HaloDictee()
+                Circle()
+                    .fill(Color.white.opacity(0.22))
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.5), lineWidth: 1))
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 46, height: 46)
+            .accessibilityHidden(true)
+
+            OndeDeVoix()
+                .padding(.top, 10)
+
+            Text("Dicter")
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(.white)
+                .padding(.top, 8)
+            Text("le plus rapide")
+                .font(.dsLegende)
+                .foregroundStyle(Color.white.opacity(0.85))
+                .padding(.top, 1)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 

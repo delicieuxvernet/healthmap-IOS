@@ -65,15 +65,71 @@
 >   quatre lignes** (protéines · glucides · lipides · fibres) avec objectif et **surplus en hachures,
 >   lu selon l'objectif de la personne** (vert seulement pour les protéines de qui veut prendre du
 >   muscle, orangé sinon ; fibres : référence canonique 30 g) · **la saisie SUR la page** : « Dicter »
->   (seule surface verte — **un toucher = mains libres ; un appui maintenu = la bulle d'écoute
->   surgit en haut de l'écran et vit tant que le doigt tient, relâcher analyse, glisser à gauche
->   jette, glisser vers le haut verrouille** ; `AppuiDicter`, seuils `DicteeGeste`) et « Photographier », puis « Autres façons d'ajouter » qui déplie Écrire ·
+>   (seule surface verte — **le bouton DEVIENT la bulle d'écoute** (voir « Dicter, être écouté,
+>   être félicité » plus bas) : **un toucher = mains libres, on touche la bulle pour terminer ; un
+>   appui maintenu = elle vit tant que le doigt tient, relâcher analyse, glisser à gauche jette,
+>   glisser vers le haut verrouille** ; `AppuiDicter`, seuils `DicteeGeste`) et « Photographier », puis « Autres façons d'ajouter » qui déplie Écrire ·
 >   Rechercher · Code-barres (« Écrire » **ouvre la feuille d'analyse sur un champ de texte, clavier levé** — depuis le 21 sept. : l'app ignorant la zone du clavier à sa racine, un champ posé sur la page finissait caché derrière lui, sans sortie ; même analyse et même quota que la dictée) ·
 >   « Apports à renforcer » (la phrase de l'interaction, **trois anneaux** à la couleur de l'apport,
 >   une sortie verte) · le jour en **mosaïque** de quatre repas (le toucher ouvre **la fiche de CE repas**, `FicheRepasSheet` : ce que tu as saisi, modifiable · « Ce qu'il t'a apporté », macro par macro avec sa part de la cible du jour · vitamines et minéraux · un constat, jamais un geste).
 >   **Le bouton `+` flottant et sa feuille d'ajout ont disparu.** **Avant le questionnaire** : la
 >   saisie d'abord, puis « On ne connaît pas encore tes besoins » (porte), « En attendant, en France »
 >   (`TeaserStatsCatalog`, jamais un chiffre inventé), « À la fin du questionnaire ».
+> - **Dicter, être écouté, être félicité** (maquette « Kiwio - Motion » du 1er octobre 2026 ;
+>   `EcouteDictee.swift`, `CelebrationAjout.swift`, jetons dans `KiwiMotion.swift`) — la séquence la
+>   plus utilisée, animée de bout en bout :
+>   1. **le bouton devient la bulle** : le rectangle r22 de « Dicter » s'étire en un cercle de 132 pt
+>      au bas de l'écran (ressort fluide), **toute l'interface recule à 0,94** derrière un voile flou
+>      (`ReculSousLaBulle`, posé à la racine : la barre d'onglets recule aussi). Le bouton d'origine
+>      n'est jamais retiré de la page, seulement masqué : l'appui maintenu garde son geste ;
+>   2. **la bulle écoute** : son échelle suit le niveau RÉEL du micro (1 → 1,07), une aura liquide à
+>      trois harmoniques déborde derrière, cinq barres vivent sous le micro, « Kiwio t'écoute » et le
+>      minuteur au-dessus. Mains libres : « Touche la bulle pour terminer » + « Annuler ». Maintenu :
+>      « Relâche pour lancer l'analyse » ;
+>   3. **le calcul** : la bulle se contracte en indicateur (0,42, arc qui tourne) et disparaît sous
+>      la feuille d'analyse ; la dictée transcrite s'y relit **mot à mot, du flou au net**
+>      (`MotsQuiArrivent`). ⚠️ Les mots n'arrivent PAS pendant qu'on parle : la capture enregistre
+>      d'abord et transcrit ensuite (voir `SpeechCaptureService`), décision conservée ;
+>   4. **les résultats** : aliments en cascade (80 ms), total qui compte, aliments reconnus en vert
+>      dans la citation, et **« Ce repas t'apporte »** — protéines, glucides, lipides, fibres, la
+>      valeur qui compte et une barre à hauteur de la part de l'objectif du jour (sans cible de
+>      profil : la valeur seule, jamais d'objectif inventé) ;
+>   5. **la célébration, dans la feuille** : 0 ms pastille verte en rebond · 160 coche + vibration de
+>      succès · 220 onde · 320 douze confettis aux couleurs des apports · 340 titre « Ajouté au
+>      déjeuner » · 550 étiquettes en cascade de 70 ms (« +577 kcal », « Fer +18 % », « 13 jours » :
+>      l'apport et la série seulement s'ils existent) · 2 100 la feuille redescend. Ni pendant le
+>      tutoriel ni en mode Zen ;
+>   6. **le retour au Journal** : une pastille noire sort du haut de l'écran (`PastilleConfirmation`,
+>      « Ajouté au déjeuner · 577 kcal », la toucher ouvre le repas), la carte des calories gonfle à
+>      1,035 et **compte** jusqu'à sa nouvelle valeur, anneau et jauges macros suivent en ressort.
+>      (La vraie Dynamic Island demanderait une activité en direct et une extension : non fait.)
+>   **Une seule physique** : `kiwiVif` (0,28 / 0,86 — appuis), `kiwiFluide` (0,5 / 0,9 — feuilles,
+>   bulle, recul), `kiwiRebond` (0,55 / 0,72 — célébrations uniquement), `kiwiCompteur` (chiffres,
+>   sans dépassement). Échelles `KiwiEchelle` : appui 0,96 · récompense 0,5 → 1,08 → 1 · impulsion
+>   1,035 · recul 0,94 ; **rien ne dépasse 1,08**. Vibrations : Dicter doux · fin d'écoute léger ·
+>   ajout succès · étiquettes sélection. **Réduire les animations** : fondu de 0,2 s à la place du
+>   trajet, ni aura ni confettis, coche déjà tracée, chiffres directement à leur valeur.
+>   Pour l'instant, seule la dictée (et « Écrire », même feuille) se fête ainsi ; les autres ajouts
+>   gardent la gratification ci-dessous.
+> - **Poids et eau (1er octobre 2026)** (`JournalPoidsEau.swift`, calcul `Core/ObjectifPoids.swift`, eau
+>   `Services/SuiviEau.swift`) — sous la saisie, avant « Apports à renforcer ». **Carte poids** : poids
+>   actuel à gauche, **poids souhaité** à droite, chacun avec son moins et son plus (pas de 100 g, un
+>   appui maintenu répète le pas). L'écart donne le SENS de l'objectif (perdre · prendre · maintenir à
+>   moins d'un demi-kilo) ; les calories et les macros des cartes du dessus sortent des formules
+>   existantes (`calculateMacros`), recalculées sous le doigt, enregistrées quand le geste s'arrête
+>   (`DashboardViewModel.reglerPoids`). Le pied dit l'objectif du jour, le rythme et l'échéance estimée.
+>   **Deux réserves : jamais de déficit vers un poids sous le repère de corpulence (IMC 18,5), ni
+>   enceinte ou allaitante** — les calories restent au maintien et la carte le dit. Sans poids souhaité
+>   réglé, rien ne change (les cibles suivent le premier objectif du questionnaire). **Carte eau** :
+>   huit gobelets de 25 cl sur deux rangs, l'eau monte d'un coup de ressort ; toucher le dernier rempli
+>   le vide ; compte gardé sur le téléphone, par compte et par jour (effacé à la déconnexion).
+> - **Offre annuelle** (`OffreAnnuelleOverlay.swift`, `Services/OffrePremium.swift`) : carte qui monte
+>   du bas, surcouche de la RACINE comme la gratification. Elle n'affiche que ce qui est LU chez Apple
+>   (prix annuel, équivalent d'un an à la semaine, essai gratuit) ; l'économie est le même calcul que
+>   le badge du paywall. **Aucun compte à rebours.** « Voir l'offre » ouvre le paywall, « Plus tard »
+>   referme. Comptes gratuits ayant fait leur bilan seulement, sur le Journal, après une gratification
+>   ou au retour sur l'onglet ; jamais le premier jour, une fois tous les trois jours, puis toutes les
+>   deux semaines après trois refus (`RythmeOffre`). Jamais pendant le tutoriel, le brief ou les captures.
 > - **Gratification après un ajout** (`GratificationOverlay.swift`, moteur `GratificationRepas`) : une
 >   carte de deux secondes qui montre **ce que le geste a changé** — bandeau de verre en haut
 >   (« Ajouté au déjeuner · **Modifier** » ouvre la fiche du repas), coche dessinée + deux ondes +
@@ -171,7 +227,22 @@
 >   de carte, pastilles à **trois sens** (gris / vert = connecté ou actif / rouge = destructif).
 >   L'interrupteur Notifications porte `RappelsPersonnalises.actifs` et lève l'ancien mode Zen,
 >   qui n'a plus d'interrupteur à l'écran. Sous-pages : compte (mot de passe si compte e-mail),
->   objectifs, abonnement, suppression du compte (double verrou).
+>   objectifs, abonnement, suppression du compte (double verrou). Depuis le 1er oct. 2026, la carte
+>   Application porte aussi « Widgets et écran verrouillé » (sous Notifications).
+>
+> - **Widgets, écran verrouillé, activité en direct** (1er oct. 2026, maquette montrée dans le chat,
+>   `Partage/VuesWidgets.swift` + `KiwioWidgets/`) : quatre widgets et une carte d'écran verrouillé
+>   qui reprennent le Journal, jamais un design à part. **Ma journée** (petit : le chiffre des kcal
+>   restantes + jauge ; moyen : le chiffre, la série, les quatre repas Matin · Midi · Soir · Encas avec
+>   leurs symboles et teintes de la mosaïque, un « + » vert sur chacun ; rectangulaire d'écran
+>   verrouillé). **Ajout rapide** (petit et rond : le micro ; moyen : quatre tuiles, Dicter en vert,
+>   Photo, l'eau, le rituel). **Eau** (les litres comme sur la carte Eau, « + 25 cl »). **Rituel du
+>   jour** (matin · midi · soir à cocher, **jamais de dose**). **Activité en direct « Ta journée »** :
+>   les quatre repas, puis Dicter · eau · rituel. Règle de geste : l'eau et le rituel se cochent sur
+>   place ; Dicter, Photo et un repas ouvrent l'app au bon endroit (un widget ne peut pas enregistrer
+>   la voix). Le vert reste réservé à ce qui se touche. Un widget suit le mode clair ou sombre du
+>   téléphone (l'app, elle, reste claire). Réglages → Widgets et écran verrouillé : l'interrupteur
+>   « Ma journée en direct », les aperçus (les vraies vues), le mode d'emploi en trois lignes.
 >
 > - **Prise de sang** (Premium, 30 sept. 2026 — maquette validée le 6 juil., `Views/PriseDeSang/PriseDeSangSheet.swift`) :
 >   quatrième option de « Autres façons d'ajouter » du Journal (« Prise de sang », goutte) et carte

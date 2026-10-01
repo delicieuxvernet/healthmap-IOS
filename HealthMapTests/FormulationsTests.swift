@@ -87,9 +87,24 @@ final class FormulationsTests: XCTestCase {
             for (rang, cible) in variantesDeBilan(id).enumerated() {
                 for jour in 0..<8 {
                     let contexte = "\(id) bilan#\(rang) jour \(jour)"
-                    verifier(FormulationsRappel.midi(cible: cible, jour: jour, manqueHier: nil), "midi " + contexte)
-                    verifier(FormulationsRappel.midi(cible: cible, jour: jour, manqueHier: 42), "midi+hier " + contexte)
+                    // Midi : veille pas chiffrable, basse, couverte.
+                    verifier(FormulationsRappel.midi(cible: cible, jour: jour, hier: nil), "midi " + contexte)
+                    verifier(FormulationsRappel.midi(cible: cible, jour: jour, hier: 42), "midi+hier " + contexte)
+                    verifier(FormulationsRappel.midi(cible: cible, jour: jour, hier: 100), "midi+couvert " + contexte)
+                    // Encas et soir : rien de noté aujourd'hui, en cours, déjà couvert.
+                    verifier(FormulationsRappel.encas(cible: cible, jour: jour, aujourdhui: nil), "encas " + contexte)
+                    verifier(FormulationsRappel.encas(cible: cible, jour: jour, aujourdhui: (pourcent: 35, repas: 12)), "encas+jour " + contexte)
                     verifier(FormulationsRappel.soir(cible: cible, jour: jour), "soir " + contexte)
+                    verifier(FormulationsRappel.soir(cible: cible, jour: jour, aujourdhui: 35), "soir+jour " + contexte)
+                    verifier(FormulationsRappel.soir(cible: cible, jour: jour, aujourdhui: 100), "soir+couvert " + contexte)
+                    // Brief : le plus bas de la veille, avec ou sans série.
+                    for serie in [0, 12] {
+                        verifier(FormulationsRappel.brief(repasHier: 12, couvertsHier: 10, plusBas: (cible: cible, pourcent: 100), serie: serie, jour: jour),
+                                 "brief série \(serie) " + contexte)
+                        verifier(FormulationsRappel.brief(repasHier: 2, couvertsHier: 0, plusBas: (cible: cible, pourcent: 5), serie: serie, jour: jour),
+                                 "brief zéro couvert, série \(serie) " + contexte)
+                    }
+                    verifier(FormulationsRappel.retour(cible: cible), "retour " + contexte)
                 }
             }
         }
@@ -98,11 +113,63 @@ final class FormulationsTests: XCTestCase {
     func testMatrice_briefRetourEtSansBilan_tiennentLePlancher() {
         for jour in 0..<8 {
             verifier(FormulationsRappel.briefDuMatin(jour: jour), "brief jour \(jour)")
+            verifier(FormulationsRappel.brief(repasHier: 0, couvertsHier: nil, plusBas: nil, serie: 0, jour: jour), "brief veille vide jour \(jour)")
+            verifier(FormulationsRappel.brief(repasHier: 1, couvertsHier: nil, plusBas: nil, serie: 0, jour: jour), "brief un seul repas jour \(jour)")
+            verifier(FormulationsRappel.brief(repasHier: 3, couvertsHier: 8, plusBas: nil, serie: 0, jour: jour), "brief sans cible jour \(jour)")
             verifier(FormulationsRappel.midiSansBilan(jour: jour), "midi sans bilan jour \(jour)")
             verifier(FormulationsRappel.soirSansBilan(jour: jour), "soir sans bilan jour \(jour)")
         }
-        verifier(FormulationsRappel.retour(cible: cible("iron")), "retour avec cible")
         verifier(FormulationsRappel.retour(cible: nil), "retour sans cible")
+        verifier(FormulationsRappel.dernierAppel(repas: 1, couverts: nil), "dernier appel, un repas")
+        verifier(FormulationsRappel.dernierAppel(repas: 12, couverts: 10), "dernier appel chiffré")
+        verifier(FormulationsRappel.dernierAppel(repas: 3, couverts: 0), "dernier appel, zéro couvert")
+        verifier(FormulationsRappel.semaine(repas: 21, jours: 7, effort: nil), "semaine sans effort")
+        for id in nutriments {
+            let effort = BriefDuJour.Effort(id: id, nom: NutrientData.definition(for: id)?.label ?? id, points: 100)
+            verifier(FormulationsRappel.semaine(repas: 21, jours: 7, effort: effort), "semaine \(id)")
+        }
+    }
+
+    // MARK: - Le déclic (ce qui freine un apport)
+
+    /// Tous les libellés de frein ALIMENTAIRE que le registre sait produire
+    /// tiennent dans une notification, pour chaque apport et chaque variante.
+    func testDeclic_tientLePlancher_etSeTaitPlutotQueDeDeborder() {
+        let libelles = [
+            "Café ou thé pendant les repas", "Viande 3 fois par semaine ou moins", "Ni viande, ni œufs, ni poisson",
+            "Très peu de produits animaux", "Très peu de produits laitiers", "Sel iodé mais très peu de sel",
+            "Repas surtout pris dehors", "Ultra-transformés fréquents", "Alimentation pauvre en glucides",
+            "Pas de poisson gras", "Pain blanc", "Cuisson à l'eau",
+        ]
+        for id in nutriments {
+            for libelle in libelles {
+                for jour in 0..<3 {
+                    let texte = FormulationsRappel.declic(
+                        cible: cible(id), frein: FreinCible(libelle: libelle, points: 45), jour: jour
+                    )
+                    XCTAssertNotNil(texte, "\(id) « \(libelle) » jour \(jour)")
+                    if let texte { verifier(texte, "déclic \(id) « \(libelle) » jour \(jour)") }
+                }
+            }
+        }
+        // Un libellé hors gabarit : on se tait, on ne se fait pas couper.
+        let fleuve = String(repeating: "Très peu de légumes verts ", count: 6)
+        XCTAssertNil(FormulationsRappel.declic(cible: cible("iron"), frein: FreinCible(libelle: fleuve, points: 10), jour: 0))
+        XCTAssertNil(FormulationsRappel.declic(cible: cible("iron"), frein: FreinCible(libelle: "  ", points: 10), jour: 0))
+    }
+
+    // MARK: - Les accords
+
+    func testLeVerbeSAccordeAvecLApport() {
+        XCTAssertTrue(FormulationsRappel.retour(cible: cible("omega3")).titre.hasPrefix("Tes oméga-3 t'attendent"))
+        XCTAssertTrue(FormulationsRappel.retour(cible: cible("iron")).titre.hasPrefix("Ton fer t'attend "))
+        XCTAssertTrue(FormulationsRappel.soir(cible: cible("fiber"), jour: 0, aujourdhui: 35).titre
+            .hasPrefix("Ce soir : tes fibres sont à 35 %"))
+        XCTAssertTrue(FormulationsRappel.encas(cible: cible("vitD"), jour: 0, aujourdhui: (pourcent: 35, repas: 1)).titre
+            .hasPrefix("Un encas ? Ta vitamine D est à 35 %"))
+        XCTAssertEqual(FormulationsRappel.repasNotes(1), "1 repas noté")
+        XCTAssertEqual(FormulationsRappel.besoinsCouverts(1), "1 besoin sur 10 couvert")
+        XCTAssertEqual(FormulationsRappel.besoinsCouverts(6), "6 besoins sur 10 couverts")
     }
 
     // MARK: - On varie (sans jamais descendre)
@@ -111,10 +178,24 @@ final class FormulationsTests: XCTestCase {
         for id in nutriments {
             for cible in variantesDeBilan(id) {
                 for jour in 0..<7 {
+                    for hier in [nil, 42, 100] as [Int?] {
+                        XCTAssertNotEqual(
+                            FormulationsRappel.midi(cible: cible, jour: jour, hier: hier).corps,
+                            FormulationsRappel.midi(cible: cible, jour: jour + 1, hier: hier).corps,
+                            "\(id) : même phrase du midi deux jours de suite (jour \(jour))"
+                        )
+                    }
+                    for aujourdhui in [nil, (pourcent: 35, repas: 2)] as [(pourcent: Int, repas: Int)?] {
+                        XCTAssertNotEqual(
+                            FormulationsRappel.encas(cible: cible, jour: jour, aujourdhui: aujourdhui).corps,
+                            FormulationsRappel.encas(cible: cible, jour: jour + 1, aujourdhui: aujourdhui).corps,
+                            "\(id) : même phrase d'encas deux jours de suite (jour \(jour))"
+                        )
+                    }
                     XCTAssertNotEqual(
-                        FormulationsRappel.midi(cible: cible, jour: jour, manqueHier: nil).corps,
-                        FormulationsRappel.midi(cible: cible, jour: jour + 1, manqueHier: nil).corps,
-                        "\(id) : même phrase du midi deux jours de suite (jour \(jour))"
+                        FormulationsRappel.soir(cible: cible, jour: jour, aujourdhui: 35).corps,
+                        FormulationsRappel.soir(cible: cible, jour: jour + 1, aujourdhui: 35).corps,
+                        "\(id) : même phrase du soir chiffré deux jours de suite (jour \(jour))"
                     )
                     XCTAssertNotEqual(
                         FormulationsRappel.soir(cible: cible, jour: jour).corps,
@@ -134,10 +215,21 @@ final class FormulationsTests: XCTestCase {
 
     func testLeChiffreDHier_neSAfficheQueSIlYALieu() {
         let c = cible("iron", aliments: ["Lentilles"])
-        XCTAssertTrue(FormulationsRappel.midi(cible: c, jour: 0, manqueHier: 42).corps.hasPrefix("Hier, il t'en a manqué 42 %."))
-        XCTAssertFalse(FormulationsRappel.midi(cible: c, jour: 0, manqueHier: 0).corps.contains("Hier"),
-                       "un besoin couvert à 100 % hier n'a pas à être reproché")
-        XCTAssertFalse(FormulationsRappel.midi(cible: c, jour: 0, manqueHier: nil).corps.contains("Hier"))
+        // Le chiffre ouvre le titre : c'est lui qu'on lit sur l'écran verrouillé.
+        let bas = FormulationsRappel.midi(cible: c, jour: 0, hier: 58)
+        XCTAssertTrue(bas.titre.hasPrefix("Ton fer : 58 % hier"))
+        XCTAssertTrue(bas.corps.hasPrefix("Il t'en a manqué 42 %."))
+
+        // Un besoin couvert hier n'a pas à être reproché.
+        let couvert = FormulationsRappel.midi(cible: c, jour: 0, hier: 85)
+        XCTAssertTrue(couvert.titre.hasPrefix("Ton fer : 85 % hier"))
+        XCTAssertTrue(couvert.corps.hasPrefix("Besoin couvert hier."))
+        XCTAssertFalse(couvert.corps.contains("manqué"))
+
+        // Veille pas chiffrable : aucun chiffre, nulle part.
+        let sans = FormulationsRappel.midi(cible: c, jour: 0, hier: nil)
+        XCTAssertFalse((sans.titre + sans.corps).contains("%"))
+        XCTAssertFalse(sans.corps.contains("hier"))
     }
 
     // MARK: - Le brief instantané

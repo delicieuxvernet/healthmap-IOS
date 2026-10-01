@@ -566,13 +566,11 @@ struct PaywallView: View {
         if let short = shortPlan {
             // `shortPlan` est l'hebdo par construction : 52 périodes par an.
             let periodsPerYear: Decimal = short.periodUnit == .week ? 52 : 12
-            let yearAtShortRate = short.price * periodsPerYear
-            if yearAtShortRate > 0 {
-                let savings: Decimal = (1 - annual.price / yearAtShortRate) * 100
-                let percent = Int((savings as NSDecimalNumber).doubleValue.rounded())
-                if percent > 0 {
-                    parts.append("−\(percent) %")
-                }
+            // Même calcul que la carte de l'offre annuelle : un seul chiffre.
+            if let percent = OffrePremium.economie(
+                annuel: annual.price, court: short.price, periodesParAn: periodsPerYear
+            ) {
+                parts.append("−\(percent) %")
             }
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")

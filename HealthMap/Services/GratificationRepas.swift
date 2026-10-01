@@ -32,14 +32,7 @@ struct GratificationRepas: Identifiable, Equatable {
     let serie: Int?
 
     /// « Ajouté au déjeuner » — le bandeau du haut.
-    var bandeau: String {
-        switch creneau {
-        case .breakfast: return "Ajouté au petit-déjeuner"
-        case .lunch: return "Ajouté au déjeuner"
-        case .dinner: return "Ajouté au dîner"
-        case .snack: return "Ajouté en encas"
-        }
-    }
+    var bandeau: String { creneau.libelleAjout }
 
     /// « Ce déjeuner fait bouger deux de tes apports. »
     var phrase: String {
@@ -150,6 +143,20 @@ struct GratificationRepas: Identifiable, Equatable {
     private static func enLettres(_ n: Int) -> String {
         let mots = ["zéro", "un", "deux", "trois"]
         return n >= 0 && n < mots.count ? mots[n] : "\(n)"
+    }
+}
+
+extension MealJournalService.MealSlot {
+    /// « Ajouté au déjeuner » : où le repas vient d'être rangé. Une seule
+    /// formulation pour le bandeau de la gratification, la célébration de la
+    /// dictée et la pastille de confirmation.
+    var libelleAjout: String {
+        switch self {
+        case .breakfast: return "Ajouté au petit-déjeuner"
+        case .lunch: return "Ajouté au déjeuner"
+        case .dinner: return "Ajouté au dîner"
+        case .snack: return "Ajouté en encas"
+        }
     }
 }
 

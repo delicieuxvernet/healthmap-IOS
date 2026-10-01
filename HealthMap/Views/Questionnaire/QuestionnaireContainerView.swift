@@ -52,6 +52,11 @@ struct QuestionnaireContainerView: View {
     /// rather than inline text — an alert is impossible to miss.
     @State private var showSubmitError = false
 
+    /// La croix demande confirmation dès qu'une réponse a été donnée : on ne
+    /// quitte plus le questionnaire par accident (le glissement vers le bas,
+    /// lui, ne ferme plus la feuille — voir `healthMapQuestionnaireSheet`).
+    @State private var confirmeFermeture = false
+
     // MARK: - État des teasers (Lot E — carotte au bout du nez)
 
     /// Teaser affiché sur l'écran d'intro courant. `nil` = intro sans teaser.
@@ -123,14 +128,14 @@ struct QuestionnaireContainerView: View {
             }
         }
         .onAppear {
-            // Pré-remplit le prénom déjà connu (signup email OU Sign in with Apple,
-            // via profiles.first_name porté par dashboardVM) UNIQUEMENT s'il est
-            // vide — ne jamais écraser un draft. La question « prénom » est alors
-            // masquée (showIf), donc jamais redemandée après Sign in with Apple
-            // (App Review Guideline 4).
-            if viewModel.profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               !dashboardVM.profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                viewModel.profile.firstName = dashboardVM.profile.firstName
+            // Le prénom que le compte connaît déjà (signup email OU Sign in with
+            // Apple, via profiles.first_name porté par dashboardVM) est repris tel
+            // quel et la question « prénom » retirée du parcours : jamais
+            // redemandée après Sign in with Apple (App Review Guideline 4).
+            // Sans prénom connu, la question reste affichée tant qu'on y tape.
+            let prenomDuCompte = dashboardVM.firstName
+            if !prenomDuCompte.isEmpty {
+                viewModel.adopterPrenomDuCompte(prenomDuCompte)
             }
             // Parcours unique adaptatif : plus d'écran de choix express/complet,
             // on démarre directement (draft restauré ou non). Trace le début une
@@ -142,6 +147,16 @@ struct QuestionnaireContainerView: View {
         }
         .onDisappear {
             autoAdvanceTask?.cancel()
+        }
+        .confirmationDialog(
+            "Quitter le bilan ?",
+            isPresented: $confirmeFermeture,
+            titleVisibility: .visible
+        ) {
+            Button("Reprendre plus tard") { fermer() }
+            Button("Continuer mon bilan", role: .cancel) { }
+        } message: {
+            Text("Tes réponses sont gardées. Tu pourras reprendre quand tu veux.")
         }
         // Célébration post-questionnaire retirée le 28 juin 2026 : après la
         // dernière question on bascule directement sur le Bilan (écran de
@@ -189,7 +204,7 @@ struct QuestionnaireContainerView: View {
         }
     }
 
-    // MARK: - Header compact (retour + progression + compteur)
+    // MARK: - Header compact (retour + progression + fermer + compteur)
     private var flowHeader: some View {
         VStack(spacing: Theme.spacingXS) {
             HStack(spacing: Theme.spacingSM) {
@@ -214,7 +229,10 @@ struct QuestionnaireContainerView: View {
                 }
 
                 progressBar
-                    .padding(.trailing, Theme.spacingMD)
+
+                // Seule sortie hors « Explorer d'abord » : la feuille ne se
+                // ferme plus en glissant, la croix confirme avant de quitter.
+                DSCloseButton { demanderFermeture() }
             }
 
             HStack {
@@ -621,6 +639,26 @@ struct QuestionnaireContainerView: View {
                 viewModel.previousQuestion()
             }
         }
+    }
+
+    // MARK: - Fermeture
+
+    /// Tap sur la croix. Tant que rien n'a été répondu, on sort sans friction ;
+    /// ensuite on confirme, pour qu'un geste malheureux ne coûte pas le fil.
+    private func demanderFermeture() {
+        autoAdvanceTask?.cancel()
+        HapticService.shared.tap()
+        if viewModel.isFirstQuestion && viewModel.interactedQuestionIds.isEmpty {
+            fermer()
+        } else {
+            confirmeFermeture = true
+        }
+    }
+
+    /// Referme la feuille. Le draft est sauvegardé en continu par le ViewModel :
+    /// rien n'est perdu, l'onglet d'origine est intact.
+    private func fermer() {
+        dashboardVM.questionnaireOuvert = false
     }
 
     // MARK: - Carrefours d'approfondissement (parcours adaptatif)

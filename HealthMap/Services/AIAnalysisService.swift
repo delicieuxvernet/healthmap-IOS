@@ -322,6 +322,9 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         copy.completed = false
         copy.firstName = ""
         copy.avatarKey = ""   // cosmétique (choix d'avatar POST-bilan) : ne doit jamais changer le hash
+        // Le poids se règle par pas de 100 g depuis le Journal : chaque pas ne
+        // doit pas relancer un bilan payant. Voir `poidsPourLeHash`.
+        copy.weight = poidsPourLeHash(profile.weight)
         guard let data = try? JSONEncoder().encode(copy),
               let jsonObj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "0" }
 
@@ -336,9 +339,14 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         // invalider le cache. Réintégré le 2026-07-05 (audit archi) : tous les
         // profils avec un caddie non vide déclencheront une ré-analyse au prochain
         // lancement — attendu, une seule fois.
+        // targetWeight (poids souhaité, 1er octobre 2026) : il règle les calories
+        // et les macros du jour, calculées sur le téléphone, jamais le bilan.
+        // L'exclure garde aussi le hash des profils existants À L'IDENTIQUE :
+        // une clé de plus aurait régénéré le bilan de tout le monde.
         let filtered = jsonObj.filter {
             $0.key != "completed" && $0.key != "firstName"
                 && $0.key != "avatarKey" && $0.key != "groceries"
+                && $0.key != "targetWeight"
         }
         let sortedKeys = filtered.keys.sorted()
 
@@ -376,6 +384,17 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             h = ((h << 5) &+ h) &+ Int64(char.value)
         }
         return String(abs(h), radix: 36)
+    }
+
+    /// Le poids tel qu'il entre dans le hash : au demi-kilo. Une valeur déjà
+    /// sur un demi-kilo (ce qu'écrit le questionnaire) ressort telle quelle,
+    /// caractère pour caractère, donc aucun profil existant ne change de hash.
+    /// Entre deux demi-kilos, 100 ou 200 g ne changent rien au bilan.
+    static func poidsPourLeHash(_ poids: String) -> String {
+        guard let kilos = Double(poids) else { return poids }
+        let demis = kilos * 2
+        guard abs(demis - demis.rounded()) > 0.001 else { return poids }
+        return ObjectifPoids.stockage(demis.rounded() / 2)
     }
 
     // MARK: - Merge with Canonical (forces local labels/emojis/scores)

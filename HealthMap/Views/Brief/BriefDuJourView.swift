@@ -465,9 +465,10 @@ struct InvitationNotificationsContenu: View {
 
     static func explication(cible: CibleNutritionnelle?) -> String {
         guard let cible else {
-            return "Un rappel à midi et un le soir, juste avant de passer à table. Rien d'autre."
+            return "Quelques signes dans la journée, avant de passer à table, chacun avec un chiffre tiré de tes repas notés."
         }
-        return "\(NomNutriment.majusculeInitiale(cible.avecPossessif)) est ton apport le plus bas. On te prévient à midi et le soir, juste avant de passer à table."
+        let verbe = NomNutriment.accord(id: cible.id, singulier: "est", pluriel: "sont")
+        return "\(NomNutriment.majusculeInitiale(cible.avecPossessif)) \(verbe) ton apport le plus bas. Kiwio te fait signe dans la journée, avec tes chiffres : où tu en es, et quoi mettre dans l'assiette."
     }
 
     static func exemple(cible: CibleNutritionnelle?) -> String {

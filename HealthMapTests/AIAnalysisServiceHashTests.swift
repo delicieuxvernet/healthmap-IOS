@@ -37,4 +37,46 @@ final class AIAnalysisServiceHashTests: XCTestCase {
         let hashes = (0..<10).map { _ in AIAnalysisService.hashProfile(profile) }
         XCTAssertEqual(Set(hashes).count, 1, "An empty groceries dict must not introduce non-determinism")
     }
+
+    // MARK: - Poids réglé depuis le Journal (1er octobre 2026)
+
+    /// Le poids souhaité règle les calories du jour, pas le bilan : le régler
+    /// ne doit jamais relancer une analyse.
+    func testLePoidsSouhaiteNeChangePasLeHash() {
+        var base = UserProfile.empty
+        base.weight = "74"
+
+        var avecObjectif = base
+        avecObjectif.targetWeight = "70"
+
+        XCTAssertEqual(AIAnalysisService.hashProfile(base), AIAnalysisService.hashProfile(avecObjectif))
+    }
+
+    /// Un pas de 100 g ne relance pas un bilan ; un demi-kilo, si.
+    func testLePoidsEntreDansLeHashAuDemiKilo() {
+        var base = UserProfile.empty
+        base.weight = "74"
+
+        var unPas = base
+        unPas.weight = "74.2"
+        XCTAssertEqual(AIAnalysisService.hashProfile(base), AIAnalysisService.hashProfile(unPas))
+
+        var unDemiKilo = base
+        unDemiKilo.weight = "74.5"
+        XCTAssertNotEqual(AIAnalysisService.hashProfile(base), AIAnalysisService.hashProfile(unDemiKilo))
+    }
+
+    /// Ce qu'écrit le questionnaire ressort caractère pour caractère : aucun
+    /// profil existant ne change de hash.
+    func testUnPoidsDejaAuDemiKiloResteTelQuel() {
+        XCTAssertEqual(AIAnalysisService.poidsPourLeHash("74"), "74")
+        XCTAssertEqual(AIAnalysisService.poidsPourLeHash("74.0"), "74.0")
+        XCTAssertEqual(AIAnalysisService.poidsPourLeHash("74.5"), "74.5")
+        XCTAssertEqual(AIAnalysisService.poidsPourLeHash(""), "")
+        XCTAssertEqual(AIAnalysisService.poidsPourLeHash("abc"), "abc")
+
+        XCTAssertEqual(AIAnalysisService.poidsPourLeHash("74.2"), "74")
+        XCTAssertEqual(AIAnalysisService.poidsPourLeHash("74.3"), "74.5")
+        XCTAssertEqual(AIAnalysisService.poidsPourLeHash("74.8"), "75")
+    }
 }
