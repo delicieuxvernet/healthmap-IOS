@@ -485,7 +485,13 @@ final class DashboardViewModel: ObservableObject {
         guard let debut = calendrier.date(byAdding: .day, value: -JournalApports.fenetreJours, to: aujourdhui),
               let repas = try? await MealJournalService.shared.loadRange(userId: userId, from: debut, to: aujourdhui)
         else { return }
-        observationsJournal = JournalApports.observations(repas: repas, profil: profile)
+        // Même mesure que le Journal : la composition exacte des aliments
+        // quand la base la connaît, ce que le repas avait enregistré sinon.
+        let compositions = await CompositionsStore.shared.completer(pour: repas)
+        observationsJournal = JournalApports.observations(
+            repas: MesuresRepas.repasPrecises(repas, compositions: compositions),
+            profil: profile
+        )
     }
 
     #if DEBUG

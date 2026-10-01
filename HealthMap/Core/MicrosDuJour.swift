@@ -1,0 +1,407 @@
+import Foundation
+
+// MARK: - Les micronutriments du Journal : un seul chiffre par apport (1er octobre 2026)
+//
+// Retour d'Arthur : Progrès affichait « 55 → 11 % » pour la vitamine D, et la
+// fiche ouvrait sur « 58 ». Trois mesures différentes posées côte à côte.
+//
+// La règle, désormais : UN chiffre par apport, la part du besoin couverte.
+//   · il PART du questionnaire (le score du registre, `NutrientLedger`) ;
+//   · il BOUGE avec les repas notés (`JournalApports`), puis avec une prise de
+//     sang ;
+//   · c'est le même dans le Journal, dans Progrès et dans la fiche.
+// Les micros sans question dans le questionnaire n'ont pas de point de départ :
+// leur chiffre vient des seuls repas notés, et reste vide tant qu'il n'y a pas
+// trois journées assez remplies.
+//
+// Chaque ligne explique son chiffre par des FAITS de la personne : ce qu'elle a
+// répondu, ce que ses repas ont apporté, ce qu'elle a signalé. Jamais une
+// phrase générale servie à tout le monde.
+
+/// Ce que le calcul lit de la personne. Comparable : sert de clé de cache.
+struct ContexteMicros: Equatable {
+    /// Besoin quotidien par micro (`BesoinsMicros`).
+    let besoins: [String: Double]
+    /// Dépense quotidienne, en kcal : dit si une journée est assez notée.
+    let depense: Double
+    /// Scores du registre par apport du bilan (questionnaire, repas, prise de sang).
+    let scores: [String: Int]
+    /// Ce que les repas notés ont montré aux apports du bilan, en part du besoin.
+    let couvertureJournal: [String: Int]
+    /// Symptômes déclarés au questionnaire.
+    let symptomes: [String]
+}
+
+struct FaitMicro: Equatable, Identifiable {
+    enum Genre: Equatable {
+        case questionnaire, repas, priseDeSang, symptome, saison, jour
+    }
+    let genre: Genre
+    let texte: String
+    var id: String { texte }
+}
+
+/// Une journée de la semaine affichée. `couverture` nil = pas assez noté.
+struct JourMicro: Equatable, Identifiable {
+    let jour: Date
+    let couverture: Int?
+    var id: Date { jour }
+}
+
+enum StatutMicro: Equatable {
+    case normal
+    /// Sous le seuil sur la journée affichée, quand elle est assez notée.
+    case basCeJour
+    /// Sous le seuil au moins trois jours sur les sept derniers.
+    case basProlonge(jours: Int)
+    /// Au-dessus de la limite au moins trois jours sur les sept derniers.
+    case auDessusDeLaLimite(jours: Int)
+
+    var estUneAlerte: Bool {
+        switch self {
+        case .basProlonge, .auDessusDeLaLimite: return true
+        case .normal, .basCeJour: return false
+        }
+    }
+}
+
+/// Un aliment des sept derniers jours et la part de l'apport qu'il a portée.
+struct ContributeurMicro: Equatable, Identifiable {
+    let nom: String
+    let part: Int
+    var id: String { nom }
+}
+
+struct LigneMicro: Equatable, Identifiable {
+    let id: String
+    let nom: String
+    let unite: String
+    let famille: FamilleMicro
+    let sens: SensMicro
+    /// Part du besoin couverte, de 0 à 100. nil = pas encore mesurable.
+    let niveau: Int?
+    /// Le chiffre part-il du questionnaire ? Sinon il ne vient que des repas.
+    let partDuQuestionnaire: Bool
+    let besoin: Double
+    /// Quantité notée sur la journée affichée ; nil = aucun aliment ne la renseigne.
+    let quantiteDuJour: Double?
+    let semaine: [JourMicro]
+    let statut: StatutMicro
+    let faits: [FaitMicro]
+    let contributeurs: [ContributeurMicro]
+    let role: String
+    let sources: [String]
+}
+
+struct TableauMicros: Equatable {
+    /// Les trois apports qui comptent le plus pour cette personne.
+    let priorites: [LigneMicro]
+    /// Tous les micros, dans l'ordre du catalogue.
+    let toutes: [LigneMicro]
+
+    /// Les apports en alerte prolongée, pour le bandeau du haut du Journal.
+    var alertes: [LigneMicro] { toutes.filter { $0.statut.estUneAlerte && $0.sens == .besoin } }
+
+    static let vide = TableauMicros(priorites: [], toutes: [])
+}
+
+enum MicrosDuJour {
+
+    /// En dessous, la journée est basse pour cet apport (règle validée par Arthur).
+    static let seuilBas = 60
+    /// Nombre de jours bas, sur sept, qui déclenche l'alerte.
+    static let joursPourAlerte = 3
+    static let joursDeLaSemaine = 7
+    static let nombreDePriorites = 3
+    /// Journées assez notées qu'il faut pour donner un chiffre tiré des seuls repas.
+    static let joursMinimum = JournalApports.joursMinimum
+    static let fenetreJours = JournalApports.fenetreJours
+
+    // MARK: Le tableau
+
+    static func tableau(
+        repas: [MealJournalService.MealRecord],
+        jourAffiche: Date,
+        compositions: Compositions,
+        contexte: ContexteMicros,
+        registre: [String: DetailApport],
+        maintenant: Date = Date(),
+        calendar: Calendar = .current
+    ) -> TableauMicros {
+        let journees = MesuresRepas.journees(repas: repas, compositions: compositions, calendar: calendar)
+        let jour = calendar.startOfDay(for: jourAffiche)
+        let aujourdhui = calendar.startOfDay(for: maintenant)
+
+        // Les sept jours qui finissent au jour affiché.
+        var semaine: [Date] = []
+        for recul in stride(from: joursDeLaSemaine - 1, through: 0, by: -1) {
+            if let date = calendar.date(byAdding: .day, value: -recul, to: jour) { semaine.append(date) }
+        }
+        // Les quatorze jours pleins avant aujourd'hui : la journée en cours ne
+        // compte pas, elle n'est pas finie.
+        var quinzaine: [Date] = []
+        for recul in 1...fenetreJours {
+            if let date = calendar.date(byAdding: .day, value: -recul, to: aujourdhui) { quinzaine.append(date) }
+        }
+
+        var lignes: [LigneMicro] = []
+        for micro in Micronutriments.tous {
+            let besoin = contexte.besoins[micro.id] ?? 0
+
+            func couverture(le date: Date) -> Double? {
+                guard let journee = journees[date] else { return nil }
+                return MesuresRepas.couverture(micro.id, journee: journee, besoin: besoin, depense: contexte.depense)
+            }
+
+            let jours = semaine.map { date in
+                JourMicro(jour: date, couverture: couverture(le: date).map { Int($0.rounded()) })
+            }
+            let mesuresQuinzaine = quinzaine.compactMap { couverture(le: $0) }
+
+            // Le chiffre : le registre quand il existe, sinon les repas seuls.
+            var niveau: Int?
+            var partDuQuestionnaire = false
+            if micro.sens == .besoin {
+                if micro.apport != nil, let score = contexte.scores[micro.id] {
+                    niveau = max(0, min(100, score))
+                    partDuQuestionnaire = true
+                } else if mesuresQuinzaine.count >= joursMinimum {
+                    let moyenne = mesuresQuinzaine.reduce(0, +) / Double(mesuresQuinzaine.count)
+                    niveau = max(0, min(100, Int(moyenne.rounded())))
+                }
+            }
+
+            let etat = Self.statut(sens: micro.sens, semaine: jours)
+            let quantiteDuJour = journees[jour]?.quantites[micro.id]
+
+            let raisons = Self.faits(
+                micro: micro,
+                niveau: niveau,
+                partDuQuestionnaire: partDuQuestionnaire,
+                detail: registre[micro.id],
+                couvertureJournal: contexte.couvertureJournal[micro.id],
+                joursMesures: mesuresQuinzaine.count,
+                symptomes: contexte.symptomes,
+                quantiteDuJour: quantiteDuJour,
+                besoin: besoin,
+                jourEstAujourdhui: jour == aujourdhui,
+                mois: calendar.component(.month, from: maintenant)
+            )
+
+            lignes.append(LigneMicro(
+                id: micro.id,
+                nom: micro.nom,
+                unite: micro.unite,
+                famille: micro.famille,
+                sens: micro.sens,
+                niveau: niveau,
+                partDuQuestionnaire: partDuQuestionnaire,
+                besoin: besoin,
+                quantiteDuJour: quantiteDuJour,
+                semaine: jours,
+                statut: etat,
+                faits: raisons,
+                contributeurs: contributeurs(micro.id, jours: semaine, journees: journees),
+                role: micro.role,
+                sources: micro.sources
+            ))
+        }
+
+        return TableauMicros(priorites: priorites(lignes, symptomes: contexte.symptomes), toutes: lignes)
+    }
+
+    // MARK: Le statut
+
+    static func statut(sens: SensMicro, semaine: [JourMicro]) -> StatutMicro {
+        let mesures = semaine.compactMap(\.couverture)
+        switch sens {
+        case .besoin:
+            let bas = mesures.filter { $0 < seuilBas }.count
+            if bas >= joursPourAlerte { return .basProlonge(jours: bas) }
+            if let dernier = semaine.last?.couverture, dernier < seuilBas { return .basCeJour }
+            return .normal
+        case .limite:
+            let hauts = mesures.filter { $0 > 100 }.count
+            return hauts >= joursPourAlerte ? .auDessusDeLaLimite(jours: hauts) : .normal
+        }
+    }
+
+    // MARK: Les priorités
+
+    /// Les apports qui comptent le plus pour cette personne : les plus bas
+    /// d'abord, puis ceux en alerte prolongée, puis ceux qu'un symptôme déclaré
+    /// éclaire. Le détail d'un autre apport (ALA, EPA et DHA) n'y entre pas, ni
+    /// un apport sans chiffre.
+    static func priorites(_ lignes: [LigneMicro], symptomes: [String]) -> [LigneMicro] {
+        struct Candidat {
+            let rang: Int
+            let poids: Int
+            let ligne: LigneMicro
+        }
+        var candidats: [Candidat] = []
+        for (rang, ligne) in lignes.enumerated() {
+            guard ligne.sens == .besoin, let niveau = ligne.niveau,
+                  Micronutriments.parId[ligne.id]?.detailDe == nil else { continue }
+            var poids = 100 - niveau
+            if case .basProlonge = ligne.statut { poids += 40 }
+            poids += bonusSymptome(ligne.id, niveau: niveau, symptomes: symptomes)
+            candidats.append(Candidat(rang: rang, poids: poids, ligne: ligne))
+        }
+        candidats.sort { gauche, droite in
+            gauche.poids == droite.poids ? gauche.rang < droite.rang : gauche.poids > droite.poids
+        }
+        return candidats.prefix(nombreDePriorites).map(\.ligne)
+    }
+
+    /// Les liens solides de la table validée (`SymptomesApports`) : un lien
+    /// faible ne pèse jamais seul. Le symptôme n'éclaire qu'un apport déjà bas.
+    private static func liensSolides(_ id: String, symptomes: [String]) -> [LienSymptome] {
+        guard let apport = NutrientID(rawValue: id) else { return [] }
+        let declares = Set(symptomes)
+        return SymptomesApports.liens.filter {
+            $0.nutriment == apport && declares.contains($0.symptome) && $0.niveau != .faible
+        }
+    }
+
+    private static func bonusSymptome(_ id: String, niveau: Int, symptomes: [String]) -> Int {
+        guard niveau < seuilBas else { return 0 }
+        let liens = liensSolides(id, symptomes: symptomes)
+        if liens.contains(where: { $0.niveau == .fort }) { return 30 }
+        return liens.isEmpty ? 0 : 20
+    }
+
+    // MARK: Les faits
+
+    private static func points(_ delta: Int) -> String {
+        let signe = delta >= 0 ? "+" : "\u{2212}"
+        let valeur = abs(delta)
+        return "\(signe)\(valeur) \(valeur > 1 ? "points" : "point")"
+    }
+
+    static func faits(
+        micro: MicroDefinition,
+        niveau: Int?,
+        partDuQuestionnaire: Bool,
+        detail: DetailApport?,
+        couvertureJournal: Int?,
+        joursMesures: Int,
+        symptomes: [String],
+        quantiteDuJour: Double?,
+        besoin: Double,
+        jourEstAujourdhui: Bool,
+        mois: Int
+    ) -> [FaitMicro] {
+        var faits: [FaitMicro] = []
+
+        if micro.sens == .limite {
+            faits.append(FaitMicro(genre: .repas, texte: "Suivi sur tes repas notés, sans chiffre de départ."))
+        } else if partDuQuestionnaire {
+            // 1. Ce que la personne a répondu : le facteur le plus lourd.
+            let declares = (detail?.contributions ?? []).filter { $0.section != .journal && $0.section != .priseDeSang }
+            let frein = declares.filter { $0.delta < 0 }.min { $0.delta < $1.delta }
+            let appui = declares.filter { $0.delta > 0 }.max { $0.delta < $1.delta }
+            if let retenu = frein ?? appui {
+                faits.append(FaitMicro(
+                    genre: .questionnaire,
+                    texte: "Ton questionnaire : « \(retenu.libelle) » (\(points(retenu.delta)))."
+                ))
+            } else {
+                faits.append(FaitMicro(genre: .questionnaire, texte: "Ton questionnaire ne signale rien qui pèse sur cet apport."))
+            }
+
+            // 2. Ce que les repas notés ont changé au chiffre.
+            let correction = detail?.contributions.first { $0.section == .journal }
+            if let couvertureJournal, let correction {
+                faits.append(FaitMicro(
+                    genre: .repas,
+                    texte: "Tes repas notés couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : \(points(correction.delta))."
+                ))
+            } else if let couvertureJournal {
+                faits.append(FaitMicro(
+                    genre: .repas,
+                    texte: "Tes repas notés couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : ils confirment ce chiffre."
+                ))
+            } else {
+                faits.append(FaitMicro(
+                    genre: .repas,
+                    texte: "Pas encore assez de repas notés pour l'ajuster : il faut \(joursMinimum) journées complètes."
+                ))
+            }
+
+            // 3. Un fait de plus, le plus solide disponible.
+            if let sang = detail?.contributions.first(where: { $0.section == .priseDeSang }) {
+                faits.append(FaitMicro(genre: .priseDeSang, texte: "Ta prise de sang : \(points(sang.delta))."))
+            } else if let niveau, niveau < seuilBas,
+                      let lien = liensSolides(micro.id, symptomes: symptomes).first {
+                faits.append(FaitMicro(genre: .symptome, texte: "Tu as signalé \(lien.formulation)."))
+            } else if micro.id == "vitD", [10, 11, 12, 1, 2, 3].contains(mois) {
+                faits.append(FaitMicro(
+                    genre: .saison,
+                    texte: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes."
+                ))
+            }
+        } else if niveau != nil {
+            faits.append(FaitMicro(
+                genre: .repas,
+                texte: "Calculé sur tes repas notés : \(joursMesures) journées complètes."
+            ))
+        } else {
+            faits.append(FaitMicro(
+                genre: .repas,
+                texte: "Pas encore assez de repas notés pour le calculer : il faut \(joursMinimum) journées complètes."
+            ))
+        }
+
+        // Toujours : ce que la journée affichée a apporté.
+        let moment = jourEstAujourdhui ? "Aujourd'hui" : "Ce jour-là"
+        if let quantiteDuJour, besoin > 0 {
+            let suffixe = micro.sens == .limite ? " au plus" : ""
+            faits.append(FaitMicro(
+                genre: .jour,
+                texte: "\(moment) : \(quantite(quantiteDuJour)) sur \(quantite(besoin))\(DS.fine)\(micro.unite)\(suffixe)."
+            ))
+        } else {
+            faits.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+        }
+        return faits
+    }
+
+    /// « 0,25 », « 4,2 », « 120 » : la précision suit l'ordre de grandeur.
+    static func quantite(_ valeur: Double) -> String {
+        let absolue = abs(valeur)
+        if absolue >= 10 { return DS.entier(Int(valeur.rounded())) }
+        if absolue >= 1 { return DS.decimal(valeur, decimales: 1) }
+        return DS.decimal(valeur, decimales: 2)
+    }
+
+    // MARK: D'où ça vient dans les repas
+
+    /// Les trois aliments qui ont le plus porté cet apport sur la semaine
+    /// affichée, avec leur part. Vide quand rien n'est renseigné.
+    static func contributeurs(
+        _ id: String,
+        jours: [Date],
+        journees: [Date: JourneeMesuree]
+    ) -> [ContributeurMicro] {
+        var parAliment: [String: Double] = [:]
+        for jour in jours {
+            guard let journee = journees[jour] else { continue }
+            for part in journee.bouchees {
+                guard let nom = part.nom, !nom.isEmpty, let quantite = part.quantites[id], quantite > 0 else { continue }
+                parAliment[nom, default: 0] += quantite
+            }
+        }
+        let total = parAliment.values.reduce(0, +)
+        guard total > 0 else { return [] }
+        let tries = parAliment.sorted { gauche, droite in
+            gauche.value == droite.value ? gauche.key < droite.key : gauche.value > droite.value
+        }
+        var sortie: [ContributeurMicro] = []
+        for (nom, quantite) in tries.prefix(3) {
+            let part = Int((quantite / total * 100).rounded())
+            guard part > 0 else { continue }
+            sortie.append(ContributeurMicro(nom: nom, part: part))
+        }
+        return sortie
+    }
+}
