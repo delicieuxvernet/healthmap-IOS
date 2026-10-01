@@ -269,6 +269,8 @@ struct MainTabView: View {
     /// neutralisent par le même argument de lancement qu'avant.
     @ObservedObject private var tutoriel = TutorielService.partage
     @ObservedObject private var gratifications = GratificationCentre.partage
+    /// L'offre annuelle, rappelée de temps en temps aux comptes gratuits.
+    @ObservedObject private var offres = OffreCentre.partage
 
     /// Récap animé : la séquence qui délivre le bilan juste après le
     /// questionnaire. Les slides sont construits UNE fois, au moment de
@@ -458,6 +460,7 @@ struct MainTabView: View {
                 object: nouvel.route
             )
             tutoriel.ongletChange()
+            if nouvel == .journal { proposerOffre() }
         }
         .ignoresSafeArea(.keyboard)
         .tint(Color.dsAccent)
@@ -564,6 +567,8 @@ struct MainTabView: View {
             if let gratification = gratifications.courante, !estModeCaptures {
                 GratificationOverlay(gratification: gratification, onFermer: {
                     gratifications.courante = nil
+                    // Le repas vient de compter : le bon moment pour l'offre.
+                    proposerOffre()
                 }, onModifier: {
                     gratifications.courante = nil
                     selectedTab = .journal
@@ -572,6 +577,19 @@ struct MainTabView: View {
                 })
                 .id(gratification.id)
                 .zIndex(70)
+            }
+        }
+        // L'offre annuelle : même placement que la gratification, donc
+        // par-dessus la barre d'onglets. « Voir l'offre » ouvre le paywall.
+        .overlay {
+            if let offre = offres.courante, !estModeCaptures {
+                OffreAnnuelleOverlay(offre: offre, onFermer: {
+                    offres.courante = nil
+                }, onVoir: {
+                    offres.courante = nil
+                    showPaywallFromDeepLink = true
+                })
+                .zIndex(60)
             }
         }
         // Fix: onAppear doesn't re-fire when the questionnaire is completed
@@ -788,6 +806,22 @@ struct MainTabView: View {
     private var ciblesDuBilan: [CibleNutritionnelle]? {
         guard let apports = dashboardVM.analysisV2?.bilan?.apports else { return nil }
         return BriefDuJourBuilder.cibles(depuis: apports)
+    }
+
+    /// Rappelle l'offre annuelle à un compte gratuit, sur le Journal, quand
+    /// rien d'autre n'occupe l'écran. Le rythme (jamais le premier jour, pas
+    /// plus d'une fois tous les trois jours) est tenu par `OffreCentre`.
+    private func proposerOffre() {
+        guard dashboardVM.premiumVisible, !estModeCaptures, tutoriel.etape == nil,
+              !afficheBrief, !afficheRecap, !afficheInvitationNotifs,
+              !dashboardVM.questionnaireOuvert else { return }
+        Task {
+            // Le temps que la gratification redescende ou que l'onglet glisse.
+            try? await Task.sleep(for: .milliseconds(900))
+            guard selectedTab == .journal, gratifications.courante == nil,
+                  dashboardVM.premiumVisible else { return }
+            await offres.proposer()
+        }
     }
 
     /// Captures d'écran (workflow screenshots.yml) : ni brief ni invitation,
