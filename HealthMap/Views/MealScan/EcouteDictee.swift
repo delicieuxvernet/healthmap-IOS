@@ -1,81 +1,147 @@
 import SwiftUI
 
-// MARK: - La bulle d'écoute (maquette « Motion », 1er octobre 2026)
+// MARK: - La bulle d'écoute (maquette « bulle kiwi », 2 octobre 2026)
 //
-// « Dicter, être écouté, être félicité » : le bouton Dicter DEVIENT la bulle.
-// Le rectangle de 22 pt de rayon s'étire en un cercle de 132 pt au bas de
-// l'écran, pendant que toute l'interface recule à 0,94 derrière un voile flou.
-// Tant qu'on parle, la bulle suit le niveau du micro (de 1 à 1,07), une aura
-// liquide à trois harmoniques déborde derrière elle et cinq barres vivent sous
-// le micro. La toucher termine : elle se contracte en indicateur de calcul et
-// disparaît sous la feuille d'analyse qui monte.
+// La bulle des messages vocaux de Snapchat et d'Instagram, avec le signe Kiwio
+// à la place du rond blanc. Elle remplace la grande scène du 1er octobre
+// (voile flou, page qui recule, cercle de 132 pt) : la page reste là, nette.
 //
-// La scène vit à la RACINE (comme la gratification) : elle recouvre la barre
+// Dès que la dictée démarre, une tranche de kiwi de 84 pt surgit juste
+// au-dessus du bouton « Dicter » (0,62 → 1, ressort vif). Ses douze graines
+// s'allongent avec la voix : chaque mesure du micro entre par la graine de
+// droite et fait le tour dans le sens des aiguilles d'une montre. Un arc naît
+// en haut à droite, s'allonge jusqu'à un quart de tour et tourne en 1,7 s.
+// Tant que le doigt tient le bouton, la bulle le suit à l'horizontale et
+// s'estompe à l'approche de l'annulation. À la fin elle rétrécit et s'efface
+// en 0,15 s, et la feuille d'analyse monte.
+//
+// Le bouton, lui, garde sa place et dit où on en est : le minuteur, et le
+// geste qui termine. La scène vit à la RACINE : elle passe par-dessus la barre
 // d'onglets, et le Journal porte déjà trop de présentations. Le Journal garde
 // toute la logique de la dictée et ne fait que déposer ici de quoi la montrer.
 //
 // Le bouton d'origine n'est jamais retiré de la page (seulement masqué) : un
-// appui maintenu garde donc son geste vivant sous la bulle.
+// appui maintenu garde donc son geste vivant sous la scène.
 //
-// « Réduire les animations » : pas de trajet ni d'aura, un fondu de 0,2 s, la
-// bulle ne respire pas. Les barres bougent encore : elles disent qu'on écoute.
+// « Réduire les animations » : un fondu de 0,2 s, pas d'arc, pas de trajet.
+// Les graines bougent encore : elles disent qu'on écoute.
 
 // MARK: Géométrie
 
 enum EcouteGeometrie {
-    /// Diamètre de la bulle d'écoute.
-    static let diametre: CGFloat = 132
-    /// Rayon du bouton « Dicter » d'où elle part.
+    /// Diamètre de la bulle : la tranche de kiwi.
+    static let diametre: CGFloat = 84
+    /// Rayon du bouton « Dicter » au-dessus duquel elle se pose.
     static let rayonBouton: CGFloat = 22
-    /// Distance du centre de la bulle au bas de la zone sûre.
-    static let hauteurDuCentre: CGFloat = 176
-    /// Côté du carré dans lequel l'aura se dessine.
-    static let coteAura: CGFloat = 260
-    /// La bulle contractée en indicateur de calcul.
-    static let contraction: CGFloat = 0.42
+    /// Entre le haut du bouton et le bas de la bulle.
+    static let ecartAuBouton: CGFloat = 12
+    /// Ce qu'on garde avec les bords de l'écran.
+    static let margeEcran: CGFloat = 12
+    /// Jamais plus haut : la bulle resterait sous l'encoche.
+    static let hautMinimum: CGFloat = 60
+    /// Sans cadre de bouton connu : distance du centre au bas de l'écran.
+    static let hauteurParDefaut: CGFloat = 176
 
-    /// Où la bulle se pose, dans une surcouche de cette taille.
-    static func cadreBulle(dans taille: CGSize) -> CGRect {
-        CGRect(x: taille.width / 2 - diametre / 2,
-               y: taille.height - hauteurDuCentre - diametre / 2,
-               width: diametre,
-               height: diametre)
-    }
+    // L'entrée et la sortie.
 
-    /// Échelle de la bulle pour un niveau de micro 0…1 : de 1 à 1,07. Une voix
-    /// normale doit déjà la faire respirer, d'où le rehaussement.
-    static func echelle(niveau: Float) -> CGFloat {
-        let borne = CGFloat(min(1, max(0, niveau * 1.6)))
-        return 1 + (KiwiEchelle.voix - 1) * borne
-    }
+    /// D'où la bulle surgit.
+    static let echelleDepart: CGFloat = 0.62
+    /// Vers quoi elle rétrécit en partant.
+    static let echelleSortie: CGFloat = 0.6
+    /// Elle descend d'autant en s'effaçant.
+    static let deriveSortie: CGFloat = 10
+    static let dureeSortie: Double = 0.15
 
-    /// Rayon de l'aura dans une direction : un cercle déformé par trois
-    /// harmoniques qui tournent à des vitesses différentes. `vigueur` = la part
-    /// du rayon que la déformation peut prendre.
-    static func rayonAura(base: CGFloat, angle: Double, temps: Double, vigueur: CGFloat) -> CGFloat {
-        let premiere = sin(angle * 2 + temps * 1.3) * 0.5
-        let deuxieme = sin(angle * 3 - temps * 1.9) * 0.3
-        let troisieme = sin(angle * 5 + temps * 2.6) * 0.2
-        let onde = CGFloat(premiere + deuxieme + troisieme)
-        return base * (1 + vigueur * onde)
-    }
+    // Le doigt.
 
-    static func contourAura(centre: CGPoint, base: CGFloat, temps: Double, vigueur: CGFloat) -> Path {
-        var chemin = Path()
-        let pas = 72
-        for index in 0...pas {
-            let angle = Double(index) / Double(pas) * 2 * Double.pi
-            let rayon = rayonAura(base: base, angle: angle, temps: temps, vigueur: vigueur)
-            let point = CGPoint(x: centre.x + CGFloat(cos(angle)) * rayon,
-                                y: centre.y + CGFloat(sin(angle)) * rayon)
-            if index == 0 {
-                chemin.move(to: point)
-            } else {
-                chemin.addLine(to: point)
-            }
+    /// Vers la droite, la bulle suit le doigt jusque-là, pas plus loin.
+    static let glisseDroiteMax: CGFloat = 60
+    /// Distance sur laquelle la bulle s'estompe en partant vers l'annulation.
+    static let courseEstompe: CGFloat = 140
+    static let opaciteMinimum: Double = 0.25
+
+    // L'arc.
+
+    /// Entre le bord de la bulle et l'arc.
+    static let arcEcart: CGFloat = 5.5
+    static let arcEpaisseur: CGFloat = 2
+    /// Sa longueur une fois déployé : 85° sur 360.
+    static let arcPart: CGFloat = 85.0 / 360
+    /// Où il naît : en haut à droite (0° = à droite, sens des aiguilles).
+    static let arcDepart: Double = -60
+    /// Durée d'un tour.
+    static let arcTour: Double = 1.7
+    /// Il attend que la bulle soit posée, puis se déploie.
+    static let arcDelai: Duration = .milliseconds(250)
+    static let arcDeploiement: Double = 0.6
+
+    // La tranche. Mêmes rayons que `KiwiMarque.Geometrie.standard`, dans une
+    // boîte de 96 : la peau (rayon 48) touche le bord de la bulle.
+
+    static let boite: CGFloat = 96
+    static let rayonPeau: CGFloat = 48
+    static let rayonChair: CGFloat = 43
+    static let rayonHaloRepos: CGFloat = 21
+    static let rayonCoeurRepos: CGFloat = 12
+    static let orbiteRepos: CGFloat = 26
+    /// Ce qu'une graine gagne en longueur au plus fort de la voix.
+    static let allongeGraine: CGFloat = 11
+    /// Le halo et le cœur gonflent à peine : 10 % et 14 %.
+    static let souffleHalo: CGFloat = 0.10
+    static let souffleCoeur: CGFloat = 0.14
+
+    /// Où le centre de la bulle se pose, dans une surcouche de cette taille :
+    /// à l'aplomb du bouton, juste au-dessus de lui, toujours à l'écran.
+    static func centreBulle(bouton: CGRect?, dans taille: CGSize) -> CGPoint {
+        let rayon = diametre / 2
+        guard let bouton else {
+            return CGPoint(x: taille.width / 2, y: taille.height - hauteurParDefaut)
         }
-        chemin.closeSubpath()
-        return chemin
+        let gauche = rayon + margeEcran
+        let droite = max(gauche, taille.width - rayon - margeEcran)
+        let x = min(droite, max(gauche, bouton.midX))
+        let y = max(hautMinimum + rayon, bouton.minY - ecartAuBouton - rayon)
+        return CGPoint(x: x, y: y)
+    }
+
+    /// Le déplacement de la bulle pour un doigt qui a glissé d'autant : elle le
+    /// suit, bornée à gauche par le seuil d'annulation.
+    static func glisse(_ largeur: CGFloat) -> CGFloat {
+        max(DicteeGeste.seuilAnnulation, min(glisseDroiteMax, largeur))
+    }
+
+    /// La bulle s'estompe à l'approche du seuil : on sent l'annulation venir.
+    static func opacite(glisse: CGFloat) -> Double {
+        max(opaciteMinimum, 1 + Double(min(0, glisse) / courseEstompe))
+    }
+
+    /// Le niveau du micro ramené entre 0 et 1. Une voix normale doit déjà
+    /// faire vivre les graines, d'où le rehaussement.
+    static func amplitude(niveau: Float) -> CGFloat {
+        CGFloat(min(1, max(0, niveau * 1.6)))
+    }
+
+    /// Une graine pour une amplitude 0…1 : elle s'allonge vers le bord, son
+    /// bout intérieur ne bouge pas.
+    static func graine(amplitude: CGFloat) -> (longueur: CGFloat, orbite: CGFloat) {
+        let borne = min(1, max(0, amplitude))
+        let gain = allongeGraine * borne
+        return (KiwiMarque.graineHauteur + gain, orbiteRepos + gain / 2)
+    }
+
+    static func rayonHalo(amplitude: CGFloat) -> CGFloat {
+        rayonHaloRepos * (1 + souffleHalo * min(1, max(0, amplitude)))
+    }
+
+    static func rayonCoeur(amplitude: CGFloat) -> CGFloat {
+        rayonCoeurRepos * (1 + souffleCoeur * min(1, max(0, amplitude)))
+    }
+
+    /// La trace de la voix après une nouvelle mesure : elle entre par la
+    /// première graine et pousse les autres d'un cran.
+    static func avancer(_ historique: [CGFloat], avec amplitude: CGFloat) -> [CGFloat] {
+        guard !historique.isEmpty else { return historique }
+        return [min(1, max(0, amplitude))] + historique.dropLast()
     }
 }
 
@@ -89,11 +155,11 @@ final class EcouteCentre: ObservableObject {
     enum Phase: Equatable {
         /// Rien à l'écran.
         case repos
-        /// La bulle a la main.
+        /// La bulle est là, on écoute.
         case ecoute
-        /// Fin d'écoute : la bulle se contracte, la feuille d'analyse monte.
+        /// Fin d'écoute : la bulle s'efface, la feuille d'analyse monte.
         case calcul
-        /// Dictée jetée ou trop courte : la bulle redevient le bouton.
+        /// Dictée jetée ou trop courte : la bulle s'efface, le bouton revient.
         case retour
     }
 
@@ -101,7 +167,7 @@ final class EcouteCentre: ObservableObject {
     /// Mains libres : on touche la bulle pour terminer. Sinon le doigt tient le
     /// bouton, et le lever lance l'analyse.
     @Published private(set) var mainsLibres = true
-    /// Le bouton de la page s'efface tant que la bulle porte sa forme.
+    /// Le bouton de la page s'efface tant que la scène porte sa face.
     @Published private(set) var boutonCache = false
 
     private(set) var speech: SpeechCaptureService?
@@ -110,8 +176,8 @@ final class EcouteCentre: ObservableObject {
     private var annuler: () -> Void = {}
     private var rangement: Task<Void, Never>?
 
-    /// Le temps laissé à la bulle pour finir son trajet avant de quitter l'écran.
-    static let sortie: Duration = .milliseconds(520)
+    /// Le temps laissé à la scène pour s'effacer avant de quitter l'écran.
+    static let sortie: Duration = .milliseconds(320)
 
     init() {}
 
@@ -136,7 +202,7 @@ final class EcouteCentre: ObservableObject {
         mainsLibres = true
     }
 
-    /// Fin d'écoute réussie : la bulle se contracte, la feuille prend le relais.
+    /// Fin d'écoute réussie : la bulle s'efface, la feuille prend le relais.
     func contracter() {
         guard phase == .ecoute else { return }
         phase = .calcul
@@ -144,7 +210,7 @@ final class EcouteCentre: ObservableObject {
         ranger()
     }
 
-    /// Dictée jetée ou trop courte : la bulle retourne dans son bouton.
+    /// Dictée jetée ou trop courte : la bulle s'efface, le bouton reprend sa face.
     func rendreLeBouton() {
         guard phase == .ecoute else { return }
         phase = .retour
@@ -176,24 +242,6 @@ final class EcouteCentre: ObservableObject {
     }
 }
 
-// MARK: - Le recul de la page
-
-/// Toute l'interface recule à 0,94 quand la bulle prend la main, et revient
-/// quand elle la rend. Seul ce modificateur suit le relais : la racine, elle,
-/// n'est pas réévaluée.
-struct ReculSousLaBulle: ViewModifier {
-    @ObservedObject private var centre = EcouteCentre.partage
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func body(content: Content) -> some View {
-        let recule = centre.phase == .ecoute
-        content
-            .scaleEffect(recule && !reduceMotion ? KiwiEchelle.recul : 1)
-            .animation(reduceMotion ? nil : .kiwiFluide, value: recule)
-            .background(Color.dsFond.ignoresSafeArea())
-    }
-}
-
 // MARK: - La surcouche (posée par la racine)
 
 struct EcouteSurcouche: View {
@@ -202,8 +250,8 @@ struct EcouteSurcouche: View {
     let taille: CGSize
 
     @ObservedObject private var centre = EcouteCentre.partage
-    /// Le cadre du bouton AVANT que la page ne recule : c'est de là que la
-    /// bulle part, et là qu'elle revient.
+    /// Le cadre du bouton AVANT que la scène ne s'ouvre : il ne doit pas
+    /// bouger sous elle si la page se remet en page pendant l'écoute.
     @State private var cadreAuRepos: CGRect?
 
     var body: some View {
@@ -216,7 +264,7 @@ struct EcouteSurcouche: View {
 
             if centre.phase != .repos, let speech = centre.speech, let geste = centre.geste {
                 EcouteScene(centre: centre, speech: speech, geste: geste,
-                            depart: cadreAuRepos, taille: taille)
+                            bouton: cadreAuRepos, taille: taille)
             }
         }
         .frame(width: taille.width, height: taille.height)
@@ -229,156 +277,154 @@ private struct EcouteScene: View {
     @ObservedObject var centre: EcouteCentre
     let speech: SpeechCaptureService
     let geste: GesteDictee
-    let depart: CGRect?
+    let bouton: CGRect?
     let taille: CGSize
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// La bulle a quitté la forme du bouton.
+    /// La bulle a surgi.
     @State private var ouverte = false
-    /// Fin d'écoute : la bulle se contracte en indicateur de calcul.
-    @State private var contractee = false
-    /// Contractée, elle s'efface sous la feuille qui monte.
-    @State private var effacee = false
-
-    private var cible: CGRect { EcouteGeometrie.cadreBulle(dans: taille) }
-
-    /// Pas de trajet : sous « Réduire les animations », ou si le cadre du
-    /// bouton n'est pas connu. La bulle est alors déjà à sa place, et c'est
-    /// toute la scène qui arrive en fondu.
-    private var sansTrajet: Bool { reduceMotion || depart == nil }
-
-    /// Le cadre de la bulle à cet instant.
-    private var cadre: CGRect {
-        guard !sansTrajet, !ouverte, let depart else { return cible }
-        return depart
-    }
 
     /// La scène est installée et on écoute encore.
     private var enScene: Bool { ouverte && centre.phase == .ecoute }
 
-    private var courbe: Animation {
-        reduceMotion ? .easeOut(duration: 0.2) : .kiwiFluide
+    private var entree: Animation {
+        reduceMotion ? .easeOut(duration: 0.2) : .kiwiVif
     }
 
     var body: some View {
+        let position = EcouteGeometrie.centreBulle(bouton: bouton, dans: taille)
+
         ZStack(alignment: .topLeading) {
-            // Le voile : la page recule derrière lui.
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .opacity(enScene ? 1 : 0)
-                .ignoresSafeArea()
-                .accessibilityHidden(true)
-            // Plus rien n'est touchable derrière la scène, jusqu'à sa sortie.
+            // Plus rien n'est touchable derrière la scène, jusqu'à sa sortie :
+            // on ne change pas d'onglet avec un micro ouvert.
             Color.black.opacity(0.001)
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
 
-            entete
+            if let bouton {
+                FaceEcoute(centre: centre, speech: speech, enScene: enScene)
+                    .frame(width: bouton.width, height: bouton.height)
+                    .position(x: bouton.midX, y: bouton.midY)
+            }
 
-            BulleVivante(
+            BulleKiwi(
                 speech: speech,
                 geste: geste,
-                ouverte: ouverte,
-                contractee: contractee,
+                enScene: enScene,
+                partie: centre.phase != .ecoute,
                 mainsLibres: centre.mainsLibres,
                 reduceMotion: reduceMotion,
                 onToucher: { centre.toucherLaBulle() }
             )
-            .frame(width: cadre.width, height: cadre.height)
-            .opacity(effacee ? 0 : 1)
-            .position(x: cadre.midX, y: cadre.midY)
-
-            pied
+            .position(x: position.x, y: position.y)
         }
         .frame(width: taille.width, height: taille.height)
-        .opacity(sansTrajet && !enScene ? 0 : 1)
-        .animation(courbe, value: centre.phase)
-        .animation(courbe, value: centre.mainsLibres)
         .onAppear {
-            withAnimation(courbe) { ouverte = true }
-        }
-        .onChange(of: centre.phase) { _, phase in
-            switch phase {
-            case .retour:
-                withAnimation(courbe) { ouverte = false }
-            case .calcul:
-                withAnimation(courbe) { contractee = true }
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(240))
-                    withAnimation(.easeOut(duration: 0.2)) { effacee = true }
-                }
-            case .repos, .ecoute:
-                break
-            }
+            withAnimation(entree) { ouverte = true }
         }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
     }
+}
 
-    // MARK: Ce qui se lit au-dessus de la bulle
+// MARK: - La face du bouton pendant l'écoute
 
-    private var entete: some View {
-        VStack(spacing: 8) {
-            Text("Kiwio t'écoute")
-                .font(.system(.title2, design: .default).weight(.bold))
-                .tracking(-0.6)
-                .foregroundStyle(Color.dsTexte)
-                .accessibilityAddTraits(.isHeader)
-            MinuteurEcoute(speech: speech)
-            Text("Dis ce que tu as mangé, avec les quantités…")
-                .font(.dsCorps)
-                .tracking(DSTracking.corps)
-                .foregroundStyle(Color.dsSecondaire)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-        }
-        .padding(.horizontal, 32)
-        .frame(width: taille.width)
-        .opacity(enScene ? 1 : 0)
-        .offset(y: enScene || reduceMotion ? 0 : 12)
-        .position(x: taille.width / 2, y: taille.height * 0.26)
+/// Posée exactement sur le bouton « Dicter » : même fond, et à la place de
+/// « Dicter · le plus rapide », le minuteur et le geste qui termine. À la
+/// sortie elle reprend la face du bouton, puis la scène s'en va : le passage
+/// de l'une à l'autre ne se voit pas.
+private struct FaceEcoute: View {
+    @ObservedObject var centre: EcouteCentre
+    let speech: SpeechCaptureService
+    let enScene: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var forme: RoundedRectangle {
+        RoundedRectangle(cornerRadius: EcouteGeometrie.rayonBouton, style: .continuous)
     }
 
-    // MARK: Ce qui se lit sous la bulle
+    var body: some View {
+        ZStack {
+            FondBoutonDicter(rayon: EcouteGeometrie.rayonBouton)
 
-    private var pied: some View {
-        VStack(spacing: 2) {
-            Text(centre.mainsLibres ? "Touche la bulle pour terminer" : "Relâche pour lancer l'analyse")
-                .font(.dsSousTitreMoyen)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsTexte)
-                .multilineTextAlignment(.center)
+            FaceBoutonDicter()
+                .opacity(enScene ? 0 : 1)
+                .accessibilityHidden(true)
 
-            if centre.mainsLibres {
-                Button {
-                    HapticService.shared.tap()
-                    centre.toucherAnnuler()
-                } label: {
-                    Text("Annuler")
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: DS.cibleTactile)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.dsPress)
-                .accessibilityLabel("Jeter la dictée")
-            } else {
-                Text("Glisse à gauche pour annuler, vers le haut pour lâcher le bouton.")
-                    .font(.dsLegende)
-                    .tracking(DSTracking.legende)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(minHeight: DS.cibleTactile)
-            }
+            consignes
+                .opacity(enScene ? 1 : 0)
         }
-        .padding(.horizontal, 32)
-        .frame(width: taille.width)
-        .opacity(enScene ? 1 : 0)
-        .position(x: taille.width / 2, y: taille.height - 52)
+        .clipShape(forme)
+        .contentShape(forme)
+        // Mains libres : toucher le bouton termine aussi, comme toucher la bulle.
+        .onTapGesture { centre.toucherLaBulle() }
+        .animation(reduceMotion ? nil : .kiwiVif, value: enScene)
+        .animation(reduceMotion ? nil : .kiwiVif, value: centre.mainsLibres)
+    }
+
+    private var consignes: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 0) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.22))
+                        .overlay(Circle().strokeBorder(Color.white.opacity(0.5), lineWidth: 1))
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 46, height: 46)
+                .accessibilityHidden(true)
+
+                Spacer(minLength: 0)
+
+                if centre.mainsLibres {
+                    Button {
+                        HapticService.shared.tap()
+                        centre.toucherAnnuler()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Color.white.opacity(0.22)))
+                            .frame(width: DS.cibleTactile, height: DS.cibleTactile)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.dsPress)
+                    .accessibilityLabel("Jeter la dictée")
+                }
+            }
+
+            // La place de l'onde du bouton : la même hauteur, pour que les
+            // deux faces se superposent ligne à ligne.
+            Color.clear
+                .frame(height: 14)
+                .padding(.top, 10)
+                .overlay(alignment: .bottomLeading) {
+                    if !centre.mainsLibres {
+                        Text("‹‹ Glisse pour annuler")
+                            .font(.dsLegende)
+                            .foregroundStyle(Color.white.opacity(0.85))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+
+            MinuteurEcoute(speech: speech)
+                .padding(.top, 8)
+
+            Text(centre.mainsLibres ? "Touche pour terminer" : "Relâche pour envoyer")
+                .font(.dsLegende)
+                .foregroundStyle(Color.white.opacity(0.85))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.top, 1)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -390,9 +436,12 @@ private struct MinuteurEcoute: View {
     var body: some View {
         HStack(spacing: 7) {
             PointEnregistrement()
+                .padding(3)
+                .background(Circle().fill(Color.white))
             Text(String(format: "%d:%02d", Int(speech.duree) / 60, Int(speech.duree) % 60))
-                .font(.system(.subheadline, design: .default).weight(.medium).monospacedDigit())
-                .foregroundStyle(Color.dsSecondaire)
+                .font(Font.dsHeadline.monospacedDigit())
+                .tracking(DSTracking.corps)
+                .foregroundStyle(.white)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Enregistrement en cours")
@@ -404,87 +453,94 @@ private struct MinuteurEcoute: View {
 /// Vue SÉPARÉE, et c'est le point : avec le minuteur, elle est la seule à
 /// observer `speech` (niveau sonore, 20 Hz) et `geste` (glissement du doigt,
 /// 120 Hz). Ni la scène ni la racine ne sont réinvalidées à ce rythme.
-private struct BulleVivante: View {
+private struct BulleKiwi: View {
     @ObservedObject var speech: SpeechCaptureService
     @ObservedObject var geste: GesteDictee
-    let ouverte: Bool
-    let contractee: Bool
+    /// La bulle est à l'écran et on écoute.
+    let enScene: Bool
+    /// L'écoute est finie : la bulle s'en va.
+    let partie: Bool
     let mainsLibres: Bool
     let reduceMotion: Bool
     let onToucher: () -> Void
 
-    /// L'arc de l'indicateur de calcul tourne.
-    @State private var tourne = false
+    /// La trace de la voix : une amplitude par graine, la plus récente d'abord.
+    @State private var historique: [CGFloat] = Array(repeating: 0, count: KiwiMarque.nombreDeGraines)
+    @State private var arcDeploye = false
+    @State private var arcTourne = false
+    /// Où le doigt l'avait menée : elle s'efface là, sans revenir au centre.
+    @State private var dernierGlisse: CGFloat = 0
 
     private var ecoute: Bool { speech.state == .listening }
 
-    /// La bulle respire avec la voix : de 1 à 1,07.
-    private var echelleVoix: CGFloat {
-        guard ouverte, !contractee, !reduceMotion, ecoute else { return 1 }
-        return EcouteGeometrie.echelle(niveau: speech.level)
+    private var amplitude: CGFloat {
+        ecoute ? EcouteGeometrie.amplitude(niveau: speech.level) : 0
     }
 
-    private var rayon: CGFloat {
-        ouverte ? EcouteGeometrie.diametre / 2 : EcouteGeometrie.rayonBouton
-    }
-
-    /// La courbe du trajet de la bulle (la même que celle de la scène).
-    private var courbe: Animation {
-        reduceMotion ? .easeOut(duration: 0.2) : .kiwiFluide
-    }
-
-    /// Appui maintenu : la bulle suit le doigt vers la gauche et s'estompe à
-    /// l'approche du seuil, on sent l'annulation venir.
+    /// Appui maintenu : la bulle suit le doigt à l'horizontale.
     private var glisse: CGFloat {
-        guard !mainsLibres else { return 0 }
-        return max(DicteeGeste.seuilAnnulation, min(0, geste.glissement.width))
+        if mainsLibres { return 0 }
+        return partie ? dernierGlisse : EcouteGeometrie.glisse(geste.glissement.width)
+    }
+
+    private var echelle: CGFloat {
+        if reduceMotion || enScene { return 1 }
+        return partie ? EcouteGeometrie.echelleSortie : EcouteGeometrie.echelleDepart
+    }
+
+    /// Elle surgit sur un ressort, elle part sur une durée courte.
+    private var courbe: Animation {
+        if reduceMotion { return .easeOut(duration: 0.2) }
+        return enScene ? .kiwiVif : .easeOut(duration: EcouteGeometrie.dureeSortie)
+    }
+
+    /// Le côté du carré qui contient la bulle et son arc.
+    private var cote: CGFloat {
+        EcouteGeometrie.diametre + 2 * (EcouteGeometrie.arcEcart + EcouteGeometrie.arcEpaisseur)
     }
 
     var body: some View {
         Button(action: onToucher) {
             ZStack {
-                FondBoutonDicter(rayon: rayon)
+                KiwiVivant(historique: historique, amplitude: amplitude, reduceMotion: reduceMotion)
+                    .frame(width: EcouteGeometrie.diametre, height: EcouteGeometrie.diametre)
+                    .compositingGroup()
+                    .shadow(color: Color.black.opacity(0.16), radius: 7, x: 0, y: 4)
 
-                // La face du bouton, tant qu'il n'est pas devenu bulle.
-                FaceBoutonDicter()
-                    .opacity(ouverte ? 0 : 1)
-
-                VStack(spacing: 9) {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 38, weight: .medium))
-                        .foregroundStyle(.white)
-                    BarresDeVoix(level: speech.level, active: ecoute)
-                }
-                .opacity(ouverte && !contractee ? 1 : 0)
-                .rotationEffect(.degrees(contractee ? 90 : 0))
-
-                // Contractée, elle devient l'indicateur de calcul.
-                Circle()
-                    .trim(from: 0, to: 0.3)
-                    .stroke(Color.white, style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                    .padding(34)
-                    .rotationEffect(.degrees(tourne ? 360 : 0))
-                    .opacity(contractee ? 1 : 0)
+                if !reduceMotion { arc }
             }
-            .clipShape(RoundedRectangle(cornerRadius: rayon, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: rayon, style: .continuous))
-            // Le rayon et les fondus suivent le trajet de la bulle (ressort
-            // fluide), pas la courbe de 80 ms réservée à la respiration : sans
-            // ces deux lignes, celle-ci, posée plus bas, les emporterait.
-            .animation(courbe, value: ouverte)
-            .animation(courbe, value: contractee)
+            .frame(width: cote, height: cote)
+            .contentShape(Circle())
         }
         .buttonStyle(.dsPress)
-        .disabled(!mainsLibres || !ouverte || contractee)
-        .scaleEffect(echelleVoix)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: echelleVoix)
-        .scaleEffect(contractee ? EcouteGeometrie.contraction : 1)
-        .background { aura }
-        .offset(x: glisse)
-        .opacity(Double(max(0.25, 1 + glisse / 140)))
-        .onChange(of: contractee) { _, maintenant in
-            guard maintenant, !reduceMotion else { return }
-            withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) { tourne = true }
+        .disabled(!mainsLibres || !enScene)
+        .scaleEffect(echelle)
+        .opacity(enScene ? EcouteGeometrie.opacite(glisse: glisse) : 0)
+        .offset(x: glisse, y: partie && !reduceMotion ? EcouteGeometrie.deriveSortie : 0)
+        .animation(courbe, value: enScene)
+        // Verrouillée d'un glissé vers le haut, elle revient à l'aplomb du bouton.
+        .animation(reduceMotion ? nil : .kiwiVif, value: mainsLibres)
+        // `duree` avance à chaque mesure du micro : c'est l'horloge de la trace.
+        .onChange(of: speech.duree) { _, _ in
+            guard ecoute else { return }
+            historique = EcouteGeometrie.avancer(historique, avec: amplitude)
+        }
+        // La page remet le glissement à zéro en fermant la dictée : on garde
+        // le dernier, pour que la bulle parte de là où elle était.
+        .onChange(of: geste.glissement) { _, nouveau in
+            if !partie { dernierGlisse = EcouteGeometrie.glisse(nouveau.width) }
+        }
+        .onChange(of: ecoute) { _, estActif in
+            if !estActif { historique = Array(repeating: 0, count: KiwiMarque.nombreDeGraines) }
+        }
+        .task {
+            guard !reduceMotion else { return }
+            try? await Task.sleep(for: EcouteGeometrie.arcDelai)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: EcouteGeometrie.arcDeploiement)) { arcDeploye = true }
+            withAnimation(.linear(duration: EcouteGeometrie.arcTour).repeatForever(autoreverses: false)) {
+                arcTourne = true
+            }
         }
         .accessibilityLabel(mainsLibres ? "Terminer la dictée" : "Enregistrement en cours")
         .accessibilityHint(mainsLibres
@@ -492,96 +548,88 @@ private struct BulleVivante: View {
                            : "Relâche pour lancer l'analyse")
     }
 
-    @ViewBuilder
-    private var aura: some View {
-        if ouverte, !contractee, !reduceMotion {
-            AuraLiquide(niveau: speech.level, active: ecoute)
-                .transition(.opacity)
-        }
+    /// L'arc : il naît en haut à droite, s'allonge, et tourne tant qu'on écoute.
+    private var arc: some View {
+        Circle()
+            .trim(from: 0, to: arcDeploye ? EcouteGeometrie.arcPart : 0)
+            .stroke(KiwiMarque.peau,
+                    style: StrokeStyle(lineWidth: EcouteGeometrie.arcEpaisseur, lineCap: .round))
+            .frame(width: EcouteGeometrie.diametre + 2 * EcouteGeometrie.arcEcart,
+                   height: EcouteGeometrie.diametre + 2 * EcouteGeometrie.arcEcart)
+            .rotationEffect(.degrees(EcouteGeometrie.arcDepart + (arcTourne ? 360 : 0)))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 
-// MARK: - L'aura liquide
+// MARK: - La tranche qui écoute
 
-/// Deux nappes vertes qui ondulent derrière la bulle. Leur rayon et leur
-/// agitation suivent le NIVEAU SONORE mesuré : quand on parle, ça déborde ;
-/// quand on se tait, ça retombe. Aucune boucle décorative.
-private struct AuraLiquide: View {
-    let niveau: Float
-    let active: Bool
-
-    private var amplitude: CGFloat {
-        guard active else { return 0 }
-        return CGFloat(min(1, max(0, niveau * 1.6)))
-    }
+/// Le signe Kiwio, vivant : mêmes couleurs et mêmes rayons que `KiwiSigne`,
+/// mais les graines s'allongent avec la voix et le cœur gonfle à peine. Au
+/// silence, c'est exactement le logo.
+private struct KiwiVivant: View {
+    let historique: [CGFloat]
+    let amplitude: CGFloat
+    let reduceMotion: Bool
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { contexte in
-            let temps = contexte.date.timeIntervalSinceReferenceDate
-            let force = amplitude
-            Canvas { dessin, taille in
-                let centre = CGPoint(x: taille.width / 2, y: taille.height / 2)
-                let proche = EcouteGeometrie.contourAura(
-                    centre: centre,
-                    base: EcouteGeometrie.diametre / 2 + 8 + force * 12,
-                    temps: temps,
-                    vigueur: 0.04 + force * 0.07
-                )
-                let lointaine = EcouteGeometrie.contourAura(
-                    centre: centre,
-                    base: EcouteGeometrie.diametre / 2 + 20 + force * 18,
-                    temps: temps + 1.7,
-                    vigueur: 0.05 + force * 0.08
-                )
-                dessin.fill(lointaine, with: .color(Color.dsAccent.opacity(0.14)))
-                dessin.fill(proche, with: .color(Color.dsAccent.opacity(0.24)))
+        ZStack {
+            DisqueVivant(rayon: EcouteGeometrie.rayonPeau).fill(KiwiMarque.peau)
+            DisqueVivant(rayon: EcouteGeometrie.rayonChair).fill(KiwiMarque.chair)
+            DisqueVivant(rayon: EcouteGeometrie.rayonHalo(amplitude: amplitude)).fill(KiwiMarque.halo)
+            DisqueVivant(rayon: EcouteGeometrie.rayonCoeur(amplitude: amplitude)).fill(KiwiMarque.coeur)
+            ForEach(0..<KiwiMarque.nombreDeGraines, id: \.self) { index in
+                GraineVivante(index: index, amplitude: historique.indices.contains(index) ? historique[index] : 0)
+                    .fill(KiwiMarque.peau)
             }
         }
-        .frame(width: EcouteGeometrie.coteAura, height: EcouteGeometrie.coteAura)
-        .blur(radius: 5)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Cinq barres sous le micro
-
-/// Les cinq derniers niveaux du micro, de gauche à droite : la trace de la
-/// voix, pas une animation en boucle.
-private struct BarresDeVoix: View {
-    let level: Float
-    let active: Bool
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var historique: [CGFloat] = Array(repeating: 0, count: BarresDeVoix.nombre)
-
-    private static let nombre = 5
-    private static let poids: [CGFloat] = [0.6, 0.85, 1, 0.85, 0.6]
-    private static let hauteurMin: CGFloat = 6
-    private static let course: CGFloat = 20
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 4) {
-            ForEach(0..<Self.nombre, id: \.self) { index in
-                Capsule()
-                    .fill(Color.white.opacity(0.95))
-                    .frame(width: 4, height: hauteur(index))
-            }
-        }
-        .frame(height: Self.hauteurMin + Self.course)
+        // 80 ms entre deux mesures du micro : les graines glissent de l'une à
+        // l'autre au lieu de sauter.
         .animation(reduceMotion ? nil : .linear(duration: 0.08), value: historique)
-        .onChange(of: level) { _, nouveau in
-            guard active else { return }
-            historique.removeFirst()
-            historique.append(CGFloat(min(1, max(0, nouveau * 1.6))))
-        }
-        .onChange(of: active) { _, estActif in
-            if !estActif { historique = Array(repeating: 0, count: Self.nombre) }
-        }
+        .animation(reduceMotion ? nil : .linear(duration: 0.08), value: amplitude)
         .accessibilityHidden(true)
     }
+}
 
-    private func hauteur(_ index: Int) -> CGFloat {
-        Self.hauteurMin + historique[index] * Self.poids[index] * Self.course
+/// Un disque centré, de rayon donné dans la boîte de la tranche.
+private struct DisqueVivant: Shape {
+    var rayon: CGFloat
+
+    var animatableData: CGFloat {
+        get { rayon }
+        set { rayon = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let unite = min(rect.width, rect.height) / EcouteGeometrie.boite
+        return Path(ellipseIn: CGRect(x: rect.midX - rayon * unite, y: rect.midY - rayon * unite,
+                                      width: 2 * rayon * unite, height: 2 * rayon * unite))
+    }
+}
+
+/// Une graine posée sur son orbite, grand axe tourné vers le centre, qui
+/// s'allonge vers le bord avec l'amplitude.
+private struct GraineVivante: Shape {
+    let index: Int
+    var amplitude: CGFloat
+
+    var animatableData: CGFloat {
+        get { amplitude }
+        set { amplitude = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let unite = min(rect.width, rect.height) / EcouteGeometrie.boite
+        let forme = EcouteGeometrie.graine(amplitude: amplitude)
+        let angle = Double(index) * 2 * Double.pi / Double(KiwiMarque.nombreDeGraines)
+        let largeur = KiwiMarque.graineLargeur * unite
+        let longueur = forme.longueur * unite
+        let ellipse = Path(ellipseIn: CGRect(x: -largeur / 2, y: -longueur / 2,
+                                             width: largeur, height: longueur))
+        let x = rect.midX + CGFloat(cos(angle)) * forme.orbite * unite
+        let y = rect.midY + CGFloat(sin(angle)) * forme.orbite * unite
+        return ellipse.applying(
+            CGAffineTransform(translationX: x, y: y).rotated(by: CGFloat(angle + Double.pi / 2))
+        )
     }
 }

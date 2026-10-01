@@ -865,8 +865,8 @@ struct JournalSaisieBloc: View {
 
     private var boutonDicter: some View {
         ZStack {
-            // La bulle d'écoute porte la forme du bouton : il s'efface d'un
-            // coup sous elle, et revient d'un coup quand elle s'y repose.
+            // Pendant l'écoute, la scène pose sa propre face sur le bouton :
+            // il s'efface d'un coup sous elle, et revient d'un coup à la fin.
             boutonDicterVisuel
                 .opacity(ecoute.boutonCache ? 0 : 1)
                 .animation(nil, value: ecoute.boutonCache)
@@ -972,12 +972,11 @@ struct JournalSaisieBloc: View {
 
 // MARK: - Le bouton Dicter, en deux morceaux
 //
-// La bulle d'écoute (`EcouteDictee.swift`) PART de ce bouton et y REVIENT :
-// elle dessine le même fond et la même face, pour que le passage de l'un à
-// l'autre ne se voie pas.
+// La scène d'écoute (`EcouteDictee.swift`) se pose SUR ce bouton pendant la
+// dictée : elle dessine le même fond et la même face, pour que le passage de
+// l'un à l'autre ne se voie pas.
 
-/// Le fond vert du bouton : dégradé de marque et lumière en haut. Son rayon
-/// s'anime (22 pt pour le bouton, un cercle pour la bulle).
+/// Le fond vert du bouton : dégradé de marque et lumière en haut.
 struct FondBoutonDicter: View {
     let rayon: CGFloat
 
