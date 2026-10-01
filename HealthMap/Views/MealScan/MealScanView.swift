@@ -756,12 +756,14 @@ struct JournalView: View {
         if let actuel { profil.weight = ObjectifPoids.stockage(actuel) }
         if let souhaite { profil.targetWeight = ObjectifPoids.stockage(souhaite) }
         profilRegle = profil
+        let poidsActuel = profil.weight
+        let poidsSouhaite = profil.targetWeight
 
         sauvegardePoids?.cancel()
         sauvegardePoids = Task {
             try? await Task.sleep(for: .milliseconds(700))
             guard !Task.isCancelled else { return }
-            await dashboardVM.enregistrerPoids(actuel: profil.weight, souhaite: profil.targetWeight)
+            await dashboardVM.enregistrerPoids(actuel: poidsActuel, souhaite: poidsSouhaite)
             // Un nouveau pas est arrivé entre-temps : il enregistrera à son tour.
             guard !Task.isCancelled else { return }
             profilRegle = nil
