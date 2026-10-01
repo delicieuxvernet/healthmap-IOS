@@ -163,6 +163,7 @@ struct ContentView: View {
 /// dashboard snapshot, score history) remains usable offline.
 private struct OfflineBanner: View {
     @State private var showReconnected = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 4) {
@@ -197,11 +198,11 @@ private struct OfflineBanner: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Hors ligne. Certaines données ne sont pas à jour.")
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("healthmapDidReconnect"))) { _ in
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.3)) {
                 showReconnected = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.3)) {
                     showReconnected = false
                 }
             }

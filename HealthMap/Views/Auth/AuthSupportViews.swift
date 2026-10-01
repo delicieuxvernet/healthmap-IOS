@@ -99,6 +99,7 @@ struct ForgotPasswordSheet: View {
     @State private var newPassword = ""
     @State private var confirmPassword = ""
     @State private var step: Step = .email
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -164,7 +165,7 @@ struct ForgotPasswordSheet: View {
                 HapticService.shared.primary()
                 let ok = await authVM.resetPassword(email: email)
                 if ok {
-                    withAnimation(.healthMapSpring) { step = .codeAndPassword }
+                    withAnimation(reduceMotion ? nil : .healthMapSpring) { step = .codeAndPassword }
                 } else {
                     HapticService.shared.warning()
                 }
@@ -249,7 +250,7 @@ struct ForgotPasswordSheet: View {
                 HapticService.shared.primary()
                 let ok = await authVM.completeResetPassword(code: code, newPassword: newPassword)
                 if ok {
-                    withAnimation(.healthMapSpring) { step = .success }
+                    withAnimation(reduceMotion ? nil : .healthMapSpring) { step = .success }
                 } else {
                     HapticService.shared.warning()
                 }

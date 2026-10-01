@@ -160,24 +160,24 @@ struct DashboardView: View {
 
                 // Z1 · En-tête (plus de pill Premium : le paywall vit dans Réglages)
                 BilanV7Header(date: Date(), showsPremiumPill: false) { }
-                    .staggeredAppear(index: 0)
+                    .kiwiEntrance(0)
 
                 // Z2 · Hero : l'anneau attend le bilan (aucun bouton ici —
                 // un CTA géant par zone, jamais trois empilés)
                 BilanV7ScoreTeaserCard()
-                    .staggeredAppear(index: 1)
+                    .kiwiEntrance(1)
 
                 // Z3 · Grille des apports en stats France + CTA bilan
                 BilanV7ApportsTeaserCard {
                     viewModel.demarrerBilan()
                 }
-                .staggeredAppear(index: 2)
+                .kiwiEntrance(2)
 
                 // Z4 · Points d'attention : exemple générique + CTA bilan
                 BilanV7AttentionTeaserCard {
                     viewModel.demarrerBilan()
                 }
-                .staggeredAppear(index: 3)
+                .kiwiEntrance(3)
 
                 // Z5 · Ta série — état existant (donnée réelle du journal,
                 // indépendante du bilan ; masquée en mode zen comme ailleurs)
@@ -185,13 +185,13 @@ struct DashboardView: View {
                     BilanV7SerieCard(streak: gamification.currentStreak) {
                         showTrophies = true
                     }
-                    .staggeredAppear(index: 4)
+                    .kiwiEntrance(4)
                 }
 
                 // Z6 · Tes derniers repas — état vide existant (masquée si vide)
                 if !repasLines.isEmpty {
                     BilanV7RepasCard(lines: repasLines)
-                        .staggeredAppear(index: 5)
+                        .kiwiEntrance(5)
                 }
 
                 // Z7 · Premium : jamais avant le bilan (`premiumVisible`, V12a)
@@ -230,7 +230,7 @@ struct DashboardView: View {
 
                 // Z1 · En-tête (plus de pill Premium : le paywall vit dans Réglages)
                 BilanV7Header(date: Date(), showsPremiumPill: false) { }
-                    .staggeredAppear(index: 0)
+                    .kiwiEntrance(0)
 
                 // Z2 · Score du jour (anneau compact + tendance de la semaine)
                 // `scoreInsight` commente le score GLOBAL du bilan (« 52/100 »),
@@ -244,7 +244,7 @@ struct DashboardView: View {
                     HapticService.shared.tap()
                     showScoreDetail = true
                 }
-                .staggeredAppear(index: 1)
+                .kiwiEntrance(1)
 
                 // Z3 · HÉROS — tes apports à renforcer
                 if let apports = v2.bilan?.apports, !apports.isEmpty {
@@ -254,7 +254,7 @@ struct DashboardView: View {
                     ) { apport in
                         selectedApport = apport
                     }
-                    .staggeredAppear(index: 2)
+                    .kiwiEntrance(2)
                 }
 
                 // Z3b · Points d'attention (interactions du contrat).
@@ -267,7 +267,7 @@ struct DashboardView: View {
                     ) { item in
                         selectedAttention = item
                     }
-                    .staggeredAppear(index: 3)
+                    .kiwiEntrance(3)
                 }
 
                 // Z3c · Ta prise de sang (Premium, 30 sept. 2026) : ce qui a
@@ -275,7 +275,7 @@ struct DashboardView: View {
                 PriseDeSangCarte(prise: viewModel.priseDeSang) {
                     showPriseDeSang = true
                 }
-                .staggeredAppear(index: 4)
+                .kiwiEntrance(4)
 
                 // Z4 · Tes symptômes suivis + CTA solutions
                 let rows = symptomRows(v2)
@@ -286,7 +286,7 @@ struct DashboardView: View {
                         onTapSymptom: { _ in openTab(.suivi) },
                         onSolutions: { openTab(.plan) }
                     )
-                    .staggeredAppear(index: 4)
+                    .kiwiEntrance(4)
                 }
 
                 // Z5 · Ta série (masquée en mode zen, comme la récolte v6)
@@ -294,13 +294,13 @@ struct DashboardView: View {
                     BilanV7SerieCard(streak: gamification.currentStreak) {
                         showTrophies = true
                     }
-                    .staggeredAppear(index: 5)
+                    .kiwiEntrance(5)
                 }
 
                 // Z6 · Tes derniers repas (bilan du journal — masqué si vide)
                 if !repasLines.isEmpty {
                     BilanV7RepasCard(lines: repasLines)
-                        .staggeredAppear(index: 6)
+                        .kiwiEntrance(6)
                 }
 
                 // Z7 (ex-carte Kiwio Premium) : retirée, le paywall vit
@@ -481,36 +481,9 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Staggered Appear (loi 17)
-/// Apparition des sections en léger stagger : fondu + petite montée, une
-/// seule courbe (`.healthMapSpring`), délai croissant par index. Reduce
-/// Motion → affichage immédiat sans animation.
-private struct StaggeredAppear: ViewModifier {
-    let index: Int
-    @State private var appeared = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 10)
-            .onAppear {
-                if reduceMotion {
-                    appeared = true
-                } else {
-                    withAnimation(.healthMapSpring.delay(Double(index) * 0.04)) {
-                        appeared = true
-                    }
-                }
-            }
-    }
-}
-
-private extension View {
-    func staggeredAppear(index: Int) -> some View {
-        modifier(StaggeredAppear(index: index))
-    }
-}
+// L'entrée en cascade des sections passe par `kiwiEntrance` (`KiwiMotion.swift`),
+// comme le Plan, les Compléments et les fiches : ce fichier avait sa propre
+// version, avec un autre décalage et une autre courbe.
 
 // MARK: - Écran de chargement plein (flux du 20 juin — inchangé)
 // Tant que le bilan IA n'est pas prêt, on n'affiche AUCUN résultat : juste le
@@ -553,7 +526,7 @@ struct FullAnalysisLoadingView: View {
                 .progressViewStyle(.linear)
                 .tint(Color.dsAccent)
                 .frame(maxWidth: 200)
-                .animation(.easeInOut(duration: 0.4), value: progress)
+                .reducedMotionAnimation(.easeInOut(duration: 0.4), value: progress)
 
             VStack(spacing: Theme.spacingSM) {
                 Text("Compte 2 à 3 minutes")

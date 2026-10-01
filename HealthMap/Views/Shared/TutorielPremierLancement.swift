@@ -130,7 +130,8 @@ final class TutorielService: ObservableObject {
     func ongletChange() { if etape == .suite { terminer() } }
 
     private func aller(_ nouvelle: TutorielEtape) {
-        withAnimation(.easeOut(duration: 0.22)) { etape = nouvelle }
+        // Hors d'une vue : la préférence se lit auprès du système.
+        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeOut(duration: 0.22)) { etape = nouvelle }
         defauts.set(nouvelle.rawValue, forKey: cle)
     }
 }

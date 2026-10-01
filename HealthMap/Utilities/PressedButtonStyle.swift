@@ -1,35 +1,23 @@
 import SwiftUI
 
 // MARK: - Pressed Button Style
-/// Remplace `.buttonStyle(.plain)` partout où on veut un feedback visuel
-/// standard iOS-like sur le tap. Scale 0.97 + opacity 0.85 = cohérent
-/// avec Apple Music, Fitness, Health.
+/// Un seul état d'appui dans toute l'app : celui du design system
+/// (`DSPressStyle`, `KiwiDS.swift` : léger rétrécissement + assombrissement,
+/// rétrécissement coupé sous « Réduire les animations »).
 ///
-/// Respecte `AccessibilityReduceMotion` : pas de scale si l'utilisateur
-/// a activé Reduce Motion (mais opacity reste pour feedback visuel).
+/// `.healthMapPressed` est le nom historique. Il renvoie désormais au même
+/// style que `.dsPress` : il existait deux réglages différents pour le même
+/// geste (opacité 0,85 ici, assombrissement là), et un bouton ne répondait pas
+/// pareil selon l'écran où il se trouvait.
 ///
 /// Usage :
 /// ```swift
 /// Button { action() } label: { ... }
 ///     .buttonStyle(.healthMapPressed)
 /// ```
-struct PressedButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+typealias PressedButtonStyle = DSPressStyle
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(scaleFor(isPressed: configuration.isPressed))
-            .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-    }
-
-    private func scaleFor(isPressed: Bool) -> CGFloat {
-        if reduceMotion { return 1.0 }
-        return isPressed ? 0.97 : 1.0
-    }
-}
-
-extension ButtonStyle where Self == PressedButtonStyle {
-    /// Style standard Kiwio pour tous les CTAs et cards interactives.
-    static var healthMapPressed: PressedButtonStyle { PressedButtonStyle() }
+extension ButtonStyle where Self == DSPressStyle {
+    /// Nom historique de `.dsPress` : même style, même réglage.
+    static var healthMapPressed: DSPressStyle { DSPressStyle() }
 }

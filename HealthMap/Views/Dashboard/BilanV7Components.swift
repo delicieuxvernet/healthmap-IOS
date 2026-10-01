@@ -83,14 +83,11 @@ extension View {
     func bilanV7Card() -> some View { modifier(BilanV7CardStyle()) }
 }
 
-// MARK: - Appui (.tap:active → scale .98)
-struct BilanV7PressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
+// MARK: - Appui
+/// Même état d'appui que le reste de l'app (`DSPressStyle`). Ce style-ci
+/// avait son propre réglage (0,98, 120 ms) et ignorait « Réduire les
+/// animations ».
+typealias BilanV7PressStyle = DSPressStyle
 
 // MARK: - Libellé de section (.section-label)
 struct BilanV7SectionLabel: View {
