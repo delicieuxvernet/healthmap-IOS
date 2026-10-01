@@ -3,9 +3,17 @@ import SwiftUI
 // MARK: - Journal : les micronutriments (1er octobre 2026)
 //
 // Sous le bloc de saisie : les trois apports qui comptent le plus pour la
-// personne, chacun avec les faits qui expliquent son chiffre, puis tous les
-// autres derrière « Voir les … micronutriments ». Le calcul vit dans
-// `MicrosDuJour` ; ces vues n'affichent que ce qu'il rend.
+// personne, puis tous les autres derrière « Voir les … micronutriments ». Le
+// calcul vit dans `MicrosDuJour` ; ces vues n'affichent que ce qu'il rend.
+//
+// Une ligne = le nom, la jauge, le chiffre, et un « i » qui ouvre la fiche.
+// Rien d'autre : la première version posait sous chaque priorité trois lignes
+// de faits (questionnaire, repas, journée). Retour d'Arthur du 1er octobre
+// 2026 : « ça fait de trop gros blocs, trop d'informations pour très peu de
+// valeur ajoutée ». Les faits vivent désormais dans la fiche, derrière le « i ».
+//
+// Toute cette partie est réservée au Premium (décision d'Arthur du même
+// jour) : la porte se pose dans `MealScanView.microsSection`.
 //
 // Un seul chiffre par apport : la part du besoin couverte. C'est le même que
 // dans Progrès et dans la fiche de l'apport.
@@ -112,11 +120,6 @@ struct JournalMicrosCard: View {
     @State private var famille: FamilleMicro?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Dans la carte, trois faits au plus par priorité : ce que dit le
-    /// questionnaire, ce qu'ont montré les repas, ce qu'apporte la journée.
-    /// Les autres attendent dans la fiche.
-    private static let genresDeLaCarte: [FaitMicro.Genre] = [.questionnaire, .repas, .jour]
-
     /// Tout ce qui n'est pas déjà dans les priorités : les alertes d'abord,
     /// puis l'ordre du catalogue.
     private var autres: [LigneMicro] {
@@ -167,22 +170,18 @@ struct JournalMicrosCard: View {
                     .padding(.bottom, 2)
 
                 ForEach(tableau.priorites) { ligne in
-                    LigneMicroVue(
-                        ligne: ligne,
-                        faits: ligne.faits.filter { Self.genresDeLaCarte.contains($0.genre) },
-                        enAvant: true
-                    ) { onLigne(ligne) }
-                    DSSeparator()
+                    LigneMicroVue(ligne: ligne, enAvant: true) { onLigne(ligne) }
                 }
             }
 
+            if !tableau.priorites.isEmpty { DSSeparator() }
             boutonToutVoir
 
             if deplie {
                 DSSeparator()
                 filtres
                 ForEach(autres) { ligne in
-                    LigneMicroVue(ligne: ligne, faits: [], enAvant: false) { onLigne(ligne) }
+                    LigneMicroVue(ligne: ligne, enAvant: false) { onLigne(ligne) }
                 }
                 legende
             }
@@ -274,8 +273,7 @@ struct JournalMicrosCard: View {
 
 private struct LigneMicroVue: View {
     let ligne: LigneMicro
-    let faits: [FaitMicro]
-    /// Priorité : nom en gras, faits dessous.
+    /// Priorité : nom en gras.
     let enAvant: Bool
     let action: () -> Void
 
@@ -299,57 +297,51 @@ private struct LigneMicroVue: View {
             morceaux.append(sansChiffre)
         }
         if let phrase = ligne.statut.phrase { morceaux.append(phrase) }
-        morceaux.append(contentsOf: faits.map(\.texte))
         return morceaux.joined(separator: ". ")
     }
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 10) {
-                    Circle()
-                        .fill(ligne.statut.couleurDePastille)
-                        .frame(width: 8, height: 8)
-                    Text(ligne.nom)
-                        .font(enAvant ? .dsSousTitreFort : .dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(ligne.statut.couleurDePastille)
+                    .frame(width: 8, height: 8)
+                Text(ligne.nom)
+                    .font(enAvant ? .dsSousTitreFort : .dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 8)
+                if let niveau = ligne.niveau {
+                    DSGauge(fraction: Double(niveau) / 100, couleur: Color.dsStatut(niveau), hauteur: 6)
+                        .frame(width: 70)
+                    Text(DS.pourcent(niveau))
+                        .font(.dsValeurLigneForte)
                         .foregroundStyle(Color.dsTexte)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Spacer(minLength: 8)
-                    if let niveau = ligne.niveau {
-                        DSGauge(fraction: Double(niveau) / 100, couleur: Color.dsStatut(niveau), hauteur: 6)
-                            .frame(width: 70)
-                        Text(DS.pourcent(niveau))
-                            .font(.dsValeurLigneForte)
-                            .foregroundStyle(Color.dsTexte)
-                            .frame(width: 54, alignment: .trailing)
-                            .contentTransition(.numericText())
-                    } else {
-                        Text(sansChiffre)
-                            .font(.dsLegende)
-                            .tracking(DSTracking.legende)
-                            .foregroundStyle(Color.dsSecondaire)
-                    }
+                        .frame(width: 54, alignment: .trailing)
+                        .contentTransition(.numericText())
+                } else {
+                    Text(sansChiffre)
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsSecondaire)
                 }
-                if !faits.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(faits) { fait in
-                            FaitMicroVue(fait: fait)
-                        }
-                    }
-                    .padding(.leading, 18)
-                }
+                // Le « i » : la ligne entière ouvre la fiche, il le dit.
+                Image(systemName: "info.circle")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(Color.dsAccent)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, DS.paddingCarte)
-            .padding(.vertical, enAvant ? 11 : 6)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.dsPress)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(libelleVocal)
-        .accessibilityHint("Ouvre le détail de cet apport")
+        .accessibilityHint("Ouvre les informations sur cet apport")
     }
 }
 
