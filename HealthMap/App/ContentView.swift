@@ -602,9 +602,11 @@ struct MainTabView: View {
             }
         }
         // Un repas dicté vient d'être rangé : la pastille le confirme en haut
-        // de l'écran, par-dessus tout. La toucher ouvre ce repas.
+        // de l'écran, par-dessus tout. La toucher ouvre ce repas. Repartie
+        // seule, elle laisse la place à l'offre : un repas dicté compte autant
+        // qu'un autre (les autres ajouts la proposent après leur gratification).
         .overlay(alignment: .top) {
-            PastilleConfirmation { creneau in
+            PastilleConfirmation(onPartie: { proposerOffre() }) { creneau in
                 selectedTab = .journal
                 NotificationCenter.default.post(name: .healthmapOuvrirRepas, object: creneau.rawValue)
             }

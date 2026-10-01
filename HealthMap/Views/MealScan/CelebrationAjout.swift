@@ -319,6 +319,9 @@ final class ConfirmationCentre: ObservableObject {
 /// activité en direct et une extension dédiée : ce n'est pas ce que fait ce
 /// composant.)
 struct PastilleConfirmation: View {
+    /// La pastille est repartie d'elle-même (personne ne l'a touchée) : l'écran
+    /// est libre, la racine peut enchaîner (l'offre annuelle, par exemple).
+    var onPartie: () -> Void = {}
     /// Toucher la pastille : ouvrir la fiche de ce repas.
     let onOuvrir: (MealJournalService.MealSlot) -> Void
 
@@ -350,6 +353,7 @@ struct PastilleConfirmation: View {
                         try? await Task.sleep(for: Self.duree)
                         guard !Task.isCancelled, centre.courante?.id == confirmation.id else { return }
                         centre.courante = nil
+                        onPartie()
                     }
             }
         }
