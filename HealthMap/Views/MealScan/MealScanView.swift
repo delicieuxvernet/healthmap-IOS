@@ -670,9 +670,12 @@ struct JournalView: View {
                 JournalMacrosCard(lignes: lignesMacros)
                     .padding(.top, DS.interCarte)
 
-                microsSection
-
                 saisieBloc.padding(.top, 14)
+
+                // Sous la saisie (retour d'Arthur du 1er octobre 2026) : placée
+                // juste sous les macros, la carte repoussait Dicter et
+                // Photographier hors de l'écran.
+                microsSection
 
                 poidsEtEau
 
@@ -754,7 +757,7 @@ struct JournalView: View {
         Calendar.current.isDateInToday(journal.selectedDay)
     }
 
-    // MARK: - Micronutriments (sous les macros : un seul chiffre par apport)
+    // MARK: - Micronutriments (sous la saisie : un seul chiffre par apport)
 
     /// Ce que le calcul lit de la personne. Les scores sont ceux du registre
     /// (questionnaire, repas notés, prise de sang) : le même chiffre que dans

@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Journal : les micronutriments (1er octobre 2026)
 //
-// Sous les macros du jour : les trois apports qui comptent le plus pour la
+// Sous le bloc de saisie : les trois apports qui comptent le plus pour la
 // personne, chacun avec les faits qui expliquent son chiffre, puis tous les
 // autres derrière « Voir les … micronutriments ». Le calcul vit dans
 // `MicrosDuJour` ; ces vues n'affichent que ce qu'il rend.
