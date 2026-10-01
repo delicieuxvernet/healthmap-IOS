@@ -269,6 +269,9 @@ final class AuthViewModel: ObservableObject {
         // fer ») sur l'écran verrouillé. Ils partent avec lui ; le suivant
         // aura les siens à sa première ouverture.
         RappelsPersonnalises.toutAnnuler()
+        // Widgets et activité en direct : ils montrent la journée du compte
+        // sur l'écran d'accueil et l'écran verrouillé. Ils se vident avec lui.
+        SynchroWidgets.deconnexion()
     }
 
     // MARK: - Sign In

@@ -92,6 +92,9 @@
     <array>
         <string>remote-notification</string>
     </array>
+    <!-- Activite en direct : la journee sur l'ecran verrouille (widgets) -->
+    <key>NSSupportsLiveActivities</key>
+    <true/>
     <!-- Deep Linking -->
     <key>CFBundleURLTypes</key>
     <array>

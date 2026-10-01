@@ -199,6 +199,10 @@ struct SupplementsView: View {
                 seedDefaults()
             }
             .onChange(of: complementsSignature) { _, _ in refreshRituel() }
+            // Le rituel a été coché depuis un widget : les coches se relisent.
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapRituelModifie)) { _ in
+                refreshRituel()
+            }
             .onChange(of: chainsSignature) { _, _ in seedDefaults() }
             // Grand titre natif (se replie en inline au défilement).
             .navigationTitle("Compléments")
@@ -635,6 +639,8 @@ struct SupplementsView: View {
         withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
             rituel = SuiviEngineV4.toggleRituel(id: id, complements: complementsV2)
         }
+        // Les widgets montrent le même rituel : ils suivent la coche.
+        SynchroWidgets.rafraichir()
     }
 
     private func toggleCart(_ id: String) {
