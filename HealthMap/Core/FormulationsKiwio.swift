@@ -96,6 +96,18 @@ enum RaisonNutriment {
 }
 
 // MARK: - Formulations des rappels
+//
+// Refonte du 1er oct. 2026 (demande d'Arthur, captures de Yazio à l'appui) :
+// « très factuel et très aguicheur ». Yazio envoie huit rappels par jour, tous
+// interchangeables (« Bien s'hydrater peut faire des merveilles pour la
+// peau »). Kiwio sait ce que la personne a mangé, ce qu'elle a répondu, ce qui
+// freine ses apports : chaque rappel OUVRE donc sur un fait à elle — un
+// pourcentage tiré de ses repas notés, un compte de repas, des points du
+// registre — et n'invente jamais un chiffre. Sans fait à dire, il se rabat sur
+// l'ancienne formulation, sans chiffre.
+//
+// Le titre porte le fait (c'est lui qu'on lit sur l'écran verrouillé), le
+// corps porte le geste.
 
 /// Un rappel écrit : titre + corps. Les variantes tournent avec le jour, pour
 /// qu'une semaine de rappels ne soit pas sept fois la même phrase.
@@ -120,28 +132,186 @@ enum FormulationsRappel {
         return ".?!".contains(derniere) ? propre : propre + "."
     }
 
+    // MARK: Briques
+
+    /// Au-delà, iOS coupe le corps sur l'écran verrouillé (`FormulationsTests`).
+    static let corpsMax = 145
+
+    /// « Ton fer », « Tes oméga-3 » — pour ouvrir une phrase ou un titre.
+    static func sujet(_ cible: CibleNutritionnelle) -> String {
+        NomNutriment.majusculeInitiale(cible.avecPossessif)
+    }
+
+    /// Le titre suivi de l'emoji canonique de l'apport.
+    static func avecEmoji(_ titre: String, _ cible: CibleNutritionnelle) -> String {
+        let emoji = cible.emoji
+        return emoji.isEmpty ? titre : "\(titre) \(emoji)"
+    }
+
+    /// « ton fer est à », « tes fibres sont à ».
+    static func estA(_ cible: CibleNutritionnelle) -> String {
+        let verbe = NomNutriment.accord(id: cible.id, singulier: "est", pluriel: "sont")
+        return "\(cible.avecPossessif) \(verbe) à"
+    }
+
+    /// « 1 repas noté », « 3 repas notés ».
+    static func repasNotes(_ nombre: Int) -> String {
+        nombre <= 1 ? "\(nombre) repas noté" : "\(nombre) repas notés"
+    }
+
+    /// « 1 besoin sur 10 couvert », « 6 besoins sur 10 couverts ».
+    static func besoinsCouverts(_ nombre: Int) -> String {
+        nombre <= 1 ? "\(nombre) besoin sur 10 couvert" : "\(nombre) besoins sur 10 couverts"
+    }
+
+    // MARK: Brief du matin
+
+    /// Série à partir de laquelle on la dit : deux jours de suite ne font pas
+    /// encore une habitude.
+    static let serieMin = 3
+
+    /// Le brief quand on NE SAIT PAS ce qui a été noté la veille (journal
+    /// illisible au moment de planifier) : aucune affirmation, aucun chiffre.
+    static func briefDuMatin(jour: Int) -> (titre: String, corps: String) {
+        let variantes = [
+            "Ce qui t'a manqué hier, et ce sur quoi miser aujourd'hui.",
+            "Ta veille en un coup d'œil, et ta priorité du jour.",
+            "Deux chiffres sur hier, une idée pour aujourd'hui.",
+        ]
+        return ("Ton brief du jour est prêt", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+    }
+
+    /// Le brief chiffré.
+    /// - Parameters:
+    ///   - repasHier: repas notés la veille.
+    ///   - couvertsHier: besoins (sur 10) couverts la veille ; `nil` = trop
+    ///     peu noté pour qu'un chiffre veuille dire quelque chose.
+    ///   - plusBas: l'apport à travailler le plus bas la veille, et sa part
+    ///     couverte.
+    ///   - serie: la série affichée dans l'app, veille comprise ; 0 quand on
+    ///     ne la connaît pas.
+    static func brief(
+        repasHier: Int,
+        couvertsHier: Int?,
+        plusBas: (cible: CibleNutritionnelle, pourcent: Int)?,
+        serie: Int,
+        jour: Int
+    ) -> (titre: String, corps: String) {
+        guard let couvertsHier else {
+            if repasHier == 1 {
+                return ("Ton brief du jour est prêt",
+                        "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain il parle.")
+            }
+            let variantes = [
+                "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton brief aura quelque chose à dire.",
+                "Pas de repas noté hier. Une photo de ton petit-déjeuner, et ton brief repart demain.",
+                "Ton brief n'a rien à te dire ce matin : hier est resté vide. Note ton petit-déjeuner pour le relancer.",
+            ]
+            return ("Ton brief attend tes repas", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+        }
+
+        let chiffre = "Hier : \(besoinsCouverts(couvertsHier))"
+        let suite: String
+        if let plusBas {
+            suite = "Le plus bas : \(plusBas.cible.avecPossessif), à \(plusBas.pourcent) %. Ton brief te dit sur quoi miser aujourd'hui."
+        } else {
+            suite = "Ton brief te montre ta veille, apport par apport."
+        }
+        // « 0 besoin sur 10 » ne donne envie de rien ouvrir : on le tait.
+        let corpsChiffre = couvertsHier >= 1 ? "\(chiffre). \(suite)" : suite
+
+        // Une série se fête : elle prend le titre, le chiffre passe dessous.
+        if serie >= serieMin {
+            return ("\(serie) jours d'affilée 🔥", corpsChiffre)
+        }
+        guard couvertsHier >= 1 else { return ("Ton brief du jour est prêt", suite) }
+        return ("\(chiffre) 📊", suite)
+    }
+
+    // MARK: Déclic (ce qui freine un apport, d'après le questionnaire)
+
+    /// `nil` quand le libellé du registre ferait déborder la notification : on
+    /// préfère se taire que se faire couper par iOS au milieu d'une phrase.
+    static func declic(cible: CibleNutritionnelle, frein: FreinCible, jour: Int) -> (titre: String, corps: String)? {
+        let libelle = frein.libelle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !libelle.isEmpty, frein.points > 1 else { return nil }
+        let enMinuscule = NomNutriment.minusculeInitiale(libelle)
+        let variantes = [
+            "D'après tes réponses : « \(enMinuscule) », c'est \(frein.points) points en moins. Ton plan te montre comment les reprendre.",
+            "« \(libelle) » : \(frein.points) points en moins dans ton bilan. Touche pour voir par où les reprendre.",
+            "\(frein.points) points partent avec « \(enMinuscule) ». Ton plan te dit par quoi commencer.",
+        ]
+        let corps = variantes[indexVariante(jour: jour, parmi: variantes.count)]
+        guard corps.count <= corpsMax else { return nil }
+        return (avecEmoji("Ce qui freine \(cible.avecPossessif)", cible), corps)
+    }
+
     // MARK: Midi
 
-    /// - Parameter manqueHier: part du besoin NON couverte hier (0-100), quand
-    ///   on la connaît — seulement pour aujourd'hui, « hier » n'est pas encore
-    ///   écrit pour les jours suivants.
-    static func midi(cible: CibleNutritionnelle, jour: Int, manqueHier: Int?) -> (titre: String, corps: String) {
+    /// - Parameter hier: part du besoin COUVERTE la veille (0-100) pour cet
+    ///   apport ; `nil` quand la veille est trop peu notée pour être chiffrée.
+    static func midi(cible: CibleNutritionnelle, jour: Int, hier: Int?) -> (titre: String, corps: String) {
         let aliments = aliments(de: cible)
         // Nutriment hors catalogue (ne devrait pas arriver : les cibles sont
         // filtrées sur `NutrientData`) — on reste utile plutôt que bancal.
         guard !aliments.isEmpty else { return midiSansBilan(jour: jour) }
+        let enMinuscule = NomNutriment.minusculeInitiale(aliments)
 
-        let variantes = [
-            "\(aliments) ce midi ? Scanne ton assiette.",
-            "\(aliments) au déjeuner, et ça remonte. Scanne ton assiette.",
-            "Au menu du midi : \(NomNutriment.minusculeInitiale(aliments)). Scanne ton assiette.",
-        ]
-        var corps = ""
-        if let manqueHier, manqueHier > 0 {
-            corps = "Hier, il t'en a manqué \(manqueHier) %. "
+        guard let hier else {
+            let variantes = [
+                "\(aliments) ce midi ? Scanne ton assiette, tu sauras ce qu'elle t'apporte.",
+                "\(aliments) au déjeuner, et ça remonte. Scanne ton assiette.",
+                "Au menu du midi : \(enMinuscule). Une photo, et tu vois ce que ça change.",
+            ]
+            return (avecEmoji("Ce midi, mise sur \(cible.avecPossessif)", cible),
+                    variantes[indexVariante(jour: jour, parmi: variantes.count)])
         }
-        corps += variantes[indexVariante(jour: jour, parmi: variantes.count)]
-        return ("C'est le moment de renforcer \(cible.avecPossessif)", corps)
+
+        let titre = avecEmoji("\(sujet(cible)) : \(hier) % hier", cible)
+        // Besoin couvert la veille : rien à rattraper, on garde le cap.
+        if hier >= BriefDuJourBuilder.seuilCouvert {
+            let variantes = [
+                "Besoin couvert hier. \(aliments) ce midi pour tenir le cap ? Scanne ton assiette.",
+                "Hier, le compte y était. \(aliments) au déjeuner, et tu gardes le rythme.",
+                "Besoin couvert hier : on garde le cap. Au menu du midi : \(enMinuscule).",
+            ]
+            return (titre, variantes[indexVariante(jour: jour, parmi: variantes.count)])
+        }
+        let variantes = [
+            "Il t'en a manqué \(100 - hier) %. \(aliments) ce midi ? Scanne ton assiette.",
+            "\(aliments) au déjeuner, et le chiffre remonte. Scanne ton assiette pour le voir.",
+            "Pour faire mieux qu'hier : \(enMinuscule) ce midi. Une photo, et tu vois où tu en es.",
+        ]
+        return (titre, variantes[indexVariante(jour: jour, parmi: variantes.count)])
+    }
+
+    // MARK: Encas
+
+    /// - Parameter aujourdhui: où en est cet apport d'après les repas notés
+    ///   AUJOURD'HUI, et sur combien de repas ; `nil` = rien de noté ce jour.
+    static func encas(
+        cible: CibleNutritionnelle,
+        jour: Int,
+        aujourdhui: (pourcent: Int, repas: Int)?
+    ) -> (titre: String, corps: String) {
+        guard let aujourdhui else {
+            let ouEn = NomNutriment.accord(id: cible.id, singulier: "où en est", pluriel: "où en sont")
+            let variantes = [
+                "Commence par ton encas : une photo ou quelques mots à voix haute. Demain, ton brief aura de vrais chiffres.",
+                "Un encas noté, et tu sais \(ouEn) \(cible.avecPossessif) aujourd'hui. Une photo ou quelques mots suffisent.",
+                "Sans repas noté, pas de chiffre : ton encas peut être le premier. Dis-le à voix haute ou prends-le en photo.",
+            ]
+            return ("Rien de noté pour l'instant 🍎", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+        }
+        let reste = max(0, 100 - aujourdhui.pourcent)
+        let variantes = [
+            "Compté sur \(repasNotes(aujourdhui.repas)) aujourd'hui. Ce que tu grignotes compte aussi : note-le.",
+            "C'est ton chiffre du jour, pour l'instant. Note ton encas et regarde-le bouger.",
+            "Il reste \(reste) % à aller chercher d'ici ce soir. Ton encas en fait partie : note-le.",
+        ]
+        let fait = NomNutriment.majusculeInitiale(estA(cible))
+        return (avecEmoji("Un encas ? \(fait) \(aujourdhui.pourcent) %", cible),
+                variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
 
     // MARK: Soir
@@ -153,9 +323,17 @@ enum FormulationsRappel {
     /// alors aux aliments au lieu de le servir nu.
     static let conseilAutoportantMin = 35
 
-    static func soir(cible: CibleNutritionnelle, jour: Int) -> (titre: String, corps: String) {
+    /// - Parameter aujourdhui: part du besoin couverte AUJOURD'HUI pour cet
+    ///   apport, d'après les repas déjà notés ; `nil` = rien de noté ce jour.
+    static func soir(cible: CibleNutritionnelle, jour: Int, aujourdhui: Int? = nil) -> (titre: String, corps: String) {
         let aliments = aliments(de: cible)
         guard !aliments.isEmpty else { return soirSansBilan(jour: jour) }
+
+        // Déjà à 100 % avant le dîner : on le dit, et on ne pousse rien.
+        if let aujourdhui, aujourdhui >= 100 {
+            return ("\(sujet(cible)) : besoin du jour couvert ✅",
+                    "100 % d'après tes repas notés. Ajoute ton dîner pour boucler la journée.")
+        }
 
         // Le conseil vient du serveur (contrat : 55 caractères). Au-delà de
         // 120 il ferait déborder la notification : on s'en passe plutôt que
@@ -170,28 +348,56 @@ enum FormulationsRappel {
                     : "\(aliments) au dîner ? \(conseil)"
             )
         }
-        variantes.append("\(aliments) au dîner ? Ta journée se complète.")
+        if aujourdhui == nil {
+            variantes.append("\(aliments) au dîner ? Ta journée se complète.")
+        } else {
+            variantes.append("\(aliments) au dîner, et tu finis la journée plus haut. Scanne ton assiette.")
+        }
         if let raison = RaisonNutriment.pour(cible.id) {
             // Deux phrases : l'énumération reprend donc la majuscule.
             variantes.append("\(raison) \(aliments) ce soir ?")
         } else {
             variantes.append("Un dîner avec \(NomNutriment.minusculeInitiale(aliments)), et la journée est complète.")
         }
-        return (
-            "Ce soir, pense à \(cible.avecPossessif)",
-            variantes[indexVariante(jour: jour, parmi: variantes.count)]
-        )
+
+        let titre: String
+        if let aujourdhui {
+            titre = avecEmoji("Ce soir : \(estA(cible)) \(aujourdhui) %", cible)
+        } else {
+            titre = avecEmoji("Ce soir, pense à \(cible.avecPossessif)", cible)
+        }
+        return (titre, variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
 
-    // MARK: Brief du matin
+    // MARK: Dernier appel (le dîner manque à une journée déjà commencée)
 
-    static func briefDuMatin(jour: Int) -> (titre: String, corps: String) {
-        let variantes = [
-            "Ce qui t'a manqué hier, et ce sur quoi miser aujourd'hui.",
-            "Ta veille en un coup d'œil, et ta priorité du jour.",
-            "Deux chiffres sur hier, une idée pour aujourd'hui.",
-        ]
-        return ("Ton brief du jour est prêt", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+    /// - Parameters:
+    ///   - repas: repas notés aujourd'hui (au moins un).
+    ///   - couverts: besoins couverts aujourd'hui ; `nil` = pas assez noté
+    ///     pour un chiffre.
+    static func dernierAppel(repas: Int, couverts: Int?) -> (titre: String, corps: String) {
+        let titre = "Il manque ton dîner 🌙"
+        if let couverts, couverts >= 1 {
+            return (titre, "\(repasNotes(repas)) et \(besoinsCouverts(couverts)) aujourd'hui. Ajoute ton dîner : ton brief de demain sera complet.")
+        }
+        return (titre, "\(repasNotes(repas)) aujourd'hui. Ajoute ton dîner, à la voix ou en photo : ton brief de demain aura de vrais chiffres.")
+    }
+
+    // MARK: Dimanche (la semaine en chiffres)
+
+    /// - Parameters:
+    ///   - repas: repas notés depuis lundi.
+    ///   - jours: jours de la semaine avec au moins un repas noté.
+    ///   - effort: l'apport qui a le plus progressé sur la semaine précédente.
+    static func semaine(repas: Int, jours: Int, effort: BriefDuJour.Effort?) -> (titre: String, corps: String) {
+        let titre = "Ta semaine en chiffres 📈"
+        let surJours = jours <= 1 ? "\(jours) jour" : "\(jours) jours"
+        guard let effort else {
+            return (titre, "\(repasNotes(repas)) sur \(surJours) cette semaine. Ton point de la semaine t'attend dans Progrès.")
+        }
+        let nomSujet = NomNutriment.majusculeInitiale(NomNutriment.possessif(id: effort.id, nom: effort.nom))
+        let verbe = NomNutriment.accord(id: effort.id, singulier: "a gagné", pluriel: "ont gagné")
+        return (titre, "\(repasNotes(repas)) sur \(surJours). \(nomSujet) \(verbe) \(effort.points) points par rapport à la semaine dernière. Le détail t'attend dans Progrès.")
     }
 
     // MARK: Retour après une semaine sans ouvrir
@@ -201,8 +407,9 @@ enum FormulationsRappel {
             return ("Ton suivi t'attend",
                     "Une semaine sans nouvelles : un repas noté suffit à le relancer.")
         }
+        let verbe = NomNutriment.accord(id: cible.id, singulier: "t'attend", pluriel: "t'attendent")
         return (
-            "\(NomNutriment.majusculeInitiale(cible.avecPossessif)) t'attend",
+            avecEmoji("\(sujet(cible)) \(verbe)", cible),
             "Une semaine sans nouvelles : un repas noté suffit à relancer ton suivi."
         )
     }
