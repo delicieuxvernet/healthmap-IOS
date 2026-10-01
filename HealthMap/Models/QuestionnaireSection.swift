@@ -185,10 +185,13 @@ extension QuestionnaireSection {
                 .init("equilibre", "Équilibre nutritionnel", emoji: "🥗"),
             ]
         ),
-        // Masquée si le prénom est déjà connu (signup email OU Sign in with Apple) :
-        // Authentication Services le fournit déjà, on ne le redemande jamais (Gl. 4).
-        Question(id: "firstName", text: "Comment tu t'appelles ?", type: .textInput(placeholder: "Prenom"),
-                 showIf: { $0.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
+        // Masquée si le prénom est déjà connu du COMPTE (signup email OU Sign in
+        // with Apple) : Authentication Services le fournit déjà, on ne le
+        // redemande jamais (Gl. 4). Cette règle vit dans le ViewModel
+        // (`prenomConnuDuCompte`) et surtout PAS dans un `showIf` : un `showIf`
+        // qui lit le champ que la question remplit la fait disparaître à la
+        // première lettre tapée (bug du 17 juil. au 1er oct. 2026).
+        Question(id: "firstName", text: "Comment tu t'appelles ?", type: .textInput(placeholder: "Prénom")),
         Question(id: "age", text: "Quel age as-tu ?", type: .numericInput(placeholder: "25", suffix: "ans")),
         Question(
             id: "gender",

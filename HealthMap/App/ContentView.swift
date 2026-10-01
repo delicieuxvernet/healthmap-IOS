@@ -529,15 +529,15 @@ struct MainTabView: View {
         }
         // Entrée libre (V12a) : le questionnaire se lance/reprend depuis
         // n'importe quel onglet via `dashboardVM.demarrerBilan()`. Feuille
-        // plein écran (même style que l'édition du profil) : le glissement
-        // vers le bas permet de sortir à tout moment — le draft est sauvegardé
-        // en continu par QuestionnaireViewModel, la reprise se fait à la
-        // question en cours. À la fermeture, l'onglet d'origine est intact.
+        // plein écran qui ne se ferme PAS en glissant (on la quittait par
+        // accident) : la sortie passe par sa croix, qui confirme. Le draft est
+        // sauvegardé en continu par QuestionnaireViewModel, la reprise se fait
+        // à la question en cours. À la fermeture, l'onglet d'origine est intact.
         .sheet(isPresented: $dashboardVM.questionnaireOuvert) {
             QuestionnaireContainerView()
                 .environmentObject(questionnaireVM)
                 .environmentObject(dashboardVM)
-                .healthMapFullSheet()
+                .healthMapQuestionnaireSheet()
         }
         // Le tutoriel est posé ICI, APRÈS `mainInterface` : son voile couvre
         // donc AUSSI la barre d'onglets flottante (elle-même en overlay de
