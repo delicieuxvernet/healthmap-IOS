@@ -645,7 +645,9 @@ struct JournalView: View {
                 saisieBloc.padding(.top, 16)
                 avantQuestionnaire
             } else {
-                if let premiere = tableauMicros.alertes.first {
+                // Réservé au Premium, comme toute la partie micronutriments :
+                // le bandeau nomme les apports bas.
+                if !dashboardVM.premiumVisible, let premiere = tableauMicros.alertes.first {
                     JournalMicrosAlerte(alertes: tableauMicros.alertes) {
                         HapticService.shared.tap()
                         selectedMicro = premiere
@@ -794,9 +796,26 @@ struct JournalView: View {
     @ViewBuilder
     private var microsSection: some View {
         DSSectionHeader(titre: "Micronutriments")
-        JournalMicrosCard(tableau: tableauMicros) { ligne in
-            HapticService.shared.tap()
-            selectedMicro = ligne
+        if dashboardVM.premiumVisible {
+            // Porte Premium (décision d'Arthur du 1er octobre 2026) : la carte
+            // reste devinable derrière le voile, rien ne s'ouvre, et la fiche
+            // d'un micronutriment n'est donc pas atteignable. Même geste que
+            // dans Progrès (`GatedOverlay` + `UnlockDoor`).
+            GatedOverlay(intensity: .locked) {
+                JournalMicrosCard(tableau: tableauMicros) { _ in }
+            }
+            UnlockDoor(
+                icon: "chart.bar.xaxis",
+                title: "Débloque tes micronutriments",
+                subtitle: "Vitamines, minéraux et acides gras, calculés sur tes repas",
+                zone: "journal_micros"
+            )
+            .padding(.top, DS.interCarte)
+        } else {
+            JournalMicrosCard(tableau: tableauMicros) { ligne in
+                HapticService.shared.tap()
+                selectedMicro = ligne
+            }
         }
     }
 
