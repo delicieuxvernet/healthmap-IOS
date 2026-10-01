@@ -35,6 +35,12 @@ final class HapticService {
         selectionGen.prepare()
     }
 
+    /// Light impact — use when a hands-free gesture ends (the listening bubble closes).
+    func lightTap() {
+        light.impactOccurred()
+        light.prepare()
+    }
+
     /// Soft impact — use for card taps, sheet presentations.
     func tap() {
         soft.impactOccurred()

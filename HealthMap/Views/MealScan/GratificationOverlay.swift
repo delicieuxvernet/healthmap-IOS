@@ -405,7 +405,9 @@ private struct EtincelleVolante: View {
 
 // MARK: - Le tracé de la coche
 
-private struct TraceCoche: Shape {
+/// Partagé avec la célébration de la dictée (`CelebrationAjout`) : une seule
+/// coche dans l'app.
+struct TraceCoche: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         path.move(to: CGPoint(x: rect.minX + rect.width * 0.25, y: rect.minY + rect.height * 0.525))

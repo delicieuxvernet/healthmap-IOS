@@ -28,6 +28,144 @@ extension Animation {
     static let kiwiSnap = Animation.easeOut(duration: 0.18)
 }
 
+// MARK: - Une seule physique (maquette « Motion », 1er octobre 2026)
+//
+// Ce qui répond au doigt ou fête un geste ne prend AUCUNE durée fixe : trois
+// ressorts, pour que tout s'interrompe et reparte sans saut. Les quatre courbes
+// du dessus restent celles du contenu qui s'installe tout seul (entrée d'une
+// page, jauge qui se remplit à l'ouverture).
+extension Animation {
+
+    /// Vif : appuis, bascules, sélection.
+    static let kiwiVif = Animation.spring(response: 0.28, dampingFraction: 0.86)
+
+    /// Fluide : feuilles, morphing de la bulle d'écoute, recul de la page.
+    static let kiwiFluide = Animation.spring(response: 0.5, dampingFraction: 0.9)
+
+    /// Rebond : célébrations uniquement (coche, étiquettes, confirmation).
+    static let kiwiRebond = Animation.spring(response: 0.55, dampingFraction: 0.72)
+
+    /// Un chiffre qui compte jusqu'à sa nouvelle valeur. Amorti critique : un
+    /// compteur qui dépasse sa cible puis revient afficherait un faux total.
+    static let kiwiCompteur = Animation.spring(response: 0.6, dampingFraction: 1)
+}
+
+/// Ce qui grandit, et de combien. Rien ne dépasse 1,08 : au-delà, ça devient
+/// un jeu.
+enum KiwiEchelle {
+    /// Appui sur tout élément touchable.
+    static let appui: CGFloat = 0.96
+    /// Une récompense qui apparaît : 0,5 → 1,08 → 1.
+    static let recompenseDepart: CGFloat = 0.5
+    static let recompenseCrete: CGFloat = 1.08
+    /// Une carte dont la valeur vient de changer : impulsion, puis retour.
+    static let impulsion: CGFloat = 1.035
+    /// La page, quand la bulle d'écoute prend la main.
+    static let recul: CGFloat = 0.94
+    /// La bulle d'écoute, au plus fort de la voix.
+    static let voix: CGFloat = 1.07
+    /// Le plafond de tout ce qui précède.
+    static let plafond: CGFloat = 1.08
+}
+
+// MARK: - Un chiffre qui compte
+
+/// Affiche un entier qui COMPTE jusqu'à sa nouvelle valeur quand celle-ci
+/// change dans une transaction animée (`.animation(.kiwiCompteur, value:)`).
+/// Sans animation, il prend directement sa valeur : c'est le comportement
+/// attendu sous « Réduire les animations ».
+struct ChiffreQuiCompte: View, Animatable {
+    var valeur: Double
+    /// Mise en forme de l'entier affiché (`DS.entier` par défaut : `1 021`).
+    var format: (Int) -> String = { DS.entier($0) }
+
+    var animatableData: Double {
+        get { valeur }
+        set { valeur = newValue }
+    }
+
+    var body: some View {
+        Text(format(Int(valeur.rounded())))
+    }
+}
+
+// MARK: - Impulsion d'une carte mise à jour
+
+/// La carte gonfle à 1,035 puis revient, une fois, quand `declencheur` change.
+/// Rien sous « Réduire les animations » : la nouvelle valeur suffit.
+struct KiwiImpulsion<Declencheur: Equatable>: ViewModifier {
+    let declencheur: Declencheur
+    @State private var gonflee = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(gonflee ? KiwiEchelle.impulsion : 1)
+            .onChange(of: declencheur) { _, _ in
+                guard !reduceMotion else { return }
+                withAnimation(.kiwiVif) { gonflee = true }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(180))
+                    withAnimation(.kiwiRebond) { gonflee = false }
+                }
+            }
+    }
+}
+
+// MARK: - Apparition d'une récompense
+
+/// 0,5 → 1,08 → 1 : la récompense surgit, dépasse à peine, se pose. Sous
+/// « Réduire les animations », un simple fondu.
+struct KiwiRecompense: ViewModifier {
+    let visible: Bool
+    @State private var echelle: CGFloat = KiwiEchelle.recompenseDepart
+    @State private var opacite: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(echelle)
+            .opacity(opacite)
+            .onAppear { if visible { surgir() } }
+            .onChange(of: visible) { _, maintenant in
+                if maintenant { surgir() } else { ranger() }
+            }
+    }
+
+    private func surgir() {
+        guard !reduceMotion else {
+            echelle = 1
+            withAnimation(.easeOut(duration: 0.2)) { opacite = 1 }
+            return
+        }
+        withAnimation(.easeOut(duration: 0.18)) {
+            echelle = KiwiEchelle.recompenseCrete
+            opacite = 1
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(170))
+            withAnimation(.kiwiRebond) { echelle = 1 }
+        }
+    }
+
+    private func ranger() {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .kiwiVif) { opacite = 0 }
+        echelle = reduceMotion ? 1 : KiwiEchelle.recompenseDepart
+    }
+}
+
+extension View {
+    /// Impulsion 1,035 puis retour quand `declencheur` change.
+    func kiwiImpulsion<Declencheur: Equatable>(_ declencheur: Declencheur) -> some View {
+        modifier(KiwiImpulsion(declencheur: declencheur))
+    }
+
+    /// La vue surgit comme une récompense quand `visible` devient vrai.
+    func kiwiRecompense(_ visible: Bool) -> some View {
+        modifier(KiwiRecompense(visible: visible))
+    }
+}
+
 // MARK: - Entrée en cascade
 
 /// Fait arriver un élément en fondu, très légèrement décalé vers le bas,

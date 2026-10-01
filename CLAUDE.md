@@ -105,7 +105,7 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
 
 8. **Palette et tokens : `KiwiDS.swift` (refonte 23 août 2026, préfixe `ds`) sur tout écran refondu ; `Color+Theme.swift` pour l'historique.** Fond neutre, cartes sans ombre rayon 14, gras ≤ 700, vert réservé à l'interactif. Pas de règle d'absolu inventée — demander au user avant de proposer une nouvelle teinte.
 9. **Touch targets ≥ 44×44 pt** (HIG Apple).
-10. **`whileTap` scale 0.97** via `.dsPress` (refonte) ou `.healthMapPressed` (historique). Standardisé partout.
+10. **Appui : scale 0.96** via `.dsPress` (refonte, `KiwiEchelle.appui`, ressort `kiwiVif` — maquette « Motion » du 1er octobre 2026) ; `.healthMapPressed` (historique) reste à 0.97. Les ressorts et les échelles se lisent dans `KiwiMotion.swift` : on consomme, on n'invente pas de courbe.
 11. **Dynamic Type clamped** `.large ... .accessibility3` (ne pas exploser le layout).
 12. **Reduce-motion respecté** sur toute animation (`@Environment(\.accessibilityReduceMotion)`).
 

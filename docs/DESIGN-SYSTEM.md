@@ -29,7 +29,8 @@ Trois règles portent 80 % de l'écart perçu :
 | Cartes | `.dsCard()` : blanc, rayon 14 continu, **aucune ombre, aucune bordure** |
 | Listes | `DSGroupedList` + `DSRow` + `DSSeparator(retrait: 49 avec icône / 16 sans)` |
 | Jauges | `DSGauge` (4 pt, animée 1 s easeOut, cascade 50 ms) · `DSRing` (92 pt, trait 9) |
-| Boutons | `DSCapsuleButton` (50 pt, capsule) · `DSLinkRow` (lien vert de fin de carte) · `.dsPress` (0,97 + assombrissement) |
+| Boutons | `DSCapsuleButton` (50 pt, capsule) · `DSLinkRow` (lien vert de fin de carte) · `.dsPress` (0,96 + assombrissement, ressort `kiwiVif`) |
+| Mouvement | `KiwiMotion.swift` : ressorts `kiwiVif` · `kiwiFluide` · `kiwiRebond` · `kiwiCompteur`, échelles `KiwiEchelle` (rien au-dessus de 1,08), `ChiffreQuiCompte`, `.kiwiImpulsion(_:)`, `.kiwiRecompense(_:)` |
 | Formats | `DS.entier(1021)` → `1 021` · `DS.pourcent(42)` → `42 %` · `DS.decimal(5.9)` → `5,9` (espace fine U+202F) |
 | Navigation | `KiwiFloatingTabBar` (capsule, 5 onglets) · `DSAddButton` (60 pt) · grands titres natifs `.large` |
 

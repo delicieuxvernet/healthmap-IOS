@@ -550,14 +550,23 @@ struct MainTabView: View {
                 .environmentObject(dashboardVM)
                 .healthMapQuestionnaireSheet()
         }
+        // Quand la bulle d'écoute prend la main, TOUTE l'interface recule à
+        // 0,94 (barre d'onglets comprise). Posé avant les surcouches : la
+        // bulle, elle, ne recule pas.
+        .modifier(ReculSousLaBulle())
         // Le tutoriel est posé ICI, APRÈS `mainInterface` : son voile couvre
         // donc AUSSI la barre d'onglets flottante (elle-même en overlay de
         // `mainInterface`). Ne jamais le remonter dans un onglet. Les cibles
         // (bouton +, carte apports, barre d'onglets) remontent par préférence.
+        //
+        // La scène d'écoute de la dictée partage ce repère : le bouton
+        // « Dicter » y devient la bulle, depuis son cadre exact dans la page.
         .overlayPreferenceValue(TutorielCibleKey.self) { ancres in
             GeometryReader { proxy in
                 TutorielOverlayPrincipal(service: tutoriel, ancres: ancres, proxy: proxy,
                                          journalVisible: selectedTab == .journal)
+                EcouteSurcouche(cadreBouton: ancres[.boutonDicter].map { proxy[$0] },
+                                taille: proxy.size)
             }
         }
         // La gratification après un ajout : surcouche de la racine (le Journal
@@ -590,6 +599,16 @@ struct MainTabView: View {
                     showPaywallFromDeepLink = true
                 })
                 .zIndex(60)
+            }
+        }
+        // Un repas dicté vient d'être rangé : la pastille le confirme en haut
+        // de l'écran, par-dessus tout. La toucher ouvre ce repas. Repartie
+        // seule, elle laisse la place à l'offre : un repas dicté compte autant
+        // qu'un autre (les autres ajouts la proposent après leur gratification).
+        .overlay(alignment: .top) {
+            PastilleConfirmation(onPartie: { proposerOffre() }) { creneau in
+                selectedTab = .journal
+                NotificationCenter.default.post(name: .healthmapOuvrirRepas, object: creneau.rawValue)
             }
         }
         // Fix: onAppear doesn't re-fire when the questionnaire is completed
