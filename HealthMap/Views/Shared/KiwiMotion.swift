@@ -39,7 +39,7 @@ extension Animation {
     /// Vif : appuis, bascules, sélection.
     static let kiwiVif = Animation.spring(response: 0.28, dampingFraction: 0.86)
 
-    /// Fluide : feuilles, morphing de la bulle d'écoute, recul de la page.
+    /// Fluide : feuilles et grandes surfaces qui s'installent.
     static let kiwiFluide = Animation.spring(response: 0.5, dampingFraction: 0.9)
 
     /// Rebond : célébrations uniquement (coche, étiquettes, confirmation).
@@ -60,10 +60,6 @@ enum KiwiEchelle {
     static let recompenseCrete: CGFloat = 1.08
     /// Une carte dont la valeur vient de changer : impulsion, puis retour.
     static let impulsion: CGFloat = 1.035
-    /// La page, quand la bulle d'écoute prend la main.
-    static let recul: CGFloat = 0.94
-    /// La bulle d'écoute, au plus fort de la voix.
-    static let voix: CGFloat = 1.07
     /// Le plafond de tout ce qui précède.
     static let plafond: CGFloat = 1.08
 }

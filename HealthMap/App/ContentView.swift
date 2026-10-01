@@ -557,17 +557,13 @@ struct MainTabView: View {
         .onChange(of: dashboardVM.questionnaireOuvert) { _, ouvert in
             if !ouvert { dashboardVM.repriseBilan = questionnaireVM.repriseBilan }
         }
-        // Quand la bulle d'écoute prend la main, TOUTE l'interface recule à
-        // 0,94 (barre d'onglets comprise). Posé avant les surcouches : la
-        // bulle, elle, ne recule pas.
-        .modifier(ReculSousLaBulle())
         // Le tutoriel est posé ICI, APRÈS `mainInterface` : son voile couvre
         // donc AUSSI la barre d'onglets flottante (elle-même en overlay de
         // `mainInterface`). Ne jamais le remonter dans un onglet. Les cibles
         // (bouton +, carte apports, barre d'onglets) remontent par préférence.
         //
-        // La scène d'écoute de la dictée partage ce repère : le bouton
-        // « Dicter » y devient la bulle, depuis son cadre exact dans la page.
+        // La scène d'écoute de la dictée partage ce repère : la bulle kiwi s'y
+        // pose juste au-dessus du bouton « Dicter », d'après son cadre exact.
         .overlayPreferenceValue(TutorielCibleKey.self) { ancres in
             GeometryReader { proxy in
                 TutorielOverlayPrincipal(service: tutoriel, ancres: ancres, proxy: proxy,

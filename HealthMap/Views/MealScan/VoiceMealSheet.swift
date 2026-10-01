@@ -257,8 +257,8 @@ struct VoiceMealSheet: View {
 
     // MARK: - 2. Analyse
 
-    /// La bulle d'écoute s'est contractée en indicateur de calcul et a disparu
-    /// sous cette feuille : le pépin qui tourne prend son relais. Dès que la
+    /// La bulle d'écoute s'est effacée et cette feuille est montée : le pépin
+    /// qui tourne prend son relais. Dès que la
     /// dictée est transcrite, ce qui a été dit arrive mot à mot, du flou au
     /// net — la preuve qu'on a été entendu, pendant que le serveur chiffre.
     private var analyzingView: some View {

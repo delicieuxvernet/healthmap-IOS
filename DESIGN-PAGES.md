@@ -65,7 +65,7 @@
 >   quatre lignes** (protéines · glucides · lipides · fibres) avec objectif et **surplus en hachures,
 >   lu selon l'objectif de la personne** (vert seulement pour les protéines de qui veut prendre du
 >   muscle, orangé sinon ; fibres : référence canonique 30 g) · **la saisie SUR la page** : « Dicter »
->   (seule surface verte — **le bouton DEVIENT la bulle d'écoute** (voir « Dicter, être écouté,
+>   (seule surface verte — **la bulle kiwi surgit au-dessus du bouton** (voir « Dicter, être écouté,
 >   être félicité » plus bas) : **un toucher = mains libres, on touche la bulle pour terminer ; un
 >   appui maintenu = elle vit tant que le doigt tient, relâcher analyse, glisser à gauche jette,
 >   glisser vers le haut verrouille** ; `AppuiDicter`, seuils `DicteeGeste`) et « Photographier », puis « Autres façons d'ajouter » qui déplie Écrire ·
@@ -78,16 +78,19 @@
 > - **Dicter, être écouté, être félicité** (maquette « Kiwio - Motion » du 1er octobre 2026 ;
 >   `EcouteDictee.swift`, `CelebrationAjout.swift`, jetons dans `KiwiMotion.swift`) — la séquence la
 >   plus utilisée, animée de bout en bout :
->   1. **le bouton devient la bulle** : le rectangle r22 de « Dicter » s'étire en un cercle de 132 pt
->      au bas de l'écran (ressort fluide), **toute l'interface recule à 0,94** derrière un voile flou
->      (`ReculSousLaBulle`, posé à la racine : la barre d'onglets recule aussi). Le bouton d'origine
->      n'est jamais retiré de la page, seulement masqué : l'appui maintenu garde son geste ;
->   2. **la bulle écoute** : son échelle suit le niveau RÉEL du micro (1 → 1,07), une aura liquide à
->      trois harmoniques déborde derrière, cinq barres vivent sous le micro, « Kiwio t'écoute » et le
->      minuteur au-dessus. Mains libres : « Touche la bulle pour terminer » + « Annuler ». Maintenu :
->      « Relâche pour lancer l'analyse » ;
->   3. **le calcul** : la bulle se contracte en indicateur (0,42, arc qui tourne) et disparaît sous
->      la feuille d'analyse ; la dictée transcrite s'y relit **mot à mot, du flou au net**
+>   1. **la bulle surgit** (maquette « bulle kiwi » du 2 octobre 2026, d'après la bulle vocale de
+>      Snapchat ; elle remplace la grande scène du 1er octobre : plus de voile, la page ne recule
+>      plus) : une tranche de kiwi de 84 pt apparaît juste au-dessus du bouton « Dicter »
+>      (0,62 → 1, ressort vif). Le bouton d'origine n'est jamais retiré de la page, seulement
+>      masqué sous la face d'écoute : l'appui maintenu garde son geste ;
+>   2. **la bulle écoute** : ses douze graines s'allongent avec le niveau RÉEL du micro (chaque
+>      mesure entre par la graine de droite et fait le tour), le cœur gonfle à peine, un arc naît
+>      en haut à droite, s'allonge jusqu'à 85° et tourne en 1,7 s. Le doigt posé, la bulle le suit
+>      à l'horizontale et s'estompe vers l'annulation. Le bouton porte le minuteur et le geste :
+>      maintenu, « ‹‹ Glisse pour annuler » et « Relâche pour envoyer » ; mains libres, « Touche
+>      pour terminer » et une croix qui jette la dictée ;
+>   3. **le calcul** : la bulle rétrécit et s'efface en 0,15 s, la feuille d'analyse monte ; la
+>      dictée transcrite s'y relit **mot à mot, du flou au net**
 >      (`MotsQuiArrivent`). ⚠️ Les mots n'arrivent PAS pendant qu'on parle : la capture enregistre
 >      d'abord et transcrit ensuite (voir `SpeechCaptureService`), décision conservée ;
 >   4. **les résultats** : aliments en cascade (80 ms), total qui compte, aliments reconnus en vert

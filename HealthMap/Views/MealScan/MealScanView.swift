@@ -624,8 +624,8 @@ struct JournalView: View {
                 .padding(.top, 8)
 
             // La photo en attente d'analyse vit ici, sous le titre. La dictée,
-            // elle, n'est plus dans la page : le bouton Dicter devient la bulle
-            // d'écoute, posée par la racine (`EcouteDictee.swift`).
+            // elle, n'est plus dans la page : la bulle d'écoute surgit au-dessus
+            // du bouton Dicter, posée par la racine (`EcouteDictee.swift`).
             if let message = messageSaisie {
                 Text(message.texte)
                     .font(.dsLegendeMoyenne)
@@ -1170,7 +1170,7 @@ struct JournalView: View {
 
     /// Démarre une dictée. VERROUILLÉE (toucher bref, VoiceOver) : mains
     /// libres, on touche la bulle pour terminer. Non verrouillée (appui
-    /// maintenu) : elle vit tant que le doigt tient. Le bouton devient la bulle
+    /// maintenu) : elle vit tant que le doigt tient. La bulle surgit
     /// TOUT DE SUITE ; le micro s'ouvre derrière — aucune attente perçue.
     private func demarrerDictee(verrouillee: Bool) {
         guard !dicteeEnCours else { return }
@@ -1188,7 +1188,7 @@ struct JournalView: View {
         dicteeEnCours = true
         dicteeVerrouillee = verrouillee
         erreurDictee = nil
-        // Le bouton devient la bulle : impact doux, comme une surface qui cède.
+        // La bulle surgit : impact doux, comme une surface qui cède.
         HapticService.shared.tap()
         EcouteCentre.partage.ouvrir(
             speech: dicteeBox.speech,
@@ -1217,9 +1217,9 @@ struct JournalView: View {
         }
     }
 
-    /// Clôt la dictée : trop courte, la bulle retourne dans son bouton sans
-    /// faire attendre ; sinon elle se contracte en indicateur de calcul et la
-    /// feuille monte sur l'analyse de ce qui vient d'être enregistré.
+    /// Clôt la dictée : trop courte, la bulle s'efface sans faire attendre ;
+    /// sinon elle s'efface et la feuille monte sur l'analyse de ce qui vient
+    /// d'être enregistré.
     private func terminerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
@@ -1240,17 +1240,17 @@ struct JournalView: View {
             showVoice = true
             return
         }
-        // La contraction se voit, PUIS la feuille monte et la recouvre. Le
-        // micro reste ouvert ces 220 ms : c'est la feuille qui le referme.
+        // La bulle s'efface, PUIS la feuille monte. Le micro reste ouvert ces
+        // 220 ms : c'est la feuille qui le referme.
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(220))
             showVoice = true
         }
     }
 
-    /// Annulation volontaire (« Annuler » sous la bulle, ou glissé à gauche) :
-    /// on jette l'enregistrement sans message d'erreur — c'est un choix, pas un
-    /// raté. La bulle redevient le bouton.
+    /// Annulation volontaire (la croix du bouton, ou glissé à gauche) : on
+    /// jette l'enregistrement sans message d'erreur — c'est un choix, pas un
+    /// raté. La bulle s'efface, le bouton reprend sa face.
     private func annulerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
