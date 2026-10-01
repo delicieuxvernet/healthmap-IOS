@@ -183,6 +183,9 @@ struct BilanEchelle: View {
                     BilanTuile(emoji: option.emoji, titre: option.titre, choisie: option.id == valeur, enLigne: true) {
                         choisir(option.id)
                     }
+                    // Seule sur sa ligne, une tuile garde sa hauteur : elle
+                    // ne doit pas s'étirer pour remplir l'écran.
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         } else {
@@ -260,6 +263,7 @@ struct BilanGrille: View {
                 BilanTuile(emoji: option.emoji, titre: option.titre, choisie: choisies.contains(option.id), enLigne: true) {
                     choisir(option.id)
                 }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
