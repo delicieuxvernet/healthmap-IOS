@@ -125,6 +125,8 @@ final class MealJournalViewModel: ObservableObject {
             // le réseau (retour d'Arthur du 19 sept. : « il arrive au bout
             // d'une minute »).
             BriefDuJourStore.memoriserRepas(all)
+            // Et les widgets : les calories par repas d'aujourd'hui.
+            SynchroWidgets.memoriserRepas(all)
             meals = all.filter { Calendar.current.isDateInToday($0.consumedAt) }
             jourLePlusAncienCharge = min(jourLePlusAncienCharge, cal.startOfDay(for: from))
             jourLePlusRecentCharge = max(jourLePlusRecentCharge, cal.startOfDay(for: to))

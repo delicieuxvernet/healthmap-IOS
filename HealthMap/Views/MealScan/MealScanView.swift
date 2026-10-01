@@ -387,6 +387,40 @@ struct JournalView: View {
             Button("Choisir dans la galerie") { showPhotoLibrary = true }
             Button("Annuler", role: .cancel) {}
         }
+        // Un widget a demandé un geste du Journal (dicter, photographier, un
+        // repas précis). `@Published` émet AVANT d'écrire sa valeur : on la lit
+        // au tour suivant. Posé ici, hors de la longue chaîne du `body`.
+        .onReceive(RouteurWidgets.partage.$pourLeJournal) { lien in
+            guard lien != nil else { return }
+            DispatchQueue.main.async { ouvrirDepuisWidget() }
+        }
+    }
+
+    /// Sert le geste demandé par un widget. Un widget parle toujours
+    /// d'AUJOURD'HUI : le journal y revient s'il affichait un autre jour. Une
+    /// saisie déjà en cours garde la main.
+    private func ouvrirDepuisWidget() {
+        guard let lien = RouteurWidgets.partage.prendrePourLeJournal() else { return }
+        guard !saisieOuverte, !dicteeEnCours else { return }
+        if !isTodaySelected {
+            Task { await journal.allerAuJour(Date()) }
+        }
+        switch lien {
+        case .repas(let brut):
+            if let slot = MealJournalService.MealSlot(rawValue: brut) { repasOuvert = slot }
+        case .dicter:
+            demarrerDictee(verrouillee: true)
+        case .photo:
+            if CameraPicker.isAvailable {
+                showCaptureChoice = true
+            } else {
+                showPhotoLibrary = true
+            }
+        case .rechercher:
+            showSearch = true
+        case .journal, .complements:
+            break
+        }
     }
 
     // MARK: - Pill série (barre de navigation)

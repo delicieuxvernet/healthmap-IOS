@@ -96,6 +96,14 @@ struct ContentView: View {
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             handleUniversalLink(activity)
         }
+        // Un widget ou l'activité en direct a ouvert l'app sur un écran précis
+        // (`healthmap://widget/…`). Posé sur la racine pour la même raison que
+        // les liens universels : le lien attend que les onglets existent. Les
+        // autres liens du schéma (retour de connexion Google) ne sont pas lus ici.
+        .onOpenURL { url in
+            guard let lien = LienKiwio(url: url) else { return }
+            RouteurWidgets.partage.recevoir(lien)
+        }
         // Session-expiry notice. `AuthViewModel.startRefreshTimer` flips this
         // flag right before signing out when the refresh token has been
         // revoked or expired (10-minute background tick). Surfacing the
@@ -684,6 +692,12 @@ struct MainTabView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapJournalAllerAuJour)) { _ in
                 selectedTab = .journal
             }
+            // Un widget a demandé un écran. `@Published` émet AVANT d'écrire sa
+            // valeur : on la lit au tour suivant, une fois posée.
+            .onReceive(RouteurWidgets.partage.$enAttente) { lien in
+                guard lien != nil else { return }
+                DispatchQueue.main.async { servirLienWidget() }
+            }
             .sheet(isPresented: $afficheInvitationNotifs, onDismiss: armerTutoriel) {
                 InvitationNotificationsSheet(cible: ciblesDuBilan?.first)
             }
@@ -696,6 +710,28 @@ struct MainTabView: View {
         BriefDuJourStore.memoriserPrenom(dashboardVM.firstName)
         proposerBrief()
         replanifierRappels()
+        // Les widgets et l'activité en direct : on applique ce qui a été
+        // touché pendant que l'app dormait, puis on réécrit la journée.
+        Task { await SynchroWidgets.synchroniser(dashboardVM) }
+    }
+
+    /// Un widget a ouvert l'app sur un écran précis. Comme pour une
+    /// notification, le brief s'efface devant l'intention : on est venu dicter,
+    /// pas lire. Jamais par-dessus le questionnaire, le récap ou le tutoriel.
+    private func servirLienWidget() {
+        guard let lien = RouteurWidgets.partage.prendre() else { return }
+        guard !dashboardVM.questionnaireOuvert, !dashboardVM.recapArme, !afficheRecap,
+              tutoriel.etape == nil else { return }
+        briefReporte = true
+        let briefOuvert = afficheBrief
+        afficheBrief = false
+        let versComplements = (lien == LienKiwio.complements)
+        selectedTab = versComplements ? Tab.complements : Tab.journal
+        guard !versComplements, lien != LienKiwio.journal else { return }
+        // Le brief finit de sortir avant qu'une feuille ne monte.
+        DispatchQueue.main.asyncAfter(deadline: .now() + (briefOuvert ? 0.5 : 0.05)) {
+            RouteurWidgets.partage.confierAuJournal(lien)
+        }
     }
 
     private func replanifierRappels() {
@@ -814,6 +850,7 @@ struct MainTabView: View {
             && !dashboardVM.recapArme
             && !dashboardVM.questionnaireOuvert
             && tutoriel.etape == nil
+            && RouteurWidgets.partage.enAttente == nil
             && !BriefDuJourStore.dejaVuAujourdhui()
     }
 
