@@ -289,13 +289,16 @@ struct BilanPuces: View {
                 }
             }
         } else {
-            DSFlow(espacement: 6) {
+            // Chaque puce porte sa marge (cible de 44 points) : le flux n'en
+            // ajoute pas, sinon la liste des symptômes ne tient plus à l'écran.
+            DSFlow(espacement: 0) {
                 ForEach(choix) { option in
                     BilanPuce(choix: option, cochee: choisies.contains(option.id)) {
                         basculer(option.id)
                     }
                 }
             }
+            .padding(.horizontal, -2)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -331,6 +334,7 @@ struct BilanPuce: View {
             .overlay(Capsule().strokeBorder(cochee ? teinte.vive : Color.clear, lineWidth: 1.5))
             // La cible tactile déborde de la puce : 44 points de haut.
             .padding(.vertical, 4)
+            .padding(.horizontal, 2)
             .contentShape(Rectangle())
         }
         .buttonStyle(.dsPress)

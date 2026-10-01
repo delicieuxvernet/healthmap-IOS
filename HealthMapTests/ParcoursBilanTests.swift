@@ -246,6 +246,14 @@ final class ParcoursBilanTests: XCTestCase {
         XCTAssertEqual(ParcoursBilan.texteReste(secondes: 238), "encore ~4 min")
     }
 
+    func testLeTempsRestantSeDitAussiAVoixHaute() {
+        XCTAssertEqual(ParcoursBilan.texteResteVocal(secondes: 0), "")
+        XCTAssertEqual(ParcoursBilan.texteResteVocal(secondes: 30), "encore moins d'une minute")
+        XCTAssertEqual(ParcoursBilan.texteResteVocal(secondes: 60), "encore environ 1 minute")
+        XCTAssertEqual(ParcoursBilan.texteResteVocal(secondes: 90), "encore environ 1 minute 30")
+        XCTAssertEqual(ParcoursBilan.texteResteVocal(secondes: 204), "encore environ 3 minutes 30")
+    }
+
     /// La promesse de l'accueil est celle des portes de l'app : « bilan 3 min ».
     func testLeParcoursSAnnonceEnTroisMinutes() {
         XCTAssertEqual(ParcoursBilan.minutesAnnoncees(contexte()), 3)

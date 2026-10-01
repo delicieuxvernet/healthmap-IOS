@@ -34,6 +34,20 @@ struct BilanRepasView: View {
     }
 
     var body: some View {
+        ScrollViewReader { defilement in
+            contenu
+                // L'aliment qu'on vient de toucher reste visible quand la
+                // barre des trois mots monte par-dessus le bas de la grille.
+                .onChange(of: selection) { _, nouvelle in
+                    guard let nouvelle else { return }
+                    withAnimation(reduceMotion ? nil : .kiwiFluide) {
+                        defilement.scrollTo(nouvelle, anchor: .center)
+                    }
+                }
+        }
+    }
+
+    private var contenu: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 BilanTitre(titre: repas.titre, pourquoi: "Coche ce que tu prends d'habitude.")
@@ -53,6 +67,7 @@ struct BilanRepasView: View {
                     ) {
                         toucher(aliment.id)
                     }
+                    .id(aliment.id)
                 }
 
                 Button {

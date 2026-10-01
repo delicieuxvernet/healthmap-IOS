@@ -368,6 +368,18 @@ enum ParcoursBilan {
         return demiMinutes % 2 == 1 ? "encore ~\(minutes) min 30" : "encore ~\(minutes) min"
     }
 
+    /// Le même temps restant, pour VoiceOver : « ~2 min 30 » se lit mal.
+    static func texteResteVocal(secondes: Int) -> String {
+        guard secondes > 0 else { return "" }
+        if secondes < 50 { return "encore moins d'une minute" }
+        let demiMinutes = Int((Double(secondes) / 30).rounded())
+        let minutes = demiMinutes / 2
+        let mot = minutes > 1 ? "minutes" : "minute"
+        return demiMinutes % 2 == 1
+            ? "encore environ \(minutes) \(mot) 30"
+            : "encore environ \(minutes) \(mot)"
+    }
+
     /// Durée du parcours entier, arrondie à la minute : « Environ 3 minutes ».
     static func minutesAnnoncees(_ c: ContexteBilan) -> Int {
         let total = ecrans(c).filter { !$0.estAffinage }.reduce(0) { $0 + $1.duree }

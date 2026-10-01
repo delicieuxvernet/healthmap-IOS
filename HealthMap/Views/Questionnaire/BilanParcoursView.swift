@@ -150,11 +150,24 @@ struct BilanParcoursView: View {
                 .minimumScaleFactor(0.8)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 30)
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(chapitreVocal(chapitre))
             }
         }
         .padding(.horizontal, 6)
         .padding(.top, 6)
+    }
+
+    /// La même ligne, dite à voix haute : « ~2 min » se lit mal.
+    private func chapitreVocal(_ chapitre: String) -> String {
+        var phrase = chapitre
+        let reste = ParcoursBilan.texteResteVocal(
+            secondes: ParcoursBilan.secondesRestantes(depuis: ecran, viewModel.contexteBilan)
+        )
+        if !reste.isEmpty { phrase += ", \(reste)" }
+        let pistes = viewModel.lectureBilan.pistes.count
+        if pistes > 0 { phrase += pistes == 1 ? ", 1 piste repérée" : ", \(pistes) pistes repérées" }
+        return phrase
     }
 
     /// Le nom de l'étape en cours. `nil` sur l'accueil et sur la fin.
