@@ -34,7 +34,7 @@ final class WidgetsPartageTests: XCTestCase {
         InstantaneJour(
             jour: jour, connecte: true, bilanFait: true, kcalObjectif: 2100,
             kcalParCreneau: ["breakfast": 420, "lunch": 820], serie: 4,
-            eau: InstantaneJour.Eau(verres: 3, objectif: 8),
+            eau: InstantaneJour.Eau(verres: 3, objectif: 8, centilitres: 25),
             rituel: [
                 .init(id: "iron", nom: "Fer", moment: "matin", fait: true),
                 .init(id: "vitD", nom: "Vitamine D", moment: "matin", fait: false),
@@ -51,7 +51,8 @@ final class WidgetsPartageTests: XCTestCase {
 
         XCTAssertEqual(affiche.jour, "2026-10-02")
         XCTAssertEqual(affiche.kcalConsommees, 0, "Les calories d'hier ne sont pas celles d'aujourd'hui")
-        XCTAssertEqual(affiche.eau, InstantaneJour.Eau(verres: 0, objectif: 8), "L'eau repart de zéro, l'objectif reste")
+        XCTAssertEqual(affiche.eau, InstantaneJour.Eau(verres: 0, objectif: 8, centilitres: 25),
+                       "L'eau repart de zéro, l'objectif reste")
         XCTAssertTrue(affiche.rituel.allSatisfy { !$0.fait }, "Le rituel se décoche chaque matin")
         XCTAssertEqual(affiche.rituel.map(\.id), ["iron", "vitD", "magnesium"], "Sa composition ne change pas à minuit")
         XCTAssertEqual(affiche.kcalObjectif, 2100)
@@ -156,6 +157,29 @@ final class WidgetsPartageTests: XCTestCase {
         // Complet : le bouton ne décoche rien.
         BoiteCommune.cocherProchainMoment()
         XCTAssertEqual(BoiteCommune.etatAffiche()?.prisesFaites, 3)
+    }
+
+    func testOnNeNotePasAuDelaDeLObjectif() {
+        // Comme le Journal : huit verres, pas neuf.
+        var pleine = journee(jour: BoiteCommune.cleDuJour())
+        pleine.eau = InstantaneJour.Eau(verres: 7, objectif: 8, centilitres: 25)
+        BoiteCommune.ecrireInstantane(pleine)
+
+        BoiteCommune.ajouterVerre()
+        BoiteCommune.ajouterVerre()
+        BoiteCommune.ajouterVerre()
+
+        XCTAssertEqual(BoiteCommune.etatAffiche()?.eau?.verres, 8)
+        XCTAssertEqual(BoiteCommune.lireAttente()?.verres, 1, "Les touchers en trop ne s'empilent pas dans l'attente")
+        XCTAssertEqual(BoiteCommune.etatAffiche()?.eau?.atteint, true)
+    }
+
+    func testLesLitresSEcriventCommeDansLeJournal() {
+        XCTAssertEqual(FormatW.litres(centilitres: 75), "0,75")
+        XCTAssertEqual(FormatW.litres(centilitres: 50), "0,5")
+        XCTAssertEqual(FormatW.litres(centilitres: 200), "2")
+        XCTAssertEqual(FormatW.litres(centilitres: 125), "1,25")
+        XCTAssertEqual(FormatW.litres(centilitres: 0), "0")
     }
 
     func testLaDeconnexionVideLaBoite() {

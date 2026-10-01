@@ -37,10 +37,17 @@ struct InstantaneJour: Codable, Hashable {
         var fait: Bool
     }
 
-    /// L'eau du jour. `nil` dans l'instantané = l'app ne suit pas l'eau.
+    /// L'eau du jour, en verres (les gobelets du Journal). `nil` dans
+    /// l'instantané = l'app ne suit pas l'eau.
     struct Eau: Codable, Hashable {
         var verres: Int
+        /// L'objectif du jour, qui est aussi le plafond : comme dans le
+        /// Journal, on ne note pas au-delà.
         var objectif: Int
+        /// Contenance d'un verre, en centilitres.
+        var centilitres: Int
+
+        var atteint: Bool { verres >= objectif }
     }
 
     /// Jour décrit, « yyyy-MM-dd » dans le fuseau du téléphone.
@@ -96,7 +103,9 @@ struct InstantaneJour: Codable, Hashable {
         if etat.jour != jourDemande {
             etat.jour = jourDemande
             etat.kcalParCreneau = [:]
-            if let eau = etat.eau { etat.eau = Eau(verres: 0, objectif: eau.objectif) }
+            if let eau = etat.eau {
+                etat.eau = Eau(verres: 0, objectif: eau.objectif, centilitres: eau.centilitres)
+            }
             etat.rituel = etat.rituel.map { prise in
                 var neuve = prise
                 neuve.fait = false
@@ -105,7 +114,8 @@ struct InstantaneJour: Codable, Hashable {
         }
         guard let attente, attente.jour == jourDemande else { return etat }
         if let eau = etat.eau, attente.verres != 0 {
-            etat.eau = Eau(verres: max(0, eau.verres + attente.verres), objectif: eau.objectif)
+            etat.eau = Eau(verres: min(eau.objectif, max(0, eau.verres + attente.verres)),
+                           objectif: eau.objectif, centilitres: eau.centilitres)
         }
         for id in attente.prisesBasculees {
             guard let index = etat.rituel.firstIndex(where: { $0.id == id }) else { continue }
@@ -317,7 +327,10 @@ enum BoiteCommune {
 
     // MARK: Gestes des widgets
 
+    /// Un verre de plus. Objectif atteint (ou eau non suivie) : rien, comme
+    /// dans le Journal, qui ne note pas au-delà.
     static func ajouterVerre() {
+        guard let eau = etatAffiche()?.eau, !eau.atteint else { return }
         modifierAttente { $0.verres += 1 }
     }
 
@@ -366,7 +379,7 @@ extension InstantaneJour {
         kcalObjectif: 2100,
         kcalParCreneau: ["breakfast": 420, "lunch": 820],
         serie: 4,
-        eau: Eau(verres: 3, objectif: 8),
+        eau: Eau(verres: 3, objectif: 8, centilitres: 25),
         rituel: [
             Prise(id: "iron", nom: "Fer", moment: "matin", fait: true),
             Prise(id: "vitD", nom: "Vitamine D", moment: "midi", fait: true),

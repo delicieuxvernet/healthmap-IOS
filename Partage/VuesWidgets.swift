@@ -20,8 +20,8 @@ enum TeinteW {
     static let vert = Color(red: 0x5D / 255.0, green: 0xA8 / 255.0, blue: 0x38 / 255.0)
     /// Orangé des calories et de la série (`dsCalories`).
     static let calories = Color(red: 1.0, green: 0x6B / 255.0, blue: 0x35 / 255.0)
-    /// Bleu de l'eau.
-    static let eau = Color(red: 0x2F / 255.0, green: 0x9B / 255.0, blue: 0xEA / 255.0)
+    /// Bleu de l'eau : la teinte système du Journal (`eauKiwio`).
+    static let eau = Color.cyan
     /// Fond d'une tuile neutre : une voile de l'encre, lisible en clair comme en sombre.
     static let tuile = Color.primary.opacity(0.07)
 
@@ -71,6 +71,16 @@ enum FormatW {
     static func fractionCalories(_ etat: InstantaneJour) -> Double {
         guard let objectif = etat.kcalObjectif, objectif > 0 else { return 0 }
         return min(1, max(0, Double(etat.kcalConsommees) / Double(objectif)))
+    }
+
+    /// `0,75` · `2` · `1,5` : des litres, à partir de centilitres (virgule
+    /// décimale, sans zéro inutile). Même écriture que la carte Eau du Journal.
+    static func litres(centilitres: Int) -> String {
+        let entiers = centilitres / 100
+        let reste = centilitres % 100
+        if reste == 0 { return "\(entiers)" }
+        if reste % 10 == 0 { return "\(entiers),\(reste / 10)" }
+        return "\(entiers)," + String(format: "%02d", reste)
     }
 
     /// Noms des compléments d'un moment, sans dose : « Fer + Vitamine D ».
@@ -444,7 +454,8 @@ struct VueDicterRonde: View {
 
 // MARK: - Eau
 
-/// Format petit : le compte du jour, sa jauge, et « Un verre ».
+/// Format petit : les litres du jour comme sur la carte Eau du Journal, la
+/// jauge, et un verre de plus d'un toucher.
 struct VueEauPetite: View {
     let etat: InstantaneJour?
 
@@ -461,35 +472,50 @@ struct VueEauPetite: View {
                 }
                 Spacer(minLength: 4)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(eau.verres)")
-                        .font(.system(size: 34, weight: .bold).monospacedDigit())
+                    Text("\(FormatW.litres(centilitres: eau.verres * eau.centilitres)) L")
+                        .font(.system(size: 30, weight: .bold).monospacedDigit())
                         .foregroundStyle(.primary)
-                    Text("/ \(eau.objectif) verres")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text("sur \(FormatW.litres(centilitres: eau.objectif * eau.centilitres)) L")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(eau.verres) verres sur \(eau.objectif)")
+                .accessibilityLabel("Eau : \(eau.verres) verres sur \(eau.objectif)")
                 JaugeW(fraction: eau.objectif > 0 ? Double(eau.verres) / Double(eau.objectif) : 0,
                        couleur: TeinteW.eau)
                     .padding(.top, 4)
                 Spacer(minLength: 8)
-                Button(intent: AjouterVerreIntent()) {
+                if eau.atteint {
                     HStack(spacing: 4) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("Un verre")
+                        Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(TeinteW.vert)
+                        Text("Objectif atteint")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
                     }
-                    .foregroundStyle(Color.white)
                     .frame(maxWidth: .infinity, minHeight: 32)
-                    .background(Capsule().fill(TeinteW.vert))
-                    .contentShape(Capsule())
+                    .background(Capsule().fill(TeinteW.tuile))
+                } else {
+                    Button(intent: AjouterVerreIntent()) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("\(eau.centilitres) cl")
+                                .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                        }
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .background(Capsule().fill(TeinteW.vert))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Ajouter un verre d'eau, \(eau.centilitres) centilitres")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Ajouter un verre d'eau")
             }
         } else {
             InvitationW(message: "Ouvre Kiwio pour suivre ton eau.")
@@ -646,7 +672,8 @@ struct VueActiviteJournee: View {
                 if let eau = etat.eau {
                     Button(intent: AjouterVerreEnDirectIntent()) {
                         PastilleActiviteW(symbole: "drop.fill", titre: "\(eau.verres) / \(eau.objectif)",
-                                          teinte: TeinteW.eau, accessoire: "plus")
+                                          teinte: TeinteW.eau,
+                                          accessoire: eau.atteint ? "checkmark.circle.fill" : "plus")
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Ajouter un verre d'eau. \(eau.verres) sur \(eau.objectif)")

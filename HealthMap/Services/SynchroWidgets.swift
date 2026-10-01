@@ -30,8 +30,8 @@ extension Notification.Name {
 /// l'instantané ne porte pas d'eau et les widgets n'en montrent pas.
 @MainActor
 enum PontEau {
-    /// Verres bus aujourd'hui et objectif du jour.
-    static var lire: (() -> (verres: Int, objectif: Int))?
+    /// Verres bus aujourd'hui, objectif du jour, contenance d'un verre (cl).
+    static var lire: (() -> (verres: Int, objectif: Int, centilitres: Int))?
     /// Ajoute des verres à aujourd'hui (geste venu d'un widget).
     static var ajouter: ((Int) -> Void)?
 }
@@ -153,7 +153,8 @@ enum SynchroWidgets {
             serie: contexte.serie,
             eau: PontEau.lire.map { lire in
                 let eau = lire()
-                return InstantaneJour.Eau(verres: eau.verres, objectif: eau.objectif)
+                return InstantaneJour.Eau(verres: eau.verres, objectif: eau.objectif,
+                                          centilitres: eau.centilitres)
             },
             rituel: prises(contexte.complements)
         )

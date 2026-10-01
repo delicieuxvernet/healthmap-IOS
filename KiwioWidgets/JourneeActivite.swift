@@ -52,7 +52,8 @@ struct JourneeActivite: Widget {
                             Button(intent: AjouterVerreEnDirectIntent()) {
                                 PastilleActiviteW(symbole: "drop.fill",
                                                   titre: "\(eau.verres) / \(eau.objectif)",
-                                                  teinte: TeinteW.eau, accessoire: "plus")
+                                                  teinte: TeinteW.eau,
+                                                  accessoire: eau.atteint ? "checkmark.circle.fill" : "plus")
                             }
                             .buttonStyle(.plain)
                         }
