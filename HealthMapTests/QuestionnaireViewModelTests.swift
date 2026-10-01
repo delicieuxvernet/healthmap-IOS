@@ -236,13 +236,67 @@ final class QuestionnaireViewModelTests: XCTestCase {
         // Fresh profile → symptoms (Q1, multi-choice, empty) is the first unanswered
         XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 0, "Fresh profile should resume at the first question")
 
-        // Answer symptoms + goals + firstName → une fois le prénom renseigné, la
-        // question « prénom » est masquée (déjà connu, App Review Gl. 4), donc la
-        // prochaine non répondue est age, désormais à l'index plat 2 (et non 3).
+        // Answer symptoms + goals + firstName → la question « prénom » RESTE
+        // dans le parcours une fois renseignée (elle ne se masque que si le
+        // compte connaissait déjà le prénom), donc la prochaine non répondue
+        // est age, à l'index plat 3.
         vm.updateAnswer(questionId: "symptoms", value: ["fatigue_chronic"])
         vm.updateAnswer(questionId: "goals", value: ["energie"])
         vm.updateAnswer(questionId: "firstName", value: "Lea")
-        XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 2, "Should resume at age; firstName is hidden once known")
+        XCTAssertEqual(vm.firstUnansweredQuestionIndex(), 3, "Should resume at age; firstName stays in the flow once typed")
+    }
+
+    // MARK: - Le prénom
+
+    /// Le bug du 17 juil. au 1er oct. 2026 : la question se masquait dès la
+    /// première lettre tapée (son `showIf` lisait le champ qu'elle remplit) et
+    /// l'écran passait à la question suivante. Taper un prénom lettre à lettre
+    /// ne doit JAMAIS changer la question affichée.
+    func testPrenom_laQuestionResteAfficheePendantLaSaisie() throws {
+        let index = try XCTUnwrap(vm.visibleQuestions.firstIndex { $0.id == "firstName" })
+        vm.currentQuestionIndex = index
+        let total = vm.totalQuestions
+
+        for saisie in ["L", "Lé", "Léa"] {
+            vm.updateAnswer(questionId: "firstName", value: saisie)
+            XCTAssertEqual(vm.currentQuestion?.id, "firstName", "« \(saisie) » : la question prénom doit rester à l'écran")
+            XCTAssertEqual(vm.totalQuestions, total, "« \(saisie) » : le parcours ne doit pas rétrécir pendant la saisie")
+        }
+        XCTAssertEqual(vm.profile.firstName, "Léa")
+    }
+
+    /// Quand le compte connaît déjà le prénom (inscription par e-mail, Sign in
+    /// with Apple), il est repris tel quel et la question n'est pas posée.
+    func testPrenomConnuDuCompte_laQuestionNEstPasPosee() {
+        XCTAssertTrue(vm.visibleQuestions.contains { $0.id == "firstName" }, "Sans prénom connu, la question est posée")
+
+        vm.adopterPrenomDuCompte("Thomas")
+
+        XCTAssertTrue(vm.prenomConnuDuCompte)
+        XCTAssertEqual(vm.profile.firstName, "Thomas")
+        XCTAssertFalse(vm.visibleQuestions.contains { $0.id == "firstName" }, "Prénom connu du compte : on ne le redemande pas")
+    }
+
+    /// Le prénom du compte remplace une lettre restée dans un draft : la
+    /// question étant masquée, personne ne pourrait plus la corriger.
+    func testPrenomConnuDuCompte_remplaceUneLettreResteeDansLeDraft() {
+        vm.updateAnswer(questionId: "firstName", value: "T")
+
+        vm.adopterPrenomDuCompte("Thomas")
+
+        XCTAssertEqual(vm.profile.firstName, "Thomas")
+    }
+
+    /// Retirer la question du parcours ne doit pas faire sauter la question en
+    /// cours : la liste perd un élément, l'index suit.
+    func testPrenomConnuDuCompte_neDeplacePasLaQuestionCourante() throws {
+        let index = try XCTUnwrap(vm.visibleQuestions.firstIndex { $0.id == "age" })
+        vm.currentQuestionIndex = index
+
+        vm.adopterPrenomDuCompte("Thomas")
+
+        XCTAssertEqual(vm.currentQuestion?.id, "age", "On reste sur la même question")
+        XCTAssertEqual(vm.currentQuestionIndex, index - 1, "L'index recule d'un cran avec la liste")
     }
 
     // MARK: - clearDraft
