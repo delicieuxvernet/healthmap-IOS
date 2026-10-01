@@ -2,11 +2,15 @@ import SwiftUI
 
 /// La fonction phare de Kiwio : on dicte son repas, l'app compte les calories.
 ///
-/// Trois états, comme le design (`Scan - kcal autonome.html`) :
-///   1. écoute   — bulle compacte : pilule waveform + minuteur
-///   2. analyse  — transcription du vocal puis « J'identifie tes aliments… »
-///   3. résultat — lignes compactes, UNE seule carte déployée à la fois,
-///                 total en direct, CTA bloqué tant qu'il manque une quantité.
+/// L'écoute vit hors de cette feuille (la bulle d'`EcouteDictee.swift`). Ici,
+/// trois états, animés selon la maquette « Motion » du 1er octobre 2026 :
+///   1. analyse  — transcription du vocal, relue mot à mot du flou au net,
+///                 puis « Je reconnais tes aliments… »
+///   2. résultat — lignes compactes posées en cascade, UNE seule carte
+///                 déployée à la fois, total qui compte, « Ce repas t'apporte »
+///                 en barres, CTA bloqué tant qu'il manque une quantité.
+///   3. ajouté   — la célébration (`CelebrationAjout`), puis la feuille
+///                 redescend d'elle-même.
 ///
 /// Cette vue ne calcule AUCUNE valeur nutritionnelle de son cru : tout part des
 /// valeurs pour 100 g renvoyées par l'edge function (base CIQUAL/OpenFoodFacts),
@@ -23,12 +27,29 @@ struct VoiceMealSheet: View {
     /// ICI et non sur la page : l'app ignore la zone du clavier à sa racine, un
     /// champ posé sur la page finissait caché derrière lui, sans sortie.
     var saisieAuClavier = false
+    /// Cibles du jour (profil) : les barres de « Ce repas t'apporte » disent
+    /// quelle part de la journée ce repas couvre. `nil` = les grammes seuls,
+    /// sans barre : jamais d'objectif inventé.
+    var cibleProteines: Int? = nil
+    var cibleGlucides: Int? = nil
+    var cibleLipides: Int? = nil
+    /// Ce que ce repas change aujourd'hui (apports, série), calculé par
+    /// l'appelant sur le journal déjà chargé. `nil` = rien d'honnête à dire :
+    /// la célébration se contente alors de confirmer l'ajout.
+    var gratification: ((MealJournalService.MealRecord) -> GratificationRepas?)? = nil
     /// Capture audio possédée par l'appelant. Elle est injectée — et non créée
     /// ici — pour que la dictée puisse DÉMARRER sur l'accueil, le doigt posé sur
     /// « Dicte ton repas », et se terminer dans cette feuille.
     @ObservedObject var speech: SpeechCaptureService
-    /// Appelé après enregistrement : (nb d'aliments ajoutés, kcal du repas).
-    var onAdded: (Int, Int) -> Void
+    /// Appelé après enregistrement, avant que la feuille ne fête puis se ferme.
+    var onAdded: (Ajout) -> Void
+
+    /// Ce que la feuille vient d'enregistrer.
+    struct Ajout: Equatable {
+        let nombre: Int
+        let kcal: Int
+        let creneau: MealJournalService.MealSlot
+    }
 
     @Environment(\.dismiss) private var dismiss
 
@@ -87,6 +108,11 @@ struct VoiceMealSheet: View {
     /// s'affiche, y compris quand l'utilisateur ajuste une quantité.
     @State private var compteurActif = false
     @State private var revelation: Task<Void, Never>?
+    /// Les aliments sont posés : les barres de « Ce repas t'apporte » se
+    /// remplissent, en cascade.
+    @State private var apportsPoses = false
+    /// Le repas est enregistré : de quoi le fêter dans la feuille.
+    @State private var fete: Fete?
 
     private let journal = MealJournalService.shared
 
@@ -95,7 +121,16 @@ struct VoiceMealSheet: View {
     // repas », bulle façon WhatsApp). La feuille ne s'ouvre qu'avec un audio
     // déjà capté et enchaîne directement transcription → analyse. L'ancien
     // mode écoute (le « popup » ouvert par un appui simple) est supprimé.
-    enum Phase { case saisie, analyzing, results, failed }
+    // `.ajoute` (1er octobre 2026) : le repas est enregistré, la feuille le
+    // fête deux secondes puis redescend d'elle-même.
+    enum Phase { case saisie, analyzing, results, failed, ajoute }
+
+    /// La célébration d'un ajout : où il a été rangé, et ce qu'il change.
+    struct Fete: Equatable {
+        let titre: String
+        let phrase: String
+        let etiquettes: [CelebrationAjout.Etiquette]
+    }
 
     struct RemplacementCible: Identifiable {
         let index: Int
@@ -111,6 +146,7 @@ struct VoiceMealSheet: View {
             case .analyzing: analyzingView
             case .results:   resultsView
             case .failed:    errorView
+            case .ajoute:    celebrationView
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -147,7 +183,9 @@ struct VoiceMealSheet: View {
 
     private var hauteurs: Set<PresentationDetent> {
         switch phaseAffichee {
-        case .analyzing: return [.height(300)]
+        // Assez haut pour ce qui vient d'être dit, relu mot à mot.
+        case .analyzing: return [.height(340)]
+        case .ajoute: return [.height(430)]
         case .saisie, .results, .failed: return [.large]
         }
     }
@@ -219,19 +257,39 @@ struct VoiceMealSheet: View {
 
     // MARK: - 2. Analyse
 
+    /// La bulle d'écoute s'est contractée en indicateur de calcul et a disparu
+    /// sous cette feuille : le pépin qui tourne prend son relais. Dès que la
+    /// dictée est transcrite, ce qui a été dit arrive mot à mot, du flou au
+    /// net — la preuve qu'on a été entendu, pendant que le serveur chiffre.
     private var analyzingView: some View {
         VStack(spacing: 12) {
-            Spacer()
+            Spacer(minLength: 0)
             KiwiLoader(size: 60)
-            Text("J'identifie tes aliments…")
+            Text("Je reconnais tes aliments…")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Color.dsTexte)
-            Text("kcal, macros et micros compris.")
-                .font(.footnote)
-                .foregroundStyle(Color.dsSecondaire)
-            Spacer()
+            if !saisieAuClavier, !dernierTranscript.isEmpty {
+                MotsQuiArrivent(texte: dernierTranscript)
+                    .padding(.top, 2)
+            } else {
+                Text("kcal, macros et micros compris.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.dsSecondaire)
+            }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
+    }
+
+    // MARK: - 4. L'ajout se fête
+
+    @ViewBuilder
+    private var celebrationView: some View {
+        if let fete {
+            CelebrationAjout(titre: fete.titre, phrase: fete.phrase, etiquettes: fete.etiquettes) {
+                dismiss()
+            }
+        }
     }
 
     // MARK: - 3. Résultat
@@ -244,10 +302,12 @@ struct VoiceMealSheet: View {
                     .foregroundStyle(Color.dsTexte)
                     .padding(.top, 18)
 
-                Text("« \(quotedTranscript) »")
+                // Ce qui a été dit, avec les aliments reconnus en vert.
+                Text(transcriptSurligne)
                     .font(.system(size: 14))
                     .italic()
                     .foregroundStyle(Color.dsSecondaire)
+                    .accessibilityLabel(quotedTranscript)
 
                 ForEach(itemsAffiches) { item in
                     VoiceItemRow(
@@ -273,7 +333,7 @@ struct VoiceMealSheet: View {
                             if deployee == item.index { deployee = prochainManquant() }
                         }
                     )
-                    .transition(.opacity.combined(with: .offset(y: 10)))
+                    .transition(.opacity.combined(with: .offset(y: 14)))
                 }
 
                 if !estimatedNames.isEmpty {
@@ -393,15 +453,55 @@ struct VoiceMealSheet: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.dsTertiaire)
             }
-            HStack(spacing: 7) {
-                MacroPill("P", totaux.proteines, Kiwio.proteines, Kiwio.proteinesFond)
-                MacroPill("G", totaux.glucides, Kiwio.glucides, Kiwio.glucidesFond)
-                MacroPill("L", totaux.lipides, Kiwio.lipides, Kiwio.lipidesFond)
+
+            Rectangle()
+                .fill(Color.dsSeparateur)
+                .frame(height: 0.5)
+
+            // « Ce repas t'apporte » : quatre lignes qui se remplissent en
+            // cascade une fois les aliments posés, puis suivent en direct la
+            // moindre quantité corrigée.
+            Text("Ce repas t'apporte")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.dsSecondaire)
+            VStack(spacing: 10) {
+                ForEach(Array(apportsDuRepas.enumerated()), id: \.element.id) { rang, ligne in
+                    LigneApportRepas(ligne: ligne, posee: apportsPoses, rang: rang)
+                }
+            }
+            if apportsDuRepas.contains(where: { $0.cible != nil }) {
+                Text("Chaque barre : la part de ton objectif du jour.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.dsTertiaire)
             }
         }
         .padding(14)
         .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14))
         .padding(.top, 4)
+    }
+
+    /// Les macros du repas, face aux cibles du jour quand le profil en donne.
+    /// Mêmes noms, mêmes couleurs et même référence de fibres que la carte des
+    /// macros du Journal : c'est elle qui va bouger à l'enregistrement.
+    private var apportsDuRepas: [JournalMacrosCard.Ligne] {
+        let repas = totaux
+        return JournalMacrosCard.lignesDuJour(
+            proteines: repas.proteines, glucides: repas.glucides,
+            lipides: repas.lipides, fibres: repas.fibres,
+            cibleProteines: cibleProteines, cibleGlucides: cibleGlucides, cibleLipides: cibleLipides,
+            veutDuMuscle: false
+        )
+    }
+
+    /// La citation de la dictée, les aliments reconnus passés en vert.
+    private var transcriptSurligne: AttributedString {
+        var texte = AttributedString("« \(quotedTranscript) »")
+        for item in visibleItems {
+            guard let dit = item.libelle, dit.count >= 2,
+                  let plage = texte.range(of: dit, options: [.caseInsensitive, .diacriticInsensitive]) else { continue }
+            texte[plage].swiftUI.foregroundColor = Color.dsAccent
+        }
+        return texte
     }
 
     @ViewBuilder
@@ -693,8 +793,8 @@ struct VoiceMealSheet: View {
     }
 
     /// Total recalculé à chaque interaction, à partir des valeurs pour 100 g.
-    private var totaux: (kcal: Int, proteines: Double, glucides: Double, lipides: Double) {
-        var k = 0.0, p = 0.0, g = 0.0, l = 0.0
+    private var totaux: (kcal: Int, proteines: Double, glucides: Double, lipides: Double, fibres: Double) {
+        var k = 0.0, p = 0.0, g = 0.0, l = 0.0, fi = 0.0
         for item in visibleItems where !aVerifier(item) {
             guard let poids = grams[item.index], poids > 0, let cent = item.per100 else { continue }
             let f = poids / 100
@@ -702,8 +802,10 @@ struct VoiceMealSheet: View {
             p += cent.proteines * f
             g += cent.glucides * f
             l += cent.lipides * f
+            fi += cent.fibres * f
         }
-        return (Int(k.rounded()), (p * 10).rounded() / 10, (g * 10).rounded() / 10, (l * 10).rounded() / 10)
+        return (Int(k.rounded()), (p * 10).rounded() / 10, (g * 10).rounded() / 10,
+                (l * 10).rounded() / 10, (fi * 10).rounded() / 10)
     }
 
     // MARK: - Actions
@@ -770,6 +872,7 @@ struct VoiceMealSheet: View {
         guard !reduceMotion else {
             revelees = items.count
             compteurActif = false
+            apportsPoses = true
             return
         }
         let nombre = visibleItems.count
@@ -777,6 +880,7 @@ struct VoiceMealSheet: View {
         revelees = 0
         kcalAffiche = 0
         compteurActif = true
+        apportsPoses = false
         // Les aliments se posent ET le total monte EN MÊME TEMPS. Avant, le
         // compteur ne démarrait qu'après les N × 250 ms de la pose : la ligne
         // « Total du repas » affichait 0 kcal pendant 1 à 6 secondes, juste
@@ -785,18 +889,22 @@ struct VoiceMealSheet: View {
         // chiffres du même bloc se contredisaient à l'écran.
         revelation = Task { @MainActor in
             let intervalle: Double = 0.03            // 30 ms
-            let posePar: Double = 0.25               // un aliment toutes les 250 ms
-            let duree = max(Double(nombre) * posePar, 0.48)
+            // Cascade de la maquette « Motion » : un aliment toutes les 80 ms,
+            // le total qui compte un peu plus longtemps qu'eux.
+            let posePar: Double = 0.08
+            let duree = max(Double(nombre) * posePar + 0.35, 0.6)
             let tics = max(1, Int((duree / intervalle).rounded()))
             for tic in 1...tics {
                 try? await Task.sleep(nanoseconds: UInt64(intervalle * 1_000_000_000))
                 guard !Task.isCancelled else { return }
                 let poses = min(nombre, Int(Double(tic) * intervalle / posePar))
                 if poses != revelees {
-                    withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+                    withAnimation(.kiwiFluide) {
                         revelees = poses
                     }
                 }
+                // Le dernier aliment est posé : les barres se remplissent.
+                if poses >= nombre, !apportsPoses { apportsPoses = true }
                 if cible > 0 {
                     kcalAffiche = Int((Double(cible) * Double(tic) / Double(tics)).rounded())
                 }
@@ -804,6 +912,7 @@ struct VoiceMealSheet: View {
             guard !Task.isCancelled else { return }
             revelees = items.count
             compteurActif = false
+            apportsPoses = true
         }
     }
 
@@ -878,9 +987,27 @@ struct VoiceMealSheet: View {
             MealJournalViewModel.signalerEcriture()
             NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
 
+            // Pendant le tutoriel, c'est lui qui prend la suite ; en mode Zen,
+            // on ne fête rien. Dans les deux cas la feuille redescend aussitôt.
+            let sansFete = TutorielService.partage.etape != nil || GamificationService.shared.isZenMode
+            let kcal = totaux.kcal
             TutorielService.partage.repasEnregistre()
-            onAdded(entries.count, totaux.kcal)
-            dismiss()
+            onAdded(Ajout(nombre: entries.count, kcal: kcal, creneau: slot))
+            guard !sansFete else {
+                dismiss()
+                return
+            }
+            let agregats = MealJournalService.aggregatesFromItems(entries)
+            let repas = MealJournalService.MealRecord(
+                id: "ajout-\(UUID().uuidString)",
+                consumedAt: MealJournalService.horodatage(jour: jour, slot: slot),
+                slot: slot,
+                items: entries,
+                macros: agregats.macros,
+                micros: agregats.micros
+            )
+            fete = Self.composerFete(creneau: slot, kcal: kcal, gratification: gratification?(repas))
+            phase = .ajoute
         } catch {
             errorMessage = "L'enregistrement a échoué. Réessaie."
             phase = .failed
@@ -888,27 +1015,89 @@ struct VoiceMealSheet: View {
     }
 }
 
-// MARK: - Pastille macro
+// MARK: - La fête d'un ajout
 
-private struct MacroPill: View {
-    let lettre: String
-    let valeur: Double
-    let teinte: Color
-    let fond: Color
+extension VoiceMealSheet {
+    /// Titre, phrase et étiquettes de la célébration. Le total du repas est
+    /// toujours là ; l'apport qui remonte et la série seulement s'ils existent.
+    static func composerFete(creneau: MealJournalService.MealSlot,
+                             kcal: Int,
+                             gratification: GratificationRepas?) -> Fete {
+        var etiquettes = [
+            CelebrationAjout.Etiquette(id: "kcal", symbole: "fork.knife",
+                                       texte: "+\(DS.entier(kcal)) kcal", teinte: Color.dsCalories),
+        ]
+        if let gain = gratification?.gains.first {
+            etiquettes.append(CelebrationAjout.Etiquette(
+                id: "apport", symbole: "arrow.up.right",
+                texte: "\(gain.nom) \(DS.delta(gain.apres - gain.avant))",
+                teinte: Color.nutrientColor(for: gain.id)
+            ))
+        }
+        if let jours = gratification?.serie {
+            etiquettes.append(CelebrationAjout.Etiquette(
+                id: "jours", symbole: "flame.fill", texte: "\(jours) jours", teinte: Color.dsCalories
+            ))
+        }
+        return Fete(titre: creneau.libelleAjout,
+                    phrase: gratification?.phrase ?? "C'est compté dans ta journée.",
+                    etiquettes: etiquettes)
+    }
+}
 
-    init(_ lettre: String, _ valeur: Double, _ teinte: Color, _ fond: Color) {
-        self.lettre = lettre; self.valeur = valeur; self.teinte = teinte; self.fond = fond
+// MARK: - Une ligne de « Ce repas t'apporte »
+
+/// Le nom, la valeur qui compte, et — quand le profil donne une cible — une
+/// barre qui se remplit à hauteur de la part de l'objectif du jour. Les lignes
+/// arrivent en cascade (80 ms) une fois les aliments posés.
+private struct LigneApportRepas: View {
+    let ligne: JournalMacrosCard.Ligne
+    /// Les aliments sont posés : la ligne peut se remplir.
+    let posee: Bool
+    let rang: Int
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var grammes: Int { Int(ligne.grammes.rounded()) }
+
+    private var fraction: Double {
+        guard let cible = ligne.cible, cible > 0 else { return 0 }
+        return min(1, ligne.grammes / cible)
     }
 
     var body: some View {
-        HStack(spacing: 3) {
-            Text(lettre).font(.system(size: 11, weight: .bold))
-            Text("\(valeur, specifier: "%.0f") g").font(.kiwioMono(11, .semibold))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(ligne.nom)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.dsTexte)
+                Spacer(minLength: 8)
+                ChiffreQuiCompte(valeur: posee ? Double(grammes) : 0, format: { "\(DS.entier($0)) g" })
+                    .font(.kiwioMono(14, .semibold))
+                    .foregroundStyle(Color.dsTexte)
+            }
+            if ligne.cible != nil {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.dsRemplissage)
+                        Capsule()
+                            .fill(LinearGradient(colors: ligne.teintes, startPoint: .leading, endPoint: .trailing))
+                            .frame(width: geo.size.width * (posee ? fraction : 0))
+                    }
+                }
+                .frame(height: 6)
+            }
         }
-        .foregroundStyle(teinte)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .background(fond, in: Capsule())
+        .animation(reduceMotion ? nil : Animation.kiwiFluide.delay(0.08 * Double(rang)), value: posee)
+        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: grammes)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(libelleVocal)
+    }
+
+    private var libelleVocal: String {
+        guard let cible = ligne.cible, cible > 0 else { return "\(ligne.nom) : \(grammes) grammes." }
+        let part = Int((fraction * 100).rounded())
+        return "\(ligne.nom) : \(grammes) grammes, \(part) pour cent de ton objectif du jour."
     }
 }
 
@@ -1288,60 +1477,6 @@ private struct BoutonPas: View {
     }
 }
 
-// MARK: - Micro vivant (halo piloté par le volume réel)
-
-/// Gros micro entouré de deux halos dont le rayon suit le NIVEAU SONORE mesuré
-/// (`SpeechCaptureService.level`), pas une boucle décorative : quand on parle,
-/// ça s'ouvre ; quand on se tait, ça retombe. C'est le repère « je suis
-/// écouté » qui manquait — l'équivalent du retour visuel d'un vocal Instagram
-/// ou Snapchat. Sous « Réduire les animations », le halo reste fixe.
-struct MicroVivant: View {
-    /// Niveau instantané 0…1 publié par le service de capture.
-    let level: Float
-    let active: Bool
-    /// Doigt posé : le bouton s'enfonce légèrement, comme un vocal Instagram.
-    var pressed: Bool = false
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// Niveau borné et légèrement rehaussé : une voix normale doit déjà faire
-    /// respirer le halo, sinon on croit que rien ne se passe.
-    private var amplitude: CGFloat {
-        guard active else { return 0 }
-        return min(1, max(0, CGFloat(level)) * 1.6)
-    }
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color.dsAccent.opacity(0.10))
-                .frame(width: 96, height: 96)
-                .scaleEffect(reduceMotion ? 1 : 1 + amplitude * 0.30)
-
-            Circle()
-                .fill(Color.dsAccent.opacity(0.16))
-                .frame(width: 76, height: 76)
-                .scaleEffect(reduceMotion ? 1 : 1 + amplitude * 0.18)
-
-            Circle()
-                .fill(active ? Color.dsAccent : Color.dsSecondaire)
-                .frame(width: 68, height: 68)
-                .scaleEffect(pressed ? 0.94 : 1)
-                .shadow(color: active ? Color.dsAccent.opacity(0.35) : .clear,
-                        radius: 12, x: 0, y: 6)
-
-            Image(systemName: "mic.fill")
-                .font(.system(size: 28, weight: .semibold))
-                .foregroundStyle(.white)
-                .scaleEffect(pressed ? 0.94 : 1)
-        }
-        .frame(height: 104)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: amplitude)
-        .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.7), value: pressed)
-        .accessibilityHidden(true)
-    }
-}
-
 // MARK: - Point d'enregistrement
 
 /// Point rouge qui bat, comme sur un enregistreur. Première preuve que l'app
@@ -1361,63 +1496,6 @@ struct PointEnregistrement: View {
             )
             .onAppear { actif = true }
             .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Waveform
-
-/// Waveform pilotée par le VOLUME RÉEL du micro.
-///
-/// Le premier jet était une animation décorative en boucle : joli, mais ça ne
-/// prouvait rien — on ne savait pas si l'app écoutait vraiment. Ici chaque barre
-/// suit le niveau sonore mesuré sur le buffer audio, comme les mémos vocaux
-/// d'iMessage : quand on se tait, ça retombe à ~3 pt ; quand on parle, ça monte.
-struct Waveform: View {
-    /// Niveau instantané 0…1 publié par SpeechCaptureService.
-    let level: Float
-    let active: Bool
-    /// Nombre de barres : 44 dans la feuille vocale (pleine largeur), moins
-    /// dans la bulle de l'accueil Scan où la place est comptée.
-    let nbBarres: Int
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Historique glissant : la barre la plus à droite est l'instant présent,
-    /// les autres défilent vers la gauche — d'où l'effet de « trace sonore ».
-    @State private var historique: [CGFloat]
-
-    private static let hauteurMin: CGFloat = 3
-    private static let hauteurMax: CGFloat = 26
-
-    init(level: Float, active: Bool, nbBarres: Int = 44) {
-        self.level = level
-        self.active = active
-        self.nbBarres = nbBarres
-        _historique = State(initialValue: Array(repeating: 0, count: nbBarres))
-    }
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(Array(historique.enumerated()), id: \.offset) { _, h in
-                Capsule()
-                    .fill(Color.dsAccent.opacity(active ? 1 : 0.35))
-                    .frame(
-                        width: 2.5,
-                        height: Self.hauteurMin + h * (Self.hauteurMax - Self.hauteurMin)
-                    )
-            }
-        }
-        .frame(height: Self.hauteurMax, alignment: .center)
-        .frame(maxWidth: .infinity)
-        .animation(reduceMotion ? nil : .linear(duration: 0.08), value: historique)
-        .onChange(of: level) { _, nouveau in
-            guard active else { return }
-            historique.removeFirst()
-            historique.append(CGFloat(max(0, min(1, nouveau))))
-        }
-        .onChange(of: active) { _, estActif in
-            if !estActif { historique = Array(repeating: 0, count: nbBarres) }
-        }
-        .accessibilityHidden(true)
     }
 }
 

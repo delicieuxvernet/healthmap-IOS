@@ -56,8 +56,8 @@ struct JournalView: View {
     /// ⚠️ Détenu par une BOÎTE non observante, pas par un `@StateObject` direct.
     /// `SpeechCaptureService` publie `level` ET `duree` toutes les 50 ms
     /// pendant un enregistrement : observé ici, il invalidait TOUTE la page
-    /// 20 fois par seconde. Seule la bulle d'enregistrement a besoin de ce
-    /// flux : elle s'y abonne elle-même (`BulleDictee`).
+    /// 20 fois par seconde. Seule la bulle d'écoute a besoin de ce flux :
+    /// elle s'y abonne elle-même (`EcouteDictee.swift`).
     @StateObject private var dicteeBox = DicteeBox()
     private var speech: SpeechCaptureService { dicteeBox.speech }
     /// Miroir local de `speech.error` : la page ne suivant plus le service, le
@@ -77,7 +77,12 @@ struct JournalView: View {
         nonmutating set { dicteeBox.geste.glissement = newValue }
     }
     @State private var demarrageDictee: Task<Void, Never>?
-    @State private var voiceConfirmation: String?
+    /// Le repas que la feuille de dictée vient d'enregistrer. La page ne bouge
+    /// qu'à la fermeture de la feuille : c'est là que la pastille confirme et
+    /// que la carte des calories compte jusqu'à sa nouvelle valeur.
+    @State private var ajoutVocal: VoiceMealSheet.Ajout?
+    /// Compteur d'ajouts : fait gonfler la carte des calories (1,035).
+    @State private var impulsionKcal = 0
     /// Découverte (V12e) : la porte bilan du résultat de scan doit d'abord
     /// refermer le sheet résultat — ce drapeau fait ouvrir la feuille
     /// questionnaire (racine) à la fermeture, jamais par-dessus le sheet.
@@ -118,8 +123,16 @@ struct JournalView: View {
     /// quantité corrigée. On ne fête qu'un AJOUT — un repas que le jour affiché
     /// ne connaissait pas —, aujourd'hui, hors tutoriel et hors mode Zen.
     private func rechargerEtCelebrer() async {
+        // La feuille de dictée fête elle-même son ajout, et la page ne se met à
+        // jour qu'à sa fermeture (`apresFeuilleVocale`) : sinon la carte des
+        // calories compterait cachée derrière elle.
+        guard !showVoice, !showTexte else { return }
+
         let connus = Set(journal.dayMeals.map(\.id))
         await journal.load()
+        if journalCharge, journal.dayMeals.contains(where: { !connus.contains($0.id) }) {
+            impulsionKcal += 1
+        }
 
         guard journalCharge,
               Calendar.current.isDateInToday(journal.selectedDay),
@@ -145,6 +158,33 @@ struct JournalView: View {
         GratificationCentre.partage.courante = gratification
     }
 
+    /// Ce que le repas dicté change aujourd'hui, calculé sur le journal déjà
+    /// chargé (aucun réseau) : la feuille s'en sert pour ses étiquettes.
+    private func gratificationDe(_ repas: MealJournalService.MealRecord) -> GratificationRepas? {
+        GratificationRepas.calculer(
+            nouveau: repas,
+            repasDuJour: journal.dayMeals,
+            apportsARenforcer: dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id),
+            quinzaine: journal.fortnight
+        )
+    }
+
+    /// La feuille de dictée (ou d'écriture) vient de redescendre. Si elle a
+    /// enregistré un repas : la pastille confirme en haut de l'écran, la page
+    /// se recharge, la carte des calories gonfle et compte.
+    private func apresFeuilleVocale() {
+        guard let ajout = ajoutVocal else { return }
+        ajoutVocal = nil
+        // Pendant le tutoriel, c'est lui qui parle : pas de pastille par-dessus.
+        if TutorielService.partage.etape == nil {
+            ConfirmationCentre.partage.courante = ConfirmationAjout(creneau: ajout.creneau, kcal: ajout.kcal)
+        }
+        Task {
+            await journal.load()
+            impulsionKcal += 1
+        }
+    }
+
     /// Le résultat du scan est présenté en bottom-sheet : ouvert dès qu'une
     /// analyse est prête, fermé → `reset()`.
     private var resultBinding: Binding<Bool> {
@@ -157,9 +197,6 @@ struct JournalView: View {
     var body: some View {
         NavigationStack {
             scaffold
-                .overlay(alignment: .top) { bulleMaintenue }
-                .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.75), value: dicteeEnCours)
-                .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8), value: dicteeVerrouillee)
                 .kiwiTabBarBottomInset()
                 // « Modifier » sur la carte de gratification : la fiche de ce repas.
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapOuvrirRepas)) { note in
@@ -214,33 +251,39 @@ struct JournalView: View {
                 .sheet(item: $selectedApport) { apport in
                     ApportV2DetailSheet(apport: apport)
                 }
-                .sheet(isPresented: $showVoice) {
+                .sheet(isPresented: $showVoice, onDismiss: { apresFeuilleVocale() }) {
                     if let uid = AuthService.shared.cachedCurrentUserIdString {
                         VoiceMealSheet(
                             userId: uid,
                             jour: journal.selectedDay,
+                            cibleProteines: dashboardVM.physicalMetrics.macros?.protein,
+                            cibleGlucides: dashboardVM.physicalMetrics.macros?.carbs,
+                            cibleLipides: dashboardVM.physicalMetrics.macros?.fat,
+                            gratification: { gratificationDe($0) },
                             speech: speech
-                        ) { count, kcal in
-                            voiceConfirmation = "\(count) aliment\(count > 1 ? "s" : "") ajouté\(count > 1 ? "s" : "") · \(kcal) kcal"
+                        ) { ajout in
+                            ajoutVocal = ajout
                             // Le quota ne se décompte QUE si la dictée a abouti
                             // à un enregistrement — un essai annulé ne coûte rien.
                             VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
-                            Task { await journal.load() }
                         }
                     }
                 }
-                .sheet(isPresented: $showTexte) {
+                .sheet(isPresented: $showTexte, onDismiss: { apresFeuilleVocale() }) {
                     if let uid = AuthService.shared.cachedCurrentUserIdString {
                         VoiceMealSheet(
                             userId: uid,
                             jour: journal.selectedDay,
                             saisieAuClavier: true,
+                            cibleProteines: dashboardVM.physicalMetrics.macros?.protein,
+                            cibleGlucides: dashboardVM.physicalMetrics.macros?.carbs,
+                            cibleLipides: dashboardVM.physicalMetrics.macros?.fat,
+                            gratification: { gratificationDe($0) },
                             speech: speech
-                        ) { count, kcal in
-                            voiceConfirmation = "\(count) aliment\(count > 1 ? "s" : "") ajouté\(count > 1 ? "s" : "") · \(kcal) kcal"
+                        ) { ajout in
+                            ajoutVocal = ajout
                             // Même quota que la dictée : c'est la même analyse.
                             VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
-                            Task { await journal.load() }
                         }
                     }
                 }
@@ -527,16 +570,9 @@ struct JournalView: View {
             barreDeJour
                 .padding(.top, 8)
 
-            // La dictée mains libres et la photo en attente d'analyse vivent
-            // ici, sous le titre : visibles, jamais par-dessus la page.
-            // Mains libres : la bulle vit ici. Maintenue : elle flotte au-dessus
-            // de la page (`bulleMaintenue`), visible même si on a fait défiler.
-            if dicteeEnCours, dicteeVerrouillee {
-                bulleDictee
-                    .padding(.top, 16)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-            }
-
+            // La photo en attente d'analyse vit ici, sous le titre. La dictée,
+            // elle, n'est plus dans la page : le bouton Dicter devient la bulle
+            // d'écoute, posée par la racine (`EcouteDictee.swift`).
             if let message = messageSaisie {
                 Text(message.texte)
                     .font(.dsLegendeMoyenne)
@@ -565,7 +601,8 @@ struct JournalView: View {
                     onActivite: {
                         HapticService.shared.tap()
                         showActivite = true
-                    }
+                    },
+                    impulsion: impulsionKcal
                 )
                 .padding(.top, 16)
 
@@ -637,12 +674,12 @@ struct JournalView: View {
         }
     }
 
-    /// Message de suivi de saisie (confirmation de dictée ou d'ajout, erreur
-    /// de dictée) : une ligne sous le semainier, jamais une fenêtre.
+    /// Message de suivi de saisie (confirmation d'ajout, erreur de dictée) :
+    /// une ligne sous le semainier, jamais une fenêtre. Un repas dicté, lui,
+    /// est confirmé par la pastille du haut de l'écran (`ConfirmationCentre`).
     private var messageSaisie: (texte: String, erreur: Bool)? {
         if let erreur = erreurDictee { return (erreur.message, true) }
-        if dicteeTropCourte { return ("Trop court. Parle un peu plus longtemps, puis touche Analyser.", true) }
-        if let voiceConfirmation { return (voiceConfirmation, false) }
+        if dicteeTropCourte { return ("Trop court. Parle un peu plus longtemps, puis touche la bulle.", true) }
         if let addFoodConfirmation { return (addFoodConfirmation, false) }
         return nil
     }
@@ -868,31 +905,6 @@ struct JournalView: View {
         )
     }
 
-    private var bulleDictee: some View {
-        BulleDictee(
-            speech: dicteeBox.speech,
-            geste: dicteeBox.geste,
-            verrouillee: dicteeVerrouillee,
-            onAnnuler: { annulerDictee() },
-            onTerminer: { terminerDictee() }
-        )
-        .dsCard()
-    }
-
-    /// La bulle d'écoute de l'appui maintenu : elle surgit en haut de l'écran
-    /// (jamais sous la main) et vit tant que le doigt tient.
-    @ViewBuilder
-    private var bulleMaintenue: some View {
-        if dicteeEnCours, !dicteeVerrouillee {
-            bulleDictee
-                .shadow(color: Color.black.opacity(0.12), radius: 18, y: 8)
-                .padding(.horizontal, DS.marge)
-                .padding(.top, 8)
-                .transition(reduceMotion ? .opacity
-                            : .scale(scale: 0.7, anchor: .top).combined(with: .opacity))
-        }
-    }
-
     /// Le doigt glisse pendant l'appui : à gauche on jette, vers le haut on
     /// verrouille (mains libres). Mêmes seuils que la bulle (`DicteeGeste`).
     private func glisserDictee(_ deplacement: CGSize) {
@@ -905,6 +917,7 @@ struct JournalView: View {
             HapticService.shared.selection()
             glissementDictee = .zero
             dicteeVerrouillee = true
+            EcouteCentre.partage.verrouiller()
         case .continuer:
             break
         }
@@ -918,9 +931,9 @@ struct JournalView: View {
     }
 
     /// Démarre une dictée. VERROUILLÉE (toucher bref, VoiceOver) : mains
-    /// libres, la bulle et ses boutons prennent la main. Non verrouillée (appui
-    /// maintenu) : elle vit tant que le doigt tient. La bulle apparaît TOUT DE
-    /// SUITE ; le micro s'ouvre derrière — aucune attente perçue.
+    /// libres, on touche la bulle pour terminer. Non verrouillée (appui
+    /// maintenu) : elle vit tant que le doigt tient. Le bouton devient la bulle
+    /// TOUT DE SUITE ; le micro s'ouvre derrière — aucune attente perçue.
     private func demarrerDictee(verrouillee: Bool) {
         guard !dicteeEnCours else { return }
         guard peutDicter else {
@@ -933,12 +946,19 @@ struct JournalView: View {
         }
         dicteeTropCourte = false
         dicteeAnnulee = false
-        voiceConfirmation = nil
         glissementDictee = .zero
         dicteeEnCours = true
         dicteeVerrouillee = verrouillee
         erreurDictee = nil
-        HapticService.shared.primary()
+        // Le bouton devient la bulle : impact doux, comme une surface qui cède.
+        HapticService.shared.tap()
+        EcouteCentre.partage.ouvrir(
+            speech: dicteeBox.speech,
+            geste: dicteeBox.geste,
+            mainsLibres: verrouillee,
+            onTerminer: { terminerDictee() },
+            onAnnuler: { annulerDictee() }
+        )
         // Autorisations et quota passés : le voile du tutoriel se lève.
         TutorielService.partage.dicteeDemarree()
         Task {
@@ -953,14 +973,15 @@ struct JournalView: View {
             if speech.state != .listening {
                 dicteeEnCours = false
                 dicteeVerrouillee = false
+                EcouteCentre.partage.rendreLeBouton()
                 TutorielService.partage.dicteeJetee()
             }
         }
     }
 
-    /// Clôt la dictée : trop courte, on annule sans faire attendre ; sinon la
-    /// feuille s'ouvre directement sur l'analyse de ce qui vient d'être
-    /// enregistré.
+    /// Clôt la dictée : trop courte, la bulle retourne dans son bouton sans
+    /// faire attendre ; sinon elle se contracte en indicateur de calcul et la
+    /// feuille monte sur l'analyse de ce qui vient d'être enregistré.
     private func terminerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
@@ -971,15 +992,27 @@ struct JournalView: View {
             HapticService.shared.warning()
             speech.reset()
             dicteeTropCourte = true
+            EcouteCentre.partage.rendreLeBouton()
             TutorielService.partage.dicteeJetee()
             return
         }
-        HapticService.shared.strong()
-        showVoice = true
+        HapticService.shared.lightTap()
+        EcouteCentre.partage.contracter()
+        guard !reduceMotion else {
+            showVoice = true
+            return
+        }
+        // La contraction se voit, PUIS la feuille monte et la recouvre. Le
+        // micro reste ouvert ces 220 ms : c'est la feuille qui le referme.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(220))
+            showVoice = true
+        }
     }
 
-    /// Annulation volontaire (poubelle de la bulle) : on jette l'enregistrement
-    /// sans message d'erreur — c'est un choix, pas un raté.
+    /// Annulation volontaire (« Annuler » sous la bulle, ou glissé à gauche) :
+    /// on jette l'enregistrement sans message d'erreur — c'est un choix, pas un
+    /// raté. La bulle redevient le bouton.
     private func annulerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
@@ -988,6 +1021,7 @@ struct JournalView: View {
         glissementDictee = .zero
         HapticService.shared.warning()
         speech.reset()
+        EcouteCentre.partage.rendreLeBouton()
         TutorielService.partage.dicteeJetee()
     }
 
@@ -1952,50 +1986,6 @@ enum DicteeGeste {
     }
 }
 
-// MARK: - Indices de geste de la bulle vocale
-
-/// « Glisse pour annuler », qui ondule vers la gauche — l'indice de geste des
-/// vocaux WhatsApp/Instagram. Immobile sous « Réduire les animations ».
-private struct IndiceGlisser: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var decale = false
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 12, weight: .semibold))
-            Text("Glisse pour annuler")
-                .font(.system(size: 12.5, weight: .medium))
-        }
-        .foregroundStyle(Color.dsSecondaire)
-        .offset(x: decale ? -6 : 0)
-        .animation(
-            reduceMotion ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
-            value: decale
-        )
-        .onAppear { decale = true }
-        .accessibilityHidden(true)
-    }
-}
-
-/// Capsule verrou au-dessus du micro : glisser vers le haut fige
-/// l'enregistrement mains libres, le doigt peut lâcher.
-private struct IndiceVerrou: View {
-    var body: some View {
-        VStack(spacing: 2) {
-            Image(systemName: "lock")
-                .font(.system(size: 11, weight: .semibold))
-            Image(systemName: "chevron.up")
-                .font(.system(size: 10, weight: .semibold))
-        }
-        .foregroundStyle(Color.dsSecondaire)
-        .padding(.vertical, 6)
-        .padding(.horizontal, 8)
-        .background(Color.dsRemplissage, in: Capsule())
-        .accessibilityHidden(true)
-    }
-}
-
 #Preview {
     JournalView()
         .environmentObject(DashboardViewModel())
@@ -2018,100 +2008,4 @@ final class DicteeBox: ObservableObject {
 @MainActor
 final class GesteDictee: ObservableObject {
     @Published var glissement: CGSize = .zero
-}
-
-// MARK: - Bulle d'enregistrement (le seul abonné au flux du micro)
-/// La bulle d'enregistrement, DANS la carte à deux colonnes — le voile sombre
-/// et la carte flottante d'avant faisaient pop-up, exactement ce que les vocaux
-/// WhatsApp/Instagram ne font pas. Ici la carte se transforme sur place : le
-/// micro gonfle sous le doigt et suit le glissement, la colonne photo laisse
-/// place à la waveform, au minuteur et aux indices.
-///
-/// Vue SÉPARÉE, et c'est le point : elle est la seule à observer `speech` et
-/// `geste`, donc la seule que le niveau sonore (20 Hz) et le glissement du
-/// doigt (120 Hz) réinvalident.
-private struct BulleDictee: View {
-    @ObservedObject var speech: SpeechCaptureService
-    @ObservedObject var geste: GesteDictee
-    let verrouillee: Bool
-    let onAnnuler: () -> Void
-    let onTerminer: () -> Void
-
-    var body: some View {
-        HStack(spacing: 16) {
-            VStack(spacing: 4) {
-                if !verrouillee {
-                    IndiceVerrou()
-                }
-                MicroVivant(
-                    level: speech.level,
-                    active: speech.state == .listening,
-                    pressed: !verrouillee
-                )
-                // La bulle suit le doigt vers la gauche et s'estompe à
-                // l'approche du seuil — on sent l'annulation venir.
-                .offset(x: max(DicteeGeste.seuilAnnulation, min(0, geste.glissement.width)))
-                .opacity(Double(max(0.25, 1 + min(0, geste.glissement.width) / 140)))
-            }
-
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(spacing: 8) {
-                    PointEnregistrement()
-                    Text(verrouillee ? "Mains libres" : "Je t'écoute…")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(Color.dsTexte)
-                    Spacer(minLength: 0)
-                    Text(String(format: "%d:%02d", Int(speech.duree) / 60, Int(speech.duree) % 60))
-                        .font(.kiwioMono(13, .medium))
-                        .foregroundStyle(Color.dsSecondaire)
-                }
-
-                // 28 barres : la trace tient dans la colonne droite de la
-                // carte même sur l'écran le plus étroit (SE), sans rognage.
-                Waveform(level: speech.level, active: speech.state == .listening, nbBarres: 28)
-
-                if verrouillee {
-                    HStack(spacing: 10) {
-                        Button {
-                            HapticService.shared.tap()
-                            onAnnuler()
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(Kiwio.rouge)
-                                .frame(width: 44, height: 44)
-                                .background(Color.dsRemplissage, in: Circle())
-                        }
-                        .buttonStyle(.healthMapPressed)
-                        .accessibilityLabel("Jeter la dictée")
-
-                        Button {
-                            HapticService.shared.tap()
-                            onTerminer()
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.up")
-                                    .font(.system(size: 15, weight: .bold))
-                                Text("Analyser")
-                                    .font(.system(size: 15, weight: .semibold))
-                            }
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(Color.dsAccent, in: Capsule())
-                        }
-                        .buttonStyle(.healthMapPressed)
-                        .accessibilityLabel("Envoyer à l'analyse")
-                    }
-                } else {
-                    IndiceGlisser()
-                }
-            }
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(verrouillee
-                            ? "Enregistrement mains libres."
-                            : "Enregistrement en cours. Relâche pour lancer l'analyse.")
-    }
 }

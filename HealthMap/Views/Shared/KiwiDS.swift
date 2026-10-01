@@ -51,8 +51,8 @@ enum DS {
 
     // MARK: Mouvement
 
-    /// État d'appui : 0,97 + assombrissement, ressort court.
-    static let ressortAppui = Animation.spring(response: 0.3, dampingFraction: 0.7)
+    /// État d'appui : 0,96 + assombrissement, ressort « vif » (`KiwiMotion`).
+    static let ressortAppui = Animation.kiwiVif
     /// Remplissage des jauges et anneaux à l'apparition.
     static let remplissage = Animation.easeOut(duration: 1.0)
     /// Décalage en cascade entre éléments d'une même carte.
@@ -240,21 +240,21 @@ extension View {
     }
 }
 
-// MARK: - État d'appui (0,97 + assombrissement, 120 ms)
+// MARK: - État d'appui (0,96 + assombrissement, ressort « vif »)
 
 struct DSPressStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1))
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? KiwiEchelle.appui : 1))
             .brightness(configuration.isPressed ? -0.04 : 0)
             .animation(DS.ressortAppui, value: configuration.isPressed)
     }
 }
 
 extension ButtonStyle where Self == DSPressStyle {
-    /// Style d'appui du DS refonte : `scaleEffect(0.97)` + assombrissement.
+    /// Style d'appui du DS refonte : `scaleEffect(0.96)` + assombrissement.
     static var dsPress: DSPressStyle { DSPressStyle() }
 }
 
