@@ -89,10 +89,10 @@ private struct ActivitePerimee: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Nouvelle journée")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.primary)
                 Text("Ouvre Kiwio pour la commencer.")
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondary)
             }
             Spacer(minLength: 0)
         }

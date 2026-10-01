@@ -14,6 +14,10 @@ import AppIntents
 // chiffres sont à chasse tabulaire, aucun complément ne porte de dose.
 // Différence assumée : un widget suit le mode clair ou sombre du téléphone,
 // alors que l'app reste claire. Les couleurs sont donc sémantiques.
+//
+// Les encres s'écrivent `Color.primary` / `Color.secondary`, jamais `.primary` /
+// `.secondary` : ces derniers sont des NIVEAUX de la teinte courante, et dans
+// un `Link` ou un `Button` la teinte courante est le bleu des liens.
 
 enum TeinteW {
     /// Vert Kiwio (`kiwiGreen`).
@@ -98,7 +102,7 @@ struct MarqueW: View {
             KiwiSigne(taille: 16)
             Text("Kiwio")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Kiwio")
@@ -117,7 +121,7 @@ struct SerieW: View {
                     .foregroundStyle(TeinteW.calories)
                 Text("\(serie)")
                     .font(.system(size: 13, weight: .bold).monospacedDigit())
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.primary)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Série : \(serie) jours")
@@ -168,12 +172,12 @@ struct TuileCreneauW: View {
             }
             Text(creneau.libelle)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary)
                 .lineLimit(1)
             if kcal > 0 {
                 Text("\(FormatW.entier(kcal)) kcal")
                     .font(.system(size: 11).monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             } else if !compacte {
@@ -229,7 +233,7 @@ struct InvitationW: View {
             KiwiSigne(taille: 30)
             Text(message)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -257,10 +261,10 @@ struct VueJourneeMoyenne: View {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(calories.nombre)
                         .font(.system(size: 28, weight: .bold).monospacedDigit())
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.primary)
                     Text(calories.legende)
                         .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Spacer(minLength: 6)
@@ -298,12 +302,12 @@ struct VueJourneePetite: View {
                 Spacer(minLength: 6)
                 Text(calories.nombre)
                     .font(.system(size: 34, weight: .bold).monospacedDigit())
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text(calories.legende)
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Spacer(minLength: 8)
@@ -344,13 +348,13 @@ struct VueJourneeRectangulaire: View {
                 if let ligne = secondeLigne(etat) {
                     Text(ligne)
                         .font(.system(size: 12).monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.secondary)
                         .lineLimit(1)
                 }
             } else {
                 Text("Ouvre l'app pour commencer")
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -429,7 +433,7 @@ struct VueDicterPetite: View {
                 .background(Circle().fill(TeinteW.vert))
             Text("Dicter un repas")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
@@ -468,18 +472,18 @@ struct VueEauPetite: View {
                         .foregroundStyle(TeinteW.eau)
                     Text("Eau")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.secondary)
                 }
                 Spacer(minLength: 4)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(FormatW.litres(centilitres: eau.verres * eau.centilitres)) L")
                         .font(.system(size: 30, weight: .bold).monospacedDigit())
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Text("sur \(FormatW.litres(centilitres: eau.objectif * eau.centilitres)) L")
                         .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
@@ -496,7 +500,7 @@ struct VueEauPetite: View {
                             .foregroundStyle(TeinteW.vert)
                         Text("Objectif atteint")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.primary)
                     }
                     .frame(maxWidth: .infinity, minHeight: 32)
                     .background(Capsule().fill(TeinteW.tuile))
@@ -576,7 +580,7 @@ struct LigneMomentW: View {
                 if detail {
                     Text(prises.isEmpty ? "Rien à prendre" : FormatW.noms(prises))
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.secondary)
                         .lineLimit(1)
                 }
             }
@@ -616,11 +620,11 @@ struct VueRituel: View {
                 HStack {
                     Text("Rituel du jour")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.secondary)
                     Spacer(minLength: 4)
                     Text("\(etat.prisesFaites) / \(etat.rituel.count)")
                         .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.primary)
                         .accessibilityLabel("\(etat.prisesFaites) sur \(etat.rituel.count)")
                 }
                 ForEach(MomentRituel.allCases) { moment in
@@ -651,7 +655,7 @@ struct VueActiviteJournee: View {
                 Spacer(minLength: 6)
                 Text("\(calories.nombre) \(calories.legende)")
                     .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 SerieW(serie: etat.serie)
