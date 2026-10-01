@@ -86,7 +86,11 @@ struct LigneMicro: Equatable, Identifiable {
     let partDuQuestionnaire: Bool
     let besoin: Double
     /// Quantité notée sur la journée affichée ; nil = aucun aliment ne la renseigne.
+    /// Pour un rapport : le rapport de la journée affichée.
     let quantiteDuJour: Double?
+    /// Pour un rapport seulement : sa valeur sur les repas notés (« 12 » pour
+    /// 12 g d'oméga-6 par gramme d'oméga-3). nil = pas encore mesurable.
+    let rapport: Double?
     let semaine: [JourMicro]
     let statut: StatutMicro
     let faits: [FaitMicro]
@@ -148,6 +152,13 @@ enum MicrosDuJour {
 
         var lignes: [LigneMicro] = []
         for micro in Micronutriments.tous {
+            if micro.sens == .rapport {
+                lignes.append(ligneDuRapport(
+                    micro, semaine: semaine, quinzaine: quinzaine, jour: jour,
+                    jourEstAujourdhui: jour == aujourdhui, journees: journees, depense: contexte.depense
+                ))
+                continue
+            }
             let besoin = contexte.besoins[micro.id] ?? 0
 
             func couverture(le date: Date) -> Double? {
@@ -201,6 +212,7 @@ enum MicrosDuJour {
                 partDuQuestionnaire: partDuQuestionnaire,
                 besoin: besoin,
                 quantiteDuJour: quantiteDuJour,
+                rapport: nil,
                 semaine: jours,
                 statut: etat,
                 faits: raisons,
@@ -226,7 +238,137 @@ enum MicrosDuJour {
         case .limite:
             let hauts = mesures.filter { $0 > 100 }.count
             return hauts >= joursPourAlerte ? .auDessusDeLaLimite(jours: hauts) : .normal
+        case .rapport:
+            // Un repère à regarder, pas une alerte : la règle validée (trois
+            // jours sur sept) porte sur les apports.
+            return .normal
         }
+    }
+
+    // MARK: Le rapport oméga-6 / oméga-3
+
+    /// Le repère de l'ANSES (2011) : acide linoléique / acide alpha-linolénique.
+    static let rapportVise = 5.0
+    /// Au-delà, un chiffre précis ne dit plus rien.
+    static let rapportMaximal = 50.0
+    /// Valeur retenue quand les repas apportent des oméga-6 et aucun oméga-3.
+    static let rapportSansOmega3 = 999.0
+
+    /// Oméga-6 (acide linoléique) et oméga-3 (acide alpha-linolénique) des
+    /// aliments qui renseignent LES DEUX : comparer l'un mesuré sur tout le
+    /// repas à l'autre mesuré sur la moitié fausserait le rapport. Avec
+    /// `assezNotee`, la journée doit en plus être représentative, comme pour
+    /// les autres chiffres.
+    static func omegas(
+        _ journee: JourneeMesuree,
+        depense: Double,
+        assezNotee: Bool
+    ) -> (omega6: Double, omega3: Double)? {
+        if assezNotee {
+            guard journee.kcal > 0, journee.kcal >= depense * MesuresRepas.partMinimaleDesCalories else { return nil }
+        }
+        var omega6 = 0.0
+        var omega3 = 0.0
+        var kcal = 0.0
+        var parts = 0
+        for part in journee.bouchees {
+            guard let linoleique = part.quantites["omega6"], let linolenique = part.quantites["ala"] else { continue }
+            omega6 += linoleique
+            omega3 += linolenique
+            kcal += part.kcal
+            parts += 1
+        }
+        guard parts > 0 else { return nil }
+        if assezNotee {
+            guard kcal > 0, kcal >= journee.kcal * MesuresRepas.partMinimaleRenseignee else { return nil }
+        }
+        return (omega6, omega3)
+    }
+
+    /// nil quand les repas n'apportent ni l'un ni l'autre.
+    static func rapport(omega6: Double, omega3: Double) -> Double? {
+        if omega3 > 0 { return min(rapportSansOmega3, omega6 / omega3) }
+        return omega6 > 0 ? rapportSansOmega3 : nil
+    }
+
+    /// « 4,2 pour 1 », « 12 pour 1 », « plus de 50 pour 1 ».
+    static func texteDuRapport(_ valeur: Double) -> String {
+        valeur > rapportMaximal
+            ? "plus de \(Int(rapportMaximal)) pour 1"
+            : "\(quantite(valeur)) pour 1"
+    }
+
+    private static func ligneDuRapport(
+        _ micro: MicroDefinition,
+        semaine: [Date],
+        quinzaine: [Date],
+        jour: Date,
+        jourEstAujourdhui: Bool,
+        journees: [Date: JourneeMesuree],
+        depense: Double
+    ) -> LigneMicro {
+        func mesure(le date: Date) -> (omega6: Double, omega3: Double)? {
+            guard let journee = journees[date] else { return nil }
+            return omegas(journee, depense: depense, assezNotee: true)
+        }
+
+        // Jour par jour, en part du repère : 100 = 5 pour 1.
+        let jours = semaine.map { date -> JourMicro in
+            let duJour = mesure(le: date).flatMap { rapport(omega6: $0.omega6, omega3: $0.omega3) }
+            return JourMicro(jour: date, couverture: duJour.map { Int(($0 / rapportVise * 100).rounded()) })
+        }
+
+        // Sur la quinzaine : les grammes s'additionnent, puis on divise. Une
+        // moyenne de rapports donnerait trop de poids à un petit repas.
+        var omega6 = 0.0
+        var omega3 = 0.0
+        var mesures = 0
+        for date in quinzaine {
+            guard let duJour = mesure(le: date) else { continue }
+            omega6 += duJour.omega6
+            omega3 += duJour.omega3
+            mesures += 1
+        }
+        let ensemble: Double? = mesures > 0 ? rapport(omega6: omega6, omega3: omega3) : nil
+
+        // La journée affichée, telle qu'elle est notée à cet instant.
+        var duJourAffiche: Double?
+        if let journee = journees[jour], let note = omegas(journee, depense: depense, assezNotee: false) {
+            duJourAffiche = rapport(omega6: note.omega6, omega3: note.omega3)
+        }
+
+        var raisons: [FaitMicro] = []
+        if ensemble != nil {
+            raisons.append(FaitMicro(genre: .repas, texte: "Calculé sur tes repas notés : \(Self.journees(mesures))."))
+        } else {
+            raisons.append(FaitMicro(genre: .repas, texte: "Pas encore de journée assez notée pour le calculer."))
+        }
+        let moment = jourEstAujourdhui ? "Aujourd'hui" : "Ce jour-là"
+        if let duJourAffiche {
+            raisons.append(FaitMicro(genre: .jour, texte: "\(moment) : \(texteDuRapport(duJourAffiche))."))
+        } else {
+            raisons.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+        }
+
+        return LigneMicro(
+            id: micro.id,
+            nom: micro.nom,
+            unite: micro.unite,
+            famille: micro.famille,
+            sens: micro.sens,
+            niveau: nil,
+            partDuQuestionnaire: false,
+            besoin: rapportVise,
+            quantiteDuJour: duJourAffiche,
+            rapport: ensemble,
+            semaine: jours,
+            statut: .normal,
+            faits: raisons,
+            // Ce qui pèse dans le rapport : d'où viennent les oméga-6.
+            contributeurs: contributeurs("omega6", jours: semaine, journees: journees),
+            role: micro.role,
+            sources: micro.sources
+        )
     }
 
     // MARK: Les priorités

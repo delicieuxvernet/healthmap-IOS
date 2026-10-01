@@ -36,6 +36,8 @@ enum FamilleMicro: String, CaseIterable, Identifiable {
 enum SensMicro: Equatable {
     case besoin
     case limite
+    /// Pas une quantité : un rapport entre deux apports (oméga-6 / oméga-3).
+    case rapport
 }
 
 struct MicroDefinition: Identifiable, Equatable {
@@ -162,6 +164,13 @@ enum Micronutriments {
         MicroDefinition("omega9", "Oméga-9", "g", .acidesGras,
                         role: "L'acide oléique est une graisse insaturée. Remplacer des graisses saturées par des graisses insaturées contribue au maintien d'une cholestérolémie normale.",
                         sources: ["Huile d'olive", "Noisettes", "Avocat"]),
+        // Le rapport entre l'acide linoléique (oméga-6) et l'acide
+        // alpha-linolénique (oméga-3) : l'ANSES (2011) le veut inférieur à 5.
+        // Ses « sources » sont les aliments qui le font baisser.
+        MicroDefinition("rapportOmega", "Rapport oméga-6 / oméga-3", "", .acidesGras,
+                        role: "Les oméga-6 et les oméga-3 empruntent les mêmes voies dans l'organisme. L'ANSES recommande un rapport entre l'acide linoléique (oméga-6) et l'acide alpha-linolénique (oméga-3) inférieur à 5.",
+                        sources: ["Huile de colza", "Noix", "Graines de lin"],
+                        sens: .rapport),
     ]
 
     static let parId: [String: MicroDefinition] = Dictionary(uniqueKeysWithValues: tous.map { ($0.id, $0) })
@@ -241,6 +250,8 @@ enum BesoinsMicros {
             return femme ? 1.5 : 1.9
         case "sodium":
             return 2300
+        case "rapportOmega":
+            return MicrosDuJour.rapportVise
         case "epaDha":
             return 0.5
         case "ala":
