@@ -185,6 +185,22 @@ enum PriseDeSangApports {
         "Ta prise de sang du \(prise.dateCourte(maintenant: maintenant))"
     }
 
+    /// Ce que la prise de sang apporte au hash du bilan : sa date, puis ce
+    /// qu'elle change aux scores. La date seule suffit à régénérer le bilan —
+    /// il la CITE (`generate-analysis` lit `blood_reports`, 1er oct. 2026),
+    /// même quand elle ne déplace aucun score. Vide sans prise de sang : aucun
+    /// autre bilan ne se régénère.
+    static func signatureDuBilan(_ prise: PriseDeSang?, scores: String) -> String {
+        guard let prise else { return "" }
+        return "\(prise.takenAt)/\(scores)"
+    }
+
+    /// Le moment où la prise de sang cesse de compter pleinement : c'est là
+    /// que le rappel sonne (`RappelsPersonnalises`).
+    static func finDuPleinEffet(prelevement: Date, calendar: Calendar = .current) -> Date? {
+        calendar.date(byAdding: .month, value: moisPleinEffet, to: prelevement)
+    }
+
     /// Ce que la prise de sang a changé à un apport.
     struct Effet: Equatable, Identifiable {
         let id: String

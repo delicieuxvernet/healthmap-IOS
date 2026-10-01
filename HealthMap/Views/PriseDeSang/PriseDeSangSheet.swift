@@ -5,8 +5,11 @@ import UniformTypeIdentifiers
 // MARK: - Prise de sang (Premium) — maquette validée le 6 juil. 2026
 //
 // Portée de l'ancien onglet Scan (segment « Prise de sang ») vers le Journal
-// (« Autres façons d'ajouter ») et le Bilan complet, depuis que le Scan a
-// fusionné dans le Journal. Quatre temps, comme la maquette :
+// et le Bilan complet, depuis que le Scan a fusionné dans le Journal. Depuis
+// le 1er oct. 2026, elle s'ouvre d'une carte à elle (`PriseDeSangCarte`, sous
+// « Poids et eau ») et s'annonce « Nouveau · en bêta » : ce que Kiwio fait des
+// analyses, la limite de la lecture, et le médecin. Quatre temps, comme la
+// maquette :
 //   · gratuit : l'écran verrouillé, une porte (`UnlockDoor`, zone `prise_de_sang`) ;
 //   · dépôt : photographier la page, choisir une photo, ou importer le PDF ;
 //   · lecture : « Kiwio lit tes résultats… » ;
@@ -126,11 +129,13 @@ struct PriseDeSangSheet: View {
 
     private var verrouille: some View {
         VStack(alignment: .leading, spacing: DS.interCarte) {
+            encartBeta
+                .padding(.top, 12)
+            carteMedecin(avisMedical)
             zoneDeDepot
                 .blur(radius: 1.5)
                 .opacity(0.55)
                 .accessibilityHidden(true)
-                .padding(.top, 12)
             UnlockDoor(
                 icon: "drop",
                 title: "Tes analyses de sang, dans ton bilan",
@@ -138,6 +143,53 @@ struct PriseDeSangSheet: View {
                 zone: "prise_de_sang"
             )
         }
+    }
+
+    // MARK: Nouveau · en bêta
+
+    private var avisMedical: LocalizedStringKey {
+        "Ce n'est pas un avis médical. Pour interpréter tes résultats, demande toujours à ton médecin."
+    }
+
+    /// Ce que Kiwio fait des analyses, et la limite de la lecture : montré
+    /// avant le dépôt, à tout le monde.
+    private var encartBeta: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Nouveau · en bêta")
+                .font(.dsSousTitreFort)
+            Text("Kiwio lit tes analyses et regarde si tes vitamines et minéraux vont dans le même sens que ton profil. Tes apports, ton bilan et ton plan s'ajustent.")
+                .font(.dsLegende)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("La lecture peut se tromper : compare avec ton compte rendu.")
+                .font(.dsLegende)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(Color(hex: "8A560F"))
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                .fill(Color.dsARenforcer.opacity(0.14))
+        )
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Le médecin est cité, pas remplacé : la même carte avant le dépôt et
+    /// au-dessus des résultats.
+    private func carteMedecin(_ texte: LocalizedStringKey) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: "stethoscope")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color.dsAccent)
+                .accessibilityHidden(true)
+            Text(texte)
+                .font(.dsLegende)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
     }
 
     // MARK: Dépôt
@@ -167,8 +219,10 @@ struct PriseDeSangSheet: View {
 
     private var depot: some View {
         VStack(alignment: .leading, spacing: DS.interCarte) {
-            zoneDeDepot
+            encartBeta
                 .padding(.top, 12)
+            carteMedecin(avisMedical)
+            zoneDeDepot
 
             if CameraPicker.isAvailable {
                 DSCapsuleButton(titre: "Photographier la page") {
@@ -321,19 +375,16 @@ struct PriseDeSangSheet: View {
                 compteur(dansReperes, "dans les repères", fond: Color.dsAccentPale, encre: Color.kiwiGreenInk)
             }
 
-            HStack(alignment: .top, spacing: 9) {
-                Image(systemName: "stethoscope")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.dsAccent)
-                    .accessibilityHidden(true)
-                Text("Repères **nutritionnels** : Kiwio compare tes valeurs aux repères imprimés par ton laboratoire, sans remplacer un avis médical. Montre ces résultats à ton médecin.")
+            carteMedecin("Repères **nutritionnels** : Kiwio compare tes valeurs aux repères imprimés par ton laboratoire, sans remplacer un avis médical. Montre ces résultats à ton médecin.")
+
+            HStack(alignment: .top, spacing: 8) {
+                PriseDeSangPastilleBeta()
+                Text("La lecture peut se tromper : compare ces valeurs avec ton compte rendu.")
                     .font(.dsLegende)
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .dsCard()
+            .padding(.horizontal, 4)
 
             ForEach(prise.markers) { carte($0) }
 
@@ -507,22 +558,74 @@ struct PriseDeSangSheet: View {
     }
 }
 
-// MARK: - Carte du Bilan complet
+// MARK: - Pastille « Nouveau · bêta »
 
-/// « Ta prise de sang » dans le Bilan complet : ce qui a été importé (date et
-/// valeurs à optimiser), ou l'invitation à le faire. Le toucher ouvre la
-/// feuille ; en gratuit, c'est elle qui montre la porte.
+/// La lecture d'un compte rendu est récente et peut se tromper : on le dit là
+/// où la fonction se présente (carte du Journal et du Bilan, feuille).
+struct PriseDeSangPastilleBeta: View {
+    var body: some View {
+        Text("Nouveau · bêta")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color(hex: "8A560F"))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.dsARenforcer.opacity(0.14), in: Capsule())
+            .accessibilityLabel("Nouveau, en bêta")
+    }
+}
+
+// MARK: - Carte du Journal et du Bilan complet
+
+/// « Prise de sang » sur le Journal (sous « Poids et eau », maquette validée
+/// le 1er oct. 2026 : elle sort de « Autres façons d'ajouter », où personne ne
+/// la voyait) et dans le Bilan complet. Ce qui a été importé — date, valeurs à
+/// optimiser, scores avant → après — ou l'invitation à le faire. Le toucher
+/// ouvre la feuille ; en gratuit, c'est elle qui montre la porte.
 struct PriseDeSangCarte: View {
     let prise: PriseDeSang?
+    /// Ce que la prise de sang a changé aux scores (`effetsPriseDeSang()`) :
+    /// la preuve, sur la carte, qu'elle compte.
+    var effets: [PriseDeSangApports.Effet] = []
+    /// Compte gratuit : la carte reste visible, avec sa pastille Premium.
+    var premium: Bool = true
+    var identifiant: String = "bilan.priseDeSang"
     let action: () -> Void
 
-    private var sousTitre: String {
-        guard let prise else {
-            return "Ajoute tes analyses : Kiwio en tient compte dans tes apports."
+    static let invitation = "Ajoute tes analyses : Kiwio vérifie tes apports avec ce qui a été mesuré."
+    static let avis = "Ne remplace pas un avis médical."
+
+    /// La ligne sous le titre : l'invitation, ou ce qui a été importé et ce
+    /// que ça pèse encore (`PriseDeSangApports.fraicheur`).
+    static func sousTitre(_ prise: PriseDeSang?, maintenant: Date = Date()) -> String {
+        guard let prise else { return invitation }
+        let quand = "\(prise.dateLue ? "Prélèvement du" : "Importée le") \(prise.dateCourte(maintenant: maintenant))"
+        switch PriseDeSangApports.fraicheur(prise, maintenant: maintenant) {
+        case 1:
+            let n = prise.markers.filter { PriseDeSangApports.etat($0) == .aOptimiser }.count
+            let valeurs = n == 0 ? "tout est dans les repères" : (n == 1 ? "1 valeur à optimiser" : "\(n) valeurs à optimiser")
+            return "\(quand) · \(valeurs)"
+        case 0:
+            return "\(quand) · plus d'un an : elle ne compte plus dans tes apports"
+        default:
+            return "\(quand) · plus de 6 mois : elle compte moitié moins"
         }
-        let n = prise.markers.filter { PriseDeSangApports.etat($0) == .aOptimiser }.count
-        let valeurs = n == 0 ? "tout est dans les repères" : (n == 1 ? "1 valeur à optimiser" : "\(n) valeurs à optimiser")
-        return "Prélèvement du \(prise.dateCourte()) · \(valeurs)"
+    }
+
+    /// « Fer 62 → 41 ».
+    static func pastille(_ effet: PriseDeSangApports.Effet) -> String {
+        let nom = NutrientData.definition(for: effet.id)?.label ?? effet.id
+        return "\(nom) \(effet.avant) → \(effet.apres)"
+    }
+
+    private var lectureVoiceOver: String {
+        var phrases = ["Prise de sang, nouveau, en bêta", Self.sousTitre(prise)]
+        if !premium { phrases.append("Réservée à Kiwio Premium") }
+        phrases += effets.map { effet in
+            let nom = NutrientData.definition(for: effet.id)?.label ?? effet.id
+            return "\(nom) : \(effet.avant) avant, \(effet.apres) avec ta prise de sang"
+        }
+        phrases.append(Self.avis)
+        return phrases.joined(separator: ". ")
     }
 
     var body: some View {
@@ -530,25 +633,52 @@ struct PriseDeSangCarte: View {
             HapticService.shared.tap()
             action()
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "drop.fill")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(Color.dsACombler.opacity(0.85))
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.dsACombler.opacity(0.10)))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Ta prise de sang")
-                        .font(.dsHeadline)
-                        .foregroundStyle(Color.dsTexte)
-                    Text(sousTitre)
-                        .font(.dsSousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 12) {
+                    Image(systemName: "drop.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Color.dsACombler.opacity(0.85))
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Color.dsACombler.opacity(0.10)))
+                    VStack(alignment: .leading, spacing: 3) {
+                        DSFlow(espacement: 6) {
+                            Text("Prise de sang")
+                                .font(.dsHeadline)
+                                .foregroundStyle(Color.dsTexte)
+                            // Les pastilles se centrent sur la ligne du titre.
+                            PriseDeSangPastilleBeta().frame(minHeight: 22)
+                            if !premium { BilanV7PremiumBadge().frame(minHeight: 22) }
+                        }
+                        Text(Self.sousTitre(prise))
+                            .font(.dsSousTitre)
+                            .foregroundStyle(Color.dsSecondaire)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 8)
+                    DSChevron()
                 }
-                Spacer(minLength: 8)
-                DSChevron()
+
+                if !effets.isEmpty {
+                    DSFlow(espacement: 6) {
+                        ForEach(effets) { effet in
+                            Text(Self.pastille(effet))
+                                .font(.dsLegendeMoyenne)
+                                .monospacedDigit()
+                                .foregroundStyle(Color.dsSecondaire)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4)
+                                .background(Color.dsRemplissage, in: Capsule())
+                        }
+                    }
+                    .padding(.top, 10)
+                }
+
+                Text(Self.avis)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .padding(.top, 8)
             }
             .padding(DS.paddingCarte)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -556,6 +686,9 @@ struct PriseDeSangCarte: View {
             .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
         }
         .buttonStyle(.dsPress)
-        .accessibilityIdentifier("bilan.priseDeSang")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(lectureVoiceOver)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier(identifiant)
     }
 }

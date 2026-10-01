@@ -426,8 +426,9 @@ final class DashboardViewModel: ObservableObject {
         JournalApports.appliquer(HealthCalculator.registreApports(profile: profile), observations: observationsJournal)
     }
 
-    /// Le hash du bilan : le profil, la version du calcul, et ce que le journal
-    /// puis la prise de sang changent aux scores (par paliers de 5 points).
+    /// Le hash du bilan : le profil, la version du calcul, ce que le journal
+    /// puis la prise de sang changent aux scores (par paliers de 5 points), et
+    /// la date de la prise de sang — le bilan la cite.
     var hashDuBilan: String {
         let questionnaire = HealthCalculator.registreApports(profile: profile)
         let avecJournal = JournalApports.appliquer(questionnaire, observations: observationsJournal)
@@ -436,7 +437,11 @@ final class DashboardViewModel: ObservableObject {
             avant: avecJournal,
             apres: PriseDeSangApports.appliquer(avecJournal, priseDeSang: priseDeSang)
         )
-        return AIAnalysisService.hashProfile(profile, journal: signature, sang: signatureSang)
+        return AIAnalysisService.hashProfile(
+            profile,
+            journal: signature,
+            sang: PriseDeSangApports.signatureDuBilan(priseDeSang, scores: signatureSang)
+        )
     }
 
     // MARK: - La prise de sang (Premium, 30 sept. 2026)
@@ -446,6 +451,16 @@ final class DashboardViewModel: ObservableObject {
     func chargerPriseDeSang(userId: String) async {
         guard let derniere = try? await PriseDeSangService.shared.derniere(userId: userId) else { return }
         priseDeSang = derniere
+        // Le rappel des 6 mois se planifie sans le bilan en main (retour au
+        // premier plan, onglet Progrès) : la date lui est laissée ici.
+        RappelsPersonnalises.memoriserPriseDeSang(derniere.date)
+    }
+
+    /// La prise de sang a changé (import, suppression) : le rappel des 6 mois
+    /// suit, tout de suite.
+    private func replanifierRappelPriseDeSang() {
+        RappelsPersonnalises.memoriserPriseDeSang(priseDeSang?.date)
+        Task { await RappelsPersonnalises.replanifier() }
     }
 
     /// Ce que la prise de sang change à chaque apport : le score sans elle,
@@ -472,6 +487,7 @@ final class DashboardViewModel: ObservableObject {
         }
         priseDeSang = nouvelle
         computeLocalScores()
+        replanifierRappelPriseDeSang()
         Task { await retryBilanV2() }
     }
 
@@ -485,6 +501,7 @@ final class DashboardViewModel: ObservableObject {
             await chargerPriseDeSang(userId: session.user.id.uuidString)
         }
         computeLocalScores()
+        replanifierRappelPriseDeSang()
         Task { await retryBilanV2() }
     }
 

@@ -767,9 +767,6 @@ struct JournalSaisieBloc: View {
     let onCodeBarres: () -> Void
     /// « Écrire » : ouvre la feuille de saisie (le clavier y est chez lui).
     let onEcrire: () -> Void
-    /// « Prise de sang » (Premium, 30 sept. 2026) : pas un repas, mais un
-    /// document qu'on scanne — l'héritière du segment de l'ancien onglet Scan.
-    var onPriseDeSang: (() -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// La scène d'écoute : c'est elle qui dit quand le bouton est « parti »
@@ -822,10 +819,6 @@ struct JournalSaisieBloc: View {
                     option("pencil", "Écrire", action: onEcrire)
                     option("magnifyingglass", "Rechercher", action: onRechercher)
                     option("barcode.viewfinder", "Code-barres", action: onCodeBarres)
-                    if let onPriseDeSang {
-                        option("drop", "Prise de sang", action: onPriseDeSang)
-                            .accessibilityIdentifier("journal.priseDeSang")
-                    }
                 }
                 .transition(.opacity)
             }

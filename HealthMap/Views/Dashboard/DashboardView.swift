@@ -272,7 +272,11 @@ struct DashboardView: View {
 
                 // Z3c · Ta prise de sang (Premium, 30 sept. 2026) : ce qui a
                 // été mesuré, ou l'invitation à l'importer.
-                PriseDeSangCarte(prise: viewModel.priseDeSang) {
+                PriseDeSangCarte(
+                    prise: viewModel.priseDeSang,
+                    effets: viewModel.effetsPriseDeSang(),
+                    premium: subscriptionService.isPremium
+                ) {
                     showPriseDeSang = true
                 }
                 .staggeredAppear(index: 4)
