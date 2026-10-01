@@ -10,6 +10,9 @@ import PhotosUI
 //   4. carte macros : quatre lignes, objectif et surplus lu selon l'objectif ;
 //   5. la SAISIE, sur la page : Dicter (vert) · Photographier, puis « Autres
 //      façons d'ajouter » qui déplie Écrire · Rechercher · Code-barres ;
+//   5 bis. « Poids et eau » (1er octobre) : poids actuel et poids souhaité côte
+//      à côte, chacun avec son moins et son plus (l'écart règle les calories
+//      et les macros du jour), puis l'eau du jour en gobelets ;
 //   6. « Apports à renforcer » + « Tout afficher » : l'interaction détectée,
 //      trois anneaux, une seule sortie verte ;
 //   7. le jour en mosaïque : quatre repas, deux par deux.
@@ -111,6 +114,13 @@ struct JournalView: View {
     /// Prise de sang (Premium) : import + « Tes repères ».
     @State private var showPriseDeSang = false
     @AppStorage("healthkit_linked") private var healthLinked = false
+    /// Gobelets d'eau bus le jour affiché (gardés sur le téléphone, `SuiviEau`).
+    @State private var gobeletsEau = 0
+    /// Le profil pendant qu'on règle un poids : la page suit le doigt sans
+    /// réveiller les quatre autres onglets, le vrai profil ne bouge qu'une
+    /// fois le geste fini. nil hors réglage.
+    @State private var profilRegle: UserProfile?
+    @State private var sauvegardePoids: Task<Void, Never>?
 
     // MARK: - Gratification après un ajout
 
@@ -263,9 +273,9 @@ struct JournalView: View {
                         VoiceMealSheet(
                             userId: uid,
                             jour: journal.selectedDay,
-                            cibleProteines: dashboardVM.physicalMetrics.macros?.protein,
-                            cibleGlucides: dashboardVM.physicalMetrics.macros?.carbs,
-                            cibleLipides: dashboardVM.physicalMetrics.macros?.fat,
+                            cibleProteines: mesures.macros?.protein,
+                            cibleGlucides: mesures.macros?.carbs,
+                            cibleLipides: mesures.macros?.fat,
                             gratification: { gratificationDe($0) },
                             speech: speech
                         ) { ajout in
@@ -282,9 +292,9 @@ struct JournalView: View {
                             userId: uid,
                             jour: journal.selectedDay,
                             saisieAuClavier: true,
-                            cibleProteines: dashboardVM.physicalMetrics.macros?.protein,
-                            cibleGlucides: dashboardVM.physicalMetrics.macros?.carbs,
-                            cibleLipides: dashboardVM.physicalMetrics.macros?.fat,
+                            cibleProteines: mesures.macros?.protein,
+                            cibleGlucides: mesures.macros?.carbs,
+                            cibleLipides: mesures.macros?.fat,
                             gratification: { gratificationDe($0) },
                             speech: speech
                         ) { ajout in
@@ -436,6 +446,40 @@ struct JournalView: View {
             Button("Prendre une photo") { showCamera = true }
             Button("Choisir dans la galerie") { showPhotoLibrary = true }
             Button("Annuler", role: .cancel) {}
+        }
+        // Un widget a demandé un geste du Journal (dicter, photographier, un
+        // repas précis). `@Published` émet AVANT d'écrire sa valeur : on la lit
+        // au tour suivant. Posé ici, hors de la longue chaîne du `body`.
+        .onReceive(RouteurWidgets.partage.$pourLeJournal) { lien in
+            guard lien != nil else { return }
+            DispatchQueue.main.async { ouvrirDepuisWidget() }
+        }
+    }
+
+    /// Sert le geste demandé par un widget. Un widget parle toujours
+    /// d'AUJOURD'HUI : le journal y revient s'il affichait un autre jour. Une
+    /// saisie déjà en cours garde la main.
+    private func ouvrirDepuisWidget() {
+        guard let lien = RouteurWidgets.partage.prendrePourLeJournal() else { return }
+        guard !saisieOuverte, !dicteeEnCours else { return }
+        if !isTodaySelected {
+            Task { await journal.allerAuJour(Date()) }
+        }
+        switch lien {
+        case .repas(let brut):
+            if let slot = MealJournalService.MealSlot(rawValue: brut) { repasOuvert = slot }
+        case .dicter:
+            demarrerDictee(verrouillee: true)
+        case .photo:
+            if CameraPicker.isAvailable {
+                showCaptureChoice = true
+            } else {
+                showPhotoLibrary = true
+            }
+        case .rechercher:
+            showSearch = true
+        case .journal, .complements:
+            break
         }
     }
 
@@ -609,7 +653,7 @@ struct JournalView: View {
 
                 JournalCaloriesCard(
                     consommees: journal.dayCalories,
-                    objectif: dashboardVM.physicalMetrics.macros?.calories,
+                    objectif: mesures.macros?.calories,
                     depensees: isTodaySelected ? activeEnergyToday : nil,
                     isToday: isTodaySelected,
                     santeLiee: healthLinked,
@@ -627,6 +671,8 @@ struct JournalView: View {
                 microsSection
 
                 saisieBloc.padding(.top, 14)
+
+                poidsEtEau
 
                 apportsSection
 
@@ -822,12 +868,84 @@ struct JournalView: View {
         }
     }
 
+    // MARK: - Poids et eau
+
+    /// Les cibles du jour, lues sur le profil en cours de réglage s'il y en a
+    /// un : calories et macros se recalculent sous le doigt.
+    private var mesures: PhysicalMetrics {
+        PhysicalMetrics(profile: profilRegle ?? dashboardVM.profile)
+    }
+
+    /// Le poids actuel et le poids souhaité, puis l'eau du jour. L'écart entre
+    /// les deux poids règle les calories et les macros des cartes du dessus.
+    @ViewBuilder
+    private var poidsEtEau: some View {
+        let profil = profilRegle ?? dashboardVM.profile
+        let cibles = mesures
+
+        DSSectionHeader(titre: "Poids et eau")
+
+        JournalPoidsCard(
+            actuel: profil.weightDouble,
+            souhaite: profil.targetWeightDouble,
+            calories: cibles.macros?.calories,
+            phrase: cibles.objectifPoids?.phrase(calories: cibles.macros?.calories, tdee: cibles.tdee)
+                ?? "Règle ton poids souhaité : tes calories et tes macros s'ajustent.",
+            onActuel: { reglerPoids(actuel: $0) },
+            onSouhaite: { reglerPoids(souhaite: $0) }
+        )
+
+        JournalEauCard(bus: gobeletsEau, onToucher: { rang in noterEau(rang) })
+            .padding(.top, DS.interCarte)
+            .task(id: journal.selectedDay) { relireEau() }
+            // De l'eau ajoutée ailleurs que sur cette carte (un widget) : la
+            // carte relit le compteur du jour affiché.
+            .onReceive(NotificationCenter.default.publisher(for: .healthmapEauChange)) { _ in
+                relireEau()
+            }
+    }
+
+    private func relireEau() {
+        guard let uid = AuthService.shared.cachedCurrentUserIdString else { return }
+        let lus = SuiviEau.gobelets(userId: uid, jour: journal.selectedDay)
+        if lus != gobeletsEau { gobeletsEau = lus }
+    }
+
+    /// Un pas sur l'un des deux poids. L'écriture attend que le geste soit
+    /// fini : chaque pas la repousse, le dernier l'emporte.
+    private func reglerPoids(actuel: Double? = nil, souhaite: Double? = nil) {
+        var profil = profilRegle ?? dashboardVM.profile
+        if let actuel { profil.weight = ObjectifPoids.stockage(actuel) }
+        if let souhaite { profil.targetWeight = ObjectifPoids.stockage(souhaite) }
+        profilRegle = profil
+        let poidsActuel = profil.weight
+        let poidsSouhaite = profil.targetWeight
+
+        sauvegardePoids?.cancel()
+        sauvegardePoids = Task {
+            try? await Task.sleep(for: .milliseconds(700))
+            guard !Task.isCancelled else { return }
+            await dashboardVM.enregistrerPoids(actuel: poidsActuel, souhaite: poidsSouhaite)
+            // Un nouveau pas est arrivé entre-temps : il enregistrera à son tour.
+            guard !Task.isCancelled else { return }
+            profilRegle = nil
+        }
+    }
+
+    /// L'eau se note sur le jour affiché, comme un repas.
+    private func noterEau(_ rang: Int) {
+        guard let uid = AuthService.shared.cachedCurrentUserIdString else { return }
+        HapticService.shared.tap()
+        gobeletsEau = SuiviEau.apresToucher(index: rang, actuel: gobeletsEau)
+        SuiviEau.noter(gobeletsEau, userId: uid, jour: journal.selectedDay)
+    }
+
     // MARK: - Macros (quatre lignes, surplus lu selon l'objectif)
 
     private var veutDuMuscle: Bool { dashboardVM.profile.goals.contains("muscle") }
 
     private var lignesMacros: [JournalMacrosCard.Ligne] {
-        let macros = dashboardVM.physicalMetrics.macros
+        let macros = mesures.macros
         return JournalMacrosCard.lignesDuJour(
             proteines: journal.dayProteins, glucides: journal.dayCarbs,
             lipides: journal.dayFats, fibres: journal.dayFiber,

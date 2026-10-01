@@ -38,4 +38,17 @@ extension View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
     }
+
+    /// Pour le questionnaire : plein écran, et le glissement vers le bas NE
+    /// ferme PAS la feuille. On la quittait par accident, en faisant défiler
+    /// une liste ou une molette ; la sortie passe désormais par la croix, qui
+    /// confirme. Pas de poignée non plus : elle promettrait un geste qui ne
+    /// fait plus rien.
+    func healthMapQuestionnaireSheet() -> some View {
+        self
+            .presentationDetents([.large])
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(28)
+            .interactiveDismissDisabled()
+    }
 }

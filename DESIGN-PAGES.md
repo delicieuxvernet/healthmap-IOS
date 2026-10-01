@@ -111,6 +111,25 @@
 >   trajet, ni aura ni confettis, coche déjà tracée, chiffres directement à leur valeur.
 >   Pour l'instant, seule la dictée (et « Écrire », même feuille) se fête ainsi ; les autres ajouts
 >   gardent la gratification ci-dessous.
+> - **Poids et eau (1er octobre 2026)** (`JournalPoidsEau.swift`, calcul `Core/ObjectifPoids.swift`, eau
+>   `Services/SuiviEau.swift`) — sous la saisie, avant « Apports à renforcer ». **Carte poids** : poids
+>   actuel à gauche, **poids souhaité** à droite, chacun avec son moins et son plus (pas de 100 g, un
+>   appui maintenu répète le pas). L'écart donne le SENS de l'objectif (perdre · prendre · maintenir à
+>   moins d'un demi-kilo) ; les calories et les macros des cartes du dessus sortent des formules
+>   existantes (`calculateMacros`), recalculées sous le doigt, enregistrées quand le geste s'arrête
+>   (`DashboardViewModel.reglerPoids`). Le pied dit l'objectif du jour, le rythme et l'échéance estimée.
+>   **Deux réserves : jamais de déficit vers un poids sous le repère de corpulence (IMC 18,5), ni
+>   enceinte ou allaitante** — les calories restent au maintien et la carte le dit. Sans poids souhaité
+>   réglé, rien ne change (les cibles suivent le premier objectif du questionnaire). **Carte eau** :
+>   huit gobelets de 25 cl sur deux rangs, l'eau monte d'un coup de ressort ; toucher le dernier rempli
+>   le vide ; compte gardé sur le téléphone, par compte et par jour (effacé à la déconnexion).
+> - **Offre annuelle** (`OffreAnnuelleOverlay.swift`, `Services/OffrePremium.swift`) : carte qui monte
+>   du bas, surcouche de la RACINE comme la gratification. Elle n'affiche que ce qui est LU chez Apple
+>   (prix annuel, équivalent d'un an à la semaine, essai gratuit) ; l'économie est le même calcul que
+>   le badge du paywall. **Aucun compte à rebours.** « Voir l'offre » ouvre le paywall, « Plus tard »
+>   referme. Comptes gratuits ayant fait leur bilan seulement, sur le Journal, après une gratification
+>   ou au retour sur l'onglet ; jamais le premier jour, une fois tous les trois jours, puis toutes les
+>   deux semaines après trois refus (`RythmeOffre`). Jamais pendant le tutoriel, le brief ou les captures.
 > - **Gratification après un ajout** (`GratificationOverlay.swift`, moteur `GratificationRepas`) : une
 >   carte de deux secondes qui montre **ce que le geste a changé** — bandeau de verre en haut
 >   (« Ajouté au déjeuner · **Modifier** » ouvre la fiche du repas), coche dessinée + deux ondes +
@@ -208,7 +227,22 @@
 >   de carte, pastilles à **trois sens** (gris / vert = connecté ou actif / rouge = destructif).
 >   L'interrupteur Notifications porte `RappelsPersonnalises.actifs` et lève l'ancien mode Zen,
 >   qui n'a plus d'interrupteur à l'écran. Sous-pages : compte (mot de passe si compte e-mail),
->   objectifs, abonnement, suppression du compte (double verrou).
+>   objectifs, abonnement, suppression du compte (double verrou). Depuis le 1er oct. 2026, la carte
+>   Application porte aussi « Widgets et écran verrouillé » (sous Notifications).
+>
+> - **Widgets, écran verrouillé, activité en direct** (1er oct. 2026, maquette montrée dans le chat,
+>   `Partage/VuesWidgets.swift` + `KiwioWidgets/`) : quatre widgets et une carte d'écran verrouillé
+>   qui reprennent le Journal, jamais un design à part. **Ma journée** (petit : le chiffre des kcal
+>   restantes + jauge ; moyen : le chiffre, la série, les quatre repas Matin · Midi · Soir · Encas avec
+>   leurs symboles et teintes de la mosaïque, un « + » vert sur chacun ; rectangulaire d'écran
+>   verrouillé). **Ajout rapide** (petit et rond : le micro ; moyen : quatre tuiles, Dicter en vert,
+>   Photo, l'eau, le rituel). **Eau** (les litres comme sur la carte Eau, « + 25 cl »). **Rituel du
+>   jour** (matin · midi · soir à cocher, **jamais de dose**). **Activité en direct « Ta journée »** :
+>   les quatre repas, puis Dicter · eau · rituel. Règle de geste : l'eau et le rituel se cochent sur
+>   place ; Dicter, Photo et un repas ouvrent l'app au bon endroit (un widget ne peut pas enregistrer
+>   la voix). Le vert reste réservé à ce qui se touche. Un widget suit le mode clair ou sombre du
+>   téléphone (l'app, elle, reste claire). Réglages → Widgets et écran verrouillé : l'interrupteur
+>   « Ma journée en direct », les aperçus (les vraies vues), le mode d'emploi en trois lignes.
 >
 > - **Prise de sang** (Premium, 30 sept. 2026 — maquette validée le 6 juil., `Views/PriseDeSang/PriseDeSangSheet.swift`) :
 >   quatrième option de « Autres façons d'ajouter » du Journal (« Prise de sang », goutte) et carte

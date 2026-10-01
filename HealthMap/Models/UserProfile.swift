@@ -14,6 +14,10 @@ struct UserProfile: Codable, Equatable {
     var height: String = ""
     var weight: String = ""
     var weightTrend: String = ""
+    /// Poids souhaité, en kg (réglé depuis le Journal, 1er octobre 2026). Vide
+    /// tant que la personne n'en a pas choisi : les cibles du jour suivent
+    /// alors ses objectifs, comme avant. Voir `ObjectifPoids`.
+    var targetWeight: String = ""
     /// Morphology avatar chosen by the user, e.g. "av_m_w45_m55".
     /// Empty until the user picks one in the avatar selection step.
     var avatarKey: String = ""
@@ -184,6 +188,11 @@ struct UserProfile: Codable, Equatable {
 
     var ageInt: Int { Int(age) ?? 30 }
     var weightDouble: Double { Double(weight) ?? 70 }
+    /// nil tant qu'aucun poids souhaité n'est réglé (jamais une valeur par défaut).
+    var targetWeightDouble: Double? {
+        guard let valeur = Double(targetWeight), valeur > 0 else { return nil }
+        return valeur
+    }
     var heightDouble: Double { Double(height) ?? 170 }
 
     var fattyFishInt: Int { Int(fattyFish) ?? 0 }
@@ -231,7 +240,7 @@ struct UserProfile: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case pathway, completed
-        case goals, firstName, age, gender, height, weight, weightTrend, avatarKey
+        case goals, firstName, age, gender, height, weight, weightTrend, targetWeight, avatarKey
         case indoorWork, sunExposure, skinType, strengthTraining
         case stressLevel, sleepHours, sleepDuration, wakeFeeling, screenBeforeBed
         case caffeineIntake, caffeineTiming, waterIntake, smoking, alcohol, bloating, antibiotics
@@ -260,6 +269,7 @@ struct UserProfile: Codable, Equatable {
         height = (try? c.decode(String.self, forKey: .height)) ?? ""
         weight = (try? c.decode(String.self, forKey: .weight)) ?? ""
         weightTrend = (try? c.decode(String.self, forKey: .weightTrend)) ?? ""
+        targetWeight = (try? c.decode(String.self, forKey: .targetWeight)) ?? ""
         avatarKey = (try? c.decode(String.self, forKey: .avatarKey)) ?? ""
 
         indoorWork = (try? c.decode(String.self, forKey: .indoorWork)) ?? ""
@@ -340,6 +350,7 @@ struct UserProfile: Codable, Equatable {
         try c.encode(height, forKey: .height)
         try c.encode(weight, forKey: .weight)
         try c.encode(weightTrend, forKey: .weightTrend)
+        try c.encode(targetWeight, forKey: .targetWeight)
         try c.encode(avatarKey, forKey: .avatarKey)
 
         try c.encode(indoorWork, forKey: .indoorWork)

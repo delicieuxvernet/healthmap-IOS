@@ -274,6 +274,16 @@ struct ReglagesView: View {
 
             DSSeparator(retrait: Self.retraitPastille)
 
+            NavigationLink {
+                WidgetsReglagesView()
+            } label: {
+                ReglageLigne(symbole: "square.grid.2x2", titre: "Widgets et écran verrouillé")
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityIdentifier("reglages.widgets")
+
+            DSSeparator(retrait: Self.retraitPastille)
+
             Button {
                 HapticService.shared.tap()
                 TutorielService.partage.relancer()
