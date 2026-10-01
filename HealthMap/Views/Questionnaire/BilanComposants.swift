@@ -155,12 +155,14 @@ struct BilanTuile: View {
         }
     }
 
+    /// Un mot seul tient sur une ligne, quitte à se resserrer : sur deux
+    /// lignes, « Beaucoup » se coupait d'un tiret (« Beau-coup »).
     private var mot: some View {
         Text(titre)
             .font(serree ? BilanTypo.echelle : BilanTypo.tuile)
             .multilineTextAlignment(.center)
-            .lineLimit(2)
-            .minimumScaleFactor(0.8)
+            .lineLimit(titre.contains(" ") ? 2 : 1)
+            .minimumScaleFactor(titre.contains(" ") ? 0.8 : 0.65)
     }
 }
 

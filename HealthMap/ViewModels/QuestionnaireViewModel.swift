@@ -838,10 +838,10 @@ final class QuestionnaireViewModel: ObservableObject {
     /// Combien de questions ont reçu une réponse, sur combien de posables à
     /// cette personne. C'est ce que dit l'écran de fin : un décompte, pas une
     /// note de précision qu'on ne saurait pas justifier.
-    var reponsesDonnees: (donnees: Int, total: Int) {
+    var decompteDesReponses: (repondues: Int, total: Int) {
         let posables = QuestionnaireSection.allQuestions.filter { $0.showIf?(profile) ?? true }
-        let donnees = posables.filter { aRepondu($0) }.count
-        return (donnees, posables.count)
+        let repondues = posables.filter { aRepondu($0) }.count
+        return (repondues, posables.count)
     }
 
     private func toutEstRepondu(_ ecran: EcranBilan) -> Bool {

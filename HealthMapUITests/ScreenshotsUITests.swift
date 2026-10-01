@@ -546,6 +546,14 @@ final class ScreenshotsUITests: XCTestCase {
 
         quitterLeBilan()
         sleep(2)
+        // La carte « Ton bilan t'attend » est plus bas dans le Journal.
+        let reprendre = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reprendre mon bilan")).firstMatch
+        var glissements = 0
+        while reprendre.exists && !reprendre.isHittable && glissements < 4 {
+            app.swipeUp(velocity: .slow)
+            glissements += 1
+        }
+        sleep(1)
         snap("99-bilan-journal-reprise")
     }
 

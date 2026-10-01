@@ -65,6 +65,21 @@ final class RepasCatalogTests: XCTestCase {
         }
     }
 
+    /// Une personne végétarienne n'ouvre pas le catalogue sur la viande : ces
+    /// rayons restent là, mais à la fin.
+    func testLesRayonsEcartesParLeRegimePassentALaFin() {
+        for regime in ["vegetarien", "vegan"] {
+            for repas in RepasBilan.allCases {
+                let rayons = RepasCatalog.rayons(repas, regime: regime).map(\.id)
+                XCTAssertEqual(rayons.count, GroceryCatalog.aisles.count, "\(regime) / \(repas.rawValue)")
+                XCTAssertEqual(Set(rayons.suffix(2)), ["viandes", "poissons"], "\(regime) / \(repas.rawValue)")
+            }
+        }
+        XCTAssertEqual(RepasCatalog.rayons(.midi, regime: "vegetarien").first?.id, "legumes")
+        XCTAssertEqual(RepasCatalog.rayons(.midi, regime: "omnivore").first?.id, "viandes")
+        XCTAssertEqual(RepasCatalog.rayons(.midi, regime: "omnivore").map(\.id), RepasCatalog.rayons(.midi).map(\.id))
+    }
+
     func testChaqueRayonAppartientAAuMoinsUnRepas() {
         let couverts = Set(RepasCatalog.rayonsPropres.values.flatMap { $0 })
         XCTAssertEqual(couverts, Set(GroceryCatalog.aisles.map(\.id)))

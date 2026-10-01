@@ -293,8 +293,8 @@ final class QuestionnaireParcoursTests: XCTestCase {
             XCTAssertTrue(vm.aRepondu(question), "« \(id) » sans réponse en fin de parcours")
         }
 
-        let (donnees, total) = vm.reponsesDonnees
-        XCTAssertEqual(total - donnees, 16, "il ne reste que les questions d'affinage")
+        let (repondues, total) = vm.decompteDesReponses
+        XCTAssertEqual(total - repondues, 16, "il ne reste que les questions d'affinage")
         XCTAssertTrue(vm.resteAAffiner)
     }
 
@@ -325,8 +325,8 @@ final class QuestionnaireParcoursTests: XCTestCase {
         XCTAssertEqual(vm.profile.medicalHistory, ["none"])
         XCTAssertFalse(vm.resteAAffiner)
 
-        let (donnees, total) = vm.reponsesDonnees
-        XCTAssertEqual(donnees, total - 1, "seul le caddie est resté vide")
+        let (repondues, total) = vm.decompteDesReponses
+        XCTAssertEqual(repondues, total - 1, "seul le caddie est resté vide")
     }
 
     func testAffinerReprendLaOuIlManqueUneReponse() {

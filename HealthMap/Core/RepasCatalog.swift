@@ -158,13 +158,25 @@ enum RepasCatalog {
         .soir: ["poissons", "viandes", "legumes", "feculents", "laitiers", "gras"],
     ]
 
+    /// Les rayons que le régime déclaré écarte en entier.
+    static func rayonsEcartes(regime: String) -> Set<String> {
+        switch regime {
+        case "vegan", "vegetarien": return ["viandes", "poissons"]
+        default: return []
+        }
+    }
+
     /// Le catalogue entier vu depuis un repas : ses rayons d'abord, les autres
-    /// ensuite. Aucun rayon n'est jamais omis.
-    static func rayons(_ repas: RepasBilan) -> [GroceryAisle] {
+    /// ensuite. Aucun rayon n'est jamais omis ; ceux que le régime écarte
+    /// passent seulement à la fin, pour ne pas ouvrir sur la viande chez une
+    /// personne végétarienne.
+    static func rayons(_ repas: RepasBilan, regime: String = "") -> [GroceryAisle] {
         let propres = rayonsPropres[repas] ?? []
         let enTete = propres.compactMap { id in GroceryCatalog.aisles.first { $0.id == id } }
         let reste = GroceryCatalog.aisles.filter { !propres.contains($0.id) }
-        return enTete + reste
+        let ecartes = rayonsEcartes(regime: regime)
+        let tous = enTete + reste
+        return tous.filter { !ecartes.contains($0.id) } + tous.filter { ecartes.contains($0.id) }
     }
 
     /// Rayon de chaque aliment (id d'aliment → id de rayon).

@@ -884,8 +884,8 @@ private struct BilanFin: View {
     var body: some View {
         let synthese = PistesBilan.synthese(profil: viewModel.profile)
         let prenom = Prenom.affichable(viewModel.profile.firstName)
-        let reponses = viewModel.reponsesDonnees
-        let fraction = reponses.total > 0 ? Double(reponses.donnees) / Double(reponses.total) : 0
+        let decompte = viewModel.decompteDesReponses
+        let fraction = decompte.total > 0 ? Double(decompte.repondues) / Double(decompte.total) : 0
 
         ScrollView {
             VStack(spacing: 0) {
@@ -922,7 +922,7 @@ private struct BilanFin: View {
                         HStack {
                             Text("Réponses données")
                             Spacer(minLength: 8)
-                            Text("\(reponses.donnees) sur \(reponses.total)")
+                            Text("\(decompte.repondues) sur \(decompte.total)")
                                 .monospacedDigit()
                         }
                         .font(.dsSousTitreFort)

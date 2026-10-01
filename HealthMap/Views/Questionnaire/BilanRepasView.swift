@@ -33,88 +33,22 @@ struct BilanRepasView: View {
         return GroceryCatalog.item(id: selection)
     }
 
+    @Environment(\.dynamicTypeSize) private var tailleDeTexte
+
+    /// Le titre, les jauges et les onglets restent en place pendant qu'on
+    /// parcourt les aliments : c'est en voyant la jauge se remplir qu'on a
+    /// envie de cocher le suivant. Aux très grandes tailles de texte, ils
+    /// défilent avec le reste pour laisser la place à la grille.
+    private var enTeteFixe: Bool { !tailleDeTexte.isAccessibilitySize }
+
     var body: some View {
-        ScrollViewReader { defilement in
-            contenu
-                // L'aliment qu'on vient de toucher reste visible quand la
-                // barre des trois mots monte par-dessus le bas de la grille.
-                .onChange(of: selection) { _, nouvelle in
-                    guard let nouvelle else { return }
-                    withAnimation(reduceMotion ? nil : .kiwiFluide) {
-                        defilement.scrollTo(nouvelle, anchor: .center)
-                    }
-                }
-        }
-    }
-
-    private var contenu: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                BilanTitre(titre: repas.titre, pourquoi: "Coche ce que tu prends d'habitude.")
-                    .padding(.bottom, 10)
-
-                BilanJauges(jauges: PistesBilan.jauges(profil: viewModel.profile))
-
-                onglets
-                    .padding(.vertical, 8)
-
-                BilanGrilleEgale(elements: grille) { aliment in
-                    BilanTuileAliment(
-                        emoji: aliment.emoji,
-                        nom: RepasCatalog.nomCourt(aliment),
-                        niveau: viewModel.niveau(de: aliment.id),
-                        enReglage: selection == aliment.id
-                    ) {
-                        toucher(aliment.id)
-                    }
-                    .id(aliment.id)
-                }
-
-                Button {
-                    HapticService.shared.tap()
-                    catalogueOuvert = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 14, weight: .semibold))
-                            .accessibilityHidden(true)
-                        Text("Voir tous les aliments")
-                            .font(.dsSousTitreFort)
-                            .tracking(DSTracking.sousTitre)
-                    }
-                    .foregroundStyle(Color.dsAccent)
-                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.dsPress)
-                .padding(.top, 6)
-
-                Text(note)
-                    .font(.dsLegende)
-                    .tracking(DSTracking.legende)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 2)
+        VStack(spacing: 0) {
+            if enTeteFixe {
+                enTete
+                    .padding(.horizontal, DS.marge)
+                    .padding(.top, 10)
             }
-            .padding(.horizontal, DS.marge)
-            .padding(.top, 10)
-            .padding(.bottom, 10)
-        }
-        .scrollBounceBehavior(.basedOnSize)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let aliment = enReglage {
-                BilanBarreNiveau(
-                    nom: RepasCatalog.nomCourt(aliment),
-                    apports: PistesBilan.apports(de: aliment),
-                    niveau: viewModel.niveau(de: aliment.id) ?? .parDefaut,
-                    regler: { viewModel.regler(aliment.id, $0) },
-                    retirer: { retirer(aliment.id) }
-                )
-                .padding(.horizontal, DS.marge)
-                .padding(.bottom, 6)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
+            aliments
         }
         .animation(reduceMotion ? nil : .kiwiVif, value: selection)
         .onChange(of: repas) { _, _ in selection = nil }
@@ -124,6 +58,99 @@ struct BilanRepasView: View {
                 .environment(\.teinteBilan, .kiwi)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var enTete: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            BilanTitre(titre: repas.titre, pourquoi: "Coche ce que tu prends d'habitude.")
+                .padding(.bottom, 10)
+
+            BilanJauges(jauges: PistesBilan.jauges(profil: viewModel.profile))
+
+            onglets
+                .padding(.vertical, 8)
+        }
+    }
+
+    private var aliments: some View {
+        ScrollViewReader { defilement in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if !enTeteFixe {
+                        enTete
+                            .padding(.top, 10)
+                    }
+
+                    BilanGrilleEgale(elements: grille) { aliment in
+                        BilanTuileAliment(
+                            emoji: aliment.emoji,
+                            nom: RepasCatalog.nomCourt(aliment),
+                            niveau: viewModel.niveau(de: aliment.id),
+                            enReglage: selection == aliment.id
+                        ) {
+                            toucher(aliment.id)
+                        }
+                        .id(aliment.id)
+                    }
+
+                    Button {
+                        HapticService.shared.tap()
+                        catalogueOuvert = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 14, weight: .semibold))
+                                .accessibilityHidden(true)
+                            Text("Voir tous les aliments")
+                                .font(.dsSousTitreFort)
+                                .tracking(DSTracking.sousTitre)
+                        }
+                        .foregroundStyle(Color.dsAccent)
+                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.dsPress)
+                    .padding(.top, 6)
+
+                    Text(note)
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 2)
+                }
+                .padding(.horizontal, DS.marge)
+                .padding(.bottom, 10)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let aliment = enReglage {
+                    BilanBarreNiveau(
+                        nom: RepasCatalog.nomCourt(aliment),
+                        apports: PistesBilan.apports(de: aliment),
+                        niveau: viewModel.niveau(de: aliment.id) ?? .parDefaut,
+                        regler: { viewModel.regler(aliment.id, $0) },
+                        retirer: { retirer(aliment.id) }
+                    )
+                    .padding(.horizontal, DS.marge)
+                    .padding(.bottom, 6)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
+            // L'aliment qu'on vient de toucher reste visible quand la barre des
+            // trois mots monte par-dessus le bas de la grille : on défile du
+            // strict nécessaire, une fois la barre en place.
+            .onChange(of: selection) { _, nouvelle in
+                guard let nouvelle else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    withAnimation(reduceMotion ? nil : .kiwiFluide) {
+                        defilement.scrollTo(nouvelle)
+                    }
+                }
+            }
         }
     }
 
@@ -264,8 +291,8 @@ struct BilanTuileAliment: View {
                 Text(nom)
                     .font(BilanTypo.tuile)
                     .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
+                    .lineLimit(nom.contains(" ") ? 2 : 1)
+                    .minimumScaleFactor(nom.contains(" ") ? 0.8 : 0.65)
             }
             .foregroundStyle(coche ? teinte.encre : Color.dsTexte)
             .padding(.horizontal, 5)
@@ -424,7 +451,7 @@ struct BilanCatalogueView: View {
                     if cherche {
                         resultats
                     } else {
-                        ForEach(RepasCatalog.rayons(repas)) { rayon in
+                        ForEach(RepasCatalog.rayons(repas, regime: viewModel.profile.dietType)) { rayon in
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("\(rayon.emoji) \(rayon.label)")
                                     .font(.dsHeadline)
