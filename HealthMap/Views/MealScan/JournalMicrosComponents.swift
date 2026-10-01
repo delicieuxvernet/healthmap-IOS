@@ -143,7 +143,7 @@ struct JournalMicrosCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if tableau.priorites.isEmpty {
-                Text("Tes micronutriments se calculent à partir de tes repas notés. Il faut trois journées complètes pour en tirer un premier chiffre.")
+                Text("Tes micronutriments se calculent à partir de tes repas notés. Une journée assez notée suffit pour un premier chiffre.")
                     .font(.dsSousTitre)
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsSecondaire)
@@ -380,7 +380,7 @@ struct MicroDuJourSheet: View {
             return "Une limite à ne pas dépasser, suivie sur tes repas notés."
         }
         guard ligne.niveau != nil else {
-            return "Pas encore de chiffre : il faut trois journées de repas complètes."
+            return "Pas encore de chiffre : il faut une journée de repas assez notée."
         }
         return ligne.partDuQuestionnaire
             ? "de ton besoin couvert, d'après ton questionnaire puis tes repas notés."

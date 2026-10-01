@@ -48,14 +48,16 @@ final class MicrosDuJourTests: XCTestCase {
     }
 
     private func contexte(scores: [String: Int] = [:], symptomes: [String] = [],
-                          couvertureJournal: [String: Int] = [:]) -> ContexteMicros {
+                          couvertureJournal: [String: Int] = [:],
+                          joursJournal: [String: Int] = [:]) -> ContexteMicros {
         var besoins: [String: Double] = [:]
         for micro in Micronutriments.tous { besoins[micro.id] = 100 }
         besoins["vitE"] = 10
         besoins["vitD"] = 600
         besoins["sodium"] = 2300
         return ContexteMicros(besoins: besoins, depense: 2000, scores: scores,
-                              couvertureJournal: couvertureJournal, symptomes: symptomes)
+                              couvertureJournal: couvertureJournal, joursJournal: joursJournal,
+                              symptomes: symptomes)
     }
 
     private func tableau(_ repas: [S.MealRecord], contexte: ContexteMicros,
@@ -151,20 +153,23 @@ final class MicrosDuJourTests: XCTestCase {
         XCTAssertTrue(vitD.partDuQuestionnaire)
     }
 
-    func testLeChiffreDesAutresVientDesRepasEtDemandeTroisJournees() throws {
-        let deux = try (1...2).map { repas($0, [try item(3, grammes: 100, kcal: 2000)]) }
-        XCTAssertNil(try ligne("vitE", dans: tableau(deux, contexte: contexte())).niveau)
+    func testLeChiffreDesAutresVientDesRepasDesLaPremiereJournee() throws {
+        XCTAssertNil(try ligne("vitE", dans: tableau([], contexte: contexte())).niveau)
 
-        let trois = try (1...3).map { repas($0, [try item(3, grammes: 100, kcal: 2000)]) }
-        let vitE = try ligne("vitE", dans: tableau(trois, contexte: contexte()))
+        let une = [repas(1, [try item(3, grammes: 100, kcal: 2000)])]
+        let vitE = try ligne("vitE", dans: tableau(une, contexte: contexte()))
         XCTAssertEqual(vitE.niveau, 10)   // 1 mg sur 10
         XCTAssertFalse(vitE.partDuQuestionnaire)
+        XCTAssertTrue(vitE.faits.contains { $0.texte.contains("1 journée") })
     }
 
-    func testAujourdhuiNEntrePasDansLeChiffre() throws {
-        // Trois journées dont aujourd'hui : il n'en reste que deux de finies.
-        let jours = try (0...2).map { repas($0, [try item(3, grammes: 100, kcal: 2000)]) }
-        let vitE = try ligne("vitE", dans: tableau(jours, contexte: contexte()))
+    func testLaJourneeEnCoursCompteDesQuElleEstAssezNotee() throws {
+        let complete = [repas(0, [try item(3, grammes: 100, kcal: 2000)])]
+        XCTAssertEqual(try ligne("vitE", dans: tableau(complete, contexte: contexte())).niveau, 10)
+
+        // Le matin, 300 kcal notées : pas encore de chiffre…
+        let matin = [repas(0, [try item(3, grammes: 100, kcal: 300)])]
+        let vitE = try ligne("vitE", dans: tableau(matin, contexte: contexte()))
         XCTAssertNil(vitE.niveau)
         // … mais la journée affichée montre bien ce qui a été noté.
         XCTAssertEqual(vitE.quantiteDuJour ?? 0, 1, accuracy: 0.001)
@@ -247,7 +252,7 @@ final class MicrosDuJourTests: XCTestCase {
         XCTAssertTrue(questionnaire.texte.contains("25 points"))
         // Sans repas notés, on le dit : aucun chiffre inventé.
         let repas = try XCTUnwrap(vitD.faits.first { $0.genre == .repas })
-        XCTAssertTrue(repas.texte.contains("Pas encore assez"))
+        XCTAssertTrue(repas.texte.contains("Pas encore"))
         XCTAssertTrue(vitD.faits.contains { $0.genre == .jour })
     }
 
@@ -260,12 +265,13 @@ final class MicrosDuJourTests: XCTestCase {
             score: 32
         )
         let vitD = try ligne("vitD", dans: tableau(
-            [], contexte: contexte(scores: ["vitD": 32], couvertureJournal: ["vitD": 11]),
+            [], contexte: contexte(scores: ["vitD": 32], couvertureJournal: ["vitD": 11], joursJournal: ["vitD": 6]),
             registre: ["vitD": detail]
         ))
         let repas = try XCTUnwrap(vitD.faits.first { $0.genre == .repas })
         XCTAssertTrue(repas.texte.contains("11"))
         XCTAssertTrue(repas.texte.contains("13 points"))
+        XCTAssertTrue(repas.texte.contains("6 journées"))
         // Le questionnaire ne cite pas la ligne du journal comme une réponse.
         let questionnaire = try XCTUnwrap(vitD.faits.first { $0.genre == .questionnaire })
         XCTAssertFalse(questionnaire.texte.contains(JournalApports.libelle))

@@ -11,8 +11,8 @@ import Foundation
 //     sang ;
 //   · c'est le même dans le Journal, dans Progrès et dans la fiche.
 // Les micros sans question dans le questionnaire n'ont pas de point de départ :
-// leur chiffre vient des seuls repas notés, et reste vide tant qu'il n'y a pas
-// trois journées assez remplies.
+// leur chiffre vient des seuls repas notés, et reste vide tant qu'aucune
+// journée n'est assez remplie.
 //
 // Chaque ligne explique son chiffre par des FAITS de la personne : ce qu'elle a
 // répondu, ce que ses repas ont apporté, ce qu'elle a signalé. Jamais une
@@ -28,6 +28,8 @@ struct ContexteMicros: Equatable {
     let scores: [String: Int]
     /// Ce que les repas notés ont montré aux apports du bilan, en part du besoin.
     let couvertureJournal: [String: Int]
+    /// Nombre de journées notées qui renseignent chaque apport du bilan.
+    let joursJournal: [String: Int]
     /// Symptômes déclarés au questionnaire.
     let symptomes: [String]
 }
@@ -137,10 +139,10 @@ enum MicrosDuJour {
         for recul in stride(from: joursDeLaSemaine - 1, through: 0, by: -1) {
             if let date = calendar.date(byAdding: .day, value: -recul, to: jour) { semaine.append(date) }
         }
-        // Les quatorze jours pleins avant aujourd'hui : la journée en cours ne
-        // compte pas, elle n'est pas finie.
+        // Les quatorze derniers jours, aujourd'hui compris : la journée en
+        // cours compte dès qu'elle est assez notée (`MesuresRepas.couverture`).
         var quinzaine: [Date] = []
-        for recul in 1...fenetreJours {
+        for recul in 0..<fenetreJours {
             if let date = calendar.date(byAdding: .day, value: -recul, to: aujourdhui) { quinzaine.append(date) }
         }
 
@@ -180,6 +182,7 @@ enum MicrosDuJour {
                 partDuQuestionnaire: partDuQuestionnaire,
                 detail: registre[micro.id],
                 couvertureJournal: contexte.couvertureJournal[micro.id],
+                joursJournal: contexte.joursJournal[micro.id],
                 joursMesures: mesuresQuinzaine.count,
                 symptomes: contexte.symptomes,
                 quantiteDuJour: quantiteDuJour,
@@ -278,12 +281,18 @@ enum MicrosDuJour {
         return "\(signe)\(valeur) \(valeur > 1 ? "points" : "point")"
     }
 
+    /// « 1 journée », « 6 journées ».
+    private static func journees(_ nombre: Int) -> String {
+        nombre > 1 ? "\(nombre) journées" : "\(nombre) journée"
+    }
+
     static func faits(
         micro: MicroDefinition,
         niveau: Int?,
         partDuQuestionnaire: Bool,
         detail: DetailApport?,
         couvertureJournal: Int?,
+        joursJournal: Int? = nil,
         joursMesures: Int,
         symptomes: [String],
         quantiteDuJour: Double?,
@@ -311,20 +320,21 @@ enum MicrosDuJour {
 
             // 2. Ce que les repas notés ont changé au chiffre.
             let correction = detail?.contributions.first { $0.section == .journal }
+            let notes = joursJournal.map { " (\(journees($0)))" } ?? ""
             if let couvertureJournal, let correction {
                 faits.append(FaitMicro(
                     genre: .repas,
-                    texte: "Tes repas notés couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : \(points(correction.delta))."
+                    texte: "Tes repas notés\(notes) couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : \(points(correction.delta))."
                 ))
             } else if let couvertureJournal {
                 faits.append(FaitMicro(
                     genre: .repas,
-                    texte: "Tes repas notés couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : ils confirment ce chiffre."
+                    texte: "Tes repas notés\(notes) couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : ils confirment ce chiffre."
                 ))
             } else {
                 faits.append(FaitMicro(
                     genre: .repas,
-                    texte: "Pas encore assez de repas notés pour l'ajuster : il faut \(joursMinimum) journées complètes."
+                    texte: "Pas encore de journée assez notée pour l'ajuster."
                 ))
             }
 
@@ -343,12 +353,12 @@ enum MicrosDuJour {
         } else if niveau != nil {
             faits.append(FaitMicro(
                 genre: .repas,
-                texte: "Calculé sur tes repas notés : \(joursMesures) journées complètes."
+                texte: "Calculé sur tes repas notés : \(journees(joursMesures))."
             ))
         } else {
             faits.append(FaitMicro(
                 genre: .repas,
-                texte: "Pas encore assez de repas notés pour le calculer : il faut \(joursMinimum) journées complètes."
+                texte: "Pas encore de journée assez notée pour le calculer."
             ))
         }
 

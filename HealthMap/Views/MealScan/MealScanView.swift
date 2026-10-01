@@ -183,6 +183,8 @@ struct JournalView: View {
                 // si c'est un AJOUT, dépose de quoi le célébrer.
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
                     Task { await rechargerEtCelebrer() }
+                    // Les chiffres des apports suivent ce qui vient d'être noté.
+                    Task { await dashboardVM.rafraichirApresUnRepas() }
                 }
                 // Le brief du jour propose d'ajouter les repas d'hier : le
                 // journal se positionne sur ce jour-là (les ajouts y seront datés).
@@ -727,6 +729,7 @@ struct JournalView: View {
             depense: depense,
             scores: dashboardVM.profile.completed ? dashboardVM.nutrientScores : [:],
             couvertureJournal: dashboardVM.observationsJournal?.couverture ?? [:],
+            joursJournal: dashboardVM.observationsJournal?.jours ?? [:],
             symptomes: dashboardVM.profile.symptoms
         )
     }
