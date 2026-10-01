@@ -484,14 +484,15 @@ final class DashboardViewModel: ObservableObject {
         Task { await retryBilanV2() }
     }
 
-    /// Lit les repas notés des 14 derniers jours (aujourd'hui exclu) et en
+    /// Lit les repas notés des 14 derniers jours (aujourd'hui compris) et en
     /// tire les observations. Un échec réseau laisse le calcul au seul
     /// questionnaire, sans message : le journal corrige, il ne bloque jamais.
     func chargerJournal(userId: String) async {
         let calendrier = Calendar.current
         let aujourdhui = calendrier.startOfDay(for: Date())
-        guard let debut = calendrier.date(byAdding: .day, value: -JournalApports.fenetreJours, to: aujourdhui),
-              let repas = try? await MealJournalService.shared.loadRange(userId: userId, from: debut, to: aujourdhui)
+        guard let debut = calendrier.date(byAdding: .day, value: -(JournalApports.fenetreJours - 1), to: aujourdhui),
+              let demain = calendrier.date(byAdding: .day, value: 1, to: aujourdhui),
+              let repas = try? await MealJournalService.shared.loadRange(userId: userId, from: debut, to: demain)
         else { return }
         // Même mesure que le Journal : la composition exacte des aliments
         // quand la base la connaît, ce que le repas avait enregistré sinon.
@@ -500,6 +501,15 @@ final class DashboardViewModel: ObservableObject {
             repas: MesuresRepas.repasPrecises(repas, compositions: compositions),
             profil: profile
         )
+    }
+
+    /// Un repas vient d'être noté, modifié ou retiré : les chiffres se refont
+    /// tout de suite (demande d'Arthur du 1er octobre 2026). Le bilan rédigé,
+    /// lui, attend le prochain lancement : on ne rappelle pas l'IA à chaque repas.
+    func rafraichirApresUnRepas() async {
+        guard profile.completed, let session = await AuthService.shared.currentSession else { return }
+        await chargerJournal(userId: session.user.id.uuidString)
+        computeLocalScores()
     }
 
     #if DEBUG
