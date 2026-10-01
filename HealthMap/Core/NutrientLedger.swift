@@ -155,7 +155,10 @@ enum CalculApports {
     /// 2026-09-22 : étape 1 (quantités jamais posées, deux moteurs alignés).
     /// 2026-09-22.2 : étape 2 (soleil compté une fois, richesse des aliments,
     /// poids de l'assiette pour la vitamine D).
-    static let version = "2026-09-22.2"
+    /// 2026-10-01 : le journal corrige les scores depuis la composition exacte
+    /// des aliments (`MesuresRepas.repasPrecises`), plus depuis les seuls
+    /// pourcentages enregistrés avec le repas.
+    static let version = "2026-10-01"
 }
 
 // MARK: - Le registre

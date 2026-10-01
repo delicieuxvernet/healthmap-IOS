@@ -513,9 +513,24 @@ struct SuiviView: View {
         // Tant qu'elle n'est pas capturée, on passe [:] : avant = après, aucun
         // écart affiché (évite un socle transitoire faux).
         let baseline = dashboardVM.profile.baselineNutrientScores ?? [:]
-        return SuiviEngineV4.nutrientCoverage(fortnight: journal.fortnight,
-                                              focusIds: weakNutrientIds,
-                                              baseline: baseline)
+        let mesures = SuiviEngineV4.nutrientCoverage(fortnight: journal.fortnight,
+                                                     focusIds: weakNutrientIds,
+                                                     baseline: baseline)
+        // « Avant » est le score du premier bilan. « Après » doit être la MÊME
+        // mesure, aujourd'hui : le score du registre (questionnaire, puis repas
+        // notés, puis prise de sang). L'écran posait à côté la couverture des
+        // repas de la semaine : « 55 → 11 % », puis une fiche à 58 (retour
+        // d'Arthur, 1er octobre 2026). Un seul chiffre, le même que la fiche.
+        let scores = dashboardVM.nutrientScores
+        return mesures.map { mesure -> SuiviEngineV4.NutrientCoverage7d in
+            guard let score = scores[mesure.id] else { return mesure }
+            let actuel = max(0, min(100, score))
+            let depart = baseline[mesure.id].map { max(0, min(100, $0)) } ?? actuel
+            return SuiviEngineV4.NutrientCoverage7d(
+                id: mesure.id, nom: mesure.nom, pct: actuel,
+                trendPct: mesure.trendPct, baselinePct: depart
+            )
+        }
     }
 }
 
