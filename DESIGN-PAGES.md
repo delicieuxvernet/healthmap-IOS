@@ -543,6 +543,71 @@ Lois spécifiques : la suppression d'un ITEM réécrit `detected_foods` + agrég
 lisent ces colonnes) ; les clés annexes de l'Edge (`ciqual_code`, `confidence`,
 `nova_class`, `micros[].amount`…) sont préservées telles quelles (passthrough).
 
+## 8. QUESTIONNAIRE (feuille « bilan » — refonte du 1er octobre 2026)
+
+> **Source** : maquette cliquable validée par Arthur en trois tours le 1er octobre 2026
+> (« c'est bien dans l'idée » → repas et mêmes données → « pas beaucoup, modérément, beaucoup »).
+> **Pourquoi** : l'ancien flux (une question par écran, barre qui repartait de zéro à chaque
+> section, animation imposée entre deux sections) était « très long, pas aéré » ; on ne savait ni
+> où on en était ni à quoi servait la question. 36 inscrits sur 44 le commençaient, 26 le
+> finissaient ; la perte était au caddie.
+> **La règle qui borne tout** : *les données envoyées à l'API sont les mêmes*. Mêmes clés, mêmes
+> valeurs (`QuestionnaireSection`), même `profile.groceries[id] = portions par semaine`. La
+> refonte ne change que l'ordre, le regroupement et les mots. `ParcoursBilanTests` et
+> `LibellesBilanTests` le vérifient.
+
+Code : `Views/Questionnaire/Bilan*.swift` (vue), `Core/ParcoursBilan.swift` (ordre, écrans
+visibles, ce qu'il faut avoir répondu), `Core/PistesBilan.swift` (ce que les réponses apprennent),
+`Core/RepasCatalog.swift` (aliments par repas), `Core/NiveauConsommation.swift` (les trois mots),
+`Core/LibellesBilan.swift` (les mots des réponses). L'état reste dans `QuestionnaireViewModel`.
+
+**Quatre étapes, une couleur chacune** (`EtapeBilan.teinte`) : ① Toi (bleu `#007AFF`) · ② Ton
+quotidien (orange `#FF9500`) · ③ Ta forme (violet `#AF52DE`) · ④ Ton assiette (vert kiwi). La
+couleur habille l'écran (halos du fond, réponse choisie, segment de la barre) ; **le bouton du bas
+reste vert d'un bout à l'autre**. Écart assumé à la règle « le vert ne colore que ce qui se tape » :
+ici la couleur porte un sens, l'étape, comme la couleur d'une jauge porte un statut.
+
+Ordre des écrans (`EcranBilan`, l'ordre des cas est l'ordre du parcours) :
+accueil → **Toi** : motif (objectifs + symptômes, en puces) · prénom (sauté si le compte le
+connaît) · repères (sexe + trois molettes âge, taille, poids) · récap → **Ton quotidien** :
+soleil (intérieur, exposition, nuancier de peau) · bouger (activité, poids + « c'était voulu ? ») ·
+boire (café, moment du café à partir de trois, eau) · alcool et tabac · récap → **Ta forme** :
+ressenti (curseurs stress, réveil) · nuits (curseurs écrans, sommeil) · ventre · cycle (femmes) ·
+récap → **Ton assiette** : régime · « ce qu'on voit déjà » · petit déj · midi · goûter · soir ·
+« jamais » (le champ `allergies`) → fin. Sur demande (« Affiner d'abord ») : à table · pain, sel
+et compagnie · habitudes · compléments · traitements · digestion · antécédents.
+
+Lois de l'écran :
+1. **En-tête** : chevron retour · quatre segments qui ne repartent JAMAIS de zéro · croix (confirme
+   avant de quitter ; la feuille ne se ferme pas en glissant). Dessous : nom de l'étape dans son
+   encre · « encore ~2 min » · pastille « 🔍 N pistes ».
+2. **Chaque écran dit pourquoi il demande** : une phrase sous le titre, vraie au regard du moteur
+   (« le café pendant le repas freine l'absorption du fer »).
+3. **La carte de piste**, sous les réponses : « Piste repérée » / « C'est noté » / « Bon point ».
+   Elle vient d'un FAIT du registre (`HealthCalculator.registreApports`), lu par différence, jamais
+   d'un symptôme (doctrine `SymptomesApports`) et jamais du sexe ou de l'âge seuls. Rien à dire :
+   pas de carte. Vocabulaire : « piste », « à surveiller », « ton assiette dira si elle compense ».
+4. **Aucune réponse validée en silence** : un curseur exige un geste, une molette se touche, un
+   champ qui porte une valeur par défaut (sexe, régime, cycle) ne s'affiche choisi qu'une fois
+   choisi. Une bascule éteinte vaut « non », écrit au moment de continuer.
+5. **Les aliments** : douze vedettes par repas (adaptées au régime déclaré), puis « Voir tous les
+   aliments » (le catalogue entier, rayons du repas en tête, recherche). Sous un aliment coché :
+   **« Pas beaucoup · Modérément · Beaucoup »** = 1 · 3 · 10 portions par semaine ; un aliment
+   coché part sur « Modérément ». Dix jauges, une par apport, se remplissent en direct.
+6. **Fin** : la phrase et les trois lignes viennent des VRAIS scores ; « Réponses données N sur M »
+   est un décompte, pas une note de précision. « Voir mon bilan » envoie ; « Affiner d'abord »
+   ouvre les écrans d'approfondissement.
+7. **Reprise** : là où on s'est arrêté, sans jamais sauter un écran pas terminé (remplace la
+   décision du 6 juillet 2026, « reprise au début »). Le Journal affiche alors « Ton bilan
+   t'attend · Étape 2 sur 4 » avec la barre et « Reprendre ».
+8. **Identité** : le signe (`KiwiSigne`) sur l'accueil et sur la fin ; aucun emoji kiwi.
+9. **Mouvement** : jetons de `KiwiMotion` uniquement, rien au-delà de 1,08, tout coupé par
+   « Réduire les animations ». La gerbe de fin d'étape se joue une fois.
+
+L'ancien flux (`QuestionnaireContainerView`, `GroceryShoppingView`, `SectionIntroView`,
+`TeaserEngine`, `QuantityBracket`) reste dans le dépôt, plus présenté, tant que le nouveau n'est
+pas validé sur appareil ; il part ensuite dans une PR à part.
+
 ---
 
 *Maquettes de référence : session du 11 juin 2026 (« rendu_final_4_ecrans_reference »

@@ -20,6 +20,11 @@ on:
         required: false
         default: ""
         type: string
+      seulement:
+        description: "Un seul test à lancer, par son nom (ex. test05_QuestionnaireEnQuatreEtapes ; vide = tous)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -116,13 +121,20 @@ jobs:
         env:
           TEST_RUNNER_SCREENSHOT_EMAIL: audit-b@test.com
           TEST_RUNNER_SCREENSHOT_PASSWORD: ${{ secrets.DEMO_ACCOUNT_PASSWORD }}
+          SEULEMENT: ${{ inputs.seulement }}
         run: |
           set -o pipefail
           # Diagnostic (valeurs jamais affichées) : longueur des identifiants transmis.
           echo "email=${#TEST_RUNNER_SCREENSHOT_EMAIL} caractères, mot de passe=${#TEST_RUNNER_SCREENSHOT_PASSWORD} caractères"
+          # Un seul test si demandé (un parcours à vérifier), tous sinon.
+          FILTRE=()
+          if [ -n "$SEULEMENT" ]; then
+            FILTRE=(-only-testing:"HealthMapUITests/ScreenshotsUITests/$SEULEMENT")
+          fi
           xcodebuild test \
             -project HealthMap.xcodeproj \
             -scheme HealthMapScreenshots \
+            "${FILTRE[@]}" \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -resultBundlePath "$RUNNER_TEMP/Screenshots.xcresult" \
             -test-timeouts-enabled YES \

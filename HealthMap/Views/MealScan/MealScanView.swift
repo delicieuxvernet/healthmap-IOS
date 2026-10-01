@@ -741,7 +741,7 @@ struct JournalView: View {
     /// déjà ajoutés aujourd'hui (entrée libre) restent listés en dessous.
     @ViewBuilder
     private var avantQuestionnaire: some View {
-        JournalAvantQuestionnaireCard { dashboardVM.demarrerBilan() }
+        JournalAvantQuestionnaireCard(reprise: dashboardVM.repriseBilan) { dashboardVM.demarrerBilan() }
             .padding(.top, 14)
 
         DSSectionHeader(titre: "En attendant, en France")

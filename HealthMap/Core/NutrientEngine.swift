@@ -179,6 +179,16 @@ enum NutrientEngine {
         return Int((Double(brut) * poids).rounded())
     }
 
+    /// Part de la cible de la semaine que les courses atteignent pour cet
+    /// apport, de 0 à 1. C'est ce que montrent les jauges du questionnaire
+    /// pendant qu'on coche ses aliments : la même grandeur que `foodDeltaBrut`,
+    /// avant qu'elle ne tombe dans une tranche. Lecture seule, aucun score n'en
+    /// dépend.
+    static func couvertureDesCourses(_ p: UserProfile, _ nutrient: GroceryNutrient) -> Double {
+        let cible = Double(max(1, targets[nutrient] ?? 5))
+        return min(1, max(0, weeklyServings(p, nutrient) / cible))
+    }
+
     /// Portions/semaine cumulées d'un rayon.
     private static func aisleServings(_ p: UserProfile, _ aisleId: String) -> Int {
         (GroceryCatalog.aisles.first { $0.id == aisleId }?.items ?? [])
