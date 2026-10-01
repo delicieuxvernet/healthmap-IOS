@@ -59,6 +59,7 @@ enum SynchroWidgets {
     /// premier plan, arrivée du bilan.
     static func synchroniser(_ dashboardVM: DashboardViewModel) async {
         guard AuthService.shared.cachedCurrentUserIdString != nil else { return }
+        brancherEau()
         var neuf = Contexte()
         neuf.bilanFait = dashboardVM.bilanComplete
         neuf.kcalObjectif = dashboardVM.bilanAffichage == .decouverte
@@ -122,6 +123,29 @@ enum SynchroWidgets {
         BoiteCommune.toutEffacer()
         WidgetCenter.shared.reloadAllTimelines()
         Task { await ActiviteJournee.terminer() }
+    }
+
+    // MARK: Eau
+
+    private static var eauBranchee = false
+
+    /// Branche le compteur d'eau du Journal (`SuiviEau`) sur les widgets : ils
+    /// le lisent, y ajoutent leurs verres en attente, et suivent chaque écriture.
+    private static func brancherEau() {
+        guard !eauBranchee else { return }
+        eauBranchee = true
+        PontEau.lire = {
+            let userId = AuthService.shared.cachedCurrentUserIdString
+            let gobelets = userId.map { SuiviEau.gobelets(userId: $0, jour: Date()) } ?? 0
+            return (gobelets, SuiviEau.gobeletsParJour, SuiviEau.centilitresParGobelet)
+        }
+        PontEau.ajouter = { nombre in
+            guard let userId = AuthService.shared.cachedCurrentUserIdString else { return }
+            SuiviEau.ajouter(nombre, userId: userId)
+        }
+        NotificationCenter.default.addObserver(forName: .healthmapEauChange, object: nil, queue: .main) { _ in
+            Task { @MainActor in SynchroWidgets.rafraichir() }
+        }
     }
 
     // MARK: Assemblage
