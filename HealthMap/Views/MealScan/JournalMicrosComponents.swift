@@ -134,6 +134,12 @@ struct JournalMicrosCard: View {
         return enAlerte + reste
     }
 
+    /// Le rapport oméga-6 / oméga-3 est une ligne de la liste, pas un
+    /// micronutriment de plus.
+    private var nombreDeMicros: Int {
+        tableau.toutes.filter { $0.sens != .rapport }.count
+    }
+
     private var titreDesPriorites: String {
         tableau.priorites.count > 1
             ? "Tes \(tableau.priorites.count) priorités, en part de ton besoin couverte"
@@ -195,7 +201,7 @@ struct JournalMicrosCard: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(deplie ? "Masquer le détail" : "Voir les \(tableau.toutes.count) micronutriments")
+                Text(deplie ? "Masquer le détail" : "Voir les \(nombreDeMicros) micronutriments")
                     .font(.dsSousTitreMoyen)
                     .tracking(DSTracking.sousTitre)
                 Image(systemName: deplie ? "chevron.up" : "chevron.down")
@@ -275,6 +281,9 @@ private struct LigneMicroVue: View {
 
     /// Ce qui s'affiche à droite quand l'apport n'a pas de chiffre.
     private var sansChiffre: String {
+        if ligne.sens == .rapport {
+            return ligne.rapport.map { MicrosDuJour.texteDuRapport($0) } ?? "À mesurer"
+        }
         if ligne.sens == .limite {
             guard let quantite = ligne.quantiteDuJour else { return "Rien de noté" }
             return "\(MicrosDuJour.quantite(quantite))\(DS.fine)\(ligne.unite)"
@@ -376,6 +385,11 @@ struct MicroDuJourSheet: View {
     @State private var montreLesCauses = false
 
     private var sousTitre: String {
+        if ligne.sens == .rapport {
+            return ligne.rapport == nil
+                ? "Pas encore de chiffre : il faut une journée de repas assez notée. Le repère de l'ANSES : 5 pour 1 ou moins."
+                : "Pour 1 g d'oméga-3, tes repas notés apportent ce nombre de grammes d'oméga-6. Le repère de l'ANSES : 5 pour 1 ou moins."
+        }
         if ligne.sens == .limite {
             return "Une limite à ne pas dépasser, suivie sur tes repas notés."
         }
@@ -385,6 +399,22 @@ struct MicroDuJourSheet: View {
         return ligne.partDuQuestionnaire
             ? "de ton besoin couvert, d'après ton questionnaire puis tes repas notés."
             : "de ton besoin couvert, d'après tes repas notés."
+    }
+
+    private var noteDuGraphe: String {
+        switch ligne.sens {
+        case .besoin: return "pointillé : 60 % du besoin"
+        case .limite: return "pointillé : la limite"
+        case .rapport: return "pointillé : 5 pour 1"
+        }
+    }
+
+    private var titreDesSources: String {
+        switch ligne.sens {
+        case .besoin: return "Où le trouver"
+        case .limite: return "Où il se cache"
+        case .rapport: return "Pour le rééquilibrer"
+        }
     }
 
     var body: some View {
@@ -411,7 +441,7 @@ struct MicroDuJourSheet: View {
 
                 FicheBloc(
                     titre: "Tes repas, jour par jour",
-                    note: ligne.sens == .limite ? "pointillé : la limite" : "pointillé : 60 % du besoin",
+                    note: noteDuGraphe,
                     rang: 2
                 ) {
                     SemaineMicroGraphe(jours: ligne.semaine, sens: ligne.sens)
@@ -421,7 +451,7 @@ struct MicroDuJourSheet: View {
                 }
 
                 if !ligne.contributeurs.isEmpty {
-                    FicheBloc(titre: "Dans tes repas cette semaine", rang: 3) {
+                    FicheBloc(titre: ligne.sens == .rapport ? "Tes oméga-6 viennent surtout de" : "Dans tes repas cette semaine", rang: 3) {
                         VStack(spacing: 0) {
                             ForEach(Array(ligne.contributeurs.enumerated()), id: \.element.id) { index, aliment in
                                 if index > 0 { DSSeparator() }
@@ -444,12 +474,12 @@ struct MicroDuJourSheet: View {
                     }
                 }
 
-                FicheBloc(titre: "À quoi ça sert", rang: 4) {
+                FicheBloc(titre: ligne.sens == .rapport ? "Pourquoi le regarder" : "À quoi ça sert", rang: 4) {
                     FicheTexteCarte(texte: ligne.role)
                 }
 
                 if !ligne.sources.isEmpty {
-                    FicheBloc(titre: ligne.sens == .limite ? "Où il se cache" : "Où le trouver", rang: 5) {
+                    FicheBloc(titre: titreDesSources, rang: 5) {
                         DSFlow(espacement: 8) {
                             ForEach(ligne.sources, id: \.self) { aliment in
                                 Text(aliment)
@@ -516,6 +546,13 @@ struct MicroDuJourSheet: View {
                 DSGauge(fraction: Double(niveau) / 100, couleur: Color.dsStatut(niveau), hauteur: 6)
                     .padding(.top, 2)
                     .padding(.bottom, 6)
+            } else if ligne.sens == .rapport, let valeur = ligne.rapport {
+                Text(MicrosDuJour.texteDuRapport(valeur))
+                    .font(.dsHeros34)
+                    .tracking(DSTracking.heros34)
+                    .foregroundStyle(Color.dsTexte)
+                    .padding(.top, 6)
+                    .padding(.bottom, 4)
             }
 
             Text(sousTitre)
@@ -560,8 +597,15 @@ private struct SemaineMicroGraphe: View {
 
     private static let hauteur: CGFloat = 84
     /// Le haut du graphe : 100 % du besoin, ou une fois et demie la limite.
-    private var plafond: Double { sens == .limite ? 150 : 100 }
-    private var repere: Double { sens == .limite ? 100 : Double(MicrosDuJour.seuilBas) }
+    private var plafond: Double {
+        switch sens {
+        case .besoin: return 100
+        case .limite: return 150
+        // 100 = 5 pour 1 ; le haut du graphe, 15 pour 1.
+        case .rapport: return 300
+        }
+    }
+    private var repere: Double { sens == .besoin ? Double(MicrosDuJour.seuilBas) : 100 }
 
     private static let initiale: DateFormatter = {
         let format = DateFormatter()
@@ -573,7 +617,7 @@ private struct SemaineMicroGraphe: View {
     private func couleur(_ couverture: Int) -> Color {
         switch sens {
         case .besoin: return couverture < MicrosDuJour.seuilBas ? .dsACombler : .dsAccent
-        case .limite: return couverture > 100 ? .dsACombler : .dsAccent
+        case .limite, .rapport: return couverture > 100 ? .dsACombler : .dsAccent
         }
     }
 
@@ -636,7 +680,8 @@ private struct SemaineMicroGraphe: View {
 
     private var libelleVocal: String {
         let mesures = jours.compactMap(\.couverture)
-        guard !mesures.isEmpty else { return resume }
+        // Un rapport ne se lit pas en pour cent : le résumé suffit.
+        guard !mesures.isEmpty, sens != .rapport else { return resume }
         let detail = mesures.map { "\($0) pour cent" }.joined(separator: ", ")
         return "\(resume) Jour par jour : \(detail)."
     }
