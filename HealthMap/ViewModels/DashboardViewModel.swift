@@ -704,4 +704,37 @@ final class DashboardViewModel: ObservableObject {
             }
         }
     }
+
+    // MARK: - Poids actuel et poids souhaité (Journal)
+
+    /// Enregistre les deux poids réglés depuis le Journal (valeurs telles
+    /// qu'elles s'écrivent dans le profil, voir `ObjectifPoids.stockage`). Si
+    /// l'écriture échoue, le profil retrouve ses valeurs d'avant : l'écran ne
+    /// ment pas sur ce qui est enregistré.
+    func enregistrerPoids(actuel: String, souhaite: String) async {
+        let avant = (actuel: profile.weight, souhaite: profile.targetWeight)
+        guard avant.actuel != actuel || avant.souhaite != souhaite else { return }
+        profile.weight = actuel
+        profile.targetWeight = souhaite
+        do {
+            guard let session = await AuthService.shared.currentSession else {
+                throw HealthMapError.auth(.sessionExpired)
+            }
+            try await databaseService.saveProfile(
+                userId: session.user.id.uuidString,
+                email: session.user.email ?? loadedEmail,
+                firstName: profile.firstName,
+                questionnaireData: profile
+            )
+            // Le poids pèse sur les besoins, donc sur les apports : on recalcule.
+            computeLocalScores()
+        } catch {
+            // Réglage repris pendant l'écriture : le pas suivant enregistrera.
+            guard !Task.isCancelled else { return }
+            profile.weight = avant.actuel
+            profile.targetWeight = avant.souhaite
+            ToastService.shared.confirmer("Poids non enregistré. Vérifie ta connexion et réessaie.")
+            AppLogger.database.report(error, context: "Save weight")
+        }
+    }
 }

@@ -12,6 +12,9 @@ struct PhysicalMetrics {
     let bmr: Int?
     let tdee: Int?
     let macros: (calories: Int, protein: Int, carbs: Int, fat: Int)?
+    /// Ce que le poids souhaité change aux cibles du jour ; nil tant qu'aucun
+    /// poids souhaité n'est réglé.
+    let objectifPoids: ObjectifPoids?
 
     init(profile: UserProfile) {
         let computedBMI = HealthCalculator.calculateBMI(
@@ -35,9 +38,21 @@ struct PhysicalMetrics {
         )
         self.tdee = computedTDEE
 
+        // Un poids souhaité réglé donne le sens de l'objectif (perdre, prendre,
+        // maintenir) ; sans lui, le premier objectif du questionnaire, comme
+        // avant. Les formules, elles, ne changent pas.
+        let objectifPoids = ObjectifPoids(profile: profile)
+        self.objectifPoids = objectifPoids
+        let objectifDeCalcul: String?
+        if let objectifPoids {
+            objectifDeCalcul = objectifPoids.objectifDeCalcul(principal: profile.goals.first)
+        } else {
+            objectifDeCalcul = profile.goals.first
+        }
+
         self.macros = HealthCalculator.calculateMacros(
             tdee: computedTDEE,
-            goal: profile.goals.first,
+            goal: objectifDeCalcul,
             weightKg: profile.weightDouble
         )
     }
