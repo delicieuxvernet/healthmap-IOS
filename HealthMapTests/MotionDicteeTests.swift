@@ -17,11 +17,14 @@ final class MotionDicteeTests: XCTestCase {
 
     func testRienNeDepasseLePlafond() {
         let echelles = [KiwiEchelle.appui, KiwiEchelle.recompenseDepart, KiwiEchelle.recompenseCrete,
-                        KiwiEchelle.impulsion]
+                        KiwiEchelle.impulsion, KiwiEchelle.coche, KiwiEchelle.iconeOnglet]
         for echelle in echelles {
             XCTAssertLessThanOrEqual(echelle, KiwiEchelle.plafond)
         }
-        XCTAssertEqual(KiwiEchelle.plafond, 1.08, accuracy: 0.0001)
+        // Verre liquide (2 octobre 2026) : le plafond suit l'icône d'onglet
+        // qui rebondit, la plus grande échelle de la maquette.
+        XCTAssertEqual(KiwiEchelle.plafond, 1.22, accuracy: 0.0001)
+        XCTAssertEqual(KiwiEchelle.coche, 1.2, accuracy: 0.0001)
         XCTAssertEqual(KiwiEchelle.appui, 0.96, accuracy: 0.0001)
         XCTAssertEqual(KiwiEchelle.impulsion, 1.035, accuracy: 0.0001)
     }

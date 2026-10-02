@@ -9,30 +9,99 @@
 
 ---
 
+## Verre liquide (2 octobre 2026)
+
+> Maquette Claude Design « Kiwio - Motion v3 - Verre liquide ». Elle remplace le fond neutre et
+> la carte blanche du socle du 23 août ; le reste du socle (vert réservé à ce qui se touche,
+> un chiffre héros par écran, typographie, formats) tient toujours.
+> Code : `HealthMap/Views/Shared/KiwiVerre.swift`, `KiwiMascotte.swift`, `KiwiMotion.swift`.
+
+**Fond.** `VerreFond` (= `DSPageBackground()`) : quatre halos flous qui dérivent lentement sur une
+base pâle. La teinte suit l'onglet (`VerreTeinte` : `kiwi` Journal · `aube` Progrès · `ciel` Plan ·
+`orchidee` Compléments · `neutre` Réglages), en fondu de 0,9 s ; la racine la pose dans
+l'environnement (`\.verreTeinte`). Une page racine ne peint jamais d'aplat. Page poussée :
+`VerrePageFond()`. Feuille : `.verreFeuille()` sur son contenu (fond de verre, coins de 38).
+
+**Verre.** Une matière = une recette (`VerreMatiere`) dessinée dans une forme (`VerrePlaque`).
+
+| Matière | Recette | Modificateur |
+|---|---|---|
+| `carte` | blanc 80 → 58 %, liseré blanc intérieur, rayon 24, ombre douce découpée | `.dsCard()` · `.verreCarte()` · `.verreCarte(teinte:)` |
+| `carteFlottante` | la même + flou vivant (au-dessus d'un contenu) | `.verreCarteFlottante()` (rayon 28) |
+| `clair` | blanc 74 → 40 %, reflet haut et bas, capsule | `.verreClair()` · `.verreClair(Circle())` |
+| `clairActif` | vert pâle (bouton déplié, choix retenu) | `.verre(.clairActif, forme:)` |
+| `principal` | vert `#8AD262 → #5DA838 → #4C982B`, même reflet | `.verrePrincipal()` · `DSCapsuleButton` |
+| `principalBombe` | le bouton Dicter (éclat sur la moitié haute) | `.verre(.principalBombe, forme:)` |
+| `barre` · `pastille` | barre d'onglets et sa pastille qui glisse | `KiwiFloatingTabBar` |
+| `piste` · `curseur` | bascule à segments | `VerreBascule` |
+| `surVoile` | bouton posé sur le voile de la dictée | `.verre(.surVoile, forme:)` |
+
+Le flou d'arrière-plan vivant (`Material`) est réservé à ce qui flotte au-dessus d'un contenu qui
+défile : barre d'onglets, bord haut (`VerreBordHaut`), voile (`VerreVoile`), feuilles, carte du Plan.
+Une carte posée sur le fond n'en porte pas. Sous « Réduire la transparence », chaque matière devient
+un aplat opaque.
+
+**Couleurs.** Une teinte par catégorie, une version foncée pour le texte posé sur fond clair. Le vert
+kiwi reste réservé à ce qui se touche.
+
+| Catégorie | Teinte | Texte |
+|---|---|---|
+| Kiwi | `teinteKiwi` #5DA838 | `teinteKiwiTexte` #3B6D11 |
+| Énergie | `teinteEnergie` #F07040 | #A94620 |
+| Vitamine D · à renforcer | `teinteVitamineD` #F1961D | #995600 |
+| Glucides | `teinteGlucides` #E6B731 | #876200 |
+| Lipides | `teinteLipides` #F18336 | #923F00 |
+| Fibres | `teinteFibres` #4CAC91 | #206C58 |
+| Vitamine C | `teinteVitamineC` #11A6AA | #006368 |
+| Eau | `teinteEau` #46B1E3 | #147298 |
+| Protéines · symptômes du Plan | `teinteProteines` #4E82E5 | #224FA7 |
+| Iode · soir | `teinteIode` #7368D4 | #5348A1 |
+| Fer | `teinteFer` #AF5FC7 | #7F3C93 |
+| Symptômes | `teinteSymptomes` #EB5070 | #B52F4E |
+| B12 · magnésium · oméga-3 · zinc · calcium | dérivées (hors maquette) : #E8605B · #2FA9CE · #3B9CF6 · #DB5FA1 · #8E8E93 | `Color.teinteApportTexte(for:)` |
+
+`Color.nutrientColor(for:)` renvoie la teinte d'un apport ; `dsProteines`, `dsGlucides`, `dsLipides`,
+`dsFibres`, `dsCalories`, `dsARenforcer` pointent sur cette palette.
+
+**Quatre mouvements, partout.** Glisse (pages, onglets) `Animation.kiwiGlisse` = `.smooth(duration: 0.45)` ·
+ressort (feuilles, zoom, bulle) `kiwiFluide` = `.spring(response: 0.5, dampingFraction: 0.82)` · rebond
+(coches, icônes, pastilles) `kiwiRebond` = `.bouncy(duration: 0.45, extraBounce: 0.2)` · compteurs
+`.contentTransition(.numericText())` + `kiwiCompteur` (0,9 s). L'appui reste `kiwiVif` (0,96).
+Effets : `.verreCascade(_:delai:)`, `.verreSurgir(_:delai:)`, `.verreGerbe(...)`, `.verreEnvol(...)`,
+`.verrePop(...)`, `.verreBrillance()`, `VerreHaloQuiRespire`. Rien ne dépasse 1,22 (`KiwiEchelle`).
+Haptique : `.selection` au changement d'onglet, `.success` à la coche, à l'ajout d'un repas et au
+rituel terminé, impact doux par gobelet. Sous « Réduire les animations » : fondus seuls, bulle fixe,
+ni particules ni rebond.
+
+**Mascotte.** `KiwiMascotte` (« Le regard ») : Réglages (ligne Premium, 44 pt, immobile) et feuille
+Premium (84 pt, animée, `KiwiMascotteHalo`). Partout ailleurs : le signe `KiwiSigne`.
+
+---
+
 ## Socle « qualité Apple » (23 août 2026)
 
 Trois règles portent 80 % de l'écart perçu :
 
-1. **Fond neutre** `Color.dsFond` (`systemGroupedBackground`, #F2F2F7). Le crème ne survit
-   qu'en voile de marque sur 240 pt (`DSBrandWash`, `DSPageBackground`).
+1. ~~Fond neutre~~ → **fond de verre** (voir « Verre liquide » ci-dessus). `Color.dsFond` (#EEF2EC)
+   ne sert plus qu'aux surfaces qui doivent rester opaques.
 2. **Le vert `Color.dsAccent` ne colore que ce qui se tape** : onglet actif, bouton, lien, `+`,
    chevron d'action. Les chiffres sont noirs (`dsTexte`). Seules les jauges gardent une couleur
-   de statut (`dsACombler` #FF3B30, `dsARenforcer` #FF9500, `dsCalories` #FF6B35) ; macros :
-   `dsProteines` #3B82F6, `dsGlucides` #34C759, `dsLipides` #FFCC00.
+   de statut (`dsACombler` #FF3B30, `dsARenforcer` #F1961D, `dsCalories` #F07040) ; macros :
+   `dsProteines` #4E82E5, `dsGlucides` #E6B731, `dsLipides` #F18336, `dsFibres` #4CAC91.
 3. **Un seul chiffre héros par écran** (`.dsHeros48`), puis deux niveaux décroissants.
 
 | Token | Valeur |
 |---|---|
-| Neutres | `dsTexte` (label) · `dsSecondaire` (secondaryLabel) · `dsTertiaire` (tertiaryLabel) · `dsSeparateur` (separator, 0,5 pt) · `dsRemplissage` (#EFEFF4) · `dsTrait` (#D1D1D6) |
+| Neutres | `dsTexte` (label) · `dsSecondaire` (secondaryLabel) · `dsTertiaire` (tertiaryLabel) · `dsSeparateur` (separator, 0,5 pt) · `dsRemplissage` (`rgba(120,120,128,.12)`) · `dsTrait` (#D1D1D6) |
 | Typo (SF Pro, ≤ 700) | `dsGrandTitre` 34/700 · `dsSection` 22/700 · `dsHeadline` 17/600 · `dsCorps` 17/400 · `dsSousTitre` 15/400 · `dsLegende` 13/400 · chiffres `dsHeros48`, `dsHeros34`, `dsValeur24`, `dsValeurLigne` (tabulaires) |
 | Tracking | `DSTracking` : −0,95 grand titre · −0,55 section · −0,4 corps · −0,2 sous-titre · −2,2 héros 48 |
-| Cartes | `.dsCard()` : blanc, rayon 14 continu, **aucune ombre, aucune bordure** |
+| Cartes | `.dsCard()` : verre dépoli, rayon 24 continu, liseré blanc intérieur, ombre douce découpée |
 | Listes | `DSGroupedList` + `DSRow` + `DSSeparator(retrait: 49 avec icône / 16 sans)` |
 | Jauges | `DSGauge` (4 pt, animée 1 s easeOut, cascade 50 ms) · `DSRing` (92 pt, trait 9) |
-| Boutons | `DSCapsuleButton` (50 pt, capsule) · `DSLinkRow` (lien vert de fin de carte) · `.dsPress` (0,96 + assombrissement, ressort `kiwiVif`) |
-| Mouvement | `KiwiMotion.swift` : ressorts `kiwiVif` · `kiwiFluide` · `kiwiRebond` · `kiwiCompteur`, échelles `KiwiEchelle` (rien au-dessus de 1,08), `ChiffreQuiCompte`, `.kiwiImpulsion(_:)`, `.kiwiRecompense(_:)` |
+| Boutons | `DSCapsuleButton` (50 pt, capsule, verre vert) · `DSLinkRow` (lien vert de fin de carte) · `DSCloseButton` (rond de verre de 36) · `.dsPress` (0,96 + assombrissement, ressort `kiwiVif`) |
+| Mouvement | `KiwiMotion.swift` : `kiwiVif` · `kiwiGlisse` · `kiwiFluide` · `kiwiRebond` · `kiwiCompteur`, échelles `KiwiEchelle` (rien au-dessus de 1,22), `ChiffreQuiCompte`, `.kiwiImpulsion(_:)`, `.kiwiRecompense(_:)` |
 | Formats | `DS.entier(1021)` → `1 021` · `DS.pourcent(42)` → `42 %` · `DS.decimal(5.9)` → `5,9` (espace fine U+202F) |
-| Navigation | `KiwiFloatingTabBar` (capsule, 5 onglets) · `DSAddButton` (60 pt) · grands titres natifs `.large` |
+| Navigation | `KiwiFloatingTabBar` (capsule de verre de 62, pastille qui glisse, 5 onglets) · grands titres natifs `.large` |
 
 Vocabulaire imposé (CI) : « apports à renforcer », « à combler », « besoins », jamais les quatre
 mots proscrits par `VoiceComplianceTests`. Aucun emoji dans l'interface (seule exception : le kiwi 3D
