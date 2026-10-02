@@ -18,6 +18,13 @@ import UniformTypeIdentifiers
 //
 // Vocabulaire : « repère du laboratoire », « à optimiser », « dans les
 // repères ». Jamais de verdict ; le médecin est cité, pas remplacé.
+//
+// Verre liquide (2 octobre 2026) : la feuille est en verre, les cartes aussi.
+// Le ton est celui de la carte du Journal : pastille rouge à 10 %, étiquette
+// ambrée « Nouveau · bêta », mention « Ne remplace pas un avis médical ». La
+// zone de dépôt est en verre clair à bord pointillé, « Photographier la page »
+// en verre vert, les deux autres voies en capsules de verre clair. Les
+// compteurs des repères comptent, les cartes de valeurs arrivent en cascade.
 
 struct PriseDeSangSheet: View {
     @EnvironmentObject private var dashboardVM: DashboardViewModel
@@ -48,7 +55,6 @@ struct PriseDeSangSheet: View {
                 .padding(.horizontal, DS.marge)
                 .padding(.bottom, 40)
             }
-            .background(Color.dsFond.ignoresSafeArea())
             .navigationTitle(titre)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -57,6 +63,8 @@ struct PriseDeSangSheet: View {
                 }
             }
         }
+        // La feuille ne peint plus d'aplat : fond de verre et coins de 38.
+        .verreFeuille()
         .onAppear {
             if dashboardVM.priseDeSang != nil { etape = .resultat }
         }
@@ -157,6 +165,7 @@ struct PriseDeSangSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Nouveau · en bêta")
                 .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
             Text("Kiwio lit tes analyses et regarde si tes vitamines et minéraux vont dans le même sens que ton profil. Tes apports, ton bilan et ton plan s'ajustent.")
                 .font(.dsLegende)
                 .fixedSize(horizontal: false, vertical: true)
@@ -164,12 +173,13 @@ struct PriseDeSangSheet: View {
                 .font(.dsLegende)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .foregroundStyle(Color(hex: "8A560F"))
-        .padding(12)
+        // L'encre ambrée de l'étiquette « Nouveau · bêta », sur l'ambre à 14 %.
+        .foregroundStyle(Color.teinteAmbreEncre)
+        .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
-                .fill(Color.dsARenforcer.opacity(0.14))
+                .fill(Color.teinteVitamineD.opacity(0.14))
         )
         .accessibilityElement(children: .combine)
     }
@@ -177,44 +187,57 @@ struct PriseDeSangSheet: View {
     /// Le médecin est cité, pas remplacé : la même carte avant le dépôt et
     /// au-dessus des résultats.
     private func carteMedecin(_ texte: LocalizedStringKey) -> some View {
-        HStack(alignment: .top, spacing: 9) {
-            Image(systemName: "stethoscope")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Color.dsAccent)
-                .accessibilityHidden(true)
+        HStack(alignment: .top, spacing: 12) {
+            VerrePastilleIcone(symbole: "stethoscope", taille: 36, tailleIcone: 18)
             Text(texte)
                 .font(.dsLegende)
+                .tracking(DSTracking.legende)
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 36, alignment: .center)
         }
-        .padding(12)
+        .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
     }
 
     // MARK: Dépôt
 
+    /// La forme de la zone de dépôt : une tuile de verre clair de rayon 22.
+    private var formeDepot: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+    }
+
+    /// Zone de dépôt : verre clair à bord pointillé, pastille rouge à 10 %
+    /// (la même que sur la carte du Journal).
     private var zoneDeDepot: some View {
         VStack(spacing: 10) {
             Image(systemName: "doc.text.viewfinder")
-                .font(.system(size: 40, weight: .regular))
-                .foregroundStyle(Color.dsSecondaire)
+                .font(.system(size: 26, weight: .medium))
+                .foregroundStyle(Color.dsACombler.opacity(0.85))
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(Color.dsACombler.opacity(0.10)))
+                .accessibilityHidden(true)
             Text("Dépose ta prise de sang")
                 .font(.dsHeadline)
+                .tracking(DSTracking.corps)
                 .foregroundStyle(Color.dsTexte)
             Text("La page des résultats, avec les valeurs de référence.")
                 .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.vertical, 34)
+        .padding(.vertical, 30)
         .padding(.horizontal, DS.paddingCarte)
         .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.dsTrait, style: StrokeStyle(lineWidth: 2, dash: [7, 6]))
-                .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.dsCarte))
-        )
+        .verreClair(formeDepot)
+        .overlay {
+            formeDepot
+                .strokeBorder(Color.dsTertiaire, style: StrokeStyle(lineWidth: 1.5, dash: [7, 6]))
+                .allowsHitTesting(false)
+        }
     }
 
     private var depot: some View {
@@ -258,6 +281,7 @@ struct PriseDeSangSheet: View {
         }
     }
 
+    /// Action secondaire : capsule de verre clair, encre du texte.
     private func optionLabel(_ symbole: String, _ titre: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: symbole)
@@ -266,13 +290,15 @@ struct PriseDeSangSheet: View {
                 .accessibilityHidden(true)
             Text(titre)
                 .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsTexte)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
         }
+        .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, minHeight: DS.hauteurBouton)
-        .dsCard()
-        .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+        .verreClair()
+        .contentShape(Capsule())
     }
 
     private func ligneInfo(_ symbole: String, _ texte: String) -> some View {
@@ -301,15 +327,21 @@ struct PriseDeSangSheet: View {
             VStack(spacing: 6) {
                 Text("Kiwio lit tes résultats…")
                     .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
                     .foregroundStyle(Color.dsTexte)
                 Text("On repère les valeurs et on prépare tes repères nutrition. Quelques secondes.")
                     .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(.vertical, 36)
+        .padding(.horizontal, DS.paddingCarte)
         .frame(maxWidth: .infinity)
-        .padding(.top, 90)
+        .dsCard()
+        .padding(.top, 60)
         .accessibilityElement(children: .combine)
     }
 
@@ -371,9 +403,10 @@ struct PriseDeSangSheet: View {
                 .padding(.top, 8)
 
             HStack(spacing: 10) {
-                compteur(aOptimiser, "à optimiser", fond: Color.dsARenforcer.opacity(0.14), encre: Color(hex: "8A560F"))
-                compteur(dansReperes, "dans les repères", fond: Color.dsAccentPale, encre: Color.kiwiGreenInk)
+                compteur(aOptimiser, "à optimiser", fond: Color.teinteVitamineD.opacity(0.14), encre: Color.teinteAmbreEncre)
+                compteur(dansReperes, "dans les repères", fond: Color.teinteKiwi.opacity(0.14), encre: Color.teinteKiwiTexte)
             }
+            .kiwiEntrance(0)
 
             carteMedecin("Repères **nutritionnels** : Kiwio compare tes valeurs aux repères imprimés par ton laboratoire, sans remplacer un avis médical. Montre ces résultats à ton médecin.")
 
@@ -386,7 +419,11 @@ struct PriseDeSangSheet: View {
             }
             .padding(.horizontal, 4)
 
-            ForEach(prise.markers) { carte($0) }
+            // Une carte par valeur, en cascade (plafonnée par `kiwiEntrance`).
+            ForEach(Array(prise.markers.enumerated()), id: \.element.id) { rang, marqueur in
+                carte(marqueur)
+                    .kiwiEntrance(rang + 1)
+            }
 
             if !effets.isEmpty {
                 DSSectionHeader(titre: "Ton bilan en tient compte")
@@ -423,19 +460,24 @@ struct PriseDeSangSheet: View {
         }
     }
 
+    /// Un compteur des repères : le chiffre compte jusqu'à sa valeur, en SF Pro
+    /// Rounded, sur une tuile à 14 % de sa teinte.
     private func compteur(_ n: Int, _ libelle: String, fond: Color, encre: Color) -> some View {
         VStack(spacing: 2) {
-            Text("\(n)")
-                .font(.dsValeur24)
+            PriseDeSangChiffre(valeur: n)
+                .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
+                .tracking(DSTracking.valeur24)
                 .foregroundStyle(encre)
             Text(libelle)
                 .font(.dsLegende)
+                .tracking(DSTracking.legende)
                 .foregroundStyle(encre)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous).fill(fond))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(n) \(libelle)")
     }
 
     private func carte(_ m: MarqueurSanguin) -> some View {
@@ -445,7 +487,9 @@ struct PriseDeSangSheet: View {
             HStack(alignment: .center, spacing: 10) {
                 Text(m.libelle)
                     .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
                     .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 pastille(etat)
             }
@@ -466,7 +510,7 @@ struct PriseDeSangSheet: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "fork.knife")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.dsAccent)
+                        .foregroundStyle(Verre.iconeNeutre)
                         .accessibilityHidden(true)
                     Text("**Côté assiette :** \(aliments.joined(separator: ", "))")
                         .font(.dsLegende)
@@ -477,7 +521,7 @@ struct PriseDeSangSheet: View {
             case .dansLesReperes:
                 Label("Continue comme ça", systemImage: "face.smiling")
                     .font(.dsLegende)
-                    .foregroundStyle(Color.kiwiGreenInk)
+                    .foregroundStyle(Color.teinteKiwiTexte)
                     .padding(.top, 9)
             case .auDessus:
                 Text("Au-dessus du repère : rien à ajouter côté assiette. Parles-en à ton médecin.")
@@ -506,16 +550,16 @@ struct PriseDeSangSheet: View {
     private func pastille(_ etat: PriseDeSangApports.Etat) -> some View {
         let (fond, encre, symbole): (Color, Color, String) = {
             switch etat {
-            case .aOptimiser: return (Color.dsARenforcer.opacity(0.14), Color(hex: "8A560F"), "arrow.up.right")
-            case .dansLesReperes: return (Color.dsAccentPale, Color.kiwiGreenInk, "checkmark")
-            case .auDessus, .sansRepere: return (Color.dsBoutonNeutre, Color.dsSecondaire, "minus")
+            case .aOptimiser: return (Color.teinteVitamineD.opacity(0.14), Color.teinteAmbreEncre, "arrow.up.right")
+            case .dansLesReperes: return (Color.teinteKiwi.opacity(0.14), Color.teinteKiwiTexte, "checkmark")
+            case .auDessus, .sansRepere: return (Verre.remplissage, Color.dsSecondaire, "minus")
             }
         }()
         return Label(etat.libelle, systemImage: symbole)
-            .font(.dsLegendeMoyenne)
+            .font(.dsLegende.weight(.semibold))
             .foregroundStyle(encre)
             .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             .background(Capsule().fill(fond))
     }
 
@@ -558,18 +602,46 @@ struct PriseDeSangSheet: View {
     }
 }
 
+// MARK: - Chiffre qui compte
+
+/// Le chiffre d'un compteur des repères : il part de zéro et compte jusqu'à sa
+/// valeur à l'apparition, puis à chaque changement. Sous « Réduire les
+/// animations », il prend directement sa valeur.
+private struct PriseDeSangChiffre: View {
+    let valeur: Int
+
+    @State private var affiche: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ChiffreQuiCompte(valeur: affiche)
+            .onAppear { compter() }
+            .onChange(of: valeur) { _, _ in compter() }
+    }
+
+    private func compter() {
+        if reduceMotion {
+            affiche = Double(valeur)
+        } else {
+            withAnimation(Animation.kiwiCompteur) { affiche = Double(valeur) }
+        }
+    }
+}
+
 // MARK: - Pastille « Nouveau · bêta »
 
 /// La lecture d'un compte rendu est récente et peut se tromper : on le dit là
 /// où la fonction se présente (carte du Journal et du Bilan, feuille).
+/// Étiquette ambrée de la maquette : 11 / 600, encre `#7F490C` sur l'ambre à
+/// 14 %.
 struct PriseDeSangPastilleBeta: View {
     var body: some View {
         Text("Nouveau · bêta")
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color(hex: "8A560F"))
+            .foregroundStyle(Color.teinteAmbreEncre)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Color.dsARenforcer.opacity(0.14), in: Capsule())
+            .background(Color.teinteVitamineD.opacity(0.14), in: Capsule())
             .accessibilityLabel("Nouveau, en bêta")
     }
 }
@@ -635,6 +707,7 @@ struct PriseDeSangCarte: View {
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 12) {
+                    // Pastille rouge à 10 %, goutte à 85 % : la maquette.
                     Image(systemName: "drop.fill")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(Color.dsACombler.opacity(0.85))
@@ -644,6 +717,7 @@ struct PriseDeSangCarte: View {
                         DSFlow(espacement: 6) {
                             Text("Prise de sang")
                                 .font(.dsHeadline)
+                                .tracking(DSTracking.corps)
                                 .foregroundStyle(Color.dsTexte)
                             // Les pastilles se centrent sur la ligne du titre.
                             PriseDeSangPastilleBeta().frame(minHeight: 22)
@@ -651,6 +725,8 @@ struct PriseDeSangCarte: View {
                         }
                         Text(Self.sousTitre(prise))
                             .font(.dsSousTitre)
+                            .tracking(DSTracking.sousTitre)
+                            .lineSpacing(2)
                             .foregroundStyle(Color.dsSecondaire)
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)

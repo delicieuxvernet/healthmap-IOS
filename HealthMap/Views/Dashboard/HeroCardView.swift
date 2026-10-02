@@ -18,36 +18,33 @@ struct RedFlagsCardView: View {
             BilanV7SectionLabel(
                 icon: "exclamationmark.triangle",
                 text: "Important pour toi",
-                color: BilanV7.alertInk
+                color: BilanV7.alertInk,
+                teinte: teinteCarte
             )
 
             ForEach(Array(flags.enumerated()), id: \.element.id) { index, flag in
                 let tint = urgencyColor(flag.urgency)
-                HStack(spacing: 11) {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(tint.opacity(0.12))
-                        .frame(width: 34, height: 34)
-                        .overlay(
-                            Image(systemName: urgencyIcon(flag.urgency))
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(tint)
-                        )
-                        .accessibilityHidden(true)
+                HStack(spacing: 12) {
+                    // Pastille ronde à 12 % de la teinte de l'urgence.
+                    VerrePastilleIcone(
+                        symbole: urgencyIcon(flag.urgency),
+                        teinte: tint,
+                        taille: 36,
+                        tailleIcone: 18
+                    )
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(urgencyLabel(flag.urgency))
-                            .font(.system(size: 11, weight: .bold))
-                            .kerning(0.3)
-                            .textCase(.uppercase)
-                            .foregroundStyle(tint)
+                            .font(.dsLegende.weight(.semibold))
+                            .foregroundStyle(urgencyInk(flag.urgency))
                         // Sécurité avant commerce : ce message est la
                         // conclusion la plus forte de l'écran. Il passe donc
-                        // en 17 / heavy, au-dessus de la carte « Kiwio
+                        // en 17 / 600, au-dessus de la carte « Kiwio
                         // Premium » (ramenée à 15 / semibold) qui le
                         // dominait jusqu'ici.
                         Text(flag.message)
-                            .font(Theme.conclusionFont)
-                            .tracking(Theme.conclusionTracking)
+                            .font(.dsHeadline)
+                            .tracking(DSTracking.corps)
                             .lineSpacing(2)
                             .foregroundStyle(BilanV7.ink)
                             .fixedSize(horizontal: false, vertical: true)
@@ -59,7 +56,7 @@ struct RedFlagsCardView: View {
                 .padding(.vertical, 10)
                 .overlay(alignment: .bottom) {
                     if index < flags.count - 1 {
-                        Rectangle().fill(BilanV7.hairline).frame(height: 1)
+                        Rectangle().fill(BilanV7.hairline).frame(height: 0.5)
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -70,13 +67,16 @@ struct RedFlagsCardView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.dsCarte)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(BilanV7.statusFill.opacity(0.18), lineWidth: 1)
-        )
-        // (ombre retirée, refonte 23 août 2026)
+        // Carte de verre, teintée dans son coin à la couleur de l'alerte la
+        // plus pressante : elle se distingue des autres cartes sans filet.
+        .verreCarte(teinte: teinteCarte)
+    }
+
+    /// La teinte de la carte : celle de l'alerte la plus pressante.
+    private var teinteCarte: Color {
+        if flags.contains(where: { $0.urgency == .immediate }) { return BilanV7.statusFill }
+        if flags.contains(where: { $0.urgency == .soon }) { return BilanV7.statusReinforce }
+        return Color.teinteProteines
     }
 
     /// Palette v7 (couleur = sens) plutôt que les anciens tons « tout bleu » :
@@ -85,7 +85,17 @@ struct RedFlagsCardView: View {
         switch urgency {
         case .immediate: return BilanV7.statusFill
         case .soon: return BilanV7.statusReinforce
-        case .routine: return BilanV7.blue
+        case .routine: return Color.teinteProteines
+        }
+    }
+
+    /// Encre du mot d'urgence : la version foncée de la teinte, lisible sur le
+    /// verre (l'ambre plein ne tient pas le contraste en petit corps).
+    private func urgencyInk(_ urgency: RedFlag.Urgency) -> Color {
+        switch urgency {
+        case .immediate: return BilanV7.statusFill
+        case .soon: return Color.dsARenforcerTexte
+        case .routine: return Color.teinteProteinesTexte
         }
     }
 

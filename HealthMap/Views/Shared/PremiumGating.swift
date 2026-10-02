@@ -5,7 +5,7 @@ import SwiftUI
 // Porte fidèle du cahier `instructions-claude-code-premium.md` (§2-§3) et de
 // la planche `Premium - etats (HTML).html`. Trois composants réutilisables
 // appliqués aux 33 zones du quadrillage :
-//   • GatedOverlay(intensity:) { … }  → blur + voile + interaction coupée
+//   • GatedOverlay(intensity:) { … }  → flou + interaction coupée (+ pastille)
 //   • UnlockDoor(…)                   → la porte (bénéfice spécifique)
 //   • PremiumTeaseCard(…)             → l'écrin « analyse personnelle » (var. B)
 //   • QuotaMeter / QuotaWall          → famille 5 (scans, vocal)
@@ -15,31 +15,43 @@ import SwiftUI
 // Jamais de mur vide : la silhouette reste lisible sous le flou.
 //
 // DA : accent unique vert kiwi (#5DA838), sentence case, SF Symbols, chiffres
-// en monospace. Valeurs de flou verrouillées par le cahier (6px teaser / 8px
-// locked) — ne pas dériver.
+// en monospace.
+//
+// ── Verre liquide (2 octobre 2026) ──────────────────────────────────────────
+// La maquette « Motion v3 - Verre liquide » ne montre plus qu'UN traitement du
+// contenu verrouillé : flou 8, opacité 0,5, et une pastille de verre vert de
+// 36 pt posée dessus (cadenas + « Voir ta courbe »). Les cartes sont en verre,
+// le voile blanc qui « fondait la zone dans la carte » n'a plus lieu d'être
+// (la carte est translucide : il y ferait une tache). Et la feuille Premium
+// grandit depuis la carte touchée : voir `feuillePremium` plus bas.
 
 // MARK: - Intensité du flou (les 2 états gatés)
 enum GateIntensity {
-    /// Teaser : aperçu de qualité, le contenu gaté reste bien lisible en
-    /// silhouette. blur 6px / opacity .7.
+    /// Teaser : aperçu de qualité, la silhouette du contenu reste lisible.
     case teaser
-    /// Verrouillé : zone entièrement gatée mais structurée. blur 8px / opacity
-    /// .6 — seule la structure (créneaux, catégories) transparaît.
+    /// Verrouillé : zone entièrement gatée mais structurée — seule la
+    /// structure (créneaux, catégories) transparaît.
     case locked
 
-    var blur: CGFloat { self == .teaser ? 6 : 8 }
-    var opacity: Double { self == .teaser ? 0.7 : 0.6 }
+    // Les deux états partagent désormais les valeurs de la maquette (flou 8,
+    // opacité 0,5). Les deux cas restent : ils disent l'intention de l'appelant.
+    var blur: CGFloat { 8 }
+    var opacity: Double { 0.5 }
 }
 
-// MARK: - GatedOverlay — floute un contenu + pose le voile dégradé
+// MARK: - GatedOverlay — floute un contenu, pose la pastille dessus
 /// Enveloppe le contenu à gater : applique le flou, coupe toute interaction
-/// (`allowsHitTesting(false)` → pas de sélection/copie du texte flouté), puis
-/// pose le voile dégradé (transparent → couleur de carte) qui fond la zone
-/// floutée dans la carte. Le voile utilise `healthMapCard` (blanc en light,
-/// sombre en dark) pour rester correct dans les deux thèmes — l'intention du
-/// cahier (« fondre dans la carte »), fidèle à la planche validée en light.
+/// (`allowsHitTesting(false)` → pas de sélection/copie du texte flouté) et le
+/// masque à VoiceOver. Avec `pastille`, la pastille de verre vert de la
+/// maquette (« Voir ta courbe ») est posée sur le contenu flouté et ouvre la
+/// feuille Premium ; sans, le contenu est seulement flouté (la porte est alors
+/// posée à côté par l'appelant, avec `UnlockDoor`).
 struct GatedOverlay<Content: View>: View {
     let intensity: GateIntensity
+    /// Libellé de la pastille posée sur le contenu flouté. `nil` : aucune.
+    var pastille: String? = nil
+    /// Identifiant de zone de la pastille (tracking paywall contextualisé).
+    var zone: String = ""
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -47,16 +59,171 @@ struct GatedOverlay<Content: View>: View {
             .blur(radius: intensity.blur)
             .opacity(intensity.opacity)
             .allowsHitTesting(false)
-            .overlay(
-                LinearGradient(
-                    colors: [Color.dsCarte.opacity(0), Color.dsCarte.opacity(0.55)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .allowsHitTesting(false)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
             .accessibilityHidden(true)
+            .overlay {
+                if let pastille {
+                    PremiumPastille(titre: pastille, zone: zone)
+                }
+            }
+    }
+}
+
+// MARK: - La feuille Premium grandit depuis la carte touchée
+//
+// Maquette : « Toucher la carte verrouillée ou la ligne Premium : la feuille
+// grandit depuis la carte touchée ». iOS 18 et plus :
+// `.navigationTransition(.zoom(sourceID:in:))` ; iOS 17 : une `.sheet` simple.
+//
+// Deux façons de l'adopter :
+//   • la vue touchée porte aussi la feuille → `.feuillePremium(isPresented:source:)`
+//     remplace `.sheet { PaywallView(source:).healthMapFullSheet() }` ;
+//   • la feuille est présentée ailleurs (racine de l'écran) → la vue touchée
+//     reçoit `.premiumOrigine(id, dans: espace)` et le contenu de la feuille
+//     `.premiumDepuis(id, dans: espace)`, avec le même `@Namespace`.
+
+/// Marque la vue d'où part la feuille Premium. Sans effet avant iOS 18.
+private struct PremiumOrigine<ID: Hashable>: ViewModifier {
+    let id: ID
+    let espace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.matchedTransitionSource(id: id, in: espace)
+        } else {
+            content
+        }
+    }
+}
+
+/// Fait grandir la feuille depuis la vue marquée. Sans effet avant iOS 18.
+private struct PremiumDepuis<ID: Hashable>: ViewModifier {
+    let id: ID
+    let espace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.navigationTransition(.zoom(sourceID: id, in: espace))
+        } else {
+            content
+        }
+    }
+}
+
+/// La vue touchée ET sa feuille Premium : la feuille grandit depuis la vue.
+private struct FeuillePremium: ViewModifier {
+    @Binding var estPresentee: Bool
+    let source: String
+
+    @Namespace private var espace
+
+    func body(content: Content) -> some View {
+        content
+            .premiumOrigine("premium", dans: espace)
+            .sheet(isPresented: $estPresentee) {
+                PaywallView(source: source)
+                    .healthMapFullSheet()
+                    .premiumDepuis("premium", dans: espace)
+            }
+    }
+}
+
+extension View {
+    /// À poser sur la carte (ou le bouton) d'où part la feuille Premium.
+    func premiumOrigine<ID: Hashable>(_ id: ID, dans espace: Namespace.ID) -> some View {
+        modifier(PremiumOrigine(id: id, espace: espace))
+    }
+
+    /// À poser sur le CONTENU de la feuille Premium (`PaywallView`).
+    func premiumDepuis<ID: Hashable>(_ id: ID, dans espace: Namespace.ID) -> some View {
+        modifier(PremiumDepuis(id: id, espace: espace))
+    }
+
+    /// Présente la feuille Premium, qui grandit depuis cette vue. `source`
+    /// est transmis au paywall pour le suivi de conversion.
+    func feuillePremium(isPresented: Binding<Bool>, source: String = "generic") -> some View {
+        modifier(FeuillePremium(estPresentee: isPresented, source: source))
+    }
+}
+
+// MARK: - Pastille de déverrouillage (verre vert, 36 pt)
+/// La pastille posée sur un contenu flouté : cadenas + un bénéfice précis
+/// (« Voir ta courbe »), en verre vert. Elle ouvre la feuille Premium, qui
+/// grandit depuis elle ; `onUnlock` permet une navigation à la charge de
+/// l'appelant.
+struct PremiumPastille: View {
+    let titre: String
+    /// Identifiant de zone (tracking paywall contextualisé).
+    var zone: String = ""
+    /// Navigation custom ; si nil → présente `PaywallView`.
+    var onUnlock: (() -> Void)? = nil
+
+    @State private var showPaywall = false
+
+    var body: some View {
+        Button {
+            HapticService.shared.tap()
+            if let onUnlock {
+                onUnlock()
+            } else {
+                showPaywall = true
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "lock")
+                    .font(.system(size: 15, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text(titre)
+                    .font(.dsSousTitreFort)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 36)
+            .verrePrincipal()
+            // 36 pt de haut : la cible tactile déborde de 4 pt pour atteindre 44.
+            .contentShape(Rectangle().inset(by: -4))
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityLabel(titre)
+        .accessibilityHint("Ouvre Kiwio Premium.")
+        .feuillePremium(isPresented: $showPaywall, source: zone.isEmpty ? "premium_gate" : zone)
+    }
+}
+
+// MARK: - Action principale d'une feuille Premium (verre vert, 54 pt)
+/// « Essayer 7 jours gratuits », « Voir l'offre » : le verre vert de l'action
+/// principale, à la hauteur d'une feuille (54 pt), traversé par un reflet
+/// toutes les 3,2 s. Le reflet passe SOUS le texte, comme sur la maquette.
+struct PremiumAction: View {
+    let titre: String
+    var chargement: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Text(titre)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .opacity(chargement ? 0 : 1)
+                if chargement {
+                    ProgressView().tint(.white)
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: Verre.hauteurAction)
+            .background {
+                Color.clear
+                    .verrePrincipal()
+                    .verreBrillance()
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.dsPress)
     }
 }
 
@@ -111,8 +278,8 @@ struct PremiumTeaseHeader: View {
     }
 }
 
-/// Tuile de promesse : libellé net, deuxième ligne floutée. Fond gris
-/// neutre, encre du DS (plus d'emoji).
+/// Tuile de promesse : libellé net, deuxième ligne floutée. Tuile neutre
+/// translucide (elle est posée sur une carte de verre), encre du DS.
 private struct PremiumTeaseTile: View {
     let promise: PremiumTeasePromise
 
@@ -138,8 +305,8 @@ private struct PremiumTeaseTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(9)
-        .background(Color.dsRemplissage)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Verre.tuileInactive)
+        .clipShape(RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(promise.label), réservé à Kiwio Premium")
     }
@@ -160,7 +327,8 @@ private struct PremiumTeaseButton: View {
                 DSChevron(couleur: .dsAccent)
             }
             .frame(minHeight: 32)
-            .contentShape(Rectangle())
+            // 32 pt de haut : la cible tactile déborde de 6 pt pour atteindre 44.
+            .contentShape(Rectangle().inset(by: -6))
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel(title)
@@ -215,10 +383,7 @@ struct PremiumTeaseCard: View {
         .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
-        .sheet(isPresented: $showPaywall) {
-            PaywallView(source: zone.isEmpty ? "premium_gate" : zone)
-                .healthMapFullSheet()
-        }
+        .feuillePremium(isPresented: $showPaywall, source: zone.isEmpty ? "premium_gate" : zone)
     }
 }
 
@@ -230,8 +395,9 @@ struct PremiumTeaseCard: View {
 ///
 /// Présentation « variante B » (18 août 2026) : la porte pleine largeur porte
 /// l'écrin premium (dégradé violet, kicker, badge, CTA kiwi). La variante
-/// compacte reste l'ancien aplat kiwi : elle sert de bouton de mur de quota,
-/// pas d'écrin de teasing.
+/// compacte est une capsule de verre vert : elle sert de bouton de mur de
+/// quota, pas d'écrin de teasing. Dans les deux cas, la feuille Premium
+/// grandit depuis la porte (iOS 18 et plus).
 struct UnlockDoor: View {
     let icon: String
     let title: String
@@ -265,7 +431,8 @@ struct UnlockDoor: View {
 
     /// Maquette « Fiche apport · gratuit » : cadenas + titre en headline, la
     /// précision en secondaire, puis la capsule d'essai (libellé lu depuis
-    /// StoreKit, jamais codé en dur). Carte blanche, sans ombre.
+    /// StoreKit, jamais codé en dur). Carte de verre ; la feuille Premium
+    /// grandit depuis elle.
     private var fullDoor: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
@@ -300,13 +467,10 @@ struct UnlockDoor: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
         .accessibilityElement(children: .contain)
-        .sheet(isPresented: $showPaywall) {
-            PaywallView(source: zone.isEmpty ? "premium_gate" : zone)
-                .healthMapFullSheet()
-        }
+        .feuillePremium(isPresented: $showPaywall, source: zone.isEmpty ? "premium_gate" : zone)
     }
 
-    /// Mur de quota : capsule pleine, sans ombre.
+    /// Mur de quota : capsule de verre vert, l'action principale.
     private var compactDoor: some View {
         Button {
             ouvrir()
@@ -319,18 +483,16 @@ struct UnlockDoor: View {
                     .font(.dsSousTitreFort)
                     .foregroundStyle(.white)
             }
+            .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
-            .frame(height: DS.hauteurBouton)
-            .background(Capsule().fill(Color.dsAccent))
+            .frame(minHeight: DS.hauteurBouton)
+            .verrePrincipal()
             .contentShape(Capsule())
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel(subtitle == nil ? title : "\(title). \(subtitle ?? "")")
         .accessibilityAddTraits(.isButton)
-        .sheet(isPresented: $showPaywall) {
-            PaywallView(source: zone.isEmpty ? "premium_gate" : zone)
-                .healthMapFullSheet()
-        }
+        .feuillePremium(isPresented: $showPaywall, source: zone.isEmpty ? "premium_gate" : zone)
     }
 }
 
@@ -367,7 +529,7 @@ struct QuotaMeter: View {
             HStack(spacing: 7) {
                 ForEach(0..<max(1, total), id: \.self) { index in
                     Capsule()
-                        .fill(index < used ? Color.dsAccent : Color.dsAccent.opacity(0.18))
+                        .fill(index < used ? Color.dsAccent : Verre.remplissage)
                         .frame(height: 8)
                 }
             }
@@ -384,11 +546,7 @@ struct QuotaMeter: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.dsTexte.opacity(0.04), lineWidth: 1)
-        )
+        .dsCard()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label) : \(used) sur \(total). Il te reste \(remaining) \(unit)\(remaining > 1 ? "s" : "").")
     }
@@ -409,15 +567,13 @@ struct QuotaWall: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.dsRemplissage)
-                    .frame(width: 52, height: 52)
-                Image(systemName: icon)
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(Color.dsAccent)
-            }
-            .accessibilityHidden(true)
+            // Pastille ronde de la palette : fond à 12 % de la teinte.
+            Image(systemName: icon)
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(Color.teinteKiwi)
+                .frame(width: 52, height: 52)
+                .background(Circle().fill(Color.teinteKiwi.opacity(0.12)))
+                .accessibilityHidden(true)
 
             Text(title)
                 .font(.system(size: 16, weight: .bold))
@@ -446,11 +602,7 @@ struct QuotaWall: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity)
-        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.dsTexte.opacity(0.04), lineWidth: 1)
-        )
+        .dsCard()
     }
 }
 
@@ -484,5 +636,5 @@ struct QuotaWall: View {
         }
         .padding()
     }
-    .background(Color.healthMapWarm)
+    .background(DSPageBackground())
 }

@@ -5,6 +5,9 @@ import SwiftUI
 // Le panier, derrière la mosaïque : les tuiles ne portent ni dose, ni prix, ni
 // marque ; le budget mensuel vit ici. Habillage pur : produits et prix viennent
 // du moteur (`SupplementEngine`), inchangés. Tokens : `KiwiDS.swift`.
+//
+// Verre liquide (2 octobre 2026) : feuille de verre, bascule de verre pour la
+// qualité, liste posée sur une carte de verre.
 
 // MARK: - Ligne « Ma sélection » (pied de liste, discrète)
 
@@ -64,6 +67,7 @@ struct ComplementsSelectionSheet: View {
                             .font(.dsGrandTitre)
                             .tracking(DSTracking.grandTitre)
                             .foregroundStyle(Color.dsTexte)
+                            .accessibilityAddTraits(.isHeader)
                         Text("\(totalLabel) par mois, au prix du marché")
                             .font(.dsSousTitre)
                             .tracking(DSTracking.sousTitre)
@@ -73,11 +77,16 @@ struct ComplementsSelectionSheet: View {
                     DSCloseButton { dismiss() }
                 }
 
-                Picker("Qualité", selection: $premium) {
-                    Text("Économique").tag(false)
-                    Text("Premium").tag(true)
-                }
-                .pickerStyle(.segmented)
+                // La même bascule de verre que celle de l'onglet.
+                VerreBascule(
+                    selection: $premium,
+                    options: [
+                        (valeur: false, libelle: "Économique"),
+                        (valeur: true, libelle: "Premium"),
+                    ]
+                )
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Qualité")
                 .padding(.top, 18)
                 Text(premium ? "Les formes que ton corps absorbe le mieux."
                              : "Des formes plus simples, un peu moins bien absorbées.")
@@ -139,9 +148,9 @@ struct ComplementsSelectionSheet: View {
             .padding(.top, 12)
             .padding(.bottom, 30)
         }
-        .background(Color.dsFond)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(34)
+        // Feuille de verre : le fond et les coins de 38 viennent du socle.
+        .verreFeuille()
     }
 }

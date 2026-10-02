@@ -70,6 +70,12 @@ struct SafeFluent3DIcon: View {
 ///      bilan, le détail du calcul.
 /// Aucune redirection vers un autre onglet. Aucun chiffre inventé : tout ce
 /// qui se calcule vient de `LectureApport`.
+///
+/// Verre liquide (2 octobre 2026) : c'est LA fiche d'apport de la maquette.
+/// Feuille de verre, cartes de verre, filets bord à bord entre deux lignes,
+/// causes et gestes en cascade (0,2 + i × 0,07 puis 0,45 + i × 0,08), barres
+/// de poids qui se remplissent en 0,8 s, aliments en pastilles de verre clair
+/// qui surgissent.
 struct ApportV2DetailSheet: View {
     let apport: ApportV2
 
@@ -82,7 +88,8 @@ struct ApportV2DetailSheet: View {
     @State private var surligne: String?
     @State private var causeOuverte: CauseOuverte?
     @State private var enSavoirPlus = false
-    /// Les barres de poids se remplissent à l'arrivée de la fiche.
+    /// La fiche est arrivée : les lignes entrent en cascade, les barres de
+    /// poids se remplissent, les pastilles d'aliments surgissent.
     @State private var rempli = false
     /// Source unique premium (loi 11), OBSERVÉE : un achat depuis la fiche
     /// défloute les sections gatées en direct, sans réouverture.
@@ -202,7 +209,7 @@ struct ApportV2DetailSheet: View {
             }
             .padding(.horizontal, DS.marge)
             .padding(.top, 8)
-            .padding(.bottom, 30)
+            .padding(.bottom, 40)
             .containerRelativeFrame(.horizontal, alignment: .leading)
         }
         .safeAreaInset(edge: .bottom) {
@@ -214,20 +221,24 @@ struct ApportV2DetailSheet: View {
                     .padding(.horizontal, DS.marge)
                     .padding(.top, 8)
                     .padding(.bottom, 12)
-                    .background(Color.dsFond)
+                    // La porte flotte au-dessus de la fiche qui défile : le
+                    // verre épais de la feuille, avec son flou vivant.
+                    .background { VerreFeuilleFond() }
             }
         }
-        .background(Color.dsFond)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(34)
+        // La feuille ne peint plus d'aplat : fond de verre et coins de 38.
+        .verreFeuille()
         .sheet(item: $causeOuverte, onDismiss: { surligne = nil }) { cause in
             CauseApportSheet(cause: cause, detail: detail,
                              apportAvecArticle: avecArticle, couleur: couleurApport)
         }
         .onAppear {
+            // Chaque ligne porte sa propre courbe et son propre délai : l'état
+            // bascule sans transaction, les modificateurs font le reste.
             guard !rempli else { return }
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.7).delay(0.25)) { rempli = true }
+            rempli = true
         }
     }
 
@@ -239,8 +250,8 @@ struct ApportV2DetailSheet: View {
                           taille: .heros, surligne: surligne)
             VStack(alignment: .leading, spacing: 4) {
                 Text(nom)
-                    .font(.system(size: 22, weight: .bold))
-                    .tracking(-0.6)
+                    .font(.dsSection)
+                    .tracking(DSTracking.section)
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(LectureApport.verdict(id: apport.id ?? "", nom: nom, detail: detail))
@@ -259,8 +270,7 @@ struct ApportV2DetailSheet: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, DS.paddingCarte)
-        .padding(.vertical, 14)
+        .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
         .padding(.top, 4)
@@ -269,10 +279,33 @@ struct ApportV2DetailSheet: View {
 
     // MARK: 2 · Ce qui pèse le plus
 
+    /// La barre de poids d'une cause : piste neutre, remplissage à la teinte de
+    /// sa part de l'anneau, en 0,8 s, décalé de 80 ms par ligne.
+    private func barreDePoids(_ ligne: LectureApport.CausePesee, teinte: Color, rang: Int) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Verre.remplissage)
+                Capsule().fill(teinte)
+                    .frame(width: max(5, geo.size.width * (rempli ? ligne.poids : 0)))
+            }
+        }
+        .frame(height: 5)
+        .animation(
+            reduceMotion ? nil : Animation.timingCurve(0.3, 1.1, 0.4, 1, duration: 0.8).delay(0.35 + Double(rang) * 0.08),
+            value: rempli
+        )
+        .accessibilityHidden(true)
+    }
+
     private func causesCarte(_ causes: [LectureApport.CausePesee]) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(causes.enumerated()), id: \.element.id) { rang, ligne in
-                if rang > 0 { DSSeparator(retrait: 0) }
+                // Le filet court d'un bord à l'autre de la carte, et arrive
+                // avec sa ligne (dans la maquette, c'est son bord haut).
+                if rang > 0 {
+                    DSSeparator(retrait: 0)
+                        .verreCascade(rempli, delai: 0.2 + Double(rang) * 0.07, decalage: 0)
+                }
                 let teinte = AnneauTeintes.cause(rang: rang)
                 Button {
                     HapticService.shared.selection()
@@ -282,26 +315,18 @@ struct ApportV2DetailSheet: View {
                     causeOuverte = CauseOuverte(contribution: ligne.cause, teinte: teinte)
                 } label: {
                     HStack(alignment: .center, spacing: 12) {
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
                             .fill(teinte)
                             .frame(width: 10, height: 10)
                             .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text(ligne.cause.libelle)
                                 .font(.dsSousTitre)
                                 .tracking(DSTracking.sousTitre)
                                 .foregroundStyle(Color.dsTexte)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(AnneauTeintes.piste)
-                                    Capsule().fill(teinte)
-                                        .frame(width: max(5, geo.size.width * (rempli ? ligne.poids : 0)))
-                                }
-                            }
-                            .frame(height: 5)
-                            .accessibilityHidden(true)
+                            barreDePoids(ligne, teinte: teinte, rang: rang)
                         }
                         Text(PointsApport.signe(ligne.cause.delta))
                             .font(.dsSousTitreFort.monospacedDigit())
@@ -309,6 +334,7 @@ struct ApportV2DetailSheet: View {
                             .foregroundStyle(Color.dsTexte)
                         DSChevron()
                     }
+                    .padding(.horizontal, DS.paddingCarte)
                     .padding(.vertical, 12)
                     .frame(minHeight: DS.cibleTactile)
                     .contentShape(Rectangle())
@@ -316,10 +342,9 @@ struct ApportV2DetailSheet: View {
                 .buttonStyle(.dsPress)
                 .accessibilityLabel("\(ligne.cause.libelle), \(PointsApport.signe(ligne.cause.delta)) points")
                 .accessibilityHint("Ouvre le détail de cette cause")
+                .verreCascade(rempli, delai: 0.2 + Double(rang) * 0.07, decalage: 10)
             }
         }
-        .padding(.horizontal, DS.paddingCarte)
-        .padding(.vertical, 2)
         .dsCard()
     }
 
@@ -328,13 +353,19 @@ struct ApportV2DetailSheet: View {
     private func gestesCarte(_ gestes: [LectureApport.Geste]) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(gestes.enumerated()), id: \.element.id) { rang, geste in
-                if rang > 0 { DSSeparator(retrait: 0) }
+                // Le filet court d'un bord à l'autre de la carte, et arrive
+                // avec sa ligne.
+                if rang > 0 {
+                    DSSeparator(retrait: 0)
+                        .verreCascade(rempli, delai: 0.45 + Double(rang) * 0.08, decalage: 0)
+                }
                 HStack(alignment: .top, spacing: 12) {
+                    // Pastille numérotée : vert foncé du kiwi sur le vert pâle.
                     Text(DS.entier(rang + 1))
-                        .font(.dsLegende.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(Color.kiwiGreenInk)
+                        .font(.dsSousTitre.weight(.bold).monospacedDigit())
+                        .foregroundStyle(Color.teinteKiwiTexte)
                         .frame(width: 30, height: 30)
-                        .background(Color.dsAccent.opacity(0.16), in: Circle())
+                        .background(Color.teinteKiwiPale, in: Circle())
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(geste.texte)
@@ -347,19 +378,24 @@ struct ApportV2DetailSheet: View {
                             .font(.dsLegende)
                             .tracking(DSTracking.legende)
                             .foregroundStyle(Color.dsSecondaire)
+                            .lineSpacing(1)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 12)
+                .padding(.horizontal, DS.paddingCarte)
+                .padding(.vertical, 14)
                 .accessibilityElement(children: .combine)
+                .verreCascade(rempli, delai: 0.45 + Double(rang) * 0.08, decalage: 10)
             }
             if hasTip {
-                if !gestes.isEmpty { DSSeparator(retrait: 0) }
+                if !gestes.isEmpty {
+                    DSSeparator(retrait: 0)
+                        .verreCascade(rempli, delai: 0.45 + Double(gestes.count) * 0.08, decalage: 0)
+                }
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "lightbulb")
-                        .font(.system(size: 17, weight: .medium))
-                        .symbolRenderingMode(.hierarchical)
+                        .font(.system(size: 20, weight: .regular))
                         .foregroundStyle(Color.dsSecondaire)
                         .frame(width: 30, height: 30)
                         .accessibilityHidden(true)
@@ -369,6 +405,7 @@ struct ApportV2DetailSheet: View {
                                 .font(.dsSousTitre)
                                 .tracking(DSTracking.sousTitre)
                                 .foregroundStyle(Color.dsTexte)
+                                .lineSpacing(2)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         if let rest = apport.tipRest, !rest.isEmpty {
@@ -376,17 +413,18 @@ struct ApportV2DetailSheet: View {
                                 .font(.dsLegende)
                                 .tracking(DSTracking.legende)
                                 .foregroundStyle(Color.dsSecondaire)
+                                .lineSpacing(1)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 12)
+                .padding(.horizontal, DS.paddingCarte)
+                .padding(.vertical, 14)
                 .accessibilityElement(children: .combine)
+                .verreCascade(rempli, delai: 0.45 + Double(gestes.count) * 0.08, decalage: 10)
             }
         }
-        .padding(.horizontal, DS.paddingCarte)
-        .padding(.vertical, 2)
         .dsCard()
     }
 
@@ -400,25 +438,30 @@ struct ApportV2DetailSheet: View {
 
     // MARK: 4 · Où le trouver (premium)
 
+    /// Les aliments, en pastilles de verre clair (36 pt, 15 / 500) qui
+    /// surgissent l'une après l'autre.
     private var alimentsPastilles: some View {
         DSFlow(espacement: 8) {
-            ForEach(Array(aliments.enumerated()), id: \.offset) { _, aliment in
+            ForEach(Array(aliments.enumerated()), id: \.offset) { rang, aliment in
                 HStack(spacing: 7) {
                     SafeFluent3DIcon(name: aliment.icone, size: 22)
                     Text(aliment.nom ?? "")
-                        .font(.dsLegendeMoyenne)
-                        .tracking(DSTracking.legende)
+                        .font(.dsSousTitreMoyen)
+                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsTexte)
                         .lineLimit(1)
                 }
-                .padding(.leading, 9)
-                .padding(.trailing, 13)
-                .frame(height: 38)
-                .background(Color.dsCarte, in: Capsule())
+                .padding(.leading, 10)
+                .padding(.trailing, 14)
+                .frame(minHeight: 36)
+                .verreClair()
                 .accessibilityElement(children: .combine)
+                .verreSurgir(rempli, delai: 0.5 + Double(rang) * 0.06)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // L'ombre des pastilles déborde de leur boîte : on lui laisse sa place.
+        .padding(.bottom, 6)
     }
 
     // MARK: 5 · En savoir plus (replié)
@@ -434,7 +477,7 @@ struct ApportV2DetailSheet: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Button {
                         HapticService.shared.selection()
-                        withAnimation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.86)) {
+                        withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
                             enSavoirPlus.toggle()
                         }
                     } label: {

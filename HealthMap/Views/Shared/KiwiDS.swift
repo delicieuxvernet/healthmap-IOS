@@ -153,6 +153,9 @@ extension Color {
 
     /// À combler.
     static let dsACombler = Color(hex: "FF3B30")
+    /// Texte « à combler » posé sur fond clair : le rouge, assez dense pour
+    /// se lire en petit corps sur le verre (`#C0322A`).
+    static let dsAComblerTexte = Color(hex: "C0322A")
     /// À renforcer — l'ambre de la palette (`#F1961D`).
     static let dsARenforcer = Color.teinteVitamineD
     /// Texte « à renforcer » posé sur fond clair (`#995600`).
@@ -433,11 +436,16 @@ struct DSRing: View {
     }
 }
 
-// MARK: - Bouton capsule (50 pt, vert, texte 17 / 600)
+// MARK: - Bouton capsule (50 pt, verre vert, texte 17 / 600)
 
 struct DSCapsuleButton: View {
     let titre: String
     var chargement: Bool = false
+    /// 50 pt par défaut ; l'action principale d'une feuille fait 54
+    /// (`Verre.hauteurAction`).
+    var hauteur: CGFloat = DS.hauteurBouton
+    /// Reflet périodique de la maquette, pour l'action qui conclut une feuille.
+    var brillance: Bool = false
     let action: () -> Void
 
     var body: some View {
@@ -453,7 +461,13 @@ struct DSCapsuleButton: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: DS.hauteurBouton)
+            .frame(height: hauteur)
+            .background {
+                // Le reflet passe SOUS le libellé, comme sur la maquette.
+                if brillance && !chargement {
+                    Color.clear.verreBrillance()
+                }
+            }
             .verrePrincipal()
             .contentShape(Capsule())
         }

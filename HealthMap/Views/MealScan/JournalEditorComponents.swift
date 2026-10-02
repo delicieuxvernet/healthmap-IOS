@@ -9,12 +9,58 @@ import SwiftUI
 //   • info — ligne sans détail par aliment (legacy/manuel) : note + suppression.
 // L'aperçu (kcal + macros) est un re-scaling LINÉAIRE des valeurs de base —
 // exactement ce que la persistance fera (FoodEntry.rescaled / entry(for:)).
+//
+// Verre liquide (2 octobre 2026) : la fiche est une feuille de verre. Les
+// réglages de quantité et leur aperçu tiennent dans UNE carte de verre, les
+// choix et le « − / + » sont en verre clair, l'action est en verre vert, et
+// les trois macros portent la teinte de leur catégorie. Le chiffre des
+// calories compte jusqu'à sa nouvelle valeur. Aucun calcul n'a bougé.
 
 extension MealJournalService.MealSlot: Identifiable {
     var id: String { rawValue }
 }
 
 extension MealJournalService.FoodDetail: Identifiable {}
+
+/// Les trois macros de l'aperçu, chacune à la teinte de sa catégorie (fond à
+/// 10 %, texte dans la version foncée : le jaune des glucides ne se lit pas
+/// sur du clair).
+private enum PortionMacro {
+    case proteines, glucides, lipides
+
+    var nom: String {
+        switch self {
+        case .proteines: return "Protéines"
+        case .glucides: return "Glucides"
+        case .lipides: return "Lipides"
+        }
+    }
+
+    /// Libellé court, quand les trois puces ne tiennent pas sur une ligne.
+    var abrege: String {
+        switch self {
+        case .proteines: return "Prot."
+        case .glucides: return "Gluc."
+        case .lipides: return "Lip."
+        }
+    }
+
+    var teinte: Color {
+        switch self {
+        case .proteines: return .teinteProteines
+        case .glucides: return .teinteGlucides
+        case .lipides: return .teinteLipides
+        }
+    }
+
+    var encre: Color {
+        switch self {
+        case .proteines: return .teinteProteinesTexte
+        case .glucides: return .teinteGlucidesTexte
+        case .lipides: return .teinteLipidesTexte
+        }
+    }
+}
 
 struct PortionSheet: View {
     enum Mode {
@@ -42,6 +88,7 @@ struct PortionSheet: View {
     /// L'utilisateur a demandé à saisir en grammes malgré l'unité.
     @State private var enGrammes = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(mode: Mode,
          onAdd: ((Double) async -> Bool)? = nil,
@@ -76,28 +123,50 @@ struct PortionSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingLG) {
-            header
+        // Le contenu défile s'il dépasse (grande taille de texte, note en
+        // plus) au lieu d'être rogné ; l'action reste posée en bas, hors du
+        // défilement.
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    header
 
-            switch mode {
-            case .info(let row):
-                infoBody(row)
-            case .add(let detail, _):
-                if detail.kcal100g == nil {
-                    incomputableNote
-                } else {
-                    editorControls
-                    if detail.microsIncomplets { microsNote }
+                    switch mode {
+                    case .info(let row):
+                        infoBody(row)
+                            .kiwiEntrance(1)
+                    case .add(let detail, _):
+                        if detail.kcal100g == nil {
+                            incomputableNote
+                                .kiwiEntrance(1)
+                        } else {
+                            editorControls
+                                .kiwiEntrance(1)
+                            if detail.microsIncomplets {
+                                microsNote
+                                    .kiwiEntrance(2)
+                            }
+                        }
+                    case .edit:
+                        editorControls
+                            .kiwiEntrance(1)
+                    }
                 }
-            case .edit:
-                editorControls
+                .padding(.horizontal, DS.marge)
+                .padding(.top, 20)
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollBounceBehavior(.basedOnSize)
 
-            Spacer(minLength: 0)
-            actions
+            VStack(spacing: 2) {
+                actions
+            }
+            .padding(.horizontal, DS.marge)
+            .padding(.top, 6)
+            .padding(.bottom, 10)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .verreFeuille()
     }
 
     // MARK: - En-tête
@@ -106,12 +175,15 @@ struct PortionSheet: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(titleText)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.dsTitreInline)
+                .tracking(DSTracking.corps)
                 .foregroundStyle(Color.dsTexte)
                 .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Text(subtitleText)
-                .font(.system(size: 13, design: .default))
+                .font(.dsLegende)
                 .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -140,31 +212,25 @@ struct PortionSheet: View {
     // MARK: - Contrôles quantité (presets + stepper + saisie libre)
 
     private var editorControls: some View {
-        VStack(spacing: Theme.spacingMD) {
-            if let unite, !enGrammes {
-                controlesUnite(unite)
-            } else {
-                controlesGrammes
-            }
+        VStack(spacing: 0) {
+            VStack(spacing: 12) {
+                if let unite, !enGrammes {
+                    controlesUnite(unite)
+                } else {
+                    controlesGrammes
+                }
 
-            VStack(spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(scaled.kcal)")
-                        .font(.system(size: 22, weight: .semibold, design: .default))
-                        .foregroundStyle(Color.dsTexte)
-                        .contentTransition(.numericText())
-                    Text("kcal")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.dsSecondaire)
-                }
-                HStack(spacing: Theme.spacingMD) {
-                    macroDot("P", scaled.p, color: .macroProtein)
-                    macroDot("G", scaled.c, color: .macroCarb)
-                    macroDot("L", scaled.f, color: .macroFat)
-                }
+                Rectangle()
+                    .fill(Color.dsSeparateur)
+                    .frame(height: 0.5)
+                    .accessibilityHidden(true)
+
+                apercu
             }
+            .padding(.horizontal, DS.paddingCarte)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity)
-            .animation(.default, value: grams)
+            .dsCard()
 
             // Unités ↔ grammes : les grammes retenus ne bougent pas, seule la
             // façon de les choisir change.
@@ -174,13 +240,36 @@ struct PortionSheet: View {
                     enGrammes.toggle()
                 } label: {
                     Text(enGrammes ? unite.lienCompter : "Saisir en grammes")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsAccent)
-                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.healthMapPressed)
+                .buttonStyle(.dsPress)
             }
         }
+    }
+
+    /// Ce que la quantité retenue apporte : les calories en grand (elles
+    /// comptent jusqu'à leur nouvelle valeur), puis les trois macros.
+    private var apercu: some View {
+        let valeurs = scaled
+        return VStack(spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(DS.entier(valeurs.kcal))
+                    .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
+                    .tracking(-0.9)
+                    .foregroundStyle(Color.dsTexte)
+                    .contentTransition(.numericText())
+                Text("kcal")
+                    .font(.dsSousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+            }
+            macroPuces(p: valeurs.p, c: valeurs.c, f: valeurs.f)
+        }
+        .frame(maxWidth: .infinity)
+        .animation(reduceMotion ? nil : Animation.kiwiCompteur, value: grams)
     }
 
     // MARK: Saisie en unités (« 1 œuf », « 2 tranches »)
@@ -193,7 +282,7 @@ struct PortionSheet: View {
     /// Tailles (petit / moyen / gros) si l'unité en a, puis « − 2 œufs + » avec
     /// les grammes dessous : on compte, l'app pèse.
     private func controlesUnite(_ unite: UnitPortionCatalog.Unite) -> some View {
-        VStack(spacing: Theme.spacingMD) {
+        VStack(spacing: 12) {
             if !unite.tailles.isEmpty {
                 HStack(spacing: 8) {
                     ForEach(Array(unite.tailles.enumerated()), id: \.offset) { index, t in
@@ -210,17 +299,20 @@ struct PortionSheet: View {
                 stepUnite("minus", unite: unite, delta: -1)
                 VStack(spacing: 2) {
                     Text(unite.libelle(nombre: nombre(unite)))
-                        .font(.system(size: 22, weight: .semibold, design: .default))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .tracking(-0.8)
                         .foregroundStyle(Color.dsTexte)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .contentTransition(.numericText())
                     Text("\(grams) g")
-                        .font(.system(size: 13))
+                        .font(.dsLegende.monospacedDigit())
                         .foregroundStyle(Color.dsSecondaire)
+                        .contentTransition(.numericText())
                 }
                 .frame(minWidth: 120, minHeight: 44)
                 .accessibilityElement(children: .combine)
+                .animation(reduceMotion ? nil : Animation.kiwiVif, value: grams)
                 stepUnite("plus", unite: unite, delta: 1)
             }
             .frame(maxWidth: .infinity)
@@ -235,7 +327,7 @@ struct PortionSheet: View {
         } label: {
             stepLabel(symbol)
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .disabled(delta < 0 && nombre(unite) <= 1)
         .accessibilityLabel(delta > 0 ? "Ajouter une unité" : "Retirer une unité")
     }
@@ -243,7 +335,7 @@ struct PortionSheet: View {
     // MARK: Saisie en grammes (presets + stepper + saisie libre)
 
     private var controlesGrammes: some View {
-        VStack(spacing: Theme.spacingMD) {
+        VStack(spacing: 12) {
             HStack(spacing: 8) {
                 presetPill("Petite", 80)
                 presetPill("Moyenne", 150)
@@ -253,23 +345,21 @@ struct PortionSheet: View {
             HStack(spacing: Theme.spacingMD) {
                 stepButton("minus", delta: -10)
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    // Champ en verre clair ; le liseré vert dit « ça se touche ».
                     TextField("0", text: gramsBinding)
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.center)
-                        .font(.system(size: 22, weight: .semibold, design: .default))
+                        .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Color.dsTexte)
                         .frame(width: 96, height: 44)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.dsCarte)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.dsAccent, lineWidth: 1.5)
-                                )
+                        .verreClair(RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                                .strokeBorder(Color.dsAccent, lineWidth: 1.5)
                         )
                         .accessibilityLabel("Quantité en grammes")
                     Text("g")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.dsSousTitre)
                         .foregroundStyle(Color.dsSecondaire)
                 }
                 stepButton("plus", delta: 10)
@@ -282,36 +372,32 @@ struct PortionSheet: View {
         pill(label, sous: "\(value) g", choisie: grams == value) { grams = value }
     }
 
-    /// Chip de choix (portion ou taille) : libellé + grammes, bordure accent
-    /// quand elle est retenue.
+    /// Puce de choix (portion ou taille) : libellé + grammes, en verre clair.
+    /// Retenue, elle passe au verre vert pâle, texte dans le vert foncé.
     private func pill(_ label: String, sous: String, choisie: Bool,
                       action: @escaping () -> Void) -> some View {
-        Button {
+        let forme = RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+        return Button {
             HapticService.shared.selection()
             action()
         } label: {
             VStack(spacing: 2) {
                 Text(label)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, design: .default).weight(.semibold))
+                    .foregroundStyle(choisie ? Color.teinteKiwiTexte : Color.dsTexte)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Text(sous)
-                    .font(.system(size: 11, design: .default))
+                    .font(.system(.caption, design: .default).monospacedDigit())
+                    .foregroundStyle(choisie ? Color.teinteKiwiTexte : Color.dsSecondaire)
+                    .lineLimit(1)
             }
-            .foregroundStyle(choisie ? Color.dsTexte : Color.dsSecondaire)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(choisie ? Color.dsRemplissage : Color.dsCarte)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(choisie ? Color.dsAccent : Color.dsTexte.opacity(0.08),
-                                    lineWidth: 1)
-                    )
-            )
+            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+            .padding(.vertical, 3)
+            .verre(choisie ? VerreMatiere.clairActif : VerreMatiere.clair, forme: forme)
+            .contentShape(forme)
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel("\(label), \(sous)")
         .accessibilityAddTraits(choisie ? .isSelected : [])
     }
@@ -323,23 +409,18 @@ struct PortionSheet: View {
         } label: {
             stepLabel(symbol)
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel(delta > 0 ? "Plus 10 grammes" : "Moins 10 grammes")
     }
 
+    /// Rond de verre clair de 44 pt, signe dans le vert de ce qui se touche.
     private func stepLabel(_ symbol: String) -> some View {
         Image(systemName: symbol)
             .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(Color.dsTexte)
+            .foregroundStyle(Color.dsAccent)
             .frame(width: 44, height: 44)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.dsCarte)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.dsTexte.opacity(0.08), lineWidth: 1)
-                    )
-            )
+            .verreClair(Circle())
+            .contentShape(Circle())
     }
 
     private var gramsBinding: Binding<String> {
@@ -349,13 +430,41 @@ struct PortionSheet: View {
         )
     }
 
-    private func macroDot(_ label: String, _ value: Double, color: Color) -> some View {
-        HStack(spacing: 4) {
-            Circle().fill(color).frame(width: 7, height: 7)
-            Text("\(label) \(Int(value.rounded())) g")
-                .font(.system(size: 13, weight: .semibold, design: .default))
-                .foregroundStyle(Color.dsTexte)
+    /// Les trois macros en puces teintées. En entier si la ligne le permet,
+    /// en abrégé sinon, empilées en dernier recours (très grande taille de
+    /// texte) : jamais tronquées.
+    private func macroPuces(p: Double, c: Double, f: Double) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) { macroPucesContenu(court: false, p: p, c: c, f: f) }
+            HStack(spacing: 6) { macroPucesContenu(court: true, p: p, c: c, f: f) }
+            VStack(spacing: 6) { macroPucesContenu(court: false, p: p, c: c, f: f) }
         }
+    }
+
+    @ViewBuilder
+    private func macroPucesContenu(court: Bool, p: Double, c: Double, f: Double) -> some View {
+        macroPuce(.proteines, p, court: court)
+        macroPuce(.glucides, c, court: court)
+        macroPuce(.lipides, f, court: court)
+    }
+
+    private func macroPuce(_ macro: PortionMacro, _ value: Double, court: Bool) -> some View {
+        let grammes = Int(value.rounded())
+        return HStack(spacing: 5) {
+            Text(court ? macro.abrege : macro.nom)
+                .font(.system(.footnote, design: .default).weight(.semibold))
+            Text("\(DS.entier(grammes))\(DS.fine)g")
+                .font(.system(.footnote, design: .default).weight(.bold).monospacedDigit())
+                .contentTransition(.numericText())
+        }
+        .foregroundStyle(macro.encre)
+        .lineLimit(1)
+        .fixedSize()
+        .padding(.horizontal, 11)
+        .frame(minHeight: 30)
+        .background(Capsule(style: .continuous).fill(macro.teinte.opacity(0.10)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(macro.nom), \(grammes) grammes")
     }
 
     /// Aperçu live = re-scaling linéaire de la base (100 g pour un ajout,
@@ -384,12 +493,8 @@ struct PortionSheet: View {
     // MARK: - Notes
 
     private func infoBody(_ row: MealJournalRow) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            HStack(spacing: Theme.spacingMD) {
-                macroDot("P", row.macros.proteins, color: .macroProtein)
-                macroDot("G", row.macros.carbs, color: .macroCarb)
-                macroDot("L", row.macros.fats, color: .macroFat)
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            macroPuces(p: row.macros.proteins, c: row.macros.carbs, f: row.macros.fats)
             noteCard("Cette ligne vient d'un ancien scan ou d'un ajout à la main : le détail aliment par aliment n'existe pas. Tu ne peux pas changer la quantité, et la supprimer retire le repas en entier.")
         }
     }
@@ -403,20 +508,19 @@ struct PortionSheet: View {
     }
 
     private func noteCard(_ text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(Color.dsSecondaire)
+        HStack(alignment: .top, spacing: 10) {
+            VerrePastilleIcone(symbole: "info", taille: 30, tailleIcone: 15)
             Text(text)
-                .font(.system(size: 12))
+                .font(.dsLegende)
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
         }
-        .padding(Theme.spacingMD)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.dsTexte.opacity(0.04))
+            RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                .fill(Verre.tuileInactive)
         )
     }
 
@@ -451,49 +555,72 @@ struct PortionSheet: View {
         }
     }
 
+    /// L'action principale : verre teinté vert, capsule de 54 pt, reflet qui
+    /// passe tant qu'elle est disponible.
     private func primaryButton(_ title: String, enabled: Bool,
                                action: @escaping () async -> Void) -> some View {
         Button {
             Task { await action() }
         } label: {
-            Group {
+            ZStack {
                 if isWorking {
                     ProgressView().tint(.white)
                 } else {
                     Text(title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
                         .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, 16)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.dsAccent)
-            )
+            .frame(maxWidth: .infinity, minHeight: Verre.hauteurAction)
+            .verrePrincipal()
+            .overlay {
+                if enabled && !isWorking {
+                    Color.clear
+                        .verreBrillance()
+                        .allowsHitTesting(false)
+                }
+            }
+            .contentShape(Capsule(style: .continuous))
             .opacity(enabled ? 1 : 0.4)
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .disabled(!enabled || isWorking)
         .accessibilityIdentifier("portion.valider")
     }
 
+    /// Retirer : quand c'est la seule action de la fiche (`filled`), une
+    /// capsule de verre clair ; sous « Enregistrer », un simple lien. Rouge
+    /// dans les deux cas : le vert reste à ce qui ajoute.
     private func deleteButton(title: String, filled: Bool) -> some View {
         Button {
             onDelete?()
             dismiss()
         } label: {
-            Text(title)
-                .font(.system(size: filled ? 15 : 13, weight: .semibold))
-                .foregroundStyle(filled ? .white : Color.scoreDeficient)
-                .frame(maxWidth: .infinity)
-                .frame(height: filled ? 48 : 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(filled ? Color.scoreDeficient : Color.clear)
-                )
+            if filled {
+                Text(title)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsACombler)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, minHeight: Verre.hauteurAction)
+                    .verreClair()
+                    .contentShape(Capsule(style: .continuous))
+            } else {
+                Text(title)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsACombler)
+                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                    .contentShape(Rectangle())
+            }
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel(title)
     }
 }
@@ -544,43 +671,32 @@ struct FoodSearchSheet: View {
     @State private var loadingHitId: String?
     @State private var confirmation: String?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Le « + » rapide : le verre vert de l'action principale, sans son ombre.
+    /// Il y en a un par ligne, et une ombre découpée par ligne coûterait cher
+    /// dans une liste qui défile.
+    private static let matierePlus: VerreMatiere = {
+        var matiere = VerreMatiere.principal
+        matiere.ombre = nil
+        return matiere
+    }()
+
+    // Verre liquide : la feuille est en verre (plus d'aplat), le champ et les
+    // exemples sont en verre clair, et chaque section de résultats tient dans
+    // UNE carte de verre dont les lignes arrivent en cascade.
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.dsFond.ignoresSafeArea()
-                ScrollView {
-                    VStack(spacing: Theme.spacingMD) {
-                        searchBar
-                        if let confirmation {
-                            confirmationPill(confirmation)
-                        }
-                        if vm.query.trimmingCharacters(in: .whitespaces).count < 2 {
-                            examples
-                        } else if vm.isSearching {
-                            ProgressView()
-                                .tint(Color.dsAccent)
-                                .padding(.top, Theme.spacingLG)
-                        } else if vm.hits.isEmpty {
-                            Text("Aucun résultat. Essaie un autre nom.")
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color.dsSecondaire)
-                                .padding(.top, Theme.spacingLG)
-                        } else {
-                            ForEach(RechercheVisuelle.sections(vm.hits, source: \.source, score: \.score)) { section in
-                                RechercheSectionTitre(titre: section.titre)
-                                ForEach(section.lignes) { hit in
-                                    hitRow(hit)
-                                }
-                            }
-                            if vm.hits.contains(where: { $0.source == "off" }) {
-                                RechercheCreditPhotos()
-                            }
-                        }
+            ScrollView {
+                VStack(spacing: Theme.spacingMD) {
+                    searchBar
+                    if let confirmation {
+                        confirmationPill(confirmation)
                     }
-                    .padding(.vertical, Theme.spacingMD)
-                    .padding(.horizontal, Theme.spacingLG)
+                    contenu
                 }
+                .padding(.vertical, Theme.spacingMD)
+                .padding(.horizontal, DS.marge)
             }
             .navigationTitle("Ajouter : \(slot.label)")
             .navigationBarTitleDisplayMode(.inline)
@@ -591,6 +707,7 @@ struct FoodSearchSheet: View {
                 }
             }
         }
+        .verreFeuille()
         .sheet(item: $selectedDetail) { detail in
             PortionSheet(mode: .add(detail: detail, slot: slot),
                          onAdd: { grams in
@@ -598,15 +715,61 @@ struct FoodSearchSheet: View {
                              if ok { showConfirmation(for: detail, grams: grams) }
                              return ok
                          })
-            .presentationDetents([.height(460)])
+            .presentationDetents([.height(500)])
             .presentationDragIndicator(.visible)
         }
+    }
+
+    /// Sous le champ : les exemples, l'attente, le vide ou les résultats.
+    @ViewBuilder
+    private var contenu: some View {
+        if vm.query.trimmingCharacters(in: .whitespaces).count < 2 {
+            examples
+        } else if vm.isSearching {
+            ProgressView()
+                .tint(Color.dsAccent)
+                .padding(.top, Theme.spacingLG)
+        } else if vm.hits.isEmpty {
+            Text("Aucun résultat. Essaie un autre nom.")
+                .font(.dsSousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .multilineTextAlignment(.center)
+                .padding(.top, Theme.spacingLG)
+        } else {
+            ForEach(RechercheVisuelle.sections(vm.hits, source: \.source, score: \.score)) { section in
+                VStack(spacing: 8) {
+                    RechercheSectionTitre(titre: section.titre)
+                    sectionCarte(section.lignes)
+                }
+            }
+            if vm.hits.contains(where: { $0.source == "off" }) {
+                RechercheCreditPhotos()
+            }
+        }
+    }
+
+    /// Les lignes d'une section, dans une carte de verre, séparées d'un filet
+    /// aligné sur le texte (12 + vignette 48 + 12).
+    private func sectionCarte(_ lignes: [MealJournalService.FoodHit]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(lignes.enumerated()), id: \.element.id) { index, hit in
+                if index > 0 {
+                    DSSeparator(retrait: 72)
+                }
+                hitRow(hit)
+                    .kiwiEntrance(index)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .dsCard()
     }
 
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color.dsSecondaire)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(Verre.iconeNeutre)
+                .accessibilityHidden(true)
             TextField("Rechercher un aliment", text: $vm.query)
                 .font(Theme.bodyFont)
                 .accessibilityIdentifier("recherche.champ")
@@ -618,59 +781,73 @@ struct FoodSearchSheet: View {
                     vm.hits = []
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Color.dsSecondaire)
+                        .font(.system(size: 17))
+                        .foregroundStyle(Color.dsTertiaire)
+                        .frame(width: DS.cibleTactile, height: DS.cibleTactile)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.dsPress)
                 .accessibilityLabel("Effacer la recherche")
             }
         }
-        .padding(Theme.spacingSM)
-        .background(Color.dsCarte)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.leading, 16)
+        .padding(.trailing, vm.query.isEmpty ? 16 : 2)
+        .frame(minHeight: 48)
+        .verreClair()
     }
 
     private var examples: some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             Text("Essaie par exemple :")
-                .font(Theme.captionFont)
+                .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
+                .padding(.horizontal, 2)
             HStack(spacing: 8) {
-                exampleChip("Yaourt")
-                exampleChip("Saumon")
-                exampleChip("Lentilles")
+                exampleChip("Yaourt", index: 0)
+                exampleChip("Saumon", index: 1)
+                exampleChip("Lentilles", index: 2)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func exampleChip(_ text: String) -> some View {
+    /// Puce de verre clair (36 pt, 15 / 500), comme les aliments suggérés de
+    /// la maquette ; la cible tactile déborde pour atteindre 44 pt.
+    private func exampleChip(_ text: String, index: Int) -> some View {
         Button {
             vm.query = text
             vm.search()
         } label: {
             Text(text)
-                .font(.system(size: 13, weight: .medium))
+                .font(.dsSousTitreMoyen)
                 .foregroundStyle(Color.dsTexte)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.dsRemplissage)
-                .clipShape(Capsule())
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 36)
+                .verreClair()
+                .frame(minHeight: DS.cibleTactile)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.dsPress)
+        .kiwiEntrance(index)
     }
 
     private func hitRow(_ hit: MealJournalService.FoodHit) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Button {
                 openDetail(hit)
             } label: {
                 FoodHitContenu(hit: hit)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
 
+            // Ajout direct : un rond de verre vert, la seule action de la ligne.
             Button {
                 quickAdd(hit)
             } label: {
                 ZStack {
-                    Circle().fill(Color.dsAccent).frame(width: 32, height: 32)
                     if loadingHitId == hit.id {
                         ProgressView().tint(.white).scaleEffect(0.7)
                     } else {
@@ -679,22 +856,19 @@ struct FoodSearchSheet: View {
                             .foregroundStyle(.white)
                     }
                 }
+                .frame(width: 32, height: 32)
+                .verre(Self.matierePlus, forme: Circle())
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
             }
+            .buttonStyle(.dsPress)
             .disabled(loadingHitId != nil)
             .accessibilityLabel(UnitPortionCatalog.unite(pourNom: hit.name).map { "Ajouter \(hit.name), \($0.libelle(nombre: 1))" }
                                 ?? "Ajouter \(hit.name), 100 grammes")
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.dsCarte)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.dsTexte.opacity(0.05), lineWidth: 1)
-                )
-        )
+        .padding(.leading, 12)
+        .padding(.trailing, 6)
+        .padding(.vertical, 10)
     }
 
     /// Tap sur la ligne → fiche portion (fetch `get_food` d'abord).
@@ -741,26 +915,38 @@ struct FoodSearchSheet: View {
 
     private func showConfirmation(for detail: MealJournalService.FoodDetail, grams: Double) {
         let kcal = Int(((detail.kcal100g ?? 0) * grams / 100).rounded())
-        withAnimation { confirmation = "\(detail.name) ajouté · \(kcal) kcal" }
+        withAnimation(animationConfirmation) { confirmation = "\(detail.name) ajouté · \(kcal) kcal" }
         Task {
             try? await Task.sleep(nanoseconds: 2_200_000_000)
-            withAnimation { confirmation = nil }
+            withAnimation(animationConfirmation) { confirmation = nil }
         }
     }
 
+    /// Le ressort des surfaces qui s'installent ; un fondu court sous
+    /// « Réduire les animations ».
+    private var animationConfirmation: Animation {
+        reduceMotion ? Animation.easeOut(duration: 0.2) : Animation.kiwiFluide
+    }
+
+    /// « Yaourt ajouté · 96 kcal » : une capsule de verre vert pâle, la coche
+    /// dans sa pastille.
     private func confirmationPill(_ text: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Color.dsAccent)
+            VerrePastilleIcone(symbole: "checkmark", teinte: Color.teinteKiwi, taille: 30, tailleIcone: 14)
             Text(text)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.dsLegende.weight(.semibold))
                 .foregroundStyle(Color.dsTexte)
                 .lineLimit(1)
-            Spacer()
+                .minimumScaleFactor(0.85)
+            Spacer(minLength: 0)
         }
-        .padding(Theme.spacingSM)
-        .background(Color.dsRemplissage)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .transition(.opacity)
+        .padding(.leading, 8)
+        .padding(.trailing, 16)
+        .frame(minHeight: 46)
+        .verre(.clairActif, forme: Capsule(style: .continuous))
+        .accessibilityElement(children: .combine)
+        .transition(reduceMotion
+            ? AnyTransition.opacity
+            : AnyTransition.opacity.combined(with: .scale(scale: 0.94)))
     }
 }

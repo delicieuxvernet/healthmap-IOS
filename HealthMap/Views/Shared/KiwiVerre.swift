@@ -490,11 +490,11 @@ struct VerreMatiere {
         ombre: VerreOmbre(couleur: Verre.encreOmbre.opacity(0.14), rayon: 6, y: 4)
     )
 
-    /// Piste d'une bascule : blanc 34 %, flou vivant.
+    /// Piste d'une bascule : blanc 34 %. Pas de flou vivant : une bascule vit
+    /// dans une page qui défile, posée sur le fond (déjà flou).
     static let piste = VerreMatiere(
         arrets: blanc(0.34, 0.34),
         lisere: 0.75,
-        flouVivant: true,
         opaque: Color(uiColor: .systemGray5)
     )
 
@@ -910,6 +910,9 @@ struct VerrePuce<Icone: View>: View {
         .padding(.trailing, 16)
         .frame(minHeight: Verre.hauteurPuce)
         .verreClair()
+        // La plaque ignore les touches : dans un bouton, c'est cette forme
+        // qui rend toute la puce touchable.
+        .contentShape(Capsule(style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

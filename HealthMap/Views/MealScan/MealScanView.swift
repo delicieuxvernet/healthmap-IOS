@@ -1,26 +1,49 @@
 import SwiftUI
 import PhotosUI
 
-// MARK: - Journal (maquette « Journal & Progrès v2 », 20 septembre 2026)
+// MARK: - Journal (maquette « Motion v3 - Verre liquide », 2 octobre 2026)
 //
 // Le tableau de bord du jour EST le journal. Ordre vertical :
-//   1. grand titre « Journal » (natif, se replie au défilement) + pill série ;
-//   2. barre de jour (chevrons + calendrier sans borne) ;
-//   3. carte calories : chiffre héros + anneau 88 pt + ligne Apple Santé ;
-//   4. carte macros : quatre lignes, objectif et surplus lu selon l'objectif ;
-//   5. la SAISIE, sur la page : Dicter (vert) · Photographier, puis « Autres
-//      façons d'ajouter » qui déplie Écrire · Rechercher · Code-barres ;
-//   5 bis. « Poids et eau » (1er octobre) : poids actuel et poids souhaité côte
-//      à côte, chacun avec son moins et son plus (l'écart règle les calories
-//      et les macros du jour), puis l'eau du jour en gobelets ;
-//   6. « Apports à renforcer » + « Tout afficher » : l'interaction détectée,
-//      trois anneaux, une seule sortie verte ;
-//   7. le jour en mosaïque : quatre repas, deux par deux.
+//   1. « Journal » à gauche et, sur la même ligne, la capsule de verre du jour
+//      (chevrons + libellé qui roule ; le libellé ouvre le calendrier sans
+//      borne). La barre de navigation native est masquée : elle ne sait pas
+//      poser un accessoire sur la ligne de son grand titre ;
+//   2. les puces de verre : Eau, Poids, Série, Analyses. Toucher Eau, Poids ou
+//      Analyses fait défiler jusqu'à la carte ;
+//   3. la carte Énergie : kcal restantes, anneau de 72 pt, puis les quatre
+//      macros en colonnes (objectif et surplus lu selon l'objectif) ;
+//   4. la SAISIE, sur une rangée : Dicter (verre vert) · Photo · Autres, qui
+//      déplie Écrire · Rechercher · Code-barres ;
+//   5. la carte Micronutriments (elle ouvre la page d'un micronutriment,
+//      POUSSÉE dans la pile : elle entre par la droite) ;
+//   6. « Poids et eau » : poids actuel et poids souhaité côte à côte (l'écart
+//      règle les calories et les macros du jour), puis l'eau en gobelets ;
+//   7. la prise de sang ;
+//   8. « Apports à renforcer » + « Tout afficher » : l'interaction détectée,
+//      trois anneaux qui se tracent, une seule sortie verte ;
+//   9. le jour en mosaïque : quatre repas, deux par deux, en cascade.
 //
-// Le bouton d'ajout flottant et sa feuille à six entrées ont disparu : la
-// saisie se voit. La machinerie (quota, résultat immersif du scan, recherche,
-// fiche portion, dictée mains libres) est inchangée. « Écrire » emprunte le
-// chemin d'analyse de la dictée, texte en main au lieu d'un enregistrement.
+// La machinerie (quota, résultat immersif du scan, recherche, fiche portion,
+// dictée mains libres) est inchangée. « Écrire » emprunte le chemin d'analyse
+// de la dictée, texte en main au lieu d'un enregistrement.
+
+/// Les cartes que les puces d'en-tête savent atteindre.
+private enum AncreJournal: Hashable {
+    case poids
+    case eau
+    case sang
+}
+
+private extension VerreMatiere {
+    /// La carte de verre sans son ombre découpée : pour une ligne de résultat
+    /// dans une liste qui défile, où une ombre par ligne coûterait cher.
+    static let ligneDeListe: VerreMatiere = {
+        var matiere = VerreMatiere.carte
+        matiere.ombre = nil
+        return matiere
+    }()
+}
+
 struct JournalView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @StateObject private var viewModel = MealScanViewModel()
@@ -80,6 +103,11 @@ struct JournalView: View {
         nonmutating set { dicteeBox.geste.glissement = newValue }
     }
     @State private var demarrageDictee: Task<Void, Never>?
+    /// Fin d'écoute : la transcription puis l'analyse tournent ici, sous la
+    /// bulle contractée. La feuille ne monte qu'avec leur résultat.
+    @State private var calculDictee: Task<Void, Never>?
+    /// Ce que le calcul a donné : la feuille de dictée s'ouvre dessus.
+    @State private var departDictee: VoiceMealSheet.Depart?
     /// Le repas que la feuille de dictée vient d'enregistrer. La page ne bouge
     /// qu'à la fermeture de la feuille : c'est là que la pastille confirme et
     /// que la carte des calories compte jusqu'à sa nouvelle valeur.
@@ -96,8 +124,24 @@ struct JournalView: View {
     /// nil = Santé non lié / rien partagé → jamais un « 0 » trompeur.
     @State private var activeEnergyToday: Int?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Les cinq onglets restent montés : c'est ce signal qui dit qu'on vient
+    /// d'arriver sur le Journal, pour rejouer son entrée.
+    @Environment(\.estOngletActif) private var estOngletActif
 
-    /// « Autres façons d'ajouter » déplié (Écrire · Rechercher · Code-barres).
+    /// L'entrée de la page est jouée : les repas montent en cascade, les
+    /// anneaux des apports se tracent. Repasse à faux puis à vrai à chaque
+    /// arrivée sur l'onglet et à chaque changement de jour.
+    @State private var entree = false
+    @State private var entreeEnAttente: Task<Void, Never>?
+    /// La carte qu'une puce d'en-tête vient de viser : la page y défile.
+    @State private var ancreDemandee: AncreJournal?
+    /// « Déjeuner ajouté · 3 aliments » : la sous-ligne de la carte Énergie
+    /// juste après un ajout. Elle rend la place à l'objectif au bout de
+    /// quelques secondes, ou dès qu'on change de jour.
+    @State private var ajoutRecent: String?
+    @State private var effacementAjout: Task<Void, Never>?
+
+    /// « Autres » déplié (Écrire · Rechercher · Code-barres).
     @State private var autresFacons = false
     /// Le premier chargement est passé : avant lui, TOUS les repas sembleraient
     /// nouveaux, et l'app fêterait l'ouverture.
@@ -107,8 +151,11 @@ struct JournalView: View {
     @State private var showActivite = false
     /// Fiche apport ouverte depuis « Apports à renforcer ».
     @State private var selectedApport: ApportV2?
-    /// Micronutriment touché dans la carte du Journal.
+    /// Micronutriment touché dans la carte du Journal. Il reste en place
+    /// pendant que sa page se referme : c'est `microPoussee` qui la pousse.
     @State private var selectedMicro: LigneMicro?
+    /// La page d'un micronutriment est poussée dans la pile du Journal.
+    @State private var microPoussee = false
     /// Bilan complet (ex-onglet), présenté par « Tout afficher ».
     @State private var showBilanComplet = false
     /// Prise de sang (Premium) : import + « Tes repères ».
@@ -125,10 +172,13 @@ struct JournalView: View {
     // MARK: - Gratification après un ajout
 
     /// Une feuille de saisie est encore à l'écran : la gratification attend
-    /// qu'elle soit redescendue, sinon elle jouerait cachée derrière.
+    /// qu'elle soit redescendue, sinon elle jouerait cachée derrière. Une
+    /// dictée en cours de calcul (la bulle tourne) compte aussi : sa feuille
+    /// va monter.
     private var saisieOuverte: Bool {
         showVoice || showTexte || showSearch || showBarcode || repasOuvert != nil
             || barcodeDetail != nil || selectedFood != nil || viewModel.analysisResult != nil
+            || calculDictee != nil
     }
 
     /// `.healthmapMealScanned` veut dire « journal modifié » : ajout, retrait ou
@@ -142,16 +192,20 @@ struct JournalView: View {
 
         let connus = Set(journal.dayMeals.map(\.id))
         await journal.load()
-        if journalCharge, journal.dayMeals.contains(where: { !connus.contains($0.id) }) {
+        let entres = journal.dayMeals.filter { !connus.contains($0.id) }
+        if journalCharge, !entres.isEmpty {
             impulsionKcal += 1
+            // Un seul repas vient d'entrer : la carte Énergie le nomme.
+            if entres.count == 1, let seul = entres.first {
+                signalerAjout(seul.slot, aliments: seul.items.count)
+            }
         }
 
         guard journalCharge,
               Calendar.current.isDateInToday(journal.selectedDay),
               TutorielService.partage.etape == nil,
               !GamificationService.shared.isZenMode else { return }
-        let nouveaux = journal.dayMeals.filter { !connus.contains($0.id) }
-        guard nouveaux.count == 1, let nouveau = nouveaux.first,
+        guard entres.count == 1, let nouveau = entres.first,
               let gratification = GratificationRepas.calculer(
                 nouveau: nouveau,
                 repasDuJour: journal.dayMeals,
@@ -185,15 +239,54 @@ struct JournalView: View {
     /// enregistré un repas : la pastille confirme en haut de l'écran, la page
     /// se recharge, la carte des calories gonfle et compte.
     private func apresFeuilleVocale() {
+        // La feuille est redescendue : le voile de la dictée s'éteint (c'est
+        // déjà fait si elle s'est refermée d'elle-même), et son résultat ne
+        // doit pas resservir à la prochaine.
+        EcouteCentre.partage.fermer()
+        departDictee = nil
         guard let ajout = ajoutVocal else { return }
         ajoutVocal = nil
         // Pendant le tutoriel, c'est lui qui parle : pas de pastille par-dessus.
         if TutorielService.partage.etape == nil {
-            ConfirmationCentre.partage.courante = ConfirmationAjout(creneau: ajout.creneau, kcal: ajout.kcal)
+            ConfirmationCentre.partage.courante = ConfirmationAjout(
+                creneau: ajout.creneau, kcal: ajout.kcal, sousLigne: ajout.sousLigne
+            )
         }
         Task {
             await journal.load()
             impulsionKcal += 1
+            signalerAjout(ajout.creneau, aliments: ajout.nombre)
+        }
+    }
+
+    /// Un repas vient d'entrer dans la journée affichée : la carte Énergie le
+    /// dit sous son chiffre (« Déjeuner ajouté · 3 aliments »), puis rend la
+    /// place à l'objectif. Seulement aujourd'hui, comme la maquette.
+    private func signalerAjout(_ creneau: MealJournalService.MealSlot, aliments: Int) {
+        guard isTodaySelected else { return }
+        ajoutRecent = creneau.phraseAjout(aliments: aliments)
+        effacementAjout?.cancel()
+        effacementAjout = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled else { return }
+            ajoutRecent = nil
+        }
+    }
+
+    /// Rejoue l'entrée de la page : tout se range d'un coup, puis les repas
+    /// remontent en cascade et les anneaux des apports se retracent. Sous
+    /// « Réduire les animations », rien ne se range : le contenu est là.
+    private func rejouerEntree(apres delai: Duration) {
+        entreeEnAttente?.cancel()
+        guard !reduceMotion else {
+            entree = true
+            return
+        }
+        entree = false
+        entreeEnAttente = Task { @MainActor in
+            try? await Task.sleep(for: delai)
+            guard !Task.isCancelled else { return }
+            entree = true
         }
     }
 
@@ -229,18 +322,15 @@ struct JournalView: View {
                     guard let jour = note.object as? Date else { return }
                     Task { await journal.allerAuJour(jour) }
                 }
-                // Grand titre natif : il se replie en titre inline au défilement,
-                // avec apparition progressive du filet de barre (§5 du document).
+                // Le titre est dessiné dans la page, sur la ligne de la capsule
+                // du jour : la barre native est masquée ici. Le titre reste
+                // déclaré : c'est le nom de l'écran dans la pile.
                 .navigationTitle("Journal")
-                .navigationBarTitleDisplayMode(.large)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        // La série ne s'affiche que lorsqu'elle existe : un
-                        // « 0 » dans une pill n'encourage personne.
-                        if !gamification.isZenMode, gamification.currentStreak > 0 {
-                            seriePill
-                        }
-                    }
+                .toolbar(.hidden, for: .navigationBar)
+                // La page d'un micronutriment entre par la droite, dans la
+                // pile du Journal : la barre d'onglets reste là.
+                .navigationDestination(isPresented: $microPoussee) {
+                    pageMicro
                 }
                 // Le Bilan complet garde sa propre pile de navigation : on le
                 // présente en feuille, jamais poussé (pile dans la pile).
@@ -262,13 +352,8 @@ struct JournalView: View {
                         onLier: { await lierAppleSante() }
                     )
                 }
-                .sheet(item: ficheJournal) { fiche in
-                    switch fiche {
-                    case .apport(let apport):
-                        ApportV2DetailSheet(apport: apport)
-                    case .micro(let ligne):
-                        MicroDuJourSheet(ligne: ligne, apportDuBilan: apportDuBilan(pour: ligne))
-                    }
+                .sheet(item: $selectedApport) { apport in
+                    ApportV2DetailSheet(apport: apport)
                 }
                 .sheet(isPresented: $showVoice, onDismiss: { apresFeuilleVocale() }) {
                     if let uid = AuthService.shared.cachedCurrentUserIdString {
@@ -279,6 +364,9 @@ struct JournalView: View {
                             cibleGlucides: mesures.macros?.carbs,
                             cibleLipides: mesures.macros?.fat,
                             gratification: { gratificationDe($0) },
+                            // Déjà transcrite et chiffrée sous la bulle : la
+                            // feuille monte directement sur son résultat.
+                            depart: departDictee,
                             speech: speech
                         ) { ajout in
                             ajoutVocal = ajout
@@ -382,7 +470,7 @@ struct JournalView: View {
                 }
                 // Ouvert par le routage (« scanner » = le Journal, saisie dépliée).
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapOuvrirAjout)) { _ in
-                    withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) { autresFacons = true }
+                    withAnimation(reduceMotion ? nil : Animation.kiwiFluide) { autresFacons = true }
                 }
         }
     }
@@ -400,6 +488,8 @@ struct JournalView: View {
                 }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                // Fond de verre et coins de 38 : la feuille ne peint plus d'aplat.
+                .verreFeuille()
         }
     }
 
@@ -410,7 +500,6 @@ struct JournalView: View {
                 searchTab
                     .padding(.vertical, Theme.spacingMD)
             }
-            .background(Color.dsFond.ignoresSafeArea())
             .navigationTitle("Rechercher")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -423,6 +512,7 @@ struct JournalView: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .verreFeuille()
     }
 
     // MARK: - Scaffold
@@ -430,15 +520,29 @@ struct JournalView: View {
     private var scaffold: some View {
         ZStack {
             DSPageBackground()
-            ScrollView {
-                journalContent
-                    // Épingle la largeur du contenu à celle du conteneur : empêche
-                    // toute dérive/scroll horizontal.
-                    .containerRelativeFrame(.horizontal)
+            ScrollViewReader { defile in
+                ScrollView {
+                    journalContent
+                        // Épingle la largeur du contenu à celle du conteneur : empêche
+                        // toute dérive/scroll horizontal.
+                        .containerRelativeFrame(.horizontal)
+                }
+                // Appui maintenu : la page ne défile pas sous le doigt qui glisse
+                // pour verrouiller ou pour jeter.
+                .scrollDisabled(dicteeEnCours && !dicteeVerrouillee)
+                // Une puce d'en-tête vient de viser une carte : la page y glisse.
+                .onChange(of: ancreDemandee) { _, ancre in
+                    guard let ancre else { return }
+                    if reduceMotion {
+                        defile.scrollTo(ancre, anchor: .top)
+                    } else {
+                        withAnimation(Animation.kiwiGlisse) {
+                            defile.scrollTo(ancre, anchor: .top)
+                        }
+                    }
+                    ancreDemandee = nil
+                }
             }
-            // Appui maintenu : la page ne défile pas sous le doigt qui glisse
-            // pour verrouiller ou pour jeter.
-            .scrollDisabled(dicteeEnCours && !dicteeVerrouillee)
         }
         .confirmationDialog(
             "Ajouter une photo de ton repas",
@@ -464,6 +568,21 @@ struct JournalView: View {
     private func ouvrirDepuisWidget() {
         guard let lien = RouteurWidgets.partage.prendrePourLeJournal() else { return }
         guard !saisieOuverte, !dicteeEnCours else { return }
+        // La page d'un micronutriment est poussée : elle se referme d'abord,
+        // le geste demandé se sert sur le Journal une fois revenu.
+        guard !microPoussee else {
+            microPoussee = false
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                servirLienWidget(lien)
+            }
+            return
+        }
+        servirLienWidget(lien)
+    }
+
+    private func servirLienWidget(_ lien: LienKiwio) {
+        guard !saisieOuverte, !dicteeEnCours else { return }
         if !isTodaySelected {
             Task { await journal.allerAuJour(Date()) }
         }
@@ -485,93 +604,99 @@ struct JournalView: View {
         }
     }
 
-    // MARK: - Pill série (barre de navigation)
+    // MARK: - En-tête : le titre et le jour
 
-    private var seriePill: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "flame.fill")
-                .font(.system(size: 15, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.dsCalories)
-                .accessibilityHidden(true)
-            Text("\(gamification.currentStreak)")
-                .font(.system(.subheadline, design: .default).weight(.bold).monospacedDigit())
-                .contentTransition(.numericText())
-                .foregroundStyle(Color.dsTexte)
+    /// « Journal » à gauche (34 / 700), la capsule du jour à droite. La barre
+    /// de navigation native est masquée : c'est cette ligne qui porte le titre.
+    private var enTete: some View {
+        HStack(alignment: .center, spacing: 8) {
+            DSLargeTitle(titre: "Journal")
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: 8)
+            capsuleDeJour
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 7)
-        .background(Capsule().fill(Color.dsCarte.opacity(0.7)))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Série : \(gamification.currentStreak) jours")
     }
 
-    // MARK: - Barre de jour (navigation par date)
+    /// Le libellé du jour roule vers le haut quand le jour change : le nouveau
+    /// monte de 16 pt en apparaissant, l'ancien cède la place d'un coup (la
+    /// maquette le remplace, elle ne superpose pas les deux).
+    private var rouleDuJour: AnyTransition {
+        reduceMotion
+            ? AnyTransition.opacity
+            : AnyTransition.asymmetric(
+                insertion: AnyTransition.offset(y: 16).combined(with: AnyTransition.opacity),
+                removal: AnyTransition.identity
+            )
+    }
 
-    /// Deux chevrons et la date, en tête de page. La date ouvre un calendrier
-    /// SANS borne : on remonte aussi loin qu'on a mangé, on avance sur les
-    /// jours à venir. Demandé le 11 sept. 2026 — celui qui note son dîner à
-    /// 00h30 doit pouvoir le poser sur la veille, et préparer la suite.
-    private var barreDeJour: some View {
-        HStack(spacing: 2) {
-            boutonJour(icone: "chevron.left", libelle: "Jour précédent") {
+    /// Deux chevrons et le jour, dans une capsule de verre clair de 44 pt. Le
+    /// libellé ouvre un calendrier SANS borne : on remonte aussi loin qu'on a
+    /// mangé, on avance sur les jours à venir. Demandé le 11 sept. 2026 —
+    /// celui qui note son dîner à 00h30 doit pouvoir le poser sur la veille,
+    /// et préparer la suite. Le chevron de droite s'estompe donc aujourd'hui
+    /// (maquette), mais il répond toujours.
+    private var capsuleDeJour: some View {
+        HStack(spacing: 0) {
+            chevronDeJour("chevron.left", libelle: "Jour précédent", estompe: false) {
                 journal.goPrevDay()
             }
-
-            Spacer(minLength: 0)
 
             Button {
                 HapticService.shared.tap()
                 montreCalendrier = true
             } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.dsAccent)
-                    VStack(spacing: 1) {
+                HStack(spacing: 5) {
+                    ZStack {
                         Text(journal.dayLabel)
-                            .font(.dsHeadline)
+                            .font(.dsSousTitreFort)
+                            .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsTexte)
-                        Text(journal.daySub)
-                            .font(.dsLegende)
-                            .foregroundStyle(Color.dsSecondaire)
+                            .lineLimit(1)
+                            .id(journal.selectedDay)
+                            .transition(rouleDuJour)
                     }
+                    .clipped()
                     if journal.chargeLArchive {
                         ProgressView()
                             .scaleEffect(0.6)
                             .frame(width: 14, height: 14)
                     }
                 }
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
+                .frame(minWidth: 92, minHeight: DS.cibleTactile)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Choisir une date. Jour affiché : \(journal.dayLabel)")
+            .animation(reduceMotion ? Animation.easeOut(duration: 0.2) : Animation.kiwiRebond, value: journal.selectedDay)
+            .accessibilityLabel("Choisir une date. Jour affiché : \(journal.dayLabel), \(journal.daySub)")
 
-            Spacer(minLength: 0)
-
-            boutonJour(icone: "chevron.right", libelle: "Jour suivant") {
+            chevronDeJour("chevron.right", libelle: "Jour suivant", estompe: isTodaySelected) {
                 journal.goNextDay()
             }
         }
-        .padding(.horizontal, 4)
-        .dsCard()
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: journal.selectedDay)
+        .verreClair()
     }
 
-    private func boutonJour(icone: String, libelle: String, action: @escaping () -> Void) -> some View {
+    private func chevronDeJour(
+        _ icone: String,
+        libelle: String,
+        estompe: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
         Button {
             HapticService.shared.tap()
             action()
         } label: {
             Image(systemName: icone)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color.dsAccent)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+                .opacity(estompe ? 0.3 : 1)
+                .frame(width: 40, height: DS.cibleTactile)
+                // 40 pt de large dans la capsule ; la cible, elle, en fait 44.
+                .contentShape(Rectangle().inset(by: -2))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.dsPress)
+        .animation(reduceMotion ? nil : Animation.kiwiSoft, value: estompe)
         .accessibilityLabel(libelle)
     }
 
@@ -601,7 +726,6 @@ struct JournalView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, DS.marge)
-            .background(Color.dsFond.ignoresSafeArea())
             .navigationTitle("Aller à une date")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -612,16 +736,137 @@ struct JournalView: View {
             }
         }
         .presentationDetents([.medium, .large])
+        // Fond de verre et coins de 38 : la feuille ne peint plus d'aplat.
+        .verreFeuille()
+    }
+
+    // MARK: - Puces d'en-tête (Eau · Poids · Série · Analyses)
+
+    /// La série ne s'affiche que lorsqu'elle existe : un « 0 » dans une puce
+    /// n'encourage personne.
+    private var serieVisible: Bool {
+        !gamification.isZenMode && gamification.currentStreak > 0
+    }
+
+    /// Les cartes Poids, Eau et Prise de sang n'existent qu'une fois le
+    /// questionnaire fait : avant, leurs puces n'auraient nulle part où mener.
+    private var cartesDuJourPresentes: Bool {
+        dashboardVM.bilanAffichage != .decouverte
+    }
+
+    /// Une rangée de puces de verre qui défile à l'horizontale, d'un bord de
+    /// l'écran à l'autre. Eau, Poids et Analyses mènent à leur carte ; la
+    /// série se lit, elle ne mène nulle part.
+    @ViewBuilder
+    private var puces: some View {
+        if cartesDuJourPresentes || serieVisible {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if cartesDuJourPresentes {
+                        puceEau
+                        pucePoids
+                    }
+                    if serieVisible {
+                        puceSerie
+                    }
+                    if cartesDuJourPresentes {
+                        puceAnalyses
+                    }
+                }
+                .padding(.horizontal, DS.marge)
+            }
+            // L'ombre du verre déborde de la rangée : elle ne doit pas être rognée.
+            .scrollClipDisabled()
+            .padding(.horizontal, -DS.marge)
+            .padding(.top, 12)
+        }
+    }
+
+    private var puceEau: some View {
+        Button {
+            allerA(.eau)
+        } label: {
+            VerrePuce(
+                libelle: "Eau",
+                valeur: "\(DS.decimal(SuiviEau.litres(gobeletsEau), decimales: 2)) L"
+            ) {
+                JournalPuceEau(fraction: Double(gobeletsEau) / Double(max(1, SuiviEau.gobeletsParJour)))
+            }
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityHint("Va à la carte de l'eau")
+    }
+
+    private var pucePoids: some View {
+        let profil = profilRegle ?? dashboardVM.profile
+        return Button {
+            allerA(.poids)
+        } label: {
+            VerrePuce(
+                libelle: "Poids",
+                valeur: "\(ObjectifPoids.affichage(profil.weightDouble)) kg"
+            ) {
+                VerrePastilleIcone(symbole: "scalemass")
+            }
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityHint("Va à la carte du poids")
+    }
+
+    private var puceSerie: some View {
+        let jours = gamification.currentStreak
+        return VerrePuce(
+            libelle: "Série",
+            valeur: "\(jours) jour\(jours > 1 ? "s" : "")"
+        ) {
+            // La flamme au trait, comme la puce de Progrès et la maquette.
+            VerrePastilleIcone(symbole: "flame", teinte: Color.teinteEnergie)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Série : \(jours) jour\(jours > 1 ? "s" : "")")
+    }
+
+    /// « Nouveau » tant qu'aucune prise de sang n'est importée ; ensuite, la
+    /// date de la dernière.
+    private var puceAnalyses: some View {
+        Button {
+            allerA(.sang)
+        } label: {
+            VerrePuce(
+                libelle: "Analyses",
+                valeur: dashboardVM.priseDeSang.map { $0.dateCourte() } ?? "Nouveau"
+            ) {
+                VerrePastilleIcone(
+                    symbole: "drop.fill",
+                    teinte: Color.dsACombler.opacity(0.85),
+                    taille: 30,
+                    tailleIcone: 15
+                )
+            }
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityHint("Va à la carte de la prise de sang")
+    }
+
+    /// Une puce vient d'être touchée : la page défile jusqu'à sa carte.
+    private func allerA(_ ancre: AncreJournal) {
+        HapticService.shared.tap()
+        ancreDemandee = ancre
     }
 
     // MARK: - Contenu
 
     private var journalContent: some View {
         VStack(spacing: 0) {
-            // Le jour affiché, tout en haut : c'est lui qui commande la page
-            // entière (jauges, apports, repas) ET la date des ajouts.
-            barreDeJour
-                .padding(.top, 8)
+            // Le titre et le jour affiché, tout en haut : le jour commande la
+            // page entière (jauges, apports, repas) ET la date des ajouts.
+            enTete
+                .padding(.top, 14)
+
+            puces
 
             // La photo en attente d'analyse vit ici, sous le titre. La dictée,
             // elle, n'est plus dans la page : la bulle d'écoute surgit au-dessus
@@ -642,7 +887,7 @@ struct JournalView: View {
             if dashboardVM.bilanAffichage == .decouverte {
                 // Avant le questionnaire : la saisie d'abord (l'entrée est
                 // libre), puis la population à la place des chiffres perso.
-                saisieBloc.padding(.top, 16)
+                saisieBloc.padding(.top, 14)
                 avantQuestionnaire
             } else {
                 // Réservé au Premium, comme toute la partie micronutriments :
@@ -650,33 +895,34 @@ struct JournalView: View {
                 if !dashboardVM.premiumVisible, let premiere = tableauMicros.alertes.first {
                     JournalMicrosAlerte(alertes: tableauMicros.alertes) {
                         HapticService.shared.tap()
-                        selectedMicro = premiere
+                        ouvrirMicro(premiere)
                     }
-                    .padding(.top, 16)
+                    .padding(.top, 14)
                 }
 
-                JournalCaloriesCard(
+                // Une seule carte pour l'énergie : le chiffre et l'anneau,
+                // puis les quatre macros sous un filet.
+                JournalEnergieCard(
                     consommees: journal.dayCalories,
                     objectif: mesures.macros?.calories,
                     depensees: isTodaySelected ? activeEnergyToday : nil,
                     isToday: isTodaySelected,
+                    macros: lignesMacros,
                     santeLiee: healthLinked,
                     onActivite: {
                         HapticService.shared.tap()
                         showActivite = true
                     },
-                    impulsion: impulsionKcal
+                    impulsion: impulsionKcal,
+                    ajoutRecent: ajoutRecent
                 )
-                .padding(.top, 16)
+                .padding(.top, 14)
 
-                JournalMacrosCard(lignes: lignesMacros)
-                    .padding(.top, DS.interCarte)
-
-                saisieBloc.padding(.top, 14)
+                saisieBloc.padding(.top, DS.interCarte)
 
                 // Sous la saisie (retour d'Arthur du 1er octobre 2026) : placée
-                // juste sous les macros, la carte repoussait Dicter et
-                // Photographier hors de l'écran.
+                // juste sous les macros, la carte repoussait Dicter hors de
+                // l'écran.
                 microsSection
 
                 poidsEtEau
@@ -693,6 +939,8 @@ struct JournalView: View {
                     showPriseDeSang = true
                 }
                 .padding(.top, DS.interCarte)
+                // La puce « Analyses » mène ici.
+                .id(AncreJournal.sang)
 
                 apportsSection
 
@@ -704,6 +952,25 @@ struct JournalView: View {
         }
         .padding(.horizontal, DS.marge)
         .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.8), value: dicteeEnCours)
+        // L'entrée de la page : 0,3 s après le lancement, puis rejouée à
+        // chaque arrivée sur l'onglet et à chaque changement de jour.
+        .onAppear {
+            if !entree { rejouerEntree(apres: .milliseconds(300)) }
+        }
+        .onChange(of: estOngletActif) { _, actif in
+            if actif {
+                rejouerEntree(apres: .milliseconds(60))
+            } else if microPoussee {
+                // On quitte l'onglet : la page d'un micronutriment se referme
+                // (maquette), le Journal se retrouve sur sa racine au retour.
+                microPoussee = false
+            }
+        }
+        .onChange(of: journal.selectedDay) { _, _ in
+            effacementAjout?.cancel()
+            ajoutRecent = nil
+            rejouerEntree(apres: .milliseconds(40))
+        }
         .task {
             await journal.load()
             journalCharge = true
@@ -762,7 +1029,7 @@ struct JournalView: View {
     /// est confirmé par la pastille du haut de l'écran (`ConfirmationCentre`).
     private var messageSaisie: (texte: String, erreur: Bool)? {
         if let erreur = erreurDictee { return (erreur.message, true) }
-        if dicteeTropCourte { return ("Trop court. Parle un peu plus longtemps, puis touche la bulle.", true) }
+        if dicteeTropCourte { return ("Trop court. Parle un peu plus longtemps, puis touche Terminer.", true) }
         if let addFoodConfirmation { return (addFoodConfirmation, false) }
         return nil
     }
@@ -793,17 +1060,20 @@ struct JournalView: View {
         journal.tableauMicros(contexteMicros) { dashboardVM.registre }
     }
 
+    /// La carte suit la saisie, à un espace de carte : elle porte son propre
+    /// libellé de catégorie (maquette), il n'y a plus de titre de section
+    /// au-dessus d'elle.
     @ViewBuilder
     private var microsSection: some View {
-        DSSectionHeader(titre: "Micronutriments")
         if dashboardVM.premiumVisible {
             // Porte Premium (décision d'Arthur du 1er octobre 2026) : la carte
-            // reste devinable derrière le voile, rien ne s'ouvre, et la fiche
+            // reste devinable derrière le voile, rien ne s'ouvre, et la page
             // d'un micronutriment n'est donc pas atteignable. Même geste que
             // dans Progrès (`GatedOverlay` + `UnlockDoor`).
             GatedOverlay(intensity: .locked) {
                 JournalMicrosCard(tableau: tableauMicros) { _ in }
             }
+            .padding(.top, DS.interCarte)
             UnlockDoor(
                 icon: "chart.bar.xaxis",
                 title: "Débloque tes micronutriments",
@@ -814,38 +1084,46 @@ struct JournalView: View {
         } else {
             JournalMicrosCard(tableau: tableauMicros) { ligne in
                 HapticService.shared.tap()
-                selectedMicro = ligne
+                ouvrirMicro(ligne)
             }
+            .padding(.top, DS.interCarte)
         }
     }
 
-    /// Les deux fiches d'un apport passent par UNE seule feuille : le Journal
-    /// en porte déjà beaucoup, et une de plus ne s'ouvre pas.
-    private enum FicheJournal: Identifiable {
-        case apport(ApportV2)
-        case micro(LigneMicro)
+    /// Un micronutriment vient d'être touché : sa page entre par la droite.
+    private func ouvrirMicro(_ ligne: LigneMicro) {
+        selectedMicro = ligne
+        microPoussee = true
+    }
 
-        var id: String {
-            switch self {
-            case .apport(let apport): return "apport-" + (apport.id ?? "")
-            case .micro(let ligne): return "micro-" + ligne.id
-            }
+    /// La page d'un micronutriment, POUSSÉE dans la pile du Journal (elle
+    /// était une feuille) : elle entre par la droite et la barre d'onglets
+    /// reste là. La vue vit dans `JournalMicrosComponents.swift` : elle
+    /// dessine son propre retour (« ‹ Journal », qui dépile la page) et son
+    /// fond de verre. La barre native est donc masquée ici aussi, sinon le
+    /// retour serait écrit deux fois.
+    @ViewBuilder
+    private var pageMicro: some View {
+        if let ligne = selectedMicro {
+            MicroDuJourSheet(ligne: ligne, apportDuBilan: apportDuBilan(pour: ligne))
+                .environmentObject(dashboardVM)
+                .kiwiTabBarBottomInset()
+                .toolbar(.hidden, for: .navigationBar)
+                .simultaneousGesture(retourParLeBord)
         }
     }
 
-    private var ficheJournal: Binding<FicheJournal?> {
-        Binding(
-            get: {
-                if let micro = selectedMicro { return FicheJournal.micro(micro) }
-                if let apport = selectedApport { return FicheJournal.apport(apport) }
-                return nil
-            },
-            set: { nouvelle in
-                guard nouvelle == nil else { return }
-                selectedMicro = nil
-                selectedApport = nil
+    /// Barre masquée, le glissé de retour du système ne répond plus : on
+    /// garde le geste. Un glissé parti du bord gauche, franchement vers la
+    /// droite, referme la page.
+    private var retourParLeBord: some Gesture {
+        DragGesture(minimumDistance: 20)
+            .onEnded { geste in
+                guard geste.startLocation.x < 28,
+                      geste.translation.width > 70,
+                      abs(geste.translation.height) < 60 else { return }
+                microPoussee = false
             }
-        )
     }
 
     /// La fiche des causes n'existe que pour les apports du bilan.
@@ -878,6 +1156,7 @@ struct JournalView: View {
                     bilan: bilan,
                     scores: dashboardVM.nutrientScores,
                     isPremium: subscriptionService.isPremium,
+                    entree: entree,
                     onApport: { apport in
                         HapticService.shared.tap()
                         TutorielService.partage.apportOuvert()
@@ -922,6 +1201,8 @@ struct JournalView: View {
         let cibles = mesures
 
         DSSectionHeader(titre: "Poids et eau")
+            // La puce « Poids » mène ici : le titre, puis la carte.
+            .id(AncreJournal.poids)
 
         JournalPoidsCard(
             actuel: profil.weightDouble,
@@ -941,6 +1222,8 @@ struct JournalView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapEauChange)) { _ in
                 relireEau()
             }
+            // La puce « Eau » mène ici.
+            .id(AncreJournal.eau)
     }
 
     private func relireEau() {
@@ -978,7 +1261,7 @@ struct JournalView: View {
         SuiviEau.noter(gobeletsEau, userId: uid, jour: journal.selectedDay)
     }
 
-    // MARK: - Macros (quatre lignes, surplus lu selon l'objectif)
+    // MARK: - Macros (quatre colonnes de la carte Énergie, surplus lu selon l'objectif)
 
     private var veutDuMuscle: Bool { dashboardVM.profile.goals.contains("muscle") }
 
@@ -1006,7 +1289,9 @@ struct JournalView: View {
                 Text("\(DS.entier(journal.dayCalories)) kcal")
                     .font(.dsValeurLigne)
                     .foregroundStyle(Color.dsSecondaire)
+                    // Le total du jour compte quand un repas vient d'entrer.
                     .contentTransition(.numericText())
+                    .animation(reduceMotion ? nil : Animation.kiwiCompteur, value: journal.dayCalories)
             }
         }
         .padding(.top, DS.avantSection - 8)
@@ -1024,6 +1309,7 @@ struct JournalView: View {
                     vide: journal.dayRows(in: slot).isEmpty
                 )
             },
+            entree: entree,
             onOuvrir: { slot in repasOuvert = slot }
         )
     }
@@ -1169,11 +1455,12 @@ struct JournalView: View {
     }
 
     /// Démarre une dictée. VERROUILLÉE (toucher bref, VoiceOver) : mains
-    /// libres, on touche la bulle pour terminer. Non verrouillée (appui
-    /// maintenu) : elle vit tant que le doigt tient. La bulle surgit
-    /// TOUT DE SUITE ; le micro s'ouvre derrière — aucune attente perçue.
+    /// libres, on touche « Terminer » (ou la bulle). Non verrouillée (appui
+    /// maintenu) : elle vit tant que le doigt tient. Le bouton devient la
+    /// bulle TOUT DE SUITE ; le micro s'ouvre derrière — aucune attente perçue.
     private func demarrerDictee(verrouillee: Bool) {
-        guard !dicteeEnCours else { return }
+        // Une dictée en cours de calcul garde la main : sa feuille va monter.
+        guard !dicteeEnCours, calculDictee == nil else { return }
         guard peutDicter else {
             showPaywall = true
             return
@@ -1188,14 +1475,15 @@ struct JournalView: View {
         dicteeEnCours = true
         dicteeVerrouillee = verrouillee
         erreurDictee = nil
-        // La bulle surgit : impact doux, comme une surface qui cède.
+        // Le bouton devient la bulle : impact doux, comme une surface qui cède.
         HapticService.shared.tap()
         EcouteCentre.partage.ouvrir(
             speech: dicteeBox.speech,
             geste: dicteeBox.geste,
             mainsLibres: verrouillee,
             onTerminer: { terminerDictee() },
-            onAnnuler: { annulerDictee() }
+            onAnnuler: { annulerDictee() },
+            onAbandonner: { abandonnerCalcul() }
         )
         // Autorisations et quota passés : le voile du tutoriel se lève.
         TutorielService.partage.dicteeDemarree()
@@ -1217,9 +1505,10 @@ struct JournalView: View {
         }
     }
 
-    /// Clôt la dictée : trop courte, la bulle s'efface sans faire attendre ;
-    /// sinon elle s'efface et la feuille monte sur l'analyse de ce qui vient
-    /// d'être enregistré.
+    /// Clôt la dictée : trop courte, la bulle retourne dans son bouton sans
+    /// faire attendre ; sinon elle se contracte et tourne, le temps de
+    /// transcrire puis de chiffrer ce qui vient d'être dit, et la feuille
+    /// monte avec le résultat.
     private func terminerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
@@ -1236,21 +1525,38 @@ struct JournalView: View {
         }
         HapticService.shared.lightTap()
         EcouteCentre.partage.contracter()
-        guard !reduceMotion else {
-            showVoice = true
-            return
-        }
-        // La bulle s'efface, PUIS la feuille monte. Le micro reste ouvert ces
-        // 220 ms : c'est la feuille qui le referme.
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(220))
+        // Le calcul se fait ICI, sous la bulle : on referme le micro, on
+        // transcrit l'enregistrement entier, la carte le relit, puis le
+        // serveur chiffre. La feuille ne monte qu'avec le résultat (ou
+        // l'échec, qu'elle sait rejouer).
+        calculDictee?.cancel()
+        calculDictee = Task { @MainActor in
+            let depart = await VoiceMealSheet.preparer(speech: speech) { texte in
+                EcouteCentre.partage.transcrire(texte)
+            }
+            // Abandonné entre-temps (« Annuler » sous la bulle) : rien ne monte.
+            guard !Task.isCancelled else { return }
+            calculDictee = nil
+            departDictee = depart
+            EcouteCentre.partage.livrer()
             showVoice = true
         }
     }
 
-    /// Annulation volontaire (la croix du bouton, ou glissé à gauche) : on
-    /// jette l'enregistrement sans message d'erreur — c'est un choix, pas un
-    /// raté. La bulle s'efface, le bouton reprend sa face.
+    /// « Annuler » pendant le calcul : on ne garde rien de cette dictée. La
+    /// bulle retourne dans son bouton, comme pour une dictée jetée.
+    private func abandonnerCalcul() {
+        calculDictee?.cancel()
+        calculDictee = nil
+        HapticService.shared.warning()
+        speech.reset()
+        EcouteCentre.partage.rendreLeBouton()
+        TutorielService.partage.dicteeJetee()
+    }
+
+    /// Annulation volontaire (« Annuler », ou glissé à gauche) : on jette
+    /// l'enregistrement sans message d'erreur — c'est un choix, pas un raté.
+    /// La bulle retourne dans son bouton, qui reprend sa face.
     private func annulerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
@@ -1374,7 +1680,7 @@ struct JournalView: View {
             .containerRelativeFrame(.horizontal)
         }
         .ignoresSafeArea(edges: .top)
-        .background(Color.dsFond.ignoresSafeArea())
+        // Plus d'aplat ici : le fond est le verre de la feuille (`resultSheet`).
         .task {
             await journal.load()
             if let uid = AuthService.shared.cachedCurrentUserIdString {
@@ -1635,8 +1941,7 @@ struct JournalView: View {
                                 .foregroundStyle(Color.dsTexte)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(Capsule().fill(Color.dsFond))
-                                .overlay(Capsule().stroke(BilanV7.hairline, lineWidth: 1))
+                                .background(Capsule().fill(Verre.remplissage))
                         }
                     }
                 }
@@ -1812,9 +2117,8 @@ struct JournalView: View {
         .padding(.horizontal, Theme.spacingLG)
     }
 
-    /// CTA primaire de la feuille résultat, à la charte : 15/semibold, h48,
-    /// sans ombre. Il pesait 16/bold sur 54 pt avec un halo vert, plus lourd
-    /// que la conclusion qu'il suivait.
+    /// L'action principale de la feuille résultat : le verre teinté vert, en
+    /// capsule, à la hauteur des actions de feuille.
     private var scanAgainButton: some View {
         Button {
             viewModel.reset()
@@ -1822,13 +2126,15 @@ struct JournalView: View {
             HStack(spacing: 9) {
                 Image(systemName: "camera.fill").font(.system(size: 15, weight: .semibold))
                 Text("Scanner un autre repas")
-                    .font(Theme.ctaFont)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
             }
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsAccent))
+            .frame(maxWidth: .infinity, minHeight: Verre.hauteurAction)
+            .verrePrincipal()
+            .contentShape(Capsule(style: .continuous))
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .padding(.horizontal, Theme.spacingLG)
     }
 
@@ -1856,8 +2162,7 @@ struct JournalView: View {
                 }
             }
             .padding(Theme.spacingSM)
-            .background(Color.dsCarte)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM))
+            .verreClair(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .padding(.horizontal, Theme.spacingLG)
 
             if viewModel.searchQuery.isEmpty {
@@ -1915,8 +2220,10 @@ struct JournalView: View {
                                 }
                             }
                             .padding(Theme.spacingSM)
-                            .background(Color.dsCarte)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            // Verre sans ombre : la liste défile, et une
+                            // ombre découpée par ligne coûterait cher.
+                            .verre(.ligneDeListe, forme: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.healthMapPressed)
                         .disabled(isAddingFood)
@@ -2072,8 +2379,7 @@ private struct NeedImpactDetailSheet: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .padding(.horizontal, 8)
-                            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsCarte))
-                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.dsTexte.opacity(0.05), lineWidth: 1))
+                            .verreCarte(rayon: 16)
                         }
                     }
                 }
@@ -2084,26 +2390,28 @@ private struct NeedImpactDetailSheet: View {
                 } label: {
                     HStack(spacing: 8) {
                         Text("Voir mon plan")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.dsHeadline)
+                            .tracking(DSTracking.corps)
                         Image(systemName: "arrow.right")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 17, weight: .semibold))
                     }
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.dsAccent))
-                    // (ombre retirée, refonte 23 août 2026)
+                    .frame(maxWidth: .infinity, minHeight: Verre.hauteurAction)
+                    // L'action principale d'une feuille : verre teinté vert.
+                    .verrePrincipal()
+                    .contentShape(Capsule(style: .continuous))
                 }
-                .buttonStyle(.healthMapPressed)
+                .buttonStyle(.dsPress)
                 .padding(.top, 22)
             }
             .padding(.horizontal, 22)
             .padding(.top, 8)
             .padding(.bottom, 30)
         }
-        .background(Color.dsFond)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(30)
+        // Fond de verre et coins de 38 : la feuille ne peint plus d'aplat.
+        .verreFeuille()
     }
 
     private var header: some View {
@@ -2135,15 +2443,8 @@ private struct NeedImpactDetailSheet: View {
                 .background(Capsule().fill(color.opacity(0.14)))
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.dsSecondaire)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.dsTexte.opacity(0.06)))
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityLabel("Fermer")
+            // Le rond de verre du socle : même croix, même libellé « Fermer ».
+            DSCloseButton { dismiss() }
         }
     }
 

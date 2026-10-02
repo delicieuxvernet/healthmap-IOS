@@ -1,9 +1,11 @@
 import SwiftUI
 
 // MARK: - Onboarding View (page de garde + 3 pages)
-/// Refonte premium : fond animé (blobs lents, miroir du hero du site web),
-/// page de garde avec le signe Kiwio et son nom, apparitions
-/// douces étagées, CTA gradient avec ombre lumineuse.
+/// Page de garde avec le signe Kiwio et son nom, puis trois pages, en
+/// apparitions douces étagées.
+/// Verre liquide (2 octobre 2026) : fond de verre qui respire (teinte kiwi),
+/// action principale en verre teinté vert, icône de chaque page dans un
+/// disque de verre clair.
 /// Reduce Motion → tout est statique (fond figé, apparitions instantanées).
 struct OnboardingView: View {
     @Binding var hasSeenOnboarding: Bool
@@ -33,21 +35,28 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            // Fond chaud unifié, statique (WarmBackground)
-            WarmBackground()
+            // Le fond de verre de l'app (teinte kiwi : on est hors onglets).
+            VerreFond()
 
             VStack(spacing: 0) {
                 // Skip button
                 HStack {
                     Spacer()
                     if currentPage < pageCount - 1 {
-                        Button("Passer") {
+                        Button {
                             withAnimation(reduceMotion ? .none : .healthMapSpring) {
                                 hasSeenOnboarding = true
                             }
+                        } label: {
+                            // Cible de 44 pt DANS le label : le libellé seul
+                            // n'en fait qu'une vingtaine de haut.
+                            Text("Passer")
+                                .font(.dsSousTitreFort)
+                                .foregroundStyle(Color.dsAccent)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
-                        .font(.dsSousTitreFort)
-                        .foregroundStyle(Color.dsAccent)
+                        .buttonStyle(.dsPress)
                     }
                 }
                 .padding(.horizontal, Theme.spacingLG)
@@ -77,7 +86,7 @@ struct OnboardingView: View {
                 }
                 .padding(.bottom, Theme.spacingLG)
 
-                // CTA — gradient brand + ombre lumineuse (miroir du CTA web)
+                // CTA : le verre teinté vert de l'action principale.
                 Button {
                     withAnimation(reduceMotion ? .none : .healthMapSpring) {
                         if currentPage < pageCount - 1 {
@@ -93,7 +102,7 @@ struct OnboardingView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: DS.hauteurBouton)
-                        .background(Capsule().fill(Color.dsAccent))
+                        .verrePrincipal()
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.dsPress)
@@ -204,20 +213,17 @@ private struct OnboardingPageView: View {
         VStack(spacing: Theme.spacingLG) {
             Spacer()
 
-            // Icône sur halo bleu, teinte gradient brand
-            ZStack {
-                Circle()
-                    .fill(Color.dsAccentPale)
-                    .frame(width: 120, height: 120)
-
-                Image(systemName: page.icon)
-                    .font(.system(size: 44, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(Color.dsAccent)
-            }
-            .scaleEffect(appeared ? 1.0 : 0.6)
-            .opacity(appeared ? 1 : 0)
-            .animation(staged(0), value: appeared)
+            // Icône verte dans un disque de verre clair.
+            Image(systemName: page.icon)
+                .font(.system(size: 44, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.dsAccent)
+                .frame(width: 120, height: 120)
+                .verreClair(Circle())
+                .accessibilityHidden(true)
+                .scaleEffect(appeared ? 1.0 : 0.6)
+                .opacity(appeared ? 1 : 0)
+                .animation(staged(0), value: appeared)
 
             // Title
             Text(page.title)

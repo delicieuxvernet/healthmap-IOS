@@ -10,6 +10,10 @@ import SwiftUI
 // Les valeurs écrites sont celles de `QuestionnaireSection`, via
 // `LibellesBilan.choix` : ces écrans ne connaissent aucun identifiant de
 // réponse en dur, hormis oui / non.
+//
+// Verre liquide (2 octobre 2026) : à l'arrivée sur un écran, le titre puis les
+// réponses montent en cascade (`bilanCascade`) ; les écrans de bilan (accueil,
+// fin d'étape, « ce qu'on voit déjà », fin) font monter leurs lignes une à une.
 
 /// Aiguille l'écran courant vers sa vue.
 struct BilanEcranView: View {
@@ -64,7 +68,9 @@ struct BilanPage<Contenu: View>: View {
                 VStack(alignment: .leading, spacing: 0) {
                     BilanTitre(titre: titre, pourquoi: pourquoi)
                         .padding(.bottom, 14)
+                        .bilanCascade(0)
                     contenu()
+                        .bilanCascade(1)
                     Spacer(minLength: 14)
                     if let carte {
                         BilanCartePiste(carte: carte)
@@ -74,9 +80,11 @@ struct BilanPage<Contenu: View>: View {
                 }
                 .padding(.horizontal, DS.marge)
                 .padding(.top, 10)
-                .padding(.bottom, 10)
+                // La carte de verre du bas porte une ombre : assez d'air pour
+                // qu'elle ne soit pas coupée net par le bord de l'écran.
+                .padding(.bottom, 24)
                 .frame(minHeight: geo.size.height, alignment: .top)
-                .animation(reduceMotion ? nil : .kiwiFluide, value: carte)
+                .animation(reduceMotion ? nil : Animation.kiwiFluide, value: carte)
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollBounceBehavior(.basedOnSize)
@@ -96,12 +104,14 @@ private struct BilanAccueil: View {
                 KiwiSigne(taille: 64)
                     .padding(.top, 12)
                     .padding(.bottom, 10)
+                    .bilanCascade(0)
                 BilanTitre(
                     titre: "Ton bilan, en 4 étapes",
                     pourquoi: "Environ \(ParcoursBilan.minutesAnnoncees(contexte)) minutes. Tes réponses sont gardées à chaque pas.",
                     centre: true
                 )
                 .padding(.bottom, 16)
+                .bilanCascade(1)
 
                 VStack(spacing: 8) {
                     ForEach(EtapeBilan.allCases) { etape in
@@ -111,12 +121,13 @@ private struct BilanAccueil: View {
                             mention: ParcoursBilan.dureeAnnoncee(etape, contexte),
                             teinte: etape.teinte
                         )
-                        .kiwiEntrance(etape.rawValue)
+                        .bilanCascade(etape.rawValue + 2)
                     }
                 }
             }
             .padding(.horizontal, DS.marge)
-            .padding(.vertical, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 24)
         }
         .scrollBounceBehavior(.basedOnSize)
     }
@@ -171,15 +182,13 @@ private struct BilanPrenom: View {
                 .submitLabel(.continue)
                 .focused($saisie)
                 .onSubmit { avancer() }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .frame(minHeight: 56)
-                .background(
-                    RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                        .fill(Color.dsCarte)
-                )
+                // Un champ de verre clair ; le liseré kiwi dit qu'on y écrit.
+                .verreClair(RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                        .strokeBorder(saisie ? teinte.vive : Color.clear, lineWidth: 2)
+                        .strokeBorder(saisie ? BilanVerre.bordChoisi : Color.clear, lineWidth: 1.5)
                 )
                 .accessibilityLabel("Ton prénom")
 
@@ -284,11 +293,12 @@ private struct BilanFinDEtape: View {
             VStack(spacing: 0) {
                 ZStack {
                     BilanGerbe()
+                    // La coche de l'étape : un disque de verre à sa couleur.
                     Image(systemName: "checkmark")
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(Color.white)
                         .frame(width: 64, height: 64)
-                        .background(Circle().fill(etape.teinte.vive))
+                        .verre(BilanVerre.disque(etape.teinte.vive), forme: Circle())
                         .kiwiRecompense(true)
                         .accessibilityHidden(true)
                 }
@@ -302,10 +312,13 @@ private struct BilanFinDEtape: View {
                     centre: true
                 )
                 .padding(.bottom, 14)
+                .bilanCascade(0)
 
+                // Les lignes montent une à une : ce qu'on sait, puis ce qui vient.
                 VStack(spacing: 8) {
                     if etape == .toi {
                         BilanLigne(emoji: "🎯", titre: "Tes besoins sont calculés", mention: "fait", teinte: .information)
+                            .bilanCascade(1)
                         if raisons > 0 {
                             BilanLigne(
                                 emoji: "📝",
@@ -313,9 +326,10 @@ private struct BilanFinDEtape: View {
                                 mention: raisons == 1 ? "notée" : "notées",
                                 teinte: .information
                             )
+                            .bilanCascade(2)
                         }
                     }
-                    ForEach(pistes) { piste in
+                    ForEach(Array(pistes.enumerated()), id: \.offset) { rang, piste in
                         BilanLigne(
                             emoji: NutrientData.definition(for: piste).emoji,
                             titre: NutrientData.definition(for: piste).label,
@@ -323,6 +337,7 @@ private struct BilanFinDEtape: View {
                             teinte: .apport(piste),
                             mentionForte: true
                         )
+                        .bilanCascade(rang + 3)
                     }
                     if let suivante {
                         BilanLigne(
@@ -332,11 +347,13 @@ private struct BilanFinDEtape: View {
                             teinte: suivante.teinte,
                             teintee: true
                         )
+                        .bilanCascade(6)
                     }
                 }
             }
             .padding(.horizontal, DS.marge)
-            .padding(.vertical, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 24)
         }
         .scrollBounceBehavior(.basedOnSize)
     }
@@ -637,7 +654,7 @@ private struct BilanProvisoire: View {
             LazyVGrid(columns: colonnes, spacing: 6) {
                 ForEach(NutrientData.all) { apport in
                     BilanCaseApport(apport: apport, etat: lecture.etats[apport.id] ?? .enAttente)
-                        .kiwiEntrance(NutrientID.allCases.firstIndex(of: apport.id) ?? 0)
+                        .bilanCascade(NutrientID.allCases.firstIndex(of: apport.id) ?? 0)
                 }
             }
         }
@@ -670,21 +687,34 @@ private struct BilanCaseApport: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(etat == .enAttente ? Color.dsCarte : teinte.pale)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(
-                    etat == .enAttente ? Color.dsTrait : Color.clear,
-                    style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])
-                )
-        )
+        .background { fond }
         .accessibilityElement(children: .combine)
+    }
+
+    private var forme: RoundedRectangle {
+        RoundedRectangle(cornerRadius: BilanTypo.rayonCase, style: .continuous)
+    }
+
+    /// En attente : une case en creux, au bord pointillé. Dès qu'on sait
+    /// quelque chose : du verre, teinté de la couleur de l'apport.
+    @ViewBuilder
+    private var fond: some View {
+        if etat == .enAttente {
+            forme
+                .fill(Verre.tuileInactive)
+                .overlay(
+                    forme.strokeBorder(
+                        Color.dsTertiaire,
+                        style: StrokeStyle(lineWidth: 1, dash: [4, 3])
+                    )
+                )
+        } else {
+            Color.clear
+                .verre(VerreMatiere.carteTeintee(teinte.vive), forme: forme)
+        }
     }
 }
 
@@ -893,7 +923,7 @@ private struct BilanFin: View {
                     BilanGerbe()
                     KiwiSigne(taille: 60)
                         .frame(width: 112, height: 112)
-                        .background(Circle().fill(Color.dsCarte))
+                        .verre(.clair, forme: Circle())
                         .overlay(Circle().strokeBorder(Color.dsAccent, lineWidth: 8))
                         .kiwiRecompense(true)
                 }
@@ -906,9 +936,10 @@ private struct BilanFin: View {
                     centre: true
                 )
                 .padding(.bottom, 12)
+                .bilanCascade(0)
 
                 VStack(spacing: 8) {
-                    ForEach(synthese.lignes) { ligne in
+                    ForEach(Array(synthese.lignes.enumerated()), id: \.offset) { rang, ligne in
                         BilanLigne(
                             emoji: NutrientData.definition(for: ligne.nutriment).emoji,
                             titre: NutrientData.definition(for: ligne.nutriment).label,
@@ -916,6 +947,7 @@ private struct BilanFin: View {
                             teinte: ligne.aSurveiller ? .apport(ligne.nutriment) : .kiwi,
                             mentionForte: true
                         )
+                        .bilanCascade(rang + 1)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -941,17 +973,16 @@ private struct BilanFin: View {
                         .foregroundStyle(Color.dsSecondaire)
                         .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                            .fill(Color.dsCarte)
-                    )
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .verreCarte()
                     .accessibilityElement(children: .combine)
+                    .bilanCascade(4)
                 }
             }
             .padding(.horizontal, DS.marge)
-            .padding(.vertical, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 24)
         }
         .scrollBounceBehavior(.basedOnSize)
     }

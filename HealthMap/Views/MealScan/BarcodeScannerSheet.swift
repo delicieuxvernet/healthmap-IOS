@@ -13,6 +13,11 @@ import AVFoundation
 // - Caméra refusée : on l'explique et on propose les Réglages, on ne bloque pas.
 // - Un seul code est renvoyé : dès la première lecture la session s'arrête, pour
 //   éviter dix callbacks pendant que le doigt cherche le bouton.
+//
+// Verre liquide (2 octobre 2026) : la feuille est en verre. Tant que la caméra
+// n'est pas autorisée, l'explication tient dans une carte de verre (icône dans
+// sa pastille, action en verre vert). Caméra ouverte, l'image occupe tout et
+// seule la consigne flotte, dans une capsule de verre sombre.
 struct BarcodeScannerSheet: View {
     /// Appelé une seule fois, avec le code lu.
     let onCode: (String) -> Void
@@ -23,10 +28,11 @@ struct BarcodeScannerSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
-
                 switch autorisation {
                 case .authorized:
+                    // Le noir ne sert que sous l'image, le temps que la
+                    // session démarre : les deux autres états sont en verre.
+                    Color.black.ignoresSafeArea()
                     BarcodeCameraView { code in
                         onCode(code)
                         dismiss()
@@ -48,6 +54,7 @@ struct BarcodeScannerSheet: View {
                 }
             }
         }
+        .verreFeuille()
     }
 
     /// Cadre de visée + consigne. Purement décoratif : la lecture se fait sur
@@ -55,15 +62,22 @@ struct BarcodeScannerSheet: View {
     private var viseur: some View {
         VStack(spacing: 14) {
             Spacer()
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.9), lineWidth: 3)
+            RoundedRectangle(cornerRadius: Verre.rayonCarte, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.9), lineWidth: 3)
                 .frame(width: 260, height: 150)
+            // Verre sombre : la consigne doit rester lisible quel que soit ce
+            // que la caméra voit (un emballage blanc comme une table noire).
             Text("Vise le code-barres du produit")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.dsSousTitreFort)
                 .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.45), in: Capsule())
+                .padding(.horizontal, 16)
+                .frame(minHeight: 36)
+                .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+                .overlay(
+                    Capsule(style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 0.5)
+                )
+                .environment(\.colorScheme, .dark)
             Spacer()
         }
         .allowsHitTesting(false)
@@ -71,49 +85,66 @@ struct BarcodeScannerSheet: View {
     }
 
     private var demande: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "barcode.viewfinder")
-                .font(.system(size: 44))
-                .foregroundStyle(.white)
-            Text("Kiwio a besoin de la caméra pour lire le code-barres.")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-            Button("Autoriser la caméra") {
+        etat(symbole: "barcode.viewfinder", teinte: Color.teinteKiwi,
+             texte: "Kiwio a besoin de la caméra pour lire le code-barres.") {
+            Button {
                 AVCaptureDevice.requestAccess(for: .video) { _ in
                     Task { @MainActor in
                         autorisation = AVCaptureDevice.authorizationStatus(for: .video)
                     }
                 }
+            } label: {
+                etiquetteAction("Autoriser la caméra")
             }
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(Color.dsTexte)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(Capsule().fill(.white))
+            .buttonStyle(.dsPress)
         }
-        .padding(32)
     }
 
     private var refus: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "video.slash.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(.white)
-            Text("L'accès à la caméra est désactivé. Tu peux l'autoriser dans les Réglages, ou taper le nom du produit dans la recherche.")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
+        etat(symbole: "video.slash.fill", teinte: nil,
+             texte: "L'accès à la caméra est désactivé. Tu peux l'autoriser dans les Réglages, ou taper le nom du produit dans la recherche.") {
             if let url = URL(string: UIApplication.openSettingsURLString) {
-                Link("Ouvrir les Réglages", destination: url)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.dsTexte)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(Capsule().fill(.white))
+                Link(destination: url) {
+                    etiquetteAction("Ouvrir les Réglages")
+                }
+                .buttonStyle(.dsPress)
             }
         }
-        .padding(32)
+    }
+
+    /// Un état sans caméra : l'icône dans sa pastille, l'explication, puis
+    /// l'action, dans une carte de verre posée sur la feuille.
+    private func etat<Action: View>(symbole: String, teinte: Color?, texte: String,
+                                    @ViewBuilder action: () -> Action) -> some View {
+        VStack(spacing: 18) {
+            VerrePastilleIcone(symbole: symbole, teinte: teinte, taille: 72, tailleIcone: 32)
+            Text(texte)
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsTexte)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            action()
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 24)
+        .frame(maxWidth: .infinity)
+        .dsCard()
+        .padding(.horizontal, DS.marge)
+    }
+
+    /// L'action principale d'une feuille : capsule de verre vert de 54 pt.
+    private func etiquetteAction(_ titre: String) -> some View {
+        Text(titre)
+            .font(.dsHeadline)
+            .tracking(DSTracking.corps)
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: Verre.hauteurAction)
+            .verrePrincipal()
+            .contentShape(Capsule(style: .continuous))
     }
 }
 

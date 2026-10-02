@@ -16,6 +16,11 @@ import SwiftUI
 // Les DONNÉES, elles, ne changent pas : mêmes clés, mêmes valeurs, même envoi
 // (`QuestionnaireViewModel.submitQuestionnaire`). La couche données vit dans le
 // ViewModel et dans `ParcoursBilan` ; cette vue ne fait que la présentation.
+//
+// Verre liquide (2 octobre 2026) : le fond est celui de l'app, les halos qui
+// respirent, et c'est LEUR teinte qui dit l'étape (ciel, aube, orchidée, kiwi),
+// en fondu de 0,9 s. Les réponses sont en verre clair, l'action du bas en
+// verre vert. Les écrans se suivent sur la glisse des pages (`kiwiGlisse`).
 struct BilanParcoursView: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
     @EnvironmentObject var dashboardVM: DashboardViewModel
@@ -46,6 +51,8 @@ struct BilanParcoursView: View {
             }
         }
         .environment(\.teinteBilan, teinte)
+        // La teinte du fond suit l'étape, pour tout ce que la feuille contient.
+        .environment(\.verreTeinte, ecran.teinteVerre)
         .onAppear {
             // Le prénom que le compte connaît déjà (inscription par e-mail ou
             // Sign in with Apple) est repris tel quel : son écran ne se montre
@@ -79,26 +86,11 @@ struct BilanParcoursView: View {
 
     // MARK: - Fond
 
-    /// Le gris de l'app, et deux halos de la couleur de l'étape : c'est ce qui
-    /// change quand on change de chapitre.
+    /// Le fond de verre de l'app. Ses halos prennent la teinte de l'étape
+    /// (lue dans l'environnement) : c'est ce qui change quand on change de
+    /// chapitre. Le fondu d'une teinte à l'autre est celui de `VerreFond`.
     private var fond: some View {
-        GeometryReader { geo in
-            ZStack {
-                Color.dsFond
-                Circle()
-                    .fill(teinte.pale)
-                    .frame(width: 300, height: 300)
-                    .position(x: geo.size.width - 30, y: 10)
-                Circle()
-                    .fill(teinte.pale)
-                    .opacity(0.7)
-                    .frame(width: 120, height: 120)
-                    .position(x: -16, y: 230)
-            }
-        }
-        .ignoresSafeArea()
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.4), value: ecran.etape)
-        .accessibilityHidden(true)
+        VerreFond()
     }
 
     // MARK: - En-tête
@@ -181,14 +173,19 @@ struct BilanParcoursView: View {
     private var pilule: some View {
         let nombre = viewModel.lectureBilan.pistes.count
         if nombre > 0 {
-            Text(nombre == 1 ? "🔍 1 piste" : "🔍 \(nombre) pistes")
-                .font(.system(.caption, design: .default).weight(.semibold))
-                .foregroundStyle(Color.dsTexte)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Color.dsCarte))
-                .kiwiImpulsion(nombre)
-                .transition(.opacity)
+            HStack(spacing: 4) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Verre.iconeNeutre)
+                Text(nombre == 1 ? "1 piste" : "\(nombre) pistes")
+                    .font(.system(.caption, design: .default).weight(.semibold))
+                    .foregroundStyle(Color.dsTexte)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .verreClair()
+            .kiwiImpulsion(nombre)
+            .transition(.opacity)
         }
     }
 
@@ -219,8 +216,9 @@ struct BilanParcoursView: View {
         )
     }
 
+    /// Les écrans sont des pages : ils se suivent sur la glisse.
     private var animationDEcran: Animation {
-        reduceMotion ? .kiwiSoft : .kiwiFluide
+        reduceMotion ? Animation.kiwiSoft : Animation.kiwiGlisse
     }
 
     // MARK: - Pied
@@ -231,19 +229,24 @@ struct BilanParcoursView: View {
                 avancer()
             } label: {
                 // Le bouton reste vert d'un bout à l'autre : la couleur de
-                // l'étape habille l'écran, pas ce qui fait avancer.
+                // l'étape habille l'écran, pas ce qui fait avancer. Verre
+                // teinté vert quand on peut avancer ; verre clair, libellé
+                // estompé, tant que l'écran attend une réponse.
                 Text(libelleDuBouton)
                     .font(.dsHeadline)
                     .tracking(DSTracking.corps)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(viewModel.ecranComplet ? Color.white : Color.dsTertiaire)
                     .frame(maxWidth: .infinity)
-                    .frame(height: DS.hauteurBouton)
-                    .background(Capsule().fill(viewModel.ecranComplet ? Color.dsAccent : Color.dsTertiaire))
+                    .frame(height: Verre.hauteurAction)
+                    .verre(
+                        viewModel.ecranComplet ? VerreMatiere.principal : VerreMatiere.clair,
+                        forme: Capsule(style: .continuous)
+                    )
                     .contentShape(Capsule())
             }
             .buttonStyle(.dsPress)
             .disabled(!viewModel.ecranComplet)
-            .animation(reduceMotion ? nil : .kiwiVif, value: viewModel.ecranComplet)
+            .animation(reduceMotion ? nil : Animation.kiwiVif, value: viewModel.ecranComplet)
             .accessibilityHint(viewModel.ecranComplet ? "" : "Réponds d'abord aux questions de cet écran.")
 
             if ecran == .accueil && !dashboardVM.bilanComplete {

@@ -1,10 +1,18 @@
 import SwiftUI
 
 // MARK: - Methode View (educational transparency page)
+//
+// Verre liquide (2 octobre 2026) : page poussée sur `VerrePageFond()`, cartes
+// de verre de rayon 24. Les étapes portent la pastille numérotée de la
+// maquette (rond vert pâle, chiffre vert foncé) ; les interactions deviennent
+// UNE carte à filets, chaque ligne dans la teinte de l'apport concerné, avec
+// un symbole à la place des emojis (aucun emoji dans l'interface). Le vert
+// kiwi ne décore plus rien : il reste réservé à ce qui se touche. Les textes
+// sont ceux d'avant, au mot près.
 struct MethodeView: View {
     var body: some View {
         ZStack {
-            Color.dsFond.ignoresSafeArea()
+            VerrePageFond()
 
             ScrollView {
                 VStack(spacing: Theme.spacingLG) {
@@ -24,6 +32,9 @@ struct MethodeView: View {
                 .padding(.bottom, Theme.spacingXL)
             }
         }
+        // Page poussée : la barre d'onglets reste au-dessus, les sources du
+        // bas de page doivent pouvoir défiler jusqu'au-dessus d'elle.
+        .kiwiTabBarBottomInset()
         .navigationTitle("Notre méthode")
         .navigationBarTitleDisplayMode(.inline)
         .kiwiNavigationBarBackground()
@@ -32,24 +43,23 @@ struct MethodeView: View {
     // MARK: - Header
     private var headerSection: some View {
         VStack(spacing: Theme.spacingSM) {
-            Image(systemName: "brain.head.profile")
-                .font(.system(size: 40))
-                .foregroundStyle(Color.dsAccent)
-                .frame(width: 72, height: 72)
-                .background(Color.dsAccent.opacity(0.12))
-                .clipShape(Circle())
+            VerrePastilleIcone(symbole: "brain.head.profile", taille: 72, tailleIcone: 34)
 
             Text("Comment ça marche ?")
-                .font(Theme.titleFont)
+                .font(.dsSection)
+                .tracking(DSTracking.section)
                 .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Transparence totale sur notre algorithme")
-                .font(Theme.bodyFont)
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, Theme.spacingLG)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, DS.marge)
         .padding(.top, Theme.spacingSM)
     }
 
@@ -64,7 +74,6 @@ struct MethodeView: View {
                     title: "Questionnaire",
                     icon: "clipboard.fill",
                     description: "Tu réponds à des questions sur ton alimentation, ton mode de vie et ta santé.",
-                    color: .dsAccent,
                     isLast: false
                 )
                 stepCard(
@@ -72,7 +81,6 @@ struct MethodeView: View {
                     title: "Calcul local",
                     icon: "function",
                     description: "Notre algorithme calcule tes scores NAR pour 10 nutriments essentiels, 100% deterministe.",
-                    color: .nutrientOmega3,
                     isLast: false
                 )
                 stepCard(
@@ -80,7 +88,6 @@ struct MethodeView: View {
                     title: "Analyse IA",
                     icon: "brain",
                     description: "L'IA analyse ton profil et génère des recommandations personnalisées (temperature=0).",
-                    color: .accentIndigo,
                     isLast: false
                 )
                 stepCard(
@@ -88,52 +95,53 @@ struct MethodeView: View {
                     title: "Ton bilan",
                     icon: "chart.bar.fill",
                     description: "Tu recois un score global, tes nutriments a renforcer, et un plan d'action concret.",
-                    color: .scoreGood,
                     isLast: true
                 )
             }
             .padding(Theme.cardPadding)
-            .background(Color.dsCarte)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            // (ombre retirée, refonte 23 août 2026)
-            .padding(.horizontal, Theme.spacingLG)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .dsCard()
+            .padding(.horizontal, DS.marge)
         }
     }
 
-    private func stepCard(number: Int, title: String, icon: String, description: String, color: Color, isLast: Bool) -> some View {
-        HStack(alignment: .top, spacing: Theme.spacingSM + 4) {
-            // Timeline column
+    private func stepCard(number: Int, title: String, icon: String, description: String, isLast: Bool) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Timeline column : la pastille numérotée de la maquette (rond vert
+            // pâle de 30 pt, chiffre 15 / 700 en vert foncé), reliée à la
+            // suivante par un trait neutre.
             VStack(spacing: 0) {
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.12))
-                        .frame(width: 36, height: 36)
-                    Text("\(number)")
-                        .font(.system(size: 14, weight: .bold, design: .default))
-                        .foregroundStyle(color)
-                }
+                Text("\(number)")
+                    .font(.system(.subheadline, design: .default).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.teinteKiwiTexte)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Color.dsAccentPale))
                 if !isLast {
                     Rectangle()
-                        .fill(Color.dsSecondaire.opacity(0.3))
+                        .fill(Verre.pisteAnneau)
                         .frame(width: 2)
                         .frame(maxHeight: .infinity)
                 }
             }
-            .frame(width: 36)
+            .frame(width: 30)
 
             // Content
             VStack(alignment: .leading, spacing: Theme.spacingXS) {
                 HStack(spacing: 6) {
                     Image(systemName: icon)
                         .font(.system(size: 13))
-                        .foregroundStyle(color)
+                        .foregroundStyle(Verre.iconeNeutre)
+                        .accessibilityHidden(true)
                     Text(title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsTexte)
                 }
+                .frame(minHeight: 30)
 
                 Text(description)
-                    .font(Theme.bodyFont)
+                    .font(.dsLegende)
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -146,74 +154,101 @@ struct MethodeView: View {
         VStack(alignment: .leading, spacing: 0) {
             sectionHeader(title: "6 Interactions codees", icon: "link")
 
-            VStack(spacing: Theme.spacingSM) {
+            // Une seule carte de verre, des lignes séparées d'un filet.
+            VStack(spacing: 0) {
                 interactionCard(
-                    emoji: "\u{2615}\u{1FA78}",
+                    symbole: "cup.and.saucer.fill",
+                    apport: "iron",
+                    filet: false,
                     title: "Cafeine + Fer",
                     description: "Les tannins du café bloquent l'absorption du fer jusqu'à 60 %",
                     source: "Morck et al., 1983"
                 )
                 interactionCard(
-                    emoji: "\u{1F48A}\u{1F534}",
+                    symbole: "pills.fill",
+                    apport: "vitB12",
                     title: "IPP + B12",
                     description: "Les inhibiteurs de pompe a protons reduisent l'absorption de la B12",
                     source: "Lam et al., JAMA 2013"
                 )
                 interactionCard(
-                    emoji: "\u{1F48A}\u{26A1}",
+                    symbole: "pills.fill",
+                    apport: "vitB12",
                     title: "Metformine + B12",
                     description: "La metformine réduit l'absorption intestinale de la B12 de 30 %",
                     source: "Aroda et al., JCEM 2016"
                 )
                 interactionCard(
-                    emoji: "\u{1F48A}\u{1F6E1}\u{FE0F}",
+                    symbole: "pills.fill",
+                    apport: "zinc",
                     title: "Contraceptif + Zinc/Mag",
                     description: "La pilule augmente l'excretion du zinc et magnesium",
                     source: "Palmery et al., 2013"
                 )
                 interactionCard(
-                    emoji: "\u{1F630}\u{26A1}",
+                    symbole: "brain.head.profile",
+                    apport: "magnesium",
                     title: "Stress + Magnesium",
                     description: "Le stress chronique augmente l'excretion urinaire du magnesium",
                     source: "Pickering et al., 2020"
                 )
                 interactionCard(
-                    emoji: "\u{1F373}\u{1F34A}",
+                    symbole: "frying.pan.fill",
+                    apport: "vitC",
                     title: "Cuisson + VitC",
                     description: "La cuisson a haute temperature detruit 50-80% de la vitamine C",
                     source: "Lee & Kader, 2000"
                 )
             }
-            .padding(.horizontal, Theme.spacingLG)
+            .dsCard()
+            .padding(.horizontal, DS.marge)
         }
     }
 
-    private func interactionCard(emoji: String, title: String, description: String, source: String) -> some View {
-        HStack(alignment: .top, spacing: Theme.spacingSM) {
-            Text(emoji)
-                .font(.system(size: 20))
-                .frame(width: 36, alignment: .center)
-
-            VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.dsTexte)
-
-                Text(description)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.dsSecondaire)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(source)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.dsAccent)
+    /// Une interaction : la tuile de 40 pt porte un symbole dans la teinte de
+    /// l'apport concerné (`apport` = identifiant canonique : `iron`, `vitC`…),
+    /// la source reprend cette teinte en version foncée. `filet` : filet au-dessus
+    /// de la ligne, faux pour la première de la carte.
+    private func interactionCard(symbole: String, apport: String, filet: Bool = true,
+                                 title: String, description: String, source: String) -> some View {
+        let teinte = Color.nutrientColor(for: apport)
+        return VStack(spacing: 0) {
+            if filet {
+                DSSeparator(retrait: 0)
             }
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbole)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(teinte)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(teinte.opacity(0.12))
+                    )
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsTexte)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(description)
+                        .font(.dsLegende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(source)
+                        .font(.system(.caption, design: .default).weight(.semibold))
+                        .foregroundStyle(Color.teinteApportTexte(for: apport))
+                        .padding(.top, 2)
+                }
+            }
+            .padding(.horizontal, DS.paddingCarte)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(Theme.cardPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.dsCarte)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-        // (ombre retirée, refonte 23 août 2026)
     }
 
     // MARK: - Scoring NAR
@@ -223,28 +258,33 @@ struct MethodeView: View {
 
             VStack(alignment: .leading, spacing: Theme.spacingMD) {
                 // Starting score
-                HStack(spacing: Theme.spacingSM) {
+                HStack(alignment: .firstTextBaseline, spacing: Theme.spacingSM) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.dsAccent)
+                        .foregroundStyle(Verre.iconeNeutre)
+                        .accessibilityHidden(true)
                     Text("Chaque nutriment démarre à 70/100")
-                        .font(Theme.bodyFont)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsTexte)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 // Deductions
-                HStack(spacing: Theme.spacingSM) {
+                HStack(alignment: .firstTextBaseline, spacing: Theme.spacingSM) {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.scoreLow)
+                        .foregroundStyle(Color.dsARenforcer)
+                        .accessibilityHidden(true)
                     Text("Des deductions sont appliquees selon ton alimentation, mode de vie et interactions")
-                        .font(Theme.bodyFont)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsTexte)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 // Score ranges
-                Divider()
+                DSSeparator(retrait: 0)
 
                 VStack(spacing: Theme.spacingSM) {
                     scoreRange(label: "Bon", range: ">= 75", color: .scoreExcellent)
@@ -254,27 +294,29 @@ struct MethodeView: View {
                 }
             }
             .padding(Theme.cardPadding)
-            .background(Color.dsCarte)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            // (ombre retirée, refonte 23 août 2026)
-            .padding(.horizontal, Theme.spacingLG)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .dsCard()
+            .padding(.horizontal, DS.marge)
         }
     }
 
     private func scoreRange(label: String, range: String, color: Color) -> some View {
         HStack {
-            Circle()
+            // Le repère de la maquette : un carré de 10 pt, rayon 2.
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(color)
                 .frame(width: 10, height: 10)
+                .accessibilityHidden(true)
 
             Text(label)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsTexte)
 
             Spacer()
 
             Text(range)
-                .font(.system(size: 13, weight: .medium, design: .default).monospacedDigit())
+                .font(.dsValeurLigne)
                 .foregroundStyle(Color.dsSecondaire)
         }
     }
@@ -299,42 +341,47 @@ struct MethodeView: View {
                 )
             }
             .padding(Theme.cardPadding)
-            .background(Color.scoreLow.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .stroke(Color.scoreLow.opacity(0.2), lineWidth: 1)
-            )
-            .padding(.horizontal, Theme.spacingLG)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // Carte de verre teintée d'ambre dans son coin : la mise en garde
+            // garde sa couleur sans redevenir un aplat cerclé.
+            .verreCarte(teinte: Color.dsARenforcer)
+            .padding(.horizontal, DS.marge)
         }
     }
 
     private func limitationRow(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: Theme.spacingSM) {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.spacingSM) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundStyle(Color.scoreLow)
+                .foregroundStyle(Color.dsARenforcerTexte)
                 .frame(width: 24, alignment: .center)
+                .accessibilityHidden(true)
 
             Text(text)
-                .font(Theme.bodyFont)
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     // MARK: - Section Header
+    /// Libellé de section de la maquette : 15 / 600 en encre secondaire, posé
+    /// 4 pt en retrait du bord de la carte qu'il coiffe.
     private func sectionHeader(title: String, icon: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundStyle(Color.dsAccent)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Verre.iconeNeutre)
+                .accessibilityHidden(true)
             Text(title)
-                .font(Theme.headlineFont)
-                .foregroundStyle(Color.dsTexte)
+                .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
         }
-        .padding(.horizontal, Theme.spacingLG)
+        .padding(.horizontal, DS.marge + 4)
         .padding(.bottom, Theme.spacingSM)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 

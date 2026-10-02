@@ -9,6 +9,12 @@ import SwiftUI
 //
 // Elle lit le journal DU Journal (`MealJournalViewModel` partagé) : aucune
 // seconde lecture réseau, et une correction ici se voit aussitôt derrière.
+//
+// Verre liquide (2 octobre 2026) : feuille de verre, cartes de verre, lignes
+// à la typographie de la maquette (15 / 600, 13 secondaire). Chaque macro
+// porte la teinte de sa catégorie, les jauges se remplissent l'une après
+// l'autre et les chiffres comptent jusqu'à leur valeur. Mêmes données, mêmes
+// calculs (`FicheRepas.calculer`).
 
 struct FicheRepasSheet: View {
     let slot: MealJournalService.MealSlot
@@ -23,7 +29,7 @@ struct FicheRepasSheet: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var ligneOuverte: MealJournalRow?
     @State private var ajout = false
-    /// Les jauges se remplissent à l'ouverture.
+    /// Les jauges se remplissent et les chiffres comptent à l'ouverture.
     @State private var rempli = false
 
     private var lignes: [MealJournalRow] { journal.dayRows(in: slot) }
@@ -44,44 +50,31 @@ struct FicheRepasSheet: View {
                 entete(fiche)
 
                 Group {
-                    titreDeBloc("Ce que tu as saisi", encre: Color.dsSecondaire)
+                    titreDeBloc("Ce que tu as saisi")
                     saisies
                 }
                 .kiwiEntrance(1)
 
                 if !lignes.isEmpty {
                     Group {
-                        titreDeBloc("Ce qu'il t'a apporté", encre: Color.kiwiGreenInk)
+                        titreDeBloc("Ce qu'il t'a apporté", symbole: "flame",
+                                    teinte: Color.teinteEnergie, encre: Color.teinteEnergieTexte)
                         macros(fiche)
                     }
                     .kiwiEntrance(2)
 
                     if !fiche.apports.isEmpty {
                         Group {
-                            titreDeBloc("Vitamines et minéraux", encre: Color(hex: "B36B00"))
+                            titreDeBloc("Vitamines et minéraux", symbole: "leaf",
+                                        teinte: Color.teinteKiwi, encre: Color.teinteKiwiTexte)
                             apports(fiche)
                         }
                         .kiwiEntrance(3)
                     }
 
                     if let note = fiche.note {
-                        HStack(alignment: .top, spacing: 9) {
-                            Image(systemName: "lightbulb")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(Color(hex: "B36B00"))
-                                .padding(.top, 1)
-                                .accessibilityHidden(true)
-                            Text(note)
-                                .font(.system(.footnote, design: .default).weight(.medium))
-                                .foregroundStyle(Color(hex: "8A5200"))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.dsCalories.opacity(0.10)))
-                        .padding(.top, 14)
+                        noteDeFin(note)
+                            .kiwiEntrance(4)
                     }
                 }
             }
@@ -90,14 +83,14 @@ struct FicheRepasSheet: View {
             .padding(.bottom, DS.marge)
             .containerRelativeFrame(.horizontal)
         }
-        .background(Color.dsFond.ignoresSafeArea())
+        .verreFeuille()
         .presentationDetents([.fraction(0.78), .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(34)
         .onAppear {
+            // Chaque jauge et chaque chiffre porte sa propre animation (avec
+            // son délai de cascade) : ici on ne fait que lever le drapeau.
             guard !rempli else { return }
-            if reduceMotion { rempli = true }
-            else { withAnimation(.easeOut(duration: 0.8).delay(0.25)) { rempli = true } }
+            rempli = true
         }
         .sheet(item: $ligneOuverte) { ligne in
             PortionSheet(
@@ -109,7 +102,9 @@ struct FicheRepasSheet: View {
                     Task { await journal.delete(ligne) }
                 }
             )
-            .presentationDetents([.height(ligne.isQuantityEditable ? 480 : 320)])
+            // Un peu plus haute qu'avant : la fiche portion a pris ses cartes
+            // de verre et son action de 54 pt.
+            .presentationDetents([.height(ligne.isQuantityEditable ? 520 : 340)])
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $ajout) {
@@ -119,6 +114,48 @@ struct FicheRepasSheet: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
+    }
+
+    /// Le constat de fin de fiche : une carte de verre, l'ampoule dans sa
+    /// pastille ambrée.
+    private func noteDeFin(_ note: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            VerrePastilleIcone(symbole: "lightbulb", teinte: Color.teinteVitamineD, taille: 30, tailleIcone: 15)
+            Text(note)
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 5)
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .padding(.top, 14)
+    }
+
+    /// Délai de cascade d'une jauge (maquette : 0,35 s puis 0,08 s par ligne).
+    private func animationJauge(_ index: Int) -> Animation? {
+        reduceMotion ? nil : Animation.timingCurve(0.3, 1.1, 0.4, 1, duration: 0.8).delay(0.35 + Double(index) * 0.08)
+    }
+
+    /// Un chiffre qui compte, en même temps que sa jauge se remplit.
+    private func animationCompteur(_ index: Int) -> Animation? {
+        reduceMotion ? nil : Animation.kiwiCompteur.delay(0.35 + Double(index) * 0.08)
+    }
+
+    /// Délai d'arrivée d'une ligne saisie (maquette, résultats de dictée :
+    /// 0,15 s puis 0,09 s par ligne). Plafonné : au-delà de la 7ᵉ ligne, tout
+    /// arrive ensemble, sinon le bas d'un long repas se ferait attendre.
+    private func delaiSaisie(_ index: Int) -> Double {
+        0.15 + Double(min(max(index, 0), 6)) * 0.09
+    }
+
+    /// Délai d'arrivée d'une ligne à jauge (maquette, fiche d'un apport :
+    /// 0,2 s puis 0,07 s par ligne), plafonné de la même façon.
+    private func delaiLigne(_ index: Int) -> Double {
+        0.2 + Double(min(max(index, 0), 6)) * 0.07
     }
 
     // MARK: En-tête
@@ -150,13 +187,28 @@ struct FicheRepasSheet: View {
         return fiche.resume.isEmpty ? kcal : "\(fiche.resume) · \(kcal)"
     }
 
-    private func titreDeBloc(_ titre: String, encre: Color) -> some View {
-        Text(titre)
-            .font(.dsLegende.weight(.bold))
-            .foregroundStyle(encre)
-            .padding(.top, 18)
-            .padding(.bottom, 9)
-            .accessibilityAddTraits(.isHeader)
+    /// Libellé de bloc : 15 / 600. Une catégorie s'écrit dans sa teinte
+    /// foncée, précédée de son icône (16 pt, au trait) dans la teinte ; sinon
+    /// en secondaire.
+    private func titreDeBloc(_ titre: String, symbole: String? = nil,
+                             teinte: Color = Color.dsSecondaire,
+                             encre: Color = Color.dsSecondaire) -> some View {
+        HStack(spacing: 5) {
+            if let symbole {
+                Image(systemName: symbole)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(teinte)
+                    .accessibilityHidden(true)
+            }
+            Text(titre)
+                .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(encre)
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 22)
+        .padding(.bottom, 8)
+        .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: Ce que tu as saisi
@@ -174,8 +226,8 @@ struct FicheRepasSheet: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(ligne.name)
-                                .font(.dsCorps)
-                                .tracking(DSTracking.corps)
+                                .font(.dsSousTitreFort)
+                                .tracking(DSTracking.sousTitre)
                                 .foregroundStyle(Color.dsTexte)
                                 .multilineTextAlignment(.leading)
                             if let grammes = ligne.grams {
@@ -187,9 +239,9 @@ struct FicheRepasSheet: View {
                         }
                         Spacer(minLength: 8)
                         Text("\(DS.entier(ligne.calories)) kcal")
-                            .font(.dsValeurLigne)
+                            .font(.dsValeurLigneForte)
                             .tracking(DSTracking.sousTitre)
-                            .foregroundStyle(Color.dsSecondaire)
+                            .foregroundStyle(Color.dsTexte)
                         DSChevron()
                     }
                     .frame(minHeight: DS.cibleTactile)
@@ -198,6 +250,7 @@ struct FicheRepasSheet: View {
                 }
                 .buttonStyle(.dsPress)
                 .accessibilityHint(ligne.isQuantityEditable ? "Modifier la quantité ou retirer" : "Voir le détail ou retirer")
+                .verreCascade(rempli, delai: delaiSaisie(index), decalage: 14)
             }
 
             if !lignes.isEmpty {
@@ -212,8 +265,8 @@ struct FicheRepasSheet: View {
                         .font(.system(size: 15, weight: .semibold))
                         .accessibilityHidden(true)
                     Text(lignes.isEmpty ? "Ajouter un aliment" : "Ajouter à ce repas")
-                        .font(.dsCorps)
-                        .tracking(DSTracking.corps)
+                        .font(.dsSousTitreMoyen)
+                        .tracking(DSTracking.sousTitre)
                     Spacer(minLength: 0)
                 }
                 .foregroundStyle(Color.dsAccent)
@@ -230,48 +283,57 @@ struct FicheRepasSheet: View {
 
     // MARK: Ce qu'il t'a apporté
 
-    private static func degrade(_ id: String) -> [Color] {
+    /// Une teinte par macro : celle de sa catégorie dans la palette.
+    private static func teinte(_ id: String) -> Color {
         switch id {
-        case "proteines": return [Color(hex: "5B9BF5"), Color(hex: "2F6FE0")]
-        case "glucides": return [Color(hex: "FFD84D"), Color(hex: "F2B705")]
-        case "lipides": return [Color(hex: "FFA95C"), Color(hex: "FB8500")]
-        default: return [Color(hex: "8FD460"), Color.dsAccent]
+        case "proteines": return .teinteProteines
+        case "glucides": return .teinteGlucides
+        case "lipides": return .teinteLipides
+        default: return .teinteFibres
         }
     }
 
     private func macros(_ fiche: FicheRepas) -> some View {
         VStack(spacing: 12) {
-            ForEach(fiche.macros) { macro in
-                VStack(spacing: 6) {
-                    HStack(alignment: .firstTextBaseline) {
+            ForEach(Array(fiche.macros.enumerated()), id: \.element.id) { index, macro in
+                VStack(spacing: 7) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(macro.nom)
-                            .font(.dsSousTitre)
+                            .font(.dsSousTitreFort)
                             .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsTexte)
                         Spacer(minLength: 8)
-                        Text("\(DS.entier(Int(macro.grammes.rounded()))) g")
-                            .font(.system(.footnote, design: .default).weight(.semibold).monospacedDigit())
+                        ChiffreQuiCompte(valeur: rempli ? macro.grammes.rounded() : 0,
+                                         format: { "\(DS.entier($0))\(DS.fine)g" })
+                            .font(.dsValeurLigneForte)
                             .foregroundStyle(Color.dsTexte)
+                            .animation(animationCompteur(index), value: rempli)
                         if let part = macro.partDeLaCible {
-                            Text("· \(part) % de ta cible du jour")
-                                .font(.system(.footnote, design: .default).monospacedDigit())
+                            Text("· \(DS.pourcent(part)) de ta cible du jour")
+                                .font(.dsLegende.monospacedDigit())
                                 .foregroundStyle(Color.dsSecondaire)
                         }
                     }
                     if let part = macro.partDeLaCible {
                         GeometryReader { geo in
+                            let largeur: CGFloat = geo.size.width * CGFloat(min(100, max(0, part))) / 100
                             ZStack(alignment: .leading) {
-                                Capsule().fill(Color(uiColor: .systemGray5))
+                                Capsule().fill(Verre.remplissage)
                                 Capsule()
-                                    .fill(LinearGradient(colors: Self.degrade(macro.id),
-                                                         startPoint: .leading, endPoint: .trailing))
-                                    .frame(width: rempli ? geo.size.width * CGFloat(part) / 100 : 0)
+                                    .fill(Self.teinte(macro.id))
+                                    .frame(width: rempli ? largeur : 0)
                             }
+                            // La courbe dépasse à peine sa cible : une jauge
+                            // pleine ne doit pas sortir de sa piste.
+                            .clipShape(Capsule())
                         }
-                        .frame(height: 6)
+                        .frame(height: 5)
+                        .animation(animationJauge(index), value: rempli)
+                        .accessibilityHidden(true)
                     }
                 }
                 .accessibilityElement(children: .combine)
+                .verreCascade(rempli, delai: delaiLigne(index), decalage: 10)
             }
         }
         .padding(DS.paddingCarte)
@@ -281,6 +343,8 @@ struct FicheRepasSheet: View {
 
     // MARK: Vitamines et minéraux
 
+    /// Une ligne par apport, comme les micronutriments du Journal : pastille
+    /// de la teinte, nom, petite jauge, part du besoin du jour.
     private func apports(_ fiche: FicheRepas) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(fiche.apports.enumerated()), id: \.element.id) { index, apport in
@@ -288,27 +352,42 @@ struct FicheRepasSheet: View {
                     Rectangle().fill(Color.dsSeparateur).frame(height: 0.5)
                 }
                 // Sous le seuil, l'apport est là mais ne pèse pas : il passe au gris.
-                let teinte = apport.part < FicheRepas.seuilPresqueRien
-                    ? Color(uiColor: .systemGray) : Color.nutrientColor(for: apport.id)
-                HStack(spacing: 11) {
-                    Circle().fill(teinte).frame(width: 10, height: 10)
+                let presqueRien = apport.part < FicheRepas.seuilPresqueRien
+                let teinte = presqueRien ? Color(uiColor: .systemGray) : Color.nutrientColor(for: apport.id)
+                let largeur: CGFloat = 80 * CGFloat(min(100, max(0, apport.part))) / 100
+                HStack(spacing: 10) {
+                    Circle().fill(teinte).frame(width: 8, height: 8)
                         .accessibilityHidden(true)
                     Text(apport.nom)
-                        .font(.dsSousTitre)
+                        .font(.dsSousTitreFort)
                         .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsTexte)
                     Spacer(minLength: 8)
-                    Text("\(apport.part) %")
-                        .font(.system(.footnote, design: .default).weight(.semibold).monospacedDigit())
-                        .foregroundStyle(teinte)
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Verre.remplissage)
+                        Capsule()
+                            .fill(teinte)
+                            .frame(width: rempli ? largeur : 0)
+                    }
+                    .frame(width: 80, height: 6)
+                    .clipShape(Capsule())
+                    .animation(animationJauge(index), value: rempli)
+                    .accessibilityHidden(true)
+                    ChiffreQuiCompte(valeur: rempli ? Double(apport.part) : 0,
+                                     format: { DS.pourcent($0) })
+                        .font(.dsValeurLigneForte)
+                        .foregroundStyle(presqueRien ? Color.dsSecondaire : Color.dsTexte)
+                        .frame(minWidth: 44, alignment: .trailing)
+                        .animation(animationCompteur(index), value: rempli)
                 }
-                .frame(minHeight: 40)
+                .frame(minHeight: 48)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(apport.nom), \(apport.part) pour cent du besoin du jour")
+                .verreCascade(rempli, delai: delaiLigne(index), decalage: 10)
             }
         }
         .padding(.horizontal, DS.paddingCarte)
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
         .frame(maxWidth: .infinity)
         .dsCard()
     }

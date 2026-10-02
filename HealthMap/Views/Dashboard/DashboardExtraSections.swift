@@ -51,6 +51,8 @@ extension Notification.Name {
 extension DashboardView {
 
     // MARK: - Premium Actions
+    // Deux actions secondaires : capsules de verre clair, libellé à l'accent
+    // (elles se touchent), cible de 50 pt.
     var premiumActionsSection: some View {
         VStack(spacing: Theme.spacingSM) {
             Button {
@@ -63,47 +65,37 @@ extension DashboardView {
                     redFlags: viewModel.redFlags
                 )
             } label: {
-                HStack(spacing: Theme.spacingSM) {
-                    Image(systemName: "doc.richtext")
-                        .font(.system(size: 16))
-                    Text("Exporter mon bilan PDF")
-                        .font(.system(size: 14, weight: .medium))
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12))
-                }
-                .foregroundStyle(Color.dsAccent)
-                .padding(Theme.spacingSM)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                        .fill(Color.dsRemplissage)
-                )
+                premiumActionLabel(symbole: "doc.richtext", titre: "Exporter mon bilan PDF")
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
 
             Button {
                 HapticService.shared.primary()
                 shareScore()
             } label: {
-                HStack(spacing: Theme.spacingSM) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 16))
-                    Text("Partager mon score")
-                        .font(.system(size: 14, weight: .medium))
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12))
-                }
-                .foregroundStyle(Color.dsAccent)
-                .padding(Theme.spacingSM)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                        .fill(Color.dsRemplissage)
-                )
+                premiumActionLabel(symbole: "square.and.arrow.up", titre: "Partager mon score")
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
         }
-        .padding(.horizontal, Theme.spacingLG)
+        .padding(.horizontal, DS.marge)
+    }
+
+    private func premiumActionLabel(symbole: String, titre: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbole)
+                .font(.system(size: 17, weight: .medium))
+                .accessibilityHidden(true)
+            Text(titre)
+                .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
+            Spacer(minLength: 8)
+            DSChevron(couleur: .dsAccent)
+        }
+        .foregroundStyle(Color.dsAccent)
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, minHeight: DS.hauteurBouton)
+        .verreClair()
+        .contentShape(Capsule())
     }
 
     // MARK: - Share Score
@@ -139,15 +131,18 @@ extension DashboardView {
         HStack(alignment: .center, spacing: Theme.spacingSM) {
             Image(systemName: "info.circle.fill")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.dsSecondaire)
+                .foregroundStyle(Verre.iconeNeutre)
+                .accessibilityHidden(true)
 
             Text("Informatif\u{202F}: ne remplace pas un avis médical.")
-                .font(.system(size: 11))
+                .font(.dsLegende)
+                .tracking(DSTracking.legende)
                 .foregroundStyle(Color.dsSecondaire)
                 .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 .truncationMode(.tail)
         }
         .padding(Theme.spacingSM)
-        .padding(.horizontal, Theme.spacingLG)
+        .padding(.horizontal, DS.marge)
     }
 }

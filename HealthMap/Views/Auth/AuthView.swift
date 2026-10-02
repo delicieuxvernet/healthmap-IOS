@@ -3,8 +3,13 @@ import AuthenticationServices
 
 // MARK: - Authentication View (Login / Signup)
 /// Formulaire d'authentification. Présenté en SHEET depuis `LandingView`
-/// (mode piloté par `initialMode`), mais reste utilisable plein écran :
-/// `AuthView()` sans argument est rétro-compatible (mode connexion).
+/// (mode piloté par `initialMode`) ; `AuthView()` sans argument est
+/// rétro-compatible (mode connexion).
+///
+/// Verre liquide (2 octobre 2026) : la vue ne peint plus de fond. C'est la
+/// feuille qui porte le verre (`.verreFeuille()`, posé par l'appelant) ; le
+/// formulaire est une carte de verre, ses champs du verre clair, l'action
+/// principale du verre teinté vert, « Continuer avec Google » du verre clair.
 struct AuthView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @Environment(\.colorScheme) private var colorScheme
@@ -49,7 +54,10 @@ struct AuthView: View {
 
     var body: some View {
         ZStack {
-            Color.dsFond
+            // Plus d'aplat : le fond est celui de la feuille. La surface reste
+            // là pour rentrer le clavier quand on touche à côté du formulaire.
+            Color.clear
+                .contentShape(Rectangle())
                 .ignoresSafeArea()
                 .onTapGesture { focusedField = nil }
 
@@ -158,7 +166,7 @@ struct AuthView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: DS.hauteurBouton)
-                        .background(Capsule().fill(Color.dsAccent))
+                        .verrePrincipal()
                         .contentShape(Capsule())
                     }
                     .buttonStyle(.dsPress)
@@ -214,7 +222,7 @@ struct AuthView: View {
                         .foregroundStyle(Color.dsTexte)
                         .frame(maxWidth: .infinity)
                         .frame(height: DS.hauteurBouton)
-                        .background(Capsule().fill(Color.dsCarte))
+                        .verreClair()
                         .contentShape(Capsule())
                     }
                     .buttonStyle(.dsPress)
@@ -247,24 +255,22 @@ struct AuthView: View {
             }
             .scrollDismissesKeyboard(.interactively)
 
-            // Blocking loader while we exchange Apple's identity token
+            // Blocking loader while we exchange Apple's identity token :
+            // le voile de verre (il absorbe les touches), puis une carte de
+            // verre flottante qui porte le loader.
             if isExchangingAppleToken {
-                Color.black.opacity(0.35)
-                    .ignoresSafeArea()
+                VerreVoile()
                     .transition(.opacity)
 
                 VStack(spacing: Theme.spacingMD) {
                     KiwiLoader(size: 56)
                     Text("Connexion à Apple...")
                         .font(Theme.subheadlineFont)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.dsTexte)
                 }
                 .padding(.vertical, Theme.spacingLG)
                 .padding(.horizontal, Theme.spacingXL)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                        .fill(Color.black.opacity(0.6))
-                )
+                .verreCarteFlottante()
                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
@@ -274,6 +280,7 @@ struct AuthView: View {
         .sheet(isPresented: $showForgotPassword) {
             ForgotPasswordSheet()
                 .healthMapActionSheet()
+                .verreFeuille()
         }
         // Depuis la migration Clerk (20 avril 2026), le signup email est en 2
         // étapes : `signUp()` envoie un code, puis `pendingEmailVerification`
@@ -288,6 +295,7 @@ struct AuthView: View {
         )) {
             EmailCodeVerificationSheet(email: email)
                 .healthMapActionSheet()
+                .verreFeuille()
         }
     }
 
@@ -357,10 +365,12 @@ extension AuthView.Field: Sendable {}
 
 #Preview("Connexion") {
     AuthView()
+        .background { VerrePageFond() }
         .environmentObject(AuthViewModel())
 }
 
 #Preview("Inscription") {
     AuthView(initialMode: .signUp)
+        .background { VerrePageFond() }
         .environmentObject(AuthViewModel())
 }

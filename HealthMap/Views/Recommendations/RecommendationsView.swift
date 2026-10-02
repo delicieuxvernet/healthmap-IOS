@@ -27,7 +27,9 @@ struct RecommendationsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Refonte 23 août 2026 : fond neutre + voile de marque.
+                // Verre liquide : le fond qui respire, à la teinte de l'onglet
+                // (ciel pour le Plan). Le graphe, sa légende et la carte du
+                // bas sont posés dessus, sans aplat.
                 DSPageBackground()
 
                 if !dashboardVM.bilanComplete {
@@ -56,7 +58,8 @@ struct RecommendationsView: View {
                         // chargent. L'attente reste non bloquante.
                         KiwiLoader(size: 72)
                         Text("Chargement du plan…")
-                            .font(Theme.bodyFont)
+                            .font(.dsSousTitre)
+                            .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsSecondaire)
                     }
                 } else {
@@ -65,7 +68,8 @@ struct RecommendationsView: View {
                         // l'état vide reste accueillant.
                         KiwiSigne(taille: 72)
                         Text("Aucune analyse disponible")
-                            .font(Theme.bodyFont)
+                            .font(.dsSousTitre)
+                            .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsSecondaire)
                     }
                 }

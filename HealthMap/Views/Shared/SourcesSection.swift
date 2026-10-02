@@ -40,14 +40,7 @@ struct SourcesSection: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             // En-tête
             HStack(spacing: Theme.spacingSM) {
-                ZStack {
-                    Circle()
-                        .fill(Color.dsRemplissage)
-                        .frame(width: 26, height: 26)
-                    Image(systemName: "text.book.closed.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.dsTexte)
-                }
+                VerrePastilleIcone(symbole: "text.book.closed.fill", taille: 26, tailleIcone: 13)
                 Text("Sources scientifiques")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.dsTexte)
@@ -62,7 +55,7 @@ struct SourcesSection: View {
             VStack(spacing: 0) {
                 ForEach(Array(ScientificSources.all.enumerated()), id: \.element.id) { index, source in
                     if index > 0 {
-                        Divider().overlay(Color.dsSecondaire.opacity(0.18))
+                        DSSeparator(retrait: 0)
                     }
                     Link(destination: source.url) {
                         HStack(spacing: Theme.spacingSM) {
@@ -79,6 +72,7 @@ struct SourcesSection: View {
                             Image(systemName: "arrow.up.right")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Color.dsAccent)
+                                .accessibilityHidden(true)
                         }
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
@@ -92,34 +86,34 @@ struct SourcesSection: View {
                 Image(systemName: "info.circle")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsSecondaire)
+                    .accessibilityHidden(true)
                 Text("Information nutritionnelle éducative. Ne remplace pas un avis médical. Consulte un professionnel de santé pour toute décision de santé.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(Theme.spacingSM)
+            .padding(Theme.spacingSM + 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // Tuile dans la carte : translucide, pour rester juste sur le verre.
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.dsFond)
+                RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                    .fill(Verre.tuileInactive)
             )
         }
         .padding(Theme.spacingMD)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.dsCarte)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color.dsSecondaire.opacity(0.18), lineWidth: 1)
-                )
-        )
+        // Verre liquide : la carte de verre du DS (rayon 24, liseré, ombre
+        // découpée) remplace la carte blanche cerclée de gris.
+        .dsCard()
         .accessibilityElement(children: .contain)
     }
 }
 
 #Preview {
-    ScrollView {
-        SourcesSection()
-            .padding()
+    ZStack {
+        VerreFond()
+        ScrollView {
+            SourcesSection()
+                .padding()
+        }
     }
-    .background(Color.dsFond)
 }
