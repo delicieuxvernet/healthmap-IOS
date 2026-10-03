@@ -46,6 +46,10 @@ enum SynchroWidgets {
         var kcalDepensees: Int?
         var serie = 0
         var complements: ComplementsV2?
+        /// « Tes apports » et les gestes du conseil du jour (registre).
+        var apports: LectureApportsW?
+        var conseils: [ConseilW] = []
+        var premium = false
     }
 
     private static var contexte: Contexte?
@@ -67,6 +71,10 @@ enum SynchroWidgets {
         neuf.kcalDepensees = contexte?.kcalDepensees
         neuf.serie = GamificationService.shared.isZenMode ? 0 : GamificationService.shared.currentStreak
         neuf.complements = dashboardVM.bilanComplete ? dashboardVM.analysisV2?.complements : nil
+        neuf.premium = SubscriptionService.shared.isPremium
+        let (lecture, conseils) = lectureDesApports(dashboardVM)
+        neuf.apports = lecture
+        neuf.conseils = conseils
         contexte = neuf
 
         appliquerAttente()
@@ -87,6 +95,36 @@ enum SynchroWidgets {
         let jour = BoiteCommune.cleDuJour()
         kcalDuJour = (jour, kcalParCreneau(repas, jour: Date()))
         rafraichir()
+    }
+
+    /// Les scores viennent d'être recalculés (un repas noté corrige le
+    /// registre) : « Tes apports » et le conseil suivent, sans attendre la
+    /// prochaine ouverture de l'app.
+    static func apportsRecalcules(_ dashboardVM: DashboardViewModel) {
+        guard contexte != nil else { return }
+        let (lecture, conseils) = lectureDesApports(dashboardVM)
+        contexte?.apports = lecture
+        contexte?.conseils = conseils
+        rafraichir()
+    }
+
+    /// Ce que « Tes apports » et « Conseil du jour » montrent : rien tant
+    /// qu'il n'y a pas de bilan (le Journal non plus ne montre pas d'anneau).
+    private static func lectureDesApports(_ dashboardVM: DashboardViewModel) -> (LectureApportsW?, [ConseilW]) {
+        guard dashboardVM.bilanAffichage == .bilan else { return (nil, []) }
+        let registre = dashboardVM.registre
+        guard !registre.isEmpty else { return (nil, []) }
+        let apportsDuBilan = dashboardVM.analysisV2?.bilan?.apports ?? []
+        var aliments: [String: [AlimentV2]] = [:]
+        for apport in apportsDuBilan {
+            if let id = apport.id, let liste = apport.aliments { aliments[id] = liste }
+        }
+        let lecture = ResumeWidgets.lecture(
+            registre: registre,
+            ordreBilan: apportsDuBilan.compactMap(\.id),
+            alimentsDuBilan: aliments
+        )
+        return (lecture, ResumeWidgets.conseils(registre: registre))
     }
 
     /// Réécrit l'instantané si quelque chose a changé, et redessine.
@@ -180,7 +218,11 @@ enum SynchroWidgets {
                 return InstantaneJour.Eau(verres: eau.verres, objectif: eau.objectif,
                                           centilitres: eau.centilitres)
             },
-            rituel: prises(contexte.complements)
+            rituel: prises(contexte.complements),
+            apports: contexte.apports,
+            conseils: contexte.conseils.isEmpty ? nil : contexte.conseils,
+            conseilFait: AuthService.shared.cachedCurrentUserIdString.flatMap { ConseilDuJourStore.fait(userId: $0, jour: jour) },
+            premium: contexte.premium
         )
     }
 
@@ -224,6 +266,12 @@ enum SynchroWidgets {
         if attente.verres != 0, let ajouter = PontEau.ajouter {
             ajouter(attente.verres)
             appliquees.verres = attente.verres
+        }
+
+        if let bascules = attente.conseilsBascules, !bascules.isEmpty,
+           let userId = AuthService.shared.cachedCurrentUserIdString {
+            for id in bascules { ConseilDuJourStore.basculer(id, userId: userId, jour: attente.jour) }
+            appliquees.conseilsBascules = bascules
         }
 
         if let code = attente.route {
@@ -280,5 +328,32 @@ final class RouteurWidgets: ObservableObject {
         guard let lien = pourLeJournal else { return nil }
         pourLeJournal = nil
         return lien
+    }
+}
+
+// MARK: - Le conseil du jour coché
+
+/// « C'est fait » sur le conseil du jour : l'id du conseil coché, par compte
+/// et par jour. Préfixe `healthmap_` : la coche part avec le compte à la
+/// déconnexion. Elle ne change aucun score : le registre se nourrit du
+/// questionnaire et du journal, pas d'une coche.
+enum ConseilDuJourStore {
+    private static func cle(userId: String, jour: String) -> String {
+        "healthmap_conseil_fait_\(userId)_\(jour)"
+    }
+
+    /// L'id du conseil coché ce jour-là, s'il y en a un.
+    static func fait(userId: String, jour: String) -> String? {
+        UserDefaults.standard.string(forKey: cle(userId: userId, jour: jour))
+    }
+
+    /// Coche ce conseil ; s'il l'était déjà, le décoche.
+    static func basculer(_ id: String, userId: String, jour: String) {
+        let cleDuJour = cle(userId: userId, jour: jour)
+        if UserDefaults.standard.string(forKey: cleDuJour) == id {
+            UserDefaults.standard.removeObject(forKey: cleDuJour)
+        } else {
+            UserDefaults.standard.set(id, forKey: cleDuJour)
+        }
     }
 }

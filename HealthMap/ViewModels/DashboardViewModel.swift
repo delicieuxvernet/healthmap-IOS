@@ -531,6 +531,9 @@ final class DashboardViewModel: ObservableObject {
         guard profile.completed, let session = await AuthService.shared.currentSession else { return }
         await chargerJournal(userId: session.user.id.uuidString)
         computeLocalScores()
+        // Le repas noté a corrigé le registre : « Tes apports » et le conseil
+        // du jour des widgets suivent.
+        SynchroWidgets.apportsRecalcules(self)
     }
 
     #if DEBUG

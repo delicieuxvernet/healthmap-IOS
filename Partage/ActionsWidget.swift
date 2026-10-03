@@ -99,6 +99,45 @@ struct CocherRituelEnDirectIntent: LiveActivityIntent {
     }
 }
 
+/// Coche (ou décoche) un moment depuis l'activité en direct : la pastille du
+/// rituel montre le moment en avant, et la retoucher défait la coche.
+struct BasculerMomentEnDirectIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Cocher un moment du rituel"
+    static let isDiscoverable: Bool = false
+
+    @Parameter(title: "Moment")
+    var moment: String
+
+    init() {}
+
+    init(moment: MomentRituel) {
+        self.moment = moment.rawValue
+    }
+
+    func perform() async throws -> some IntentResult {
+        if let moment = MomentRituel(rawValue: moment) {
+            BoiteCommune.basculerMoment(moment)
+        }
+        await propagerLeGeste()
+        return .result()
+    }
+}
+
+// MARK: Conseil du jour
+
+/// « C'est fait » sur le conseil du jour (le retoucher le décoche). Le geste
+/// ne change aucun score : il garde la trace que la personne l'a fait.
+struct ConseilFaitIntent: AppIntent {
+    static let title: LocalizedStringResource = "Conseil du jour fait"
+    static let isDiscoverable: Bool = false
+
+    func perform() async throws -> some IntentResult {
+        BoiteCommune.basculerConseil()
+        await propagerLeGeste()
+        return .result()
+    }
+}
+
 // MARK: Dictée (Centre de contrôle, bouton Action, Raccourcis)
 
 /// Ouvre Kiwio, micro ouvert. Dans l'app, la route est posée directement ;

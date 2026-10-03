@@ -1,65 +1,405 @@
 import SwiftUI
+import UIKit
 import WidgetKit
 import AppIntents
 
-// MARK: - Les vues des widgets
+// MARK: - Le verre des widgets (maquette « Kiwio - Widgets », 3 oct. 2026)
 //
-// Compilées dans l'app ET dans l'extension : l'extension les pose dans ses
-// widgets, l'app s'en sert pour les montrer dans les Réglages et pour les
-// rendre en image dans les tests (la seule preuve visuelle possible sans
-// appareil). Elles ne lisent rien : on leur passe l'état à dessiner.
+// Compilé dans l'app ET dans l'extension : l'extension pose ces briques dans
+// ses widgets, l'app s'en sert pour les aperçus des Réglages et pour rendre les
+// widgets en image dans les tests (la seule preuve visuelle sans appareil).
+// Aucune brique ne lit de données : on leur passe ce qu'elles dessinent.
 //
-// Règles reprises de l'app : le vert ne colore que ce qui se touche, les
-// créneaux gardent les symboles de la mosaïque du Journal, les chiffres sont
-// à chasse tabulaire, aucun complément ne porte de dose.
-// Différence assumée : un widget suit le mode clair ou sombre du téléphone,
-// alors que l'app reste claire. Les couleurs sont donc sémantiques : hors le
-// vert Kiwio, les créneaux, les moments et l'eau gardent les teintes du
-// système, qui s'adaptent seules, là où l'app est passée à la palette du
-// verre. Même famille de couleur (orangé, indigo, rose, bleu), pas la même
-// valeur.
+// Le verre de la maquette est posé sur un fond d'écran coloré : texte blanc,
+// plaques blanches translucides, boutons verts. Un widget ne voit pas le fond
+// d'écran (pas de flou possible) : en couleurs pleines, `FondVerreW` peint la
+// base verte de la maquette puis le verre par-dessus. Dans les présentations
+// Teinté et Transparent (iOS 18, iOS 26), iOS retire ce fond et pose son
+// propre verre ; les briques passent alors en blanc translucide
+// (`widgetRenderingMode`), et les illustrations gardent leurs couleurs.
 //
-// Les encres s'écrivent `Color.primary` / `Color.secondary`, jamais `.primary` /
-// `.secondary` : ces derniers sont des NIVEAUX de la teinte courante, et dans
-// un `Link` ou un `Button` la teinte courante est le bleu des liens.
+// Les couleurs des apports et des repas sont celles de la maquette : des
+// teintes claires, faites pour se lire sur le verre. Elles ne remplacent pas
+// la palette de l'app (`KiwiVerre.swift`), qui est faite pour un fond clair.
+//
+// Les encres s'écrivent toujours avec une couleur explicite (`Color.white`) :
+// dans un `Link` ou un `Button`, `.primary` prendrait le bleu des liens.
+
+// MARK: - Couleurs
 
 enum TeinteW {
-    /// Vert Kiwio (`kiwiGreen`).
-    static let vert = Color(red: 0x5D / 255.0, green: 0xA8 / 255.0, blue: 0x38 / 255.0)
-    /// Orangé des calories et de la série. L'app est passée à `teinteEnergie`
-    /// (#F07040) ; le widget garde l'orangé d'avant le verre (#FF6B35).
-    static let calories = Color(red: 1.0, green: 0x6B / 255.0, blue: 0x35 / 255.0)
-    /// Bleu de l'eau : la teinte système, là où la carte Eau du Journal
-    /// utilise `teinteEau`.
-    static let eau = Color.cyan
-    /// Fond d'une tuile neutre : une voile de l'encre, lisible en clair comme en sombre.
-    static let tuile = Color.primary.opacity(0.07)
+    /// Vert Kiwio (`teinteKiwi`).
+    static let vert = Color(hex: "5DA838")
+    /// Haut du dégradé des boutons verts de la maquette.
+    static let vertClair = Color(hex: "96E26C")
+    /// Calories restantes, anneau du jour, Dynamic Island.
+    static let kcal = Color(hex: "FFB547")
+    /// Au-dessus du budget du jour.
+    static let depasse = Color(hex: "FF8F80")
 
-    /// Même logique que `JournalRepasMosaique` (orangé le matin, vert Kiwio le
-    /// midi, indigo le soir, rose pour l'encas), mais en teintes système hors
-    /// le vert : le Journal, lui, prend la palette du verre
-    /// (`MealSlot.teinteJournal`).
-    static func creneau(_ creneau: CreneauWidget) -> Color {
-        switch creneau {
-        case .breakfast: return .orange
-        case .lunch: return vert
-        case .dinner: return .indigo
-        case .snack: return .pink
+    /// Teinte d'un apport sur le verre. Vitamine D, magnésium et fer viennent
+    /// de la maquette ; les sept autres en sont dérivées (même clarté), pour
+    /// qu'aucune ne se confonde avec une voisine.
+    static func apport(_ id: String) -> Color {
+        switch id {
+        case "vitD": return Color(hex: "FFB547")
+        case "magnesium": return Color(hex: "AFAEFF")
+        case "iron": return Color(hex: "F0B27A")
+        case "vitB12": return Color(hex: "FF8F8F")
+        case "omega3": return Color(hex: "8CC8FF")
+        case "vitC": return Color(hex: "FFD66B")
+        case "calcium": return Color(hex: "E6E6EB")
+        case "zinc": return Color(hex: "FF9FD0")
+        case "iodine": return Color(hex: "7FDCCB")
+        case "fiber": return Color(hex: "A6E07A")
+        default: return Color.white
         }
     }
 
-    /// Même logique que `ComplementsRituelStrip` (orangé le matin, jaune le
-    /// midi, indigo le soir), en teintes système : l'onglet Compléments, lui,
-    /// prend la palette du verre (`teinteVitamineD`, `teinteGlucides`,
-    /// `teinteIode`).
-    static func moment(_ moment: MomentRituel) -> Color {
-        switch moment {
-        case .matin: return .orange
-        case .midi: return .yellow
-        case .soir: return .indigo
+    /// Teinte d'un repas dans la barre de la journée (maquette W7).
+    static func creneau(_ creneau: CreneauWidget) -> Color {
+        switch creneau {
+        case .breakfast: return Color(hex: "FFB547")
+        case .lunch: return Color(hex: "8FDB62")
+        case .dinner: return Color(hex: "AFAEFF")
+        case .snack: return Color(hex: "FF8FB1")
+        }
+    }
+
+    /// L'eau qui remplit le verre : du haut vers le bas.
+    static let eauHaut = Color(red: 150 / 255, green: 226 / 255, blue: 255 / 255).opacity(0.95)
+    static let eauBas = Color(red: 60 / 255, green: 170 / 255, blue: 240 / 255).opacity(0.9)
+    static let eauSurface = Color(red: 200 / 255, green: 240 / 255, blue: 255 / 255).opacity(0.95)
+
+    /// Piste des anneaux.
+    static let piste = Color.white.opacity(0.22)
+    /// Piste des barres (grand format).
+    static let pisteBarre = Color.white.opacity(0.2)
+    /// Piste de la barre de la journée.
+    static let pisteJournee = Color.white.opacity(0.18)
+    /// Filet entre deux blocs.
+    static let separateur = Color.white.opacity(0.25)
+
+    /// Le texte blanc, à l'opacité de la maquette : 0,9 en-têtes, 0,88 sous
+    /// les anneaux, 0,85 phrases secondaires, 0,82 sous-titres, 0,8 légendes,
+    /// 0,75 précisions, 0,7 « Prochain : … ».
+    static func encre(_ opacite: Double = 1) -> Color { Color.white.opacity(opacite) }
+}
+
+extension Font {
+    /// Les chiffres de la maquette : SF Pro Rounded gras, à chasse tabulaire
+    /// (comme les chiffres héros du Journal).
+    static func chiffreW(_ taille: CGFloat) -> Font {
+        .system(size: taille, weight: .bold, design: .rounded).monospacedDigit()
+    }
+
+    /// Le texte de la maquette : SF Pro.
+    static func texteW(_ taille: CGFloat, _ graisse: Font.Weight = .regular) -> Font {
+        .system(size: taille, weight: graisse)
+    }
+}
+
+// MARK: - Fonds
+
+/// Le fond d'un widget d'accueil (`containerBackground`). La base reprend la
+/// teinte du fond d'écran de la maquette sous le verre (vert clair en haut à
+/// gauche, vert sarcelle en bas à droite) ; le verre se dessine par-dessus.
+struct FondVerreW: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "79BE5D"), Color(hex: "3F9C63"), Color(hex: "2C8270")],
+                startPoint: UnitPoint(x: 0.1, y: 0),
+                endPoint: UnitPoint(x: 0.9, y: 1)
+            )
+            RadialGradient(colors: [Color(hex: "A9DB78").opacity(0.5), Color.clear],
+                           center: .topLeading, startRadius: 0, endRadius: 240)
+            // Le verre : blanc 26 % → 8 % → 14 %, à 155°.
+            LinearGradient(
+                stops: [
+                    .init(color: Color.white.opacity(0.26), location: 0),
+                    .init(color: Color.white.opacity(0.08), location: 0.6),
+                    .init(color: Color.white.opacity(0.14), location: 1),
+                ],
+                startPoint: UnitPoint(x: 0.29, y: 0.05),
+                endPoint: UnitPoint(x: 0.71, y: 0.95)
+            )
+            // Reflet haut, liseré, reflet bas.
+            ContainerRelativeShape()
+                .strokeBorder(
+                    LinearGradient(colors: [Color.white.opacity(0.5), Color.white.opacity(0.3), Color.white.opacity(0.14)],
+                                   startPoint: .top, endPoint: .bottom),
+                    lineWidth: 0.8
+                )
         }
     }
 }
+
+/// Le fond de la carte de l'activité en direct : verre sombre (maquette W7).
+enum FondActiviteW {
+    static let teinte = Color(red: 26 / 255, green: 36 / 255, blue: 28 / 255).opacity(0.62)
+}
+
+// MARK: - Matières : bouton vert, pastille pâle
+
+/// Le bouton vert (« G ») et la pastille de verre pâle (« P ») de la maquette,
+/// dans la forme qu'on leur donne. Hors des couleurs pleines (Teinté,
+/// Transparent), un voile blanc : iOS recolore tout, un dégradé n'y aurait
+/// plus de sens.
+private struct MatiereW<Forme: InsettableShape>: ViewModifier {
+    @Environment(\.widgetRenderingMode) private var rendu
+    let forme: Forme
+    let verte: Bool
+    let ombre: Bool
+
+    func body(content: Content) -> some View {
+        content.background {
+            if rendu == .fullColor {
+                if verte {
+                    forme
+                        .fill(LinearGradient(colors: [Color(red: 150 / 255, green: 226 / 255, blue: 108 / 255).opacity(0.95),
+                                                      Color(red: 93 / 255, green: 168 / 255, blue: 56 / 255).opacity(0.92)],
+                                             startPoint: .top, endPoint: .bottom))
+                        .overlay(
+                            forme.strokeBorder(
+                                LinearGradient(colors: [Color.white.opacity(0.7), Color.white.opacity(0.3)],
+                                               startPoint: .top, endPoint: .bottom),
+                                lineWidth: 0.8)
+                        )
+                        .shadow(color: Color(red: 30 / 255, green: 80 / 255, blue: 10 / 255).opacity(ombre ? 0.45 : 0),
+                                radius: 4, x: 0, y: 5)
+                } else {
+                    forme
+                        .fill(LinearGradient(colors: [Color.white.opacity(0.30), Color.white.opacity(0.12)],
+                                             startPoint: .top, endPoint: .bottom))
+                        .overlay(
+                            forme.strokeBorder(
+                                LinearGradient(colors: [Color.white.opacity(0.55), Color.white.opacity(0.3)],
+                                               startPoint: .top, endPoint: .bottom),
+                                lineWidth: 0.6)
+                        )
+                }
+            } else {
+                forme.fill(Color.white.opacity(verte ? 0.3 : 0.16))
+            }
+        }
+    }
+}
+
+extension View {
+    /// Fond du bouton vert de la maquette (Voir le calcul, + 25 cl, C'est
+    /// fait, Dicter…). `ombre: false` pour les petits boutons ronds.
+    func boutonVertW<Forme: InsettableShape>(_ forme: Forme, ombre: Bool = true) -> some View {
+        modifier(MatiereW(forme: forme, verte: true, ombre: ombre))
+    }
+
+    /// Fond de la pastille de verre pâle (tuiles, aliments, état « fait »).
+    func pastillePaleW<Forme: InsettableShape>(_ forme: Forme) -> some View {
+        modifier(MatiereW(forme: forme, verte: false, ombre: false))
+    }
+
+    /// Le bouton vert, ou la pastille pâle une fois le geste fait (rituel,
+    /// conseil) : la maquette passe de l'un à l'autre.
+    func boutonW<Forme: InsettableShape>(_ forme: Forme, fait: Bool, ombre: Bool = true) -> some View {
+        modifier(MatiereW(forme: forme, verte: !fait, ombre: ombre))
+    }
+}
+
+// MARK: - Anneaux et barres
+
+/// Un anneau de la maquette : départ en haut, sens horaire, extrémités nettes,
+/// piste blanche à 22 %. `diametre` est le diamètre extérieur.
+struct AnneauW<Centre: View>: View {
+    let fraction: Double
+    let couleur: Color
+    let diametre: CGFloat
+    let trait: CGFloat
+    var piste: Color = TeinteW.piste
+    @ViewBuilder var centre: () -> Centre
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(piste, lineWidth: trait)
+            Circle()
+                .trim(from: 0, to: CGFloat(min(1, max(0, fraction))))
+                .stroke(couleur, style: StrokeStyle(lineWidth: trait, lineCap: .butt))
+                .rotationEffect(.degrees(-90))
+                .widgetAccentable()
+            centre()
+        }
+        .padding(trait / 2)
+        .frame(width: diametre, height: diametre)
+        .accessibilityHidden(true)
+    }
+}
+
+extension AnneauW where Centre == EmptyView {
+    init(fraction: Double, couleur: Color, diametre: CGFloat, trait: CGFloat, piste: Color = TeinteW.piste) {
+        self.init(fraction: fraction, couleur: couleur, diametre: diametre, trait: trait, piste: piste) { EmptyView() }
+    }
+}
+
+/// Une barre horizontale (rayon = hauteur / 2), sans animation.
+struct BarreW: View {
+    let fraction: Double
+    let couleur: Color
+    var hauteur: CGFloat = 6
+    var piste: Color = TeinteW.pisteBarre
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(piste)
+                Capsule()
+                    .fill(couleur)
+                    .frame(width: max(fraction > 0 ? hauteur : 0, geo.size.width * CGFloat(min(1, max(0, fraction)))))
+                    .widgetAccentable()
+            }
+        }
+        .frame(height: hauteur)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Illustrations et en-têtes
+
+/// Une illustration 3D (`fluent_…`). Le nom doit exister dans les deux
+/// catalogues (`HealthMap/Resources/Assets.xcassets` et
+/// `KiwioWidgets/Illustrations.xcassets`) ; un nom inconnu retombe sur
+/// l'étincelle plutôt que sur un vide. Elle garde ses couleurs en Teinté.
+struct IllustrationW: View {
+    let nom: String
+    let taille: CGFloat
+
+    /// « fish » (liste fermée du bilan) ou « fluent_fish » → l'imageset.
+    static func resoudre(_ nom: String) -> String {
+        let complet = nom.hasPrefix("fluent_") ? nom : "fluent_" + nom
+        return UIImage(named: complet) != nil ? complet : "fluent_sparkles"
+    }
+
+    var body: some View {
+        image
+            .frame(width: taille, height: taille)
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var image: some View {
+        let base = Image(Self.resoudre(nom)).resizable()
+        if #available(iOS 18.0, *) {
+            base.widgetAccentedRenderingMode(.fullColor).scaledToFit()
+        } else {
+            base.scaledToFit()
+        }
+    }
+}
+
+/// Le signe Kiwio en tête de widget : en couleurs, ou d'une seule encre hors
+/// des couleurs pleines.
+struct SigneW: View {
+    @Environment(\.widgetRenderingMode) private var rendu
+    var taille: CGFloat = 16
+
+    var body: some View {
+        Group {
+            if rendu == .fullColor {
+                KiwiSigne(taille: taille)
+            } else {
+                KiwiSigne(taille: taille, variante: .mono, encre: Color.white)
+                    .widgetAccentable()
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// La ligne d'en-tête des widgets d'accueil : icône 16, libellé 13/600 à
+/// 0,9, et un élément optionnel à droite. Hauteur 18.
+struct EnTeteW<Droite: View>: View {
+    enum Icone {
+        case signe
+        case illustration(String)
+        case symbole(String)
+    }
+
+    let icone: Icone
+    let titre: String
+    @ViewBuilder var droite: () -> Droite
+
+    var body: some View {
+        HStack(spacing: 6) {
+            switch icone {
+            case .signe:
+                SigneW(taille: 16)
+            case .illustration(let nom):
+                IllustrationW(nom: nom, taille: 16)
+            case .symbole(let nom):
+                Image(systemName: nom)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(TeinteW.encre(0.9))
+                    .accessibilityHidden(true)
+            }
+            Text(titre)
+                .font(.texteW(13, .semibold))
+                .foregroundStyle(TeinteW.encre(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Spacer(minLength: 4)
+            droite()
+        }
+        .frame(height: 18)
+    }
+}
+
+extension EnTeteW where Droite == EmptyView {
+    init(icone: Icone, titre: String) {
+        self.init(icone: icone, titre: titre) { EmptyView() }
+    }
+}
+
+/// La série de jours : flamme 3D + chiffre ; rien quand elle vaut zéro.
+struct SerieW: View {
+    let serie: Int
+    var taille: CGFloat = 13
+
+    var body: some View {
+        if serie > 0 {
+            HStack(spacing: 2) {
+                IllustrationW(nom: "fluent_fire", taille: taille + 1)
+                Text("\(serie)")
+                    .font(.chiffreW(taille))
+                    .foregroundStyle(TeinteW.encre())
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Série : \(serie) jours")
+        }
+    }
+}
+
+/// Personne de connecté, l'app n'a encore rien écrit, ou pas encore de bilan.
+struct InvitationW: View {
+    var message = "Ouvre Kiwio pour commencer ta journée."
+
+    var body: some View {
+        VStack(spacing: 8) {
+            SigneW(taille: 30)
+            Text(message)
+                .font(.texteW(13, .medium))
+                .foregroundStyle(TeinteW.encre(0.88))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Un état est exploitable quand quelqu'un est connecté.
+func exploitableW(_ etat: InstantaneJour?) -> InstantaneJour? {
+    guard let etat, etat.connecte else { return nil }
+    return etat
+}
+
+// MARK: - Mise en forme
 
 enum FormatW {
     /// `1 021` : milliers séparés d'une espace fine insécable (comme `DS.entier`).
@@ -89,6 +429,13 @@ enum FormatW {
         return min(1, max(0, Double(etat.kcalConsommees) / Double(objectif)))
     }
 
+    /// « 82% » de l'anneau du jour : tronqué, comme la maquette (2027 / 2455 →
+    /// 82 %). `nil` sans objectif.
+    static func pourcentCalories(_ etat: InstantaneJour) -> Int? {
+        guard let objectif = etat.kcalObjectif, objectif > 0 else { return nil }
+        return min(999, max(0, etat.kcalConsommees * 100 / objectif))
+    }
+
     /// `0,75` · `2` · `1,5` : des litres, à partir de centilitres (virgule
     /// décimale, sans zéro inutile). Même écriture que la carte Eau du Journal.
     static func litres(centilitres: Int) -> String {
@@ -99,649 +446,22 @@ enum FormatW {
         return "\(entiers)," + String(format: "%02d", reste)
     }
 
+    /// Litres bus aujourd'hui et objectif du jour.
+    static func litresBus(_ eau: InstantaneJour.Eau) -> String {
+        litres(centilitres: eau.verres * eau.centilitres)
+    }
+
+    static func litresObjectif(_ eau: InstantaneJour.Eau) -> String {
+        litres(centilitres: eau.objectif * eau.centilitres)
+    }
+
     /// Noms des compléments d'un moment, sans dose : « Fer + Vitamine D ».
     static func noms(_ prises: [InstantaneJour.Prise]) -> String {
         prises.map(\.nom).joined(separator: " + ")
     }
-}
 
-// MARK: - Briques
-
-/// Le signe et le nom, en tête d'un widget.
-struct MarqueW: View {
-    var body: some View {
-        HStack(spacing: 5) {
-            KiwiSigne(taille: 16)
-            Text("Kiwio")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.primary)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Kiwio")
-    }
-}
-
-/// La série de jours ; rien quand elle vaut zéro.
-struct SerieW: View {
-    let serie: Int
-
-    var body: some View {
-        if serie > 0 {
-            HStack(spacing: 3) {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(TeinteW.calories)
-                Text("\(serie)")
-                    .font(.system(size: 13, weight: .bold).monospacedDigit())
-                    .foregroundStyle(Color.primary)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Série : \(serie) jours")
-        }
-    }
-}
-
-/// Jauge horizontale, sans animation (un widget est une image).
-struct JaugeW: View {
-    let fraction: Double
-    var couleur: Color = TeinteW.vert
-    var hauteur: CGFloat = 5
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(TeinteW.tuile)
-                Capsule()
-                    .fill(couleur)
-                    .frame(width: max(hauteur, geo.size.width * CGFloat(min(1, max(0, fraction)))))
-            }
-        }
-        .frame(height: hauteur)
-        .accessibilityHidden(true)
-    }
-}
-
-/// Un créneau de repas : son symbole, son « + », ce qu'on y a déjà mangé.
-struct TuileCreneauW: View {
-    let creneau: CreneauWidget
-    let kcal: Int
-    /// Activité en direct : pas de ligne « Ajouter », la hauteur est comptée.
-    var compacte = false
-
-    var body: some View {
-        VStack(spacing: 2) {
-            ZStack(alignment: .bottomTrailing) {
-                Image(systemName: creneau.symbole)
-                    .font(.system(size: compacte ? 19 : 22, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(kcal > 0 ? TeinteW.creneau(creneau) : Color.secondary)
-                    .frame(width: 38, height: compacte ? 26 : 30)
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(Color.white, TeinteW.vert)
-                    .offset(x: 3, y: 2)
-            }
-            Text(creneau.libelle)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.primary)
-                .lineLimit(1)
-            if kcal > 0 {
-                Text("\(FormatW.entier(kcal)) kcal")
-                    .font(.system(size: 11).monospacedDigit())
-                    .foregroundStyle(Color.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            } else if !compacte {
-                Text("Ajouter")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(TeinteW.vert)
-                    .lineLimit(1)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(kcal > 0
-            ? "\(creneau.libelle), \(kcal) kilocalories. Ajouter un aliment"
-            : "\(creneau.libelle), rien encore. Ajouter un aliment")
-    }
-}
-
-/// Une tuile d'action de l'ajout rapide.
-struct TuileActionW: View {
-    let symbole: String
-    let titre: String
-    /// La seule tuile verte : la dictée, la fonction phare.
-    var pleine = false
-    var teinte: Color = .primary
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: symbole)
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(pleine ? Color.white : teinte)
-                .frame(height: 26)
-            Text(titre)
-                .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(pleine ? Color.white : Color.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(pleine ? TeinteW.vert : TeinteW.tuile)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-}
-
-/// Personne de connecté, ou l'app n'a encore rien écrit.
-struct InvitationW: View {
-    var message = "Ouvre Kiwio pour commencer ta journée."
-
-    var body: some View {
-        VStack(spacing: 8) {
-            KiwiSigne(taille: 30)
-            Text(message)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-/// Un état est exploitable quand quelqu'un est connecté.
-private func exploitable(_ etat: InstantaneJour?) -> InstantaneJour? {
-    guard let etat, etat.connecte else { return nil }
-    return etat
-}
-
-// MARK: - Ma journée
-
-/// Format moyen : le chiffre du jour, la série, et les quatre repas. Toucher
-/// un repas ouvre SA fiche dans l'app, prête à recevoir un aliment.
-struct VueJourneeMoyenne: View {
-    let etat: InstantaneJour?
-
-    var body: some View {
-        if let etat = exploitable(etat) {
-            let calories = FormatW.ligneCalories(etat)
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(calories.nombre)
-                        .font(.system(size: 28, weight: .bold).monospacedDigit())
-                        .foregroundStyle(Color.primary)
-                    Text(calories.legende)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Spacer(minLength: 6)
-                    SerieW(serie: etat.serie)
-                }
-                .accessibilityElement(children: .combine)
-                Spacer(minLength: 8)
-                HStack(alignment: .top, spacing: 4) {
-                    ForEach(CreneauWidget.allCases) { creneau in
-                        Link(destination: LienKiwio.repas(creneau.rawValue).url) {
-                            TuileCreneauW(creneau: creneau, kcal: etat.kcal(creneau))
-                        }
-                    }
-                }
-            }
-        } else {
-            InvitationW()
-        }
-    }
-}
-
-/// Format petit : le chiffre du jour et sa jauge. Tout le widget ouvre le Journal.
-struct VueJourneePetite: View {
-    let etat: InstantaneJour?
-
-    var body: some View {
-        if let etat = exploitable(etat) {
-            let calories = FormatW.ligneCalories(etat)
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    MarqueW()
-                    Spacer(minLength: 4)
-                    SerieW(serie: etat.serie)
-                }
-                Spacer(minLength: 6)
-                Text(calories.nombre)
-                    .font(.system(size: 34, weight: .bold).monospacedDigit())
-                    .foregroundStyle(Color.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text(calories.legende)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Spacer(minLength: 8)
-                if etat.kcalObjectif != nil {
-                    JaugeW(fraction: FormatW.fractionCalories(etat),
-                           couleur: (etat.kcalRestantes ?? 0) < 0 ? .red : TeinteW.calories)
-                }
-            }
-            .accessibilityElement(children: .combine)
-        } else {
-            InvitationW()
-        }
-    }
-}
-
-/// Écran verrouillé, format rectangulaire : la journée en deux lignes.
-struct VueJourneeRectangulaire: View {
-    let etat: InstantaneJour?
-
-    private func secondeLigne(_ etat: InstantaneJour) -> String? {
-        var morceaux: [String] = []
-        if let eau = etat.eau { morceaux.append("Eau \(eau.verres)/\(eau.objectif)") }
-        if !etat.rituel.isEmpty { morceaux.append("Rituel \(etat.prisesFaites)/\(etat.rituel.count)") }
-        return morceaux.isEmpty ? nil : morceaux.joined(separator: " · ")
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text("Kiwio")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .widgetAccentable()
-            if let etat = exploitable(etat) {
-                let calories = FormatW.ligneCalories(etat)
-                Text("\(calories.nombre) \(calories.legende)")
-                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                if let ligne = secondeLigne(etat) {
-                    Text(ligne)
-                        .font(.system(size: 12).monospacedDigit())
-                        .foregroundStyle(Color.secondary)
-                        .lineLimit(1)
-                }
-            } else {
-                Text("Ouvre l'app pour commencer")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-// MARK: - Ajout rapide
-
-/// Format moyen : quatre gestes. Dicter et Photo ouvrent l'app au bon endroit ;
-/// l'eau et le rituel se cochent sur place. Sans suivi d'eau ou sans rituel,
-/// la tuile laisse sa place à une autre façon d'ajouter.
-struct VueAjoutRapide: View {
-    let etat: InstantaneJour?
-
-    var body: some View {
-        if let etat = exploitable(etat) {
-            HStack(spacing: 8) {
-                Link(destination: LienKiwio.dicter.url) {
-                    TuileActionW(symbole: "mic.fill", titre: "Dicter", pleine: true)
-                }
-                .accessibilityLabel("Dicter un repas")
-
-                Link(destination: LienKiwio.photo.url) {
-                    TuileActionW(symbole: "camera", titre: "Photo")
-                }
-                .accessibilityLabel("Photographier un repas")
-
-                if let eau = etat.eau {
-                    Button(intent: AjouterVerreIntent()) {
-                        TuileActionW(symbole: "drop.fill", titre: "\(eau.verres) / \(eau.objectif)",
-                                     teinte: TeinteW.eau)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Ajouter un verre d'eau. \(eau.verres) sur \(eau.objectif)")
-                } else {
-                    Link(destination: LienKiwio.rechercher.url) {
-                        TuileActionW(symbole: "magnifyingglass", titre: "Chercher")
-                    }
-                    .accessibilityLabel("Rechercher un aliment")
-                }
-
-                if etat.rituel.isEmpty {
-                    Link(destination: LienKiwio.journal.url) {
-                        TuileActionW(symbole: "book", titre: "Journal")
-                    }
-                    .accessibilityLabel("Ouvrir le Journal")
-                } else if let moment = etat.prochainMoment {
-                    Button(intent: CocherRituelIntent()) {
-                        TuileActionW(symbole: "pills", titre: moment.libelle,
-                                     teinte: TeinteW.moment(moment))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Cocher mes compléments du \(moment.libelle.lowercased())")
-                } else {
-                    Link(destination: LienKiwio.complements.url) {
-                        TuileActionW(symbole: "checkmark.circle.fill", titre: "Rituel fait",
-                                     teinte: TeinteW.vert)
-                    }
-                    .accessibilityLabel("Rituel complet")
-                }
-            }
-        } else {
-            InvitationW()
-        }
-    }
-}
-
-/// Format petit : un seul geste, dicter. Tout le widget ouvre l'app, micro ouvert.
-struct VueDicterPetite: View {
-    var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "mic.fill")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(Color.white)
-                .frame(width: 60, height: 60)
-                .background(Circle().fill(TeinteW.vert))
-            Text("Dicter un repas")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Dicter un repas")
-    }
-}
-
-/// Écran verrouillé, format rond : le micro.
-struct VueDicterRonde: View {
-    var body: some View {
-        ZStack {
-            AccessoryWidgetBackground()
-            Image(systemName: "mic.fill")
-                .font(.system(size: 22, weight: .semibold))
-                .widgetAccentable()
-        }
-        .accessibilityLabel("Dicter un repas")
-    }
-}
-
-// MARK: - Eau
-
-/// Format petit : les litres du jour comme sur la carte Eau du Journal, la
-/// jauge, et un verre de plus d'un toucher.
-struct VueEauPetite: View {
-    let etat: InstantaneJour?
-
-    var body: some View {
-        if let etat = exploitable(etat), let eau = etat.eau {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 5) {
-                    Image(systemName: "drop.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(TeinteW.eau)
-                    Text("Eau")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-                }
-                Spacer(minLength: 4)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(FormatW.litres(centilitres: eau.verres * eau.centilitres)) L")
-                        .font(.system(size: 30, weight: .bold).monospacedDigit())
-                        .foregroundStyle(Color.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text("sur \(FormatW.litres(centilitres: eau.objectif * eau.centilitres)) L")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Eau : \(eau.verres) verres sur \(eau.objectif)")
-                JaugeW(fraction: eau.objectif > 0 ? Double(eau.verres) / Double(eau.objectif) : 0,
-                       couleur: TeinteW.eau)
-                    .padding(.top, 4)
-                Spacer(minLength: 8)
-                if eau.atteint {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(TeinteW.vert)
-                        Text("Objectif atteint")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.primary)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 32)
-                    .background(Capsule().fill(TeinteW.tuile))
-                } else {
-                    Button(intent: AjouterVerreIntent()) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 12, weight: .bold))
-                            Text("\(eau.centilitres) cl")
-                                .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                        }
-                        .foregroundStyle(Color.white)
-                        .frame(maxWidth: .infinity, minHeight: 32)
-                        .background(Capsule().fill(TeinteW.vert))
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Ajouter un verre d'eau, \(eau.centilitres) centilitres")
-                }
-            }
-        } else {
-            InvitationW(message: "Ouvre Kiwio pour suivre ton eau.")
-        }
-    }
-}
-
-/// Écran verrouillé, format rond : la jauge d'eau ; un toucher ajoute un verre.
-struct VueEauRonde: View {
-    let etat: InstantaneJour?
-
-    var body: some View {
-        if let eau = exploitable(etat)?.eau {
-            let plafond = Double(max(1, eau.objectif))
-            Button(intent: AjouterVerreIntent()) {
-                Gauge(value: min(Double(eau.verres), plafond), in: 0...plafond) {
-                    Image(systemName: "drop.fill")
-                } currentValueLabel: {
-                    Text("\(eau.verres)")
-                }
-                .gaugeStyle(.accessoryCircular)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Eau : \(eau.verres) verres sur \(eau.objectif). Ajouter un verre")
-        } else {
-            ZStack {
-                AccessoryWidgetBackground()
-                Image(systemName: "drop")
-                    .font(.system(size: 20, weight: .semibold))
-            }
-            .accessibilityLabel("Eau")
-        }
-    }
-}
-
-// MARK: - Rituel de compléments
-
-/// Une ligne par moment : matin, midi, soir. Un toucher coche les prises du
-/// moment (ou les décoche). Un moment sans prise n'a pas de case.
-struct LigneMomentW: View {
-    let moment: MomentRituel
-    let prises: [InstantaneJour.Prise]
-    /// Format moyen : les noms des compléments tiennent sous le moment.
-    var detail = true
-
-    private var complet: Bool { !prises.isEmpty && prises.allSatisfy(\.fait) }
-
-    private var contenu: some View {
-        HStack(spacing: 8) {
-            Image(systemName: moment.symbole)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(prises.isEmpty ? Color.secondary.opacity(0.5) : TeinteW.moment(moment))
-                .frame(width: 20)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(moment.libelle)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(prises.isEmpty ? Color.secondary : Color.primary)
-                if detail {
-                    Text(prises.isEmpty ? "Rien à prendre" : FormatW.noms(prises))
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.secondary)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 4)
-            if !prises.isEmpty {
-                Image(systemName: complet ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(complet ? TeinteW.vert : Color.secondary.opacity(0.6))
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-    }
-
-    var body: some View {
-        if prises.isEmpty {
-            contenu
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(moment.libelle) : rien à prendre")
-        } else {
-            Button(intent: CocherMomentIntent(moment: moment)) { contenu }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(moment.libelle) : \(FormatW.noms(prises))")
-                .accessibilityValue(complet ? "fait" : "à prendre")
-        }
-    }
-}
-
-struct VueRituel: View {
-    let etat: InstantaneJour?
-    /// Le format petit n'a pas la largeur pour les noms.
-    var detail = true
-
-    var body: some View {
-        if let etat = exploitable(etat), !etat.rituel.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Rituel du jour")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.secondary)
-                    Spacer(minLength: 4)
-                    Text("\(etat.prisesFaites) / \(etat.rituel.count)")
-                        .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(Color.primary)
-                        .accessibilityLabel("\(etat.prisesFaites) sur \(etat.rituel.count)")
-                }
-                ForEach(MomentRituel.allCases) { moment in
-                    LigneMomentW(moment: moment, prises: etat.prises(du: moment), detail: detail)
-                }
-            }
-        } else {
-            InvitationW(message: exploitable(etat) == nil
-                ? "Ouvre Kiwio pour commencer ta journée."
-                : "Ton rituel arrive avec ton bilan, dans Kiwio.")
-        }
-    }
-}
-
-// MARK: - Activité en direct (écran verrouillé)
-
-/// La carte de la journée, posée sur l'écran verrouillé : les quatre repas,
-/// puis dicter, l'eau, le rituel. Les repas et la dictée ouvrent l'app ; l'eau
-/// et le rituel se cochent sur place.
-struct VueActiviteJournee: View {
-    let etat: InstantaneJour
-
-    var body: some View {
-        let calories = FormatW.ligneCalories(etat)
-        VStack(spacing: 10) {
-            HStack(spacing: 6) {
-                MarqueW()
-                Spacer(minLength: 6)
-                Text("\(calories.nombre) \(calories.legende)")
-                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(Color.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                SerieW(serie: etat.serie)
-            }
-            HStack(alignment: .top, spacing: 4) {
-                ForEach(CreneauWidget.allCases) { creneau in
-                    Link(destination: LienKiwio.repas(creneau.rawValue).url) {
-                        TuileCreneauW(creneau: creneau, kcal: etat.kcal(creneau), compacte: true)
-                    }
-                }
-            }
-            HStack(spacing: 8) {
-                Link(destination: LienKiwio.dicter.url) {
-                    PastilleActiviteW(symbole: "mic.fill", titre: "Dicter", pleine: true)
-                }
-                .accessibilityLabel("Dicter un repas")
-
-                if let eau = etat.eau {
-                    Button(intent: AjouterVerreEnDirectIntent()) {
-                        PastilleActiviteW(symbole: "drop.fill", titre: "\(eau.verres) / \(eau.objectif)",
-                                          teinte: TeinteW.eau,
-                                          accessoire: eau.atteint ? "checkmark.circle.fill" : "plus")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Ajouter un verre d'eau. \(eau.verres) sur \(eau.objectif)")
-                }
-
-                if !etat.rituel.isEmpty {
-                    if let moment = etat.prochainMoment {
-                        Button(intent: CocherRituelEnDirectIntent()) {
-                            PastilleActiviteW(symbole: "pills", titre: moment.libelle,
-                                              teinte: TeinteW.moment(moment), accessoire: "circle")
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Cocher mes compléments du \(moment.libelle.lowercased())")
-                    } else {
-                        PastilleActiviteW(symbole: "pills", titre: "Rituel fait",
-                                          teinte: TeinteW.vert, accessoire: "checkmark.circle.fill")
-                            .accessibilityLabel("Rituel complet")
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Une pastille de la rangée du bas de l'activité en direct.
-struct PastilleActiviteW: View {
-    let symbole: String
-    let titre: String
-    var pleine = false
-    var teinte: Color = .primary
-    var accessoire: String? = nil
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: symbole)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(pleine ? Color.white : teinte)
-            Text(titre)
-                .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                .foregroundStyle(pleine ? Color.white : Color.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            if let accessoire {
-                Spacer(minLength: 2)
-                Image(systemName: accessoire)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(accessoire == "checkmark.circle.fill" ? TeinteW.vert : Color.secondary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: pleine ? nil : .infinity, minHeight: 34)
-        .background(Capsule().fill(pleine ? TeinteW.vert : TeinteW.tuile))
-        .contentShape(Capsule())
+    /// « +5 Vit. D » : le badge du petit conseil ; `nil` sans point à annoncer.
+    static func badgePoints(_ conseil: ConseilW) -> String? {
+        conseil.points > 0 ? "+\(conseil.points) \(conseil.apportCourt)" : nil
     }
 }

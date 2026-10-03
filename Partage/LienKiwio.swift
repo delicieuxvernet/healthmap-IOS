@@ -19,9 +19,18 @@ enum LienKiwio: Equatable {
     case rechercher
     /// L'onglet Compléments (le rituel du jour).
     case complements
+    /// La fiche d'un apport (`NutrientID.rawValue`), causes et gestes compris.
+    case apport(String)
 
     static let schema = "healthmap"
     static let hote = "widget"
+
+    /// Les dix apports du registre : miroir de `NutrientID` (l'extension ne
+    /// voit pas le modèle de l'app ; un test tient la parité).
+    static let apportsConnus: Set<String> = [
+        "vitD", "vitB12", "iron", "magnesium", "omega3",
+        "vitC", "calcium", "zinc", "iodine", "fiber",
+    ]
 
     /// Forme courte, rangée dans l'attente par les contrôles.
     var code: String {
@@ -32,6 +41,7 @@ enum LienKiwio: Equatable {
         case .photo: return "photo"
         case .rechercher: return "rechercher"
         case .complements: return "complements"
+        case .apport(let id): return "apport/\(id)"
         }
     }
 
@@ -47,6 +57,9 @@ enum LienKiwio: Equatable {
         case "photo": self = .photo
         case "rechercher": self = .rechercher
         case "complements": self = .complements
+        case "apport":
+            guard morceaux.count == 2, Self.apportsConnus.contains(morceaux[1]) else { return nil }
+            self = .apport(morceaux[1])
         default: return nil
         }
     }

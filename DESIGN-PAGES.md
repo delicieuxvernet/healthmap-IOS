@@ -444,21 +444,42 @@
 >   `PremiumGating.swift`). **Contenu verrouillé, partout** : un seul traitement, flou 8 et opacité
 >   0,5, sans voile blanc ; portes (`UnlockDoor`), jauges de quota et écrin Premium en verre.
 >
-> - **Widgets, écran verrouillé, activité en direct** (1er oct. 2026, maquette montrée dans le chat,
->   `Partage/VuesWidgets.swift` + `KiwioWidgets/`) : quatre widgets et une carte d'écran verrouillé
->   qui reprennent le Journal, jamais un design à part. **Ma journée** (petit : le chiffre des kcal
->   restantes + jauge ; moyen : le chiffre, la série, les quatre repas Matin · Midi · Soir · Encas avec
->   les symboles de la grille du Journal, un « + » vert sur chacun ; rectangulaire d'écran
->   verrouillé ; hors le vert Kiwio, les widgets gardent les teintes du système, qui suivent le mode
->   clair ou sombre, là où l'app est passée à la palette du verre : même famille de couleur, pas la
->   même valeur). **Ajout rapide** (petit et rond : le micro ; moyen : quatre tuiles, Dicter en vert,
->   Photo, l'eau, le rituel). **Eau** (les litres comme sur la carte Eau, « + 25 cl »). **Rituel du
->   jour** (matin · midi · soir à cocher, **jamais de dose**). **Activité en direct « Ta journée »** :
->   les quatre repas, puis Dicter · eau · rituel. Règle de geste : l'eau et le rituel se cochent sur
->   place ; Dicter, Photo et un repas ouvrent l'app au bon endroit (un widget ne peut pas enregistrer
->   la voix). Le vert reste réservé à ce qui se touche. Un widget suit le mode clair ou sombre du
->   téléphone (l'app, elle, reste claire). Réglages → Widgets et écran verrouillé : l'interrupteur
->   « Ma journée en direct », les aperçus (les vraies vues), le mode d'emploi en trois lignes.
+> - **Widgets, écran verrouillé, activité en direct** (refonte « en verre » du 3 oct. 2026, maquette
+>   Claude Design « Kiwio - Widgets », W1 à W7 ; briques dans `Partage/VuesWidgets.swift`, vues dans
+>   `Partage/Widgets*.swift`, configurations dans `KiwioWidgets/`) : six widgets, des accessoires
+>   d'écran verrouillé et une carte en direct, qui disent ce que dit le Journal, jamais autre chose.
+>   **Le verre** : texte blanc, plaques blanches translucides, bouton vert (dégradé `#96E26C` →
+>   `#5DA838`) pour ce qui se touche, pastille pâle pour ce qui est fait. Un widget ne voit pas le fond
+>   d'écran : en couleurs pleines, `FondVerreW` peint la base verte de la maquette puis le verre ; en
+>   Teinté et Transparent (iOS 18, iOS 26), iOS pose son propre verre et les illustrations 3D gardent
+>   leurs couleurs. Le verre est le même en mode clair et sombre. Teintes des apports et des repas :
+>   celles de la maquette, faites pour le verre et distinctes de la palette de l'app (vitamine D
+>   `#FFB547`, magnésium `#AFAEFF`, fer `#F0B27A`, les sept autres dérivées ; repas matin `#FFB547` ·
+>   midi `#8FDB62` · soir `#AFAEFF` · encas `#FF8FB1`). **Tes apports** (petit : l'apport le plus bas
+>   en anneau, son score, un aliment pour le prochain repas ; moyen : le verdict, les trois anneaux,
+>   « Voir le calcul » ; grand : l'apport en grand, sa cause, « Ce qui la remonte » en pastilles, les
+>   autres en barres ; rond, rectangulaire et en ligne sur l'écran verrouillé) : un seul chiffre par
+>   apport, celui du registre, et les mots de la fiche (`LectureApport`), jamais recalculés.
+>   **Conseil du jour** (petit, moyen, rectangulaire) : un geste par jour pour l'apport à renforcer,
+>   tiré des gestes de la fiche, qui change à minuit sans ouvrir l'app ; « C'est fait » se coche et se
+>   décoche sur place ; le geste est réservé au Premium, comme « Ce que tu peux faire » dans la fiche ;
+>   **jamais de dose**. **Ajout rapide** (petit : le micro et la question du repas de l'heure, « Ton
+>   midi ? » ; moyen : Dicter en grand, puis Photo, l'eau, le rituel, Chercher ; rond : le micro).
+>   **Eau** (le verre qui se remplit vraiment, les litres, « + 25 cl » jusqu'à l'objectif ; rond : les
+>   verres en anneau, un toucher ajoute un verre). **Rituel du jour** (petit : le prochain moment à
+>   prendre ; moyen : matin · midi · soir ; **jamais de dose**). **Ma journée** (même rôle, habillé
+>   comme la carte en direct : les kcal, la barre des repas, les quatre repas qui ouvrent leur fiche).
+>   **Activité en direct « Ta journée »** : la journée en une barre (chaque repas sa couleur), les kcal
+>   restantes, la série, puis Dicter · eau · prise du moment ; Dynamic Island compacte (le signe, les
+>   kcal), minimale (l'anneau du jour) et étendue (l'anneau, le prochain repas, Dicter et l'eau) ; un
+>   jour périmé dit « Nouvelle journée » au lieu des chiffres de la veille. Règle de geste : l'eau, le
+>   rituel et le conseil se cochent sur place ; Dicter, Photo, Chercher, un repas et un apport ouvrent
+>   l'app au bon endroit (« Voir le calcul » et « Pourquoi ? » : la fiche de l'apport, servie par le
+>   Journal). Accessoires d'écran verrouillé : monochromes, comme iOS les dessine. Réglages → Widgets
+>   et écran verrouillé : l'interrupteur « Ma journée en direct », l'écran verrouillé en miniature sur
+>   le fond d'écran de la maquette (accessoires et carte en direct), les widgets d'accueil à leur
+>   taille d'iPhone 16 (les vraies vues, nourries par la journée en cours, sinon par un exemple), le
+>   mode d'emploi en trois lignes.
 >
 > - **Prise de sang** (Premium, 30 sept. 2026 — maquette validée le 6 juil., `Views/PriseDeSang/PriseDeSangSheet.swift`) :
 >   une carte du Journal (`PriseDeSangCarte`, sous « Poids et eau » ; la puce « Analyses » y mène —

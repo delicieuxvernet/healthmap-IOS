@@ -26,40 +26,53 @@ enum LectureApport {
         }
     }
 
+    /// « bas », « basse », « un peu justes », « couverte »… : le mot du statut,
+    /// accordé à l'apport.
+    private static func mot(_ score: Int, _ accord: Accord) -> String {
+        switch (score, accord) {
+        case (..<40, .masculin): return "bas"
+        case (..<40, .feminin): return "basse"
+        case (..<40, .masculinPluriel): return "bas"
+        case (..<40, .femininPluriel): return "basses"
+        case (..<70, .masculin), (..<70, .feminin): return "un peu juste"
+        case (..<70, _): return "un peu justes"
+        case (_, .masculin): return "couvert"
+        case (_, .feminin): return "couverte"
+        case (_, .masculinPluriel): return "couverts"
+        case (_, .femininPluriel): return "couvertes"
+        }
+    }
+
     /// « est bas », « est basse », « sont bas », « sont basses »…
     private static func etat(_ score: Int, _ accord: Accord) -> String {
         let pluriel = accord == .masculinPluriel || accord == .femininPluriel
-        let verbe = pluriel ? "sont" : "est"
-        let mot: String
-        switch (score, accord) {
-        case (..<40, .masculin): mot = "bas"
-        case (..<40, .feminin): mot = "basse"
-        case (..<40, .masculinPluriel): mot = "bas"
-        case (..<40, .femininPluriel): mot = "basses"
-        case (..<70, .masculin), (..<70, .feminin): mot = "un peu juste"
-        case (..<70, _): mot = "un peu justes"
-        case (_, .masculin): mot = "couvert"
-        case (_, .feminin): mot = "couverte"
-        case (_, .masculinPluriel): mot = "couverts"
-        case (_, .femininPluriel): mot = "couvertes"
-        }
-        return "\(verbe) \(mot)"
+        return "\(pluriel ? "sont" : "est") \(mot(score, accord))"
+    }
+
+    /// Le mot du statut d'un apport (« un peu juste »), pour les widgets.
+    static func motStatut(id: String, score: Int) -> String {
+        mot(score, accord(id))
+    }
+
+    /// « Ta vitamine D est un peu juste. » : le constat seul, sans sa cause.
+    static func constat(id: String, nom: String, score: Int) -> String {
+        let sujet = NomNutriment.majusculeInitiale(NomApport.possessif(NomApport.avecArticle(id: id, repli: nom)))
+        return "\(sujet) \(etat(score, accord(id)))."
     }
 
     /// « Ton fer est bas. Première cause : règles abondantes. » — la phrase à
     /// lire en premier. Sans cause nommée, elle s'arrête au constat.
     static func verdict(id: String, nom: String, detail: DetailApport) -> String {
-        let sujet = NomNutriment.majusculeInitiale(NomApport.possessif(NomApport.avecArticle(id: id, repli: nom)))
-        let constat = "\(sujet) \(etat(detail.score, accord(id)))."
-        guard detail.score < 70 else { return constat }
+        let phrase = constat(id: id, nom: nom, score: detail.score)
+        guard detail.score < 70 else { return phrase }
         // Une prise de sang n'est pas une cause : elle confirme le constat, et
         // la première cause reste à chercher parmi les autres freins.
         let mesure = detail.freins.first { $0.section == .priseDeSang }
         let confirmation = mesure.map { " \($0.libelle) va dans ce sens." } ?? ""
         guard let premiere = detail.freins.first(where: { $0.section != .priseDeSang }) else {
-            return constat + confirmation
+            return phrase + confirmation
         }
-        return "\(constat)\(confirmation) Première cause : \(enCoursDePhrase(premiere.libelle))."
+        return "\(phrase)\(confirmation) Première cause : \(enCoursDePhrase(premiere.libelle))."
     }
 
     /// Un libellé du registre, au milieu d'une phrase : la majuscule initiale
