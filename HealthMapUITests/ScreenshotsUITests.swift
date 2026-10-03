@@ -451,7 +451,7 @@ final class ScreenshotsUITests: XCTestCase {
         guard bilanSuite() else { return quitterLeBilan() }
 
         // Étape 2 · Ton quotidien
-        bilanBasculer("Je travaille surtout en intérieur")
+        bilanToucher("Surtout en intérieur")
         bilanToucher("Très peu")
         bilanToucher("Claire")
         snap("84-bilan-soleil")
@@ -486,13 +486,15 @@ final class ScreenshotsUITests: XCTestCase {
         snap("90-bilan-nuits")
         guard bilanSuite() else { return quitterLeBilan() }
 
-        bilanBasculer("J'ai souvent des ballonnements")
+        bilanToucher("Oui, souvent")
         snap("91-bilan-ventre")
         guard bilanSuite() else { return quitterLeBilan() }
 
         bilanToucher("Abondantes")
-        let nonConcernee = app.buttons.matching(NSPredicate(format: "label == %@", "Non concernée"))
-        if nonConcernee.count > 1 { taper(nonConcernee.element(boundBy: 1)) }
+        // Une question à la fois : on laisse « Tes règles » se ranger avant
+        // de répondre à la suivante, qui a aussi un « Non concernée ».
+        sleep(1)
+        bilanToucher("Non concernée")
         snap("92-bilan-cycle")
         guard bilanSuite() else { return quitterLeBilan() }
 
@@ -511,25 +513,25 @@ final class ScreenshotsUITests: XCTestCase {
         bilanToucher("Beaucoup")
         bilanToucher("Kiwis")
         snap("96-bilan-repas-a-petit-dej")
-        guard bilanSuite("Repas suivant") else { return quitterLeBilan() }
+        guard bilanSuite("Repas suivant : Midi") else { return quitterLeBilan() }
 
         bilanToucher("Lentilles")
         snap("96-bilan-repas-b-midi")
-        bilanToucher("Voir tous les aliments")
+        bilanToucher("Chercher un autre aliment")
         sleep(1)
         snap("96-bilan-repas-c-catalogue")
         bilanToucher("Terminé")
         sleep(1)
-        guard bilanSuite("Repas suivant") else { return quitterLeBilan() }
+        guard bilanSuite("Repas suivant : Goûter") else { return quitterLeBilan() }
 
         bilanToucher("Amandes")
         snap("96-bilan-repas-d-gouter")
-        guard bilanSuite("Repas suivant") else { return quitterLeBilan() }
+        guard bilanSuite("Repas suivant : Soir") else { return quitterLeBilan() }
 
         bilanToucher("Épinards")
         bilanToucher("Pas beaucoup")
         snap("96-bilan-repas-e-soir")
-        guard bilanSuite() else { return quitterLeBilan() }
+        guard bilanSuite("J'ai fini ma journée") else { return quitterLeBilan() }
 
         bilanToucher("Poisson, crustacés")
         snap("97-bilan-jamais")
@@ -577,21 +579,6 @@ final class ScreenshotsUITests: XCTestCase {
             return
         }
         taper(element)
-        usleep(350_000)
-    }
-
-    /// Allume une bascule. Depuis iOS 17, toucher le centre de la ligne ne
-    /// bascule rien : il faut toucher l'interrupteur lui-même.
-    private func bilanBasculer(_ libelle: String) {
-        let ligne = app.switches[libelle].firstMatch
-        guard ligne.waitForExistence(timeout: 3) else {
-            NSLog("captures: bascule introuvable « %@ »", libelle)
-            return
-        }
-        let interrupteur = ligne.switches.firstMatch
-        if interrupteur.exists { interrupteur.tap() } else {
-            ligne.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
-        }
         usleep(350_000)
     }
 

@@ -231,7 +231,13 @@ struct BilanQuestions: View {
 
     var body: some View {
         let montree = affichee
-        let rangees = questions.filter { $0.resume != nil && $0.id != montree }
+        // Les réponses données se rangent en pastilles. Pendant qu'on corrige
+        // une réponse, les questions qui attendent encore en ont une aussi :
+        // retoucher la même réponse ne change rien, il faut pouvoir repartir
+        // vers la suite sans passer par une autre réponse.
+        let rangees = questions.filter { question in
+            question.id != montree && (question.resume != nil || rouverte != nil)
+        }
 
         VStack(alignment: .leading, spacing: 14) {
             if !rangees.isEmpty {
@@ -281,18 +287,18 @@ struct BilanQuestions: View {
             courante = question.id
         } label: {
             HStack(spacing: 6) {
-                Text(question.resume ?? "")
+                Text(question.resume ?? question.titre)
                     .lineLimit(1)
-                Image(systemName: "pencil")
+                Image(systemName: question.resume == nil ? "arrow.right" : "pencil")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Color.dsSecondaire)
                     .accessibilityHidden(true)
             }
             .font(BilanTypo.tuile)
-            .foregroundStyle(BilanVerre.encreChoisie)
+            .foregroundStyle(question.resume == nil ? Color.dsTexte : BilanVerre.encreChoisie)
             .padding(.horizontal, 12)
             .frame(minHeight: 34)
-            .verre(BilanVerre.reponse(choisie: true), forme: Capsule(style: .continuous))
+            .verre(BilanVerre.reponse(choisie: question.resume != nil), forme: Capsule(style: .continuous))
             // La cible tactile déborde de la pastille : 44 points de haut.
             .padding(.vertical, 5)
             .padding(.horizontal, 2)
@@ -300,8 +306,8 @@ struct BilanQuestions: View {
         }
         .buttonStyle(.dsPress)
         .transition(.scale(scale: 0.9).combined(with: .opacity))
-        .accessibilityLabel("\(question.titre) : \(question.resume ?? "")")
-        .accessibilityHint("Touche pour modifier ta réponse.")
+        .accessibilityLabel(question.resume.map { "\(question.titre) : \($0)" } ?? question.titre)
+        .accessibilityHint(question.resume == nil ? "Touche pour y répondre." : "Touche pour modifier ta réponse.")
     }
 
     /// Après une réponse, on laisse le choix s'allumer, puis on passe à la
@@ -411,6 +417,9 @@ struct BilanVisage: View {
     let choisir: (String) -> Void
 
     @State private var position: Double
+    /// Vrai tant que le doigt est sur le curseur : la réponse ne s'écrit
+    /// qu'au lâcher, pour que la question ne parte pas sous le doigt.
+    @State private var enCours = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(titre: String, choix: [ChoixBilan], valeur: String, choisir: @escaping (String) -> Void) {
@@ -426,7 +435,7 @@ struct BilanVisage: View {
         min(max(Int(position.rounded()), 0), max(0, choix.count - 1))
     }
 
-    private var repondu: Bool { !valeur.isEmpty }
+    private var repondu: Bool { !valeur.isEmpty || enCours }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -446,8 +455,10 @@ struct BilanVisage: View {
                     value: $position,
                     in: 0...Double(choix.count - 1),
                     step: 1,
-                    onEditingChanged: { enCours in
-                        if !enCours { valider() }
+                    onEditingChanged: { glisse in
+                        enCours = glisse
+                        // Le doigt se lève, même sans avoir bougé : c'est une réponse.
+                        if !glisse { valider() }
                     }
                 )
                 .tint(Color.dsAccent)
@@ -472,14 +483,18 @@ struct BilanVisage: View {
         .verreCarte()
         .animation(reduceMotion ? nil : Animation.kiwiRebond, value: index)
         .animation(reduceMotion ? nil : Animation.kiwiVif, value: repondu)
-        .onChange(of: position) { _, _ in valider() }
+        // Pendant le geste, le visage suit, avec un petit clic à chaque cran.
+        // Hors geste (VoiceOver, clavier), la valeur s'écrit tout de suite.
+        .onChange(of: index) { _, _ in
+            if enCours { HapticService.shared.selection() } else { valider() }
+        }
     }
 
     private func valider() {
         guard choix.indices.contains(index) else { return }
         let choisi = choix[index].id
         guard choisi != valeur else { return }
-        HapticService.shared.selection()
+        if !enCours { HapticService.shared.selection() }
         choisir(choisi)
     }
 }
