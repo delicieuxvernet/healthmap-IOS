@@ -596,14 +596,9 @@ private struct MicroSection<Contenu: View>: View {
     }
 }
 
-/// La page d'un micronutriment. Elle est POUSSÉE dans la pile du Journal
-/// (`MealScanView.pageMicro`), barre native masquée : c'est donc ELLE qui
-/// dessine son retour (« ‹ Journal », en vert comme tout ce qui se touche) et
-/// son fond de verre. Les deux vont ensemble : retirer ce retour sans rendre
-/// la barre native laisserait la page sans sortie visible.
-///
-/// Le nom du type date de l'époque où c'était une feuille ; il reste, avec son
-/// `init`, pour ses appelants.
+/// La page d'un micronutriment, présentée en FEUILLE de verre
+/// (`MealScanView.pageMicro`) : on la referme en la balayant vers le bas, ou
+/// par sa croix. Le fond est celui de la feuille (`.verreFeuille()`).
 struct MicroDuJourSheet: View {
     let ligne: LigneMicro
     /// L'apport du bilan qui porte ce micro : ouvre la fiche de ses causes.
@@ -708,7 +703,6 @@ struct MicroDuJourSheet: View {
             .containerRelativeFrame(.horizontal, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        .background { VerrePageFond() }
         .onAppear { arriver() }
         .onChange(of: ligne.niveau) { _, nouveau in
             compter(jusqua: nouveau)
@@ -737,29 +731,15 @@ struct MicroDuJourSheet: View {
 
     // MARK: Retour
 
-    /// « ‹ Journal » : la rangée de 44 pt qui ouvre la page, sous la barre
-    /// d'état. Elle dépile la page (ou referme la feuille, si c'en est une).
-    ///
-    /// La maquette décale cette rangée de 6 pt vers la gauche parce que son
-    /// icône flotte dans une boîte de 24. Le symbole système n'a pas cette
-    /// marge : sans décalage, le chevron tombe à l'aplomb du titre.
+    /// La page s'ouvre en feuille (on la balaie vers le bas pour la fermer) :
+    /// en tête, la croix de verre des autres feuilles, à droite.
     private var retour: some View {
-        Button {
-            dismiss()
-        } label: {
-            HStack(spacing: 2) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 20, weight: .medium))
-                    .accessibilityHidden(true)
-                Text("Journal")
-                    .font(.dsCorps)
-            }
-            .foregroundStyle(Color.dsAccent)
-            .frame(minHeight: DS.cibleTactile)
-            .contentShape(Rectangle())
+        HStack {
+            Spacer(minLength: 0)
+            DSCloseButton { dismiss() }
         }
-        .buttonStyle(.dsPress)
-        .accessibilityLabel("Retour au Journal")
+        .padding(.top, 8)
+        .padding(.trailing, -6)
     }
 
     // MARK: Le chiffre

@@ -339,9 +339,10 @@ struct JournalView: View {
                 // déclaré : c'est le nom de l'écran dans la pile.
                 .navigationTitle("Journal")
                 .toolbar(.hidden, for: .navigationBar)
-                // La page d'un micronutriment entre par la droite, dans la
-                // pile du Journal : la barre d'onglets reste là.
-                .navigationDestination(isPresented: $microPoussee) {
+                // La page d'un micronutriment s'ouvre en FEUILLE de verre :
+                // on la referme en la balayant vers le bas (demande d'Arthur
+                // du 3 oct. 2026, plutôt que le retour « ‹ Journal »).
+                .sheet(isPresented: $microPoussee) {
                     pageMicro
                 }
                 // Le Bilan complet garde sa propre pile de navigation : on le
@@ -884,7 +885,7 @@ struct JournalView: View {
             // Le titre et le jour affiché, tout en haut : le jour commande la
             // page entière (jauges, apports, repas) ET la date des ajouts.
             enTete
-                .padding(.top, 14)
+                .padding(.top, DS.hautTitreOnglet)
 
             puces
 
@@ -1116,34 +1117,18 @@ struct JournalView: View {
         microPoussee = true
     }
 
-    /// La page d'un micronutriment, POUSSÉE dans la pile du Journal (elle
-    /// était une feuille) : elle entre par la droite et la barre d'onglets
-    /// reste là. La vue vit dans `JournalMicrosComponents.swift` : elle
-    /// dessine son propre retour (« ‹ Journal », qui dépile la page) et son
-    /// fond de verre. La barre native est donc masquée ici aussi, sinon le
-    /// retour serait écrit deux fois.
+    /// La page d'un micronutriment, en feuille de verre pleine hauteur : on
+    /// la referme en la balayant vers le bas, ou par sa croix. La vue vit
+    /// dans `JournalMicrosComponents.swift`.
     @ViewBuilder
     private var pageMicro: some View {
         if let ligne = selectedMicro {
             MicroDuJourSheet(ligne: ligne, apportDuBilan: apportDuBilan(pour: ligne))
                 .environmentObject(dashboardVM)
-                .kiwiTabBarBottomInset()
-                .toolbar(.hidden, for: .navigationBar)
-                .simultaneousGesture(retourParLeBord)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .verreFeuille()
         }
-    }
-
-    /// Barre masquée, le glissé de retour du système ne répond plus : on
-    /// garde le geste. Un glissé parti du bord gauche, franchement vers la
-    /// droite, referme la page.
-    private var retourParLeBord: some Gesture {
-        DragGesture(minimumDistance: 20)
-            .onEnded { geste in
-                guard geste.startLocation.x < 28,
-                      geste.translation.width > 70,
-                      abs(geste.translation.height) < 60 else { return }
-                microPoussee = false
-            }
     }
 
     /// La fiche des causes n'existe que pour les apports du bilan.

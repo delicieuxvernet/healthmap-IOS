@@ -38,8 +38,11 @@ enum PlanGraphTeintes {
     static let levier = Color(hex: "C7C7CC")
     static let levierFonce = Color(hex: "8E8E93")
 
-    /// Un lien au repos : `rgba(60,60,67,.16)`.
-    static let lienFroid = Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.16)
+    /// Un lien au repos. La maquette dit `rgba(60,60,67,.16)`, mais sur le fond
+    /// de verre les tiges disparaissaient : on ne voyait plus qu'elles TIENNENT
+    /// les bulles (retour d'Arthur sur le build 714, « comme le graphe
+    /// d'Obsidian »). Elles restent grises et fines, mais lisibles.
+    static let lienFroid = Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.34)
     /// Le nom du centre, ou d'un nœud relié au nœud choisi : `rgba(60,60,67,.75)`.
     static let nomVoisin = Verre.iconeNeutre
     /// Le nom d'un nœud hors du voisinage : `rgba(60,60,67,.35)`.
@@ -326,7 +329,7 @@ struct PlanGraphView: View {
             // Un trait épais reste un lien fort : la force module l'épaisseur
             // autour des valeurs de la maquette (1,5 pt au repos, 3 pt allumé).
             let force = CGFloat(min(max(lien.force, 1), 3))
-            let froide: CGFloat = 1.5 + (force - 2) * 0.4
+            let froide: CGFloat = 1.6 + (force - 2) * 0.4
             let chaude: CGFloat = 3 + (force - 2) * 0.6
             let style = StrokeStyle(lineWidth: froide + (chaude - froide) * chaleur, lineCap: .round)
             if chaleur < 1 {

@@ -37,7 +37,7 @@ struct RecommendationsView: View {
                 // états (découverte, plan, chargement, vide).
                 VStack(spacing: 0) {
                     DSLargeTitle(titre: "Plan")
-                        .padding(.top, 18)
+                        .padding(.top, DS.hautTitreOnglet)
                         .padding(.horizontal, DS.marge)
                         .frame(maxWidth: .infinity, alignment: .leading)
 

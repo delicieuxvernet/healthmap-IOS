@@ -35,12 +35,13 @@ struct ProgresBarPoint: Identifiable {
 // MARK: - La toile (maquette « Verre liquide », 2 octobre 2026)
 //
 // Les dix apports sur un radar : un axe par apport, dans l'ordre du canon.
-// Le cercle pointillé est le BESOIN : un apport posé dessus ou au-delà est « à
-// ton besoin », un apport en dedans est « à renforcer ». Le seuil est celui
-// que l'écran applique déjà (un score du registre sous 60, comme les jauges de
-// `Color.dsStatut`), donc le cercle pointillé passe par 60 ; au-delà, la toile
-// ne déborde que d'un dixième, comme la maquette. Le cercle plein, à mi-rayon,
-// tombe sur 30 : la limite du « à combler ».
+// Le cercle pointillé est le BESOIN (100 %). Comme sur la maquette, le rayon
+// est PROPORTIONNEL au score (`rv(v) = RM × v / 100`) : un apport à 58 % se
+// pose nettement en dedans, un apport à 100 % sur le cercle. (Retour d'Arthur
+// sur le build 714 : la première version écrasait 60 → 100 dans un dixième du
+// rayon, un 58 % et un 100 % se touchaient presque.) Le cercle plein, à
+// mi-rayon, tombe sur 50 %. La couleur d'un point suit le statut de l'app
+// (« à renforcer » sous 60, comme `Color.dsStatut`).
 
 /// Un apport posé sur la toile. `pct` est le score du registre : le seul
 /// chiffre de cet apport dans toute l'app.
@@ -75,7 +76,7 @@ enum ProgresToile {
     static let rayonLibelles: CGFloat = 146
     /// Rayon où le dégradé de la surface atteint sa pleine teinte.
     static let rayonDegrade: CGFloat = 130
-    /// Un apport pleinement couvert dépasse le cercle d'un dixième, pas plus.
+    /// Les axes et la toile s'arrêtent à 110 % du besoin (maquette : `min(v, 110)`).
     static let depassement: Double = 1.10
 
     static let encrePointille = Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.35)
@@ -104,14 +105,10 @@ enum ProgresToile {
         apports.filter { !$0.aRenforcer }.count
     }
 
-    /// La part du rayon « besoin » qu'occupe un score : linéaire jusqu'au
-    /// seuil (qui tombe sur le cercle pointillé), puis un dixième de plus
-    /// réparti jusqu'à 100.
+    /// La part du rayon « besoin » qu'occupe un score : proportionnelle, comme
+    /// la maquette (100 % = cercle pointillé, plafond à 110 %).
     static func part(_ pct: Double) -> Double {
-        let borne = min(100, max(0, pct))
-        let limite = Double(seuil)
-        if borne <= limite { return borne / limite }
-        return 1 + (depassement - 1) * (borne - limite) / (100 - limite)
+        min(depassement * 100, max(0, pct)) / 100
     }
 
     /// L'échelle du repère dans un bloc donné. `debord` = la marge de page que

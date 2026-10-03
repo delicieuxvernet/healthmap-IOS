@@ -56,6 +56,11 @@ enum DS {
     static let hauteurBouton: CGFloat = 50
     /// Cible tactile minimale.
     static let cibleTactile: CGFloat = 44
+    /// Espace entre la barre d'état et le grand titre d'un onglet (Journal,
+    /// Progrès, Plan, Réglages) : la place d'une barre de navigation, comme
+    /// l'app Santé. Demandé par Arthur le 3 oct. 2026 (« le haut est trop
+    /// condensé, il faut un petit bloc qui aère »).
+    static let hautTitreOnglet: CGFloat = 46
     /// Hauteur du voile de marque en haut d'écran.
     static let hauteurVoile: CGFloat = 240
 

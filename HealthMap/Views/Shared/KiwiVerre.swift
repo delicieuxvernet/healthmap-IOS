@@ -428,7 +428,8 @@ struct VerreMatiere {
         arrets: blanc(0.80, 0.58),
         refletHaut: 0.95,
         lisere: 0.7,
-        ombre: VerreOmbre(couleur: Verre.encreOmbre.opacity(0.11), rayon: 14, y: 10)
+        ombre: VerreOmbre(couleur: Verre.encreOmbre.opacity(0.11), rayon: 14, y: 10),
+        liquide: .clair
     )
 
     /// La même carte, quand elle flotte au-dessus d'un contenu (Plan,
@@ -438,7 +439,8 @@ struct VerreMatiere {
         refletHaut: 0.95,
         lisere: 0.7,
         ombre: VerreOmbre(couleur: Verre.encreOmbre.opacity(0.11), rayon: 14, y: 10),
-        flouVivant: true
+        flouVivant: true,
+        liquide: .clair
     )
 
     /// Verre clair des boutons et des puces : blanc 74 → 40 %, reflet haut
@@ -448,7 +450,8 @@ struct VerreMatiere {
         refletHaut: 1,
         refletBas: 0.45,
         lisere: 0.85,
-        ombre: VerreOmbre(couleur: Verre.encreOmbre.opacity(0.14), rayon: 8, y: 5)
+        ombre: VerreOmbre(couleur: Verre.encreOmbre.opacity(0.14), rayon: 8, y: 5),
+        liquide: .clair
     )
 
     /// Verre clair « activé » (le bouton Autres déplié) : vert pâle.
@@ -461,7 +464,8 @@ struct VerreMatiere {
         refletBas: 0.45,
         lisere: 0.85,
         ombre: VerreOmbre(couleur: Verre.encreOmbre.opacity(0.14), rayon: 8, y: 5),
-        opaque: Color.teinteKiwiPale
+        opaque: Color.teinteKiwiPale,
+        liquide: .teinte(Color.teinteKiwi.opacity(0.22))
     )
 
     /// Barre d'onglets : blanc 62 → 40 %, flou vivant.
@@ -471,7 +475,8 @@ struct VerreMatiere {
         refletBas: 0.4,
         lisere: 0.8,
         ombre: VerreOmbre(couleur: Verre.encreOmbre.opacity(0.16), rayon: 17, y: 12),
-        flouVivant: true
+        flouVivant: true,
+        liquide: .clair
     )
 
     /// Pastille de l'onglet actif : blanc 95 → 60 %.
@@ -548,11 +553,25 @@ struct VerreMatiere {
     static func carteTeintee(_ couleur: Color) -> VerreMatiere {
         var matiere = VerreMatiere.carte
         matiere.teinteCoin = couleur
+        matiere.liquide = .teinte(couleur.opacity(0.16))
         return matiere
     }
 
     /// Couleur fondue dans le coin haut gauche (voir `carteTeintee`).
     var teinteCoin: Color? = nil
+    /// Sur iOS 26 et plus : le VRAI verre liquide d'iOS (`glassEffect`), qui
+    /// floute, sature et réfracte ce qu'il recouvre. La recette dessinée
+    /// au-dessus reste celle d'iOS 17 à 25. `nil` : la matière garde sa
+    /// recette partout (actions vertes, pastilles, curseurs).
+    var liquide: VerreLiquide? = nil
+}
+
+/// La variante de verre liquide natif d'une matière (iOS 26 et plus).
+enum VerreLiquide {
+    /// Verre liquide ordinaire.
+    case clair
+    /// Verre liquide légèrement teinté.
+    case teinte(Color)
 }
 
 /// Une plaque de verre : la matière dessinée dans une forme.
@@ -563,6 +582,20 @@ struct VerrePlaque<Forme: InsettableShape>: View {
     @Environment(\.accessibilityReduceTransparency) private var reduireTransparence
 
     var body: some View {
+        if #available(iOS 26.0, *) {
+            if let liquide = matiere.liquide, !reduireTransparence {
+                VerreLiquideNatif(forme: forme, liquide: liquide)
+            } else {
+                recette
+            }
+        } else {
+            recette
+        }
+    }
+
+    /// La recette dessinée de la maquette (iOS 17 à 25, et les matières sans
+    /// verre natif).
+    private var recette: some View {
         ZStack {
             if reduireTransparence {
                 forme.fill(matiere.opaque)
@@ -632,6 +665,29 @@ struct VerrePlaque<Forme: InsettableShape>: View {
             }
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Le verre liquide natif d'iOS 26 dans une forme : il floute, sature et
+/// réfracte ce qu'il recouvre, comme les barres et boutons du système.
+@available(iOS 26.0, *)
+private struct VerreLiquideNatif<Forme: InsettableShape>: View {
+    let forme: Forme
+    let liquide: VerreLiquide
+
+    private var verre: Glass {
+        switch liquide {
+        case .clair:
+            return .regular
+        case .teinte(let couleur):
+            return .regular.tint(couleur)
+        }
+    }
+
+    var body: some View {
+        Color.clear
+            .glassEffect(verre, in: forme)
+            .allowsHitTesting(false)
     }
 }
 

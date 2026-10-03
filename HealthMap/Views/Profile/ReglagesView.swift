@@ -79,7 +79,7 @@ struct ReglagesView: View {
                         // sous le bord haut flouté, comme sur Progrès.
                         DSLargeTitle(titre: "Réglages")
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 18)
+                            .padding(.top, DS.hautTitreOnglet)
 
                         if subscriptionService.isPremium {
                             premiumActif.padding(.top, 14)
