@@ -102,53 +102,99 @@ enum CauseApport {
     }
 
     /// Les familles de facteurs, dans l'ordre où on les reconnaît.
-    private static let familles: [(mots: [String], pourquoi: String, geste: String)] = [
+    private static let familles: [(mots: [String], pourquoi: String, geste: String, court: String)] = [
         (["courses"],
          "Tes courses habituelles contiennent peu d'aliments qui apportent cet apport. C'est la première source, avant tout le reste : c'est souvent là qu'il y a le plus de points à regagner.",
-         "Ajoute à tes courses deux ou trois aliments qui en sont riches, et garde-les d'une semaine sur l'autre."),
+         "Ajoute à tes courses deux ou trois aliments qui en sont riches, et garde-les d'une semaine sur l'autre.",
+         "Ses sources dans tes courses"),
         (["cafe", "the pendant"],
          "Les tanins du café et du thé se lient au fer pendant la digestion : une partie du fer du repas n'est pas absorbée. Le magnésium est touché aussi, dans une moindre mesure.",
-         "Garde ton café ou ton thé, mais à distance des repas : une heure après suffit."),
+         "Garde ton café ou ton thé, mais à distance des repas : une heure après suffit.",
+         "Café ou thé à 1 h des repas"),
         (["vegetarien", "produits animaux", "ni viande"],
          "Le fer des végétaux est moins bien absorbé que celui des produits animaux, et la vitamine B12 ne se trouve pratiquement que chez eux. Le zinc et les oméga-3 suivent la même pente.",
-         "Associe tes légumineuses à une source de vitamine C (agrume, poivron, kiwi) : elle aide l'absorption du fer végétal."),
+         "Associe tes légumineuses à une source de vitamine C (agrume, poivron, kiwi) : elle aide l'absorption du fer végétal.",
+         "Légumineuses + vitamine C"),
         (["cuisson"],
          "La vitamine C est fragile : elle passe dans l'eau de cuisson, et la chaleur la dégrade.",
-         "Vapeur douce, cuisson courte, ou cru quand c'est possible."),
+         "Vapeur douce, cuisson courte, ou cru quand c'est possible.",
+         "Vapeur douce, ou cru"),
         (["poisson"],
          "Les oméga-3 à longue chaîne viennent surtout des poissons gras, qui apportent aussi de la vitamine D et de l'iode.",
-         "Sardines, maquereau ou hareng, deux fois par semaine : en boîte, c'est très bien."),
+         "Sardines, maquereau ou hareng, deux fois par semaine : en boîte, c'est très bien.",
+         "Poisson gras deux fois par semaine"),
         (["laitier"],
          "Les produits laitiers sont la source de calcium la plus concentrée de l'alimentation courante ; ils apportent aussi de l'iode.",
-         "Si tu en consommes peu : eaux riches en calcium, sardines avec leurs arêtes, amandes, choux."),
+         "Si tu en consommes peu : eaux riches en calcium, sardines avec leurs arêtes, amandes, choux.",
+         "Eau riche en calcium, amandes"),
         (["sel"],
          "En France, le sel iodé est l'une des principales sources d'iode du quotidien.",
-         "Vérifie la mention « iodé » sur ton sel de table."),
+         "Vérifie la mention « iodé » sur ton sel de table.",
+         "Du sel iodé à table"),
         (["pain blanc", "cereales", "gluten"],
          "Les céréales raffinées ont perdu l'essentiel de leurs fibres, de leur magnésium et de leur zinc.",
-         "Passe au complet ou au levain pour le pain du quotidien."),
+         "Passe au complet ou au levain pour le pain du quotidien.",
+         "Pain complet ou au levain"),
         (["dehors", "transforme", "maison"],
          "Les repas pris dehors et les produits transformés sont, en moyenne, plus pauvres en fibres et en minéraux.",
-         "Un repas fait maison de plus par semaine change déjà la moyenne."),
+         "Un repas fait maison de plus par semaine change déjà la moyenne.",
+         "Un repas fait maison de plus"),
         (["fermente"],
          "Les aliments fermentés nourrissent le microbiote, qui participe à l'assimilation de plusieurs apports.",
-         "Un yaourt, un peu de choucroute crue ou de kéfir, quelques fois par semaine."),
+         "Un yaourt, un peu de choucroute crue ou de kéfir, quelques fois par semaine.",
+         "Un yaourt ou un peu de kéfir"),
         (["stress", "nuits", "ecrans", "sommeil"],
          "Le stress prolongé et le manque de sommeil augmentent les pertes de magnésium ; un magnésium bas rend à son tour plus sensible au stress.",
-         "Un coucher régulier et des écrans coupés avant de dormir : c'est le levier le plus direct."),
+         "Un coucher régulier et des écrans coupés avant de dormir : c'est le levier le plus direct.",
+         "Écrans coupés avant de dormir"),
         (["interieur", "soleil", "exposition"],
          "La vitamine D se fabrique surtout dans la peau, au soleil. Sans exposition, l'alimentation seule couvre rarement le besoin.",
-         "Un quart d'heure dehors, bras découverts, en milieu de journée quand c'est possible."),
+         "Un quart d'heure dehors, bras découverts, en milieu de journée quand c'est possible.",
+         "15 min dehors, bras découverts"),
         (["alcool"],
          "L'alcool diminue l'absorption de plusieurs vitamines et minéraux, et augmente leurs pertes.",
-         "Des jours sans, chaque semaine."),
+         "Des jours sans, chaque semaine.",
+         "Des jours sans alcool"),
         (["tabac", "fume"],
          "Le tabac consomme de la vitamine C : le besoin d'un fumeur est plus élevé.",
-         "Chaque cigarette en moins compte ; en attendant, un fruit riche en vitamine C par jour."),
+         "Chaque cigarette en moins compte ; en attendant, un fruit riche en vitamine C par jour.",
+         "Un fruit riche en vitamine C"),
         (["sport", "activite"],
          "L'effort régulier augmente certains besoins, par la sueur et la récupération musculaire.",
-         "Pense aux oléagineux et aux légumineuses les jours d'entraînement."),
+         "Pense aux oléagineux et aux légumineuses les jours d'entraînement.",
+         "Oléagineux les jours de sport"),
     ]
+
+    // MARK: Hors de l'app (widgets, écran verrouillé)
+
+    /// Un widget se lit par-dessus l'épaule : il ne nomme que ce qui touche à
+    /// l'assiette et aux habitudes du quotidien (repas notés, soleil,
+    /// sommeil…), jamais un traitement, l'âge, une grossesse, une prise de
+    /// sang, le tabac ou l'alcool.
+    static func affichableHorsApp(_ contribution: ContributionApport) -> Bool {
+        switch contribution.section {
+        case .nutrition, .journal:
+            return true
+        case .modeDeVie:
+            let libelle = cle(contribution.libelle)
+            return !["tabac", "fume", "alcool"].contains { libelle.contains($0) }
+        case .profil, .sante, .symptomes, .medical, .priseDeSang:
+            return false
+        }
+    }
+
+    /// Le geste d'un frein, en version longue (celle de la fiche) et courte
+    /// (petit widget, écran verrouillé). `nil` quand le frein n'appelle pas de
+    /// geste qu'on peut montrer hors de l'app : le journal (« continue de
+    /// noter » n'est pas un conseil du jour), le repli, le tabac, l'alcool.
+    static func gesteHorsApp(pour contribution: ContributionApport) -> (texte: String, court: String)? {
+        guard contribution.delta < 0,
+              contribution.section == .nutrition || contribution.section == .modeDeVie,
+              affichableHorsApp(contribution) else { return nil }
+        let libelle = cle(contribution.libelle)
+        guard let famille = familles.first(where: { $0.mots.contains { libelle.contains($0) } }) else { return nil }
+        return (famille.geste, famille.court)
+    }
 
     /// Le geste rendu quand aucune famille ne reconnaît le facteur : il renvoie
     /// au questionnaire. La fiche d'un apport ne le liste pas parmi ses gestes.

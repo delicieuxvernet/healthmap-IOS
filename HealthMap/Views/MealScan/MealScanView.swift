@@ -605,13 +605,23 @@ struct JournalView: View {
         case .dicter:
             demarrerDictee(verrouillee: true)
         case .photo:
+            // « Photo » d'un widget : l'appareil déjà prêt (maquette des
+            // widgets), sans passer par le choix appareil / galerie.
             if CameraPicker.isAvailable {
-                showCaptureChoice = true
+                showCamera = true
             } else {
                 showPhotoLibrary = true
             }
         case .rechercher:
             showSearch = true
+        case .apport(let id):
+            // « Voir le calcul », « Pourquoi ? » : la même fiche que depuis la
+            // carte « Apports à renforcer », porte Premium comprise. Un apport
+            // que le Journal ne connaît plus (bilan refait depuis) : on reste
+            // sur le Journal plutôt que d'ouvrir une fiche vide.
+            if let nutriment = dashboardVM.nutrients.first(where: { $0.id == id }) {
+                selectedApport = ApportV2.pourLaFiche(nutriment, bilan: dashboardVM.analysisV2?.bilan)
+            }
         case .journal, .complements:
             break
         }
