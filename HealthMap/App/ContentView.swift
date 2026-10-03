@@ -609,8 +609,8 @@ struct MainTabView: View {
         // `mainInterface`). Ne jamais le remonter dans un onglet. Les cibles
         // (bouton +, carte apports, barre d'onglets) remontent par préférence.
         //
-        // La scène d'écoute de la dictée partage ce repère : la bulle kiwi s'y
-        // pose juste au-dessus du bouton « Dicter », d'après son cadre exact.
+        // La scène d'écoute de la dictée partage ce repère : la bulle part du
+        // cadre exact du bouton « Dicter », puis grandit au centre de l'écran.
         .overlayPreferenceValue(TutorielCibleKey.self) { ancres in
             GeometryReader { proxy in
                 TutorielOverlayPrincipal(service: tutoriel, ancres: ancres, proxy: proxy,

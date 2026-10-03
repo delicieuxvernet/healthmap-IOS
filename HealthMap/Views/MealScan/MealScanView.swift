@@ -34,16 +34,6 @@ private enum AncreJournal: Hashable {
     case sang
 }
 
-private extension VerreMatiere {
-    /// La carte de verre sans son ombre découpée : pour une ligne de résultat
-    /// dans une liste qui défile, où une ombre par ligne coûterait cher.
-    static let ligneDeListe: VerreMatiere = {
-        var matiere = VerreMatiere.carte
-        matiere.ombre = nil
-        return matiere
-    }()
-}
-
 struct JournalView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @StateObject private var viewModel = MealScanViewModel()
@@ -505,7 +495,7 @@ struct JournalView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { showSearch = false }
-                        .foregroundStyle(Color.dsAccent)
+                        .foregroundStyle(Color.dsTexte)
                         .accessibilityLabel("Fermer")
                 }
             }
@@ -1868,16 +1858,14 @@ struct JournalView: View {
     // MARK: - « Tes besoins du jour » (Lot 3 — scan_v2.besoins rédigés serveur)
     private func besoinsScanSection(_ besoins: [BesoinScanV2]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Charte, règle 1 : un titre de section n'est jamais neutre et
-            // jamais gros — 13/bold à l'encre de son domaine. Le 16/bold posé
-            // ici sortait en plus de l'échelle à 8 tailles, et se retrouvait
-            // PLUS GROS que les données qu'il annonce (% en 15, libellé en 13).
-            // Les six titres de cette feuille passent ensemble au patron du
-            // reste de l'onglet (`ScanCardHeader`).
-            Text("Tes besoins du jour")
-                .font(Theme.sectionLabelFont)
-                .foregroundStyle(ScanDomaine.apports)
+            // Verre liquide : les titres de cette feuille sont des libellés de
+            // catégorie (`ScanCardHeader`) — 15 / 600 dans la teinte foncée de
+            // la catégorie, précédés de son icône dans la teinte. Les apports
+            // prennent le kiwi, comme la carte Micronutriments du Journal.
+            ScanCardHeader(icon: "leaf", title: "Tes besoins du jour",
+                           color: Color.teinteKiwiTexte, teinte: Color.teinteKiwi)
                 .padding(.horizontal, 4)
+                .accessibilityAddTraits(.isHeader)
             VStack(spacing: 0) {
                 let visibles = Array(besoins.prefix(3))
                 ForEach(Array(visibles.enumerated()), id: \.offset) { idx, besoin in
@@ -1976,14 +1964,19 @@ struct JournalView: View {
         let shown = Array(source.sorted { $0.pctRDA > $1.pctRDA }.prefix(3))
         if !shown.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("Ce que ton plat t'apporte")
-                        .font(Theme.sectionLabelFont)
-                        .foregroundStyle(ScanDomaine.apports)
-                    Spacer()
+                HStack(alignment: .firstTextBaseline) {
+                    ScanCardHeader(icon: "leaf", title: "Ce que ton plat t'apporte",
+                                   color: Color.teinteKiwiTexte, teinte: Color.teinteKiwi)
+                        .accessibilityAddTraits(.isHeader)
+                        // Le titre garde sa place : sur un écran étroit,
+                        // c'est la mention qui se serre.
+                        .layoutPriority(1)
+                    Spacer(minLength: 8)
                     Text("Touche pour le détail")
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(.system(.caption, design: .default))
                         .foregroundStyle(Color.dsSecondaire)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 HStack(spacing: 11) {
                     ForEach(shown) { micro in
@@ -2002,9 +1995,9 @@ struct JournalView: View {
         let shown = Array(foods.prefix(6))
         if !shown.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Les aliments de ce repas")
-                    .font(Theme.sectionLabelFont)
-                    .foregroundStyle(ScanDomaine.energie)
+                ScanCardHeader(icon: "fork.knife", title: "Les aliments de ce repas",
+                               color: Color.teinteEnergieTexte, teinte: Color.teinteEnergie)
+                    .accessibilityAddTraits(.isHeader)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                     ForEach(shown) { food in
                         FoodTileV4(food: food) { selectedFood = food }
@@ -2139,60 +2132,22 @@ struct JournalView: View {
     }
 
     // MARK: - Search Tab
+    //
+    // Même habillage que `FoodSearchSheet` (JournalEditorComponents.swift) :
+    // champ et exemples en verre clair, confirmation en capsule de verre vert
+    // pâle, UNE carte de verre par section de résultats, lignes séparées d'un
+    // filet. La logique ne bouge pas : toucher une ligne ouvre la fiche
+    // portion ; il n'y a pas d'ajout rapide ici, donc pas de « + ».
     private var searchTab: some View {
         VStack(spacing: Theme.spacingMD) {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Color.dsSecondaire)
-                TextField("Rechercher un aliment…", text: $viewModel.searchQuery)
-                    .font(Theme.bodyFont)
-                    .accessibilityIdentifier("recherche.champ")
-                    .autocorrectionDisabled()
-                    .onChange(of: viewModel.searchQuery) { _, _ in
-                        Task { await viewModel.searchFoods() }
-                    }
-                if !viewModel.searchQuery.isEmpty {
-                    Button {
-                        viewModel.searchQuery = ""
-                        viewModel.searchResults = []
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(Color.dsSecondaire)
-                    }
-                }
-            }
-            .padding(Theme.spacingSM)
-            .verreClair(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .padding(.horizontal, Theme.spacingLG)
+            champRecherche
 
             if viewModel.searchQuery.isEmpty {
-                VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                    Text("Essaie par exemple :")
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Color.dsSecondaire)
-                    HStack(spacing: 8) {
-                        quickSearchButton("Épinards")
-                        quickSearchButton("Saumon")
-                        quickSearchButton("Lentilles")
-                    }
-                }
-                .padding(.horizontal, Theme.spacingLG)
+                exemplesRecherche
             }
 
             if let confirmation = addFoodConfirmation {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.dsAccent)
-                    Text(confirmation)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.dsTexte)
-                    Spacer()
-                }
-                .padding(Theme.spacingSM)
-                .background(Color.dsRemplissage)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .padding(.horizontal, Theme.spacingLG)
-                .transition(.opacity)
+                confirmationRecherche(confirmation)
             }
 
             if viewModel.isSearching {
@@ -2203,44 +2158,133 @@ struct JournalView: View {
                 // La même ligne à vignette que la recherche du journal
                 // (`FoodHitContenu`), rangée dans les deux mêmes sections.
                 ForEach(RechercheVisuelle.sections(viewModel.searchResults, source: \.source, score: \.score)) { section in
-                    RechercheSectionTitre(titre: section.titre)
-                        .padding(.horizontal, Theme.spacingLG)
-                    ForEach(section.lignes) { hit in
-                        Button {
-                            openSearchDetail(hit)
-                        } label: {
-                            HStack(spacing: 10) {
-                                FoodHitContenu(hit: hit)
-                                if isAddingFood {
-                                    ProgressView().tint(Color.dsAccent).scaleEffect(0.8)
-                                } else {
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(Color.dsSecondaire)
-                                }
-                            }
-                            .padding(Theme.spacingSM)
-                            // Verre sans ombre : la liste défile, et une
-                            // ombre découpée par ligne coûterait cher.
-                            .verre(.ligneDeListe, forme: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        }
-                        .buttonStyle(.healthMapPressed)
-                        .disabled(isAddingFood)
-                        .padding(.horizontal, Theme.spacingLG)
+                    VStack(spacing: 8) {
+                        RechercheSectionTitre(titre: section.titre)
+                        carteResultats(section.lignes)
                     }
                 }
                 if viewModel.searchResults.contains(where: { $0.source == "off" }) {
                     RechercheCreditPhotos()
-                        .padding(.horizontal, Theme.spacingLG)
                 }
             }
         }
+        .padding(.horizontal, DS.marge)
         // Fiche portion unifiée (quantité libre) — l'ajout passe par le VM
         // journal (ligne riche éditable), créneau déduit de l'heure.
         .sheet(item: $selectedSearchDetail) { detail in
             ajoutPortionSheet(detail)
         }
+    }
+
+    /// Le champ, en capsule de verre clair de 48 pt.
+    private var champRecherche: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(Verre.iconeNeutre)
+                .accessibilityHidden(true)
+            TextField("Rechercher un aliment…", text: $viewModel.searchQuery)
+                .font(Theme.bodyFont)
+                .accessibilityIdentifier("recherche.champ")
+                .autocorrectionDisabled()
+                .onChange(of: viewModel.searchQuery) { _, _ in
+                    Task { await viewModel.searchFoods() }
+                }
+            if !viewModel.searchQuery.isEmpty {
+                Button {
+                    viewModel.searchQuery = ""
+                    viewModel.searchResults = []
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(Color.dsTertiaire)
+                        .frame(width: DS.cibleTactile, height: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.dsPress)
+                // Nommé : sans libellé, la croix se lirait comme un second
+                // « Fermer » à côté de celui de la barre.
+                .accessibilityLabel("Effacer la recherche")
+            }
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, viewModel.searchQuery.isEmpty ? 16 : 2)
+        .frame(minHeight: 48)
+        .verreClair()
+    }
+
+    private var exemplesRecherche: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingSM) {
+            Text("Essaie par exemple :")
+                .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .padding(.horizontal, 2)
+            HStack(spacing: 8) {
+                quickSearchButton("Épinards", index: 0)
+                quickSearchButton("Saumon", index: 1)
+                quickSearchButton("Lentilles", index: 2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// « Yaourt ajouté · 96 kcal » : une capsule de verre vert pâle, la coche
+    /// dans sa pastille.
+    private func confirmationRecherche(_ texte: String) -> some View {
+        HStack(spacing: 8) {
+            VerrePastilleIcone(symbole: "checkmark", teinte: Color.teinteKiwi, taille: 30, tailleIcone: 14)
+            Text(texte)
+                .font(.dsLegende.weight(.semibold))
+                .foregroundStyle(Color.dsTexte)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 16)
+        .frame(minHeight: 46)
+        .verre(.clairActif, forme: Capsule(style: .continuous))
+        .accessibilityElement(children: .combine)
+        .transition(.opacity)
+    }
+
+    /// Les lignes d'une section, dans une carte de verre, séparées d'un filet
+    /// aligné sur le texte (12 + vignette 48 + 12).
+    private func carteResultats(_ lignes: [MealJournalService.FoodHit]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(lignes.enumerated()), id: \.element.id) { index, hit in
+                if index > 0 {
+                    DSSeparator(retrait: 72)
+                }
+                ligneResultat(hit)
+                    .kiwiEntrance(index)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .dsCard()
+    }
+
+    /// Une ligne de résultat : toute la ligne ouvre la fiche portion.
+    private func ligneResultat(_ hit: MealJournalService.FoodHit) -> some View {
+        Button {
+            openSearchDetail(hit)
+        } label: {
+            HStack(spacing: 8) {
+                FoodHitContenu(hit: hit)
+                if isAddingFood {
+                    ProgressView().tint(Color.dsAccent).scaleEffect(0.8)
+                } else {
+                    DSChevron()
+                }
+            }
+            .padding(.leading, 12)
+            .padding(.trailing, 14)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.dsPress)
+        .disabled(isAddingFood)
     }
 
     /// Fiche portion d'ajout — partagée par la recherche texte et le scan de
@@ -2262,7 +2306,8 @@ struct JournalView: View {
                          }
                          return ok
                      })
-        .presentationDetents([.height(460)])
+        // 500 pt, comme la même fiche ouverte depuis `FoodSearchSheet`.
+        .presentationDetents([.height(500)])
         .presentationDragIndicator(.visible)
     }
 
@@ -2294,19 +2339,25 @@ struct JournalView: View {
         }
     }
 
-    private func quickSearchButton(_ text: String) -> some View {
+    /// Puce de verre clair (36 pt, 15 / 500), comme les aliments suggérés de
+    /// la maquette ; la cible tactile déborde pour atteindre 44 pt.
+    private func quickSearchButton(_ text: String, index: Int) -> some View {
         Button {
             viewModel.searchQuery = text
             Task { await viewModel.searchFoods() }
         } label: {
             Text(text)
-                .font(.system(size: 13, weight: .medium))
+                .font(.dsSousTitreMoyen)
                 .foregroundStyle(Color.dsTexte)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.dsRemplissage)
-                .clipShape(Capsule())
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 36)
+                .verreClair()
+                .frame(minHeight: DS.cibleTactile)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.dsPress)
+        .kiwiEntrance(index)
     }
 }
 

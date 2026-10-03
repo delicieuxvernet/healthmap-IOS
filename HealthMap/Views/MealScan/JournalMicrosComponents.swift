@@ -612,11 +612,6 @@ struct MicroDuJourSheet: View {
         }
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .background { VerrePageFond() }
-        // Sans effet sur une page poussée ; ils ne servent que si elle était de
-        // nouveau présentée en feuille.
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(Verre.rayonFeuille)
         .onAppear { arriver() }
         .onChange(of: ligne.niveau) { _, nouveau in
             compter(jusqua: nouveau)

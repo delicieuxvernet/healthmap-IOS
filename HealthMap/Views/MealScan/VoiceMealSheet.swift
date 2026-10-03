@@ -1722,56 +1722,18 @@ private struct RemplacementAlimentSheet: View {
     @StateObject private var vm = FoodSearchViewModel()
     @Environment(\.dismiss) private var dismiss
 
-    /// Le verre d'une ligne de résultats : celui d'une carte, sans son ombre
-    /// découpée (une par ligne d'une liste qui défile coûterait trop cher).
-    private static let verreDeLigne: VerreMatiere = {
-        var matiere = VerreMatiere.carte
-        matiere.ombre = nil
-        return matiere
-    }()
-
+    // Même habillage que `FoodSearchSheet` (JournalEditorComponents.swift) :
+    // le champ en capsule de verre clair, puis UNE carte de verre par section
+    // de résultats, les lignes séparées d'un filet. Pas de « + » ni de
+    // chevron : toucher une ligne la choisit et referme la feuille.
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 10) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(Color.dsSecondaire)
-                            .accessibilityHidden(true)
-                        TextField("Rechercher un aliment", text: $vm.query)
-                            .font(Theme.bodyFont)
-                            .autocorrectionDisabled()
-                            .accessibilityLabel("Rechercher un aliment")
-                            .onChange(of: vm.query) { _, _ in vm.search() }
-                    }
-                    .padding(Theme.spacingSM)
-                    .verreClair(RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
-
-                    if vm.isSearching {
-                        ProgressView().tint(Color.dsAccent).padding(.top, 20)
-                    } else if vm.hits.isEmpty && vm.query.count >= 2 {
-                        Text("Aucun résultat. Essaie un autre nom.")
-                            .font(.dsLegende)
-                            .foregroundStyle(Color.dsSecondaire)
-                            .padding(.top, 20)
-                    } else {
-                        ForEach(vm.hits) { hit in
-                            Button {
-                                HapticService.shared.tap()
-                                onChoisir(hit)
-                            } label: {
-                                FoodHitContenu(hit: hit)
-                                    .padding(12)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .verre(Self.verreDeLigne,
-                                           forme: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            }
-                            .buttonStyle(.dsPress)
-                        }
-                    }
+                VStack(spacing: Theme.spacingMD) {
+                    champ
+                    contenu
                 }
-                .padding(.horizontal, Theme.spacingLG)
+                .padding(.horizontal, DS.marge)
                 .padding(.vertical, Theme.spacingMD)
             }
             .navigationTitle("Changer d'aliment")
@@ -1779,7 +1741,7 @@ private struct RemplacementAlimentSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
-                        .foregroundStyle(Color.dsAccent)
+                        .foregroundStyle(Color.dsTexte)
                 }
             }
         }
@@ -1788,6 +1750,76 @@ private struct RemplacementAlimentSheet: View {
             vm.query = dit
             vm.search()
         }
+    }
+
+    private var champ: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(Verre.iconeNeutre)
+                .accessibilityHidden(true)
+            TextField("Rechercher un aliment", text: $vm.query)
+                .font(Theme.bodyFont)
+                .autocorrectionDisabled()
+                .accessibilityLabel("Rechercher un aliment")
+                .onChange(of: vm.query) { _, _ in vm.search() }
+        }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 48)
+        .verreClair()
+    }
+
+    /// Sous le champ : l'attente, le vide ou les résultats, rangés dans les
+    /// deux sections de la recherche du Journal.
+    @ViewBuilder
+    private var contenu: some View {
+        if vm.isSearching {
+            ProgressView()
+                .tint(Color.dsAccent)
+                .padding(.top, Theme.spacingLG)
+        } else if vm.hits.isEmpty && vm.query.count >= 2 {
+            Text("Aucun résultat. Essaie un autre nom.")
+                .font(.dsSousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .multilineTextAlignment(.center)
+                .padding(.top, Theme.spacingLG)
+        } else {
+            ForEach(RechercheVisuelle.sections(vm.hits, source: \.source, score: \.score)) { section in
+                VStack(spacing: 8) {
+                    RechercheSectionTitre(titre: section.titre)
+                    sectionCarte(section.lignes)
+                }
+            }
+            if vm.hits.contains(where: { $0.source == "off" }) {
+                RechercheCreditPhotos()
+            }
+        }
+    }
+
+    /// Les lignes d'une section, dans une carte de verre, séparées d'un filet
+    /// aligné sur le texte (12 + vignette 48 + 12).
+    private func sectionCarte(_ lignes: [MealJournalService.FoodHit]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(lignes.enumerated()), id: \.element.id) { index, hit in
+                if index > 0 {
+                    DSSeparator(retrait: 72)
+                }
+                Button {
+                    HapticService.shared.tap()
+                    onChoisir(hit)
+                } label: {
+                    FoodHitContenu(hit: hit)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.dsPress)
+                .kiwiEntrance(index)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .dsCard()
     }
 }
 

@@ -562,7 +562,7 @@ struct TutorielBulleVerifier: View {
             TutorielBulle(
                 etape: .verifier,
                 titre: "On ne te demande que ce qui manque",
-                texte: Text("Ce qui est identifié porte une coche verte. S'il reste une quantité à préciser, un appui suffit."),
+                texte: Text("Ce qui est reconnu affiche sa quantité et ses calories. S'il manque une quantité, la ligne te la demande : un appui suffit."),
                 onPasser: { service.passer() }
             )
             .padding(.horizontal, 20)

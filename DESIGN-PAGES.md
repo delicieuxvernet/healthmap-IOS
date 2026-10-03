@@ -29,103 +29,221 @@
 > | Emploi | Composant | Où |
 > |---|---|---|
 > | Icône Apple | `AppIcon.png`, variante sur-vert, 1024 opaque | le springboard |
-> | Écran de chargement | `LaunchScreenView` : signe 72 pt au centre EXACT de l'écran + « Kiwio » 22 pt dessous | au lancement |
-> | Lancement statique | `Info.plist` `UILaunchScreen` : fond `LaunchScreenBackground` (#F2F2F7 / noir) + image `LaunchSigne` (72 pt) | avant le premier écran SwiftUI : même place, le passage ne bouge pas |
+> | Écran de chargement | `LaunchScreenView` : signe 72 pt au centre EXACT de l'écran + « Kiwio » 22 pt dessous, sur le fond de verre teinte kiwi (`VerreFond(teinte: .kiwi)`) | au lancement |
+> | Lancement statique | `Info.plist` `UILaunchScreen` : fond `LaunchScreenBackground` (#EDF2E9, la base pâle du fond de verre kiwi / noir) + image `LaunchSigne` (72 pt) | avant le premier écran SwiftUI : même place, même teinte, le passage ne bouge pas |
 > | Attente | `KiwiLoader` : **les pépins qui chargent**, une traînée qui fait **un tour en 1,8 s** (partie de la couronne pleine en 0,35 s) ; Reduce Motion = signe figé | lancement, analyse, questionnaire, Plan, Compléments, scan photo, dictée, historique, Apple |
 > | En-tête | `KiwiEnTete` (signe 72 + nom 22) | connexion ; l'onboarding en grand (signe 120 + nom 34) |
 > | Barre de l'app | `KiwiLockupBarre` (signe 26 + nom 19) | haut de la page de garde, carte du récap partageable |
 > | Confirmation | `KiwiConfirmation` (signe 44 dans un rond 72 couleur cœur) | « Bienvenue dans Kiwio Premium » |
-> | Signe seul | `KiwiSigne(taille:)` | Brief du jour, paywall, ouverture du récap, états vides (Plan, historique), centre de l'anneau de la page de garde |
+> | Signe seul | `KiwiSigne(taille:)` | Brief du jour, ouverture du récap, états vides (Plan, historique), centre de l'anneau de la page de garde |
 > | Pied de page | `KiwiPiedDePage` (signe mono 20 + nom 16 + version) | bas des Réglages, suivi de « Ne remplace pas un avis médical » |
+> | Mascotte (2 oct. 2026) | `KiwiMascotte(animee:)` + `KiwiMascotteHalo` (`Views/Shared/KiwiMascotte.swift`) | DEUX endroits seulement : la ligne Premium des Réglages (44 pt, immobile) et la feuille Premium (84 pt, animée, sur son halo tournant). Partout ailleurs, le signe reste. |
 >
 > Le nom : « Kiwio » en SF Pro Rounded gras, serré (-0,045 × la taille) : `KiwiWordmark`. Plus de
 > « kiwi » + « o » vert. Règle de la maquette : sous 32 pt, le signe seul.
+
+## ⭐⭐⭐ Verre liquide (direction du 2 octobre 2026)
+
+> **Source** : maquette Claude Design « Kiwio - Motion v3 - Verre liquide » (projet « Kiwio mobile
+> app design », fichier `Kiwio - Motion v3 - Verre liquide.dc.html`), PR #296. Elle ne change NI
+> les données, NI les calculs, NI ce qui part au serveur : elle change la matière et le mouvement
+> de tous les écrans. Les tokens et les briques sont dans `docs/DESIGN-SYSTEM.md` (section « Verre
+> liquide ») ; le code du socle dans `Views/Shared/KiwiVerre.swift`, `KiwiMotion.swift`,
+> `KiwiMascotte.swift`.
+>
+> Ce qu'elle remplace dans la refonte du 23 août décrite plus bas, sur TOUS les écrans :
+> - **le fond** : plus d'aplat neutre. Quatre halos flous qui dérivent sur une base pâle
+>   (`DSPageBackground()` = `VerreFond`), dont la teinte suit l'onglet : kiwi (Journal) · aube
+>   (Progrès) · ciel (Plan) · orchidée (Compléments) · neutre (Réglages). Page poussée :
+>   `VerrePageFond()`. Feuille : `.verreFeuille()`, coins de 38 ;
+> - **les cartes** : plus de carte blanche rayon 14. `.dsCard()` est la carte de verre (blanc 80 →
+>   58 %, liseré blanc, rayon 24, ombre douce). Boutons secondaires en verre clair, action
+>   principale en verre vert ;
+> - **la couleur** : une teinte par catégorie et sa version foncée pour le texte ; un libellé de
+>   catégorie s'écrit en 15/600 dans la teinte foncée, précédé de son icône dans la teinte. Le vert
+>   kiwi reste réservé à ce qui se touche ;
+> - **les chiffres** : les grands chiffres passent en SF Pro Rounded gras, et ils COMPTENT quand ils
+>   changent (`ChiffreQuiCompte`, `.contentTransition(.numericText())`) ;
+> - **le mouvement** : quatre mouvements partout (glisse, ressort, rebond, compteur), les blocs
+>   arrivent en cascade, anneaux et courbes se retracent à chaque arrivée sur l'onglet ; plafond
+>   d'échelle 1,22 (`KiwiEchelle.plafond`) au lieu de 1,08 ;
+> - **la racine** (`ContentView.mainInterface`) : la page de l'onglet arrive de côté en sortant d'un
+>   flou de 8 pt (`kiwiGlisse`), un bord haut flouté (`VerreBordHaut`) couvre la barre d'état, la
+>   pastille de la barre d'onglets glisse.
+>
+> Ce qui tient toujours : le vert réservé à l'interactif, un chiffre héros par écran, le
+> vocabulaire, aucune dose, toutes les règles métier et de Premium.
+> **Rien de ce qui existait n'a disparu** : un état que la maquette ne montre pas (vide, avant
+> questionnaire, hors ligne, verrouillé, mentions) est gardé, habillé en verre. Les données de la
+> maquette sont des exemples : l'app affiche les vraies, et ce qui n'a pas de donnée derrière n'est
+> pas inventé.
+>
+> Les descriptions d'écran ci-dessous sont à jour de cette direction.
 
 ## ⭐⭐ Refonte « qualité Apple » (direction du 23 août 2026 — socle iOS natif)
 
 > **Sources de vérité** : `Kiwio iOS - refonte.dc.html` (maquette, **10 écrans** dans sa
 > version du 23 août 11:52, `C:\Users\stana\AppData\Local\Temp\` ; la v1 à 7 écrans est dans
 > `Downloads`) et `instructions-claude-code-refonte-ios.md` (document d'implémentation,
-> `Downloads`). Cette direction **remplace** la DA crème/vert ci-dessous : le fond
-> devient neutre (`systemGroupedBackground`), le vert ne colore que ce qui se tape, un seul chiffre
-> héros par écran, cartes blanches rayon 14 **sans ombre**, gras plafonné à 700, chiffres SF Pro
-> tabulaires. Tokens : `HealthMap/Views/Shared/KiwiDS.swift` (préfixe `ds`).
+> `Downloads`). Cette direction **remplace** la DA crème/vert ci-dessous : le vert ne colore que ce
+> qui se tape, un seul chiffre héros par écran, gras plafonné à 700, chiffres tabulaires. Son fond
+> neutre (`systemGroupedBackground`) et ses cartes blanches rayon 14 sans ombre ont été **remplacés
+> le 2 octobre 2026 par le verre** (section ci-dessus) ; la navigation, la structure des écrans et
+> les règles de contenu restent les siennes. Tokens : `HealthMap/Views/Shared/KiwiDS.swift`
+> (préfixe `ds`), désormais posés sur le verre.
 >
 > **Navigation (5 onglets, capsule flottante)** : **Journal · Progrès · Plan · Compléments · Réglages**.
 > Le Bilan a fusionné dans le Journal (son écran complet reste accessible par « Tout afficher »,
-> en feuille, sans paywall) ; le Scan est devenu le bouton `+` flottant du Journal et sa feuille
-> d'ajout à 6 entrées (dicter · scanner · rechercher · code-barres · ma journée · activité) ; les
+> en feuille, sans paywall) ; le Scan vit sur la page du Journal, dans sa rangée de saisie (le
+> bouton `+` flottant du 23 août et sa feuille d'ajout ont disparu le 20 septembre) ; les
 > Réglages sont le **seul** endroit qui parle d'argent (carte Premium, prix et essai lus depuis StoreKit).
+> La barre d'onglets est une capsule de verre de 62 pt dont la pastille glisse d'un onglet à l'autre.
 >
 > **Écrans** :
-> - **Journal** (`MealScanView.swift` → `JournalView`, `JournalComponents.swift`) — **maquette
->   « Journal & Progrès v2 » du 20 septembre 2026** : barre de jour (chevrons + calendrier sans borne,
->   décision du 11 septembre, conservée à la place du semainier de la maquette) · carte calories
->   (héros + anneau 88 en dégradé + ligne **Apple Santé** qui ouvre l'activité du jour) · **macros en
->   quatre lignes** (protéines · glucides · lipides · fibres) avec objectif et **surplus en hachures,
->   lu selon l'objectif de la personne** (vert seulement pour les protéines de qui veut prendre du
->   muscle, orangé sinon ; fibres : référence canonique 30 g) · **la saisie SUR la page** : « Dicter »
->   (seule surface verte — **la bulle kiwi surgit au-dessus du bouton** (voir « Dicter, être écouté,
->   être félicité » plus bas) : **un toucher = mains libres, on touche la bulle pour terminer ; un
->   appui maintenu = elle vit tant que le doigt tient, relâcher analyse, glisser à gauche jette,
->   glisser vers le haut verrouille** ; `AppuiDicter`, seuils `DicteeGeste`) et « Photographier », puis « Autres façons d'ajouter » qui déplie Écrire ·
->   Rechercher · Code-barres (« Écrire » **ouvre la feuille d'analyse sur un champ de texte, clavier levé** — depuis le 21 sept. : l'app ignorant la zone du clavier à sa racine, un champ posé sur la page finissait caché derrière lui, sans sortie ; même analyse et même quota que la dictée) ·
->   « Apports à renforcer » (la phrase de l'interaction, **trois anneaux** à la couleur de l'apport,
->   une sortie verte) · le jour en **mosaïque** de quatre repas (le toucher ouvre **la fiche de CE repas**, `FicheRepasSheet` : ce que tu as saisi, modifiable · « Ce qu'il t'a apporté », macro par macro avec sa part de la cible du jour · vitamines et minéraux · un constat, jamais un geste).
->   **Le bouton `+` flottant et sa feuille d'ajout ont disparu.** **Avant le questionnaire** : la
->   saisie d'abord, puis « On ne connaît pas encore tes besoins » (porte), « En attendant, en France »
->   (`TeaserStatsCatalog`, jamais un chiffre inventé), « À la fin du questionnaire ».
-> - **Dicter, être écouté, être félicité** (maquette « Kiwio - Motion » du 1er octobre 2026 ;
->   `EcouteDictee.swift`, `CelebrationAjout.swift`, jetons dans `KiwiMotion.swift`) — la séquence la
->   plus utilisée, animée de bout en bout :
->   1. **la bulle surgit** (maquette « bulle kiwi » du 2 octobre 2026, d'après la bulle vocale de
->      Snapchat ; elle remplace la grande scène du 1er octobre : plus de voile, la page ne recule
->      plus) : une tranche de kiwi de 84 pt apparaît juste au-dessus du bouton « Dicter »
->      (0,62 → 1, ressort vif). Le bouton d'origine n'est jamais retiré de la page, seulement
->      masqué sous la face d'écoute : l'appui maintenu garde son geste ;
->   2. **la bulle écoute** : ses douze graines s'allongent avec le niveau RÉEL du micro (chaque
->      mesure entre par la graine de droite et fait le tour), le cœur gonfle à peine, un arc naît
->      en haut à droite, s'allonge jusqu'à 85° et tourne en 1,7 s. Le doigt posé, la bulle le suit
->      à l'horizontale et s'estompe vers l'annulation. Le bouton porte le minuteur et le geste :
->      maintenu, « ‹‹ Glisse pour annuler » et « Relâche pour envoyer » ; mains libres, « Touche
->      pour terminer » et une croix qui jette la dictée ;
->   3. **le calcul** : la bulle rétrécit et s'efface en 0,15 s, la feuille d'analyse monte ; la
->      dictée transcrite s'y relit **mot à mot, du flou au net**
->      (`MotsQuiArrivent`). ⚠️ Les mots n'arrivent PAS pendant qu'on parle : la capture enregistre
->      d'abord et transcrit ensuite (voir `SpeechCaptureService`), décision conservée ;
->   4. **les résultats** : aliments en cascade (80 ms), total qui compte, aliments reconnus en vert
->      dans la citation, et **« Ce repas t'apporte »** — protéines, glucides, lipides, fibres, la
->      valeur qui compte et une barre à hauteur de la part de l'objectif du jour (sans cible de
->      profil : la valeur seule, jamais d'objectif inventé) ;
->   5. **la célébration, dans la feuille** : 0 ms pastille verte en rebond · 160 coche + vibration de
->      succès · 220 onde · 320 douze confettis aux couleurs des apports · 340 titre « Ajouté au
->      déjeuner » · 550 étiquettes en cascade de 70 ms (« +577 kcal », « Fer +18 % », « 13 jours » :
->      l'apport et la série seulement s'ils existent) · 2 100 la feuille redescend. Ni pendant le
->      tutoriel ni en mode Zen ;
->   6. **le retour au Journal** : une pastille noire sort du haut de l'écran (`PastilleConfirmation`,
->      « Ajouté au déjeuner · 577 kcal », la toucher ouvre le repas), la carte des calories gonfle à
->      1,035 et **compte** jusqu'à sa nouvelle valeur, anneau et jauges macros suivent en ressort.
->      (La vraie Dynamic Island demanderait une activité en direct et une extension : non fait.)
->   **Une seule physique** : `kiwiVif` (0,28 / 0,86 — appuis), `kiwiFluide` (0,5 / 0,9 — feuilles,
->   bulle, recul), `kiwiRebond` (0,55 / 0,72 — célébrations uniquement), `kiwiCompteur` (chiffres,
->   sans dépassement). Échelles `KiwiEchelle` : appui 0,96 · récompense 0,5 → 1,08 → 1 · impulsion
->   1,035 · recul 0,94 ; **rien ne dépasse 1,08**. Vibrations : Dicter doux · fin d'écoute léger ·
->   ajout succès · étiquettes sélection. **Réduire les animations** : fondu de 0,2 s à la place du
->   trajet, ni aura ni confettis, coche déjà tracée, chiffres directement à leur valeur.
->   Pour l'instant, seule la dictée (et « Écrire », même feuille) se fête ainsi ; les autres ajouts
->   gardent la gratification ci-dessous.
+> - **Journal** (`MealScanView.swift` → `JournalView`, `JournalComponents.swift`) — structure de la
+>   maquette « Journal & Progrès v2 » du 20 septembre 2026, recomposée par le verre le 2 octobre.
+>   De haut en bas :
+>   1. **le titre et le jour** : la barre de navigation est masquée ; « Journal » (34/700) est
+>      dessiné dans la page et, à sa droite, **la capsule du jour** en verre clair de 44 pt : deux
+>      chevrons verts et le libellé du jour, qui roule vers le haut quand le jour change et ouvre
+>      le calendrier sans borne (décision du 11 septembre, conservée : le chevron de droite
+>      s'estompe aujourd'hui, mais il répond toujours). Le jour commande toute la page ET la date
+>      des ajouts ;
+>   2. **les puces** (`VerrePuce`, une rangée qui défile à l'horizontale) : Eau (anneau de 30 pt et
+>      goutte, les litres bus) · Poids · Série · Analyses (« Nouveau », puis la date de la dernière
+>      prise de sang). Eau, Poids et Analyses font défiler la page jusqu'à leur carte ; la Série se
+>      lit, elle ne mène nulle part, et n'apparaît que si elle existe, hors mode Zen ;
+>   3. **la carte Énergie, unique** (`JournalEnergieCard` : elle réunit l'ancienne carte calories
+>      et les macros) : le libellé de catégorie « Énergie », les kcal restantes en 34 arrondi (le
+>      chiffre héros, il compte), une sous-ligne (« Objectif 2 100 kcal », ou « Déjeuner ajouté ·
+>      3 aliments » pendant 8 s après un ajout), l'anneau de 72 pt de la part consommée (vert, puis
+>      rouge de statut une fois le budget dépassé). Sous un filet, **les quatre macros en colonnes**
+>      (protéines · glucides · lipides · fibres) : la valeur sur l'objectif, une barre de 4 pt dans
+>      la teinte de la macro, et **le surplus en hachures, lu selon l'objectif de la personne**
+>      (vert seulement pour les protéines de qui veut prendre du muscle et pour les fibres, orangé
+>      sinon ; fibres : référence canonique 30 g). À droite du libellé, une pastille au cœur
+>      (« +320 kcal », « Santé » ou « Relier ») ouvre l'activité **Apple Santé** du jour. Sans
+>      objectif calculable : le consommé seul, sans anneau, jamais une cible inventée ;
+>   4. **la saisie, sur UNE rangée de 60 pt** (`JournalSaisieBloc`) : « Dicter » en verre vert bombé
+>      (la seule surface verte, avec son halo qui respire et « le plus rapide »), puis « Photo » et
+>      « Autres » en verre clair. « Autres » pivote son « + » en croix, passe au vert pâle et déplie
+>      trois tuiles : Écrire · Rechercher · Code-barres (« Écrire » **ouvre la feuille d'analyse sur
+>      un champ de texte, clavier levé** — depuis le 21 sept. : l'app ignorant la zone du clavier à
+>      sa racine, un champ posé sur la page finissait caché derrière lui, sans sortie ; même analyse
+>      et même quota que la dictée). « Dicter » : **un toucher = mains libres ; un appui maintenu =
+>      la dictée vit tant que le doigt tient, relâcher analyse, glisser à gauche jette, glisser vers
+>      le haut verrouille** (`AppuiDicter`, seuils `DicteeGeste`) ; la suite est décrite dans
+>      « Dicter, être écouté » ;
+>   5. **les micronutriments**, puis **le poids et l'eau** (décrits plus bas) ;
+>   6. **la carte de la prise de sang** (voir « Prise de sang ») ;
+>   7. **« Apports à renforcer »** (lien « Tout afficher » → le Bilan complet, en feuille) : la
+>      phrase de l'interaction, **trois anneaux** à la couleur de l'apport qui se tracent en 1 s à
+>      0,1 s d'écart, une sortie verte vers le Plan ;
+>   8. **le jour en grille de quatre repas**, deux par deux (Petit-déjeuner · Déjeuner · Dîner ·
+>      Collation) : une carte de verre par repas, teintée dans son coin à la couleur du moment
+>      quand elle contient quelque chose (ambre, kiwi, indigo, framboise), « Rien pour l'instant »
+>      sinon ; les cartes arrivent en cascade et le total du jour compte à l'ajout. Le toucher
+>      ouvre **la fiche de CE repas** (`FicheRepasSheet` : ce que tu as saisi, modifiable · « Ce
+>      qu'il t'a apporté », macro par macro avec sa part de la cible du jour · vitamines et
+>      minéraux · un constat, jamais un geste).
+>   L'entrée de la page (cascade des repas, tracé des anneaux) se rejoue à chaque arrivée sur
+>   l'onglet et à chaque changement de jour. **Avant le questionnaire** : la saisie d'abord, puis
+>   « On ne connaît pas encore tes besoins » (porte), « En attendant, en France »
+>   (`TeaserStatsCatalog`, jamais un chiffre inventé), « À la fin du questionnaire » ; ni carte
+>   Énergie, ni micronutriments, ni poids, ni eau, ni prise de sang (les repas déjà notés restent
+>   listés dessous).
+> - **Dicter, être écouté** (maquette « Verre liquide » du 2 octobre 2026, « la bulle de dictée
+>   retravaillée » ; `EcouteDictee.swift`, `VoiceMealSheet.swift`, `CelebrationAjout.swift`) — la
+>   séquence la plus utilisée. Elle REMPLACE la bulle kiwi façon Snapchat de la PR #295 (tranche
+>   de 84 pt, graines, arc) et la célébration dans la feuille du 1er octobre. Les mécanismes
+>   (capture, transcription après coup, phases, annulation, gestes) sont inchangés :
+>   1. **le bouton devient la bulle** : elle part du cadre du bouton « Dicter », grandit en un
+>      disque de 150 pt posé au centre de l'écran (ressort `kiwiFluide`) pendant qu'un **voile**
+>      flou tombe sur la page (`VerreVoile`). La scène vit à la RACINE, par-dessus la barre
+>      d'onglets (`EcouteSurcouche`). Le bouton d'origine n'est jamais retiré de la page, seulement
+>      masqué : l'appui maintenu garde son geste ;
+>   2. **la bulle écoute** : trois couches liquides (des formes fermées à sept points, lissées, qui
+>      tournent et ondulent) dont l'amplitude suit le niveau RÉEL du micro ; l'ensemble gonfle avec
+>      la voix, une aura verte respire derrière, une onde part à chaque pic. Au-dessus, **la carte
+>      de transcription** en verre flottant : point rouge, « Je t'écoute… », minuteur. Dessous : la
+>      consigne « Dis ce que tu as mangé, avec les quantités », puis **« Annuler » et
+>      « Terminer »** (toucher la bulle termine aussi). Quand le doigt tient encore le bouton, ces
+>      deux boutons deviennent « Glisse pour annuler » et « Relâche pour terminer », et la bulle
+>      suit le doigt à l'horizontale en s'estompant vers l'annulation ;
+>   3. **le calcul, sous la bulle** : elle se contracte à 66 pt, trois points tournent autour
+>      d'elle (un tour en 1,2 s), les couches accélèrent, « Kiwio calcule tes apports… ». La
+>      transcription PUIS l'analyse se font là, avant que la feuille ne monte
+>      (`VoiceMealSheet.preparer` : mêmes appels, même ordre, mêmes données envoyées). Dès que la
+>      transcription existe, la carte la relit **mot à mot, du flou au net** (`MotsQuiArrivent`).
+>      ⚠️ Les mots n'arrivent PAS pendant qu'on parle : la capture enregistre d'abord et transcrit
+>      ensuite (voir `SpeechCaptureService`), décision conservée. Un « Annuler » réapparaît après
+>      4 s de calcul : la scène couvre tout l'écran, il faut une sortie ;
+>   4. **les résultats** : la bulle s'efface et **une feuille de verre DÉTACHÉE des bords** monte
+>      (marges de 8, rayon 44, posée en bas à la taille de ce qu'elle montre ; elle défile si le
+>      contenu dépasse) ; le voile reste jusqu'à ce qu'elle redescende. « Ton déjeuner » en 24/700
+>      (« Ton repas » tant que le repas n'est pas choisi) et « 3 aliments reconnus », les lignes en
+>      cascade (pastille de 40, nom, quantité, kcal ; UNE seule déployée à la fois pour régler sa
+>      quantité), le total qui compte, **les étiquettes de ce que le repas apporte** (« Protéines
+>      +42 g », glucides, lipides, fibres : des grammes, jamais un objectif inventé), « Ajouter au
+>      déjeuner » en verre vert de 54 pt avec son reflet, puis « Modifier les quantités ». Gardés
+>      alors que la maquette ne les montre pas : la citation de la dictée, les avertissements, le
+>      choix du repas, l'action bloquée tant qu'il manque une quantité, « Recommencer la dictée » ;
+>   5. **la confirmation sort de l'île** : à l'ajout (vibration de succès), la feuille redescend
+>      AUSSITÔT. Une capsule noire part de la place de la Dynamic Island (126 × 37), se déplie
+>      sous elle (350 × 68), sa pastille verte rebondit : « Ajouté au déjeuner », ce que le repas
+>      change (« Fer et fibres en hausse », sinon « C'est compté dans ta journée. »), « +564 kcal »
+>      (`PastilleConfirmation`, surcouche de la racine). Elle se replie seule après 2,9 s ; la
+>      toucher ouvre le repas. Ce n'est PAS la vraie Dynamic Island (elle demanderait une activité
+>      en direct) : une surimpression qui part de sa place et de sa taille ;
+>   6. **le retour au Journal** : la carte Énergie gonfle à 1,035 et **compte** jusqu'à sa nouvelle
+>      valeur, sa sous-ligne dit « Déjeuner ajouté · 3 aliments », l'anneau et les macros suivent.
+>   **Plus de célébration dans la feuille** (pastille, onde, confettis, étiquettes, 2,1 s) : la
+>   maquette ne garde qu'UN moment de confirmation, la capsule. La série et le gain chiffré
+>   (« Fer +18 % ») ne sont donc plus montrés après un repas dicté ; la série se lit dans la puce
+>   du Journal.
+>   **Mouvement** : les quatre mouvements de `KiwiMotion` (`kiwiGlisse`, `kiwiFluide`, `kiwiRebond`,
+>   `kiwiCompteur`) et `kiwiVif` pour l'appui (0,96) ; rien ne dépasse 1,22 (`KiwiEchelle.plafond`).
+>   **Réduire les animations** : la bulle est posée d'emblée à sa place, liquide figé, ni onde ni
+>   trajet ; la capsule arrive dépliée ; tout se fait en fondu.
+>   « Écrire » ouvre la même feuille détachée sur un champ, sans la bulle. Les autres ajouts
+>   (photo, recherche, code-barres) gardent la gratification décrite plus bas.
+> - **Micronutriments** (1er octobre 2026, verre le 2 ; `JournalMicrosComponents.swift`, calcul
+>   `Core/MicrosDuJour.swift`) — sous la saisie. **Réservé au Premium** : en gratuit, la carte
+>   reste devinable derrière le flou, et une porte « Débloque tes micronutriments » la suit (zone
+>   `journal_micros`). La carte porte son en-tête (feuille verte, « Micronutriments », « touche
+>   pour le détail ») ; **les trois apports qui comptent le plus pour la personne**, puis tous les
+>   autres derrière « Voir les N micronutriments ». Une ligne = le nom, un point et une jauge à la
+>   TEINTE de l'apport, le pourcentage, un chevron ; un apport bas porte un petit signe rouge ou
+>   orange après son nom. **Un seul chiffre par apport : la part du besoin couverte**, le même que
+>   dans Progrès et dans la fiche de l'apport. Un bandeau ambré (`JournalMicrosAlerte`) passe
+>   au-dessus de la carte Énergie quand un apport est bas au moins trois jours sur sept.
+>   **La page d'un micronutriment est POUSSÉE** dans la pile du Journal (elle était une feuille) :
+>   elle entre par la droite, la barre d'onglets reste là, la barre native est masquée et la page
+>   dessine elle-même son retour « ‹ Journal » en vert (un glissé depuis le bord gauche la referme
+>   aussi ; quitter l'onglet la referme). Elle montre : le nom en 34/700 ; une carte avec l'anneau
+>   de 150 pt à la teinte de l'apport, le pourcentage qui compte, « de ton besoin » et l'étiquette
+>   de niveau (Couvert · À renforcer · À combler) ; « Pourquoi c'est bas chez toi » (« D'où vient
+>   ce chiffre » si l'apport n'est pas bas), les faits de la personne en cascade ; « Quoi ajouter
+>   dans ton assiette », en pastilles de verre clair ; « Tes repas, jour par jour » (un jour pas
+>   assez noté reste creux) ; à quoi il sert ; et, pour un apport du bilan, « Voir tout ce qui pèse
+>   sur cet apport » (la fiche des causes).
 > - **Poids et eau (1er octobre 2026)** (`JournalPoidsEau.swift`, calcul `Core/ObjectifPoids.swift`, eau
->   `Services/SuiviEau.swift`) — sous la saisie, avant « Apports à renforcer ». **Carte poids** : poids
+>   `Services/SuiviEau.swift`) — sous les micronutriments, avant la prise de sang ; les puces
+>   « Poids » et « Eau » du haut de page y mènent. **Carte poids** : poids
 >   actuel à gauche, **poids souhaité** à droite, chacun avec son moins et son plus (pas de 100 g, un
 >   appui maintenu répète le pas). L'écart donne le SENS de l'objectif (perdre · prendre · maintenir à
->   moins d'un demi-kilo) ; les calories et les macros des cartes du dessus sortent des formules
+>   moins d'un demi-kilo) ; les calories et les macros de la carte Énergie sortent des formules
 >   existantes (`calculateMacros`), recalculées sous le doigt, enregistrées quand le geste s'arrête
->   (`DashboardViewModel.reglerPoids`). Le pied dit l'objectif du jour, le rythme et l'échéance estimée.
+>   (`JournalView.reglerPoids`, puis `DashboardViewModel.enregistrerPoids`). Le pied dit l'objectif du jour, le rythme et l'échéance estimée.
 >   **Deux réserves : jamais de déficit vers un poids sous le repère de corpulence (IMC 18,5), ni
 >   enceinte ou allaitante** — les calories restent au maintien et la carte le dit. Sans poids souhaité
 >   réglé, rien ne change (les cibles suivent le premier objectif du questionnaire). **Carte eau** :
 >   huit gobelets de 25 cl sur deux rangs, l'eau monte d'un coup de ressort ; toucher le dernier rempli
 >   le vide ; compte gardé sur le téléphone, par compte et par jour (effacé à la déconnexion).
+>   **Verre (2 oct.)** : les « − » et « + » sont des ronds de verre clair, les chiffres (poids, kcal,
+>   litres) sont en SF Pro Rounded et ROULENT quand ils changent ; l'eau prend sa teinte
+>   (`teinteEau`), ce qu'un toucher ajoute s'envole du gobelet (« +25 cl »), et le huitième gobelet
+>   déclenche une gerbe de gouttes (sur un toucher seulement, pas en revenant sur un jour déjà plein).
 > - **Offre annuelle** (`OffreAnnuelleOverlay.swift`, `Services/OffrePremium.swift`) : carte qui monte
 >   du bas, surcouche de la RACINE comme la gratification. Elle n'affiche que ce qui est LU chez Apple
 >   (prix annuel, équivalent d'un an à la semaine, essai gratuit) ; l'économie est le même calcul que
@@ -133,6 +251,9 @@
 >   referme. Comptes gratuits ayant fait leur bilan seulement, sur le Journal, après une gratification
 >   ou au retour sur l'onglet ; jamais le premier jour, une fois tous les trois jours, puis toutes les
 >   deux semaines après trois refus (`RythmeOffre`). Jamais pendant le tutoriel, le brief ou les captures.
+>   **Verre (2 oct.)** : même grammaire que la feuille Premium — voile flou (`VerreVoile`), feuille de
+>   verre aux coins de 38, titre 24/700, « Voir l'offre » en verre vert de 54 pt avec son reflet
+>   (`PremiumAction`), « Plus tard » en vert. Pas de mascotte ici.
 > - **Gratification après un ajout** (`GratificationOverlay.swift`, moteur `GratificationRepas`) : une
 >   carte de deux secondes qui montre **ce que le geste a changé** — bandeau de verre en haut
 >   (« Ajouté au déjeuner · **Modifier** » ouvre la fiche du repas), coche dessinée + deux ondes +
@@ -143,10 +264,15 @@
 >   jours suivis, « Continuer ». Une seule couleur héros : le vert du gain. **Jamais à vide** : rien
 >   n'a bougé d'au moins 5 points → pas de carte. Pas pendant le tutoriel, ni en mode Zen, ni sur un
 >   autre jour qu'aujourd'hui. Surcouche de la RACINE (le Journal porte déjà trop de feuilles).
+>   **Verre (2 oct.)** : la carte est la même feuille détachée des bords que les résultats de la
+>   dictée (marges de 8, rayon 44), posée sur le voile flou. **Un repas dicté n'ouvre plus cette
+>   carte** : la capsule du haut de l'écran le confirme. Photo, recherche et code-barres la gardent.
 > - **Enchaînements (21 sept. 2026)** : les blocs de toute feuille arrivent l'un après l'autre, de
->   haut en bas (`FicheBloc(rang:)` → `kiwiEntrance`, plafonné, coupé sous Reduce Motion) ; les
->   cartes « À quoi c'est relié » arrivent de gauche à droite ; la carte de gratification REDESCEND
->   avant que « Modifier » n'ouvre la fiche du repas ; le bandeau du Plan suit la sélection en fondu.
+>   haut en bas (`FicheBloc(rang:)` → `kiwiEntrance`, plafonné, coupé sous Reduce Motion) ; depuis
+>   le verre, les LIGNES d'un bloc arrivent à leur tour en cascade (`.verreCascade`, délais de la
+>   maquette) ; les cartes « À quoi c'est relié » arrivent de gauche à droite ; la carte de
+>   gratification REDESCEND avant que « Modifier » n'ouvre la fiche du repas ; la carte du Plan
+>   suit la sélection en fondu flouté.
 > - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) — **réordonnée le 21 sept.
 >   2026** (retour d'Arthur : « on ne sait pas où regarder en premier »), la même d'où qu'on vienne
 >   (Journal, Bilan, Progrès). Elle répond dans l'ordre des questions, et tout ce qui s'y calcule
@@ -172,73 +298,160 @@
 >   `AnneauDeCause`. Un apport hors des trois du bilan s'ouvre aussi (`ApportV2.pourLaFiche`).
 >   **Gratuit** : le verdict et les causes en clair ; les gestes et « Où le trouver » floutés, porte
 >   épinglée en bas (`UnlockDoor`, zone `fiche_apport_bilan`) qui annonce le vrai nombre de gestes.
-> - **Compléments** (`SupplementsView.swift`, `AnneauDeCause.swift`, `FicheApport.swift`) — **l'anneau
->   de cause, maquette du 20 septembre 2026** : précision « Kiwio ne gagne rien sur ce qu'il te
->   recommande » · « Ton rituel du jour » (trois tuiles matin · midi · soir qui disent QUOI prendre,
->   un tap coche le moment ; visible dans les deux voies) · segmented natif Compléments · Par
->   l'assiette · **mosaïque** : 1 héros pleine largeur (anneau 112 + les 3 freins les plus lourds et
->   leur poids) puis des tuiles deux par deux (anneau 64), une tuile restante passe en ligne pleine
->   largeur, jamais de trou. **Ni dose, ni prix, ni marque sur une tuile.** Ligne « Ma sélection »
->   (budget mensuel) sous la mosaïque. Au toucher, la **fiche en six blocs** : ce que ça peut
+>   **Verre (2 oct.)** : c'est LA fiche que la maquette dessine. Feuille de verre (coins de 38) ; les
+>   causes puis les gestes arrivent en cascade, leurs filets avec elles ; les barres de poids se
+>   remplissent en 0,8 s ; pastilles numérotées vert foncé sur vert pâle ; aliments en pastilles de
+>   verre clair qui surgissent.
+> - **Bilan complet** (`DashboardView.swift`, `BilanV7Components.swift` ; « Tout afficher » du
+>   Journal) : une PAGE présentée en feuille, avec sa pile de navigation (elle pousse l'historique
+>   du score) : fond `VerrePageFond()`, croix `DSCloseButton`, cartes de verre en cascade, libellés
+>   de catégorie teintés (`BilanV7SectionLabel(teinte:)`), jauge d'un apport à la teinte de
+>   l'apport. La maquette ne dessine pas cet écran : il est habillé par le système, sans changement
+>   de contenu.
+> - **Compléments** (`SupplementsView.swift`, `SupplementsChainV6.swift`, `AnneauDeCause.swift`,
+>   `FicheApport.swift`) — **l'anneau de cause, maquette du 20 septembre 2026**, passée au verre le
+>   2 octobre. La barre de navigation est masquée : « Compléments » est une ligne de 17/600 centrée
+>   qui défile avec la page, suivie de la précision « Kiwio ne gagne rien sur ce qu'il te
+>   recommande ». Puis :
+>   - **« Ton rituel du jour »** : trois tuiles matin · midi · soir qui disent QUOI prendre, et un
+>     compteur qui roule. Un toucher coche le moment : la tuile passe au vert kiwi, la coche se
+>     dessine en 0,3 s dans un rond vert qui rebondit, une gerbe part ; en décochant, rien ne
+>     saute. Visible dans les deux voies ;
+>   - **la bascule de verre** Compléments · Par l'assiette (`VerreBascule`), qui pilote toute la
+>     page : le corps échangé arrive en fondu, remonte de 8 pt et sort d'un flou de 4 pt ;
+>   - **voie Compléments, la mosaïque** : 1 héros pleine largeur (anneau 112 + les 3 freins les
+>     plus lourds et leur poids, en cascade) puis des tuiles deux par deux (anneau 64), une tuile
+>     restante passe en ligne pleine largeur, jamais de trou. Les parts de l'anneau se tracent
+>     l'une après l'autre et le chiffre compte ; anneaux et cascades se rejouent à chaque arrivée
+>     sur l'onglet et à chaque bascule. **Ni dose, ni prix, ni marque sur une tuile.** Ligne « Ma
+>     sélection » (budget mensuel) sous la mosaïque ;
+>   - **voie Par l'assiette** : UNE carte de verre, une ligne par apport (pastille de 40 à la
+>     teinte de l'apport, son premier aliment en titre, les suivants en précision, le nom de
+>     l'apport à droite), les lignes arrivent l'une après l'autre. **Aucun pourcentage, aucune
+>     portion ni fréquence par aliment** (la donnée n'existe pas) ; plus de tuiles à anneau dans
+>     cette voie.
+>   Au toucher, la **fiche en six blocs** (feuille de verre) : ce que ça peut
 >   expliquer chez toi (la phrase de la table déterministe `SymptomesApports`, jamais le texte libre
 >   du bilan ; le score a décidé, le symptôme éclaire) · comment on l'a vu (**cascade** : point de départ 70,
->   freins, appuis, « ramené dans l'échelle » si le total sort de 0-100 ; toucher une ligne allume
->   sa part sur l'anneau) · ce que ça fait · comment le prendre (**la forme et le moment, jamais la
->   dose** : doctrine du 20 septembre) · précautions et interactions ·
->   l'autre voie. **Le chiffre est le score déterministe du registre** (`Core/NutrientLedger.swift`,
->   même arithmétique que `analyzeNutrientScores`) : part couverte dans la couleur de l'apport,
->   freins en trois gris décroissants, « autres facteurs » en piste inactive, parts qui ferment
->   toujours à 100. Le pourcentage rédigé par le bilan n'est plus affiché dans cet onglet. Voie
->   assiette : l'aliment en titre, **aucun pourcentage ni portion par aliment** (la donnée n'existe
->   pas) ; quantités et moments restent dans la fiche nutriment existante, liée depuis la fiche.
-> - **Progrès v3** (`SuiviView.swift` + `ProgresV3Components.swift`, maquette du 20 sept. 2026) : le
->   **verdict d'abord** — « Cette semaine, en trois lignes » (un symptôme, un apport, les calories ;
->   phrases de `ProgresVerdict`, pur et testé) — puis **un seul graphe** à la fois (segmented
->   Symptômes · Apports · Calories). Courbe d'un symptôme : une ligne, trois paliers nommés en mots,
->   **le haut est toujours le mieux**, point du jour plein, pilule « +2 niveaux ». Puis « Depuis ton
->   premier jour » (avant → après + écart), puis « Voir mon récap du jour ». Check-in : feuille, **un
->   symptôme par écran**, question dans le sens du mieux, toucher = choisir ET avancer (350 ms),
->   proposé à l'arrivée sur l'onglet (jamais au lancement). Frontière Premium inchangée : tendance
->   des symptômes et des apports derrière leurs portes ; en gratuit le verdict nomme le sujet seul.
-> - **Plan en graphe** (`PlanGraphComponents.swift`, modèle `Core/PlanGraph.swift`, maquette du 20 sept.
->   2026) : **trois anneaux, trois couleurs qui portent le sens** — vert = l'objectif (centre), bleu =
+>   freins, appuis, « ramené dans l'échelle » si le total sort de 0-100 ; chaque frein porte une
+>   barre de poids qui se remplit ; toucher une ligne allume sa part sur l'anneau) · ce que ça fait ·
+>   comment le prendre (**la forme et le moment, jamais la dose** : doctrine du 20 septembre) ·
+>   précautions et interactions · l'autre voie. **Le chiffre est le score déterministe du registre**
+>   (`Core/NutrientLedger.swift`, même arithmétique que `analyzeNutrientScores`) : part couverte dans
+>   la couleur de l'apport, freins en trois gris décroissants, « autres facteurs » en piste inactive,
+>   parts qui ferment toujours à 100. Le pourcentage rédigé par le bilan n'est plus affiché dans cet
+>   onglet. Quantités et moments d'un aliment restent dans la fiche nutriment existante, liée depuis
+>   la fiche. États gardés, en verre : carte d'exemple avant le bilan, état vide, mention médicale.
+> - **Progrès : la toile** (`SuiviView.swift` + `ProgresComponents.swift` + `ProgresV3Components.swift`,
+>   maquette « Verre liquide » du 2 octobre 2026 ; elle recompose le « Progrès v3 » du 20 septembre
+>   avec les mêmes données, sans appel réseau ni IA à l'affichage). Barre de navigation masquée,
+>   « Progrès » (34/700) dessiné dans la page. De haut en bas :
+>   1. **les puces** : Équilibre « N sur 10 » (avec la toile en miniature), une puce par évolution
+>      RÉELLEMENT connue (un symptôme dont la tendance a bougé, l'apport qui a le plus bougé depuis
+>      le départ ; aucune en gratuit), la Série ;
+>   2. **la toile** (`ProgresToileView`) : les dix apports sur un radar, un axe par apport, le
+>      besoin en cercle pointillé (le score 60, seuil « à renforcer » de l'app), un chiffre au
+>      centre. Les valeurs montent en 1,3 s à chaque arrivée sur l'onglet. Toucher un point ou un
+>      libellé choisit l'apport (les autres pâlissent, le centre dit son nom, sa part et son
+>      statut) ; le toucher à nouveau, ou toucher le centre, le relâche. Les chiffres sont ceux de
+>      `DashboardViewModel.registre` : un seul chiffre par apport dans toute l'app ;
+>   3. **le verdict** : un titre 28/700 (« Ton équilibre progresse / est stable / est à
+>      surveiller », comparé au premier bilan ; « Ton équilibre du jour » en gratuit ou le premier
+>      jour), une phrase (« 6 apports sur 10 atteignent ton besoin aujourd'hui. »), puis le lien
+>      « Voir ta progression depuis le départ » (cadenas et offre en gratuit ; en Premium il fait
+>      défiler jusqu'à « En coulisses ») ;
+>   4. **« Ce qui a changé »**, des cartes de verre empilées (le sélecteur Symptômes · Apports ·
+>      Calories a disparu) : **le symptôme suivi** (un seul à la fois, un menu pour en changer :
+>      son verdict, sa courbe qui se dessine — **le haut est toujours le mieux** —, ses réponses au
+>      check-in) ; **la semaine des apports** et **celle des calories** (sept jours réels, jour
+>      hors cible en ambre, pointillé du besoin, pas de barre pour un jour sans repas) ; **« En
+>      coulisses »** : chaque apport suivi, de son score du premier bilan à celui d'aujourd'hui, la
+>      ligne ouvre la fiche de l'apport ;
+>   5. **le bas de page** : la porte vers le bilan tant qu'il n'est pas fait, la ligne du check-in
+>      du jour tant qu'il n'est pas répondu, la ligne du récap du jour.
+>   Check-in : feuille de verre, **un symptôme par écran**, question dans le sens du mieux, toucher
+>   = choisir ET avancer, proposé à l'arrivée sur l'onglet (jamais au lancement). **Frontière
+>   Premium inchangée** (zones `suivi_symptomes`, `suivi_micros`) : en gratuit la page nomme le
+>   sujet, jamais sa tendance. La porte n'est plus une carte : c'est le bouton de verre vert « Voir
+>   ta courbe » posé sur la courbe floutée, le lien sous le verdict et les lignes d'« En
+>   coulisses » ; la feuille Premium grandit depuis ce qu'on a touché (iOS 18 et plus). La carte
+>   « Cette semaine, en trois lignes » n'existe plus en tant que carte : ses phrases
+>   (`ProgresVerdict`, pur et testé) vivent dans les cartes. Premier jour sans repas : une seule
+>   carte, qui le dit (`ProgresPremierJourCard`).
+> - **Plan en graphe** (`PlanGraphComponents.swift`, modèle `Core/PlanGraph.swift`, physique
+>   `Core/PlanGraphPhysique.swift` ; maquette du 20 sept. 2026, physique validée le 30 sept., verre
+>   le 2 oct.) : **trois couleurs qui portent le sens** — vert = l'objectif (centre), bleu =
 >   les symptômes suivis (anneau 1, quatre au plus), gris = les leviers (anneau 2 : apports que le
 >   bilan rattache à ce qui est affiché, et **habitudes tirées du registre des apports**, mêmes
->   libellés et mêmes points que la fiche de l'apport). Trait épais = lien fort. Positions
->   **calculées, pas simulées** (leviers tirés vers ceux qu'ils touchent, puis écartés en une passe).
->   Les nœuds dérivent de 2 à 3 pt, une pulsation parcourt les liens du nœud choisi ; le reste
->   s'estompe à 35 %. **Entrée en scène à chaque arrivée sur l'onglet** : les nœuds surgissent du
->   centre vers l'extérieur (spring, 45 ms d'écart), les liens se révèlent ensuite. **L'horloge est en
->   pause hors de l'onglet** (`\.estOngletActif`, posé par la racine sur chaque onglet — à préférer à
->   `onAppear`, qui ne se joue qu'au lancement) et sous Reduce Motion. Ni zoom ni
->   déplacement. Bandeau du nœud choisi (état, jamais un geste) → **la feuille du nœud**
->   (`PlanNoeudSheet`, 21 sept.) : pastille + sur-titre coloré + nom · la cause · **« À quoi c'est
+>   libellés et mêmes points que la fiche de l'apport). Trait épais = lien fort. Le titre « Plan »
+>   reste le grand titre natif ; dessous, un sous-titre et la légende à trois points.
+>   **Une physique à la façon d'Obsidian** : les bulles se repoussent, les tiges qui les relient les
+>   retiennent ; on attrape une bulle, ses voisines suivent, et tout revient en place quand on la
+>   lâche. Le point de départ est le placement calculé des trois anneaux. Réglages validés par
+>   Arthur (répulsion 1150, raideur 15, amorti 0,70) : **on n'y touche pas sans lui**. Ni zoom ni
+>   déplacement de la carte.
+>   **Verre** : un nœud qui n'est ni choisi ni le centre garde sa teinte, en pâle ; le choisir
+>   l'allume (pleine couleur, halo, rebond 1 → 0,86 → 1,1 → 1). Les liens du nœud choisi passent
+>   au vert et à 3 pt en 0,3 s, une pulsation les parcourt ; les noms hors de son voisinage
+>   s'estompent. **Entrée en scène à chaque arrivée sur l'onglet** : les nœuds éclosent depuis
+>   l'objectif (0,3 → 1, 0,09 s d'écart), puis les liens se tracent (0,6 s chacun). **L'horloge est
+>   en pause hors de l'onglet** (`\.estOngletActif`, posé par la racine sur chaque onglet — à
+>   préférer à `onAppear`, qui ne se joue qu'au lancement) ; sous Reduce Motion le graphe est
+>   calculé une fois, puis fixe, sans glisser-déposer.
+>   **La carte du nœud choisi** est une plaque de verre qui flotte (rayon 28) au-dessus de la barre
+>   d'onglets : pastille, catégorie colorée, nom, résumé (un état, jamais un geste), rond vert
+>   « détail ». Quand on change de nœud, la plaque reste en place et son contenu sort d'un léger
+>   flou. Elle ouvre **la feuille du nœud**
+>   (`PlanNoeudSheet`, feuille de verre) : pastille + sur-titre coloré + nom · la cause · **« À quoi c'est
 >   relié »** (rangée de cartes : état du voisin — « 42 % », « −22 points » — et force du lien, lisible
->   en gratuit) · **« Quoi changer dans ton assiette »** (pastilles à illustration 3D, `DSFlow` ; en
->   toucher une la déplie : combien, quand, comment, l'astuce) · **« Tes habitudes »** · **« En
->   complément »** (nom + étiquette, **jamais de dose** : `PlanTopicText.sansDose`, lien vers l'onglet
->   Compléments) · délai · « C'est noté ». Gratuit : cause et liens en clair, les trois blocs de
->   solutions voilés, porte `plan_solutions`. Une habitude ouvre sa feuille à elle (la cause et ce
->   qu'elle freine). Le sélecteur « Objectifs et symptômes / Apports »
+>   en gratuit) · **« Quoi changer dans ton assiette »** (pastilles de verre clair à illustration 3D,
+>   `DSFlow` ; en toucher une la déplie : combien, quand, comment, l'astuce) · **« Tes habitudes »** ·
+>   **« En complément »** (nom + étiquette, **jamais de dose** : `PlanTopicText.sansDose`, lien vers
+>   l'onglet Compléments) · délai · « C'est noté ». Gratuit : cause et liens en clair, les trois blocs
+>   de solutions voilés, porte `plan_solutions`. Une habitude ouvre sa feuille à elle (la cause et ce
+>   qu'elle freine). Avant le bilan : un graphe d'exemple estompé, où tout toucher mène au bilan.
+>   Le sélecteur « Objectifs et symptômes / Apports »
 >   et la ligne « focus de la semaine » ont disparu : le graphe montre les deux lectures à la fois.
-> - **Réglages v3** (`ReglagesView.swift` + `ReglagesSousPages.swift`, maquette du 20 sept. 2026) :
->   bloc Premium (carte sobre sur voile, une promesse, 3 lignes en symboles gris, prix lus chez Apple
->   avec trait gris tant qu'ils chargent ; abonné = « Premium actif » + « Gérer », aucun argumentaire)
->   · **Compte** (identité, objectifs, abonnement, Apple Santé, export) · carte questionnaire ·
->   **Application** (Notifications en interrupteur, tutoriel, bilan animé, méthode) · liens
->   Restaurer · Conditions · Confidentialité · déconnexion + suppression. Deux en-têtes, deux styles
->   de carte, pastilles à **trois sens** (gris / vert = connecté ou actif / rouge = destructif).
+> - **Réglages** (`ReglagesView.swift` + `ReglagesSousPages.swift`, maquette « Réglages v3 » du
+>   20 sept. 2026, verre le 2 oct.) : même ordre — Premium, compte, questionnaire, application —
+>   sur le fond de verre neutre, grand titre natif. **Le bloc Premium est UNE ligne de verre** : la
+>   mascotte (44 pt, immobile), « Kiwio Premium », l'essai lu chez Apple en vert foncé (sans essai,
+>   la promesse existante), un chevron vert ; le prix reste juste dessous, toujours lu chez Apple
+>   (trait gris tant qu'il charge). Abonné : la même carte (« Premium actif » et l'échéance), sans
+>   chevron, puis « Gérer mon abonnement », aucun argumentaire. La carte n'apparaît qu'une fois le
+>   bilan fait. Toucher la ligne : la feuille Premium grandit depuis elle (iOS 18 et plus).
+>   Dessous, des cartes de verre **sans en-tête** (les groupes se lisent par l'écart entre cartes) :
+>   identité, objectifs, abonnement, Apple Santé, export · questionnaire · Notifications
+>   (interrupteur), « Widgets et écran verrouillé », tutoriel, bilan animé, méthode · liens
+>   Restaurer · Conditions · Confidentialité · déconnexion + suppression. Une ligne = une pastille
+>   CARRÉE de 30 pt (rayon 8), le libellé, un filet de 0,5 pt posé sous le libellé seul ; pastilles
+>   à **trois sens** (gris / vert = connecté ou actif / rouge = destructif). Les lignes arrivent en
+>   cascade à chaque visite de l'onglet.
 >   L'interrupteur Notifications porte `RappelsPersonnalises.actifs` et lève l'ancien mode Zen,
->   qui n'a plus d'interrupteur à l'écran. Sous-pages : compte (mot de passe si compte e-mail),
->   objectifs, abonnement, suppression du compte (double verrou). Depuis le 1er oct. 2026, la carte
->   Application porte aussi « Widgets et écran verrouillé » (sous Notifications).
+>   qui n'a plus d'interrupteur à l'écran. Sous-pages (fond `VerrePageFond()`, cartes de verre,
+>   réserve de la barre d'onglets) : compte (mot de passe si compte e-mail), objectifs, abonnement,
+>   suppression du compte (double verrou), questionnaire en édition, méthode, widgets ; leurs
+>   feuilles et leurs champs de saisie sont en verre.
+> - **Feuille Premium** (`PaywallView.swift`, maquette validée le 3 juillet 2026, verre le 2 oct.) :
+>   feuille de verre (coins de 38), **la mascotte de 84 pt** qui éclot sur son halo tournant,
+>   « Kiwio Premium » en vert foncé puis la promesse en 24/700, les bénéfices en cascade (pastilles
+>   teintées), les cartes de formule (liseré vert sur celle qui est choisie), l'action principale
+>   en verre vert de 54 pt avec son reflet (`PremiumAction`), la mention d'abonnement, « Plus tard »
+>   en vert, puis le code promo, la restauration, les liens, et la croix « Fermer ». **Formules,
+>   prix, essai et mentions sont lus aux mêmes endroits qu'avant** (jamais en dur) : les textes
+>   d'exemple de la maquette ne sont pas repris. Elle grandit depuis ce qu'on a touché (zoom iOS 18
+>   et plus, feuille simple sur iOS 17 : `feuillePremium`, `premiumOrigine` / `premiumDepuis` dans
+>   `PremiumGating.swift`). **Contenu verrouillé, partout** : un seul traitement, flou 8 et opacité
+>   0,5, sans voile blanc ; portes (`UnlockDoor`), jauges de quota et écrin Premium en verre.
 >
 > - **Widgets, écran verrouillé, activité en direct** (1er oct. 2026, maquette montrée dans le chat,
 >   `Partage/VuesWidgets.swift` + `KiwioWidgets/`) : quatre widgets et une carte d'écran verrouillé
 >   qui reprennent le Journal, jamais un design à part. **Ma journée** (petit : le chiffre des kcal
 >   restantes + jauge ; moyen : le chiffre, la série, les quatre repas Matin · Midi · Soir · Encas avec
->   leurs symboles et teintes de la mosaïque, un « + » vert sur chacun ; rectangulaire d'écran
->   verrouillé). **Ajout rapide** (petit et rond : le micro ; moyen : quatre tuiles, Dicter en vert,
+>   les symboles de la grille du Journal, un « + » vert sur chacun ; rectangulaire d'écran
+>   verrouillé ; hors le vert Kiwio, les widgets gardent les teintes du système, qui suivent le mode
+>   clair ou sombre, là où l'app est passée à la palette du verre : même famille de couleur, pas la
+>   même valeur). **Ajout rapide** (petit et rond : le micro ; moyen : quatre tuiles, Dicter en vert,
 >   Photo, l'eau, le rituel). **Eau** (les litres comme sur la carte Eau, « + 25 cl »). **Rituel du
 >   jour** (matin · midi · soir à cocher, **jamais de dose**). **Activité en direct « Ta journée »** :
 >   les quatre repas, puis Dicter · eau · rituel. Règle de geste : l'eau et le rituel se cochent sur
@@ -248,8 +461,9 @@
 >   « Ma journée en direct », les aperçus (les vraies vues), le mode d'emploi en trois lignes.
 >
 > - **Prise de sang** (Premium, 30 sept. 2026 — maquette validée le 6 juil., `Views/PriseDeSang/PriseDeSangSheet.swift`) :
->   quatrième option de « Autres façons d'ajouter » du Journal (« Prise de sang », goutte) et carte
->   « Ta prise de sang » du Bilan complet (entre points d'attention et symptômes). Feuille : gratuit →
+>   une carte du Journal (`PriseDeSangCarte`, sous « Poids et eau » ; la puce « Analyses » y mène —
+>   elle a quitté « Autres façons d'ajouter » le 1er octobre, où personne ne la voyait) et carte
+>   « Ta prise de sang » du Bilan complet (entre points d'attention et symptômes). Feuille de verre : gratuit →
 >   zone de dépôt voilée + porte `prise_de_sang` ; Premium → « Photographier la page » (capsule verte),
 >   « Choisir une photo » · « Importer un PDF », deux lignes d'info (document lu puis oublié ; liste des
 >   valeurs lues) ; lecture « Kiwio lit tes résultats… » ; **« Tes repères »** : date du prélèvement,
@@ -275,8 +489,11 @@
 > cinq étapes au lieu de six**) : à l'origine six étapes qui
 > FONT FAIRE sur les vraies commandes — bienvenue (carte), « + » (découpe circulaire), « Dicter mon
 > repas » (dans la feuille d'ajout), « on ne te demande que ce qui manque » (dictée), carte des
-> apports, barre d'onglets (« Reviens demain » + « J'ai compris »). Voile encre 64 % découpé par
-> `destinationOut`, bulle blanche r14 (5 points de progression, « Passer » 15/500), un seul geste
+> apports, barre d'onglets (« Reviens demain » + « J'ai compris »). Voile découpé par
+> `destinationOut` — depuis le verre, c'est le voile du système (`VerreVoile`, encre à 22 % sur un
+> flou vivant) et non plus une encre à 64 % : la cible ressort parce qu'elle est la seule chose
+> NETTE de l'écran ; la bulle et la carte de bienvenue sont en verre flottant, leurs actions en
+> verre vert (points de progression, « Passer »), un seul geste
 > par étape, étape persistée (reprise après kill), relançable via Réglages → « Revoir le tutoriel ».
 > Source : `Views/Shared/TutorielPremierLancement.swift`. Remplace l'ancien tour d'onglets et les
 > 3 bulles du Journal.
@@ -320,6 +537,12 @@
 ---
 
 ## 0. Lois transversales (s'appliquent à TOUTES les pages)
+
+> Ces lois datent du 11 juin 2026. Celles qui parlent de contenu tiennent toujours. Quatre lois
+> d'habillage sont **remplacées par le verre** (2 octobre 2026, `docs/DESIGN-SYSTEM.md`) : la 2 (le
+> thème clair reste forcé, mais le fond est le fond de verre et les cartes sont en verre), la 6
+> (rayons : 24 pour une carte, 14 pour une tuile, 38 pour une feuille), la 7 (bouton secondaire =
+> `.verreClair()`, appui = `.dsPress`) et la 17 (les quatre mouvements de `KiwiMotion`).
 
 1. **Test de valeur utilisateur (loi suprême)** : chaque élément affiché doit répondre à
    « qu'est-ce que ça apporte à l'utilisateur ? ». Réponse faible → supprimer. Les règles
@@ -564,11 +787,17 @@ visibles, ce qu'il faut avoir répondu), `Core/PistesBilan.swift` (ce que les r�
 `Core/RepasCatalog.swift` (aliments par repas), `Core/NiveauConsommation.swift` (les trois mots),
 `Core/LibellesBilan.swift` (les mots des réponses). L'état reste dans `QuestionnaireViewModel`.
 
-**Quatre étapes, une couleur chacune** (`EtapeBilan.teinte`) : ① Toi (bleu `#007AFF`) · ② Ton
-quotidien (orange `#FF9500`) · ③ Ta forme (violet `#AF52DE`) · ④ Ton assiette (vert kiwi). La
-couleur habille l'écran (halos du fond, réponse choisie, segment de la barre) ; **le bouton du bas
-reste vert d'un bout à l'autre**. Écart assumé à la règle « le vert ne colore que ce qui se tape » :
-ici la couleur porte un sens, l'étape, comme la couleur d'une jauge porte un statut.
+**Quatre étapes, une couleur chacune** (`EtapeBilan.teinte`, prises dans la palette du verre depuis
+le 2 octobre 2026) : ① Toi (bleu `teinteProteines`) · ② Ton quotidien (orange `teinteLipides`) ·
+③ Ta forme (orchidée `teinteFer`) · ④ Ton assiette (vert kiwi). L'étape se lit sur **le fond de
+verre** (`VerreFond`, dont les halos passent de ciel à aube, orchidée puis kiwi, en fondu), sur le
+nom du chapitre et sur le segment de la barre. **Une réponse choisie, elle, passe au verre vert**
+(verre vert pâle, liseré kiwi, texte vert foncé), quelle que soit l'étape, et **le bouton du bas
+reste vert d'un bout à l'autre** (verre vert de 54 pt ; verre clair et libellé estompé tant que
+l'écran attend une réponse). Écart assumé à la règle « le vert ne colore que ce qui se tape » :
+ici la couleur porte un sens, l'étape, comme la couleur d'une jauge porte un statut. Tuiles, puces
+et lignes de réponse sont en verre clair, cartes et curseurs en cartes de verre ; les écrans
+glissent (`kiwiGlisse`) et leurs blocs arrivent en cascade (`.bilanCascade`).
 
 Ordre des écrans (`EcranBilan`, l'ordre des cas est l'ordre du parcours) :
 accueil → **Toi** : motif (objectifs + symptômes, en puces) · prénom (sauté si le compte le
@@ -583,7 +812,8 @@ et compagnie · habitudes · compléments · traitements · digestion · antéc�
 Lois de l'écran :
 1. **En-tête** : chevron retour · quatre segments qui ne repartent JAMAIS de zéro · croix (confirme
    avant de quitter ; la feuille ne se ferme pas en glissant). Dessous : nom de l'étape dans son
-   encre · « encore ~2 min » · pastille « 🔍 N pistes ».
+   encre · « encore ~2 min » · pilule de verre clair « N pistes » (un symbole SF, plus la loupe
+   en emoji).
 2. **Chaque écran dit pourquoi il demande** : une phrase sous le titre, vraie au regard du moteur
    (« le café pendant le repas freine l'absorption du fer »).
 3. **La carte de piste**, sous les réponses : « Piste repérée » / « C'est noté » / « Bon point ».
@@ -603,9 +833,12 @@ Lois de l'écran :
 7. **Reprise** : là où on s'est arrêté, sans jamais sauter un écran pas terminé (remplace la
    décision du 6 juillet 2026, « reprise au début »). Le Journal affiche alors « Ton bilan
    t'attend · Étape 2 sur 4 » avec la barre et « Reprendre ».
-8. **Identité** : le signe (`KiwiSigne`) sur l'accueil et sur la fin ; aucun emoji kiwi.
-9. **Mouvement** : jetons de `KiwiMotion` uniquement, rien au-delà de 1,08, tout coupé par
-   « Réduire les animations ». La gerbe de fin d'étape se joue une fois.
+8. **Identité** : le signe (`KiwiSigne`) sur l'accueil et sur la fin ; aucun emoji kiwi. Les
+   emojis qui illustrent les réponses (catalogues `LibellesBilan`, `GroceryCatalog`…) sont
+   toujours là : les retirer est une décision produit, pas un habillage.
+9. **Mouvement** : jetons de `KiwiMotion` uniquement, rien au-delà du plafond `KiwiEchelle.plafond`
+   (1,22 depuis le verre), tout coupé par « Réduire les animations ». La gerbe de fin d'étape se
+   joue une fois.
 
 L'ancien flux (`QuestionnaireContainerView`, `GroceryShoppingView`, `SectionIntroView`,
 `TeaserEngine`, `QuantityBracket`) reste dans le dépôt, plus présenté, tant que le nouveau n'est

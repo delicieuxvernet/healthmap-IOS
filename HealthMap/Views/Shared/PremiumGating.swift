@@ -46,6 +46,13 @@ enum GateIntensity {
 /// maquette (« Voir ta courbe ») est posée sur le contenu flouté et ouvre la
 /// feuille Premium ; sans, le contenu est seulement flouté (la porte est alors
 /// posée à côté par l'appelant, avec `UnlockDoor`).
+///
+/// Aucune découpe autour du contenu flouté. Il est souvent une carte de verre
+/// entière (la carte Micronutriments du Journal : rayon 24, ombre portée
+/// découpée) : la rogner à un rayon de tuile lui mangeait les coins et lui
+/// coupait l'ombre net. La carte garde sa propre forme ; son bord et son ombre
+/// se fondent d'eux-mêmes sous le flou, comme sur la maquette, qui ne rogne
+/// pas non plus ce qu'elle floute.
 struct GatedOverlay<Content: View>: View {
     let intensity: GateIntensity
     /// Libellé de la pastille posée sur le contenu flouté. `nil` : aucune.
@@ -59,7 +66,6 @@ struct GatedOverlay<Content: View>: View {
             .blur(radius: intensity.blur)
             .opacity(intensity.opacity)
             .allowsHitTesting(false)
-            .clipShape(RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
             .accessibilityHidden(true)
             .overlay {
                 if let pastille {
