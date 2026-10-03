@@ -252,7 +252,9 @@ struct PaywallView: View {
                 .font(.system(.footnote, design: .default).weight(.bold))
                 .foregroundStyle(Color.teinteKiwiTexte)
 
-            Text("Ton bilan complet,\ntes solutions et tes scans,\nsans limite.")
+            // « chaque jour » et non « sans limite » : le serveur plafonne les
+            // scans photo à 30 par jour en Premium (`analyze-meal-photo`).
+            Text("Ton bilan complet,\ntes solutions et tes scans,\nchaque jour.")
                 .font(.system(size: tailleTitre, weight: .bold))
                 .tracking(-0.6)
                 .foregroundStyle(Color.dsTexte)
