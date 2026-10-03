@@ -700,7 +700,7 @@ struct MainTabView: View {
                 selectedTab = .reglages
             }
         }
-        // Le brief du matin, à la demande (onglet Progrès). Il se rejoue depuis
+        // Le brief du matin, à la demande (ligne des Réglages). Il se rejoue depuis
         // ce que le téléphone a gardé : « déjà vu aujourd'hui » ne s'applique
         // pas à quelqu'un qui le redemande.
         .onReceive(NotificationCenter.default.publisher(for: .healthmapRevoirBrief)) { _ in

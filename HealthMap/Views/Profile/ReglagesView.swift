@@ -369,6 +369,20 @@ struct ReglagesView: View {
             .buttonStyle(.dsPress)
             .verreCascade(lignesVisibles, delai: delai(8), decalage: 10)
 
+            // Le brief du matin, à la demande. Il vivait en bas de Progrès, que
+            // la maquette « Verre liquide » réserve à la toile et aux symptômes :
+            // rien ne disparaît, il se rejoue d'ici (présenté par la racine).
+            if BriefDuJourBuilder.depuisLeCache() != nil {
+                Button {
+                    HapticService.shared.tap()
+                    NotificationCenter.default.post(name: .healthmapRevoirBrief, object: nil)
+                } label: {
+                    ReglageLigne(symbole: "sunrise", titre: "Revoir le brief du jour", filet: true)
+                }
+                .buttonStyle(.dsPress)
+                .verreCascade(lignesVisibles, delai: delai(8), decalage: 10)
+            }
+
             // Rejouer le récap : présenté par la racine (MainTabView), une
             // feuille plein écran ouverte depuis un onglet ne s'ouvrait pas.
             if dashboardVM.analysisV2 != nil {

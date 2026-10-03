@@ -542,6 +542,8 @@ struct ProgresToileLegende: View {
 
 // MARK: - Graphe à barres de la semaine (teinte = dans la cible, ambre = hors cible, pointillé = besoins)
 
+/// N'est plus posé sur la page Progrès depuis le 3 octobre 2026 : il servait
+/// les cartes « Apports » et « Calories », absentes de la maquette.
 struct ProgresBarChart: View {
     let points: [ProgresBarPoint]
     let besoin: Double?
@@ -650,7 +652,9 @@ struct ProgresBarChart: View {
 // MARK: - État premier jour (5 blocs vides → 1)
 
 /// Petit graphe illustratif (deux points verts pleins, deux points pointillés
-/// gris), titre, une phrase, un bouton capsule.
+/// gris), titre, une phrase, un bouton capsule. N'est plus posée sur la page
+/// Progrès depuis le 3 octobre 2026 : elle annonçait les cartes « Apports » et
+/// « Calories », absentes de la maquette.
 struct ProgresPremierJourCard: View {
     let onSuivre: () -> Void
 

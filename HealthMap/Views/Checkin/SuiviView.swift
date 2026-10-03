@@ -4,16 +4,30 @@ import Foundation
 // MARK: - Progrès (onglet 2, maquette « Verre liquide » du 2 octobre 2026)
 //
 // La toile d'abord : les dix apports sur un radar, le besoin en cercle
-// pointillé, un chiffre au centre. Puis le verdict, puis « Ce qui a changé » :
-// une carte de verre par évolution réelle (un symptôme et sa courbe, la
-// semaine des apports, celle des calories, les apports depuis le premier
-// jour), et le check-in du jour en bas de page.
+// pointillé, un chiffre au centre. Puis le verdict, puis « Ce qui a changé »,
+// exactement comme la maquette (retour d'Arthur sur le build 714 : « je veux
+// vraiment qu'on reproduise ce que je t'ai envoyé ») : UNE carte par symptôme
+// suivi, empilées, puis « En coulisses », puis le check-in du jour. Les cartes
+// « Apports » et « Calories » de la semaine ne sont pas dans la maquette : elles
+// ont quitté la page (leurs types restent dans `ProgresComponents` et
+// `ProgresV3Components`).
+//
+// Une carte de symptôme prend la forme que dicte la nature du symptôme
+// (`SymptomTrend.dir`) :
+//   • un objectif qu'on veut voir MONTER (énergie, concentration) est un
+//     niveau, qui se lit au jour le jour → la courbe, avec à côté celle de
+//     l'apport que le bilan lui relie (carte « Énergie » de la maquette) ;
+//   • un problème qu'on veut voir reculer (ongles, cheveux, digestion,
+//     sommeil, fatigue…) se compte en jours → quatre barres, une par semaine,
+//     des jours répondus « mieux » (carte « Ongles » de la maquette).
 //
 // Tout se calcule seul à partir de données DÉJÀ chargées — aucun appel réseau
 // ni LLM à l'affichage :
 //   • les scores d'apports    → DashboardViewModel.registre (un seul chiffre
 //                               par apport dans toute l'app ; < 60 = à renforcer)
-//   • le journal alimentaire  → MealJournalViewModel.fortnight (14 derniers jours)
+//   • le journal alimentaire  → MealJournalViewModel.fortnight (14 derniers
+//                               jours) ; la courbe de l'apport lié en est la
+//                               série quotidienne (`SuiviEngineV4.microDailySeries`)
 //   • les symptômes déclarés  → DashboardViewModel.analysisV2?.bilan?.symptomes
 //   • les ressentis locaux    → SuiviCheckinHistory (UserDefaults scopé jour)
 //   • les phrases du verdict  → ProgresVerdict (pur, testé)
@@ -45,26 +59,18 @@ struct SuiviView: View {
     /// Incrémenté après chaque check-in : les ressentis sont relus depuis
     /// UserDefaults à la volée, ce compteur force le recalcul des courbes.
     @State private var checkinTick = 0
-    /// Symptôme affiché dans sa carte (menu quand il y en a plusieurs).
-    @State private var symptomeIndex = 0
     /// Avancement de l'entrée de la toile, 0 → 1 (1,3 s).
     @State private var toileAvancement: Double = 0
-    /// Barres des semaines tracées. Repasse à faux puis à vrai à chaque
-    /// arrivée sur l'onglet : les tracés se rejouent.
-    @State private var trace = false
-    /// Courbe et barres du symptôme affiché. Elles se rejouent aussi quand on
-    /// change de symptôme ou qu'une réponse ajoute un point, sans faire
-    /// retomber les barres des cartes voisines.
+    /// Courbes et barres des cartes de symptôme tracées. Repasse à faux puis à
+    /// vrai à chaque arrivée sur l'onglet, et quand une réponse ajoute un
+    /// point : les tracés se rejouent.
     @State private var traceSymptome = false
     /// Une arrivée qui en chasse une autre annule l'entrée en attente.
     @State private var jetonEntree = 0
-    /// Même garde, pour la seule carte du symptôme.
+    /// Même garde, pour les seules cartes de symptôme.
     @State private var jetonSymptome = 0
-    /// Le brief du matin peut-il se rejouer ? (lu hors du `body` : il décode
-    /// un cache.)
-    @State private var briefDisponible = false
     /// iOS 18 et plus : la feuille Premium grandit depuis ce qu'on a touché
-    /// (le lien, le bouton posé sur la courbe, la carte « En coulisses »).
+    /// (le lien, le bouton posé sur une courbe, la carte « En coulisses »).
     @Namespace private var espaceOffre
 
     private enum FeuilleProgres: Identifiable {
@@ -81,7 +87,9 @@ struct SuiviView: View {
         }
     }
 
-    /// Ce d'où part la feuille Premium.
+    /// Ce d'où part la feuille Premium. Une carte de symptôme ajoute son rang
+    /// à `origineCourbe` : chaque bouton « Voir ta courbe » est une source à
+    /// part.
     private static let origineLien = "progres.offre.lien"
     private static let origineCourbe = "progres.offre.courbe"
     private static let origineCoulisses = "progres.offre.coulisses"
@@ -94,12 +102,10 @@ struct SuiviView: View {
         let reponses: [String: [(jour: Date, ressenti: Int)]]
         let evolutions: [SuiviEngineV4.SymptomEvolution]
         let couverture: [SuiviEngineV4.NutrientCoverage7d]
-        let pointsApports: [ProgresBarPoint]
-        let pointsCalories: [ProgresBarPoint]
+        /// Jours des sept derniers où au moins un repas a été noté.
+        let joursSuivis: Int
         let verrouille: Bool
 
-        /// Jours de la semaine où au moins un repas a été noté.
-        var joursSuivis: Int { pointsCalories.filter { $0.valeur != nil }.count }
         /// Les scores sont connus : la toile peut se dessiner.
         var aLaToile: Bool { apports.count >= ProgresToile.axesMinimum }
     }
@@ -125,8 +131,7 @@ struct SuiviView: View {
             reponses: reponses,
             evolutions: evolutionsSymptomes(reponses),
             couverture: couvertureDepuisLeDepart(scores),
-            pointsApports: pointsGraphe(.apports),
-            pointsCalories: pointsGraphe(.calories),
+            joursSuivis: caloriesParJour.filter { $0 != nil }.count,
             verrouille: dashboardVM.premiumVisible
         )
     }
@@ -192,7 +197,7 @@ struct SuiviView: View {
     private func page(_ d: Donnees, defilement: ScrollViewProxy) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             DSLargeTitle(titre: "Progrès")
-                .padding(.top, 18)
+                .padding(.top, DS.hautTitreOnglet)
 
             puces(d)
 
@@ -243,11 +248,9 @@ struct SuiviView: View {
     }
 
     /// L'onglet vient d'être choisi : la toile et les courbes rejouent leur
-    /// entrée, le brief est relu, et le check-in du jour se propose — une fois
-    /// par jour, jamais s'il est déjà fait ou reporté, jamais sans symptôme à
-    /// suivre.
+    /// entrée, et le check-in du jour se propose — une fois par jour, jamais
+    /// s'il est déjà fait ou reporté, jamais sans symptôme à suivre.
     private func arriveeSurLOnglet() {
-        briefDisponible = BriefDuJourBuilder.depuisLeCache() != nil
         rejouerEntree()
         if feuille == nil, SuiviCheckinStore.shouldPromptToday(), !checkinSymptoms.isEmpty {
             feuille = .checkin
@@ -262,26 +265,22 @@ struct SuiviView: View {
         jetonSymptome += 1
         guard !reduceMotion else {
             toileAvancement = 1
-            trace = true
             traceSymptome = true
             return
         }
         toileAvancement = 0
-        trace = false
         traceSymptome = false
         let attendu = jetonEntree
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(60))
             guard attendu == jetonEntree else { return }
-            trace = true
             traceSymptome = true
             withAnimation(Animation.linear(duration: 1.3).delay(0.15)) { toileAvancement = 1 }
         }
     }
 
-    /// Le symptôme affiché change, ou une réponse vient d'ajouter un point :
-    /// seule sa carte se retrace. La toile et les barres des semaines ne
-    /// bougent pas.
+    /// Une réponse vient d'ajouter un point : seules les cartes de symptôme
+    /// se retracent. La toile ne bouge pas.
     private func retracerSymptome() {
         jetonSymptome += 1
         guard !reduceMotion else {
@@ -437,7 +436,7 @@ struct SuiviView: View {
     /// coulisses » (rien à montrer : pas de lien).
     @ViewBuilder
     private func lienProgression(_ d: Donnees, defilement: ScrollViewProxy) -> some View {
-        let aDesCoulisses = !aucunRepas && !d.couverture.isEmpty
+        let aDesCoulisses = !aucunRepas && !lignesCoulisses(d).isEmpty
         if d.verrouille || aDesCoulisses {
             Button {
                 if d.verrouille {
@@ -481,127 +480,210 @@ struct SuiviView: View {
 
     @ViewBuilder
     private func ceQuiAChange(_ d: Donnees) -> some View {
-        if !aucunRepas || !d.evolutions.isEmpty {
-            Text("Ce qui a changé")
-                .font(.dsSection)
-                .tracking(DSTracking.section)
-                .foregroundStyle(Color.dsTexte)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.top, 28)
-                .padding(.bottom, 12)
-        } else {
-            // Rien n'a encore changé : pas de titre, les états vides suffisent.
-            Color.clear.frame(height: 24)
-        }
+        Text("Ce qui a changé")
+            .font(.dsSection)
+            .tracking(DSTracking.section)
+            .foregroundStyle(Color.dsTexte)
+            .accessibilityAddTraits(.isHeader)
+            .padding(.top, 28)
+            .padding(.bottom, 12)
 
         VStack(spacing: DS.interCarte) {
-            if aucunRepas {
-                // Premier jour : on le dit, on n'illustre pas.
-                ProgresPremierJourCard { ouvrirAjout() }
+            if d.evolutions.isEmpty {
+                carteSansSymptome
+            } else {
+                // Une carte par symptôme suivi, empilées : plus de menu.
+                ForEach(Array(d.evolutions.enumerated()), id: \.offset) { position, evolution in
+                    carteSymptome(evolution, position: position, d)
+                }
             }
 
-            carteSymptomes(d)
-
-            // Sans repas noté, une semaine de barres vides n'apprend rien :
-            // les cartes attendent leur première donnée.
+            // Sans repas noté, rien n'a encore bougé en coulisses.
             if !aucunRepas {
-                carteSemaine(.apports, d)
-                carteSemaine(.calories, d)
                 coulisses(d)
             }
         }
     }
 
-    // MARK: - Le symptôme suivi : un seul à la fois
+    // MARK: - Aucun symptôme à suivre
 
-    @ViewBuilder
-    private func carteSymptomes(_ d: Donnees) -> some View {
-        if d.evolutions.isEmpty {
-            Text(dashboardVM.isLoadingAnalysisV2
-                 ? "On regarde tes symptômes déclarés…"
-                 : "Tu n'as déclaré aucun symptôme dans ton questionnaire : il n'y a rien à suivre ici pour le moment.")
-                .font(.dsSousTitre)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(DS.paddingCarte)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .dsCard()
+    /// La carte sobre qui dit qu'il n'y a rien à suivre, dans la grammaire des
+    /// autres : la catégorie, un verdict, une phrase.
+    private var carteSansSymptome: some View {
+        let verdict: String
+        let phrase: String
+        if dashboardVM.isLoadingAnalysisV2 {
+            verdict = "Un instant"
+            phrase = "On regarde tes symptômes déclarés…"
+        } else if !dashboardVM.bilanComplete {
+            // Découverte : pas encore de questionnaire, donc rien de déclaré.
+            verdict = "Rien à suivre pour l'instant"
+            phrase = "Les symptômes que tu déclares dans ton bilan se suivent ici, jour après jour."
         } else {
-            carteSymptome(d.evolutions[min(symptomeIndex, d.evolutions.count - 1)], d)
-                .onChange(of: symptomeIndex) { _, _ in retracerSymptome() }
+            verdict = "Rien à suivre pour l'instant"
+            phrase = "Tu n'as déclaré aucun symptôme dans ton questionnaire."
         }
-    }
-
-    private func carteSymptome(_ evolution: SuiviEngineV4.SymptomEvolution, _ d: Donnees) -> some View {
-        let trend = SymptomTrend.make(from: evolution.nom)
-        let teintes = ProgresTeintes.symptome(trend)
-        let mesuree = ProgresVerdict.aUneTendance(evolution)
-        // Gratuit : la trajectoire ENTIÈRE est gatée — courbe voilée ET
-        // verdict neutralisé (fuite corrigée le 4 août 2026). Sans réponse
-        // encore, il n'y a rien à cacher.
-        let gatee = d.verrouille && mesuree
-        let reponses = d.reponses[evolution.id] ?? []
-        let serie = serieLongue(reponses, trend: trend)
-        let axe = min(ProgresCourbeSymptome.fenetre, max(ProgresCourbeSymptome.axeMinimum, serie.count))
-        let lie: EnrichedNutrient? = gatee ? nil : apportLie(evolution)
-
         return VStack(alignment: .leading, spacing: 0) {
             ProgresSymptomeEntete(
-                noms: d.evolutions.map { ProgresVerdict.majuscule($0.nom) },
-                index: $symptomeIndex,
-                symbole: trend.symbole,
-                teinte: teintes.trait,
-                teinteTexte: teintes.texte,
-                verdict: gatee ? "Ta tendance" : (mesuree ? evolution.verdict : "Ton suivi démarre"),
-                niveaux: (gatee || !mesuree) ? nil
-                    : ProgresVerdict.niveauxGagnes(ressentis: reponses.map(\.ressenti))
+                nom: "Symptômes",
+                symbole: "heart.text.square",
+                teinte: Color.teinteSymptomes,
+                teinteTexte: Color.teinteSymptomesTexte,
+                verdict: verdict
             )
-
-            Text(phraseSymptome(evolution, mesuree: mesuree, gatee: gatee))
-                .font(.dsSousTitre)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 2)
-
-            DSSeparator(retrait: 0)
-                .padding(.vertical, 12)
-
-            chiffresDeLaSemaine(reponses, teintes: teintes, apport: lie, scores: d.scores)
-
-            courbe(serie, axe: axe, trend: trend, teinte: teintes.courbe, gatee: gatee)
-                .padding(.top, 14)
-
-            reponsesAuCheckin(reponses, axe: axe, trend: trend, teinte: teintes.courbe, gatee: gatee)
-                .padding(.top, 14)
-
-            if let lie {
-                ProgresEncart(symbole: "link", texte: lienAvecUnApport(lie, couverture: d.couverture))
-                    .padding(.top, 14)
-            }
+            phraseSousLeVerdict(phrase)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
     }
 
-    /// La phrase sous le verdict : ce que le suivi sait dire, sans jamais
-    /// livrer la tendance en gratuit.
-    private func phraseSymptome(_ evolution: SuiviEngineV4.SymptomEvolution, mesuree: Bool, gatee: Bool) -> String {
-        guard mesuree else { return "Trois réponses et la tendance apparaît." }
-        if gatee { return "Ta tendance se dessine, réponse après réponse." }
-        guard let ligne = ProgresVerdict.ligneSymptome([evolution], verrouille: false) else { return "" }
-        return ligne.gras + ligne.suite
+    // MARK: - Une carte par symptôme
+
+    /// La forme de la carte suit la nature du symptôme : un objectif qui doit
+    /// monter (énergie, concentration) se lit en courbe ; un problème qui doit
+    /// reculer se compte en jours, semaine par semaine.
+    @ViewBuilder
+    private func carteSymptome(_ evolution: SuiviEngineV4.SymptomEvolution, position: Int, _ d: Donnees) -> some View {
+        let trend = SymptomTrend.make(from: evolution.nom)
+        if trend.dir == .higherBetter {
+            carteCourbe(evolution, trend: trend, position: position, d)
+        } else {
+            carteSemaines(evolution, trend: trend, position: position, d)
+        }
     }
 
-    /// « Cette semaine » : les jours répondus, et l'apport que le bilan relie
-    /// à ce symptôme (son chiffre du jour, celui du registre).
+    /// Le verdict d'un symptôme, le même mot que sa puce d'en-tête quand il
+    /// s'améliore. En gratuit, la tendance reste réservée : on nomme le sujet.
+    private func verdictSymptome(_ evolution: SuiviEngineV4.SymptomEvolution,
+                                 trend: SymptomTrend,
+                                 mesuree: Bool,
+                                 gatee: Bool) -> String {
+        if gatee { return "Ta tendance" }
+        guard mesuree else { return "Ton suivi démarre" }
+        return evolution.improving ? trend.betterLabel : evolution.verdict
+    }
+
+    /// La phrase sous un verdict (15, secondaire).
+    private func phraseSousLeVerdict(_ texte: String) -> some View {
+        Text(texte)
+            .font(.dsSousTitre)
+            .tracking(DSTracking.sousTitre)
+            .foregroundStyle(Color.dsSecondaire)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 2)
+    }
+
+    /// La porte de la tendance, posée sur le tracé flouté d'une carte.
+    private func boutonCourbe(origine: String) -> some View {
+        ProgresBoutonOffre(titre: "Voir ta courbe") {
+            ouvrirOffre("suivi_symptomes", depuis: origine)
+        }
+        .premiumOrigine(origine, dans: espaceOffre)
+    }
+
+    // MARK: Le mode courbe (carte « Énergie » de la maquette)
+
+    private func carteCourbe(_ evolution: SuiviEngineV4.SymptomEvolution,
+                             trend: SymptomTrend,
+                             position: Int,
+                             _ d: Donnees) -> some View {
+        let teintes = ProgresTeintes.symptome(trend)
+        let mesuree = ProgresVerdict.aUneTendance(evolution)
+        // Gratuit : la trajectoire ENTIÈRE est gatée — courbes voilées ET
+        // verdict neutralisé (fuite corrigée le 4 août 2026). Sans réponse
+        // encore, il n'y a rien à cacher.
+        let gatee = d.verrouille && mesuree
+        let reponses = d.reponses[evolution.id] ?? []
+        let serie = serieLongue(reponses, trend: trend)
+        let axe = min(ProgresCourbeSymptome.fenetre, max(ProgresCourbeSymptome.axeMinimum, serie.count))
+        // Le chiffre du jour de l'apport lié est celui de la toile : il reste
+        // lisible en gratuit. Sa courbe, elle, est floutée avec l'autre.
+        let lie = apportLie(evolution)
+        let courbeLiee = lie.map { courbeApport($0, axe: axe) }
+
+        return VStack(alignment: .leading, spacing: 0) {
+            ProgresSymptomeEntete(
+                nom: ProgresVerdict.majuscule(evolution.nom),
+                symbole: trend.symbole,
+                teinte: teintes.trait,
+                teinteTexte: teintes.texte,
+                verdict: verdictSymptome(evolution, trend: trend, mesuree: mesuree, gatee: gatee)
+            )
+
+            if !mesuree {
+                phraseSousLeVerdict("Trois réponses et la tendance apparaît.")
+            }
+
+            DSSeparator(retrait: 0)
+                .padding(.vertical, 12)
+
+            chiffresDeLaSemaine(reponses, trend: trend, teintes: teintes, apport: lie, scores: d.scores, gatee: gatee)
+
+            ZStack(alignment: .top) {
+                VStack(spacing: 0) {
+                    ProgresCourbeSymptome(
+                        jours: serie,
+                        axe: axe,
+                        mieuxVersLeHaut: trend.dir == .higherBetter,
+                        libelleHaut: trend.betterLabel.lowercased(),
+                        libelleBas: trend.worseLabel.lowercased(),
+                        teinte: teintes.courbe,
+                        apport: courbeLiee,
+                        trace: traceSymptome,
+                        gatee: gatee
+                    )
+                    reponsesAuCheckin(reponses, axe: axe, trend: trend, teinte: teintes.courbe, gatee: gatee)
+                        .padding(.top, 14)
+                }
+                if gatee {
+                    // Le bouton (36 pt) est posé à 30 pt du haut ; sa cible
+                    // tactile en fait 44.
+                    boutonCourbe(origine: Self.origineCourbe + "." + String(position))
+                        .padding(.top, 26)
+                }
+            }
+            .padding(.top, 14)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+    }
+
+    /// La courbe de l'apport lié : ce que les repas notés en ont apporté, jour
+    /// après jour, sur l'axe de la carte. Jamais une valeur inventée : un jour
+    /// sans repas n'a pas de point.
+    private func courbeApport(_ apport: EnrichedNutrient, axe: Int) -> ProgresCourbeApport {
+        ProgresCourbeApport(
+            valeurs: SuiviEngineV4.microDailySeries(fortnight: journal.fortnight, id: apport.id, days: axe)
+                .map(\.value),
+            teinte: Color.nutrientColor(for: apport.id),
+            nom: NomNutriment.possessif(id: apport.id, nom: apport.label)
+        )
+    }
+
+    /// « Cette semaine » : le symptôme (les jours répondus « mieux » sur les
+    /// sept derniers) et l'apport que le bilan lui relie (son chiffre du jour,
+    /// celui du registre). En gratuit, le symptôme dit combien de jours on a
+    /// répondu, jamais dans quel sens : « 5 jours mieux » sous « Ta tendance »
+    /// livrerait la tendance que la porte réserve.
     private func chiffresDeLaSemaine(_ reponses: [(jour: Date, ressenti: Int)],
+                                     trend: SymptomTrend,
                                      teintes: ProgresTeintes.Paire,
                                      apport: EnrichedNutrient?,
-                                     scores: [String: Int]) -> some View {
-        let repondus = joursRepondusCetteSemaine(reponses)
+                                     scores: [String: Int],
+                                     gatee: Bool) -> some View {
+        let semaine = semainesDeReponses(reponses, nombre: 1).last
+        let repondus = semaine?.repondus ?? 0
+        let mieux = semaine?.mieux ?? 0
+        let valeur: String
+        if repondus == 0 {
+            valeur = "Pas de réponse"
+        } else if gatee {
+            valeur = repondus == 1 ? "1 jour répondu" : "\(repondus) jours répondus"
+        } else {
+            valeur = "\(mieux) jour\(mieux > 1 ? "s" : "") mieux"
+        }
         return VStack(alignment: .leading, spacing: 6) {
             Text("Cette semaine")
                 .font(.dsLegende.weight(.semibold))
@@ -610,9 +692,10 @@ struct SuiviView: View {
                 ProgresChiffreSemaine(
                     teinte: teintes.courbe,
                     teinteTexte: teintes.texte,
-                    libelle: "Tes réponses",
-                    valeur: repondus == 1 ? "1 jour répondu" : "\(repondus) jours répondus",
-                    legende: "sur 7"
+                    // « Ton énergie », « Ta concentration ».
+                    libelle: ProgresVerdict.majuscule(trend.noun),
+                    valeur: valeur,
+                    legende: repondus == 0 ? "ces sept derniers jours" : "sur 7"
                 )
                 if let apport {
                     ProgresChiffreSemaine(
@@ -630,36 +713,6 @@ struct SuiviView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 0)
                 }
-            }
-        }
-    }
-
-    /// La courbe du symptôme. En gratuit elle est floutée sous le bouton de
-    /// verre vert, qui ouvre l'offre.
-    private func courbe(_ serie: [SuiviEngineV4.PointJour],
-                        axe: Int,
-                        trend: SymptomTrend,
-                        teinte: Color,
-                        gatee: Bool) -> some View {
-        ZStack(alignment: .top) {
-            ProgresCourbeSymptome(
-                jours: serie,
-                axe: axe,
-                mieuxVersLeHaut: trend.dir == .higherBetter,
-                libelleHaut: trend.betterLabel.lowercased(),
-                libelleBas: trend.worseLabel.lowercased(),
-                teinte: teinte,
-                trace: traceSymptome,
-                gatee: gatee
-            )
-            if gatee {
-                ProgresBoutonOffre(titre: "Voir ta courbe") {
-                    ouvrirOffre("suivi_symptomes", depuis: Self.origineCourbe)
-                }
-                .premiumOrigine(Self.origineCourbe, dans: espaceOffre)
-                // Le bouton (36 pt) est posé à 30 pt du haut ; sa cible
-                // tactile en fait 44.
-                .padding(.top, 26)
             }
         }
     }
@@ -688,6 +741,60 @@ struct SuiviView: View {
         .font(.system(.caption, design: .default))
         .foregroundStyle(Color.dsSecondaire)
     }
+
+    // MARK: Le mode semaines (carte « Ongles » de la maquette)
+
+    private func carteSemaines(_ evolution: SuiviEngineV4.SymptomEvolution,
+                               trend: SymptomTrend,
+                               position: Int,
+                               _ d: Donnees) -> some View {
+        let teintes = ProgresTeintes.symptome(trend)
+        let mesuree = ProgresVerdict.aUneTendance(evolution)
+        let gatee = d.verrouille && mesuree
+        let semaines = semainesDeReponses(d.reponses[evolution.id] ?? [], nombre: 4)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            ProgresSymptomeEntete(
+                nom: ProgresVerdict.majuscule(evolution.nom),
+                symbole: trend.symbole,
+                teinte: teintes.trait,
+                teinteTexte: teintes.texte,
+                verdict: verdictSymptome(evolution, trend: trend, mesuree: mesuree, gatee: gatee)
+            )
+
+            phraseSousLeVerdict(phraseSemaine(semaines.last, trend: trend, mesuree: mesuree, gatee: gatee))
+
+            ZStack(alignment: .top) {
+                ProgresBarresSemaines(semaines: semaines, teinte: teintes.courbe,
+                                      trace: traceSymptome, gatee: gatee)
+                if gatee {
+                    // Le bouton (36 pt) est posé à 24 pt du haut ; sa cible
+                    // tactile en fait 44.
+                    boutonCourbe(origine: Self.origineCourbe + "." + String(position))
+                        .padding(.top, 20)
+                }
+            }
+            .padding(.top, 16)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+    }
+
+    /// « Moins cassants 2 jours sur 7 cette semaine. » : la semaine en cours,
+    /// lue dans les réponses au check-in. En gratuit, la phrase ne dit pas le
+    /// sens (« Moins cassants » sous « Ta tendance » le livrerait).
+    private func phraseSemaine(_ semaine: ProgresSemaineReponses?, trend: SymptomTrend,
+                               mesuree: Bool, gatee: Bool) -> String {
+        guard mesuree else { return "Trois réponses et la tendance apparaît." }
+        if gatee { return "Ta tendance se dessine, réponse après réponse." }
+        guard let semaine, semaine.repondus > 0 else { return "Pas encore de réponse cette semaine." }
+        guard semaine.mieux > 0 else { return "\(trend.betterLabel) : pas encore cette semaine." }
+        let pluriel = semaine.mieux > 1 ? "s" : ""
+        return "\(trend.betterLabel) \(semaine.mieux) jour\(pluriel) sur 7 cette semaine."
+    }
+
+    // MARK: Les réponses, jour par jour et semaine par semaine
 
     /// La série du symptôme sur quatre semaines au plus : le même calcul que
     /// le moteur (`serieQuotidienne`), fenêtre élargie à celle des barres.
@@ -724,12 +831,30 @@ struct SuiviView: View {
         }
     }
 
-    /// Jours des sept derniers où le symptôme a reçu une réponse.
-    private func joursRepondusCetteSemaine(_ reponses: [(jour: Date, ressenti: Int)]) -> Int {
+    /// Les `nombre` dernières semaines GLISSANTES (sept jours, la dernière
+    /// finit aujourd'hui), de la plus ancienne à la plus récente : les jours
+    /// répondus, et ceux répondus « mieux ». Plusieurs réponses le même jour :
+    /// la dernière fait foi.
+    private func semainesDeReponses(_ reponses: [(jour: Date, ressenti: Int)], nombre: Int) -> [ProgresSemaineReponses] {
         let cal = Calendar.current
-        let debut = debutAxe(7)
-        let jours = reponses.map { cal.startOfDay(for: $0.jour) }.filter { $0 >= debut }
-        return Set(jours).count
+        let debut = debutAxe(7 * nombre)
+        var parJour: [Date: Int] = [:]
+        for reponse in reponses {
+            parJour[cal.startOfDay(for: reponse.jour)] = reponse.ressenti
+        }
+        return (0..<nombre).map { rang in
+            let premier = cal.date(byAdding: .day, value: 7 * rang, to: debut) ?? debut
+            let ressentis = (0..<7).compactMap { decalage -> Int? in
+                guard let jour = cal.date(byAdding: .day, value: decalage, to: premier) else { return nil }
+                return parJour[jour]
+            }
+            return ProgresSemaineReponses(
+                id: rang,
+                debut: premier,
+                repondus: ressentis.count,
+                mieux: ressentis.filter { $0 == 0 }.count
+            )
+        }
     }
 
     /// L'apport que le bilan relie à ce symptôme (`SymptomeV2.causes`).
@@ -740,53 +865,24 @@ struct SuiviView: View {
         return dashboardVM.nutrients.first(where: { $0.id == cause })
     }
 
-    /// « Ce suivi va avec ton apport en fer, en hausse depuis ton départ. » Le
-    /// lien vient du bilan, la tendance du registre : on rapproche deux faits,
-    /// on ne promet aucun effet.
-    private func lienAvecUnApport(_ apport: EnrichedNutrient,
-                                  couverture: [SuiviEngineV4.NutrientCoverage7d]) -> String {
-        let nom = apport.label.lowercased()
-        if let mesure = couverture.first(where: { $0.id == apport.id }),
-           mesure.pct - mesure.baselinePct >= ProgresVerdict.ecartMinimum {
-            return "Ce suivi va avec ton apport en \(nom), en hausse depuis ton départ."
-        }
-        return "Ce suivi va avec ton apport en \(nom) : c'est lui qu'on regarde en premier."
-    }
-
-    // MARK: - La semaine des apports, celle des calories
-
-    private func carteSemaine(_ segment: ProgresSegment, _ d: Donnees) -> some View {
-        let apports = segment == .apports
-        let points = apports ? d.pointsApports : d.pointsCalories
-        // La précision sous le verdict : l'apport qui a le plus bougé (ou,
-        // en gratuit, le sujet suivi sans sa tendance).
-        let ligne: ProgresVerdict.Ligne? = apports
-            ? ProgresVerdict.ligneApport(couverture: d.couverture, joursSuivis: d.joursSuivis, verrouille: d.verrouille)
-            : nil
-        return ProgresSemaineCard(
-            symbole: apports ? "drop" : "flame",
-            titre: segment.libelle,
-            teinte: apports ? Color.teinteFibres : Color.teinteEnergie,
-            teinteTexte: apports ? Color.teinteFibresTexte : Color.teinteEnergieTexte,
-            verdict: conclusion(points, segment: segment),
-            phrase: ligne.map { $0.gras + $0.suite },
-            points: points,
-            besoin: besoin(segment),
-            trace: trace
-        )
-    }
-
     // MARK: - En coulisses (depuis ton premier jour : avant → après)
+
+    /// Une rangée par apport qui a VRAIMENT bougé depuis le premier bilan
+    /// (au moins `ProgresVerdict.ecartMinimum` points) : la carte s'appelle
+    /// « Ce qui bouge ». En gratuit, la rangée nomme l'apport, jamais son sens.
+    private func lignesCoulisses(_ d: Donnees) -> [ProgresDepuisLeDebutCard.Ligne] {
+        d.couverture
+            .map { ProgresDepuisLeDebutCard.Ligne(id: $0.id, nom: $0.nom, avant: $0.baselinePct, apres: $0.pct) }
+            .filter { abs($0.ecart) >= ProgresVerdict.ecartMinimum }
+    }
 
     @ViewBuilder
     private func coulisses(_ d: Donnees) -> some View {
-        let lignes = d.couverture.map {
-            ProgresDepuisLeDebutCard.Ligne(id: $0.id, nom: $0.nom, avant: $0.baselinePct, apres: $0.pct)
-        }
+        let lignes = lignesCoulisses(d)
         if !lignes.isEmpty {
-            // En gratuit la carte nomme les apports sans leur tendance, et
-            // chaque ligne ouvre l'offre ; en Premium, la fiche de l'apport.
-            ProgresDepuisLeDebutCard(lignes: lignes, duree: dureeDuSuivi, verrouille: d.verrouille) { ligne in
+            // En gratuit chaque ligne ouvre l'offre ; en Premium, la fiche de
+            // l'apport.
+            ProgresDepuisLeDebutCard(lignes: lignes, verrouille: d.verrouille) { ligne in
                 if d.verrouille {
                     ouvrirOffre("suivi_micros", depuis: Self.origineCoulisses)
                 } else if let nutriment = dashboardVM.nutrients.first(where: { $0.id == ligne.id }) {
@@ -808,7 +904,7 @@ struct SuiviView: View {
         return jours > 1 ? "\(jours) jours" : nil
     }
 
-    // MARK: - Le bas de page : le bilan à faire, le check-in du jour, le récap
+    // MARK: - Le bas de page : le bilan à faire, le check-in du jour
 
     @ViewBuilder
     private var pied: some View {
@@ -825,21 +921,14 @@ struct SuiviView: View {
             .padding(.top, 20)
         }
 
-        // Reporté ou fermé ce matin : le check-in reste à portée de main.
+        // Reporté ou fermé ce matin : le check-in reste à portée de main, en
+        // bas de page comme sur la maquette.
         if !checkinSymptoms.isEmpty, !SuiviCheckinStore.hasAnsweredToday() {
             ProgresCheckinRow(questions: checkinSymptoms.count) {
                 HapticService.shared.tap()
                 feuille = .checkin
             }
             .padding(.top, 20)
-        }
-
-        if briefDisponible {
-            ProgresRecapRow {
-                HapticService.shared.tap()
-                NotificationCenter.default.post(name: .healthmapRevoirBrief, object: nil)
-            }
-            .padding(.top, DS.interCarte)
         }
     }
 
@@ -868,27 +957,10 @@ struct SuiviView: View {
         )
     }
 
-    // MARK: - Apports et calories (fenêtre glissante de sept jours)
+    // MARK: - Les repas de la semaine (fenêtre glissante de sept jours)
 
     /// Aucun repas sur la fenêtre chargée.
     private var aucunRepas: Bool { journal.fortnight.isEmpty }
-
-    /// Ouvre la saisie du Journal.
-    private func ouvrirAjout() {
-        HapticService.shared.tap()
-        NotificationCenter.default.post(
-            name: .healthmapNavigateToTab,
-            object: NavCardDestination.scanner.rawValue
-        )
-    }
-
-    /// Initiale du jour d'une date (D L M M J V S, indexée par weekday 1-7).
-    private static let initialesParWeekday = ["D", "L", "M", "M", "J", "V", "S"]
-
-    private static func initiale(_ jour: Date) -> String {
-        let weekday = WeekScoreEngine.mondayFirst.component(.weekday, from: jour)
-        return initialesParWeekday[(weekday - 1) % 7]
-    }
 
     /// Fenêtre GLISSANTE : les 7 derniers jours, aujourd'hui en dernier.
     /// (La semaine calendaire vidait tout l'historique chaque lundi matin —
@@ -900,7 +972,9 @@ struct SuiviView: View {
     }
 
     /// Calories par jour ; nil = aucun repas ce jour-là (un trou honnête,
-    /// jamais un zéro fabriqué).
+    /// jamais un zéro fabriqué). Ne sert plus qu'à compter les jours suivis
+    /// (la puce d'un apport ne compare la semaine au départ qu'à partir de
+    /// trois jours).
     private var caloriesParJour: [Double?] {
         let cal = WeekScoreEngine.mondayFirst
         return joursSemaine.map { jour in
@@ -908,64 +982,6 @@ struct SuiviView: View {
             guard !repas.isEmpty else { return nil }
             return repas.reduce(0.0) { $0 + Double($1.macros.calories) }
         }
-    }
-
-    /// Besoin de la vue : l'objectif calorique du profil, ou 100 % pour les
-    /// apports. nil = inconnu → pas de ligne, pas de verdict.
-    private func besoin(_ segment: ProgresSegment) -> Double? {
-        switch segment {
-        case .calories: return dashboardVM.physicalMetrics.macros.map { Double($0.calories) }
-        case .apports: return 100
-        case .symptomes: return nil
-        }
-    }
-
-    /// Un jour est hors cible à plus de 15 % de l'objectif calorique, ou sous
-    /// 60 % de couverture des apports (le seuil « couvert » de l'app).
-    private func horsCible(_ valeur: Double, segment: ProgresSegment) -> Bool {
-        guard let besoin = besoin(segment), besoin > 0 else { return false }
-        if segment == .apports { return valeur < 60 }
-        return abs(valeur - besoin) / besoin > 0.15
-    }
-
-    private func pointsGraphe(_ segment: ProgresSegment) -> [ProgresBarPoint] {
-        let jours = joursSemaine
-        let valeurs: [Double?]
-        switch segment {
-        case .calories: valeurs = caloriesParJour
-        case .apports:
-            // Fenêtre glissante : les scores se calculent sur CES jours-là,
-            // pas sur la semaine calendaire du moteur.
-            valeurs = WeekScoreEngine.scoresQuotidiens(meals: journal.fortnight,
-                                                       weakNutrients: weakNutrientIds,
-                                                       jours: jours).map { $0.map(Double.init) }
-        case .symptomes: valeurs = []
-        }
-        return jours.enumerated().map { index, jour in
-            let valeur = index < valeurs.count ? valeurs[index] : nil
-            return ProgresBarPoint(
-                id: index,
-                libelle: Self.initiale(jour),
-                valeur: valeur,
-                horsCible: valeur.map { horsCible($0, segment: segment) } ?? false,
-                futur: false
-            )
-        }
-    }
-
-    private func conclusion(_ points: [ProgresBarPoint], segment: ProgresSegment) -> String {
-        let mesures = points.filter { $0.valeur != nil }
-        guard !mesures.isEmpty else { return "Pas encore de repas sur les sept derniers jours." }
-        guard besoin(segment) != nil else { return "Complète ton profil pour connaître tes besoins." }
-        let dansLaCible = mesures.filter { !$0.horsCible }.count
-        let sujet = segment == .apports ? "avec tes besoins couverts" : "dans ta cible"
-        return "\(Self.enLettres(dansLaCible).capitalized) jour\(dansLaCible > 1 ? "s" : "") sur \(Self.enLettres(mesures.count)) \(sujet)."
-    }
-
-    /// Les petits nombres s'écrivent en lettres dans une phrase.
-    private static func enLettres(_ n: Int) -> String {
-        let mots = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept"]
-        return n >= 0 && n < mots.count ? mots[n] : "\(n)"
     }
 
     // MARK: - Dérivés déterministes (aucun appel réseau)

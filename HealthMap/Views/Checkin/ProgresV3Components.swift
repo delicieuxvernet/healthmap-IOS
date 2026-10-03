@@ -3,10 +3,10 @@ import SwiftUI
 // MARK: - Progrès : les cartes de « Ce qui a changé » (maquette « Verre liquide », 2 octobre 2026)
 //
 // La toile d'abord (`ProgresComponents.swift`), puis une carte de verre par
-// évolution réelle : un symptôme et sa courbe, la semaine des apports, celle
-// des calories, et ce qui bouge en coulisses depuis le premier jour. Les
-// calculs vivent dans `ProgresVerdict` et `SuiviEngineV4` : ici, on ne fait
-// que dessiner.
+// symptôme suivi — en courbe (énergie : le symptôme et l'apport qui lui est
+// relié) ou en barres par semaine (ongles : les jours qui vont mieux) — et ce
+// qui bouge en coulisses depuis le premier jour. Les calculs vivent dans
+// `ProgresVerdict` et `SuiviEngineV4` : ici, on ne fait que dessiner.
 
 // MARK: - Outils
 
@@ -76,82 +76,32 @@ struct ProgresCarteEntete: View {
     }
 }
 
-// MARK: - En-tête d'un symptôme (nom, verdict, crans gagnés)
+// MARK: - En-tête d'une carte de symptôme (le nom, puis le verdict)
 
+/// Le libellé de catégorie (icône dans la teinte, nom dans sa version foncée),
+/// puis le verdict en 22 / 700, à 4 pt dessous — comme les deux cartes de la
+/// maquette. Une carte par symptôme : plus de menu pour en changer.
 struct ProgresSymptomeEntete: View {
-    let noms: [String]
-    @Binding var index: Int
+    /// Le symptôme tel que déclaré (« Ongles cassants »).
+    let nom: String
     let symbole: String
     let teinte: Color
     let teinteTexte: Color
     /// Le verdict écrit (« Ta tendance » quand elle est gatée, « Ton suivi
     /// démarre » avant la première réponse).
     let verdict: String
-    /// Crans gagnés ; `nil` = on ne l'affiche pas (gratuit, ou pas de réponse).
-    let niveaux: Int?
-
-    private var nomCourant: String {
-        noms.isEmpty ? "" : noms[min(max(0, index), noms.count - 1)]
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if noms.count > 1 {
-                Menu {
-                    ForEach(Array(noms.enumerated()), id: \.offset) { position, nom in
-                        Button(nom) { index = position }
-                    }
-                } label: {
-                    HStack(spacing: 5) {
-                        ProgresCarteEntete(symbole: symbole, titre: nomCourant, teinte: teinte, teinteTexte: teinteTexte)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(teinteTexte)
-                            .accessibilityHidden(true)
-                    }
-                    .frame(minHeight: 28)
-                    // 28 pt de haut : la cible tactile déborde de 8 pt en haut
-                    // et en bas pour atteindre 44.
-                    .contentShape(Rectangle().inset(by: -8))
-                }
-                .accessibilityLabel("Symptôme affiché")
-                .accessibilityValue(nomCourant)
-            } else {
-                ProgresCarteEntete(symbole: symbole, titre: nomCourant, teinte: teinte, teinteTexte: teinteTexte)
-            }
-
-            HStack(alignment: .center, spacing: 10) {
-                Text(verdict)
-                    .font(.dsSection)
-                    .tracking(DSTracking.section)
-                    .foregroundStyle(Color.dsTexte)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                if let niveaux {
-                    pilule(niveaux)
-                }
-            }
+            ProgresCarteEntete(symbole: symbole, titre: nom, teinte: teinte, teinteTexte: teinteTexte)
+            Text(verdict)
+                .font(.dsSection)
+                .tracking(DSTracking.section)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    private func pilule(_ niveaux: Int) -> some View {
-        let encre: Color = niveaux > 0 ? Color.teinteKiwiTexte
-            : (niveaux < 0 ? Color.dsARenforcerTexte : Color.dsSecondaire)
-        let fond: Color = niveaux > 0 ? Color.teinteKiwi.opacity(0.14)
-            : (niveaux < 0 ? Color.dsARenforcer.opacity(0.16) : Verre.remplissage)
-        return HStack(spacing: 5) {
-            if niveaux != 0 {
-                Image(systemName: niveaux > 0 ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .accessibilityHidden(true)
-            }
-            Text(ProgresVerdict.libelleNiveaux(niveaux))
-                .font(.system(.footnote, design: .default).weight(.semibold).monospacedDigit())
-        }
-        .foregroundStyle(encre)
-        .padding(.horizontal, 11)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(fond))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -194,7 +144,20 @@ struct ProgresChiffreSemaine: View {
     }
 }
 
-// MARK: - La courbe d'un symptôme : une ligne qui se dessine
+// MARK: - La courbe d'un symptôme, et celle de l'apport qui lui est relié
+
+/// La seconde courbe d'une carte « courbe » : l'apport que le bilan relie au
+/// symptôme (`SymptomeV2.causes`), tel que les repas notés l'ont apporté jour
+/// après jour (`SuiviEngineV4.microDailySeries`).
+struct ProgresCourbeApport {
+    /// Une valeur par jour de l'axe, du plus ancien à aujourd'hui : la part du
+    /// besoin couverte par les repas notés ce jour-là (0-100). `nil` = aucun
+    /// repas noté ce jour-là, ou un jour hors de la quinzaine chargée.
+    let valeurs: [Double?]
+    let teinte: Color
+    /// « ton fer », « tes fibres » : ce que VoiceOver annonce.
+    let nom: String
+}
 
 /// Le haut du graphe est TOUJOURS le mieux, quel que soit le sens du symptôme :
 /// une courbe qui monte est une bonne nouvelle, on n'a pas à réfléchir. Le
@@ -203,6 +166,14 @@ struct ProgresChiffreSemaine: View {
 /// La courbe partage son axe avec les barres du check-in posées dessous : un
 /// cran par jour, aujourd'hui tout à droite. Un suivi plus jeune que l'axe
 /// commence donc en cours de route, là où il a vraiment commencé.
+///
+/// Derrière elle, comme sur la maquette, la courbe de l'apport relié : un
+/// trait plus fin, le voile coloré dessous, qui part 0,15 s après. Elle dit
+/// le SENS, pas un niveau : comme la courbe du symptôme, elle part du milieu
+/// et monte quand les repas en apportent plus qu'au début de l'axe. Une
+/// hauteur proportionnelle à la couverture des repas poserait, à côté du
+/// « 58 % » du registre, un second chiffre pour le même apport (« 55 → 11 % »,
+/// retour d'Arthur du 1er octobre 2026).
 struct ProgresCourbeSymptome: View {
     /// L'axe le plus long : quatre semaines.
     static let fenetre = 28
@@ -219,6 +190,9 @@ struct ProgresCourbeSymptome: View {
     /// Écart au départ (en points de niveau) qui touche le bord du graphe : en
     /// dessous, quatre réponses « mieux » suffisent à atteindre le palier haut.
     private static let amplitudeMinimale: Double = 12
+    /// Même idée pour l'apport, en points de besoin couvert (moyenne sur sept
+    /// jours) : il faut 25 points de mieux pour toucher le haut.
+    private static let amplitudeMinimaleApport: Double = 25
 
     let jours: [SuiviEngineV4.PointJour]
     /// Nombre de jours de l'axe (au moins `jours.count`).
@@ -229,14 +203,30 @@ struct ProgresCourbeSymptome: View {
     let libelleHaut: String
     let libelleBas: String
     let teinte: Color
-    /// La ligne se dessine quand `trace` passe à vrai.
+    /// L'apport relié ; `nil` = pas de seconde courbe.
+    let apport: ProgresCourbeApport?
+    /// Les lignes se dessinent quand `trace` passe à vrai.
     let trace: Bool
-    /// Gratuit : la ligne est floutée, seule la position du jour reste nette.
+    /// Gratuit : les lignes sont floutées, seules les positions du jour
+    /// restent nettes.
     let gatee: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var animer: Bool { trace && !reduceMotion }
+
+    /// La courbe de l'apport, lissée comme sur la maquette : chaque jour, la
+    /// moyenne des jours NOTÉS parmi les sept derniers. `nil` tant qu'aucun
+    /// jour n'est noté dans la fenêtre : la courbe s'interrompt, elle ne
+    /// devine rien.
+    static func moyenneGlissante(_ valeurs: [Double?], fenetre: Int = 7) -> [Double?] {
+        valeurs.indices.map { index -> Double? in
+            let debut = max(0, index - (fenetre - 1))
+            let notees = valeurs[debut...index].compactMap { $0 }
+            guard !notees.isEmpty else { return nil }
+            return notees.reduce(0, +) / Double(notees.count)
+        }
+    }
 
     /// 0 = palier bas, 1 = palier haut, 0,5 = « pareil ».
     private var hauteurs: [Double] {
@@ -246,49 +236,110 @@ struct ProgresCourbeSymptome: View {
         return ecarts.map { 0.5 + $0 / (2 * amplitude) }
     }
 
+    /// Abscisse du rang `rang` sur un axe de `creneaux` jours.
+    private static func abscisse(_ rang: Int, creneaux: Int, largeur: CGFloat) -> CGFloat {
+        let pas = max(0, largeur - 2 * retrait) / CGFloat(max(1, creneaux - 1))
+        return retrait + pas * CGFloat(rang)
+    }
+
     private func points(largeur: CGFloat) -> [CGPoint] {
         let valeurs = hauteurs
         let creneaux = max(axe, valeurs.count, 2)
-        let pas = max(0, largeur - 2 * Self.retrait) / CGFloat(creneaux - 1)
         let premier = creneaux - valeurs.count
         return valeurs.enumerated().map { index, hauteur in
-            CGPoint(x: Self.retrait + pas * CGFloat(premier + index),
+            CGPoint(x: Self.abscisse(premier + index, creneaux: creneaux, largeur: largeur),
                     y: Self.bas - (Self.bas - Self.haut) * CGFloat(min(1, max(0, hauteur))))
         }
+    }
+
+    /// Les morceaux de la courbe de l'apport (sept jours sans repas la
+    /// coupent), et son dernier point quand elle atteint aujourd'hui. Le
+    /// premier jour noté se pose au milieu ; les suivants au-dessus ou
+    /// au-dessous, selon ce que les repas ont apporté de plus ou de moins.
+    private func traceApport(largeur: CGFloat) -> (segments: [[CGPoint]], fin: CGPoint?) {
+        guard let relie = apport else { return ([], nil) }
+        let valeurs = Self.moyenneGlissante(relie.valeurs)
+        guard let depart = valeurs.compactMap({ $0 }).first else { return ([], nil) }
+        let ecartMax = valeurs.compactMap { $0 }.map { abs($0 - depart) }.max() ?? 0
+        let amplitude = max(Self.amplitudeMinimaleApport, ecartMax)
+        let creneaux = max(axe, valeurs.count, 2)
+        let premier = creneaux - valeurs.count
+        var segments: [[CGPoint]] = []
+        var courant: [CGPoint] = []
+        for (index, valeur) in valeurs.enumerated() {
+            guard let valeur else {
+                if !courant.isEmpty { segments.append(courant) }
+                courant = []
+                continue
+            }
+            let hauteur = CGFloat(min(1, max(0, 0.5 + (valeur - depart) / (2 * amplitude))))
+            courant.append(CGPoint(x: Self.abscisse(premier + index, creneaux: creneaux, largeur: largeur),
+                                   y: Self.bas - (Self.bas - Self.haut) * hauteur))
+        }
+        // Le dernier morceau touche aujourd'hui : son bout porte la pastille.
+        let fin: CGPoint? = courant.count >= 2 ? courant.last : nil
+        if !courant.isEmpty { segments.append(courant) }
+        return (segments.filter { $0.count >= 2 }, fin)
     }
 
     var body: some View {
         GeometryReader { geo in
             let sommets = points(largeur: geo.size.width)
+            let apportTrace = traceApport(largeur: geo.size.width)
             ZStack {
-                lignes(sommets, largeur: geo.size.width)
+                lignes(sommets, apport: apportTrace.segments, largeur: geo.size.width)
                     .blur(radius: gatee ? 8 : 0)
                     .opacity(gatee ? 0.5 : 1)
 
-                // Aujourd'hui : un point plein, cerné de blanc.
+                // Aujourd'hui, pour l'apport : un point plus petit, cerné de
+                // blanc, posé sous celui du symptôme.
+                if let fin = apportTrace.fin, let couleur = apport?.teinte {
+                    pastille(couleur, diametre: 9, lisere: 2, retard: 1.3)
+                        .position(fin)
+                }
+
+                // Aujourd'hui, pour le symptôme : un point plein, cerné de blanc.
                 if let dernier = sommets.last {
-                    Circle()
-                        .fill(teinte)
-                        .frame(width: 12, height: 12)
-                        .overlay(Circle().stroke(Color.white, lineWidth: 2.5))
+                    pastille(teinte, diametre: 12, lisere: 2.5, retard: sommets.count > 1 ? 1.3 : 0)
                         .position(dernier)
-                        .opacity(trace ? 1 : 0)
-                        // « ease » CSS de la maquette : opacity .4s ease 1.3s.
-                        .animation(animer ? Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.4)
-                                                .delay(sommets.count > 1 ? 1.3 : 0) : nil,
-                                   value: trace)
                 }
             }
         }
         .frame(height: Self.hauteur)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(gatee
-            ? "Courbe du symptôme, réservée à Kiwio Premium"
-            : "Courbe du symptôme, de \(libelleBas) en bas à \(libelleHaut) en haut")
+        .accessibilityLabel(libelleVocal)
+    }
+
+    private var libelleVocal: String {
+        if gatee { return "Courbe du symptôme, réservée à Kiwio Premium" }
+        let symptome = "Courbe du symptôme, de \(libelleBas) en bas à \(libelleHaut) en haut"
+        guard apportTraceable, let nom = apport?.nom else { return symptome }
+        return symptome + ", avec celle de \(nom) d'après tes repas notés"
+    }
+
+    /// La courbe de l'apport a-t-elle au moins un morceau (deux jours de suite)
+    /// à tracer ? Sans repas noté, VoiceOver ne l'annonce pas.
+    private var apportTraceable: Bool {
+        guard let relie = apport else { return false }
+        let valeurs = Self.moyenneGlissante(relie.valeurs)
+        return valeurs.indices.dropFirst().contains { valeurs[$0] != nil && valeurs[$0 - 1] != nil }
+    }
+
+    /// Un point du jour : il apparaît quand les lignes ont fini de se tracer
+    /// (« opacity .4s ease 1.3s » de la maquette) ; tout de suite quand il n'y
+    /// a pas de ligne.
+    private func pastille(_ couleur: Color, diametre: CGFloat, lisere: CGFloat, retard: Double) -> some View {
+        Circle()
+            .fill(couleur)
+            .frame(width: diametre, height: diametre)
+            .overlay(Circle().stroke(Color.white, lineWidth: lisere))
+            .opacity(trace ? 1 : 0)
+            .animation(animer ? Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.4).delay(retard) : nil,
+                       value: trace)
     }
 
     @ViewBuilder
-    private func lignes(_ sommets: [CGPoint], largeur: CGFloat) -> some View {
+    private func lignes(_ sommets: [CGPoint], apport segments: [[CGPoint]], largeur: CGFloat) -> some View {
         ZStack {
             Path { chemin in
                 chemin.move(to: CGPoint(x: 0, y: Self.base))
@@ -296,28 +347,163 @@ struct ProgresCourbeSymptome: View {
             }
             .stroke(Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.15), lineWidth: 1)
 
-            if sommets.count >= 2 {
-                let ligne = SuiviCurveMath.smoothPath(sommets)
-
-                // Le voile sous la courbe.
-                Path { chemin in
-                    chemin.addPath(ligne)
-                    chemin.addLine(to: CGPoint(x: sommets[sommets.count - 1].x, y: Self.base))
-                    chemin.addLine(to: CGPoint(x: sommets[0].x, y: Self.base))
-                    chemin.closeSubpath()
+            // L'apport d'abord : sa courbe passe sous celle du symptôme.
+            if let couleur = apport?.teinte {
+                ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                    morceauApport(segment, couleur: couleur)
                 }
-                .fill(teinte.opacity(0.09))
-                .opacity(trace ? 1 : 0)
-                // « ease » CSS de la maquette : opacity .8s ease .5s.
-                .animation(animer ? Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.8).delay(0.5) : nil,
-                           value: trace)
+            }
 
-                ligne
+            if sommets.count >= 2 {
+                SuiviCurveMath.smoothPath(sommets)
                     .trim(from: 0, to: trace ? 1 : 0)
                     .stroke(teinte, style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
                     .animation(animer ? Animation.timingCurve(0.4, 0, 0.2, 1, duration: 1.4) : nil, value: trace)
             }
         }
+    }
+
+    /// Un morceau de la courbe de l'apport : le voile à 9 % dessous, puis le
+    /// trait de 2 à 75 %, qui part 0,15 s après celui du symptôme.
+    private func morceauApport(_ segment: [CGPoint], couleur: Color) -> some View {
+        let ligne = SuiviCurveMath.smoothPath(segment)
+        return ZStack {
+            Path { chemin in
+                chemin.addPath(ligne)
+                chemin.addLine(to: CGPoint(x: segment[segment.count - 1].x, y: Self.base))
+                chemin.addLine(to: CGPoint(x: segment[0].x, y: Self.base))
+                chemin.closeSubpath()
+            }
+            .fill(couleur.opacity(0.09))
+            .opacity(trace ? 1 : 0)
+            // « ease » CSS de la maquette : opacity .8s ease .5s.
+            .animation(animer ? Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.8).delay(0.5) : nil,
+                       value: trace)
+
+            ligne
+                .trim(from: 0, to: trace ? 1 : 0)
+                .stroke(couleur.opacity(0.75), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                .animation(animer ? Animation.timingCurve(0.4, 0, 0.2, 1, duration: 1.4).delay(0.15) : nil,
+                           value: trace)
+        }
+    }
+}
+
+// MARK: - Les semaines d'un symptôme : quatre barres, une par semaine
+
+/// Une semaine GLISSANTE de réponses au check-in (sept jours ; la dernière
+/// finit aujourd'hui).
+struct ProgresSemaineReponses: Identifiable, Equatable {
+    /// 0 = la plus ancienne.
+    let id: Int
+    /// Premier jour de la semaine.
+    let debut: Date
+    /// Jours où le symptôme a reçu une réponse.
+    let repondus: Int
+    /// Jours répondus « mieux ».
+    let mieux: Int
+}
+
+/// Une barre par semaine : sa hauteur compte les jours répondus « mieux »
+/// (11 pt par jour, comme la maquette), les semaines passées s'éclaircissent
+/// vers la gauche, la semaine en cours est pleine et porte un point. Une
+/// semaine sans réponse n'est qu'un trait gris : jamais un zéro qu'on n'a pas
+/// mesuré.
+///
+/// Le haut reste le mieux, comme sur la courbe : des barres qui montent sont
+/// une bonne nouvelle. (Le « jours cassants » de la maquette est une mesure
+/// absolue ; le check-in demande « mieux qu'avant ? » : on compte donc ce
+/// qu'il mesure.)
+struct ProgresBarresSemaines: View {
+    let semaines: [ProgresSemaineReponses]
+    let teinte: Color
+    /// Les barres montent quand `trace` passe à vrai.
+    let trace: Bool
+    /// Gratuit : les semaines passées sont floutées, la semaine en cours reste
+    /// nette.
+    let gatee: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// La zone des barres : 80 pt, sept jours × 11 y tiennent.
+    private static let hauteurBarres: CGFloat = 80
+    private static let parJour: CGFloat = 11
+    /// Hauteur d'une barre avant le tracé, ou sans jour « mieux ».
+    private static let plancher: CGFloat = 4
+
+    private func derniere(_ semaine: ProgresSemaineReponses) -> Bool {
+        semaine.id == semaines.last?.id
+    }
+
+    private func hauteur(_ semaine: ProgresSemaineReponses) -> CGFloat {
+        guard trace, semaine.repondus > 0 else { return Self.plancher }
+        return max(Self.plancher, CGFloat(semaine.mieux) * Self.parJour)
+    }
+
+    /// Opacité 0,22 + 0,12 par semaine, la dernière pleine.
+    private func couleur(_ semaine: ProgresSemaineReponses) -> Color {
+        guard semaine.repondus > 0 else { return Color.dsTrait }
+        if derniere(semaine) { return teinte }
+        return teinte.opacity(0.22 + Double(semaine.id) * 0.12)
+    }
+
+    private func montee(_ semaine: ProgresSemaineReponses) -> Animation? {
+        guard trace, !reduceMotion else { return nil }
+        return Animation.timingCurve(0.3, 1.25, 0.5, 1, duration: 0.9).delay(0.2 + Double(semaine.id) * 0.1)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .bottom, spacing: 14) {
+                ForEach(semaines) { semaine in
+                    barre(semaine)
+                }
+            }
+            .frame(height: Self.hauteurBarres, alignment: .bottom)
+
+            HStack(alignment: .firstTextBaseline) {
+                Text(semaines.first.map { "Sem. du " + ProgresDates.jourCourt($0.debut) } ?? "")
+                Spacer(minLength: 8)
+                Text("Cette sem.")
+            }
+            .font(.system(.caption, design: .default))
+            .foregroundStyle(Color.dsSecondaire)
+            .padding(.top, 6)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(libelleVocal)
+    }
+
+    private func barre(_ semaine: ProgresSemaineReponses) -> some View {
+        let voilee = gatee && !derniere(semaine)
+        return RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(couleur(semaine))
+            .frame(maxWidth: .infinity)
+            .frame(height: hauteur(semaine))
+            .overlay(alignment: .top) {
+                // Cette semaine : un point blanc cerné de la teinte, 5 pt
+                // au-dessus de la barre, qui monte avec elle.
+                if derniere(semaine) && semaine.repondus > 0 {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 11, height: 11)
+                        .overlay(Circle().strokeBorder(teinte, lineWidth: 2.5))
+                        .offset(y: -16)
+                }
+            }
+            .animation(montee(semaine), value: trace)
+            .blur(radius: voilee ? 9 : 0)
+            .opacity(voilee ? 0.5 : 1)
+    }
+
+    private var libelleVocal: String {
+        if gatee { return "Tes réponses semaine par semaine, réservées à Kiwio Premium" }
+        let detail = semaines.map { semaine -> String in
+            guard semaine.repondus > 0 else { return "pas de réponse" }
+            return "\(semaine.mieux) jour\(semaine.mieux > 1 ? "s" : "") mieux"
+        }
+        return "Tes réponses semaine par semaine, de la plus ancienne à cette semaine : "
+            + detail.joined(separator: ", ")
     }
 }
 
@@ -454,6 +640,9 @@ struct ProgresEncart: View {
 
 // MARK: - La semaine d'une mesure (apports, calories) : verdict, puis les sept jours
 
+/// Plus posée sur la page Progrès depuis le 3 octobre 2026 : ces deux cartes
+/// ne sont pas dans la maquette « Verre liquide » (retour d'Arthur sur le
+/// build 714). Gardée telle quelle.
 struct ProgresSemaineCard: View {
     let symbole: String
     let titre: String
@@ -509,8 +698,8 @@ struct ProgresSemaineCard: View {
 
 // MARK: - « En coulisses » : tes apports depuis ton premier jour
 
-/// Ce qui bouge avant de se sentir : chaque apport suivi, de son score du
-/// premier bilan à celui d'aujourd'hui. En gratuit, la carte nomme les
+/// Ce qui bouge avant de se sentir : chaque apport qui a bougé, de son score
+/// du premier bilan à celui d'aujourd'hui. En gratuit, la carte nomme les
 /// apports, jamais leur tendance : la vignette est floutée et la ligne ouvre
 /// l'offre.
 struct ProgresDepuisLeDebutCard: View {
@@ -523,8 +712,6 @@ struct ProgresDepuisLeDebutCard: View {
     }
 
     let lignes: [Ligne]
-    /// « 14 jours » ; `nil` = le suivi vient de démarrer.
-    let duree: String?
     var verrouille: Bool = false
     let onLigne: (Ligne) -> Void
 
@@ -535,11 +722,6 @@ struct ProgresDepuisLeDebutCard: View {
         return (!verrouille && progresse)
             ? "Ce qui progresse avant que tu le sentes."
             : "Ce qui bouge avant que tu le sentes."
-    }
-
-    private var sousTitre: String {
-        guard let duree else { return "Depuis ton premier jour" }
-        return "Depuis ton premier jour · \(duree)"
     }
 
     var body: some View {
@@ -553,11 +735,6 @@ struct ProgresDepuisLeDebutCard: View {
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
-
-            Text(sousTitre)
-                .font(.dsLegende)
-                .foregroundStyle(Color.dsSecondaire)
-                .padding(.top, 2)
 
             ForEach(Array(lignes.enumerated()), id: \.element.id) { position, ligne in
                 if position > 0 {
@@ -651,18 +828,16 @@ struct ProgresDepuisLeDebutCard: View {
         37 - CGFloat(min(100, max(0, pct))) / 100 * 28
     }
 
-    /// Du score de départ (point creux) à celui d'aujourd'hui (point plein).
+    /// Du score de départ (point creux) à celui d'aujourd'hui (point plein),
+    /// posés aux places du premier et du cinquième point de la maquette
+    /// (x 12,5 et 84,5), sans trait, comme elle. L'app ne connaît que ces
+    /// deux scores : les trois points du milieu ne sont pas inventés.
     private func vignette(_ ligne: Ligne, couleur: Color) -> some View {
-        let depart = CGPoint(x: 14, y: Self.ordonnee(ligne.avant))
-        let arrivee = CGPoint(x: 82, y: Self.ordonnee(ligne.apres))
+        let depart = CGPoint(x: 12.5, y: Self.ordonnee(ligne.avant))
+        let arrivee = CGPoint(x: 84.5, y: Self.ordonnee(ligne.apres))
         return ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(couleur.opacity(0.12))
-            Path { chemin in
-                chemin.move(to: depart)
-                chemin.addLine(to: arrivee)
-            }
-            .stroke(couleur, style: StrokeStyle(lineWidth: 2, lineCap: .round))
             Circle()
                 .fill(Color.white)
                 .frame(width: 9, height: 9)
@@ -742,6 +917,9 @@ struct ProgresCheckinRow: View {
 
 // MARK: - « Voir mon récap du jour »
 
+/// Plus posée sur la page Progrès depuis le 3 octobre 2026 (absente de la
+/// maquette « Verre liquide »). Elle publiait `.healthmapRevoirBrief`, que
+/// `ContentView` écoute toujours : à reposer ailleurs pour rejouer le brief.
 struct ProgresRecapRow: View {
     let action: () -> Void
 
