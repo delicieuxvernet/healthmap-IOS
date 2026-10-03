@@ -109,8 +109,8 @@ struct KiwiFloatingTabBar: View {
         } label: {
             VStack(spacing: 2) {
                 Image(systemName: item.icon)
-                    .font(.system(size: 21, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 22, weight: .medium))
+                    .symbolRenderingMode(.monochrome)
                     .scaleEffect(rebond == item.tab ? KiwiEchelle.iconeOnglet : 1)
                     .animation(reduceMotion ? nil : Animation.kiwiRebond, value: rebond)
                 Text(item.label)

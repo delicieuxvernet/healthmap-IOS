@@ -345,17 +345,18 @@ struct SuiviView: View {
                 HStack(spacing: 8) {
                     if d.aLaToile {
                         VerrePuce(libelle: "Équilibre",
-                                  valeur: "\(ProgresToile.couverts(d.apports)) sur \(d.apports.count)") {
+                                  valeur: "\(ProgresToile.couverts(d.apports)) sur \(d.apports.count)",
+                                  espacement: 10) {
                             ProgresMiniToile(apports: d.apports)
                         }
                     }
                     ForEach(evolutions) { puce in
-                        VerrePuce(libelle: puce.libelle, valeur: puce.valeur) {
+                        VerrePuce(libelle: puce.libelle, valeur: puce.valeur, espacement: 10) {
                             VerrePastilleIcone(symbole: puce.symbole, teinte: puce.teinte)
                         }
                     }
                     if let serie {
-                        VerrePuce(libelle: "Série", valeur: serie == 1 ? "1 jour" : "\(serie) jours") {
+                        VerrePuce(libelle: "Série", valeur: serie == 1 ? "1 jour" : "\(serie) jours", espacement: 10) {
                             VerrePastilleIcone(symbole: "flame", teinte: Color.teinteEnergie)
                         }
                     }
@@ -393,6 +394,9 @@ struct SuiviView: View {
         Text(phraseEquilibre(d.apports))
             .font(.dsCorps)
             .tracking(DSTracking.corps)
+            // Interligne de la maquette : 1,4 × 17 = 23,8 pt. Une ligne de
+            // SF Pro 17 pt en fait déjà 20,3 : il manque 3,5.
+            .lineSpacing(3.5)
             .foregroundStyle(Color.dsSecondaire)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 6)
@@ -566,10 +570,10 @@ struct SuiviView: View {
 
             chiffresDeLaSemaine(reponses, teintes: teintes, apport: lie, scores: d.scores)
 
-            courbe(serie, axe: axe, trend: trend, teinte: teintes.trait, gatee: gatee)
+            courbe(serie, axe: axe, trend: trend, teinte: teintes.courbe, gatee: gatee)
                 .padding(.top, 14)
 
-            reponsesAuCheckin(reponses, axe: axe, trend: trend, teinte: teintes.trait, gatee: gatee)
+            reponsesAuCheckin(reponses, axe: axe, trend: trend, teinte: teintes.courbe, gatee: gatee)
                 .padding(.top, 14)
 
             if let lie {
@@ -604,7 +608,7 @@ struct SuiviView: View {
                 .foregroundStyle(Color.dsSecondaire)
             HStack(alignment: .top, spacing: 12) {
                 ProgresChiffreSemaine(
-                    teinte: teintes.trait,
+                    teinte: teintes.courbe,
                     teinteTexte: teintes.texte,
                     libelle: "Tes réponses",
                     valeur: repondus == 1 ? "1 jour répondu" : "\(repondus) jours répondus",
@@ -614,7 +618,10 @@ struct SuiviView: View {
                     ProgresChiffreSemaine(
                         teinte: Color.nutrientColor(for: apport.id),
                         teinteTexte: Color.teinteApportTexte(for: apport.id),
-                        libelle: apport.label,
+                        // « Ton fer », « Ta vitamine D », « Tes fibres » : la
+                        // colonne parle à la personne, comme sa voisine.
+                        libelle: NomNutriment.majusculeInitiale(
+                            NomNutriment.possessif(id: apport.id, nom: apport.label)),
                         valeur: DS.pourcent(max(0, min(100, scores[apport.id] ?? apport.score))),
                         legende: "de ton besoin aujourd'hui"
                     )

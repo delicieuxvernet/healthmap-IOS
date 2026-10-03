@@ -217,8 +217,10 @@ struct PastilleConfirmation: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(Color.teinteKiwi)
+                // 20 pt comme la coche de la maquette ; semi-gras, l'épaisseur
+                // du trait Tabler.
                 Image(systemName: "checkmark")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color.white)
             }
             .frame(width: 36, height: 36)

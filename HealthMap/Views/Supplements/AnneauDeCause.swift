@@ -86,7 +86,35 @@ struct AnneauDeCause: View {
             }
         }
 
-        var tracking: CGFloat { self == .tuile ? -0.4 : -1 }
+        /// Seuls les grands chiffres (héros, fiche) sont en SF Pro Rounded :
+        /// celui d'une tuile reste dans la police du texte, sans resserrement.
+        var dessin: Font.Design { self == .tuile ? .default : .rounded }
+
+        var tracking: CGFloat { self == .tuile ? 0 : -1 }
+    }
+
+    /// Le rythme du tracé. Dans la maquette, l'anneau suit un compteur de
+    /// durée D lancé après un retard ; chaque part dure D / 1,4 et part
+    /// 0,18 × D / 1,4 après la précédente, et le chiffre compte pendant D.
+    /// D dépend de ce qui l'a fait apparaître.
+    struct Cadence: Equatable {
+        /// Avant la première part (et avant le compteur).
+        let retard: Double
+        /// Durée du tracé d'une part.
+        let part: Double
+        /// Écart entre le départ de deux parts.
+        let pas: Double
+        /// Durée du compteur du chiffre.
+        let compteur: Double
+
+        /// Le rythme d'avant la maquette du verre liquide (fiche du Bilan).
+        static let standard = Cadence(retard: 0.15, part: 0.8, pas: 0.14, compteur: 0.9)
+        /// Arrivée sur l'onglet Compléments : D = 1,1 s après 0,15 s.
+        static let ongletArrivee = Cadence(retard: 0.15, part: 0.786, pas: 0.141, compteur: 1.1)
+        /// Retour sur la voie compléments par la bascule : D = 0,9 s après 0,1 s.
+        static let bascule = Cadence(retard: 0.1, part: 0.643, pas: 0.116, compteur: 0.9)
+        /// Ouverture de la fiche d'un apport : D = 1 s après 0,25 s.
+        static let fiche = Cadence(retard: 0.25, part: 0.714, pas: 0.129, compteur: 1.0)
     }
 
     let parts: [PartAnneau]
@@ -95,6 +123,7 @@ struct AnneauDeCause: View {
     var taille: Taille = .tuile
     /// Part mise en avant depuis la cascade (`PartAnneau.id`), s'il y en a une.
     var surligne: String? = nil
+    var cadence: Cadence = .standard
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var deploye = false
@@ -106,14 +135,19 @@ struct AnneauDeCause: View {
         let teinte: Color
     }
 
-    /// L'anneau attend que la page soit posée avant de se tracer.
-    private static let retard: Double = 0.15
+    /// Chaque part se trace l'une après l'autre (`cadence`), après un retard
+    /// qui laisse la page se poser : la part couverte d'abord, puis les
+    /// causes, dans le sens horaire.
+    private func animationDuTrace(rang: Int) -> Animation {
+        Animation.timingCurve(0.215, 0.61, 0.355, 1, duration: cadence.part)
+            .delay(cadence.retard + Double(rang) * cadence.pas)
+    }
 
-    /// Chaque part se trace en 0,8 s, 0,14 s après la précédente : la part
-    /// couverte d'abord, puis les causes, dans le sens horaire.
-    private static func animationDuTrace(rang: Int) -> Animation {
-        Animation.timingCurve(0.215, 0.61, 0.355, 1, duration: 0.8)
-            .delay(retard + Double(rang) * 0.14)
+    /// Le chiffre compte sur la même courbe que `kiwiCompteur`, pendant toute
+    /// la durée du tracé.
+    private var animationDuCompteur: Animation {
+        Animation.timingCurve(0.215, 0.61, 0.355, 1, duration: cadence.compteur)
+            .delay(cadence.retard)
     }
 
     /// Jeu de 2,5 pt à la fin de chaque part (en fraction du tour), seulement
@@ -169,10 +203,10 @@ struct AnneauDeCause: View {
 
             // Le score nu, sans « % » : c'est un score sur 100, pas un taux mesuré.
             ChiffreQuiCompte(valeur: dessine ? Double(score) : 0)
-                .font(.system(size: taille.police, weight: .bold, design: .rounded).monospacedDigit())
+                .font(.system(size: taille.police, weight: .bold, design: taille.dessin).monospacedDigit())
                 .tracking(taille.tracking)
                 .foregroundStyle(Color.dsTexte)
-                .animation(reduceMotion ? nil : Animation.kiwiCompteur.delay(Self.retard), value: deploye)
+                .animation(reduceMotion ? nil : animationDuCompteur, value: deploye)
         }
         .frame(width: taille.points, height: taille.points)
         .animation(reduceMotion ? nil : DS.ressortAppui, value: surligne)
@@ -193,7 +227,7 @@ struct AnneauDeCause: View {
             .rotationEffect(.degrees(-90))
             .padding(inset)
             .opacity(enRetrait ? 0.35 : 1)
-            .animation(reduceMotion ? nil : Self.animationDuTrace(rang: rang), value: deploye)
+            .animation(reduceMotion ? nil : animationDuTrace(rang: rang), value: deploye)
     }
 }
 
@@ -224,6 +258,8 @@ struct TuileApportHero: View {
     let score: Int
     let lignes: [LigneCauseTuile]
     let cta: String
+    /// Le rythme du tracé, selon ce qui a fait apparaître la mosaïque.
+    var cadence: AnneauDeCause.Cadence = .standard
     let action: () -> Void
 
     @State private var visible = false
@@ -235,7 +271,7 @@ struct TuileApportHero: View {
         Button(action: action) {
             VStack(spacing: 0) {
                 HStack(alignment: .top, spacing: 14) {
-                    AnneauDeCause(parts: parts, score: score, couleur: couleur, taille: .heros)
+                    AnneauDeCause(parts: parts, score: score, couleur: couleur, taille: .heros, cadence: cadence)
                         .padding(.top, 6)
                     textes
                 }
@@ -339,10 +375,20 @@ struct TuileApport: View {
     let parts: [PartAnneau]
     let score: Int
     var enLigne = false
+    /// Le mot du statut (« à renforcer ») : la ligne visible ne dit que les
+    /// causes, comme la maquette ; VoiceOver, lui, dit les deux.
+    var statutMot: String? = nil
+    /// Le rythme du tracé, selon ce qui a fait apparaître la mosaïque.
+    var cadence: AnneauDeCause.Cadence = .standard
     let action: () -> Void
 
     private var anneau: some View {
-        AnneauDeCause(parts: parts, score: score, couleur: couleur, taille: .tuile)
+        AnneauDeCause(parts: parts, score: score, couleur: couleur, taille: .tuile, cadence: cadence)
+    }
+
+    private var resumeVocal: String {
+        guard let statutMot, !statutMot.isEmpty else { return statutLigne }
+        return "\(statutMot), \(statutLigne)"
     }
 
     private var textes: some View {
@@ -392,7 +438,7 @@ struct TuileApport: View {
         }
         .buttonStyle(.dsPress)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(nom), score \(score) sur 100, \(statutLigne)")
+        .accessibilityLabel("\(nom), score \(score) sur 100, \(resumeVocal)")
         .accessibilityHint("Ouvre le détail de cet apport")
     }
 }

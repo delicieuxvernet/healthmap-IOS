@@ -75,6 +75,12 @@ struct ReglagesView: View {
                 DSPageBackground()
                 ScrollView {
                     VStack(spacing: 0) {
+                        // Le titre vit dans la page (34 / 700, −0,95) et défile
+                        // sous le bord haut flouté, comme sur Progrès.
+                        DSLargeTitle(titre: "Réglages")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 18)
+
                         if subscriptionService.isPremium {
                             premiumActif.padding(.top, 14)
                         } else if montreOffre {
@@ -130,14 +136,19 @@ struct ReglagesView: View {
                     .padding(.horizontal, DS.marge)
                     .containerRelativeFrame(.horizontal)
                 }
+                // La maquette ne montre aucune barre de défilement.
+                .scrollIndicators(.hidden)
             }
             .onChange(of: estOngletActif, initial: true) { _, actif in
                 if actif { rejouerCascade() }
             }
             .kiwiTabBarBottomInset()
+            // La barre native est masquée (plus de grand titre système, plus de
+            // titre réduit au défilement). Le titre reste déclaré : c'est le nom
+            // de l'écran dans la pile, et le libellé du retour des sous-pages,
+            // qui gardent leur propre barre.
             .navigationTitle("Réglages")
-            .navigationBarTitleDisplayMode(.large)
-            .kiwiNavigationBarBackground()
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showPaywall) {
                 PaywallView(source: "reglages")
                     .healthMapFullSheet()
@@ -311,7 +322,7 @@ struct ReglagesView: View {
         }
     }
 
-    // MARK: - Questionnaire (même traitement de ligne, mis en avant par la hauteur)
+    // MARK: - Questionnaire (une ligne comme les autres : 17 pt normal, sans sous-titre)
 
     private var questionnaireCarte: some View {
         DSGroupedList {
@@ -319,10 +330,10 @@ struct ReglagesView: View {
                 EditProfileView()
                     .environmentObject(dashboardVM)
             } label: {
+                // Le libellé reste celui que cite la fiche d'une cause
+                // (`CauseApportSheet`) : il ne change qu'avec elle.
                 ReglageLigne(symbole: "list.clipboard",
-                             titre: "Modifier mes informations du questionnaire",
-                             sousTitre: "Profil · Mode de vie · Santé · Nutrition · Symptômes · Médical",
-                             grande: true)
+                             titre: "Modifier mes informations du questionnaire")
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.questionnaire")
@@ -992,7 +1003,7 @@ private struct LigneNotifications: View {
                 .overlay(alignment: .bottom) { ReglageFilet() }
             }
         }
-        .tint(Color.dsAccent)
+        .toggleStyle(InterrupteurVerreStyle())
         .padding(.horizontal, DS.paddingCarte)
         .task { await relire() }
         // Retour des réglages de l'iPhone : l'état a pu changer.
@@ -1031,5 +1042,57 @@ private struct LigneNotifications: View {
         RappelsPersonnalises.actifs = true
         voulus = true
         await RappelsPersonnalises.replanifier()
+    }
+}
+
+// MARK: - Interrupteur de la maquette (51 × 31)
+
+/// L'interrupteur dessiné par la maquette, le même sur toutes les versions
+/// d'iOS (celui d'iOS 26 est plus large et n'a plus ce dessin) : piste de
+/// 51 × 31, verte allumée, grise éteinte ; pastille blanche de 27 à 2 pt du
+/// bord. Toute la ligne se touche, comme sur la maquette. VoiceOver lit
+/// toujours un interrupteur système, avec son état.
+private struct InterrupteurVerreStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 12) {
+            configuration.label
+            InterrupteurVerre(allume: configuration.isOn)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { configuration.isOn.toggle() }
+        .accessibilityRepresentation {
+            // Style système explicite : sans lui, ce Toggle reprendrait ce
+            // style-ci (hérité de l'environnement) et se représenterait sans fin.
+            Toggle(isOn: configuration.$isOn) { configuration.label }
+                .toggleStyle(.switch)
+        }
+    }
+}
+
+/// Le dessin seul : la pastille file sur un ressort qui dépasse un peu
+/// (`kiwiRebond`), la piste change de couleur en 0,25 s. Sous « Réduire les
+/// animations », tout change d'un coup.
+private struct InterrupteurVerre: View {
+    let allume: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack {
+            Capsule(style: .continuous)
+                .fill(allume
+                      ? Color.dsAccent
+                      : Color(red: 120 / 255, green: 120 / 255, blue: 128 / 255).opacity(0.2))
+                .animation(reduceMotion ? nil : Animation.easeInOut(duration: 0.25), value: allume)
+            Circle()
+                .fill(Color.white)
+                .frame(width: 27, height: 27)
+                .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 3)
+                .shadow(color: Color.black.opacity(0.08), radius: 0.5, x: 0, y: 1)
+                .offset(x: allume ? 10 : -10)
+                .animation(reduceMotion ? nil : Animation.kiwiRebond, value: allume)
+        }
+        .frame(width: 51, height: 31)
+        .accessibilityHidden(true)
     }
 }

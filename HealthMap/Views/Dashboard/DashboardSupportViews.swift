@@ -112,34 +112,34 @@ struct AllNutrientsSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
-                    spacing: 10
-                ) {
-                    ForEach(Array(nutrients.enumerated()), id: \.element.id) { index, nutrient in
-                        Button {
-                            HapticService.shared.tap()
-                            selectedNutrient = nutrient
-                        } label: {
-                            tuile(nutrient)
+            VStack(spacing: 0) {
+                // Titre et fermeture hors de la barre d'outils : un seul rond
+                // de verre, cible tactile de 44 pt (loi 20). Voir
+                // `FeuilleEnTeteFermer` pour le pourquoi.
+                FeuilleEnTeteFermer(titre: "Tous mes nutriments") { dismiss() }
+
+                ScrollView {
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
+                        spacing: 10
+                    ) {
+                        ForEach(Array(nutrients.enumerated()), id: \.element.id) { index, nutrient in
+                            Button {
+                                HapticService.shared.tap()
+                                selectedNutrient = nutrient
+                            } label: {
+                                tuile(nutrient)
+                            }
+                            .buttonStyle(.dsPress)
+                            .accessibilityLabel("\(nutrient.label), score \(nutrient.score) sur 100")
+                            .verreCascade(arrive, delai: 0.08 + Double(min(index, 9)) * 0.04, decalage: 10)
                         }
-                        .buttonStyle(.dsPress)
-                        .accessibilityLabel("\(nutrient.label), score \(nutrient.score) sur 100")
-                        .verreCascade(arrive, delai: 0.08 + Double(min(index, 9)) * 0.04, decalage: 10)
                     }
-                }
-                .padding(.horizontal, DS.marge)
-                .padding(.vertical, Theme.spacingMD)
-            }
-            .navigationTitle("Tous mes nutriments")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    // Rond de verre clair, cible tactile de 44 pt (loi 20).
-                    DSCloseButton { dismiss() }
+                    .padding(.horizontal, DS.marge)
+                    .padding(.vertical, Theme.spacingMD)
                 }
             }
+            .toolbar(.hidden, for: .navigationBar)
         }
         // La feuille ne peint plus d'aplat : fond de verre et coins de 38.
         .verreFeuille()
@@ -172,5 +172,51 @@ struct AllNutrientsSheet: View {
         .padding(.vertical, 12)
         .padding(.horizontal, 4)
         .verreCarte(rayon: Verre.rayonTuile)
+    }
+}
+
+// MARK: - En-tête de feuille : titre centré + un seul rond « Fermer »
+
+/// En-tête d'une feuille de verre : le titre centré, à la manière d'un titre
+/// de barre en ligne (17 / 600), et `DSCloseButton` à droite.
+///
+/// Pourquoi hors de la barre d'outils : sous iOS 26, un `ToolbarItem` reçoit
+/// le fond partagé de la barre, une capsule claire qui enveloppe le rond de
+/// verre — deux anneaux à l'écran, quand la maquette n'en montre qu'un (fiche
+/// d'un apport). Le retirer demanderait `sharedBackgroundVisibility(.hidden)`
+/// derrière une vérification de disponibilité dans le constructeur de barre
+/// d'outils ; on préfère poser le bouton dans le contenu, comme `FicheApportSheet`.
+/// Partagé par les feuilles du Bilan (tous les nutriments, fiche nutriment)
+/// et la prise de sang. Le libellé « Fermer » reste celui de `DSCloseButton`.
+struct FeuilleEnTeteFermer: View {
+    /// Titre centré ; `nil` pour une feuille sans titre (fiche nutriment).
+    var titre: String? = nil
+    let fermer: () -> Void
+
+    var body: some View {
+        ZStack {
+            if let titre {
+                Text(titre)
+                    .font(.dsTitreInline)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    // Le titre ne passe jamais sous le rond de droite.
+                    .padding(.horizontal, DS.cibleTactile + 8)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                DSCloseButton(action: fermer)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+        // Le rond visible (36) tombe sur la marge de 20 : sa cible de 44
+        // déborde de 4 de chaque côté.
+        .padding(.horizontal, DS.marge - 4)
+        // La poignée système se dessine PAR-DESSUS le contenu (haut 5, 5 de
+        // haut), elle ne pousse rien. La maquette (fiche d'un apport) pose le
+        // rond 6 sous sa poignée, soit son haut à 21 : 17 + les 4 de débord.
+        .padding(.top, 17)
     }
 }

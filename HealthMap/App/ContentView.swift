@@ -478,7 +478,9 @@ struct MainTabView: View {
                         .blur(radius: (actif || reduceMotion) ? 0 : 8)
                         .animation(reduceMotion ? nil : Animation.easeInOut(duration: 0.35), value: selectedTab)
                         .opacity(actif ? 1 : 0)
-                        .animation(reduceMotion ? nil : Animation.easeInOut(duration: 0.3), value: selectedTab)
+                        // Le fondu reste sous « Réduire les animations » : il
+                        // ne déplace rien (maquette : « fondus seuls »).
+                        .animation(Animation.easeInOut(duration: 0.3), value: selectedTab)
                         .scaleEffect((actif || reduceMotion) ? 1 : 0.985)
                         .offset(x: decalage(for: tab))
                         .animation(reduceMotion ? nil : Animation.kiwiGlisse, value: selectedTab)

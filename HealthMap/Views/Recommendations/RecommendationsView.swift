@@ -32,46 +32,17 @@ struct RecommendationsView: View {
                 // bas sont posés dessus, sans aplat.
                 DSPageBackground()
 
-                if !dashboardVM.bilanComplete {
-                    // Mode découverte (V12c) : le MÊME graphe, en exemples
-                    // génériques canoniques — tout toucher mène au bilan, la
-                    // feuille de solutions n'existe pas ici.
-                    let exemples = planTopicsDecouverte()
-                    PlanGraphScreen(
-                        topics: exemples.filter { $0.kind != .apport },
-                        apports: exemples.filter { $0.kind == .apport },
-                        decouverte: { dashboardVM.demarrerBilan() }
-                    )
-                    .kiwiEntrance()
-                } else if let analysis = dashboardVM.aiAnalysis {
-                    // Arrivée en fondu d'un bloc, pas en cascade : le graphe
-                    // est un tout, le décomposer le ferait clignoter.
-                    RecommendationsContentView(analysis: analysis).kiwiEntrance()
-                } else if !v2Topics.isEmpty {
-                    // Repli : le v7 (aiAnalysis) manque mais le bilan v2 a un
-                    // plan → on le rend depuis le contrat v2 (le Plan ne reste
-                    // plus jamais vide quand le Bilan, lui, s'affiche).
-                    RecommendationsV2ContentView(topics: v2Topics).kiwiEntrance()
-                } else if dashboardVM.isLoadingAnalysis || dashboardVM.isLoadingAnalysisV2 {
-                    VStack(spacing: Theme.spacingMD) {
-                        // Loader signature : le signe Kiwio, ses pépins qui
-                        // chargent. L'attente reste non bloquante.
-                        KiwiLoader(size: 72)
-                        Text("Chargement du plan…")
-                            .font(.dsSousTitre)
-                            .tracking(DSTracking.sousTitre)
-                            .foregroundStyle(Color.dsSecondaire)
-                    }
-                } else {
-                    VStack(spacing: Theme.spacingMD) {
-                        // Le signe Kiwio plutôt qu'une icône système froide :
-                        // l'état vide reste accueillant.
-                        KiwiSigne(taille: 72)
-                        Text("Aucune analyse disponible")
-                            .font(.dsSousTitre)
-                            .tracking(DSTracking.sousTitre)
-                            .foregroundStyle(Color.dsSecondaire)
-                    }
+                // Le titre vit dans la page (34 / 700, 18 pt sous la zone
+                // sûre), comme sur Progrès : il reste en tête de TOUS les
+                // états (découverte, plan, chargement, vide).
+                VStack(spacing: 0) {
+                    DSLargeTitle(titre: "Plan")
+                        .padding(.top, 18)
+                        .padding(.horizontal, DS.marge)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    contenu
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .kiwiTabBarBottomInset()
@@ -88,10 +59,57 @@ struct RecommendationsView: View {
                     await dashboardVM.triggerAnalysis()
                 }
             }
-            // Grand titre natif (se replie en inline au défilement). Les
-            // Réglages sont un onglet : plus de bouton Profil dans la barre.
+            // Le titre est dans la page : la barre native est masquée. Il
+            // reste déclaré, c'est le nom de l'écran dans la pile. Aucune vue
+            // n'est poussée ici (le Plan n'ouvre que des feuilles).
             .navigationTitle("Plan")
-            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    /// Ce qui se pose sous le titre, selon l'état du bilan et de l'analyse.
+    @ViewBuilder
+    private var contenu: some View {
+        if !dashboardVM.bilanComplete {
+            // Mode découverte (V12c) : le MÊME graphe, en exemples
+            // génériques canoniques — tout toucher mène au bilan, la
+            // feuille de solutions n'existe pas ici.
+            let exemples = planTopicsDecouverte()
+            PlanGraphScreen(
+                topics: exemples.filter { $0.kind != .apport },
+                apports: exemples.filter { $0.kind == .apport },
+                decouverte: { dashboardVM.demarrerBilan() }
+            )
+            .kiwiEntrance()
+        } else if let analysis = dashboardVM.aiAnalysis {
+            // Arrivée en fondu d'un bloc, pas en cascade : le graphe
+            // est un tout, le décomposer le ferait clignoter.
+            RecommendationsContentView(analysis: analysis).kiwiEntrance()
+        } else if !v2Topics.isEmpty {
+            // Repli : le v7 (aiAnalysis) manque mais le bilan v2 a un
+            // plan → on le rend depuis le contrat v2 (le Plan ne reste
+            // plus jamais vide quand le Bilan, lui, s'affiche).
+            RecommendationsV2ContentView(topics: v2Topics).kiwiEntrance()
+        } else if dashboardVM.isLoadingAnalysis || dashboardVM.isLoadingAnalysisV2 {
+            VStack(spacing: Theme.spacingMD) {
+                // Loader signature : le signe Kiwio, ses pépins qui
+                // chargent. L'attente reste non bloquante.
+                KiwiLoader(size: 72)
+                Text("Chargement du plan…")
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+            }
+        } else {
+            VStack(spacing: Theme.spacingMD) {
+                // Le signe Kiwio plutôt qu'une icône système froide :
+                // l'état vide reste accueillant.
+                KiwiSigne(taille: 72)
+                Text("Aucune analyse disponible")
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+            }
         }
     }
 }

@@ -32,6 +32,31 @@ private enum AncreJournal: Hashable {
     case poids
     case eau
     case sang
+
+    /// La maquette pose la cible (le titre « Poids et eau », la carte de
+    /// l'eau, celle de la prise de sang) à 64 pt du haut du téléphone, soit
+    /// environ 5 pt sous le bord de la zone sûre, où `scrollTo(_, anchor:
+    /// .top)` aligne l'ancre.
+    static let ecartSousLeBord: CGFloat = 5
+}
+
+private extension View {
+    /// Le repère que vise une puce : un point sans taille, posé `retrait` sous
+    /// le haut de la vue, DANS sa marge du haut. La marge elle-même (30 pt
+    /// avant un titre de section, 12 entre deux cartes) passe ainsi au-dessus
+    /// du bord, comme dans la maquette qui vise le haut de l'élément, marge
+    /// non comprise. L'`id` se pose avant le décalage : c'est le point qui est
+    /// visé, pas sa marge.
+    func repereDeDefilement(_ ancre: AncreJournal, retrait: CGFloat) -> some View {
+        overlay(alignment: .top) {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .id(ancre)
+                .padding(.top, max(0, retrait))
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
 }
 
 struct JournalView: View {
@@ -250,17 +275,14 @@ struct JournalView: View {
     }
 
     /// Un repas vient d'entrer dans la journée affichée : la carte Énergie le
-    /// dit sous son chiffre (« Déjeuner ajouté · 3 aliments »), puis rend la
-    /// place à l'objectif. Seulement aujourd'hui, comme la maquette.
+    /// dit sous son chiffre (« Déjeuner ajouté · 3 aliments ») tant qu'on
+    /// reste sur ce jour, comme la maquette ; le changement de jour rend la
+    /// place à l'objectif. Seulement aujourd'hui.
     private func signalerAjout(_ creneau: MealJournalService.MealSlot, aliments: Int) {
         guard isTodaySelected else { return }
-        ajoutRecent = creneau.phraseAjout(aliments: aliments)
         effacementAjout?.cancel()
-        effacementAjout = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(8))
-            guard !Task.isCancelled else { return }
-            ajoutRecent = nil
-        }
+        effacementAjout = nil
+        ajoutRecent = creneau.phraseAjout(aliments: aliments)
     }
 
     /// Rejoue l'entrée de la page : tout se range d'un coup, puis les repas
@@ -778,7 +800,7 @@ struct JournalView: View {
         } label: {
             VerrePuce(
                 libelle: "Eau",
-                valeur: "\(DS.decimal(SuiviEau.litres(gobeletsEau), decimales: 2)) L"
+                valeur: "\(JournalEauCard.litres(gobeletsEau)) L"
             ) {
                 JournalPuceEau(fraction: Double(gobeletsEau) / Double(max(1, SuiviEau.gobeletsParJour)))
             }
@@ -797,7 +819,15 @@ struct JournalView: View {
                 libelle: "Poids",
                 valeur: "\(ObjectifPoids.affichage(profil.weightDouble)) kg"
             ) {
-                VerrePastilleIcone(symbole: "scalemass")
+                // La balance est en gris secondaire (60 %), pas dans l'encre
+                // neutre à 75 % de `VerrePastilleIcone` : seule exception de
+                // la maquette.
+                Image(systemName: "scalemass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.dsSecondaire)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Verre.remplissage))
+                    .accessibilityHidden(true)
             }
             .contentShape(Capsule(style: .continuous))
         }
@@ -929,8 +959,8 @@ struct JournalView: View {
                     showPriseDeSang = true
                 }
                 .padding(.top, DS.interCarte)
-                // La puce « Analyses » mène ici.
-                .id(AncreJournal.sang)
+                // La puce « Analyses » mène ici : la carte, marge non comprise.
+                .repereDeDefilement(.sang, retrait: DS.interCarte - AncreJournal.ecartSousLeBord)
 
                 apportsSection
 
@@ -1191,8 +1221,9 @@ struct JournalView: View {
         let cibles = mesures
 
         DSSectionHeader(titre: "Poids et eau")
-            // La puce « Poids » mène ici : le titre, puis la carte.
-            .id(AncreJournal.poids)
+            // La puce « Poids » mène ici : le titre, puis la carte. Le repère
+            // est dans la marge de 30 pt du titre, pas au-dessus d'elle.
+            .repereDeDefilement(.poids, retrait: DS.avantSection - AncreJournal.ecartSousLeBord)
 
         JournalPoidsCard(
             actuel: profil.weightDouble,
@@ -1212,8 +1243,8 @@ struct JournalView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapEauChange)) { _ in
                 relireEau()
             }
-            // La puce « Eau » mène ici.
-            .id(AncreJournal.eau)
+            // La puce « Eau » mène ici : la carte, marge non comprise.
+            .repereDeDefilement(.eau, retrait: DS.interCarte - AncreJournal.ecartSousLeBord)
     }
 
     private func relireEau() {

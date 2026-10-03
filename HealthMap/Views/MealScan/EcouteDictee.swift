@@ -391,11 +391,12 @@ final class EcouteCentre: ObservableObject {
     }
 
     /// Fin d'écoute réussie : la bulle se contracte et tourne, le temps de
-    /// transcrire puis de chiffrer. Elle a quitté le bouton, qui revient.
+    /// transcrire puis de chiffrer. Le bouton reste caché, sous le voile puis
+    /// sous la feuille : il ne revient qu'au repos (`vider()`), comme dans la
+    /// maquette.
     func contracter() {
         guard phase == .ecoute else { return }
         phase = .calcul
-        boutonCache = false
     }
 
     /// La transcription existe : la carte la relit mot à mot.
@@ -667,9 +668,10 @@ private struct EcouteScene: View {
         .allowsHitTesting(controlesVisibles)
     }
 
+    /// La vibration vient de `annulerDictee()` (un avertissement) : en jouer
+    /// une ici en ferait deux pour un seul geste.
     private var boutonAnnuler: some View {
         Button {
-            HapticService.shared.tap()
             centre.toucherAnnuler()
         } label: {
             Text("Annuler")
@@ -758,8 +760,8 @@ private struct EcouteScene: View {
             // Le calcul passe par le réseau : s'il dure, on ne garde personne
             // devant un écran sans sortie.
             if abandonPossible && actif {
+                // Vibration : celle de `abandonnerCalcul()`, une seule.
                 Button {
-                    HapticService.shared.tap()
                     centre.toucherAbandonner()
                 } label: {
                     Text("Annuler")

@@ -371,6 +371,7 @@ struct ProgresToileView: View {
     var debord: CGFloat = DS.marge
 
     @State private var selection: String? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Diamètre de la zone centrale.
     private static let diametreCentre: CGFloat = 108
@@ -425,8 +426,17 @@ struct ProgresToileView: View {
         } else {
             VStack(spacing: 0) {
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    // Le nombre compte avec la toile qui monte.
+                    // Le nombre compte avec la toile qui monte, mais sur sa
+                    // propre courbe : la maquette le fait ralentir à l'arrivée
+                    // (1 − (1 − t)³, une sortie cubique, sur toute l'entrée),
+                    // alors que l'avancement reçu est linéaire (chaque axe de
+                    // la toile applique sa propre sortie, `valeurAnimee`).
+                    // La remise à zéro, elle, reste instantanée.
                     ChiffreQuiCompte(valeur: Double(ProgresToile.couverts(apports)) * avancement)
+                        .animation(avancement > 0 && !reduceMotion
+                                   ? Animation.timingCurve(0.33, 1, 0.68, 1, duration: 1.3).delay(0.15)
+                                   : nil,
+                                   value: avancement)
                         .font(.system(size: 48, weight: .bold, design: .rounded).monospacedDigit())
                         .tracking(-1.4)
                         .foregroundStyle(Color.dsTexte)

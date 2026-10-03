@@ -32,8 +32,35 @@ struct PlanOption: Identifiable, Equatable {
     static func == (lhs: PlanOption, rhs: PlanOption) -> Bool { lhs.id == rhs.id }
 }
 
+/// Fond de la feuille Premium : verre épais et BLANC
+/// (`rgba(255,255,255,.9) → .76` sur un flou de 40), sans le liseré des autres
+/// feuilles — la maquette n'en dessine pas ici. Opaque sous « Réduire la
+/// transparence », comme `VerreFeuilleFond`.
+private struct FeuillePremiumFond: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduireTransparence
+
+    var body: some View {
+        ZStack {
+            if reduireTransparence {
+                Color.white
+            } else {
+                Rectangle().fill(.regularMaterial)
+                LinearGradient(
+                    colors: [Color.white.opacity(0.9), Color.white.opacity(0.76)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     let source: String
@@ -107,7 +134,7 @@ struct PaywallView: View {
 
     var body: some View {
         // Ton calme, sans capitales ni compte à rebours (refonte du 23 août
-        // 2026). Aucun aplat en fond : la feuille est en verre (`verreFeuille`).
+        // 2026). Aucun aplat en fond : la feuille est en verre (`FeuillePremiumFond`).
         ScrollView {
             VStack(spacing: 0) {
                 embleme
@@ -124,11 +151,15 @@ struct PaywallView: View {
                     .verreCascade(revele, delai: 0.42)
             }
             .padding(.horizontal, Self.marge)
-            .padding(.bottom, Theme.spacingMD)
+            // Maquette : 18 pt sous le dernier élément.
+            .padding(.bottom, 18)
             .frame(maxWidth: .infinity)
             .overlay(alignment: .topTrailing) { closeButton }
         }
-        .verreFeuille()
+        // La feuille Premium a SA matière dans la maquette : blanche (90 → 76 %),
+        // plus claire que le verre légèrement vert des autres feuilles.
+        .presentationBackground { FeuillePremiumFond() }
+        .presentationCornerRadius(Verre.rayonFeuille)
         .task {
             await loadOfferingsWithTimeout()
         }
@@ -195,15 +226,20 @@ struct PaywallView: View {
     }
 
     /// La mascotte de 84 pt sur son halo tournant (il déborde de 14) : elle
-    /// éclot de 0,4 à 1 sur un ressort vif. Immobile, sans rebond, sous
-    /// « Réduire les animations » (le socle s'en charge).
+    /// éclot de 0,4 à 1 en 0,7 s sur un ressort qui dépasse franchement
+    /// (maquette : `.7s cubic-bezier(.3,1.6,.5,1) .05s`), pendant le fondu
+    /// de 0,3 s du contenu. Sous « Réduire les animations » : fondu seul.
     private var embleme: some View {
         ZStack {
             KiwiMascotteHalo()
             KiwiMascotte(animee: true)
         }
         .frame(width: 84, height: 84)
-        .verreSurgir(revele, delai: 0.05, depart: 0.4)
+        .scaleEffect((revele || reduceMotion) ? 1 : 0.4)
+        .animation((revele && !reduceMotion) ? Animation.spring(duration: 0.7, bounce: 0.4).delay(0.05) : nil,
+                   value: revele)
+        .opacity(revele ? 1 : 0)
+        .animation(revele ? Animation.easeOut(duration: 0.3) : nil, value: revele)
         .accessibilityHidden(true)
     }
 
@@ -248,9 +284,9 @@ struct PaywallView: View {
             VerrePastilleIcone(symbole: icon, teinte: teinte, taille: 36, tailleIcone: 19)
 
             VStack(alignment: .leading, spacing: 1) {
+                // 15 / 500 sans interlettrage, comme la maquette.
                 Text(title)
                     .font(.dsSousTitreMoyen)
-                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
                 Text(detail)
                     .font(.dsLegende)
@@ -284,9 +320,9 @@ struct PaywallView: View {
             Button {
                 fermer()
             } label: {
+                // 15 pt sans interlettrage, comme la maquette.
                 Text("Plus tard")
                     .font(.dsSousTitre)
-                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsAccent)
                     .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
                     .contentShape(Rectangle())
@@ -550,9 +586,12 @@ struct PaywallView: View {
             : "Premium actif jusqu'au \(date)"
     }
 
+    /// « Essayer 7 jours gratuits » (maquette), la durée lue chez Apple ;
+    /// « Continuer » quand la formule choisie n'a pas d'essai.
     private var ctaTitle: String {
         if let trial = trialLabel(for: selectedPlan) {
-            return "Commencer mes \(trial)"
+            let accord = trial.hasPrefix("1 ") ? "gratuit" : "gratuits"
+            return "Essayer \(trial) \(accord)"
         }
         return "Continuer"
     }

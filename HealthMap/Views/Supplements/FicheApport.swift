@@ -1,30 +1,35 @@
 import SwiftUI
 
-// MARK: - La fiche d'un apport (six blocs, cascade interactive)
+// MARK: - La fiche d'un apport (la tête, ce qui pèse, ce qui se fait, le reste)
 //
-// L'ordre des blocs est celui des questions que la personne se pose, et il ne
-// bouge pas : ce que ça peut expliquer chez MOI, d'où sort le chiffre, à quoi
-// sert cet apport, comment le prendre, ce à quoi faire attention, et comment
-// s'en passer par l'assiette (ou l'inverse, en voie assiette).
+// L'ordre est celui de la maquette « Verre liquide » (2 octobre 2026), le même
+// que la fiche d'apport du Bilan : la tête (anneau, verdict, quantité), CE QUI
+// PÈSE LE PLUS (les trois premiers freins), CE QUE TU PEUX FAIRE dès
+// aujourd'hui (réservé au premium, comme partout). Viennent ensuite les blocs
+// propres aux compléments, qui ne disparaissent pas : ce que ça peut expliquer
+// chez toi, à quoi sert l'apport, le détail du calcul (replié), comment le
+// prendre, ce à quoi faire attention, et l'autre voie.
 //
 // Deux décisions du 20 septembre 2026 encadrent le contenu :
-//   • le bloc 01 ne cite que la table déterministe `SymptomesApports`. Le score
-//     a décidé ; le symptôme éclaire, il ne justifie rien ;
-//   • le bloc 04 donne la forme et le moment de prise, JAMAIS la dose : la
-//     posologie appartient au fabricant et à la personne.
+//   • « Ce que ça peut expliquer chez toi » ne cite que la table déterministe
+//     `SymptomesApports`. Le score a décidé ; le symptôme éclaire, il ne
+//     justifie rien ;
+//   • « Comment le prendre » donne la forme et le moment de prise, JAMAIS la
+//     dose : la posologie appartient au fabricant et à la personne.
 //
-// Le bloc 02 est le seul vraiment neuf : il déplie l'arithmétique du registre.
-// Toucher une de ses lignes allume la part correspondante de l'anneau, en haut
-// de la fiche — le lien entre le chiffre et sa cause, rendu manipulable.
+// Toucher un frein (ou une ligne du calcul déplié) allume la part
+// correspondante de l'anneau, en haut de la fiche — le lien entre le chiffre
+// et sa cause, rendu manipulable.
 //
 // La fiche n'invente rien et ne va rien chercher : l'onglet assemble son
 // contexte depuis des sources existantes (registre, bilan v2, moteur de
 // compléments, catalogue) et le lui donne.
 //
 // Verre liquide (2 octobre 2026) : la feuille est en verre (`.verreFeuille()`),
-// la tête devient une carte (anneau de 112 à gauche, le nom et la phrase à
-// lire en premier à droite), chaque frein de la cascade porte sa barre de
-// poids qui se remplit en 0,8 s, et les lignes arrivent l'une après l'autre.
+// la tête devient une carte (anneau de 112 à gauche, le nom, la phrase à lire
+// en premier et la quantité à droite), chaque frein porte sa barre de poids
+// qui se remplit en 0,8 s. La tête et les titres sont posés d'emblée ; seules
+// les lignes arrivent l'une après l'autre.
 
 /// Tout ce que la fiche affiche.
 struct FicheApportContexte: Identifiable {
@@ -68,6 +73,12 @@ struct FicheApportContexte: Identifiable {
     let conseilPrecautions: String?
     let alternatives: [Alternative]
     let ctaAlternative: String?
+    /// « 348 sur 600 UI par jour » (`QuantiteApport`), sous la phrase de tête.
+    var quantite: String? = nil
+    /// Le conseil rédigé du bilan (gras, puis suite) : la dernière ligne de
+    /// « Ce que tu peux faire », sous l'ampoule.
+    var conseil: String? = nil
+    var conseilSuite: String? = nil
 
     var nombreDeCauses: Int { detail.freins.count }
 
@@ -107,9 +118,20 @@ struct FicheBloc<Contenu: View>: View {
     var note: String? = nil
     /// Position dans la fiche : décale son entrée (0 = tout de suite).
     var rang: Int = 1
+    /// `false` : le bloc est posé d'emblée (la fiche des Compléments, où
+    /// seules les lignes arrivent en cascade).
+    var entree: Bool = true
     @ViewBuilder var contenu: () -> Contenu
 
     var body: some View {
+        if entree {
+            bloc.kiwiEntrance(rang)
+        } else {
+            bloc
+        }
+    }
+
+    private var bloc: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(titre)
@@ -132,8 +154,8 @@ struct FicheBloc<Contenu: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 22)
-        // Les blocs d'une fiche arrivent l'un après l'autre, de haut en bas.
-        .kiwiEntrance(rang)
+        // Ailleurs, les blocs d'une fiche arrivent l'un après l'autre, de
+        // haut en bas (`body`).
     }
 }
 
@@ -164,13 +186,29 @@ struct FicheApportSheet: View {
     var surAlternative: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var surligne: String?
     @State private var montreDetailAssiette = false
+    /// Frein touché dans « Ce qui pèse le plus » : sa feuille s'ouvre.
+    @State private var causeOuverte: CauseOuverte?
+    /// Le détail du calcul, replié par défaut.
+    @State private var calculDeplie = false
+    /// La fiche est arrivée : les lignes entrent en cascade, les barres de
+    /// poids se remplissent.
+    @State private var rempli = false
+    /// Source unique premium, OBSERVÉE : un achat depuis la fiche défloute
+    /// les gestes en direct.
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     private var detail: DetailApport { contexte.detail }
 
+    private var aUnConseil: Bool { contexte.conseil != nil || contexte.conseilSuite != nil }
+
     var body: some View {
-        ScrollView {
+        let causes = LectureApport.causesPrincipales(detail)
+        let gestes = LectureApport.gestes(detail)
+
+        return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     Spacer(minLength: 0)
@@ -179,28 +217,36 @@ struct FicheApportSheet: View {
 
                 enTete
 
-                if let eclairage = contexte.eclairage, !eclairage.isEmpty {
-                    bloc("Ce que ça peut expliquer chez toi", rang: 1) { texteCarte(eclairage) }
+                if !causes.isEmpty {
+                    bloc("Ce qui pèse le plus", note: "touche pour comprendre") { causesCarte(causes) }
                 }
 
-                if !detail.contributions.isEmpty {
-                    bloc("Comment on l'a vu", note: "touche une ligne", rang: 2) { cascadeCarte }
+                if !gestes.isEmpty || aUnConseil {
+                    bloc("Ce que tu peux faire, dès aujourd'hui") { gestesBloc(gestes) }
+                }
+
+                if let eclairage = contexte.eclairage, !eclairage.isEmpty {
+                    bloc("Ce que ça peut expliquer chez toi") { texteCarte(eclairage) }
                 }
 
                 if let role = contexte.role, !role.isEmpty {
-                    bloc("Ce que ça fait", rang: 3) { texteCarte(role) }
+                    bloc("Ce que ça fait") { texteCarte(role) }
+                }
+
+                if !detail.contributions.isEmpty {
+                    calculBloc
                 }
 
                 if !contexte.specs.isEmpty || contexte.noteDePrise != nil {
-                    bloc(contexte.voie == .assiette ? "Comment l'intégrer" : "Comment le prendre", rang: 4) { priseCarte }
+                    bloc(contexte.voie == .assiette ? "Comment l'intégrer" : "Comment le prendre") { priseCarte }
                 }
 
                 if !contexte.precautions.isEmpty {
-                    bloc("Précautions et interactions", rang: 5) { precautionsCarte }
+                    bloc("Précautions et interactions") { precautionsCarte }
                 }
 
                 if !contexte.alternatives.isEmpty || contexte.ctaAlternative != nil {
-                    bloc(contexte.voie == .assiette ? "Ou en complément" : "Ou par l'assiette", rang: 6) { alternativesCarte }
+                    bloc(contexte.voie == .assiette ? "Ou en complément" : "Ou par l'assiette") { alternativesCarte }
                 }
             }
             .padding(.horizontal, DS.marge)
@@ -218,6 +264,16 @@ struct FicheApportSheet: View {
                 NutrientDetailSheet(nutrient: nutrimentDetail)
             }
         }
+        .sheet(item: $causeOuverte, onDismiss: { surligne = nil }) { cause in
+            CauseApportSheet(cause: cause, detail: detail,
+                             apportAvecArticle: contexte.apportAvecArticle, couleur: contexte.couleur)
+        }
+        .onAppear {
+            // Chaque ligne porte sa propre courbe et son propre délai : l'état
+            // bascule sans transaction, les modificateurs font le reste.
+            guard !rempli else { return }
+            rempli = true
+        }
     }
 
     // MARK: En-tête : carte anneau 112 + nom + la phrase à lire en premier
@@ -234,6 +290,8 @@ struct FicheApportSheet: View {
         }
     }
 
+    /// Posée d'emblée (seul l'anneau se trace, au rythme de la fiche) ; la
+    /// quantité tient la troisième ligne, le statut est dans la phrase.
     private var enTete: some View {
         HStack(alignment: .center, spacing: 14) {
             AnneauDeCause(
@@ -241,7 +299,8 @@ struct FicheApportSheet: View {
                 score: detail.score,
                 couleur: contexte.couleur,
                 taille: .heros,
-                surligne: surligne
+                surligne: surligne,
+                cadence: .fiche
             )
             VStack(alignment: .leading, spacing: 4) {
                 Text(contexte.titre)
@@ -257,9 +316,9 @@ struct FicheApportSheet: View {
                     .lineSpacing(2)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
-                if contexte.voie == .complements {
-                    Text(contexte.sousTitre)
-                        .font(.dsLegende)
+                if contexte.voie == .complements, let quantite = contexte.quantite {
+                    Text(quantite)
+                        .font(.dsLegende.monospacedDigit())
                         .tracking(DSTracking.legende)
                         .foregroundStyle(Color.dsSecondaire)
                         .multilineTextAlignment(.leading)
@@ -272,32 +331,281 @@ struct FicheApportSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
         .padding(.top, 8)
-        .kiwiEntrance(0)
         .accessibilityElement(children: .combine)
     }
 
     // MARK: Blocs
 
+    /// Un bloc de cette fiche : posé d'emblée, sans entrée propre — dans la
+    /// maquette, seules les lignes arrivent.
     private func bloc<Contenu: View>(
         _ titre: String,
         note: String? = nil,
-        rang: Int,
         @ViewBuilder contenu: @escaping () -> Contenu
     ) -> some View {
-        FicheBloc(titre: titre, note: note, rang: rang, contenu: contenu)
+        FicheBloc(titre: titre, note: note, entree: false, contenu: contenu)
     }
 
     private func texteCarte(_ texte: String) -> some View {
         FicheTexteCarte(texte: texte)
     }
 
-    // MARK: 02 — la cascade
+    // MARK: Ce qui pèse le plus — les freins seuls
+
+    /// La barre de poids d'un frein : piste neutre, remplissage à la teinte de
+    /// sa part de l'anneau, en 0,8 s, décalé de 80 ms par frein.
+    private func barreDePoids(_ ligne: LectureApport.CausePesee, teinte: Color, rang: Int) -> some View {
+        let remplie = rempli || reduceMotion
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Verre.remplissage)
+                Capsule().fill(teinte)
+                    .frame(width: max(0, geo.size.width * CGFloat(remplie ? ligne.poids : 0)))
+            }
+        }
+        .frame(height: 5)
+        .clipShape(Capsule())
+        .animation(
+            reduceMotion ? nil : Animation.timingCurve(0.3, 1.1, 0.4, 1, duration: 0.8).delay(0.35 + Double(rang) * 0.08),
+            value: rempli
+        )
+        .accessibilityHidden(true)
+    }
+
+    /// Les trois premiers freins : libellé, barre de poids dessous, poids,
+    /// chevron. Toucher ouvre la cause et allume sa part de l'anneau.
+    private func causesCarte(_ causes: [LectureApport.CausePesee]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(causes.enumerated()), id: \.element.id) { rang, ligne in
+                // Le filet court d'un bord à l'autre de la carte, et arrive
+                // avec sa ligne (dans la maquette, c'est son bord haut).
+                if rang > 0 {
+                    DSSeparator(retrait: 0)
+                        .verreCascade(rempli, delai: 0.2 + Double(rang) * 0.07, decalage: 0)
+                }
+                causeLigne(ligne, rang: rang)
+                    .verreCascade(rempli, delai: 0.2 + Double(rang) * 0.07, decalage: 10)
+            }
+        }
+        .dsCard()
+    }
+
+    private func causeLigne(_ ligne: LectureApport.CausePesee, rang: Int) -> some View {
+        let teinte = AnneauTeintes.cause(rang: rang)
+        return Button {
+            HapticService.shared.selection()
+            // La part reste allumée tant que la cause est ouverte.
+            surligne = ligne.cause.id
+            causeOuverte = CauseOuverte(contribution: ligne.cause, teinte: teinte)
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(teinte)
+                    .frame(width: 10, height: 10)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(ligne.cause.libelle)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsTexte)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    barreDePoids(ligne, teinte: teinte, rang: rang)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(PointsApport.signe(ligne.cause.delta))
+                    .font(.dsSousTitreFort.monospacedDigit())
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                DSChevron()
+            }
+            .padding(.horizontal, DS.paddingCarte)
+            .padding(.vertical, 12)
+            .frame(minHeight: DS.cibleTactile)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityLabel("\(ligne.cause.libelle), \(PointsApport.signe(ligne.cause.delta)) points")
+        .accessibilityHint("Allume cette part sur l'anneau et ouvre le détail")
+    }
+
+    // MARK: Ce que tu peux faire (premium)
+
+    /// Les gestes sont réservés au premium, comme sur la fiche du Bilan et sur
+    /// celle d'une cause : en gratuit, ils restent visibles, floutés, avec la
+    /// porte dessous. Les causes, elles, restent en clair.
+    @ViewBuilder
+    private func gestesBloc(_ gestes: [LectureApport.Geste]) -> some View {
+        if subscriptionService.isPremium {
+            gestesCarte(gestes)
+        } else {
+            GatedOverlay(intensity: .teaser) { gestesCarte(gestes) }
+            UnlockDoor(
+                icon: "lock.fill",
+                title: titreDeLaPorte(gestes.count + (aUnConseil ? 1 : 0)),
+                subtitle: "Ce que tu peux faire dès aujourd'hui. Les causes, elles, restent toujours gratuites.",
+                zone: "fiche_apport_complements"
+            )
+        }
+    }
+
+    /// Toujours un bénéfice propre à l'apport, jamais un « Passe Premium »
+    /// générique : le compte annoncé est celui des lignes floutées.
+    private func titreDeLaPorte(_ n: Int) -> String {
+        let mots = ["", "Un", "Deux", "Trois", "Quatre"]
+        let nombre = n < mots.count ? mots[n] : "\(n)"
+        return n <= 1 ? "Un geste t'attend" : "\(nombre) gestes t'attendent"
+    }
+
+    private func gestesCarte(_ gestes: [LectureApport.Geste]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(gestes.enumerated()), id: \.element.id) { rang, geste in
+                if rang > 0 {
+                    DSSeparator(retrait: 0)
+                        .verreCascade(rempli, delai: 0.45 + Double(rang) * 0.08, decalage: 0)
+                }
+                gesteLigne(geste, rang: rang)
+                    .verreCascade(rempli, delai: 0.45 + Double(rang) * 0.08, decalage: 10)
+            }
+            if aUnConseil {
+                if !gestes.isEmpty {
+                    DSSeparator(retrait: 0)
+                        .verreCascade(rempli, delai: 0.45 + Double(gestes.count) * 0.08, decalage: 0)
+                }
+                conseilLigne
+                    .verreCascade(rempli, delai: 0.45 + Double(gestes.count) * 0.08, decalage: 10)
+            }
+        }
+        .dsCard()
+    }
+
+    /// Pastille numérotée (vert foncé du kiwi sur le vert pâle), le geste, et
+    /// ce qu'il rendrait.
+    private func gesteLigne(_ geste: LectureApport.Geste, rang: Int) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(DS.entier(rang + 1))
+                .font(.dsSousTitre.weight(.bold).monospacedDigit())
+                .foregroundStyle(Color.teinteKiwiTexte)
+                .frame(width: 30, height: 30)
+                .background(Color.teinteKiwiPale, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(geste.texte)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(sousLigne(geste))
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .lineSpacing(1)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 14)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Le conseil du bilan : une ampoule à la place du numéro.
+    private var conseilLigne: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "lightbulb")
+                .font(.system(size: 20, weight: .regular))
+                .foregroundStyle(Color.dsSecondaire)
+                .frame(width: 30, height: 30)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                if let conseil = contexte.conseil {
+                    Text(conseil)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsTexte)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let suite = contexte.conseilSuite {
+                    Text(suite)
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .lineSpacing(1)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 14)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// « jusqu'à +12 points · café pendant les repas » : ce que le geste
+    /// rendrait, et le facteur auquel il répond.
+    private func sousLigne(_ geste: LectureApport.Geste) -> String {
+        let cause = geste.cause.prefix(1).lowercased() + geste.cause.dropFirst()
+        guard let regain = LectureApport.libelleRegain(geste.regain) else { return "répond à : \(cause)" }
+        return "\(regain) · \(cause)"
+    }
+
+    // MARK: Le détail du calcul (replié)
+
+    /// Toute l'arithmétique du registre, du point de départ au score : elle
+    /// ne disparaît pas, elle se replie sous les freins.
+    private var calculBloc: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                HapticService.shared.selection()
+                withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
+                    calculDeplie.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Le détail du calcul")
+                            .font(.dsSousTitreFort)
+                            .tracking(DSTracking.sousTitre)
+                            .foregroundStyle(Color.dsTexte)
+                        Text(calculDeplie ? "Touche une ligne pour allumer sa part" : "Du point de départ à ton score, ligne à ligne")
+                            .font(.dsLegende)
+                            .tracking(DSTracking.legende)
+                            .foregroundStyle(Color.dsSecondaire)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.dsTertiaire)
+                        .rotationEffect(.degrees(calculDeplie ? 180 : 0))
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, DS.paddingCarte)
+                .padding(.vertical, 12)
+                .frame(minHeight: DS.cibleTactile)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.dsPress)
+            .dsCard()
+            .accessibilityValue(calculDeplie ? "déplié" : "replié")
+
+            if calculDeplie {
+                cascadeCarte
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(.top, 22)
+    }
 
     private var cascadeCarte: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Sans barres : les freins ont déjà les leurs, juste au-dessus.
             CascadeApport(detail: detail, couleur: contexte.couleur,
                           apportAvecArticle: contexte.apportAvecArticle,
-                          barres: true, surligne: $surligne)
+                          surligne: $surligne)
                 .padding(.horizontal, DS.paddingCarte)
                 .padding(.vertical, 4)
                 .dsCard()
@@ -330,7 +638,7 @@ struct FicheApportSheet: View {
         return "Le calcul dépasse 100 : l'anneau est plein, tes réponses vont au-delà du besoin."
     }
 
-    // MARK: 04 — la prise
+    // MARK: Comment le prendre / l'intégrer
 
     private var priseCarte: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -412,7 +720,7 @@ struct FicheApportSheet: View {
         .dsCard()
     }
 
-    // MARK: 05 — les précautions
+    // MARK: Les précautions
 
     private var precautionsCarte: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -461,7 +769,7 @@ struct FicheApportSheet: View {
         .dsCard()
     }
 
-    // MARK: 06 — l'autre voie
+    // MARK: L'autre voie
 
     private var alternativesCarte: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -532,8 +840,9 @@ struct CascadeApport: View {
     /// (`CauseApportSheet`). `nil` → la ligne ne fait qu'allumer sa part.
     var apportAvecArticle: String? = nil
     /// Chaque frein porte sa barre de poids (relative au plus lourd), qui se
-    /// remplit en 0,8 s, et les lignes arrivent en cascade : la fiche des
-    /// Compléments, où ce bloc est celui qu'on lit pour comprendre.
+    /// remplit en 0,8 s, et les lignes arrivent en cascade. Les deux fiches
+    /// d'apport montrent désormais les freins à part (« Ce qui pèse le
+    /// plus ») et replient ce calcul sans barres.
     var barres: Bool = false
     /// Part de l'anneau allumée (`PartAnneau.id`).
     @Binding var surligne: String?

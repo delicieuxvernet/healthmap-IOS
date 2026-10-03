@@ -210,9 +210,10 @@ struct PremiumAction: View {
     var body: some View {
         Button(action: action) {
             ZStack {
+                // 17 / 600 sans interlettrage : la maquette n'en met pas sur
+                // l'action de la feuille Premium.
                 Text(titre)
                     .font(.dsHeadline)
-                    .tracking(DSTracking.corps)
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .opacity(chargement ? 0 : 1)

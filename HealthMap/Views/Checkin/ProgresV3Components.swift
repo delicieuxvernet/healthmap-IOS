@@ -24,20 +24,25 @@ enum ProgresDates {
     }
 }
 
-/// Les teintes d'un sujet suivi : le trait (icône, courbe) et sa version
-/// foncée pour le texte posé sur le verre.
+/// Les teintes d'un sujet suivi : le trait (icône, puce), la courbe (ligne,
+/// point du jour, barres du check-in, tiret de « Cette semaine ») et la
+/// version foncée pour le texte posé sur le verre.
 enum ProgresTeintes {
     struct Paire {
         let trait: Color
+        let courbe: Color
         let texte: Color
     }
 
-    /// L'énergie garde le jaune de la maquette ; tout autre symptôme, le rose.
+    /// L'énergie garde le jaune de la maquette — l'icône en #D7A10C, la courbe
+    /// et ses barres en #E6B731 ; tout autre symptôme, le rose.
     static func symptome(_ trend: SymptomTrend) -> Paire {
         if trend.noun == "ton énergie" {
-            return Paire(trait: Color.teinteGlucidesTrait, texte: Color.teinteGlucidesTexte)
+            return Paire(trait: Color.teinteGlucidesTrait, courbe: Color.teinteGlucides,
+                         texte: Color.teinteGlucidesTexte)
         }
-        return Paire(trait: Color.teinteSymptomes, texte: Color.teinteSymptomesTexte)
+        return Paire(trait: Color.teinteSymptomes, courbe: Color.teinteSymptomes,
+                     texte: Color.teinteSymptomesTexte)
     }
 
     /// « tes ongles » → « Ongles » : le sujet seul, pour une puce d'en-tête.
@@ -268,7 +273,9 @@ struct ProgresCourbeSymptome: View {
                         .overlay(Circle().stroke(Color.white, lineWidth: 2.5))
                         .position(dernier)
                         .opacity(trace ? 1 : 0)
-                        .animation(animer ? Animation.easeOut(duration: 0.4).delay(sommets.count > 1 ? 1.3 : 0) : nil,
+                        // « ease » CSS de la maquette : opacity .4s ease 1.3s.
+                        .animation(animer ? Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.4)
+                                                .delay(sommets.count > 1 ? 1.3 : 0) : nil,
                                    value: trace)
                 }
             }
@@ -301,7 +308,9 @@ struct ProgresCourbeSymptome: View {
                 }
                 .fill(teinte.opacity(0.09))
                 .opacity(trace ? 1 : 0)
-                .animation(animer ? Animation.easeOut(duration: 0.8).delay(0.5) : nil, value: trace)
+                // « ease » CSS de la maquette : opacity .8s ease .5s.
+                .animation(animer ? Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.8).delay(0.5) : nil,
+                           value: trace)
 
                 ligne
                     .trim(from: 0, to: trace ? 1 : 0)
@@ -597,7 +606,7 @@ struct ProgresDepuisLeDebutCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 5) {
                     Image(systemName: symbole(ligne))
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(couleur)
                         .accessibilityHidden(true)
                     Text(ligne.nom)
@@ -606,7 +615,7 @@ struct ProgresDepuisLeDebutCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(encre)
                         .accessibilityHidden(true)
                 }
@@ -683,7 +692,7 @@ struct ProgresLigneAction: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: symbole)
-                    .font(.system(size: 21, weight: .medium))
+                    .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(Color.teinteKiwi)
                     .frame(width: 40, height: 40)
                     .background(Circle().fill(Color.teinteKiwiPale))
