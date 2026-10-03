@@ -81,12 +81,13 @@ enum ResumeWidgets {
             .map(\.element)
     }
 
-    /// « Magnésium et fer sont couverts. », « Fer est un peu juste aussi. »,
-    /// « Magnésium est couvert, fer un peu juste. » ; `nil` sans voisin.
+    /// « Magnésium et fer sont couverts. » (l'énumération de la maquette, sans
+    /// article), « Le fer est un peu juste aussi. », « Le magnésium est
+    /// couvert, le fer un peu juste. » ; `nil` sans voisin.
     static func autres(principal: ApportW, secondaires: [ApportW]) -> String? {
         guard let a = secondaires.first else { return nil }
         let aussi = { (apport: ApportW) in bande(apport.score) == bande(principal.score) ? " aussi" : "" }
-        let sujetA = NomNutriment.majusculeInitiale(nomSansArticle(a.id))
+        let sujetA = NomNutriment.majusculeInitiale(NomApport.avecArticle(id: a.id, repli: a.nom))
         let verbeA = estPluriel(a.id) ? "sont" : "est"
         let motA = LectureApport.motStatut(id: a.id, score: a.score)
 
@@ -96,7 +97,7 @@ enum ResumeWidgets {
         let b = secondaires[1]
         let motB = LectureApport.motStatut(id: b.id, score: b.score)
         guard bande(a.score) == bande(b.score) else {
-            return "\(sujetA) \(verbeA) \(motA), \(nomSansArticle(b.id)) \(motB)."
+            return "\(sujetA) \(verbeA) \(motA), \(NomApport.avecArticle(id: b.id, repli: b.nom)) \(motB)."
         }
         // Accord du pluriel : féminin seulement si les deux le sont.
         let feminin = estFeminin(a.id) && estFeminin(b.id)
@@ -106,7 +107,8 @@ enum ResumeWidgets {
         case 1: motPluriel = "un peu justes"
         default: motPluriel = feminin ? "couvertes" : "couverts"
         }
-        return "\(sujetA) et \(nomSansArticle(b.id)) sont \(motPluriel)\(aussi(a))."
+        let enumeration = NomNutriment.majusculeInitiale(nomSansArticle(a.id))
+        return "\(enumeration) et \(nomSansArticle(b.id)) sont \(motPluriel)\(aussi(a))."
     }
 
     /// « Première cause : tes repas notés ces 14 derniers jours. » — seulement

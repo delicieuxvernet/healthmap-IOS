@@ -347,13 +347,14 @@ enum CreneauWidget: String, CaseIterable, Identifiable {
     /// redessine sans que l'app soit ouverte.
     static let heuresDeBascule = [5, 11, 15, 18]
 
-    /// « Ton midi ? » : la question du petit widget Ajout rapide.
+    /// « Ton midi ? » : la question du petit widget Ajout rapide (espace
+    /// fine insécable : le « ? » ne part jamais seul à la ligne).
     var question: String {
         switch self {
-        case .breakfast: return "Ton petit-déj ?"
-        case .lunch: return "Ton midi ?"
-        case .snack: return "Ton encas ?"
-        case .dinner: return "Ton soir ?"
+        case .breakfast: return "Ton petit-déj\u{202F}?"
+        case .lunch: return "Ton midi\u{202F}?"
+        case .snack: return "Ton encas\u{202F}?"
+        case .dinner: return "Ton soir\u{202F}?"
         }
     }
 

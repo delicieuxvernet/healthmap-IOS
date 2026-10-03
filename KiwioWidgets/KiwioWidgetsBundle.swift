@@ -6,7 +6,7 @@ import WidgetKit
 // Six widgets, une activité en direct et, à partir d'iOS 18, deux contrôles
 // (Centre de contrôle, écran verrouillé, bouton Action) :
 //
-//   • Ma journée      : calories du jour et les quatre repas ;
+//   • Ta journée      : calories du jour et les quatre repas ;
 //   • Tes apports     : l'apport le plus juste en grand, les autres en anneaux ;
 //   • Conseil du jour : un geste par jour, à cocher sans ouvrir l'app ;
 //   • Ajout rapide    : dicter, photographier, un verre d'eau, le rituel ;
@@ -75,7 +75,16 @@ struct FournisseurJour: TimelineProvider {
             .sorted()
         var entrees = [EntreeJour(date: maintenant, etat: aujourdhui)]
         entrees += bascules.map { EntreeJour(date: $0, etat: aujourdhui) }
-        entrees.append(EntreeJour(date: minuit, etat: BoiteCommune.etatAffiche(maintenant: minuit)))
+        let demain = BoiteCommune.etatAffiche(maintenant: minuit)
+        entrees.append(EntreeJour(date: minuit, etat: demain))
+        // Les bascules du lendemain aussi : iOS peut différer le rechargement
+        // demandé après minuit (budget, économie d'énergie), et « Ton soir ? »
+        // ne doit pas rester affiché au réveil.
+        entrees += CreneauWidget.heuresDeBascule
+            .compactMap { heure in calendrier.date(bySettingHour: heure, minute: 0, second: 0, of: minuit) }
+            .filter { $0 > minuit }
+            .sorted()
+            .map { EntreeJour(date: $0, etat: demain) }
         // Une minute après minuit : la frise du lendemain se recalcule, avec
         // ses propres heures de bascule.
         completion(Timeline(entries: entrees, policy: .after(minuit.addingTimeInterval(60))))
@@ -142,7 +151,7 @@ struct JourneeWidget: Widget {
         StaticConfiguration(kind: Self.kind, provider: FournisseurJour()) { entree in
             JourneeWidgetVue(entree: entree)
         }
-        .configurationDisplayName("Ma journée")
+        .configurationDisplayName("Ta journée")
         .description("Tes calories du jour et tes quatre repas. Touche un repas pour y ajouter un aliment.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
         .contentMarginsDisabled()
@@ -226,7 +235,7 @@ struct ConseilWidget: Widget {
             ConseilWidgetVue(entree: entree)
         }
         .configurationDisplayName("Conseil du jour")
-        .description("Un geste par jour pour l'apport à renforcer. Coche-le sans ouvrir l'app.")
+        .description("Un geste par jour pour l'apport à renforcer, tiré de sa fiche.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
         .contentMarginsDisabled()
     }

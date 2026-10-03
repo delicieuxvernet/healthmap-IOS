@@ -230,6 +230,19 @@ enum SynchroWidgets {
         let budget = contexte.kcalObjectif.map { $0 + (contexte.kcalDepensees ?? 0) }
         let userId = AuthService.shared.cachedCurrentUserIdString
 
+        // Le conseil du jour : figé pour la journée, et d'abord celui que le
+        // widget montre déjà (lu AVANT d'écrire le nouvel instantané).
+        let conseilDuJour: (conseils: [ConseilW], choisi: String?) = userId.map {
+            ConseilDuJourStore.retenir(parmi: contexte.conseils,
+                                       affiche: BoiteCommune.etatAffiche()?.conseilDuJour,
+                                       userId: $0, jour: jour)
+        } ?? (conseils: contexte.conseils, choisi: nil)
+
+        // « Où le trouver » est réservé au Premium dans la fiche d'un apport :
+        // sans abonnement, le widget ne montre pas non plus les aliments.
+        var apports = contexte.apports
+        if !contexte.premium { apports?.aliments = [] }
+
         return InstantaneJour(
             jour: jour,
             connecte: true,
@@ -243,10 +256,10 @@ enum SynchroWidgets {
                                           centilitres: eau.centilitres)
             },
             rituel: prises(contexte.complements),
-            apports: contexte.apports,
-            conseils: contexte.conseils.isEmpty ? nil : contexte.conseils,
+            apports: apports,
+            conseils: conseilDuJour.conseils.isEmpty ? nil : conseilDuJour.conseils,
             conseilFait: userId.flatMap { ConseilDuJourStore.fait(userId: $0, jour: jour) },
-            conseilChoisi: userId.flatMap { ConseilDuJourStore.retenir(parmi: contexte.conseils, userId: $0, jour: jour) },
+            conseilChoisi: conseilDuJour.choisi,
             premium: contexte.premium
         )
     }
@@ -366,7 +379,9 @@ final class RouteurWidgets: ObservableObject {
 enum ConseilDuJourStore {
     private struct Etat: Codable {
         var jour: String
-        var choisi: String? = nil
+        /// Le conseil retenu pour ce jour, en entier : il reste le conseil du
+        /// jour même s'il sort de la liste des candidats en cours de journée.
+        var retenu: ConseilW? = nil
         var fait: String? = nil
     }
 
@@ -398,16 +413,30 @@ enum ConseilDuJourStore {
         ecrire(etat, userId: userId)
     }
 
-    /// Le conseil retenu pour ce jour : celui déjà retenu s'il est encore
-    /// parmi les candidats (un repas noté ne le change pas en cours de
-    /// journée), sinon celui du rang du jour, comme le widget le choisirait.
-    static func retenir(parmi conseils: [ConseilW], userId: String, jour: String) -> String? {
-        guard !conseils.isEmpty else { return nil }
+    /// Le conseil du jour et la liste à écrire pour le widget. Une fois
+    /// retenu, il ne change plus de la journée, même si un repas noté
+    /// réordonne les candidats ou fait remonter son apport : il revient alors
+    /// en tête de la liste. Le premier choix du jour reprend celui que le
+    /// widget montre déjà (`affiche`, choisi par le rang du jour depuis
+    /// minuit, peut-être déjà coché), sinon le rang du jour.
+    static func retenir(parmi candidats: [ConseilW], affiche: ConseilW?, userId: String,
+                        jour: String) -> (conseils: [ConseilW], choisi: String?) {
         var etat = lire(userId: userId, jour: jour)
-        if let choisi = etat.choisi, conseils.contains(where: { $0.id == choisi }) { return choisi }
-        let id = conseils[BoiteCommune.rangDuJour(jour) % conseils.count].id
-        etat.choisi = id
-        ecrire(etat, userId: userId)
-        return id
+        let choix: ConseilW
+        if let retenu = etat.retenu {
+            choix = retenu
+        } else if let affiche {
+            choix = affiche
+        } else if !candidats.isEmpty {
+            choix = candidats[BoiteCommune.rangDuJour(jour) % candidats.count]
+        } else {
+            return (candidats, nil)
+        }
+        if etat.retenu == nil {
+            etat.retenu = choix
+            ecrire(etat, userId: userId)
+        }
+        let liste = candidats.contains(where: { $0.id == choix.id }) ? candidats : [choix] + candidats
+        return (liste, choix.id)
     }
 }

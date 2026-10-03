@@ -318,6 +318,11 @@ private struct GestesOnde: View {
 
 /// Part de l'objectif d'eau bue, bornée à 0...1 (l'objectif sert aussi de
 /// plafond, comme dans le Journal).
+/// « 1 verre », « 3 verres » : pour VoiceOver.
+private func gestesVerres(_ nombre: Int) -> String {
+    "\(nombre) \(nombre > 1 ? "verres" : "verre")"
+}
+
 private func gestesFractionEau(_ eau: InstantaneJour.Eau) -> Double {
     guard eau.objectif > 0 else { return 0 }
     return min(1, max(0, Double(eau.verres) / Double(eau.objectif)))
@@ -364,7 +369,7 @@ struct VueEauPetite: View {
                 }
                 .padding(.top, 14)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Eau : \(eau.verres) verres sur \(eau.objectif), soit \(FormatW.litresBus(eau)) L sur \(FormatW.litresObjectif(eau)) L")
+                .accessibilityLabel("Eau : \(gestesVerres(eau.verres)) sur \(eau.objectif), soit \(FormatW.litresBus(eau)) L sur \(FormatW.litresObjectif(eau)) L")
                 Spacer(minLength: 4)
                 if eau.atteint {
                     // Non touchable : le Journal ne note pas au-delà de
@@ -463,23 +468,19 @@ struct VueEauRonde: View {
 
     var body: some View {
         if let eau = exploitableW(etat)?.eau {
-            Button(intent: AjouterVerreIntent()) {
-                ZStack {
-                    AccessoryWidgetBackground()
-                    GestesAnneauRond(fraction: gestesFractionEau(eau))
-                    VStack(spacing: 2) {
-                        Image(systemName: "drop")
-                            .font(.system(size: 15, weight: .semibold))
-                        Text("\(eau.verres)")
-                            .font(.chiffreW(17))
-                            .contentTransition(.numericText())
-                    }
-                    .foregroundStyle(TeinteW.encre())
-                    .widgetAccentable()
+            if eau.atteint {
+                // Objectif atteint : un bouton ne ferait plus rien et capterait
+                // le toucher ; sans lui, le toucher ouvre le Journal.
+                cadran(eau)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(annonce(eau))
+            } else {
+                Button(intent: AjouterVerreIntent()) {
+                    cadran(eau)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(annonce(eau))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(annonce(eau))
         } else {
             ZStack {
                 AccessoryWidgetBackground()
@@ -493,8 +494,24 @@ struct VueEauRonde: View {
         }
     }
 
+    private func cadran(_ eau: InstantaneJour.Eau) -> some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            GestesAnneauRond(fraction: gestesFractionEau(eau))
+            VStack(spacing: 2) {
+                Image(systemName: "drop")
+                    .font(.system(size: 15, weight: .semibold))
+                Text("\(eau.verres)")
+                    .font(.chiffreW(17))
+                    .contentTransition(.numericText())
+            }
+            .foregroundStyle(TeinteW.encre())
+            .widgetAccentable()
+        }
+    }
+
     private func annonce(_ eau: InstantaneJour.Eau) -> String {
-        let compte = "Eau : \(eau.verres) verres sur \(eau.objectif)"
+        let compte = "Eau : \(gestesVerres(eau.verres)) sur \(eau.objectif)"
         return eau.atteint ? compte + ", objectif atteint" : compte + ". Ajouter un verre"
     }
 }
@@ -523,6 +540,14 @@ private struct GestesAnneauRond: View {
 
 // MARK: - Rituel (W5)
 
+/// Pas de rituel à montrer : avant le bilan, il arrive avec lui ; après, c'est
+/// qu'aucun complément n'est retenu pour aujourd'hui.
+private func gestesRituelVide(_ etat: InstantaneJour) -> String {
+    etat.bilanFait
+        ? "Aucun complément à prendre aujourd'hui."
+        : "Ton rituel arrive avec ton bilan, dans Kiwio."
+}
+
 /// « 1 / 3 » : prises cochées sur prises du jour, en tête des deux formats.
 private struct GestesCompteurRituel: View {
     let faites: Int
@@ -532,7 +557,7 @@ private struct GestesCompteurRituel: View {
         Text("\(faites) / \(total)")
             .font(.chiffreW(13))
             .foregroundStyle(TeinteW.encre())
-            .accessibilityLabel("\(faites) prises sur \(total)")
+            .accessibilityLabel("\(faites) \(faites > 1 ? "prises" : "prise") sur \(total)")
     }
 }
 
@@ -589,8 +614,8 @@ struct VueRituelPetite: View {
                 .accessibilityValue(pris ? "pris" : "à prendre")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        } else if exploitableW(etat) != nil {
-            InvitationW(message: "Ton rituel arrive avec ton bilan, dans Kiwio.")
+        } else if let etat = exploitableW(etat) {
+            InvitationW(message: gestesRituelVide(etat))
         } else {
             InvitationW()
         }
@@ -617,8 +642,8 @@ struct VueRituelMoyenne: View {
                 .frame(maxHeight: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        } else if exploitableW(etat) != nil {
-            InvitationW(message: "Ton rituel arrive avec ton bilan, dans Kiwio.")
+        } else if let etat = exploitableW(etat) {
+            InvitationW(message: gestesRituelVide(etat))
         } else {
             InvitationW()
         }

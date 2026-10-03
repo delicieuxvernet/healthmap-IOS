@@ -88,9 +88,9 @@ final class ResumeWidgetsTests: XCTestCase {
         }
         let principal = apport("vitD", 52)
         XCTAssertEqual(ResumeWidgets.autres(principal: principal, secondaires: [apport("iron", 60)]),
-                       "Fer est un peu juste aussi.")
+                       "Le fer est un peu juste aussi.")
         XCTAssertEqual(ResumeWidgets.autres(principal: principal, secondaires: [apport("magnesium", 80), apport("iron", 61)]),
-                       "Magnésium est couvert, fer un peu juste.")
+                       "Le magnésium est couvert, le fer un peu juste.")
         XCTAssertEqual(ResumeWidgets.autres(principal: principal, secondaires: [apport("vitC", 90), apport("vitB12", 75)]),
                        "Vitamine C et vitamine B12 sont couvertes.")
         XCTAssertEqual(ResumeWidgets.autres(principal: principal, secondaires: [apport("omega3", 30), apport("fiber", 20)]),

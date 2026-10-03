@@ -24,10 +24,15 @@ import AppIntents
 private enum EtatConseilW {
     /// Personne de connecté, ou l'app n'a encore rien écrit.
     case invitation
-    /// Connecté, mais pas encore de bilan : pas de geste à proposer.
-    case sansBilan
-    /// Un bilan, et aucun apport à rattraper aujourd'hui.
-    case rienARattraper
+    /// Connecté, sans conseil écrit par l'app : pas encore de bilan, ou un
+    /// bilan fait mais un instantané écrit avant cette version (il faut
+    /// rouvrir Kiwio). Les mots disent lequel des deux.
+    case sansBilan(texte: String, court: String)
+    /// Un bilan, et aucun geste à cocher aujourd'hui. `seTiennent` : tous les
+    /// apports montrés sont couverts ; sinon un apport est bas mais rien de ce
+    /// qui le freine ne se montre hors de l'app (traitement, âge, journal…),
+    /// et on ne prétend pas qu'il se tient.
+    case rienARattraper(seTiennent: Bool)
     /// Le conseil du jour. `reserve` : sans Premium, le geste reste dans l'app.
     case conseil(ConseilW, fait: Bool, reserve: Bool)
 
@@ -40,10 +45,12 @@ private enum EtatConseilW {
             // `premium` absent (instantané écrit par une version précédente) :
             // on ne sait pas, donc le geste reste réservé.
             self = .conseil(conseil, fait: etat.conseilDuJourFait, reserve: etat.premium != true)
-        } else if etat.apports != nil {
-            self = .rienARattraper
+        } else if let apports = etat.apports {
+            self = .rienARattraper(seTiennent: apports.apports.allSatisfy { $0.score >= 70 })
+        } else if etat.bilanFait {
+            self = .sansBilan(texte: PiecesConseilW.aRouvrir, court: PiecesConseilW.aRouvrirCourt)
         } else {
-            self = .sansBilan
+            self = .sansBilan(texte: PiecesConseilW.sansBilan, court: PiecesConseilW.sansBilanCourt)
         }
     }
 }
@@ -52,9 +59,21 @@ private enum EtatConseilW {
 /// disent la même chose.
 private enum PiecesConseilW {
     static let sansBilan = "Ton conseil du jour arrive avec ton bilan, dans Kiwio."
-    static let rienARattraper = "Tes apports se tiennent. Rien à rattraper aujourd'hui."
+    static let sansBilanCourt = "Ton conseil arrive avec ton bilan."
+    static let aRouvrir = "Ouvre Kiwio pour voir ton conseil du jour."
+    static let aRouvrirCourt = "Ouvre Kiwio pour le voir."
+
+    /// Rien à cocher aujourd'hui : « se tiennent » seulement si tout est
+    /// couvert ; sinon la fiche dit ce qui pèse.
+    static func rien(seTiennent: Bool) -> String {
+        seTiennent ? "Tes apports se tiennent. Rien à rattraper aujourd'hui."
+                   : "Pas de geste à cocher aujourd'hui. Ta fiche dit ce qui pèse."
+    }
+
     /// Le rectangle de l'écran verrouillé n'a que deux lignes.
-    static let rienARattraperCourt = "Tes apports se tiennent."
+    static func rienCourt(seTiennent: Bool) -> String {
+        seTiennent ? "Tes apports se tiennent." : "Pas de geste aujourd'hui."
+    }
     static let reserve = "Ton geste du jour t'attend dans Kiwio Premium."
     static let reserveCourt = "Ton geste du jour, avec Premium"
 
@@ -103,11 +122,11 @@ private enum PiecesConseilW {
         points > 1 ? "points" : "point"
     }
 
-    /// Ce que dit le widget une fois le conseil coché. Sans chiffre annoncé,
-    /// on n'en invente pas.
+    /// Ce que dit le widget une fois le conseil coché. La coche ne change
+    /// aucun score (le registre lit le questionnaire et le journal) : on ne
+    /// promet pas de points ; le badge garde ce que pèse le facteur.
     static func note(_ conseil: ConseilW) -> String {
-        guard conseil.points > 0 else { return "Noté. Tu le refais demain\u{202F}?" }
-        return "Noté. Jusqu'à +\(conseil.points) \(unite(conseil.points)) si tu le tiens."
+        "Noté pour aujourd'hui."
     }
 
     /// La lecture VoiceOver du conseil : l'apport, la phrase affichée, les points.
@@ -115,7 +134,7 @@ private enum PiecesConseilW {
         let phrase = texte.hasSuffix(".") ? String(texte.dropLast()) : texte
         var lue = "Conseil du jour, \(conseil.apportNom). \(phrase)."
         if conseil.points > 0 {
-            lue += " Jusqu'à \(conseil.points) \(unite(conseil.points)) de plus."
+            lue += " Ce facteur pèse jusqu'à \(conseil.points) \(unite(conseil.points))."
         }
         return lue
     }
@@ -132,13 +151,13 @@ struct VueConseilPetite: View {
         switch EtatConseilW(etat) {
         case .invitation:
             InvitationW()
-        case .sansBilan:
-            InvitationW(message: PiecesConseilW.sansBilan)
-        case .rienARattraper:
+        case .sansBilan(let texte, _):
+            InvitationW(message: texte)
+        case .rienARattraper(let seTiennent):
             PetitConseilW(illustration: "fluent_sparkles",
                           etiquette: nil,
-                          texte: PiecesConseilW.rienARattraper,
-                          lecture: "Conseil du jour. " + PiecesConseilW.rienARattraper) {
+                          texte: PiecesConseilW.rien(seTiennent: seTiennent),
+                          lecture: "Conseil du jour. " + PiecesConseilW.rien(seTiennent: seTiennent)) {
                 PiedPetitConseilW(fin: .rien)
             }
         case .conseil(let conseil, fait: let fait, reserve: let reserve):
@@ -260,12 +279,12 @@ struct VueConseilMoyenne: View {
         switch EtatConseilW(etat) {
         case .invitation:
             InvitationW()
-        case .sansBilan:
-            InvitationW(message: PiecesConseilW.sansBilan)
-        case .rienARattraper:
+        case .sansBilan(let texte, _):
+            InvitationW(message: texte)
+        case .rienARattraper(let seTiennent):
             MoyenConseilW(conseilDuBadge: nil,
-                          texte: PiecesConseilW.rienARattraper,
-                          lecture: "Conseil du jour. " + PiecesConseilW.rienARattraper) {
+                          texte: PiecesConseilW.rien(seTiennent: seTiennent),
+                          lecture: "Conseil du jour. " + PiecesConseilW.rien(seTiennent: seTiennent)) {
                 EmptyView()
             }
         case .conseil(let conseil, fait: let fait, reserve: let reserve):
@@ -458,10 +477,10 @@ struct VueConseilRectangulaire: View {
         switch EtatConseilW(etat) {
         case .invitation:
             RectConseilW(symbole: nil, texte: "Ouvre Kiwio pour commencer.")
-        case .sansBilan:
-            RectConseilW(symbole: nil, texte: "Ton conseil arrive avec ton bilan.")
-        case .rienARattraper:
-            RectConseilW(symbole: "sparkles", texte: PiecesConseilW.rienARattraperCourt)
+        case .sansBilan(_, let court):
+            RectConseilW(symbole: nil, texte: court)
+        case .rienARattraper(let seTiennent):
+            RectConseilW(symbole: "sparkles", texte: PiecesConseilW.rienCourt(seTiennent: seTiennent))
         case .conseil(let conseil, fait: let fait, reserve: let reserve):
             RectConseilW(symbole: PiecesConseilW.symbole(conseil.apport),
                          texte: reserve ? PiecesConseilW.reserveCourt : PiecesConseilW.court(conseil),

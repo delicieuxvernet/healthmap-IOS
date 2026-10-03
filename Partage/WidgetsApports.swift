@@ -161,13 +161,14 @@ private struct ApportsPetitContenuW: View {
 
     /// Sous 70, le Journal le dit « un peu juste » ou « bas » : il est à
     /// renforcer. Au-dessus, il est seulement le plus bas des trois.
-    private var titre: String { principal.score < 70 ? "À renforcer" : "Le plus bas" }
+    /// « Le plus bas » serait faux : on ne compare que les apports du bilan.
+    private var titre: String { principal.score < 70 ? "À renforcer" : "Tes apports" }
 
     /// « Sardines ce soir ? » : le premier aliment de la fiche, au repas qui
     /// vient (mêmes plages que le Journal). Rien sans aliment.
     private var suggestion: String? {
         guard let aliment = lecture.aliments.first else { return nil }
-        return "\(aliment.nom) \(etat.repasAVenir(maintenant).quand)\u{00A0}?"
+        return "\(aliment.nom) \(etat.repasAVenir(maintenant).quand)\u{202F}?"
     }
 
     private var lu: String {

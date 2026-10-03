@@ -443,7 +443,7 @@ final class WidgetsPartageTests: XCTestCase {
         XCTAssertEqual(etat.repasAVenir(a(16), calendrier: calendrier), .dinner, "Encas noté : le soir")
         etat.kcalParCreneau["dinner"] = 800
         XCTAssertEqual(etat.repasAVenir(a(21), calendrier: calendrier), .dinner, "Le soir reste le soir")
-        XCTAssertEqual(etat.repasAVenir(a(21), calendrier: calendrier).question, "Ton soir ?")
+        XCTAssertEqual(etat.repasAVenir(a(21), calendrier: calendrier).question, "Ton soir\u{202F}?")
     }
 
     // MARK: - Le rituel en avant
@@ -810,7 +810,7 @@ private enum PlancheEtats {
             aliments: [AlimentW(nom: "Sardines", illustration: "fluent_fish")]
         )
     }
-    /// Tout est couvert : « Le plus bas » plutôt que « À renforcer », et pas de
+    /// Tout est couvert : « Tes apports » plutôt que « À renforcer », et pas de
     /// cause à montrer.
     static let toutCouvert = variante {
         $0.apports = LectureApportsW(
@@ -1407,7 +1407,7 @@ private struct PlancheW7: View {
 /// « Ma journée », absent de la maquette : habillé comme W7.
 private struct PlancheJournee: View {
     var body: some View {
-        SectionPlanche(code: "J", titre: "Ma journée", detail: "petit, moyen, écran verrouillé") {
+        SectionPlanche(code: "J", titre: "Ta journée", detail: "petit, moyen, écran verrouillé") {
             paire("maquette", PlancheEtats.maquette)
             paire("au-dessus du budget", PlancheEtats.auDessus)
             paire("sans objectif", PlancheEtats.sansObjectif)

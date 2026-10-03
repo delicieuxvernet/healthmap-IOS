@@ -90,13 +90,13 @@ struct WidgetsReglagesView: View {
             .frame(maxWidth: Self.largeurMoyen)
             .frame(maxWidth: .infinity)
         }
-        bloc("Conseil du jour. Un geste par jour pour ton apport à renforcer, pris dans sa fiche ; « C'est fait » se coche sans ouvrir l'app. Demain, un autre.") {
+        bloc("Conseil du jour. Un geste par jour pour ton apport à renforcer, pris dans sa fiche ; avec Premium, « C'est fait » se coche sans ouvrir l'app. Demain, un autre.") {
             moyen { VueConseilMoyenne(etat: etat) }
         }
         bloc("Rituel du jour. Matin, midi et soir, à cocher sur place. Aucune dose, comme dans l'app.") {
             moyen { VueRituelMoyenne(etat: etat) }
         }
-        bloc("Ma journée. Les kcal du jour et tes quatre repas ; touche un repas pour y ajouter un aliment.") {
+        bloc("Ta journée. Les kcal du jour et tes quatre repas ; touche un repas pour y ajouter un aliment.") {
             moyen { VueJourneeMoyenne(etat: etat) }
         }
     }
@@ -125,7 +125,7 @@ struct WidgetsReglagesView: View {
                 ReglagePastille(symbole: "lock.iphone")
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Ma journée en direct")
+                    Text("Ta journée en direct")
                         .font(.dsCorps)
                         .tracking(DSTracking.corps)
                         .foregroundStyle(Color.dsTexte)

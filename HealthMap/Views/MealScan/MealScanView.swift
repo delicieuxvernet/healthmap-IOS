@@ -605,8 +605,10 @@ struct JournalView: View {
         case .dicter:
             demarrerDictee(verrouillee: true)
         case .photo:
+            // « Photo » d'un widget : l'appareil déjà prêt (maquette des
+            // widgets), sans passer par le choix appareil / galerie.
             if CameraPicker.isAvailable {
-                showCaptureChoice = true
+                showCamera = true
             } else {
                 showPhotoLibrary = true
             }
