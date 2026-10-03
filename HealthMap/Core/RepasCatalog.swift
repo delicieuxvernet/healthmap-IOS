@@ -36,6 +36,16 @@ enum RepasBilan: String, CaseIterable, Identifiable {
         }
     }
 
+    /// L'heure du repas, dans la frise (questionnaire ludique, 3 oct. 2026).
+    var emoji: String {
+        switch self {
+        case .petitDej: return "☀️"
+        case .midi: return "🌤️"
+        case .gouter: return "🍪"
+        case .soir: return "🌙"
+        }
+    }
+
     /// Titre de l'écran.
     var titre: String {
         switch self {

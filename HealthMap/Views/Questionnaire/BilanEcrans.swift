@@ -3,17 +3,17 @@ import SwiftUI
 // MARK: - Les écrans du questionnaire (refonte du 1er octobre 2026)
 //
 // Un écran par thème, pas par question : « toi et le soleil » pose en une fois
-// l'intérieur, l'exposition et la peau. Chaque écran dit pourquoi il demande
-// (la ligne sous le titre) et montre, sous les réponses, ce qu'elles viennent
-// d'apprendre (`BilanCartePiste`).
+// l'intérieur, l'exposition et la peau. Chaque écran dit pourquoi il demande,
+// et ce que ses réponses viennent d'apprendre.
 //
 // Les valeurs écrites sont celles de `QuestionnaireSection`, via
 // `LibellesBilan.choix` : ces écrans ne connaissent aucun identifiant de
 // réponse en dur, hormis oui / non.
 //
-// Verre liquide (2 octobre 2026) : à l'arrivée sur un écran, le titre puis les
-// réponses montent en cascade (`bilanCascade`) ; les écrans de bilan (accueil,
-// fin d'étape, « ce qu'on voit déjà », fin) font monter leurs lignes une à une.
+// Questionnaire ludique (3 octobre 2026, maquette validée par Arthur) : c'est
+// le kiwi qui parle, en haut de l'écran (`BilanKiwi`) ; les questions d'un
+// écran arrivent une à la fois (`BilanQuestions`), en grandes cartes ; les
+// bascules oui / non deviennent deux cartes. Mêmes clés, mêmes valeurs.
 
 /// Aiguille l'écran courant vers sa vue.
 struct BilanEcranView: View {
@@ -52,78 +52,130 @@ struct BilanEcranView: View {
 
 // MARK: - Gabarit d'un écran
 
-/// Titre, raison de la question, réponses, puis la carte de piste collée en
-/// bas tant que la place le permet. Défile si le texte est grand.
+/// Le kiwi et sa bulle en haut (la raison de la question, puis la piste que
+/// les réponses font apparaître), un titre s'il y en a un, puis les réponses.
+/// Défile si le texte est grand.
+///
+/// Questionnaire ludique : la carte de piste du bas est devenue la bulle du
+/// kiwi, en haut, là où l'œil se pose.
 struct BilanPage<Contenu: View>: View {
-    let titre: String
+    var titre: String? = nil
     var pourquoi: String? = nil
     var carte: CartePiste? = nil
     @ViewBuilder let contenu: () -> Contenu
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        GeometryReader { geo in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    BilanTitre(titre: titre, pourquoi: pourquoi)
-                        .padding(.bottom, 14)
-                        .bilanCascade(0)
-                    contenu()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                BilanKiwi(carte: carte, pourquoi: pourquoi)
+                    .padding(.bottom, 16)
+                    .bilanCascade(0)
+                if let titre {
+                    BilanTitre(titre: titre)
+                        .padding(.bottom, 12)
                         .bilanCascade(1)
-                    Spacer(minLength: 14)
-                    if let carte {
-                        BilanCartePiste(carte: carte)
-                            .kiwiImpulsion(carte.genre)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
                 }
-                .padding(.horizontal, DS.marge)
-                .padding(.top, 10)
-                // La carte de verre du bas porte une ombre : assez d'air pour
-                // qu'elle ne soit pas coupée net par le bord de l'écran.
-                .padding(.bottom, 24)
-                .frame(minHeight: geo.size.height, alignment: .top)
-                .animation(reduceMotion ? nil : Animation.kiwiFluide, value: carte)
+                contenu()
+                    .bilanCascade(2)
             }
-            .scrollDismissesKeyboard(.interactively)
-            .scrollBounceBehavior(.basedOnSize)
+            .padding(.horizontal, DS.marge)
+            .padding(.top, 10)
+            // Le verre porte une ombre : assez d'air pour qu'elle ne soit pas
+            // coupée net par le bord de l'écran.
+            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .scrollBounceBehavior(.basedOnSize)
+    }
+}
+
+/// Un oui ou un non en deux grandes cartes, à la place des anciennes
+/// bascules : on voit qu'on a répondu. Mêmes valeurs écrites (`yes`, `no`).
+private enum OuiNon {
+    static func choix(oui: (String, String), non: (String, String)) -> [ChoixBilan] {
+        [
+            ChoixBilan(id: "yes", emoji: oui.0, titre: oui.1),
+            ChoixBilan(id: "no", emoji: non.0, titre: non.1),
+        ]
+    }
+
+    /// Le résumé de la réponse donnée, `nil` tant qu'elle est vide.
+    static func resume(_ choix: [ChoixBilan], _ valeur: String) -> String? {
+        choix.first { $0.id == valeur }.map { "\($0.emoji) \($0.titre)" }
     }
 }
 
 // MARK: - Accueil
 
+/// Le kiwi se présente, puis le chemin des quatre étapes, en zigzag.
 private struct BilanAccueil: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
+    @Environment(\.dynamicTypeSize) private var tailleDeTexte
+
+    /// Le zigzag du chemin ; tout s'aligne à gauche aux très grandes tailles.
+    private func decalage(_ etape: EtapeBilan) -> CGFloat {
+        guard !tailleDeTexte.isAccessibilitySize else { return 0 }
+        let decalages: [CGFloat] = [0, 56, 18, 70]
+        return decalages[etape.rawValue]
+    }
 
     var body: some View {
         let contexte = viewModel.contexteBilan
+        let minutes = ParcoursBilan.minutesAnnoncees(contexte)
         ScrollView {
             VStack(spacing: 0) {
-                KiwiSigne(taille: 64)
-                    .padding(.top, 12)
-                    .padding(.bottom, 10)
+                KiwiMascotte(animee: true)
+                    .frame(width: 92, height: 92)
+                    .padding(.top, 8)
                     .bilanCascade(0)
-                BilanTitre(
-                    titre: "Ton bilan, en 4 étapes",
-                    pourquoi: "Environ \(ParcoursBilan.minutesAnnoncees(contexte)) minutes. Tes réponses sont gardées à chaque pas.",
-                    centre: true
-                )
-                .padding(.bottom, 16)
+
+                VStack(spacing: 4) {
+                    Text("Salut ! Quatre petites étapes, environ \(minutes) minutes, et je te dis ce que ton assiette t'apporte vraiment.")
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsTexte)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Tes réponses sont gardées à chaque pas.")
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsSecondaire)
+                }
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .verre(.carte, forme: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .padding(.top, 10)
+                .padding(.bottom, 22)
                 .bilanCascade(1)
 
-                VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(EtapeBilan.allCases) { etape in
-                        BilanLigne(
-                            emoji: etape.emoji,
-                            titre: "\(etape.numero). \(etape.titre)",
-                            mention: ParcoursBilan.dureeAnnoncee(etape, contexte),
-                            teinte: etape.teinte
-                        )
+                        HStack(spacing: 12) {
+                            Text(etape.emoji)
+                                .font(.system(size: 24))
+                                .frame(width: 54, height: 54)
+                                .background(Circle().fill(etape.teinte.vive))
+                                .overlay(Circle().strokeBorder(Color.white, lineWidth: 4))
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("\(etape.numero). \(etape.titre)")
+                                    .font(.dsSousTitreFort)
+                                    .tracking(DSTracking.sousTitre)
+                                    .foregroundStyle(Color.dsTexte)
+                                Text(ParcoursBilan.dureeAnnoncee(etape, contexte))
+                                    .font(.dsLegende)
+                                    .foregroundStyle(Color.dsSecondaire)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.leading, decalage(etape))
+                        .accessibilityElement(children: .combine)
                         .bilanCascade(etape.rawValue + 2)
                     }
                 }
+                .padding(.horizontal, 12)
             }
             .padding(.horizontal, DS.marge)
             .padding(.top, 10)
@@ -139,7 +191,7 @@ private struct BilanMotif: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
     var body: some View {
-        BilanPage(titre: "Qu'est-ce qui t'amène ?", pourquoi: "Coche tout ce qui te parle.") {
+        BilanPage(titre: "Qu'est-ce qui t'amène ?", pourquoi: "Coche tout ce qui te parle : ton bilan regardera ça en premier.") {
             VStack(alignment: .leading, spacing: 8) {
                 BilanEtiquette(texte: "Tu voudrais")
                 BilanPuces(choix: LibellesBilan.choix("goals"), choisies: viewModel.profile.goals) { valeur in
@@ -222,54 +274,56 @@ private struct BilanReperes: View {
         viewModel.interactedQuestionIds.contains("gender") ? viewModel.profile.gender.rawValue : ""
     }
 
-    private var complet: Bool {
-        ParcoursBilan.estComplet(.reperes, viewModel.contexteBilan)
+    private var mesures: String? {
+        let p = viewModel.profile
+        guard !p.age.isEmpty, !p.height.isEmpty, !p.weight.isEmpty else { return nil }
+        return "🎂 \(p.age) ans · \(p.height) cm · \(p.weight) kg"
     }
 
     var body: some View {
         BilanPage(
-            titre: "Toi, en quatre repères",
             pourquoi: "Tes besoins en fer, en calcium ou en magnésium en dépendent.",
             carte: viewModel.carte(pour: .reperes)
         ) {
-            VStack(alignment: .leading, spacing: 10) {
-                BilanEchelle(choix: LibellesBilan.choix("gender"), valeur: sexe) { valeur in
-                    viewModel.choisirSexe(valeur)
-                }
+            BilanQuestions(questions: [
+                BilanQuestion("gender", titre: "Tu es…", resume: BilanResume.de("gender", sexe)) {
+                    BilanCartes(choix: LibellesBilan.choix("gender"), valeur: sexe) { valeur in
+                        viewModel.choisirSexe(valeur)
+                    }
+                },
+                BilanQuestion("mesures", titre: "Ton âge, ta taille, ton poids", resume: mesures) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .top, spacing: 8) {
+                            BilanMolette(titre: "Âge", unite: "ans", plage: 14...100, parDefaut: 30, texte: viewModel.profile.age) { valeur in
+                                viewModel.updateAnswer(questionId: "age", value: String(valeur))
+                                clinDOeil = FunFactCatalog.fact(for: "age", value: Double(valeur)) ?? clinDOeil
+                            }
+                            BilanMolette(titre: "Taille", unite: "cm", plage: 140...220, parDefaut: 170, texte: viewModel.profile.height) { valeur in
+                                viewModel.updateAnswer(questionId: "height", value: String(valeur))
+                                clinDOeil = FunFactCatalog.fact(for: "height", value: Double(valeur)) ?? clinDOeil
+                            }
+                            BilanMolette(titre: "Poids", unite: "kg", plage: 35...180, parDefaut: 70, texte: viewModel.profile.weight) { valeur in
+                                viewModel.updateAnswer(questionId: "weight", value: String(valeur))
+                            }
+                        }
 
-                HStack(alignment: .top, spacing: 8) {
-                    BilanMolette(titre: "Âge", unite: "ans", plage: 14...100, parDefaut: 30, texte: viewModel.profile.age) { valeur in
-                        viewModel.updateAnswer(questionId: "age", value: String(valeur))
-                        clinDOeil = FunFactCatalog.fact(for: "age", value: Double(valeur)) ?? clinDOeil
+                        Text(clinDOeil.isEmpty ? "Fais glisser chaque molette, ou touche-la si le chiffre est bon." : clinDOeil)
+                            .font(.dsLegende)
+                            .tracking(DSTracking.legende)
+                            .foregroundStyle(teinte.encre)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    BilanMolette(titre: "Taille", unite: "cm", plage: 140...220, parDefaut: 170, texte: viewModel.profile.height) { valeur in
-                        viewModel.updateAnswer(questionId: "height", value: String(valeur))
-                        clinDOeil = FunFactCatalog.fact(for: "height", value: Double(valeur)) ?? clinDOeil
-                    }
-                    BilanMolette(titre: "Poids", unite: "kg", plage: 35...180, parDefaut: 70, texte: viewModel.profile.weight) { valeur in
-                        viewModel.updateAnswer(questionId: "weight", value: String(valeur))
-                    }
-                }
-
-                Text(aide)
-                    .font(.dsLegende)
-                    .tracking(DSTracking.legende)
-                    .foregroundStyle(teinte.encre)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+                },
+            ])
         }
-    }
-
-    private var aide: String {
-        if !clinDOeil.isEmpty { return clinDOeil }
-        return complet ? " " : "Fais glisser chaque molette, ou touche-la si le chiffre est bon."
     }
 }
 
 // MARK: - Fin d'étape
 
-/// Ce qu'on a appris pendant l'étape, et ce qui vient.
+/// Ce qu'on a appris pendant l'étape, et ce qui vient. Les pistes arrivent
+/// face cachée : on les retourne d'un toucher.
 private struct BilanFinDEtape: View {
     let ecran: EcranBilan
 
@@ -283,42 +337,58 @@ private struct BilanFinDEtape: View {
         viewModel.profile.goals.count + viewModel.profile.symptoms.filter { $0 != "none" }.count
     }
 
+    private func phraseDuKiwi(pistes: Int, prenom: String) -> String {
+        let bravo = prenom.isEmpty ? "Bien joué !" : "Bien joué, \(prenom) !"
+        switch pistes {
+        case 0:
+            return etape == .toi
+                ? "\(bravo) Tes besoins sont calculés, à ta mesure."
+                : "\(bravo) Rien à signaler pour l'instant."
+        case 1:
+            return "\(bravo) J'ai repéré 1 piste. Touche-la pour la découvrir."
+        default:
+            return "\(bravo) J'ai repéré \(pistes) pistes. Touche-les pour les découvrir."
+        }
+    }
+
     var body: some View {
         let contexte = viewModel.contexteBilan
         let pistes = Array(viewModel.lectureBilan.pistes.prefix(3))
         let prenom = Prenom.affichable(viewModel.profile.firstName)
-        let aQuelqueChose = !pistes.isEmpty || etape == .toi
 
         ScrollView {
             VStack(spacing: 0) {
                 ZStack {
                     BilanGerbe()
-                    // La coche de l'étape : un disque de verre à sa couleur.
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color.white)
-                        .frame(width: 64, height: 64)
-                        .verre(BilanVerre.disque(etape.teinte.vive), forme: Circle())
+                    KiwiMascotte(animee: true)
+                        .frame(width: 84, height: 84)
                         .kiwiRecompense(true)
-                        .accessibilityHidden(true)
                 }
-                .padding(.top, 14)
-                .padding(.bottom, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
 
                 BilanTitre(
-                    titre: "Étape \(etape.numero) sur \(EtapeBilan.allCases.count) terminée",
-                    pourquoi: (prenom.isEmpty ? "" : "Bien joué, \(prenom). ")
-                        + (aQuelqueChose ? "Voilà ce qu'on sait déjà." : "Rien à signaler pour l'instant."),
+                    titre: "\(etape.titre) : fait ✓",
+                    pourquoi: phraseDuKiwi(pistes: pistes.count, prenom: prenom),
                     centre: true
                 )
-                .padding(.bottom, 14)
+                .padding(.bottom, 16)
                 .bilanCascade(0)
 
-                // Les lignes montent une à une : ce qu'on sait, puis ce qui vient.
+                if !pistes.isEmpty {
+                    HStack(spacing: 10) {
+                        ForEach(Array(pistes.enumerated()), id: \.offset) { rang, piste in
+                            BilanCartePisteCachee(nutriment: piste, rang: rang)
+                                .bilanCascade(rang + 1)
+                        }
+                    }
+                    .padding(.bottom, 12)
+                }
+
                 VStack(spacing: 8) {
                     if etape == .toi {
                         BilanLigne(emoji: "🎯", titre: "Tes besoins sont calculés", mention: "fait", teinte: .information)
-                            .bilanCascade(1)
+                            .bilanCascade(2)
                         if raisons > 0 {
                             BilanLigne(
                                 emoji: "📝",
@@ -326,18 +396,8 @@ private struct BilanFinDEtape: View {
                                 mention: raisons == 1 ? "notée" : "notées",
                                 teinte: .information
                             )
-                            .bilanCascade(2)
+                            .bilanCascade(3)
                         }
-                    }
-                    ForEach(Array(pistes.enumerated()), id: \.offset) { rang, piste in
-                        BilanLigne(
-                            emoji: NutrientData.definition(for: piste).emoji,
-                            titre: NutrientData.definition(for: piste).label,
-                            mention: EtatApport.aSurveiller.mention,
-                            teinte: .apport(piste),
-                            mentionForte: true
-                        )
-                        .bilanCascade(rang + 3)
                     }
                     if let suivante {
                         BilanLigne(
@@ -347,7 +407,7 @@ private struct BilanFinDEtape: View {
                             teinte: suivante.teinte,
                             teintee: true
                         )
-                        .bilanCascade(6)
+                        .bilanCascade(5)
                     }
                 }
             }
@@ -364,30 +424,38 @@ private struct BilanFinDEtape: View {
 private struct BilanSoleil: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
+    private static let choixInterieur = OuiNon.choix(
+        oui: ("🏢", "Surtout en intérieur"),
+        non: ("🌳", "Souvent dehors")
+    )
+
     var body: some View {
+        let p = viewModel.profile
         BilanPage(
-            titre: "Toi et le soleil",
             pourquoi: "La vitamine D se fabrique surtout dans la peau, au soleil.",
             carte: viewModel.carte(pour: .soleil)
         ) {
-            VStack(alignment: .leading, spacing: 8) {
-                BilanBascule(titre: "Je travaille surtout en intérieur", active: viewModel.profile.indoorWork == "yes") { active in
-                    viewModel.updateAnswer(questionId: "indoorWork", value: active ? "yes" : "no")
-                }
-                BilanEtiquette(texte: "Ton exposition au soleil")
-                    .padding(.top, 4)
-                BilanEchelle(choix: LibellesBilan.choix("sunExposure"), valeur: viewModel.profile.sunExposure) { valeur in
-                    viewModel.updateAnswer(questionId: "sunExposure", value: valeur)
-                }
-                BilanEtiquette(
-                    texte: "Ta peau",
-                    valeur: viewModel.profile.skinType.isEmpty ? nil : LibellesBilan.titre("skinType", viewModel.profile.skinType)
-                )
-                .padding(.top, 4)
-                BilanNuancier(choix: LibellesBilan.choix("skinType"), valeur: viewModel.profile.skinType) { valeur in
-                    viewModel.updateAnswer(questionId: "skinType", value: valeur)
-                }
-            }
+            BilanQuestions(questions: [
+                BilanQuestion("indoorWork", titre: "Tes journées, tu les passes…", resume: OuiNon.resume(Self.choixInterieur, p.indoorWork)) {
+                    BilanCartes(choix: Self.choixInterieur, valeur: p.indoorWork) { valeur in
+                        viewModel.updateAnswer(questionId: "indoorWork", value: valeur)
+                    }
+                },
+                BilanQuestion("sunExposure", titre: "Ton exposition au soleil", resume: BilanResume.de("sunExposure", p.sunExposure)) {
+                    BilanCartes(choix: LibellesBilan.choix("sunExposure"), valeur: p.sunExposure, colonnes: 3) { valeur in
+                        viewModel.updateAnswer(questionId: "sunExposure", value: valeur)
+                    }
+                },
+                BilanQuestion(
+                    "skinType",
+                    titre: "Ta peau",
+                    resume: p.skinType.isEmpty ? nil : "Peau " + LibellesBilan.titre("skinType", p.skinType).lowercased()
+                ) {
+                    BilanNuancier(choix: LibellesBilan.choix("skinType"), valeur: p.skinType) { valeur in
+                        viewModel.updateAnswer(questionId: "skinType", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -412,35 +480,50 @@ private struct BilanBouger: View {
     }
 
     private let choixVoulu = [
-        ChoixBilan(id: "oui", emoji: "", titre: "Oui, voulu"),
-        ChoixBilan(id: "non", emoji: "", titre: "Non, sans le vouloir"),
+        ChoixBilan(id: "oui", emoji: "🎯", titre: "Oui, voulu"),
+        ChoixBilan(id: "non", emoji: "🤷", titre: "Non, sans le vouloir"),
     ]
 
-    var body: some View {
-        BilanPage(
-            titre: "Tu bouges ?",
-            pourquoi: "Le sport augmente tes besoins en magnésium, en fer et en zinc.",
-            carte: viewModel.carte(pour: .bouger)
-        ) {
-            VStack(alignment: .leading, spacing: 8) {
-                BilanEtiquette(texte: "Ton activité, par semaine")
-                BilanEchelle(choix: LibellesBilan.choix("strengthTraining"), valeur: viewModel.profile.strengthTraining) { valeur in
+    private var questions: [BilanQuestion] {
+        var liste = [
+            BilanQuestion(
+                "strengthTraining",
+                titre: "Ton activité, par semaine",
+                resume: BilanResume.de("strengthTraining", viewModel.profile.strengthTraining)
+            ) {
+                BilanCartes(choix: LibellesBilan.choix("strengthTraining"), valeur: viewModel.profile.strengthTraining, colonnes: 3) { valeur in
                     viewModel.updateAnswer(questionId: "strengthTraining", value: valeur)
                 }
-                BilanEtiquette(texte: "Ton poids, ces derniers mois")
-                    .padding(.top, 4)
-                BilanEchelle(choix: choixDuSens, valeur: sens?.rawValue ?? "") { valeur in
+            },
+            BilanQuestion(
+                "sens",
+                titre: "Ton poids, ces derniers mois",
+                resume: sens.map { "\($0.emoji) Poids \($0.titre.lowercased())" }
+            ) {
+                BilanCartes(choix: choixDuSens, valeur: sens?.rawValue ?? "", colonnes: 3) { valeur in
                     choisirSens(valeur)
                 }
-                if let sens, sens != .stable {
-                    BilanEtiquette(texte: "C'était voulu ?")
-                        .padding(.top, 4)
-                    BilanSegments(choix: choixVoulu, valeur: voulu) { valeur in
+            },
+        ]
+        if let sens, sens != .stable {
+            liste.append(
+                BilanQuestion("voulu", titre: "C'était voulu ?", resume: OuiNon.resume(choixVoulu, voulu)) {
+                    BilanCartes(choix: choixVoulu, valeur: voulu) { valeur in
                         guard let tendance = LibellesBilan.tendance(sens, voulu: valeur == "oui") else { return }
                         viewModel.updateAnswer(questionId: "weightTrend", value: tendance)
                     }
                 }
-            }
+            )
+        }
+        return liste
+    }
+
+    var body: some View {
+        BilanPage(
+            pourquoi: "Le sport augmente tes besoins en magnésium, en fer et en zinc.",
+            carte: viewModel.carte(pour: .bouger)
+        ) {
+            BilanQuestions(questions: questions)
         }
     }
 
@@ -461,30 +544,40 @@ private struct BilanBouger: View {
 private struct BilanBoire: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
-    var body: some View {
-        BilanPage(
-            titre: "Ce que tu bois",
-            pourquoi: "Le café pendant le repas freine l'absorption du fer.",
-            carte: viewModel.carte(pour: .boire)
-        ) {
-            VStack(alignment: .leading, spacing: 8) {
-                BilanEtiquette(texte: "Cafés ou thés, par jour")
-                BilanEchelle(choix: LibellesBilan.choix("caffeineIntake"), valeur: viewModel.profile.caffeineIntake) { valeur in
+    private var questions: [BilanQuestion] {
+        let p = viewModel.profile
+        var liste = [
+            BilanQuestion("caffeineIntake", titre: "Cafés ou thés, par jour", resume: BilanResume.de("caffeineIntake", p.caffeineIntake)) {
+                BilanCartes(choix: LibellesBilan.choix("caffeineIntake"), valeur: p.caffeineIntake) { valeur in
                     viewModel.choisirCafe(valeur)
                 }
-                if ParcoursBilan.cafeDemandeLeMoment(viewModel.profile) {
-                    BilanEtiquette(texte: "Tu les bois plutôt")
-                        .padding(.top, 4)
-                    BilanSegments(choix: LibellesBilan.choix("caffeineTiming"), valeur: viewModel.profile.caffeineTiming) { valeur in
+            },
+        ]
+        if ParcoursBilan.cafeDemandeLeMoment(p) {
+            liste.append(
+                BilanQuestion("caffeineTiming", titre: "Tu les bois plutôt…", resume: BilanResume.de("caffeineTiming", p.caffeineTiming)) {
+                    BilanCartes(choix: LibellesBilan.choix("caffeineTiming"), valeur: p.caffeineTiming, colonnes: 3) { valeur in
                         viewModel.updateAnswer(questionId: "caffeineTiming", value: valeur)
                     }
                 }
-                BilanEtiquette(texte: "Verres d'eau, par jour")
-                    .padding(.top, 4)
-                BilanEchelle(choix: LibellesBilan.choix("waterIntake"), valeur: viewModel.profile.waterIntake) { valeur in
+            )
+        }
+        liste.append(
+            BilanQuestion("waterIntake", titre: "Verres d'eau, par jour", resume: BilanResume.de("waterIntake", p.waterIntake)) {
+                BilanCartes(choix: LibellesBilan.choix("waterIntake"), valeur: p.waterIntake, colonnes: 3) { valeur in
                     viewModel.updateAnswer(questionId: "waterIntake", value: valeur)
                 }
             }
+        )
+        return liste
+    }
+
+    var body: some View {
+        BilanPage(
+            pourquoi: "Le café pendant le repas freine l'absorption du fer.",
+            carte: viewModel.carte(pour: .boire)
+        ) {
+            BilanQuestions(questions: questions)
         }
     }
 }
@@ -492,22 +585,33 @@ private struct BilanBoire: View {
 private struct BilanAlcoolTabac: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
+    private static let choixTabac = OuiNon.choix(oui: ("🚬", "Oui"), non: ("🚭", "Non"))
+
+    /// Le tabac porte une valeur par défaut (« non ») : il ne s'affiche
+    /// répondu qu'une fois touché.
+    private var tabac: String {
+        guard viewModel.interactedQuestionIds.contains("smoking") else { return "" }
+        return viewModel.profile.isSmoker ? "yes" : "no"
+    }
+
     var body: some View {
+        let p = viewModel.profile
         BilanPage(
-            titre: "Alcool et tabac",
             pourquoi: "Les deux pèsent sur plusieurs de tes apports.",
             carte: viewModel.carte(pour: .alcoolTabac)
         ) {
-            VStack(alignment: .leading, spacing: 8) {
-                BilanEtiquette(texte: "L'alcool, pour toi")
-                BilanEchelle(choix: LibellesBilan.choix("alcohol"), valeur: viewModel.profile.alcohol) { valeur in
-                    viewModel.updateAnswer(questionId: "alcohol", value: valeur)
-                }
-                BilanBascule(titre: "Je fume", active: viewModel.profile.isSmoker) { active in
-                    viewModel.updateAnswer(questionId: "smoking", value: active ? "yes" : "no")
-                }
-                .padding(.top, 8)
-            }
+            BilanQuestions(questions: [
+                BilanQuestion("alcohol", titre: "L'alcool, pour toi", resume: BilanResume.de("alcohol", p.alcohol)) {
+                    BilanCartes(choix: LibellesBilan.choix("alcohol"), valeur: p.alcohol, colonnes: 3) { valeur in
+                        viewModel.updateAnswer(questionId: "alcohol", value: valeur)
+                    }
+                },
+                BilanQuestion("smoking", titre: "Tu fumes ?", resume: OuiNon.resume(Self.choixTabac, tabac)) {
+                    BilanCartes(choix: Self.choixTabac, valeur: tabac) { valeur in
+                        viewModel.updateAnswer(questionId: "smoking", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -518,19 +622,23 @@ private struct BilanRessenti: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
     var body: some View {
+        let p = viewModel.profile
         BilanPage(
-            titre: "Comment tu te sens",
             pourquoi: "Sous stress, le corps consomme plus de magnésium.",
             carte: viewModel.carte(pour: .ressenti)
         ) {
-            VStack(spacing: 8) {
-                BilanCurseur(titre: "Ton stress", choix: LibellesBilan.choix("stressLevel"), valeur: viewModel.profile.stressLevel) { valeur in
-                    viewModel.updateAnswer(questionId: "stressLevel", value: valeur)
-                }
-                BilanCurseur(titre: "Au réveil", choix: LibellesBilan.choix("wakeFeeling"), valeur: viewModel.profile.wakeFeeling) { valeur in
-                    viewModel.updateAnswer(questionId: "wakeFeeling", value: valeur)
-                }
-            }
+            BilanQuestions(questions: [
+                BilanQuestion("stressLevel", titre: "Ton stress, en ce moment", resume: BilanResume.de("stressLevel", p.stressLevel), attente: 1.1) {
+                    BilanVisage(titre: "Ton stress", choix: LibellesBilan.choix("stressLevel"), valeur: p.stressLevel) { valeur in
+                        viewModel.updateAnswer(questionId: "stressLevel", value: valeur)
+                    }
+                },
+                BilanQuestion("wakeFeeling", titre: "Au réveil, tu te sens…", resume: BilanResume.de("wakeFeeling", p.wakeFeeling), attente: 1.1) {
+                    BilanVisage(titre: "Au réveil", choix: LibellesBilan.choix("wakeFeeling"), valeur: p.wakeFeeling) { valeur in
+                        viewModel.updateAnswer(questionId: "wakeFeeling", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -539,19 +647,33 @@ private struct BilanNuits: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
     var body: some View {
+        let p = viewModel.profile
         BilanPage(
-            titre: "Tes soirées et tes nuits",
             pourquoi: "Des nuits courtes pèsent sur le magnésium et la vitamine D.",
             carte: viewModel.carte(pour: .nuits)
         ) {
-            VStack(spacing: 8) {
-                BilanCurseur(titre: "Écrans avant de dormir", choix: LibellesBilan.choix("screenBeforeBed"), valeur: viewModel.profile.screenBeforeBed) { valeur in
-                    viewModel.updateAnswer(questionId: "screenBeforeBed", value: valeur)
-                }
-                BilanCurseur(titre: "Tu dors", choix: LibellesBilan.choix("sleepHours"), valeur: viewModel.profile.sleepHours) { valeur in
-                    viewModel.updateAnswer(questionId: "sleepHours", value: valeur)
-                }
-            }
+            BilanQuestions(questions: [
+                BilanQuestion(
+                    "screenBeforeBed",
+                    titre: "Les écrans, avant de dormir",
+                    resume: BilanResume.de("screenBeforeBed", p.screenBeforeBed),
+                    attente: 1.1
+                ) {
+                    BilanVisage(titre: "Écrans avant de dormir", choix: LibellesBilan.choix("screenBeforeBed"), valeur: p.screenBeforeBed) { valeur in
+                        viewModel.updateAnswer(questionId: "screenBeforeBed", value: valeur)
+                    }
+                },
+                BilanQuestion(
+                    "sleepHours",
+                    titre: "Tu dors, par nuit…",
+                    resume: BilanResume.de("sleepHours", p.sleepHours),
+                    attente: 1.1
+                ) {
+                    BilanVisage(titre: "Tu dors", choix: LibellesBilan.choix("sleepHours"), valeur: p.sleepHours) { valeur in
+                        viewModel.updateAnswer(questionId: "sleepHours", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -559,20 +681,35 @@ private struct BilanNuits: View {
 private struct BilanVentre: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
+    private static let choixBallonnements = OuiNon.choix(oui: ("🎈", "Oui, souvent"), non: ("🙂", "Non"))
+    private static let choixAntibiotiques = OuiNon.choix(oui: ("💊", "Oui"), non: ("🙅", "Non"))
+
     var body: some View {
+        let p = viewModel.profile
         BilanPage(
-            titre: "Côté ventre",
             pourquoi: "Une digestion bousculée absorbe moins bien certains apports.",
             carte: viewModel.carte(pour: .ventre)
         ) {
-            VStack(spacing: 8) {
-                BilanBascule(titre: "J'ai souvent des ballonnements", active: viewModel.profile.bloating == "yes") { active in
-                    viewModel.updateAnswer(questionId: "bloating", value: active ? "yes" : "no")
-                }
-                BilanBascule(titre: "J'ai pris des antibiotiques récemment", active: viewModel.profile.antibiotics == "yes") { active in
-                    viewModel.updateAnswer(questionId: "antibiotics", value: active ? "yes" : "no")
-                }
-            }
+            BilanQuestions(questions: [
+                BilanQuestion(
+                    "bloating",
+                    titre: "Des ballonnements, souvent ?",
+                    resume: OuiNon.resume(Self.choixBallonnements, p.bloating).map { "Ballonnements : " + $0 }
+                ) {
+                    BilanCartes(choix: Self.choixBallonnements, valeur: p.bloating) { valeur in
+                        viewModel.updateAnswer(questionId: "bloating", value: valeur)
+                    }
+                },
+                BilanQuestion(
+                    "antibiotics",
+                    titre: "Des antibiotiques récemment ?",
+                    resume: OuiNon.resume(Self.choixAntibiotiques, p.antibiotics).map { "Antibiotiques : " + $0 }
+                ) {
+                    BilanCartes(choix: Self.choixAntibiotiques, valeur: p.antibiotics) { valeur in
+                        viewModel.updateAnswer(questionId: "antibiotics", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -582,34 +719,36 @@ private struct BilanCycle: View {
 
     /// La valeur d'un champ qui porte un défaut (« non concernée ») ne
     /// s'affiche choisie qu'une fois touchée.
-    private func choisie(_ id: String, _ valeur: String) -> Set<String> {
-        viewModel.interactedQuestionIds.contains(id) ? [valeur] : []
+    private func touchee(_ id: String, _ valeur: String) -> String {
+        viewModel.interactedQuestionIds.contains(id) ? valeur : ""
     }
 
     var body: some View {
+        let regles = touchee("periodFlow", viewModel.profile.periodFlow)
+        let grossesse = touchee("pregnancyStatus", viewModel.profile.pregnancyStatus)
         BilanPage(
-            titre: "Ton cycle",
             pourquoi: "Les règles et la grossesse changent tes besoins en fer.",
             carte: viewModel.carte(pour: .cycle)
         ) {
-            VStack(alignment: .leading, spacing: 8) {
-                BilanEtiquette(texte: "Tes règles")
-                BilanGrille(
-                    choix: LibellesBilan.choix("periodFlow"),
-                    choisies: choisie("periodFlow", viewModel.profile.periodFlow),
-                    large: "na"
-                ) { valeur in
-                    viewModel.updateAnswer(questionId: "periodFlow", value: valeur)
-                }
-                BilanEtiquette(texte: "En ce moment")
-                    .padding(.top, 4)
-                BilanGrille(
-                    choix: LibellesBilan.choix("pregnancyStatus"),
-                    choisies: choisie("pregnancyStatus", viewModel.profile.pregnancyStatus)
-                ) { valeur in
-                    viewModel.updateAnswer(questionId: "pregnancyStatus", value: valeur)
-                }
-            }
+            BilanQuestions(questions: [
+                BilanQuestion("periodFlow", titre: "Tes règles", resume: BilanResume.de("periodFlow", regles).map { "Règles : " + $0 }) {
+                    BilanGrille(
+                        choix: LibellesBilan.choix("periodFlow"),
+                        choisies: regles.isEmpty ? [] : [regles],
+                        large: "na"
+                    ) { valeur in
+                        viewModel.updateAnswer(questionId: "periodFlow", value: valeur)
+                    }
+                },
+                BilanQuestion("pregnancyStatus", titre: "En ce moment", resume: BilanResume.de("pregnancyStatus", grossesse)) {
+                    BilanGrille(
+                        choix: LibellesBilan.choix("pregnancyStatus"),
+                        choisies: grossesse.isEmpty ? [] : [grossesse]
+                    ) { valeur in
+                        viewModel.updateAnswer(questionId: "pregnancyStatus", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -619,19 +758,27 @@ private struct BilanCycle: View {
 private struct BilanRegime: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
-    private var choisies: Set<String> {
-        viewModel.interactedQuestionIds.contains("dietType") ? [viewModel.profile.dietType] : []
+    private var regime: String {
+        viewModel.interactedQuestionIds.contains("dietType") ? viewModel.profile.dietType : ""
     }
 
     var body: some View {
         BilanPage(
-            titre: "Ta façon de manger",
             pourquoi: "Elle dit d'où viennent ton fer, ta B12 et ton zinc.",
             carte: viewModel.carte(pour: .regime)
         ) {
-            BilanGrille(choix: LibellesBilan.choix("dietType"), colonnes: 3, choisies: choisies, large: "autre") { valeur in
-                viewModel.updateAnswer(questionId: "dietType", value: valeur)
-            }
+            BilanQuestions(questions: [
+                BilanQuestion("dietType", titre: "Ta façon de manger", resume: BilanResume.de("dietType", regime)) {
+                    BilanGrille(
+                        choix: LibellesBilan.choix("dietType"),
+                        colonnes: 3,
+                        choisies: regime.isEmpty ? [] : [regime],
+                        large: "autre"
+                    ) { valeur in
+                        viewModel.updateAnswer(questionId: "dietType", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -649,7 +796,7 @@ private struct BilanProvisoire: View {
         let lecture = viewModel.lectureBilan
         BilanPage(
             titre: "Ce qu'on voit déjà",
-            pourquoi: "Ton mode de vie a parlé. Ton assiette pèse le plus lourd : c'est elle qui tranche."
+            pourquoi: "Ton mode de vie a parlé. Ton assiette pèse le plus lourd : c'est elle qui tranche. À table !"
         ) {
             LazyVGrid(columns: colonnes, spacing: 6) {
                 ForEach(NutrientData.all) { apport in
@@ -745,27 +892,28 @@ private struct BilanATable: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
     var body: some View {
+        let p = viewModel.profile
         BilanPage(
-            titre: "À table",
             pourquoi: "Le rythme et la cuisson changent ce que ton assiette te donne vraiment.",
             carte: viewModel.carte(pour: .aTable)
         ) {
-            VStack(alignment: .leading, spacing: 8) {
-                BilanEtiquette(texte: "Tes repas, par jour")
-                BilanEchelle(choix: LibellesBilan.choix("mealsPerDay"), valeur: viewModel.profile.mealsPerDay) { valeur in
-                    viewModel.updateAnswer(questionId: "mealsPerDay", value: valeur)
-                }
-                BilanEtiquette(texte: "Ce qui est fait maison")
-                    .padding(.top, 4)
-                BilanEchelle(choix: LibellesBilan.choix("homeCookedPct"), valeur: viewModel.profile.homeCookedPct) { valeur in
-                    viewModel.updateAnswer(questionId: "homeCookedPct", value: valeur)
-                }
-                BilanEtiquette(texte: "Ta cuisson la plus fréquente")
-                    .padding(.top, 4)
-                BilanEchelle(choix: LibellesBilan.choix("cookingMethod"), valeur: viewModel.profile.cookingMethod) { valeur in
-                    viewModel.updateAnswer(questionId: "cookingMethod", value: valeur)
-                }
-            }
+            BilanQuestions(questions: [
+                BilanQuestion("mealsPerDay", titre: "Tes repas, par jour", resume: BilanResume.de("mealsPerDay", p.mealsPerDay).map { "🍽️ " + $0 + " repas" }) {
+                    BilanCartes(choix: LibellesBilan.choix("mealsPerDay"), valeur: p.mealsPerDay) { valeur in
+                        viewModel.updateAnswer(questionId: "mealsPerDay", value: valeur)
+                    }
+                },
+                BilanQuestion("homeCookedPct", titre: "Ce qui est fait maison", resume: BilanResume.de("homeCookedPct", p.homeCookedPct).map { "🏠 " + $0 }) {
+                    BilanCartes(choix: LibellesBilan.choix("homeCookedPct"), valeur: p.homeCookedPct, colonnes: 3) { valeur in
+                        viewModel.updateAnswer(questionId: "homeCookedPct", value: valeur)
+                    }
+                },
+                BilanQuestion("cookingMethod", titre: "Ta cuisson la plus fréquente", resume: BilanResume.de("cookingMethod", p.cookingMethod).map { "🍳 " + $0 }) {
+                    BilanCartes(choix: LibellesBilan.choix("cookingMethod"), valeur: p.cookingMethod, colonnes: 3) { valeur in
+                        viewModel.updateAnswer(questionId: "cookingMethod", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -773,35 +921,42 @@ private struct BilanATable: View {
 private struct BilanPlacard: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
+    private static let choixFoie = OuiNon.choix(oui: ("🫀", "Oui"), non: ("🙅", "Non"))
+    private static let choixGlucides = OuiNon.choix(oui: ("🥩", "Oui"), non: ("🍝", "Non"))
+
     var body: some View {
+        let p = viewModel.profile
         BilanPage(
-            titre: "Pain, sel et compagnie",
             pourquoi: "Le pain complet apporte fibres et magnésium, le sel iodé de l'iode.",
             carte: viewModel.carte(pour: .placard)
         ) {
-            VStack(alignment: .leading, spacing: 8) {
-                BilanEtiquette(texte: "Ton pain")
-                BilanEchelle(choix: LibellesBilan.choix("breadType"), valeur: viewModel.profile.breadType) { valeur in
-                    viewModel.updateAnswer(questionId: "breadType", value: valeur)
-                }
-                BilanEtiquette(texte: "Le sel, dans tes plats")
-                    .padding(.top, 4)
-                BilanEchelle(choix: LibellesBilan.choix("saltLevel"), valeur: viewModel.profile.saltLevel) { valeur in
-                    viewModel.updateAnswer(questionId: "saltLevel", value: valeur)
-                }
-                BilanEtiquette(texte: "Ton sel est iodé ?")
-                    .padding(.top, 4)
-                BilanSegments(choix: LibellesBilan.choix("iodizedSalt"), valeur: viewModel.profile.iodizedSalt) { valeur in
-                    viewModel.updateAnswer(questionId: "iodizedSalt", value: valeur)
-                }
-                BilanBascule(titre: "Je mange du foie ou des abats", active: viewModel.profile.eatLiver == "yes") { active in
-                    viewModel.updateAnswer(questionId: "eatLiver", value: active ? "yes" : "no")
-                }
-                .padding(.top, 6)
-                BilanBascule(titre: "Je mange très peu de glucides", active: viewModel.profile.lowCarbDiet == "yes") { active in
-                    viewModel.updateAnswer(questionId: "lowCarbDiet", value: active ? "yes" : "no")
-                }
-            }
+            BilanQuestions(questions: [
+                BilanQuestion("breadType", titre: "Ton pain", resume: BilanResume.de("breadType", p.breadType).map { "🍞 " + $0 }) {
+                    BilanCartes(choix: LibellesBilan.choix("breadType"), valeur: p.breadType) { valeur in
+                        viewModel.updateAnswer(questionId: "breadType", value: valeur)
+                    }
+                },
+                BilanQuestion("saltLevel", titre: "Le sel, dans tes plats", resume: BilanResume.de("saltLevel", p.saltLevel).map { "🧂 " + $0 }) {
+                    BilanCartes(choix: LibellesBilan.choix("saltLevel"), valeur: p.saltLevel) { valeur in
+                        viewModel.updateAnswer(questionId: "saltLevel", value: valeur)
+                    }
+                },
+                BilanQuestion("iodizedSalt", titre: "Ton sel est iodé ?", resume: BilanResume.de("iodizedSalt", p.iodizedSalt).map { "Sel iodé : " + $0 }) {
+                    BilanCartes(choix: LibellesBilan.choix("iodizedSalt"), valeur: p.iodizedSalt, colonnes: 3) { valeur in
+                        viewModel.updateAnswer(questionId: "iodizedSalt", value: valeur)
+                    }
+                },
+                BilanQuestion("eatLiver", titre: "Du foie ou des abats ?", resume: OuiNon.resume(Self.choixFoie, p.eatLiver).map { "Abats : " + $0 }) {
+                    BilanCartes(choix: Self.choixFoie, valeur: p.eatLiver) { valeur in
+                        viewModel.updateAnswer(questionId: "eatLiver", value: valeur)
+                    }
+                },
+                BilanQuestion("lowCarbDiet", titre: "Très peu de glucides ?", resume: OuiNon.resume(Self.choixGlucides, p.lowCarbDiet).map { "Peu de glucides : " + $0 }) {
+                    BilanCartes(choix: Self.choixGlucides, valeur: p.lowCarbDiet) { valeur in
+                        viewModel.updateAnswer(questionId: "lowCarbDiet", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -810,27 +965,40 @@ private struct BilanEcarts: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
     var body: some View {
+        let p = viewModel.profile
         BilanPage(
-            titre: "Tes habitudes",
             pourquoi: "Les produits très transformés prennent la place des fibres et du zinc.",
             carte: viewModel.carte(pour: .ecarts)
         ) {
-            VStack(alignment: .leading, spacing: 8) {
-                BilanEtiquette(texte: "Aliments fermentés (yaourt, kéfir, choucroute)")
-                BilanEchelle(choix: LibellesBilan.choix("fermentedFoods"), valeur: viewModel.profile.fermentedFoods) { valeur in
-                    viewModel.updateAnswer(questionId: "fermentedFoods", value: valeur)
-                }
-                BilanEtiquette(texte: "Plats tout prêts, biscuits, sodas")
-                    .padding(.top, 4)
-                BilanEchelle(choix: LibellesBilan.choix("ultraProcessedFrequency"), valeur: viewModel.profile.ultraProcessedFrequency) { valeur in
-                    viewModel.updateAnswer(questionId: "ultraProcessedFrequency", value: valeur)
-                }
-                BilanEtiquette(texte: "Le grignotage")
-                    .padding(.top, 4)
-                BilanEchelle(choix: LibellesBilan.choix("snacking"), valeur: viewModel.profile.snacking) { valeur in
-                    viewModel.updateAnswer(questionId: "snacking", value: valeur)
-                }
-            }
+            BilanQuestions(questions: [
+                BilanQuestion(
+                    "fermentedFoods",
+                    titre: "Yaourt, kéfir, choucroute…",
+                    resume: BilanResume.de("fermentedFoods", p.fermentedFoods).map { "🥛 Fermentés : " + $0.lowercased() }
+                ) {
+                    BilanCartes(choix: LibellesBilan.choix("fermentedFoods"), valeur: p.fermentedFoods) { valeur in
+                        viewModel.updateAnswer(questionId: "fermentedFoods", value: valeur)
+                    }
+                },
+                BilanQuestion(
+                    "ultraProcessedFrequency",
+                    titre: "Plats tout prêts, biscuits, sodas",
+                    resume: BilanResume.de("ultraProcessedFrequency", p.ultraProcessedFrequency).map { "🍪 Tout prêt : " + $0.lowercased() }
+                ) {
+                    BilanCartes(choix: LibellesBilan.choix("ultraProcessedFrequency"), valeur: p.ultraProcessedFrequency, colonnes: 3) { valeur in
+                        viewModel.updateAnswer(questionId: "ultraProcessedFrequency", value: valeur)
+                    }
+                },
+                BilanQuestion(
+                    "snacking",
+                    titre: "Le grignotage",
+                    resume: BilanResume.de("snacking", p.snacking).map { "🥨 Grignotage : " + $0.lowercased() }
+                ) {
+                    BilanCartes(choix: LibellesBilan.choix("snacking"), valeur: p.snacking) { valeur in
+                        viewModel.updateAnswer(questionId: "snacking", value: valeur)
+                    }
+                },
+            ])
         }
     }
 }
@@ -921,10 +1089,8 @@ private struct BilanFin: View {
             VStack(spacing: 0) {
                 ZStack {
                     BilanGerbe()
-                    KiwiSigne(taille: 60)
-                        .frame(width: 112, height: 112)
-                        .verre(.clair, forme: Circle())
-                        .overlay(Circle().strokeBorder(Color.dsAccent, lineWidth: 8))
+                    KiwiMascotte(animee: true)
+                        .frame(width: 96, height: 96)
                         .kiwiRecompense(true)
                 }
                 .padding(.top, 8)
