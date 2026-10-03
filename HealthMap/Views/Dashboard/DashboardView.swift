@@ -558,7 +558,7 @@ struct FullAnalysisLoadingView: View {
                 .progressViewStyle(.linear)
                 .tint(Color.dsAccent)
                 .frame(maxWidth: 200)
-                .animation(.easeInOut(duration: 0.4), value: progress)
+                .reducedMotionAnimation(.easeInOut(duration: 0.4), value: progress)
 
             VStack(spacing: Theme.spacingSM) {
                 // Une étiquette, pas un bouton : le vert foncé du texte, sur

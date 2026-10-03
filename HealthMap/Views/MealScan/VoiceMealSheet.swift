@@ -1297,6 +1297,10 @@ private struct VoiceItemRow: View {
     let onBasculerUnite: () -> Void
     let onRemove: () -> Void
 
+    /// Un « − » touché alors qu'il ne peut plus descendre : la quantité fait
+    /// non de la tête (`kiwiSecousse`), une fois par appui.
+    @State private var butee = Butee()
+
     private var manque: Bool { (grams ?? 0) <= 0 }
     /// Quelque chose attend la personne sur cette ligne (aliment ou quantité).
     private var alerte: Bool { manque || aVerifier }
@@ -1540,7 +1544,10 @@ private struct VoiceItemRow: View {
                 HStack(spacing: 7) {
                     ForEach(Array(unite.tailles.enumerated()), id: \.offset) { index, t in
                         let choisie = !manque && taille == index
-                        Button { onTaille(index) } label: {
+                        Button {
+                            HapticService.shared.selection()
+                            onTaille(index)
+                        } label: {
                             VStack(spacing: 2) {
                                 Text(t.libelle)
                                     .font(.system(size: 11, weight: .medium))
@@ -1562,7 +1569,9 @@ private struct VoiceItemRow: View {
 
             HStack(spacing: 14) {
                 BoutonPas(symbole: "minus", actif: nombre > 1,
-                          libelle: "Retirer une unité") { onCompter(-1) }
+                          libelle: "Retirer une unité",
+                          onButee: { butee.toucher() },
+                          action: { onCompter(-1) })
 
                 VStack(spacing: 0) {
                     Text(unite.libelle(nombre: nombre))
@@ -1570,15 +1579,21 @@ private struct VoiceItemRow: View {
                         .foregroundStyle(manque ? Color.dsTertiaire : Color.dsAccent)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                        .contentTransition(.numericText())
                     Text("\(Int(grams ?? 0)) g · \(kcalAffichees) kcal")
                         .font(.kiwioMono(12, .regular))
                         .foregroundStyle(Color.dsSecondaire)
+                        .contentTransition(.numericText())
                 }
                 .frame(maxWidth: .infinity)
+                .kiwiSecousse(butee.secousses)
 
                 BoutonPas(symbole: "plus", actif: true,
-                          libelle: "Ajouter une unité") { onCompter(1) }
+                          libelle: "Ajouter une unité",
+                          action: { onCompter(1) })
             }
+            // La quantité DÉFILE sous le doigt au lieu d'être remplacée.
+            .reducedMotionAnimation(.kiwiVif, value: grams)
         }
     }
 
@@ -1589,7 +1604,10 @@ private struct VoiceItemRow: View {
         if !item.portions.isEmpty {
             HStack(spacing: 7) {
                 ForEach(item.portions, id: \.self) { p in
-                    Button { onPick(p.grammes) } label: {
+                    Button {
+                        HapticService.shared.selection()
+                        onPick(p.grammes)
+                    } label: {
                         VStack(spacing: 2) {
                             Text(p.label)
                                 .font(.system(size: 11, weight: .medium))
@@ -1613,20 +1631,26 @@ private struct VoiceItemRow: View {
         // couvrent le cas courant, ce curseur couvre le reste sans
         // obliger à taper un nombre au clavier.
         HStack(spacing: 14) {
-            BoutonPas(symbole: "minus", actif: (grams ?? 0) > 5) { onAjuster(-5) }
+            BoutonPas(symbole: "minus", actif: (grams ?? 0) > 5,
+                      onButee: { butee.toucher() },
+                      action: { onAjuster(-5) })
 
             VStack(spacing: 0) {
                 Text("\(Int(grams ?? 0)) g")
                     .font(.kiwioMono(20, .bold))
                     .foregroundStyle(manque ? Color.dsTertiaire : Color.dsAccent)
+                    .contentTransition(.numericText())
                 Text("\(kcalAffichees) kcal")
                     .font(.kiwioMono(12, .regular))
                     .foregroundStyle(Color.dsSecondaire)
+                    .contentTransition(.numericText())
             }
             .frame(maxWidth: .infinity)
+            .kiwiSecousse(butee.secousses)
 
-            BoutonPas(symbole: "plus", actif: true) { onAjuster(5) }
+            BoutonPas(symbole: "plus", actif: true, action: { onAjuster(5) })
         }
+        .reducedMotionAnimation(.kiwiVif, value: grams)
     }
 
     /// kcal pour la quantité retenue, calculées depuis les valeurs pour 100 g.
@@ -1647,10 +1671,22 @@ private struct BoutonPas: View {
     let symbole: String
     let actif: Bool
     var libelle: String? = nil
+    /// Touché à sa butée : à l'appelant de le faire sentir.
+    var onButee: () -> Void = {}
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        // Maintenu, le bouton répète son pas de plus en plus vite (comportement
+        // système, le même que la fiche portion et le poids du Journal). À la
+        // butée il reste touchable : c'est la quantité qui répond « non ».
+        Button {
+            guard actif else {
+                onButee()
+                return
+            }
+            HapticService.shared.selection()
+            action()
+        } label: {
             Image(systemName: symbole)
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(actif ? Color.dsTexte : Color.dsTertiaire)
@@ -1659,7 +1695,7 @@ private struct BoutonPas: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.dsPress)
-        .disabled(!actif)
+        .buttonRepeatBehavior(.enabled)
         .accessibilityLabel(libelle ?? (symbole == "plus" ? "Ajouter 5 grammes" : "Retirer 5 grammes"))
     }
 }
