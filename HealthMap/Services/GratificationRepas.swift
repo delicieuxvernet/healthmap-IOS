@@ -148,8 +148,9 @@ struct GratificationRepas: Identifiable, Equatable {
 
 extension MealJournalService.MealSlot {
     /// « Ajouté au déjeuner » : où le repas vient d'être rangé. Une seule
-    /// formulation pour le bandeau de la gratification, la célébration de la
-    /// dictée et la pastille de confirmation.
+    /// formulation pour le bandeau de la gratification et la pastille de
+    /// confirmation ; l'action de la feuille de dictée la reprend à
+    /// l'infinitif (`VoiceMealSheet.titreAjout`).
     var libelleAjout: String {
         switch self {
         case .breakfast: return "Ajouté au petit-déjeuner"

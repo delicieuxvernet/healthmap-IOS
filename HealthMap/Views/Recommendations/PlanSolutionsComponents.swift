@@ -99,6 +99,8 @@ struct PlanNoeudSheet: View {
     @State private var showSources = false
     /// L'aliment dont la pastille est dépliée.
     @State private var alimentOuvert: UUID?
+    /// Les pastilles d'aliments surgissent une à une à l'ouverture.
+    @State private var pastillesVisibles = false
 
     private var genre: PlanGraph.Genre {
         switch topic.kind {
@@ -137,9 +139,11 @@ struct PlanNoeudSheet: View {
                 }
 
                 if !liens.isEmpty {
-                    titre("point.3.connected.trianglepath.dotted", "À quoi c'est relié",
-                          "\(liens.count) lien\(liens.count > 1 ? "s" : "") sur ton graphe",
-                          teinte: Color.dsAccent)
+                    PlanTitreDeBloc(symbole: "point.3.connected.trianglepath.dotted",
+                                    texte: "À quoi c'est relié",
+                                    sousTitre: "\(liens.count) lien\(liens.count > 1 ? "s" : "") sur ton graphe",
+                                    teinte: Color.dsAccent,
+                                    encre: Color.teinteKiwiTexte)
                     rangeeDeLiens
                 }
 
@@ -177,10 +181,21 @@ struct PlanNoeudSheet: View {
                     .padding(.horizontal, 4)
                 }
 
-                DSCapsuleButton(titre: "C'est noté") {
+                // L'action de la feuille : verre teinté vert, 54 pt.
+                Button {
                     HapticService.shared.tap()
                     dismiss()
+                } label: {
+                    Text("C'est noté")
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: Verre.hauteurAction)
+                        .verrePrincipal()
+                        .contentShape(Capsule())
                 }
+                .buttonStyle(.dsPress)
                 .padding(.top, 20)
 
                 // Citation des sources (App Store guideline 1.4.1), discrète,
@@ -203,41 +218,43 @@ struct PlanNoeudSheet: View {
             .containerRelativeFrame(.horizontal, alignment: .leading)
         }
         .scrollIndicators(.hidden)
-        .background(Color.dsFond.ignoresSafeArea())
+        // Le fond est celui de la feuille : du verre épais, coins de 38.
         .presentationDetents([.fraction(0.92), .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(34)
+        .verreFeuille()
         .sheet(isPresented: $showSources) {
             ScrollView {
                 SourcesSection().padding(20)
             }
-            .background(Color.dsFond.ignoresSafeArea())
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+            .verreFeuille()
         }
     }
 
     // MARK: En-tête
 
+    /// La même pastille que la carte du Plan (48, rayon 14), la catégorie en
+    /// 15 / 600 dans la version foncée de sa teinte, le nom en 22 / 700.
     private var enTete: some View {
         HStack(alignment: .center, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .fill(PlanGraphTeintes.fond(genre))
-                Image(systemName: topic.radialSymbolRefonte)
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(PlanGraphTeintes.encre(genre))
-            }
-            .frame(width: 48, height: 48)
-            .accessibilityHidden(true)
+            Image(systemName: topic.radialSymbolRefonte)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(PlanGraphTeintes.icone(genre))
+                .frame(width: 48, height: 48)
+                .background(
+                    RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                        .fill(PlanGraphTeintes.fond(genre))
+                )
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(surTitre)
-                    .font(.dsLegende.weight(.semibold))
-                    .foregroundStyle(PlanGraphTeintes.encre(genre))
+                    .font(.dsSousTitreFort)
+                    .foregroundStyle(PlanGraphTeintes.encreSurFeuille(genre))
                 Text(topic.name)
-                    .font(.system(.title2, design: .default).weight(.bold))
-                    .tracking(-0.7)
+                    .font(.dsSection)
+                    .tracking(DSTracking.section)
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -245,35 +262,6 @@ struct PlanNoeudSheet: View {
             DSCloseButton { dismiss() }
         }
         .accessibilityElement(children: .contain)
-    }
-
-    /// Un titre de bloc : pastille 30, titre 17 gras, sous-titre.
-    private func titre(_ symbole: String, _ texte: String, _ sousTitre: String, teinte: Color) -> some View {
-        HStack(spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(teinte.opacity(0.12))
-                Image(systemName: symbole)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(teinte)
-            }
-            .frame(width: 30, height: 30)
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(texte)
-                    .font(.dsHeadline.weight(.bold))
-                    .tracking(DSTracking.corps)
-                    .foregroundStyle(Color.dsTexte)
-                Text(sousTitre)
-                    .font(.dsLegende)
-                    .tracking(DSTracking.legende)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.top, 22)
-        .padding(.bottom, 10)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: À quoi c'est relié
@@ -290,8 +278,10 @@ struct PlanNoeudSheet: View {
                                 .foregroundStyle(Color.dsTexte)
                                 .lineLimit(1)
                         }
+                        // Le chiffre du lien, en SF Pro Rounded comme tous les
+                        // grands chiffres du verre.
                         Text(lien.etat)
-                            .font(.system(.title3, design: .default).weight(.bold).monospacedDigit())
+                            .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
                             .tracking(-0.6)
                             .foregroundStyle(lien.etatTeinte)
                             .lineLimit(1)
@@ -323,12 +313,14 @@ struct PlanNoeudSheet: View {
             }
             .padding(.horizontal, DS.marge)
         }
+        // L'ombre des cartes de verre déborde de la rangée : on ne la rogne pas.
+        .scrollClipDisabled()
         // La rangée défile bord à bord ; le reste de la feuille garde ses marges.
         .padding(.horizontal, -DS.marge)
     }
 
     static func teinteForce(_ force: Int) -> Color {
-        force >= 3 ? .kiwiGreenInk : (force == 2 ? Color(hex: "B36B00") : .dsSecondaire)
+        force >= 3 ? Color.teinteKiwiTexte : (force == 2 ? Color.dsARenforcerTexte : Color.dsSecondaire)
     }
 
     // MARK: Les solutions (assiette, habitudes, complément)
@@ -336,54 +328,67 @@ struct PlanNoeudSheet: View {
     @ViewBuilder
     private var solutions: some View {
         if !topic.nutrition.isEmpty {
-            titre("fork.knife", "Quoi changer dans ton assiette", "ajoute-les quand tu peux, sans compter",
-                  teinte: Color.dsAccent)
+            PlanTitreDeBloc(symbole: "fork.knife",
+                            texte: "Quoi changer dans ton assiette",
+                            sousTitre: "ajoute-les quand tu peux, sans compter",
+                            teinte: Color.dsAccent,
+                            encre: Color.teinteKiwiTexte)
             assiette
         }
 
         if !topic.habitudes.isEmpty {
-            titre("repeat", "Tes habitudes", "ce qui bloque ou aide, sans rien acheter",
-                  teinte: PlanGraphTeintes.symptome)
+            PlanTitreDeBloc(symbole: "repeat",
+                            texte: "Tes habitudes",
+                            sousTitre: "ce qui bloque ou aide, sans rien acheter",
+                            teinte: Color.teinteProteines,
+                            encre: Color.teinteProteinesTexte)
             habitudes
         }
 
-        titre("pills", "En complément",
-              topic.complements.isEmpty ? "l'assiette suffit" : "Kiwio ne gagne rien dessus",
-              teinte: Color(hex: "5856D6"))
+        PlanTitreDeBloc(symbole: "pills",
+                        texte: "En complément",
+                        sousTitre: topic.complements.isEmpty ? "l'assiette suffit" : "Kiwio ne gagne rien dessus",
+                        teinte: Color.teinteIode,
+                        encre: Color.teinteIodeTexte)
         complements
     }
 
-    /// Des pastilles : l'aliment seul, sans grammage. En toucher une la déplie —
-    /// combien, quand, comment le préparer, l'astuce.
+    /// Des pastilles de verre clair : l'aliment seul, sans grammage. En toucher
+    /// une la déplie — combien, quand, comment le préparer, l'astuce. La
+    /// pastille dépliée passe au verre vert pâle.
     private var assiette: some View {
         VStack(alignment: .leading, spacing: 10) {
             DSFlow(espacement: 8) {
-                ForEach(topic.nutrition) { aliment in
+                ForEach(Array(topic.nutrition.enumerated()), id: \.element.id) { rang, aliment in
                     let ouverte = alimentOuvert == aliment.id
                     Button {
                         HapticService.shared.selection()
                         let cible: UUID? = ouverte ? nil : aliment.id
                         if reduceMotion { alimentOuvert = cible }
-                        else { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { alimentOuvert = cible } }
+                        else { withAnimation(Animation.kiwiFluide) { alimentOuvert = cible } }
                     } label: {
                         HStack(spacing: 8) {
                             SafeFluent3DIcon(name: aliment.asset, size: 26)
                             Text(aliment.label)
-                                .font(.system(.subheadline, design: .default).weight(.semibold))
+                                .font(.dsSousTitreMoyen)
                                 .foregroundStyle(Color.dsTexte)
                                 .lineLimit(1)
                         }
                         .padding(.leading, 9)
-                        .padding(.trailing, 13)
+                        .padding(.trailing, 14)
                         .frame(minHeight: DS.cibleTactile)
-                        .background(Capsule().fill(Color.dsCarte))
-                        .overlay(Capsule().stroke(ouverte ? Color.dsAccent : Color.clear, lineWidth: 1.5))
+                        .verre(ouverte ? VerreMatiere.clairActif : VerreMatiere.clair,
+                               forme: Capsule(style: .continuous))
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.dsPress)
                     .accessibilityAddTraits(ouverte ? [.isButton, .isSelected] : .isButton)
                     .accessibilityHint("Affiche comment l'intégrer")
+                    // Elles surgissent une à une (0,6 → 1), 0,06 s d'écart.
+                    .verreSurgir(pastillesVisibles, delai: 0.3 + Double(rang) * 0.06)
                 }
             }
+            .onAppear { pastillesVisibles = true }
 
             if let aliment = topic.nutrition.first(where: { $0.id == alimentOuvert }) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -417,26 +422,20 @@ struct PlanNoeudSheet: View {
             .map { (cle: $0.0, valeur: $0.1) }
     }
 
+    /// Une ligne par habitude : pastille ronde neutre de 36, le geste en
+    /// 15 / 600, sa raison en 13. Le filet court d'un bord à l'autre de la carte.
     private var habitudes: some View {
         VStack(spacing: 0) {
             ForEach(Array(topic.habitudes.enumerated()), id: \.element.id) { index, habitude in
                 if index > 0 {
-                    Rectangle().fill(Color.dsSeparateur).frame(height: 0.5)
+                    DSSeparator(retrait: 0)
                 }
-                HStack(alignment: .top, spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.dsAccent.opacity(0.12))
-                        Image(systemName: habitude.symbol)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color.kiwiGreenInk)
-                    }
-                    .frame(width: 32, height: 32)
-                    .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .center, spacing: 12) {
+                    VerrePastilleIcone(symbole: habitude.symbol, taille: 36, tailleIcone: 19)
+                    VStack(alignment: .leading, spacing: 1) {
                         Text(habitude.text)
-                            .font(.dsCorps)
-                            .tracking(DSTracking.corps)
+                            .font(.dsSousTitreFort)
+                            .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsTexte)
                             .fixedSize(horizontal: false, vertical: true)
                         if !habitude.note.isEmpty {
@@ -449,11 +448,11 @@ struct PlanNoeudSheet: View {
                     }
                     Spacer(minLength: 0)
                 }
+                .padding(.horizontal, DS.paddingCarte)
                 .padding(.vertical, 12)
                 .accessibilityElement(children: .combine)
             }
         }
-        .padding(.horizontal, DS.paddingCarte)
         .frame(maxWidth: .infinity)
         .dsCard()
     }
@@ -466,31 +465,45 @@ struct PlanNoeudSheet: View {
             } else {
                 ForEach(Array(topic.complementsSansDose.enumerated()), id: \.element.id) { index, complement in
                     if index > 0 {
-                        Rectangle().fill(Color.dsSeparateur).frame(height: 0.5).padding(.vertical, 12)
+                        // Les filets vont d'un bord à l'autre de la carte,
+                        // comme ceux du bloc des habitudes.
+                        DSSeparator(retrait: 0)
+                            .padding(.horizontal, -DS.paddingCarte)
+                            .padding(.vertical, 12)
                     }
                     ligneComplement(nom: complement.name, etiquette: complement.tag,
                                     forte: complement.strong, note: complement.note)
                 }
                 // La forme et le moment vivent sur l'onglet Compléments —
                 // jamais la dose (doctrine du 20 septembre 2026).
+                DSSeparator(retrait: 0)
+                    .padding(.horizontal, -DS.paddingCarte)
+                    .padding(.top, 14)
                 Button {
                     HapticService.shared.tap()
                     onSeeSupplements()
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
+                        Spacer(minLength: 0)
                         Text("Voir la forme et le moment de prise")
-                        Image(systemName: "arrow.right").font(.system(size: 12, weight: .semibold))
+                            .font(.dsCorps)
+                            .tracking(DSTracking.corps)
+                            .multilineTextAlignment(.trailing)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 15, weight: .semibold))
+                            .accessibilityHidden(true)
                     }
-                    .font(.system(.subheadline, design: .default).weight(.medium))
                     .foregroundStyle(Color.dsAccent)
-                    .frame(minHeight: DS.cibleTactile)
+                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
+                .buttonStyle(.dsPress)
+                .padding(.top, 2)
             }
         }
-        .padding(DS.paddingCarte)
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.top, DS.paddingCarte)
+        .padding(.bottom, topic.complements.isEmpty ? DS.paddingCarte : 4)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
     }
@@ -505,12 +518,14 @@ struct PlanNoeudSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 if !etiquette.isEmpty {
+                    // L'étiquette : 13 / 600 dans la teinte foncée, sur la
+                    // teinte à 14 %.
                     Text(etiquette.lowercased())
-                        .font(.system(.caption, design: .default).weight(.semibold))
-                        .foregroundStyle(forte ? Color.kiwiGreenInk : Color.dsSecondaire)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(forte ? Color.dsAccent.opacity(0.12) : Color(uiColor: .systemGray5)))
+                        .font(.system(.footnote, design: .default).weight(.semibold))
+                        .foregroundStyle(forte ? Color.teinteKiwiTexte : Color.dsSecondaire)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(forte ? Color.teinteKiwi.opacity(0.14) : Verre.remplissage))
                 }
             }
             if !note.isEmpty {
@@ -522,6 +537,64 @@ struct PlanNoeudSheet: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Titre d'un bloc (feuilles du Plan)
+
+/// Le titre d'un bloc dans une feuille du Plan, façon libellé de catégorie :
+/// l'icône dans la teinte, le libellé en 15 / 600 dans sa version foncée, la
+/// précision en 13 à droite quand elle tient sur la ligne, dessous sinon.
+struct PlanTitreDeBloc: View {
+    let symbole: String
+    let texte: String
+    var sousTitre: String = ""
+    let teinte: Color
+    let encre: Color
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                libelle
+                Spacer(minLength: 0)
+                precision
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                libelle
+                precision
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.top, 22)
+        .padding(.bottom, 8)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private var libelle: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: symbole)
+                .font(.system(.subheadline, design: .default).weight(.semibold))
+                .foregroundStyle(teinte)
+                .accessibilityHidden(true)
+            Text(texte)
+                .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(encre)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private var precision: some View {
+        if !sousTitre.isEmpty {
+            Text(sousTitre)
+                .font(.dsLegende)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -546,7 +619,7 @@ extension PlanTopic {
     /// utilisent `accent` (vert encre) — contraste AA sur fond crème.
     var radialRing: Color {
         switch kind {
-        case .symptome: return Color(hex: "2F6FE0")
+        case .symptome: return PlanGraphTeintes.symptome
         case .objectif: return Color.dsAccent
         case .apport: return apportColor ?? Color.dsAccent
         }

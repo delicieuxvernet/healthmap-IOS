@@ -18,6 +18,12 @@ import SwiftUI
 // Règle : couleur = sens. Le statut d'un apport porte sa couleur, la pastille
 // d'un nutriment porte SA couleur mémo (alignée sur `Color.nutrientColor`).
 // Aucune donnée n'est inventée : une section sans donnée réelle est masquée.
+//
+// Verre liquide (2 octobre 2026) : les cartes sont en verre dépoli, les
+// pastilles d'icône sont rondes et teintées à 12 % de leur catégorie, la jauge
+// d'un apport prend SA teinte (`Color.nutrientColor`), le libellé d'une carte
+// est écrit dans la teinte foncée de sa catégorie, précédé de son icône dans
+// la teinte. Les actions principales sont en verre vert.
 
 // MARK: - Palette de l'écran (hex de la maquette)
 // Refonte 23 août 2026 : la palette de l'ancienne maquette (crème, encres
@@ -68,14 +74,12 @@ extension StatutV2 {
     var v7Ink: Color { Color.dsSecondaire }
 }
 
-// MARK: - Carte blanche (.card)
-/// `border-radius:16 · box-shadow:0 1px 3px rgba(33,31,26,.05) · border 1px`.
+// MARK: - Carte (.card)
+/// La carte du Bilan est la carte de verre du socle : blanc 80 → 58 %, liseré
+/// blanc intérieur, rayon 24, ombre douce découpée.
 struct BilanV7CardStyle: ViewModifier {
     func body(content: Content) -> some View {
-        content
-            .background(Color.dsCarte)
-            .clipShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
-            // (ombre et filet retirés, refonte 23 août 2026)
+        content.verreCarte()
     }
 }
 
@@ -83,27 +87,36 @@ extension View {
     func bilanV7Card() -> some View { modifier(BilanV7CardStyle()) }
 }
 
-// MARK: - Appui
-/// Même état d'appui que le reste de l'app (`DSPressStyle`). Ce style-ci
-/// avait son propre réglage (0,98, 120 ms) et ignorait « Réduire les
-/// animations ».
-typealias BilanV7PressStyle = DSPressStyle
+// MARK: - Appui (.tap:active → scale .98)
+struct BilanV7PressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.98 : 1))
+            .animation(DS.ressortAppui, value: configuration.isPressed)
+    }
+}
 
 // MARK: - Libellé de section (.section-label)
+/// Libellé de catégorie d'une carte : 15 / 600, écrit dans la teinte foncée de
+/// la catégorie (`color`), précédé de son icône dans la teinte (`teinte`).
+/// Sans teinte, l'icône reste neutre.
 struct BilanV7SectionLabel: View {
     let icon: String
     let text: String
     let color: Color
+    var teinte: Color? = nil
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.dsSecondaire)
+                .foregroundStyle(teinte ?? Verre.iconeNeutre)
                 .accessibilityHidden(true)
             Text(text)
-                .font(Theme.sectionLabelFont)
+                .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(color)
         }
     }
@@ -130,7 +143,7 @@ struct BilanV7PremiumBadge: View {
 struct BilanV7Bar: View {
     let value: Double
     let color: Color
-    var height: CGFloat = 7
+    var height: CGFloat = 6
     var delay: Double = 0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -139,7 +152,7 @@ struct BilanV7Bar: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(color.opacity(0.15))
+                Capsule().fill(Verre.remplissage)
                 Capsule()
                     .fill(color)
                     .frame(width: geo.size.width * (grown ? min(1, max(0, value)) : 0))
@@ -151,15 +164,15 @@ struct BilanV7Bar: View {
             if reduceMotion {
                 grown = true
             } else {
-                withAnimation(.easeOut(duration: 1).delay(delay)) { grown = true }
+                withAnimation(DS.remplissage.delay(delay)) { grown = true }
             }
         }
     }
 }
 
 // MARK: - Anneau de score (.ring)
-/// Piste vert 15 %, arc plein, départ à midi. Le chiffre central est en
-/// monospace et compte de 0 jusqu'à la valeur.
+/// Piste neutre (`Verre.pisteAnneau`), arc plein, départ à midi. Le chiffre
+/// central est en SF Pro Rounded et compte de 0 jusqu'à la valeur.
 struct BilanV7ScoreRing: View {
     let score: Int?
     var size: CGFloat = 64
@@ -179,16 +192,15 @@ struct BilanV7ScoreRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.dsAccent.opacity(0.15), lineWidth: lineWidth)
+                .stroke(Verre.pisteAnneau, lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(Color.dsAccent, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text(score == nil ? "—" : "\(shown)")
-                .font(.system(size: 19, weight: .bold, design: .default).monospacedDigit())
+                .font(.system(size: 19, weight: .bold, design: .rounded).monospacedDigit())
                 .tracking(-0.8)
                 .foregroundStyle(BilanV7.ink)
-                .monospacedDigit()
         }
         .frame(width: size, height: size)
         .onAppear(perform: animate)
@@ -213,7 +225,7 @@ struct BilanV7ScoreRing: View {
             shown = score
             return
         }
-        withAnimation(.easeOut(duration: 1).delay(0.2)) { progress = target }
+        withAnimation(DS.remplissage.delay(0.2)) { progress = target }
         // Compteur 0 → score (easeOutCubic, ~1 s). Gardé, et annulable : c'est
         // la tâche elle-même qu'il faut nettoyer.
         compteur = Task { @MainActor in
@@ -247,11 +259,13 @@ struct BilanV7Header: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 Text("Bilan")
-                    .font(Theme.screenTitleFont)
-                    .tracking(Theme.screenTitleTracking)
+                    .font(.dsGrandTitre)
+                    .tracking(DSTracking.grandTitre)
                     .foregroundStyle(BilanV7.ink)
+                    .accessibilityAddTraits(.isHeader)
                 Text(Self.dayFormatter.string(from: date))
-                    .font(Theme.dataSecondaryFont)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(BilanV7.soft)
             }
             Spacer(minLength: 0)
@@ -266,11 +280,11 @@ struct BilanV7Header: View {
                     .foregroundStyle(Color.dsTexte)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
-                    .background(Color.dsRemplissage, in: Capsule())
+                    .verreClair()
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(BilanV7PressStyle())
+                .buttonStyle(.dsPress)
                 .accessibilityLabel("Découvrir Kiwio Premium")
             }
         }
@@ -295,7 +309,7 @@ struct BilanV7ScoreCard: View {
         let color = delta > 0 ? Color.dsTexte : BilanV7.alertInk
         var line = Text(lead)
             + Text(value)
-                .font(Theme.heroValueRowFont)
+                .font(Font.dsHeadline.monospacedDigit())
                 .foregroundStyle(color)
             + Text(" cette semaine.")
         if let insight, !insight.isEmpty {
@@ -310,14 +324,17 @@ struct BilanV7ScoreCard: View {
                 BilanV7ScoreRing(score: score)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    // Titre de section : teinté, rangé sous son contenu.
+                    // Libellé de catégorie : la carte se touche, il porte donc
+                    // le vert foncé du kiwi.
                     Text("Ton score du jour")
-                        .font(Theme.sectionLabelFont)
-                        .foregroundStyle(Color.dsTexte)
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.teinteKiwiTexte)
                     // La tendance est la CONCLUSION de la carte : plus jamais
                     // en gris tronqué à deux lignes.
                     trendLine
-                        .font(Theme.insightFont)
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
                         .foregroundStyle(BilanV7.ink)
                         .lineSpacing(2)
                         .multilineTextAlignment(.leading)
@@ -325,13 +342,9 @@ struct BilanV7ScoreCard: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(BilanV7.chevron)
-                    .accessibilityHidden(true)
+                DSChevron()
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(16)
             .frame(maxWidth: .infinity)
             .bilanV7Card()
             .contentShape(Rectangle())
@@ -395,7 +408,12 @@ struct BilanV7ApportsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                BilanV7SectionLabel(icon: "target", text: "Tes apports à renforcer", color: BilanV7.amber)
+                BilanV7SectionLabel(
+                    icon: "target",
+                    text: "Tes apports à renforcer",
+                    color: Color.dsARenforcerTexte,
+                    teinte: Color.dsARenforcer
+                )
                 Spacer()
                 Text("\(apports.count) sur \(total)")
                     .font(Theme.dataSecondaryFont)
@@ -403,8 +421,8 @@ struct BilanV7ApportsCard: View {
             }
 
             Text(priority)
-                .font(Theme.conclusionFont)
-                .tracking(Theme.conclusionTracking)
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
                 .lineSpacing(2)
                 .foregroundStyle(BilanV7.ink)
                 .fixedSize(horizontal: false, vertical: true)
@@ -425,31 +443,27 @@ struct BilanV7ApportsCard: View {
     private func row(_ apport: ApportV2, delay: Double) -> some View {
         let id = apport.id ?? ""
         let pct = max(0, min(100, apport.pctBesoin ?? 0))
+        // Un apport du catalogue porte SA teinte (pastille et jauge). Hors
+        // catalogue, la pastille reste neutre et la jauge garde son statut.
+        let teinte: Color? = NutrientData.definition(for: id) == nil ? nil : Color.nutrientColor(for: id)
 
         HStack(spacing: 11) {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.dsRemplissage)
-                .frame(width: 36, height: 36)
-                .overlay(
-                    Image(systemName: BilanV7Nutrient.icon(for: id))
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.dsSecondaire)
-                )
-                .accessibilityHidden(true)
+            VerrePastilleIcone(symbole: BilanV7Nutrient.icon(for: id), teinte: teinte, taille: 36, tailleIcone: 17)
 
             VStack(spacing: 7) {
                 HStack {
                     Text(apport.nom ?? "")
-                        .font(Theme.sectionLabelFont)
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(BilanV7.ink)
                     Spacer()
-                    // Donnée-héros de la ligne : jamais sous 15 pt, et
-                    // toujours l'encre de son statut.
-                    Text("\(pct)%")
-                        .font(Theme.heroValueRowFont)
-                        .foregroundStyle(apport.statut.v7Ink)
+                    // Donnée-héros de la ligne : jamais sous 15 pt, encre pleine.
+                    Text(DS.pourcent(pct))
+                        .font(.dsValeurLigneForte)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(BilanV7.ink)
                 }
-                BilanV7Bar(value: Double(pct) / 100, color: apport.statut.v7Color, delay: delay)
+                BilanV7Bar(value: Double(pct) / 100, color: teinte ?? apport.statut.v7Color, delay: delay)
             }
 
             Button {
@@ -458,18 +472,18 @@ struct BilanV7ApportsCard: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.dsTexte)
-                    .frame(width: 26, height: 26)
-                    .background(Color(hex: "787880").opacity(0.1), in: Circle())
+                    .foregroundStyle(Color.dsAccent)
+                    .frame(width: 30, height: 30)
+                    .verreClair(Circle())
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(BilanV7PressStyle())
+            .buttonStyle(.dsPress)
             .accessibilityLabel("Voir comment renforcer \(apport.nom ?? "cet apport")")
         }
         .padding(.vertical, 13)
         .overlay(alignment: .top) {
-            Rectangle().fill(BilanV7.hairline).frame(height: 1)
+            Rectangle().fill(BilanV7.hairline).frame(height: 0.5)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -525,7 +539,8 @@ struct BilanV7AttentionCard: View {
                 BilanV7SectionLabel(
                     icon: "exclamationmark.triangle",
                     text: "Points d'attention",
-                    color: BilanV7.alertInk
+                    color: Color.teinteEnergieTexte,
+                    teinte: Color.teinteEnergie
                 )
                 Spacer(minLength: 8)
                 // En gratuit, la carte annonce l'écrin qui attend derrière le
@@ -541,39 +556,30 @@ struct BilanV7AttentionCard: View {
                     HapticService.shared.tap()
                     onTap(item)
                 } label: {
-                    HStack(spacing: 11) {
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(Color.dsRemplissage)
-                            .frame(width: 34, height: 34)
-                            .overlay(
-                                Image(systemName: icon(for: item.icone))
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Color.dsSecondaire)
-                            )
-                            .accessibilityHidden(true)
+                    HStack(spacing: 12) {
+                        VerrePastilleIcone(symbole: icon(for: item.icone), taille: 36, tailleIcone: 18)
 
                         VStack(alignment: .leading, spacing: 2) {
                             // Le problème nommé est la conclusion de la ligne.
                             if let title = title(for: item) {
                                 Text(title)
-                                    .font(Theme.insightFont)
+                                    .font(.dsSousTitreFort)
+                                    .tracking(DSTracking.sousTitre)
                                     .foregroundStyle(BilanV7.ink)
                                     .multilineTextAlignment(.leading)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             if let detail = detail(for: item) {
                                 Text(detail)
-                                    .font(Theme.dataSecondaryFont)
+                                    .font(.dsLegende)
+                                    .tracking(DSTracking.legende)
                                     .foregroundStyle(BilanV7.secondary)
                                     .multilineTextAlignment(.leading)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(BilanV7.chevron)
-                            .accessibilityHidden(true)
+                        DSChevron()
                     }
                     .padding(.top, index == 0 ? 6 : 0)
                     .padding(.vertical, 12)
@@ -583,7 +589,7 @@ struct BilanV7AttentionCard: View {
                 .buttonStyle(BilanV7PressStyle())
                 .overlay(alignment: .bottom) {
                     if index < items.count - 1 {
-                        Rectangle().fill(BilanV7.hairline).frame(height: 1)
+                        Rectangle().fill(BilanV7.hairline).frame(height: 0.5)
                     }
                 }
             }
@@ -630,7 +636,8 @@ struct BilanV7SymptomesCard: View {
             BilanV7SectionLabel(
                 icon: "waveform.path.ecg",
                 text: "Tes symptômes suivis",
-                color: BilanV7.blue
+                color: Color.teinteSymptomesTexte,
+                teinte: Color.teinteSymptomes
             )
 
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
@@ -643,16 +650,13 @@ struct BilanV7SymptomesCard: View {
                     HapticService.shared.tap()
                     onTapSymptom(row)
                 } label: {
-                    HStack(spacing: 11) {
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(Color.dsRemplissage)
-                            .frame(width: 34, height: 34)
-                            .overlay(
-                                Image(systemName: icon(for: row.nom))
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Color.dsSecondaire)
-                            )
-                            .accessibilityHidden(true)
+                    HStack(spacing: 12) {
+                        VerrePastilleIcone(
+                            symbole: icon(for: row.nom),
+                            teinte: Color.teinteSymptomes,
+                            taille: 36,
+                            tailleIcone: 18
+                        )
 
                         VStack(alignment: .leading, spacing: 2) {
                             if row.showsTrend {
@@ -669,24 +673,23 @@ struct BilanV7SymptomesCard: View {
                                         .foregroundStyle(row.improving ? Color.dsTexte : BilanV7.warnInk)
                                         .accessibilityHidden(true)
                                     Text(row.verdict)
-                                        .font(Theme.insightFont)
+                                        .font(.dsSousTitreFort)
+                                        .tracking(DSTracking.sousTitre)
                                         .foregroundStyle(BilanV7.ink)
                                 }
                             } else {
                                 // Sans tendance affichable, le symptôme est le
                                 // seul contenu de la ligne : il en est le pic.
                                 Text(row.nom)
-                                    .font(Theme.insightFont)
+                                    .font(.dsSousTitreFort)
+                                    .tracking(DSTracking.sousTitre)
                                     .foregroundStyle(BilanV7.ink)
                                     .multilineTextAlignment(.leading)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(BilanV7.chevron)
-                            .accessibilityHidden(true)
+                        DSChevron()
                     }
                     .padding(.top, index == 0 ? 6 : 0)
                     .padding(.vertical, 12)
@@ -696,34 +699,35 @@ struct BilanV7SymptomesCard: View {
                 .buttonStyle(BilanV7PressStyle())
                 .overlay(alignment: .bottom) {
                     if index < rows.count - 1 {
-                        Rectangle().fill(BilanV7.hairline).frame(height: 1)
+                        Rectangle().fill(BilanV7.hairline).frame(height: 0.5)
                     }
                 }
             }
 
+            // Action principale de la carte : capsule de verre vert.
             Button {
                 HapticService.shared.tap()
                 onSolutions()
             } label: {
                 HStack(spacing: 8) {
                     Text("Voir mes solutions")
-                        .font(Theme.ctaFont)
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
                         .foregroundStyle(.white)
                     if solutionsCount > 0 {
                         Text("\(solutionsCount)")
-                            .font(.system(size: 11.5, weight: .bold, design: .default).monospacedDigit())
+                            .font(.system(size: 12, weight: .bold, design: .default).monospacedDigit())
                             .foregroundStyle(.white)
-                            .frame(minWidth: 20, minHeight: 20)
+                            .frame(minWidth: 22, minHeight: 22)
                             .background(Color.white.opacity(0.25), in: Capsule())
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .background(Color.dsAccent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .contentShape(Rectangle())
+                .frame(maxWidth: .infinity, minHeight: DS.hauteurBouton)
+                .verrePrincipal()
+                .contentShape(Capsule())
             }
-            .buttonStyle(BilanV7PressStyle())
-            .padding(.top, 6)
+            .buttonStyle(.dsPress)
+            .padding(.top, 10)
             .accessibilityLabel(
                 solutionsCount > 0
                     ? "Voir mes solutions, \(solutionsCount) disponibles"
@@ -772,7 +776,12 @@ struct BilanV7SerieCard: View {
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    BilanV7SectionLabel(icon: "flame.fill", text: "Ta série", color: BilanV7.flame)
+                    BilanV7SectionLabel(
+                        icon: "flame.fill",
+                        text: "Ta série",
+                        color: Color.teinteEnergieTexte,
+                        teinte: Color.teinteEnergie
+                    )
                     Spacer()
                     HStack(spacing: 3) {
                         Text("trophées")
@@ -788,11 +797,12 @@ struct BilanV7SerieCard: View {
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        // Donnée-héros de la carte : le compte de jours, jamais
-                        // sous 15 pt et dans l'encre la plus foncée du bloc.
-                        (Text("\(streak)").font(Theme.heroValueRowFont)
+                        // Donnée-héros de la carte : le compte de jours, en SF
+                        // Pro Rounded, dans l'encre la plus foncée du bloc.
+                        (Text(DS.entier(streak))
+                            .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
                             + Text(streak > 1 ? " jours d'affilée" : " jour d'affilée")
-                                .font(.system(.subheadline).weight(.bold)))
+                                .font(.dsSousTitreFort))
                             .tracking(-0.2)
                             .foregroundStyle(BilanV7.ink)
 
@@ -801,7 +811,7 @@ struct BilanV7SerieCard: View {
                             .foregroundStyle(BilanV7.secondary)
                             .fixedSize(horizontal: false, vertical: true)
 
-                        BilanV7Bar(value: progress, color: Color.dsAccent, height: 6, delay: 0.5)
+                        BilanV7Bar(value: progress, color: Color.teinteEnergie, height: 6, delay: 0.5)
                             .padding(.top, 6)
                     }
                 }
@@ -842,7 +852,8 @@ struct BilanV7RepasCard: View {
                     // Bilan d'un repas : c'est un verdict, donc une conclusion
                     // de ligne (15 / semibold, encre pleine).
                     Text(line.text)
-                        .font(Theme.insightFont)
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
                         .lineSpacing(2)
                         .foregroundStyle(BilanV7.ink)
                         .fixedSize(horizontal: false, vertical: true)
@@ -863,18 +874,18 @@ struct BilanV7PremiumCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 13) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.2))
-                    .frame(width: 42, height: 42)
+                Circle()
+                    .fill(Color.white.opacity(0.22))
+                    .frame(width: 40, height: 40)
                     .overlay(
                         Image(systemName: "sparkles")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 19, weight: .semibold))
                             .foregroundStyle(.white)
                     )
                     .accessibilityHidden(true)
 
                 // Carte de vente : elle ne dépasse jamais une alerte de santé.
-                // Ramenée au rang de CTA (15 / semibold), sous les 17 / heavy
+                // Ramenée au rang de CTA (15 / semibold), sous les 17 / 600
                 // du message de « Important pour toi ».
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Kiwio Premium")
@@ -896,10 +907,10 @@ struct BilanV7PremiumCard: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity)
-            .background(Color.dsAccent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .verrePrincipal(RoundedRectangle(cornerRadius: Verre.rayonCarte, style: .continuous))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel("Kiwio Premium : 30 scans par jour, plan détaillé et suivi avancé")
     }
 }
@@ -920,14 +931,14 @@ struct BilanV7ScoreTeaserCard: View {
             // (64 pt, trait 7), piste kiwi existante, « ? » au centre.
             ZStack {
                 Circle()
-                    .stroke(Color.dsAccent.opacity(0.15), lineWidth: 7)
+                    .stroke(Verre.pisteAnneau, lineWidth: 7)
                 Circle()
                     .stroke(
                         Color.dsAccent.opacity(0.45),
                         style: StrokeStyle(lineWidth: 7, lineCap: .round, dash: [2, 8])
                     )
                 Text("?")
-                    .font(.system(size: 19, weight: .bold, design: .default))
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
                     .tracking(-0.8)
                     .foregroundStyle(BilanV7.ink)
             }
@@ -938,10 +949,12 @@ struct BilanV7ScoreTeaserCard: View {
             // puis la conclusion en 15 / semibold.
             VStack(alignment: .leading, spacing: 3) {
                 Text("Ton score t'attend")
-                    .font(Theme.sectionLabelFont)
-                    .foregroundStyle(Color.dsTexte)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.teinteKiwiTexte)
                 Text("\(NutrientData.all.count) apports calculés depuis TES réponses")
-                    .font(Theme.insightFont)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
                     .foregroundStyle(BilanV7.ink)
                     .lineSpacing(2)
                     .multilineTextAlignment(.leading)
@@ -949,8 +962,7 @@ struct BilanV7ScoreTeaserCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(16)
         .frame(maxWidth: .infinity)
         .bilanV7Card()
         .accessibilityElement(children: .combine)
@@ -965,7 +977,12 @@ struct BilanV7ApportsTeaserCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                BilanV7SectionLabel(icon: "target", text: "Tes apports à renforcer", color: BilanV7.amber)
+                BilanV7SectionLabel(
+                    icon: "target",
+                    text: "Tes apports à renforcer",
+                    color: Color.dsARenforcerTexte,
+                    teinte: Color.dsARenforcer
+                )
                 Spacer()
                 // Slot compteur (« 3 sur 10 » dans le réel) : le total canonique.
                 Text("\(NutrientData.all.count) apports")
@@ -975,8 +992,8 @@ struct BilanV7ApportsTeaserCard: View {
 
             // Slot phrase de priorité (« La B12 est ta priorité… » dans le réel).
             Text("La France en chiffres, en attendant les tiens.")
-                .font(Theme.conclusionFont)
-                .tracking(Theme.conclusionTracking)
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
                 .lineSpacing(2)
                 .foregroundStyle(BilanV7.ink)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1010,27 +1027,26 @@ struct BilanV7ApportsTeaserCard: View {
         let stat = TeaserStatsCatalog.stat(for: id)
 
         HStack(spacing: 11) {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.dsRemplissage)
-                .frame(width: 36, height: 36)
-                .overlay(
-                    Image(systemName: BilanV7Nutrient.icon(for: id))
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.dsSecondaire)
-                )
-                .accessibilityHidden(true)
+            VerrePastilleIcone(
+                symbole: BilanV7Nutrient.icon(for: id),
+                teinte: Color.nutrientColor(for: id),
+                taille: 36,
+                tailleIcone: 17
+            )
 
             VStack(spacing: 6) {
                 HStack {
                     Text(def.label)
-                        .font(Theme.sectionLabelFont)
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(BilanV7.ink)
                     Spacer()
                     // Slot « % de tes besoins » → la fraction France sourcée.
                     // C'est LE contenu de la ligne : même rang que le % réel.
                     if let fraction = stat.fraction {
                         Text(fraction)
-                            .font(Theme.heroValueRowFont)
+                            .font(.dsValeurLigneForte)
+                            .tracking(DSTracking.sousTitre)
                             .foregroundStyle(BilanV7.ink)
                     }
                 }
@@ -1049,7 +1065,7 @@ struct BilanV7ApportsTeaserCard: View {
         }
         .padding(.vertical, 11)
         .overlay(alignment: .top) {
-            Rectangle().fill(BilanV7.hairline).frame(height: 1)
+            Rectangle().fill(BilanV7.hairline).frame(height: 0.5)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(def.label) : \(stat.accessibilite)")
@@ -1066,30 +1082,30 @@ struct BilanV7AttentionTeaserCard: View {
             BilanV7SectionLabel(
                 icon: "exclamationmark.triangle",
                 text: "Points d'attention",
-                color: BilanV7.alertInk
+                color: Color.teinteEnergieTexte,
+                teinte: Color.teinteEnergie
             )
 
             // Ligne d'exemple : accent ambre (c'est un exemple générique,
             // pas une alerte détectée — jamais l'accent rouge du réel).
-            HStack(spacing: 11) {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(Color.dsRemplissage)
-                    .frame(width: 34, height: 34)
-                    .overlay(
-                        Image(systemName: "cup.and.saucer")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(BilanV7.statusReinforce)
-                    )
-                    .accessibilityHidden(true)
+            HStack(spacing: 12) {
+                VerrePastilleIcone(
+                    symbole: "cup.and.saucer",
+                    teinte: BilanV7.statusReinforce,
+                    taille: 36,
+                    tailleIcone: 18
+                )
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Exemple : le café au repas peut freiner le fer.")
-                        .font(Theme.insightFont)
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(BilanV7.ink)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                     Text("Et dans TES habitudes ?")
-                        .font(Theme.dataSecondaryFont)
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
                         .foregroundStyle(BilanV7.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1098,20 +1114,20 @@ struct BilanV7AttentionTeaserCard: View {
             .padding(.vertical, 12)
 
             // Bouton fort de la carte (même patron que le CTA « Voir mes
-            // solutions » de la carte symptômes : 44 pt, kiwi, coins 12).
+            // solutions » de la carte symptômes : capsule de verre vert).
             Button {
                 HapticService.shared.primary()
                 onStart()
             } label: {
                 Text("Détecter MES interactions")
-                    .font(Theme.ctaFont)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Color.dsAccent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .contentShape(Rectangle())
+                    .frame(maxWidth: .infinity, minHeight: DS.hauteurBouton)
+                    .verrePrincipal()
+                    .contentShape(Capsule())
             }
-            .buttonStyle(BilanV7PressStyle())
+            .buttonStyle(.dsPress)
             .padding(.top, 6)
             .accessibilityLabel("Détecter mes interactions, faire le bilan")
         }

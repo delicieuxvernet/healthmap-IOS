@@ -40,23 +40,34 @@ final class JournalApportsTests: XCTestCase {
 
     // MARK: Les jours qui comptent
 
-    func testIlFautTroisJoursRepresentatifs() {
-        let deux = [repas(1, kcal: 2200, micros: ["iron": 50]), repas(2, kcal: 2200, micros: ["iron": 50])]
-        XCTAssertNil(observations(deux))
-        let trois = deux + [repas(3, kcal: 2200, micros: ["iron": 50])]
-        XCTAssertEqual(observations(trois)?.joursRetenus, 3)
+    func testUneJourneeAssezNoteeSuffit() {
+        XCTAssertNil(observations([]))
+        let une = [repas(1, kcal: 2200, micros: ["iron": 50])]
+        XCTAssertEqual(observations(une)?.joursRetenus, 1)
+        XCTAssertEqual(observations(une)?.jours["iron"], 1)
+        let trois = une + [repas(2, kcal: 2200, micros: ["iron": 50]), repas(3, kcal: 2200, micros: ["iron": 50])]
+        XCTAssertEqual(observations(trois)?.joursPour("iron"), 3)
     }
 
     func testUnJourAMoitieNoteNeComptePas() {
+        XCTAssertNil(observations([repas(3, kcal: 500, micros: ["iron": 10])]), "un jour à 500 kcal dirait « manque » à tort")
         let jours = [repas(1, kcal: 2200, micros: ["iron": 50]), repas(2, kcal: 2200, micros: ["iron": 50]),
                      repas(3, kcal: 500, micros: ["iron": 10])]
-        XCTAssertNil(observations(jours), "un jour à 500 kcal dirait « manque » à tort")
+        XCTAssertEqual(observations(jours)?.joursRetenus, 2)
     }
 
-    func testAujourdhuiEtLesJoursHorsFenetreNeComptentPas() {
-        let jours = [repas(0, kcal: 2200, micros: ["iron": 50]), repas(1, kcal: 2200, micros: ["iron": 50]),
-                     repas(2, kcal: 2200, micros: ["iron": 50]), repas(20, kcal: 2200, micros: ["iron": 50])]
-        XCTAssertNil(observations(jours), "aujourd'hui court encore ; il y a 20 jours est hors fenêtre")
+    func testAujourdhuiCompteDesQuIlEstAssezNote() {
+        // La journée en cours entre dans le calcul comme les autres : il lui
+        // faut 60 % de la dépense notée.
+        XCTAssertEqual(observations([repas(0, kcal: 2200, micros: ["iron": 50])])?.joursRetenus, 1)
+        XCTAssertNil(observations([repas(0, kcal: 400, micros: ["iron": 10])]), "le petit déjeuner seul ne dit rien de la journée")
+    }
+
+    func testLesJoursHorsFenetreNeComptentPas() {
+        // Quatorze jours, aujourd'hui compris : le plus ancien est il y a treize jours.
+        XCTAssertEqual(observations([repas(13, kcal: 2200, micros: ["iron": 50])])?.joursRetenus, 1)
+        XCTAssertNil(observations([repas(14, kcal: 2200, micros: ["iron": 50])]))
+        XCTAssertNil(observations([repas(20, kcal: 2200, micros: ["iron": 50])]))
     }
 
     // MARK: Ce que montre un jour
@@ -85,23 +96,37 @@ final class JournalApportsTests: XCTestCase {
 
     // MARK: La correction
 
-    func testLaCorrectionTireSansRemplacer() {
-        XCTAssertEqual(JournalApports.correction(score: 70, couverture: 20), -15)
-        XCTAssertEqual(JournalApports.correction(score: 40, couverture: 160), 15, "plafonnée, et la couverture au-delà du besoin ne compte pas")
-        XCTAssertEqual(JournalApports.correction(score: 60, couverture: 66), 2)
-        XCTAssertEqual(JournalApports.correction(score: 50, couverture: 50), 0)
+    func testLePoidsDuJournalGranditAvecLesJourneesNotees() {
+        // Le questionnaire pèse comme quatre journées.
+        XCTAssertEqual(JournalApports.traction(jours: 0), 0)
+        XCTAssertEqual(JournalApports.traction(jours: 1), 0.2, accuracy: 0.001)
+        XCTAssertEqual(JournalApports.traction(jours: 4), 0.5, accuracy: 0.001)
+        XCTAssertEqual(JournalApports.traction(jours: 14), 14.0 / 18.0, accuracy: 0.001)
+        XCTAssertLessThan(JournalApports.traction(jours: 365), 1)
+
+        // Même écart de 50 points : une journée en rattrape 10, quatre 25.
+        XCTAssertEqual(JournalApports.correction(score: 70, couverture: 20, jours: 1), -10)
+        XCTAssertEqual(JournalApports.correction(score: 70, couverture: 20, jours: 4), -25)
+    }
+
+    func testLaCorrectionResteBornee() {
+        XCTAssertEqual(JournalApports.correction(score: 90, couverture: 10, jours: 14), -30, "jamais plus de 30 points")
+        XCTAssertEqual(JournalApports.correction(score: 30, couverture: 160, jours: 14), 30, "plafonnée, et la couverture au-delà du besoin ne compte pas")
+        XCTAssertEqual(JournalApports.correction(score: 60, couverture: 66, jours: 2), 2)
+        XCTAssertEqual(JournalApports.correction(score: 50, couverture: 50, jours: 7), 0)
     }
 
     func testLaLigneDuJournalSEcritDansLaCascade() {
         let registre = HealthCalculator.registreApports(profile: homme())
         let avant = registre["iron"]?.score ?? 0
-        let obs = ObservationsJournal(joursRetenus: 5, couverture: ["iron": 20, "vitC": avant + 3])
+        let vitC = registre["vitC"]?.score ?? 0
+        let obs = ObservationsJournal(joursRetenus: 5, couverture: ["iron": 20, "vitC": vitC + 2])
         let corrige = JournalApports.appliquer(registre, observations: obs)
         let ligne = corrige["iron"]?.contributions.last
         XCTAssertEqual(ligne?.libelle, JournalApports.libelle)
         XCTAssertEqual(ligne?.section, .journal)
         XCTAssertEqual(ligne?.provenance, "noté dans ton journal")
-        XCTAssertEqual(corrige["iron"]?.score, avant + JournalApports.correction(score: avant, couverture: 20))
+        XCTAssertEqual(corrige["iron"]?.score, avant + JournalApports.correction(score: avant, couverture: 20, jours: 5))
         // Un effet de moins de 2 points n'est pas écrit.
         XCTAssertEqual(corrige["vitC"], registre["vitC"])
         // Sans observations, le registre est intact.
@@ -118,7 +143,7 @@ final class JournalApportsTests: XCTestCase {
 
     // MARK: Le bilan suit le journal, par paliers
 
-    func testLaSignatureAvanceParPaliersDeCinq() {
+    func testLaSignatureAvanceParPaliersDeDix() {
         let registre = HealthCalculator.registreApports(profile: homme())
         XCTAssertEqual(JournalApports.signature(avant: registre, apres: registre), "")
         let fer = registre["iron"]?.score ?? 0

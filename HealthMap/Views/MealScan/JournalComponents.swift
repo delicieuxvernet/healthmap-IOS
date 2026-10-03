@@ -1,14 +1,16 @@
 import SwiftUI
 
-// MARK: - Journal : sous-vues (maquette « Journal & Progrès v2 », 20 septembre 2026)
+// MARK: - Journal : sous-vues (maquette « Motion v3 - Verre liquide », 2 octobre 2026)
 //
 // Habillage pur : aucune logique, aucun calcul. Les bindings et les
-// ViewModels restent dans `JournalView`. Tokens : `KiwiDS.swift`.
+// ViewModels restent dans `JournalView`. Tokens : `KiwiDS.swift` pour les
+// neutres et la typographie, `KiwiVerre.swift` pour les matières et les teintes.
 //
-// Par rapport à la refonte du 23 août : la saisie revient SUR la page (Dicter ·
-// Photographier · autres façons), le bouton flottant et sa feuille d'ajout
-// disparaissent ; les macros passent à quatre lignes avec objectif et surplus ;
-// les apports à renforcer deviennent trois anneaux ; les repas, une mosaïque.
+// Par rapport à la maquette du 20 septembre : les cartes calories et macros ne
+// font plus qu'une (la carte Énergie : chiffre, anneau, puis quatre colonnes
+// sous un filet) ; la saisie tient sur une rangée (Dicter en verre vert, Photo
+// et Autres en verre clair) ; les repas sont des cartes de verre teintées dans
+// la couleur du moment.
 
 // MARK: - Créneaux : libellés et symboles du Journal
 
@@ -36,28 +38,144 @@ extension MealJournalService.MealSlot {
         case .snack:     return "birthday.cake"
         }
     }
+
+    /// Teinte du moment dans la mosaïque : ambre le matin, kiwi le midi,
+    /// indigo le soir, framboise pour l'encas (palette du verre).
+    var teinteJournal: Color {
+        switch self {
+        case .breakfast: return .teinteVitamineD
+        case .lunch:     return .teinteKiwi
+        case .dinner:    return .teinteIode
+        case .snack:     return .teinteSymptomes
+        }
+    }
+
+    /// « Déjeuner ajouté · 3 aliments » : la sous-ligne de la carte Énergie
+    /// juste après un ajout. Sans compte d'aliments connu, le repas seul.
+    func phraseAjout(aliments: Int) -> String {
+        let tete: String
+        switch self {
+        case .breakfast: tete = "Petit-déjeuner ajouté"
+        case .lunch:     tete = "Déjeuner ajouté"
+        case .dinner:    tete = "Dîner ajouté"
+        case .snack:     tete = "Collation ajoutée"
+        }
+        guard aliments > 0 else { return tete }
+        return "\(tete) · \(aliments) aliment\(aliments > 1 ? "s" : "")"
+    }
 }
 
-// MARK: - Carte calories (chiffre héros + anneau + Apple Santé)
+// MARK: - Anneau du Journal
 
-/// Le seul chiffre héros de l'écran : les kcal restantes. À droite, l'anneau
-/// 88 pt (trait 9) de la part consommée du budget. En pied, la pastille Apple
-/// Santé et l'énergie dépensée du jour : elle ouvre la feuille Activité.
+/// Un anneau qui tient DANS sa boîte (le trait ne déborde pas, contrairement à
+/// `DSRing`) et qui se TRACE en 1 s quand l'entrée de la page se joue : la
+/// maquette retrace les anneaux à chaque arrivée sur l'onglet et à chaque
+/// changement de jour (`trace` repasse à faux, puis à vrai). Une valeur qui
+/// change sous les yeux, elle, suit un ressort.
+struct JournalAnneau: View {
+    /// Fraction 0...1.
+    let fraction: Double
+    var couleur: Color = .teinteKiwi
+    var taille: CGFloat = 72
+    var epaisseur: CGFloat = 8
+    /// Retard du tracé (les trois apports partent à 0,1 s d'écart).
+    var delai: Double = 0
+    /// L'entrée de la page est jouée. À faux, l'anneau se vide d'un coup.
+    var trace: Bool = true
+
+    @State private var apparu = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var cible: CGFloat { CGFloat(min(1, max(0, fraction))) }
+
+    private var rempli: Bool { reduceMotion || (trace && apparu) }
+
+    /// `cubic-bezier(.3,.85,.3,1)` sur 1 s : la courbe de la maquette.
+    private var courbe: Animation {
+        Animation.timingCurve(0.3, 0.85, 0.3, 1, duration: 1).delay(delai)
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Verre.pisteAnneau, lineWidth: epaisseur)
+            Circle()
+                .trim(from: 0, to: rempli ? cible : 0)
+                .stroke(couleur, style: StrokeStyle(lineWidth: epaisseur, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation((trace && !reduceMotion) ? courbe : nil, value: trace)
+                .animation(reduceMotion ? nil : Animation.kiwiFluide, value: fraction)
+        }
+        .padding(epaisseur / 2)
+        .frame(width: taille, height: taille)
+        .onAppear {
+            guard !apparu else { return }
+            if reduceMotion {
+                apparu = true
+            } else {
+                withAnimation(courbe) { apparu = true }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// L'icône de la puce « Eau » : un anneau de 30 pt (trait 4) qui dit la part
+/// de l'objectif bue, une goutte au centre.
+struct JournalPuceEau: View {
+    /// Fraction 0...1 de l'objectif d'eau du jour.
+    let fraction: Double
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.teinteEau.opacity(0.18), lineWidth: 4)
+                .padding(3)
+            Circle()
+                .trim(from: 0, to: CGFloat(min(1, max(0, fraction))))
+                .stroke(Color.teinteEau, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .padding(3)
+            Image(systemName: "drop.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.teinteEau)
+        }
+        .frame(width: 30, height: 30)
+        .animation(reduceMotion ? nil : Animation.kiwiRebond, value: fraction)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Carte Énergie (chiffre, anneau, quatre macros)
+
+/// Une seule carte pour l'énergie du jour. En haut : le libellé de la
+/// catégorie, les kcal restantes (le chiffre héros de l'écran), une sous-ligne
+/// (l'objectif, ou le repas qui vient d'entrer), et l'anneau de 72 pt de la
+/// part consommée du budget. Sous un filet : les quatre macros en colonnes.
+///
 /// Budget = objectif du profil + énergie dépensée (Apple Santé). Sans objectif
 /// calculable : le consommé seul, sans anneau (jamais une cible inventée).
-struct JournalCaloriesCard: View {
+/// La pastille au cœur, à droite du libellé, ouvre la feuille Activité.
+struct JournalEnergieCard: View {
     let consommees: Int
     let objectif: Int?
     let depensees: Int?
     let isToday: Bool
-    /// Apple Santé est-il relié ? Décide du texte de la ligne de pied.
+    /// Les quatre macros du jour (`JournalMacrosCard.lignesDuJour`).
+    let macros: [JournalMacrosCard.Ligne]
+    /// Apple Santé est-il relié ? Décide du texte de la pastille.
     var santeLiee = false
-    /// Ouvre la feuille Activité ; `nil` = pas de ligne de pied.
+    /// Ouvre la feuille Activité ; `nil` = pas de pastille.
     var onActivite: (() -> Void)? = nil
     /// Compteur d'ajouts : chaque repas qui vient d'entrer dans la journée fait
     /// gonfler la carte à 1,035 puis revenir. Un changement de jour, lui, ne
     /// la fait pas réagir.
     var impulsion = 0
+    /// « Déjeuner ajouté · 3 aliments » : le repas qui vient d'entrer. `nil` :
+    /// la sous-ligne dit l'objectif.
+    var ajoutRecent: String? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -86,139 +204,166 @@ struct JournalCaloriesCard: View {
         return santeLiee ? "Rien de dépensé pour l'instant" : "Relier pour compter tes dépenses"
     }
 
+    /// Ce que la pastille affiche : la dépense du jour quand il y en a une.
+    private var etiquetteSante: String {
+        if let depensees, depensees > 0 { return "+\(DS.entier(depensees)) kcal" }
+        return santeLiee ? "Santé" : "Relier"
+    }
+
+    /// Sous le chiffre : le repas qui vient d'entrer, sinon l'objectif du jour.
+    private var sousLigne: String? {
+        if isToday, let ajoutRecent { return ajoutRecent }
+        guard let objectif else { return nil }
+        return "Objectif \(DS.entier(objectif)) kcal"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    // Le chiffre COMPTE jusqu'à sa nouvelle valeur.
-                    ChiffreQuiCompte(valeur: Double(heros))
-                        .font(.dsHeros48)
-                        .tracking(DSTracking.heros48)
-                        .foregroundStyle(Color.dsTexte)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text(legende)
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
+                VStack(alignment: .leading, spacing: 0) {
+                    enTete
+                    chiffres
+                        .padding(.top, 2)
                 }
-                Spacer(minLength: 8)
-                if objectif != nil {
-                    ZStack {
-                        AnneauBudget(fraction: fraction, depasse: depasse)
-                        ChiffreQuiCompte(valeur: Double(min(pourcent, 999)), format: { DS.pourcent($0) })
-                            .font(.dsValeurAnneau)
-                            .foregroundStyle(Color.dsTexte)
-                    }
-                }
-            }
-            // Le chiffre et l'anneau se lisent d'une traite ; la ligne Apple
-            // Santé, en dessous, reste un bouton à part entière.
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(libelleVocal)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            if isToday, let onActivite {
-                DSSeparator(retrait: 0)
-                    .padding(.top, 14)
-                Button(action: onActivite) {
-                    HStack(spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "heart.fill")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color(uiColor: .systemPink))
-                            Text("Apple Santé")
-                                .font(.dsLegende.weight(.semibold))
-                                .foregroundStyle(Color.dsTexte)
-                        }
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color(uiColor: .systemPink).opacity(0.1)))
-                        Text(ligneDepense)
-                            .font(.dsSousTitre)
-                            .tracking(DSTracking.sousTitre)
-                            .foregroundStyle(Color.dsSecondaire)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 4)
-                        DSChevron()
-                    }
-                    .padding(.top, 12)
-                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
-                    .contentShape(Rectangle())
+                if objectif != nil {
+                    anneau
                 }
-                .buttonStyle(.dsPress)
-                .accessibilityLabel("Apple Santé. \(ligneDepense)")
-                .accessibilityHint("Ouvre l'activité du jour")
             }
+
+            DSSeparator(retrait: 0)
+                .padding(.top, 14)
+
+            JournalMacrosCard(lignes: macros)
+                .padding(.top, 12)
         }
-        .padding(18)
+        .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
-        .animation(reduceMotion ? nil : .kiwiCompteur, value: consommees)
+        .animation(reduceMotion ? nil : Animation.kiwiCompteur, value: consommees)
         .kiwiImpulsion(impulsion)
+    }
+
+    /// Le libellé de la catégorie et, aujourd'hui, la pastille Apple Santé.
+    private var enTete: some View {
+        HStack(alignment: .center, spacing: 6) {
+            ScanCardHeader(
+                icon: "flame",
+                title: "Énergie",
+                color: Color.teinteEnergieTexte,
+                teinte: Color.teinteEnergie
+            )
+            .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 6)
+            if isToday, let onActivite {
+                pastilleSante(onActivite)
+            }
+        }
+    }
+
+    /// Apple Santé : la dépense du jour, ou l'invitation à relier. Elle ouvre
+    /// la feuille Activité. La pastille est petite ; sa cible, elle, fait 44 pt.
+    private func pastilleSante(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color(uiColor: .systemPink))
+                    .accessibilityHidden(true)
+                Text(etiquetteSante)
+                    .font(.system(.caption, design: .default).weight(.semibold))
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color(uiColor: .systemPink).opacity(0.1)))
+            .contentShape(Rectangle().inset(by: -12))
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityLabel("Apple Santé. \(ligneDepense)")
+        .accessibilityHint("Ouvre l'activité du jour")
+    }
+
+    /// Le chiffre héros, sa légende, puis la sous-ligne : lus d'une traite.
+    private var chiffres: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                // Le chiffre COMPTE jusqu'à sa nouvelle valeur.
+                ChiffreQuiCompte(valeur: Double(heros))
+                    .font(.system(.largeTitle, design: .rounded).weight(.bold).monospacedDigit())
+                    .tracking(DSTracking.heros34)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(legende)
+                    .font(.dsSousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            if let sousLigne {
+                // Le fondu ne porte que sur cette ligne : le chiffre du
+                // dessus, lui, garde la courbe du compteur.
+                Text(sousLigne)
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .contentTransition(.opacity)
+                    .animation(reduceMotion ? nil : Animation.kiwiSoft, value: sousLigne)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(libelleVocal)
+    }
+
+    /// Une boîte de 72 pt, trait de 8 : vert kiwi tant qu'on est dans le
+    /// budget, rouge de statut une fois dépassé. Le pourcentage compte au
+    /// centre. La maquette pose l'axe du trait à 31 pt du centre : le bord
+    /// extérieur de l'anneau fait donc 70 pt, à 1 pt du bord de la boîte.
+    private var anneau: some View {
+        ZStack {
+            JournalAnneau(
+                fraction: fraction,
+                couleur: depasse ? Color.dsACombler : Color.teinteKiwi,
+                taille: 70,
+                epaisseur: 8,
+                delai: 0.2
+            )
+            ChiffreQuiCompte(valeur: Double(min(pourcent, 999)), format: { DS.pourcent($0) })
+                .font(.system(.subheadline, design: .default).weight(.bold).monospacedDigit())
+                .foregroundStyle(Color.dsTexte)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .padding(.horizontal, 10)
+        }
+        .frame(width: 72, height: 72)
+        .accessibilityHidden(true)
     }
 
     private var libelleVocal: String {
         guard objectif != nil else { return "\(consommees) kilocalories aujourd'hui." }
         if !isToday { return "\(consommees) kilocalories sur \(budget)." }
         let reste = depasse ? "\(abs(restantes)) kilocalories au-dessus du budget" : "\(restantes) kilocalories restantes"
-        return "\(reste), \(pourcent) pour cent du budget consommé."
+        let base = "\(reste), \(pourcent) pour cent du budget consommé."
+        guard let ajoutRecent else { return base }
+        return "\(base) \(ajoutRecent)."
     }
 }
 
-/// L'anneau du budget : dégradé orangé tant qu'on est dedans, rouge de statut
-/// une fois dépassé. Même remplissage animé que `DSRing`.
-private struct AnneauBudget: View {
-    let fraction: Double
-    let depasse: Bool
+// MARK: - Macros (quatre colonnes : valeur sur objectif, barre, surplus)
 
-    @State private var remplie = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var cible: CGFloat { CGFloat(min(1, max(0, fraction))) }
-
-    private var trait: AnyShapeStyle {
-        depasse
-            ? AnyShapeStyle(Color.dsACombler)
-            : AnyShapeStyle(LinearGradient(
-                colors: [Color(hex: "FF8A3D"), Color(hex: "FF5A2B")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ))
-    }
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.dsRemplissage, lineWidth: 9)
-            Circle()
-                .trim(from: 0, to: remplie ? cible : 0)
-                .stroke(trait, style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-        }
-        .frame(width: 88, height: 88)
-        // Un repas vient d'entrer : l'anneau reprend sa course en ressort.
-        .animation(reduceMotion ? nil : .kiwiFluide, value: fraction)
-        .onAppear {
-            if reduceMotion {
-                remplie = true
-            } else {
-                withAnimation(DS.remplissage.delay(0.2)) { remplie = true }
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Carte macros (quatre lignes : valeur sur objectif, jauge, surplus)
-
-/// Protéines, glucides, lipides, fibres : la valeur du jour sur l'objectif, une
-/// jauge de 6 pt, et le SURPLUS en hachures quand l'objectif est dépassé.
+/// Protéines, glucides, lipides, fibres, en quatre colonnes sous le filet de la
+/// carte Énergie : le nom, la valeur du jour sur l'objectif, une barre de 4 pt
+/// dans la teinte de la macro, et le SURPLUS en hachures quand l'objectif est
+/// dépassé.
 ///
 /// Le surplus se lit selon l'objectif de la personne, jamais en alerte par
 /// défaut : dépasser ses protéines en prise de muscle est une bonne nouvelle
 /// (hachures vertes), dépasser ses glucides en perte de poids est un frein
-/// (hachures orangées). Sans objectif calculable : la valeur seule, sans jauge.
+/// (hachures orangées). Sans objectif calculable : la valeur seule, sans barre.
 struct JournalMacrosCard: View {
 
     struct Ligne: Identifiable {
@@ -226,7 +371,8 @@ struct JournalMacrosCard: View {
         let nom: String
         let grammes: Double
         let cible: Double?
-        /// Dégradé de la jauge, de gauche à droite.
+        /// Teinte de la barre, de gauche à droite (la même aux deux bouts : la
+        /// palette du verre donne UNE couleur par macro).
         let teintes: [Color]
         /// Le dépassement de cette macro sert-il l'objectif de la personne ?
         let surplusFavorable: Bool
@@ -249,54 +395,53 @@ struct JournalMacrosCard: View {
         [
             Ligne(id: "proteines", nom: "Protéines", grammes: proteines,
                   cible: cibleProteines.map(Double.init),
-                  teintes: [Color(hex: "5B9BF5"), Color(hex: "2F6FE0")], surplusFavorable: veutDuMuscle),
+                  teintes: [Color.teinteProteines, Color.teinteProteines], surplusFavorable: veutDuMuscle),
             Ligne(id: "glucides", nom: "Glucides", grammes: glucides,
                   cible: cibleGlucides.map(Double.init),
-                  teintes: [Color(hex: "FFD84D"), Color(hex: "F2B705")], surplusFavorable: false),
+                  teintes: [Color.teinteGlucides, Color.teinteGlucides], surplusFavorable: false),
             Ligne(id: "lipides", nom: "Lipides", grammes: lipides,
                   cible: cibleLipides.map(Double.init),
-                  teintes: [Color(hex: "FFA95C"), Color(hex: "FB8500")], surplusFavorable: false),
+                  teintes: [Color.teinteLipides, Color.teinteLipides], surplusFavorable: false),
             Ligne(id: "fibres", nom: "Fibres", grammes: fibres,
                   cible: NutrientData.definition(for: "fiber")?.rda,
-                  teintes: [Color(hex: "8FD460"), Color.dsAccent], surplusFavorable: true),
+                  teintes: [Color.teinteFibres, Color.teinteFibres], surplusFavorable: true),
         ]
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        HStack(alignment: .top, spacing: 10) {
             ForEach(Array(lignes.enumerated()), id: \.element.id) { index, ligne in
-                ligneVue(ligne, delai: 0.35 + Double(index) * DS.cascade)
+                colonne(ligne, delai: 0.35 + Double(index) * DS.cascade)
             }
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, DS.paddingCarte)
         .frame(maxWidth: .infinity)
-        .dsCard()
     }
 
-    private func ligneVue(_ ligne: Ligne, delai: Double) -> some View {
+    private func colonne(_ ligne: Ligne, delai: Double) -> some View {
         let grammes = Int(ligne.grammes.rounded())
         let ratio: Double = (ligne.cible ?? 0) > 0 ? ligne.grammes / (ligne.cible ?? 1) : 0
         let surplus = max(0, ratio - 1)
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(ligne.nom)
-                    .font(.dsSousTitre)
-                    .tracking(DSTracking.sousTitre)
+        return VStack(alignment: .leading, spacing: 0) {
+            Text(ligne.nom)
+                .font(.system(.caption, design: .default).weight(.medium))
+                .foregroundStyle(Color.dsSecondaire)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                // La valeur COMPTE jusqu'à ce que le repas vient d'ajouter.
+                ChiffreQuiCompte(valeur: Double(grammes))
+                    .font(.system(.headline, design: .default).weight(.semibold).monospacedDigit())
+                    .tracking(-0.3)
                     .foregroundStyle(Color.dsTexte)
-                Spacer(minLength: 8)
-                HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    // La valeur COMPTE jusqu'à ce que le repas vient d'ajouter.
-                    ChiffreQuiCompte(valeur: Double(grammes), format: { "\(DS.entier($0)) g" })
-                        .font(.dsValeurLigneForte)
-                        .foregroundStyle(Color.dsTexte)
-                    if let cible = ligne.cible {
-                        Text(" / \(DS.entier(Int(cible.rounded()))) g")
-                            .font(.dsValeurLigne)
-                            .foregroundStyle(Color.dsSecondaire)
-                    }
-                }
+                Text(suffixe(ligne))
+                    .font(.system(.caption, design: .default))
+                    .foregroundStyle(Color.dsSecondaire)
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .padding(.top, 2)
+
             if ligne.cible != nil {
                 BarreMacro(
                     fraction: min(1, ratio),
@@ -305,12 +450,19 @@ struct JournalMacrosCard: View {
                     surplusFavorable: ligne.surplusFavorable,
                     delai: delai
                 )
+                .padding(.top, 6)
             }
         }
-        .padding(.vertical, 7)
-        .animation(reduceMotion ? nil : .kiwiCompteur, value: grammes)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(reduceMotion ? nil : Animation.kiwiCompteur, value: grammes)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(libelleVocal(ligne, grammes: grammes, surplus: surplus))
+    }
+
+    /// « /112 g » quand le profil donne une cible, « g » sinon.
+    private func suffixe(_ ligne: Ligne) -> String {
+        guard let cible = ligne.cible else { return "\(DS.fine)g" }
+        return "/\(DS.entier(Int(cible.rounded())))\(DS.fine)g"
     }
 
     private func libelleVocal(_ ligne: Ligne, grammes: Int, surplus: Double) -> String {
@@ -321,7 +473,7 @@ struct JournalMacrosCard: View {
     }
 }
 
-/// Jauge d'une macro : le dégradé jusqu'à l'objectif, puis le surplus en
+/// Barre d'une macro : sa teinte jusqu'à l'objectif, puis le surplus en
 /// hachures posé par-dessus depuis la gauche (sa largeur dit de combien on
 /// dépasse, plafonnée à une fois l'objectif).
 private struct BarreMacro: View {
@@ -334,6 +486,8 @@ private struct BarreMacro: View {
     @State private var remplie = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private static let hauteur: CGFloat = 4
+
     private var hachures: (fond: Color, raie: Color) {
         surplusFavorable
             ? (Color(hex: "4E9530"), Color(hex: "6FBF43"))
@@ -344,22 +498,22 @@ private struct BarreMacro: View {
         GeometryReader { geo in
             let largeur = geo.size.width
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.dsRemplissage)
+                Capsule().fill(Verre.remplissage)
                 Capsule()
                     .fill(LinearGradient(colors: teintes, startPoint: .leading, endPoint: .trailing))
-                    .frame(width: max(6, largeur * (remplie ? fraction : 0)))
+                    .frame(width: largeur * (remplie ? fraction : 0))
                 if surplus > 0 {
                     Hachures(fond: hachures.fond, raie: hachures.raie)
-                        .frame(width: max(6, largeur * (remplie ? surplus : 0)))
+                        .frame(width: largeur * (remplie ? surplus : 0))
                         .clipShape(Capsule())
                 }
             }
         }
-        .frame(height: 6)
-        // La jauge suit le repas ajouté en ressort ; son premier remplissage, à
+        .frame(height: Self.hauteur)
+        // La barre suit le repas ajouté en ressort ; son premier remplissage, à
         // l'ouverture de la page, garde la courbe longue (`DS.remplissage`).
-        .animation(reduceMotion ? nil : .kiwiFluide, value: fraction)
-        .animation(reduceMotion ? nil : .kiwiFluide, value: surplus)
+        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: fraction)
+        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: surplus)
         .onAppear {
             if reduceMotion {
                 remplie = true
@@ -406,6 +560,9 @@ struct JournalApportsCard: View {
     /// pourcentage rédigé par le bilan ne sert que de repli.
     var scores: [String: Int] = [:]
     let isPremium: Bool
+    /// L'entrée de la page est jouée : les trois anneaux se tracent, à 0,1 s
+    /// d'écart. Repasse à faux puis à vrai à chaque arrivée sur l'onglet.
+    var entree: Bool = true
     let onApport: (ApportV2) -> Void
     let onRemonter: () -> Void
 
@@ -449,7 +606,7 @@ struct JournalApportsCard: View {
             if !apports.isEmpty {
                 HStack(alignment: .top, spacing: 0) {
                     ForEach(Array(apports.enumerated()), id: \.offset) { index, apport in
-                        anneau(apport, delai: 0.5 + Double(index) * DS.cascade)
+                        anneau(apport, delai: 0.15 + Double(index) * 0.1)
                     }
                 }
                 .padding(.horizontal, 8)
@@ -472,12 +629,23 @@ struct JournalApportsCard: View {
         } label: {
             VStack(spacing: 8) {
                 ZStack {
-                    DSRing(fraction: Double(pct) / 100, couleur: couleur, taille: 74, epaisseur: 7, delai: delai)
+                    JournalAnneau(
+                        fraction: Double(pct) / 100,
+                        couleur: couleur,
+                        taille: 74,
+                        epaisseur: 7,
+                        delai: delai,
+                        trace: entree
+                    )
                     Text(DS.pourcent(pct))
-                        .font(.system(size: 16, weight: .semibold).monospacedDigit())
+                        .font(.system(.callout, design: .default).weight(.semibold).monospacedDigit())
                         .foregroundStyle(Color.dsTexte)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .padding(.horizontal, 10)
                         .contentTransition(.numericText())
                 }
+                .frame(width: 74, height: 74)
                 Text(nom)
                     .font(.dsLegendeMoyenne)
                     .tracking(DSTracking.legende)
@@ -552,16 +720,32 @@ struct JournalApportsAttenteCard: View {
 /// promesse de durée. Le tap passe par `BilanDoorButton` (haptique + funnel
 /// découverte + `demarrerBilan`), comme toutes les portes bilan de l'app.
 struct JournalAvantQuestionnaireCard: View {
+    /// Où en est un bilan commencé et pas terminé. `nil` : rien n'est
+    /// commencé, la carte invite à répondre.
+    var reprise: RepriseBilan? = nil
     let onStart: () -> Void
 
     var body: some View {
+        Group {
+            if let reprise {
+                enCours(reprise)
+            } else {
+                invitation
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+    }
+
+    private var invitation: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("On ne connaît pas encore tes besoins")
                 .font(.dsSection)
                 .tracking(DSTracking.section)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Ils dépendent de ton âge, de ton poids, de ton activité et de ce que tu manges déjà. Douze questions suffisent à les calculer.")
+            Text("Ils dépendent de ton âge, de ton poids, de ton activité et de ce que tu manges déjà. Quatre étapes suffisent à les calculer.")
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
@@ -581,9 +765,38 @@ struct JournalAvantQuestionnaireCard: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 9)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dsCard()
+    }
+
+    /// Un bilan attend : où il en est, ce qu'il reste, et de quoi reprendre
+    /// là où on s'est arrêté (refonte du questionnaire, 1er octobre 2026).
+    private func enCours(_ reprise: RepriseBilan) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Ton bilan t'attend")
+                .font(.dsLegendeMoyenne)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
+            Text(reprise.titre)
+                .font(.dsSection)
+                .tracking(DSTracking.section)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 3)
+            BilanSegmentsDEtapes(avancements: reprise.avancements)
+                .padding(.top, 12)
+            Text(reprise.reste.isEmpty ? "Tes réponses sont gardées." : "Tes réponses sont gardées. \(reprise.reste)")
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+            BilanDoorButton(
+                title: BilanDoorButton.Libelle.journalReprise,
+                accessibilityText: "Reprendre mon bilan là où je me suis arrêté",
+                zone: .bilanApports,
+                action: onStart
+            )
+            .padding(.top, 16)
+        }
     }
 }
 
@@ -622,7 +835,7 @@ struct JournalPopulationCard: View {
                     if index > 0 { DSSeparator() }
                     HStack(alignment: .center, spacing: 14) {
                         Text(ligne.fraction)
-                            .font(.system(size: 26, weight: .bold).monospacedDigit())
+                            .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
                             .tracking(-0.9)
                             .foregroundStyle(Color.dsTexte)
                             .frame(width: 74, alignment: .leading)
@@ -687,7 +900,7 @@ struct JournalFinQuestionnaireCard: View {
     }
 }
 
-// MARK: - Saisie (Dicter · Photographier · autres façons d'ajouter)
+// MARK: - Saisie (Dicter · Photo · Autres)
 
 
 // MARK: - L'appui maintenu sur « Dicter »
@@ -704,11 +917,12 @@ enum AppuiDicter: Equatable {
     static let toleranceDeBouge: CGFloat = 14
 }
 
-/// Toute la saisie, posée sur la page : plus de bouton flottant ni de feuille
-/// intermédiaire. « Dicter » est la seule surface verte — la fonction phare —
-/// et « Photographier » une carte blanche. Un bouton teinté déplie le reste :
-/// écrire, rechercher, code-barres. « Écrire » ouvre un champ compact dont le
-/// texte suit le même chemin d'analyse que la dictée.
+/// Toute la saisie, posée sur la page, sur UNE rangée de 60 pt : « Dicter » en
+/// verre vert bombé (la seule surface verte : la fonction phare), puis
+/// « Photo » et « Autres » en verre clair. « Autres » pivote son « + » en
+/// croix, passe au verre vert pâle, et déplie dessous trois tuiles : écrire,
+/// rechercher, code-barres. « Écrire » ouvre un champ compact dont le texte
+/// suit le même chemin d'analyse que la dictée.
 struct JournalSaisieBloc: View {
     @Binding var deplie: Bool
     /// Compteur de scans photo (info neutre dès le bilan fait).
@@ -722,9 +936,6 @@ struct JournalSaisieBloc: View {
     let onCodeBarres: () -> Void
     /// « Écrire » : ouvre la feuille de saisie (le clavier y est chez lui).
     let onEcrire: () -> Void
-    /// « Prise de sang » (Premium, 30 sept. 2026) : pas un repas, mais un
-    /// document qu'on scanne — l'héritière du segment de l'ancien onglet Scan.
-    var onPriseDeSang: (() -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// La scène d'écoute : c'est elle qui dit quand le bouton est « parti »
@@ -740,49 +951,41 @@ struct JournalSaisieBloc: View {
     @State private var minuterie: Task<Void, Never>?
     @State private var deplacement: CGSize = .zero
 
+    /// Rayon du bouton « Dicter » : une capsule à sa hauteur de 60 pt.
+    static let rayonDicter: CGFloat = Verre.hauteurSaisie / 2
+    /// Largeur de « Photo » et de « Autres ».
+    private static let largeurSecondaire: CGFloat = 72
+
+    /// Le verre vert pâle du bouton « Autres » déplié, sans son ombre : il se
+    /// fond par-dessus le verre clair, qui porte déjà la sienne.
+    private static let clairActifSansOmbre: VerreMatiere = {
+        var matiere = VerreMatiere.clairActif
+        matiere.ombre = nil
+        return matiere
+    }()
+
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 8) {
                 boutonDicter
                 boutonPhotographier
+                boutonAutres
             }
             .fixedSize(horizontal: false, vertical: true)
 
-            Button {
-                HapticService.shared.selection()
-                withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
-                    deplie.toggle()
-                }
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text("Autres façons d'ajouter")
-                        .font(.dsSousTitreFort)
-                        .tracking(DSTracking.sousTitre)
-                    Image(systemName: deplie ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .foregroundStyle(Color.kiwiGreenInk)
-                .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                .background(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous).fill(Color.dsAccentPale))
-                .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
-            }
-            .buttonStyle(.dsPress)
-            .accessibilityIdentifier("journal.autres")
-            .accessibilityValue(deplie ? "déplié" : "replié")
-
             if deplie {
-                HStack(spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
                     option("pencil", "Écrire", action: onEcrire)
                     option("magnifyingglass", "Rechercher", action: onRechercher)
                     option("barcode.viewfinder", "Code-barres", action: onCodeBarres)
-                    if let onPriseDeSang {
-                        option("drop", "Prise de sang", action: onPriseDeSang)
-                            .accessibilityIdentifier("journal.priseDeSang")
-                    }
                 }
-                .transition(.opacity)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
+                .transition(
+                    reduceMotion
+                        ? AnyTransition.opacity
+                        : AnyTransition.opacity.combined(with: AnyTransition.offset(y: -6))
+                )
             }
 
             if let compteur {
@@ -791,6 +994,7 @@ struct JournalSaisieBloc: View {
                     .tracking(DSTracking.legende)
                     .foregroundStyle(Color.dsTertiaire)
                     .frame(maxWidth: .infinity)
+                    .padding(.top, 10)
             }
         }
     }
@@ -825,10 +1029,15 @@ struct JournalSaisieBloc: View {
         }
     }
 
+    private var formeDicter: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Self.rayonDicter, style: .continuous)
+    }
+
     private var boutonDicter: some View {
         ZStack {
-            // La bulle d'écoute porte la forme du bouton : il s'efface d'un
-            // coup sous elle, et revient d'un coup quand elle s'y repose.
+            // Pendant l'écoute, le bouton DEVIENT la bulle : la scène part de
+            // son cadre exact. Il s'efface d'un coup sous elle, et revient
+            // d'un coup quand elle l'a quitté ou s'y est reposée.
             boutonDicterVisuel
                 .opacity(ecoute.boutonCache ? 0 : 1)
                 .animation(nil, value: ecoute.boutonCache)
@@ -836,10 +1045,10 @@ struct JournalSaisieBloc: View {
             // n'est plus touchable, et l'appui maintenu serait coupé à
             // l'instant où le bouton s'efface sous la bulle.
             Color.clear
-                .contentShape(RoundedRectangle(cornerRadius: EcouteGeometrie.rayonBouton, style: .continuous))
+                .contentShape(formeDicter)
         }
         .scaleEffect(doigtPose && !reduceMotion ? KiwiEchelle.appui : 1)
-        .animation(reduceMotion ? nil : .kiwiVif, value: doigtPose)
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: doigtPose)
         // Simultané : la page défile toujours si le doigt part en glissant.
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
@@ -860,43 +1069,30 @@ struct JournalSaisieBloc: View {
 
     private var boutonDicterVisuel: some View {
         FaceBoutonDicter()
-            .background(FondBoutonDicter(rayon: EcouteGeometrie.rayonBouton))
-            .contentShape(RoundedRectangle(cornerRadius: EcouteGeometrie.rayonBouton, style: .continuous))
+            .background(FondBoutonDicter(rayon: Self.rayonDicter))
+            .contentShape(formeDicter)
             .cibleTutoriel(.boutonDicter)
     }
 
-    // MARK: Photographier
+    // MARK: Photo
 
     private var boutonPhotographier: some View {
         Button(action: onPhotographier) {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack {
-                    Circle().fill(Color.dsFond)
-                    Image(systemName: "camera")
-                        .font(.system(size: 20, weight: .medium))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(Color.dsTexte)
-                }
-                .frame(width: 46, height: 46)
-                .accessibilityHidden(true)
-
-                Color.clear.frame(height: 14).padding(.top, 10)
-
-                Text("Photographier")
-                    .font(.dsHeadline)
-                    .tracking(DSTracking.corps)
-                    .foregroundStyle(Color.dsTexte)
-                    .padding(.top, 8)
-                Text("un plat entier")
-                    .font(.dsLegende)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .padding(.top, 1)
+            VStack(spacing: 3) {
+                Image(systemName: "camera")
+                    .font(.system(size: 21, weight: .medium))
+                    .accessibilityHidden(true)
+                Text("Photo")
+                    .font(.system(.caption, design: .default).weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.dsCarte))
-            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .foregroundStyle(Color.dsTexte)
+            .padding(.horizontal, 4)
+            .frame(width: Self.largeurSecondaire)
+            .frame(minHeight: Verre.hauteurSaisie, maxHeight: .infinity)
+            .verreClair()
+            .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel("Photographier mon plat")
@@ -905,15 +1101,55 @@ struct JournalSaisieBloc: View {
 
     // MARK: Autres façons
 
-    private func option(_ symbole: String, _ titre: String, action: @escaping () -> Void) -> some View {
+    private var boutonAutres: some View {
         Button {
+            HapticService.shared.selection()
+            withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
+                deplie.toggle()
+            }
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: "plus")
+                    .font(.system(size: 21, weight: .medium))
+                    // Le « + » pivote en croix quand la rangée est dépliée.
+                    .rotationEffect(.degrees(deplie ? 45 : 0))
+                    .animation(reduceMotion ? nil : Animation.kiwiRebond, value: deplie)
+                    .accessibilityHidden(true)
+                Text("Autres")
+                    .font(.system(.caption, design: .default).weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(deplie ? Color.teinteKiwiTexte : Color.dsTexte)
+            .padding(.horizontal, 4)
+            .frame(width: Self.largeurSecondaire)
+            .frame(minHeight: Verre.hauteurSaisie, maxHeight: .infinity)
+            .background {
+                // Deux plaques superposées : le verre vert pâle se fond sur le
+                // verre clair au lieu de le remplacer d'un coup.
+                ZStack {
+                    VerrePlaque(forme: Capsule(style: .continuous), matiere: VerreMatiere.clair)
+                    VerrePlaque(forme: Capsule(style: .continuous), matiere: Self.clairActifSansOmbre)
+                        .opacity(deplie ? 1 : 0)
+                }
+            }
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityLabel("Autres façons d'ajouter")
+        .accessibilityIdentifier("journal.autres")
+        .accessibilityValue(deplie ? "déplié" : "replié")
+    }
+
+    private func option(_ symbole: String, _ titre: String, action: @escaping () -> Void) -> some View {
+        let forme = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        return Button {
             HapticService.shared.tap()
             action()
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: symbole)
                     .font(.system(size: 19, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(Color.dsTexte)
                     .accessibilityHidden(true)
                 Text(titre)
@@ -924,9 +1160,9 @@ struct JournalSaisieBloc: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 4)
-            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-            .dsCard()
-            .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, maxHeight: .infinity)
+            .verreClair(forme)
+            .contentShape(forme)
         }
         .buttonStyle(.dsPress)
     }
@@ -934,122 +1170,67 @@ struct JournalSaisieBloc: View {
 
 // MARK: - Le bouton Dicter, en deux morceaux
 //
-// La bulle d'écoute (`EcouteDictee.swift`) PART de ce bouton et y REVIENT :
-// elle dessine le même fond et la même face, pour que le passage de l'un à
-// l'autre ne se voie pas.
+// Le fond et la face restent séparés : pendant la dictée, la bulle
+// (`EcouteDictee.swift`) part du cadre de ce bouton (`cibleTutoriel`) et de
+// son rayon (`JournalSaisieBloc.rayonDicter`), avec sa propre face.
 
-/// Le fond vert du bouton : dégradé de marque et lumière en haut. Son rayon
-/// s'anime (22 pt pour le bouton, un cercle pour la bulle).
+/// Le fond du bouton : le verre vert bombé (`VerreMatiere.principalBombe` :
+/// dégradé en biais, éclat sur la moitié haute, reflets, ombre verte).
 struct FondBoutonDicter: View {
     let rayon: CGFloat
 
     var body: some View {
-        RoundedRectangle(cornerRadius: rayon, style: .continuous)
-            .fill(LinearGradient(
-                colors: [Color(hex: "7CCC54"), Color.dsAccent, Color(hex: "428426")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ))
-            // Lumière spéculaire en haut : le rendu de base ; le verre
-            // d'iOS 26 viendra l'enrichir sans changer la mise en page.
-            .overlay(
-                RoundedRectangle(cornerRadius: rayon, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [Color.white.opacity(0.3), Color.white.opacity(0)],
-                        startPoint: .top,
-                        endPoint: .center
-                    ))
-            )
+        VerrePlaque(
+            forme: RoundedRectangle(cornerRadius: rayon, style: .continuous),
+            matiere: VerreMatiere.principalBombe
+        )
     }
 }
 
-/// La face du bouton : micro, onde, « Dicter », « le plus rapide ».
+/// La face du bouton : la pastille du micro (36 pt) et son halo qui respire,
+/// puis « Dicter » et « le plus rapide ».
 struct FaceBoutonDicter: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 10) {
             ZStack {
-                HaloDictee()
+                // Rien sous « Réduire les animations » : le socle s'en charge.
+                VerreHaloQuiRespire()
                 Circle()
                     .fill(Color.white.opacity(0.22))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.5), lineWidth: 1))
                 Image(systemName: "mic.fill")
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white)
             }
-            .frame(width: 46, height: 46)
+            .frame(width: 36, height: 36)
             .accessibilityHidden(true)
 
-            OndeDeVoix()
-                .padding(.top, 10)
-
-            Text("Dicter")
-                .font(.dsHeadline)
-                .tracking(DSTracking.corps)
-                .foregroundStyle(.white)
-                .padding(.top, 8)
-            Text("le plus rapide")
-                .font(.dsLegende)
-                .foregroundStyle(Color.white.opacity(0.85))
-                .padding(.top, 1)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-/// Deux anneaux qui respirent autour du micro. Gelés sous « Réduire les
-/// animations » : le bouton reste lisible sans eux.
-private struct HaloDictee: View {
-    @State private var respire = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        ZStack {
-            anneau(delai: 0)
-            anneau(delai: 1.3)
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            respire = true
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func anneau(delai: Double) -> some View {
-        Circle()
-            .strokeBorder(Color.white.opacity(0.6), lineWidth: 1.5)
-            .scaleEffect(respire ? 1.18 : 1)
-            .opacity(respire ? 0 : 0.55)
-            .animation(
-                reduceMotion ? nil : .easeInOut(duration: 2.6).repeatForever(autoreverses: false).delay(delai),
-                value: respire
-            )
-    }
-}
-
-/// Sept barres, hauteurs fixes : l'onde dit « voix » sans bouger en permanence.
-private struct OndeDeVoix: View {
-    private let hauteurs: [CGFloat] = [6, 11, 14, 9, 13, 7, 10]
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 2.5) {
-            ForEach(Array(hauteurs.enumerated()), id: \.offset) { _, hauteur in
-                Capsule()
-                    .fill(Color.white.opacity(0.85))
-                    .frame(width: 2.5, height: hauteur)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Dicter")
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text("le plus rapide")
+                    .font(.system(.caption, design: .default))
+                    .foregroundStyle(Color.white.opacity(0.88))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
+
+            Spacer(minLength: 0)
         }
-        .frame(height: 14)
-        .accessibilityHidden(true)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: Verre.hauteurSaisie, maxHeight: .infinity, alignment: .leading)
     }
 }
 
 // MARK: - Aujourd'hui, en mosaïque (les quatre repas)
 
-/// Quatre tuiles deux par deux. Un repas renseigné prend une teinte douce et
-/// un chevron ; un repas vide reste blanc, estompé — et reste touchable, pour
-/// qu'on puisse y ajouter. Le toucher ouvre le journal du jour.
+/// Quatre cartes de verre, deux par deux. Un repas renseigné prend la teinte
+/// de son moment dans son coin haut gauche ; un repas vide reste en verre nu,
+/// avec « Rien pour l'instant », et reste touchable pour qu'on puisse y
+/// ajouter. Le toucher ouvre le repas. Les cartes arrivent en cascade quand
+/// l'entrée de la page se joue.
 struct JournalRepasMosaique: View {
 
     struct Repas: Identifiable {
@@ -1060,77 +1241,70 @@ struct JournalRepasMosaique: View {
     }
 
     let repas: [Repas]
+    /// L'entrée de la page est jouée : les cartes montent une à une.
+    var entree: Bool = true
     let onOuvrir: (MealJournalService.MealSlot) -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let colonnes = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
     var body: some View {
         LazyVGrid(columns: colonnes, spacing: 10) {
-            ForEach(repas) { item in
+            ForEach(Array(repas.enumerated()), id: \.element.id) { index, item in
                 tuile(item)
+                    .verreCascade(entree, delai: 0.08 + Double(index) * 0.05, decalage: 10)
             }
         }
     }
 
-    private func teinte(_ slot: MealJournalService.MealSlot) -> Color {
-        switch slot {
-        case .breakfast: return Color(uiColor: .systemOrange)
-        case .lunch:     return Color.dsAccent
-        case .dinner:    return Color(uiColor: .systemIndigo)
-        case .snack:     return Color(uiColor: .systemPink)
-        }
-    }
-
     private func tuile(_ item: Repas) -> some View {
-        Button {
+        let forme = RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+        let teinte = item.slot.teinteJournal
+        return Button {
             HapticService.shared.tap()
             onOuvrir(item.slot)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
+                    // Une seule teinte, à plat, comme la maquette.
                     Image(systemName: item.slot.symboleJournal)
                         .font(.system(size: 24, weight: .medium))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(item.vide ? Color.dsTertiaire : teinte(item.slot))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(teinte)
                     Spacer(minLength: 0)
-                    if !item.vide { DSChevron() }
+                    DSChevron()
                 }
                 .accessibilityHidden(true)
                 Text(item.slot.label)
                     .font(.dsSousTitreFort)
                     .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(item.vide ? Color.dsSecondaire : Color.dsTexte)
+                    .foregroundStyle(Color.dsTexte)
                     .padding(.top, 8)
-                Text(item.vide ? "rien encore" : "\(DS.entier(item.kcal)) kcal")
+                Text(item.vide ? "Rien pour l'instant" : "\(DS.entier(item.kcal)) kcal")
                     .font(.dsValeurLigne)
-                    .foregroundStyle(item.vide ? Color.dsTertiaire : Color.dsSecondaire)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .opacity(item.vide ? 0.67 : 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    // Le total du repas compte quand un aliment y entre.
                     .contentTransition(.numericText())
+                    .animation(reduceMotion ? nil : Animation.kiwiCompteur, value: item.kcal)
                     .padding(.top, 1)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                ZStack {
-                    Color.dsCarte
-                    if !item.vide {
-                        LinearGradient(
-                            stops: [
-                                .init(color: teinte(item.slot).opacity(0.16), location: 0),
-                                .init(color: teinte(item.slot).opacity(0), location: 0.62),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    }
-                }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+            .clipShape(forme)
+            // La même carte que `.verreCarte(teinte:)` et `.verreCarte()`,
+            // choisie sans changer d'identité : le chiffre peut compter quand
+            // le repas se remplit.
+            .verre(item.vide ? VerreMatiere.carte : VerreMatiere.carteTeintee(teinte), forme: forme)
+            .contentShape(forme)
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel(item.vide
-            ? "\(item.slot.label), rien encore"
+            ? "\(item.slot.label), rien pour l'instant"
             : "\(item.slot.label), \(item.kcal) kilocalories")
         .accessibilityHint("Ouvre le journal du jour")
     }
@@ -1160,7 +1334,7 @@ struct ActiviteSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(kcalActives.map { DS.entier($0) } ?? "\u{2014}")
-                    .font(.dsHeros48)
+                    .font(.system(size: 48, weight: .bold, design: .rounded).monospacedDigit())
                     .tracking(DSTracking.heros48)
                     .foregroundStyle(kcalActives == nil ? Color.dsTertiaire : Color.dsTexte)
                 Text("kcal dépensées aujourd'hui")
@@ -1206,7 +1380,7 @@ struct ActiviteSheet: View {
         .padding(.horizontal, DS.marge)
         .presentationDetents([.height(360)])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color.dsFond)
-        .presentationCornerRadius(34)
+        // Fond de verre et coins de 38 : la feuille ne peint plus d'aplat.
+        .verreFeuille()
     }
 }

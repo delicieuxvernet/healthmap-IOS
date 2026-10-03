@@ -7,6 +7,15 @@ import RevenueCat
 // Ce qui s'ouvre depuis l'onglet Réglages (`ReglagesView.swift`) : mon compte,
 // mes objectifs, mon abonnement, supprimer mon compte — et la restauration
 // des achats, partagée entre la page principale et la page abonnement.
+//
+// Verre liquide (2 octobre 2026) : chaque page poussée repose sur
+// `VerrePageFond()`, ses cartes sont en verre, ses champs en verre clair, ses
+// feuilles en `.verreFeuille()`. Les lignes à icône reprennent la grammaire de
+// l'onglet (`ReglageLigne` : pastille carrée, filet sous le libellé).
+//
+// La barre d'onglets reste au-dessus d'une page poussée : chaque page réserve
+// sa place (`kiwiTabBarBottomInset`), sinon le bas du contenu (le bouton
+// « Enregistrer » des objectifs) défile dessous sans pouvoir en sortir.
 
 // MARK: - Restauration des achats (App Store Guideline 3.1.1)
 
@@ -79,7 +88,7 @@ struct AbonnementReglagesView: View {
 
     var body: some View {
         ZStack {
-            Color.dsFond.ignoresSafeArea()
+            VerrePageFond()
             ScrollView {
                 VStack(spacing: 0) {
                     etat
@@ -91,36 +100,35 @@ struct AbonnementReglagesView: View {
                             Button {
                                 showManageSubscriptions = true
                             } label: {
-                                DSRow(icone: "gearshape", titre: "Gérer mon abonnement",
-                                      sousTitre: "Modifier ou annuler dans les réglages Apple")
+                                ReglageLigne(symbole: "gearshape", titre: "Gérer mon abonnement",
+                                             sousTitre: "Modifier ou annuler dans les réglages Apple",
+                                             filet: true)
                             }
                             .buttonStyle(.dsPress)
                             .accessibilityHint("Ouvre la gestion de ton abonnement (modifier ou annuler) dans les réglages Apple.")
-                            DSSeparator(retrait: DS.retraitSeparateurIcone)
                         } else if dashboardVM.bilanComplete {
                             Button {
                                 HapticService.shared.tap()
                                 showPaywall = true
                             } label: {
-                                DSRow(icone: "sparkles", titre: "Découvrir Kiwio Premium")
+                                ReglageLigne(symbole: "sparkles", titre: "Découvrir Kiwio Premium", filet: true)
                             }
                             .buttonStyle(.dsPress)
-                            DSSeparator(retrait: DS.retraitSeparateurIcone)
                         }
 
                         if !subscriptionService.isPremium {
                             Button {
                                 Task { await saisirCodePromo() }
                             } label: {
-                                DSRow(icone: "ticket",
-                                      titre: isRedeemingPromo ? "Vérification de ton code…" : "J'ai un code") {
+                                ReglageLigne(symbole: "ticket",
+                                             titre: isRedeemingPromo ? "Vérification de ton code…" : "J'ai un code",
+                                             filet: true) {
                                     if isRedeemingPromo { ProgressView() } else { DSChevron() }
                                 }
                             }
                             .buttonStyle(.dsPress)
                             .disabled(isRedeemingPromo)
                             .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
-                            DSSeparator(retrait: DS.retraitSeparateurIcone)
                         }
 
                         // Restaurer : visible quel que soit l'état, un abonné qui
@@ -128,7 +136,7 @@ struct AbonnementReglagesView: View {
                         Button {
                             Task { await restauration.lancer(contexte: "reglages_abonnement") }
                         } label: {
-                            DSRow(icone: "arrow.clockwise", titre: "Restaurer mes achats") {
+                            ReglageLigne(symbole: "arrow.clockwise", titre: "Restaurer mes achats") {
                                 if restauration.enCours { ProgressView() } else { DSChevron() }
                             }
                         }
@@ -141,6 +149,7 @@ struct AbonnementReglagesView: View {
                 .padding(.bottom, DS.marge)
             }
         }
+        .kiwiTabBarBottomInset()
         .navigationTitle("Mon abonnement")
         .navigationBarTitleDisplayMode(.inline)
         .kiwiNavigationBarBackground()
@@ -250,7 +259,7 @@ struct CompteReglagesView: View {
 
     var body: some View {
         ZStack {
-            Color.dsFond.ignoresSafeArea()
+            VerrePageFond()
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     DSGroupedList {
@@ -289,6 +298,7 @@ struct CompteReglagesView: View {
                 .containerRelativeFrame(.horizontal)
             }
         }
+        .kiwiTabBarBottomInset()
         .navigationTitle("Mon compte")
         .navigationBarTitleDisplayMode(.inline)
         .kiwiNavigationBarBackground()
@@ -316,19 +326,17 @@ private struct MotDePasseSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    DSGroupedList {
+                    // Deux champs en verre clair, l'un sous l'autre.
+                    VStack(spacing: 10) {
                         SecureField("Nouveau mot de passe", text: $nouveau)
                             .textContentType(.newPassword)
                             .font(.dsCorps)
-                            .padding(.horizontal, DS.paddingCarte)
-                            .frame(minHeight: DS.cibleTactile + 6)
+                            .reglageChampVerre()
                             .accessibilityLabel("Nouveau mot de passe")
-                        DSSeparator()
                         SecureField("Confirme-le", text: $confirmation)
                             .textContentType(.newPassword)
                             .font(.dsCorps)
-                            .padding(.horizontal, DS.paddingCarte)
-                            .frame(minHeight: DS.cibleTactile + 6)
+                            .reglageChampVerre()
                             .accessibilityLabel("Confirmation du nouveau mot de passe")
                     }
 
@@ -364,7 +372,6 @@ private struct MotDePasseSheet: View {
                 .containerRelativeFrame(.horizontal)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Color.dsFond.ignoresSafeArea())
             .navigationTitle("Mot de passe")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -376,6 +383,8 @@ private struct MotDePasseSheet: View {
             .interactiveDismissDisabled(enCours)
         }
         .presentationDetents([.medium, .large])
+        // Le contenu ne peint plus d'aplat : c'est la feuille qui est en verre.
+        .verreFeuille()
     }
 
     private func enregistrer() async {
@@ -418,7 +427,7 @@ struct ObjectifsReglagesView: View {
 
     var body: some View {
         ZStack {
-            Color.dsFond.ignoresSafeArea()
+            VerrePageFond()
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Ce que tu veux changer. Ton plan s'organise autour.")
@@ -451,6 +460,7 @@ struct ObjectifsReglagesView: View {
                 .containerRelativeFrame(.horizontal)
             }
         }
+        .kiwiTabBarBottomInset()
         .navigationTitle("Mes objectifs")
         .navigationBarTitleDisplayMode(.inline)
         .kiwiNavigationBarBackground()
@@ -479,6 +489,9 @@ struct ObjectifsReglagesView: View {
                 Image(systemName: choisi ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(choisi ? Color.dsAccent : Color.dsTertiaire)
+                    // La coche se pose avec un rebond (rien sous « Réduire
+                    // les animations »).
+                    .verrePop(choisi)
                     .accessibilityHidden(true)
             }
         }
@@ -554,7 +567,7 @@ struct SuppressionCompteView: View {
 
     var body: some View {
         ZStack {
-            Color.dsFond.ignoresSafeArea()
+            VerrePageFond()
             ScrollView {
                 VStack(spacing: 0) {
                     Text("Ton compte et tout ce qu'il contient.")
@@ -569,7 +582,7 @@ struct SuppressionCompteView: View {
                         Button(role: .destructive) {
                             showDeleteFirstConfirm = true
                         } label: {
-                            DSRow(icone: "trash", iconeCouleur: .dsACombler, titre: "Supprimer mon compte") {
+                            ReglageLigne(symbole: "trash", sens: .destructif, titre: "Supprimer mon compte") {
                                 EmptyView()
                             }
                         }
@@ -588,6 +601,7 @@ struct SuppressionCompteView: View {
                 .padding(.bottom, DS.marge)
             }
         }
+        .kiwiTabBarBottomInset()
         .navigationTitle("Supprimer mon compte")
         .navigationBarTitleDisplayMode(.inline)
         .kiwiNavigationBarBackground()
@@ -606,6 +620,7 @@ struct SuppressionCompteView: View {
         .sheet(isPresented: $showDeleteSecondConfirm) {
             deleteAccountConfirmationSheet
                 .healthMapFullSheet()
+                .verreFeuille()
         }
     }
 
@@ -650,14 +665,13 @@ struct SuppressionCompteView: View {
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled()
                             .submitLabel(.done)
-                            .padding(Theme.spacingMD)
-                            .frame(minHeight: 44)
-                            .background(Color.dsCarte)
-                            .clipShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+                            // Champ en verre clair ; le liseré rouge ne vient
+                            // qu'une fois le mot reconnu.
+                            .reglageChampVerre()
                             .overlay(
-                                RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                                RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
                                     .strokeBorder(
-                                        isDeleteConfirmed ? Color.urgencyImmediate : Color.dsSeparateur,
+                                        isDeleteConfirmed ? Color.urgencyImmediate : Color.clear,
                                         lineWidth: 1
                                     )
                             )
@@ -681,7 +695,6 @@ struct SuppressionCompteView: View {
                 .padding(.bottom, Theme.spacingLG)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Color.dsFond)
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: Theme.spacingSM) {
                     Button {
@@ -726,7 +739,9 @@ struct SuppressionCompteView: View {
                 }
                 .padding(.horizontal, Theme.spacingLG)
                 .padding(.vertical, Theme.spacingSM)
-                .background(Color.dsFond)
+                // Les boutons flottent au-dessus du texte qui défile : le
+                // même verre épais que la feuille, flou compris.
+                .background { VerreFeuilleFond() }
             }
             .navigationTitle("Supprimer mon compte")
             .navigationBarTitleDisplayMode(.inline)

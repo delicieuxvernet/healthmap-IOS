@@ -11,6 +11,12 @@ import SwiftUI
 ///
 /// - Reduce Motion → apparitions instantanées + aucune animation en boucle
 ///   (anneau posé rempli, pastilles fixes, pas de pulsation).
+///
+/// Verre liquide (2 octobre 2026) : la page est posée sur le fond de verre
+/// (teinte kiwi, celle d'un écran hors onglets). Les pastilles d'apports sont
+/// des puces de verre clair, chacune avec la teinte de SA catégorie ;
+/// « C'est parti » est le verre teinté vert, « J'ai déjà un compte » un bouton
+/// de verre clair, et la feuille de connexion porte le verre de feuille.
 struct LandingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
@@ -20,8 +26,8 @@ struct LandingView: View {
     /// Mode d'auth demandé — pilote le sheet (`nil` = pas de sheet).
     @State private var authMode: AuthView.Mode?
 
-    // Refonte 23 août 2026 : couleurs du DS (fond neutre + voile de marque,
-    // accent vert réservé à l'interactif et à l'anneau signature).
+    // Couleurs du DS : accent vert réservé à l'interactif et à l'anneau
+    // signature ; le fond est le verre qui respire (`DSPageBackground`).
     private let kiwi = Color.dsAccent
     private let ink = Color.dsTexte
 
@@ -90,6 +96,7 @@ struct LandingView: View {
         .sheet(item: $authMode) { mode in
             AuthView(initialMode: mode)
                 .healthMapFullSheet()
+                .verreFeuille()
         }
     }
 
@@ -107,7 +114,7 @@ struct LandingView: View {
 
             // Anneau + centre
             ZStack {
-                Circle().stroke(Color.dsRemplissage, lineWidth: 9)
+                Circle().stroke(Verre.pisteAnneau, lineWidth: 9)
                 Circle()
                     .trim(from: 0, to: reduceMotion ? 0.78 : ringProgress)
                     .stroke(kiwi, style: StrokeStyle(lineWidth: 9, lineCap: .round))
@@ -119,11 +126,12 @@ struct LandingView: View {
             }
             .frame(width: 116, height: 116)
 
-            // Pastilles nutriments aux 4 coins (couleur = sens)
-            nutrientPill("Vitamine C", dot: kiwi, delay: 0).offset(x: -116, y: -82)
-            nutrientPill("Fer", dot: Color(red: 1, green: 0.584, blue: 0), delay: 0.9).offset(x: 116, y: -82)
-            nutrientPill("B12", dot: Color(red: 1, green: 0.231, blue: 0.188), delay: 1.8).offset(x: -120, y: 82)
-            nutrientPill("Oméga-3", dot: Color(red: 0, green: 0.478, blue: 1), delay: 2.6).offset(x: 112, y: 82)
+            // Pastilles nutriments aux 4 coins : une teinte par catégorie, celle
+            // de la palette du verre (la même que dans le Journal et le Plan).
+            nutrientPill("Vitamine C", dot: Color.teinteVitamineC, delay: 0).offset(x: -116, y: -82)
+            nutrientPill("Fer", dot: Color.teinteFer, delay: 0.9).offset(x: 116, y: -82)
+            nutrientPill("B12", dot: Color.teinteB12, delay: 1.8).offset(x: -120, y: 82)
+            nutrientPill("Oméga-3", dot: Color.teinteOmega3, delay: 2.6).offset(x: 112, y: 82)
         }
         .frame(width: 358, height: 208)
         .accessibilityHidden(true)
@@ -136,7 +144,7 @@ struct LandingView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Capsule().fill(Color.dsCarte))
+        .verreClair()
         .offset(y: floating && !reduceMotion ? -6 : 0)
         .animation(reduceMotion ? nil : .easeInOut(duration: 3.4).repeatForever(autoreverses: true).delay(delay), value: floating)
     }
@@ -159,15 +167,19 @@ struct LandingView: View {
             }
             .accessibilityHint("Ouvre la création de compte.")
 
+            // Action secondaire : verre clair, libellé à l'encre (le vert plein
+            // reste à l'action principale, juste au-dessus).
             Button {
                 authMode = .signIn
             } label: {
                 Text("J'ai déjà un compte")
-                    .font(.dsSousTitreFort)
-                    .foregroundStyle(Color.dsAccent)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
+                    .frame(minHeight: DS.hauteurBouton)
+                    .verreClair()
+                    .contentShape(Capsule())
             }
             .buttonStyle(.dsPress)
             .accessibilityHint("Ouvre la connexion avec un compte existant.")

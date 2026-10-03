@@ -1,5 +1,31 @@
 import SwiftUI
 
+// MARK: - Champ de saisie en verre
+//
+// Verre liquide (2 octobre 2026) : un champ n'est plus un aplat gris, c'est
+// une plaque de verre clair (blanc 74 → 40 %, reflet haut et bas, liseré),
+// du même rayon que les tuiles posées dans une carte. La hauteur est un
+// PLANCHER : en grande taille de texte, le champ grandit au lieu de rogner.
+
+fileprivate extension View {
+    /// Habille un champ de saisie (ou la rangée qui le contient) en verre clair.
+    func authChampVerre(hauteur: CGFloat = 50) -> some View {
+        padding(.horizontal, Theme.spacingMD)
+            .frame(minHeight: hauteur)
+            .verreClair(RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
+    }
+
+    /// Action principale d'une feuille de connexion : verre teinté vert, en
+    /// capsule, à la hauteur d'action de la maquette (54 pt au minimum).
+    func authActionVerre() -> some View {
+        foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: Verre.hauteurAction)
+            .verrePrincipal()
+            .contentShape(Capsule())
+    }
+}
+
 // MARK: - Auth Text Field
 struct AuthTextField: View {
     let icon: String
@@ -17,6 +43,7 @@ struct AuthTextField: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.dsSecondaire)
                 .frame(width: 24)
+                .accessibilityHidden(true)
 
             TextField(placeholder, text: $text)
                 .textContentType(contentType)
@@ -24,12 +51,10 @@ struct AuthTextField: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .focused(focused, equals: field)
+                .accessibilityLabel(placeholder)
                 .accessibilityIdentifier(field == .email ? "auth.email" : "auth.firstName")
         }
-        .padding(.horizontal, Theme.spacingMD)
-        .frame(height: 50)
-        .background(Color.dsFond)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .authChampVerre()
     }
 }
 
@@ -50,6 +75,7 @@ struct AuthSecureField: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.dsSecondaire)
                 .frame(width: 24)
+                .accessibilityHidden(true)
 
             Group {
                 if showPassword {
@@ -62,22 +88,27 @@ struct AuthSecureField: View {
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
             .focused(focused, equals: field)
+            .accessibilityLabel(placeholder)
             .accessibilityIdentifier("auth.password")
 
             Button {
                 showPassword.toggle()
             } label: {
+                // Cible de 44 pt DANS le label : le pictogramme seul en fait 14.
                 Image(systemName: showPassword ? "eye.slash" : "eye")
                     .font(.system(size: 14))
                     .foregroundStyle(Color.dsSecondaire)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.dsPress)
             .accessibilityLabel(showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe")
             .accessibilityIdentifier("auth.togglePassword")
         }
-        .padding(.horizontal, Theme.spacingMD)
-        .frame(height: 50)
-        .background(Color.dsFond)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.leading, Theme.spacingMD)
+        .padding(.trailing, Theme.spacingXS)
+        .frame(minHeight: 50)
+        .verreClair(RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
     }
 }
 
@@ -148,10 +179,7 @@ struct ForgotPasswordSheet: View {
             .keyboardType(.emailAddress)
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
-            .padding(.horizontal, Theme.spacingMD)
-            .frame(height: 50)
-            .background(Color.dsFond)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            .authChampVerre()
 
         if let err = authVM.errorMessage {
             Text(err)
@@ -179,12 +207,9 @@ struct ForgotPasswordSheet: View {
                         .font(.system(size: 17, weight: .semibold))
                 }
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(Color.dsAccent)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+            .authActionVerre()
         }
+        .buttonStyle(.dsPress)
         .disabled(email.isEmpty || authVM.isProcessing)
     }
 
@@ -200,26 +225,17 @@ struct ForgotPasswordSheet: View {
             .textContentType(.oneTimeCode)
             .keyboardType(.numberPad)
             .focused($focusedField, equals: .code)
-            .padding(.horizontal, Theme.spacingMD)
-            .frame(minHeight: 50)
-            .background(Color.dsFond)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            .authChampVerre()
 
         SecureField("Nouveau mot de passe", text: $newPassword)
             .textContentType(.newPassword)
             .focused($focusedField, equals: .newPassword)
-            .padding(.horizontal, Theme.spacingMD)
-            .frame(minHeight: 50)
-            .background(Color.dsFond)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            .authChampVerre()
 
         SecureField("Confirme le mot de passe", text: $confirmPassword)
             .textContentType(.newPassword)
             .focused($focusedField, equals: .confirmPassword)
-            .padding(.horizontal, Theme.spacingMD)
-            .frame(minHeight: 50)
-            .background(Color.dsFond)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            .authChampVerre()
 
         // Live password validation issues
         if !newPassword.isEmpty {
@@ -264,12 +280,9 @@ struct ForgotPasswordSheet: View {
                         .font(.system(size: 17, weight: .semibold))
                 }
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 54)
-            .background(Color.dsAccent)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+            .authActionVerre()
         }
+        .buttonStyle(.dsPress)
         .disabled(!canSubmitReset || authVM.isProcessing)
 
         Button {
@@ -365,10 +378,7 @@ struct EmailCodeVerificationSheet: View {
                     .textContentType(.oneTimeCode)
                     .font(.system(size: 24, weight: .semibold, design: .default).monospacedDigit())
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, Theme.spacingMD)
-                    .frame(height: 60)
-                    .background(Color.dsFond)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+                    .authChampVerre(hauteur: 60)
                     .focused($isCodeFocused)
                     .onChange(of: code) { _, newValue in
                         // Cap à 6 chiffres, strip tout ce qui n'est pas numérique.
@@ -402,12 +412,9 @@ struct EmailCodeVerificationSheet: View {
                                 .font(.system(size: 17, weight: .semibold))
                         }
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(Color.dsAccent)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                    .authActionVerre()
                 }
+                .buttonStyle(.dsPress)
                 .disabled(code.count != 6 || authVM.isProcessing)
 
                 // B1 : bouton "Renvoyer le code" — utile si l'user a raté l'email,

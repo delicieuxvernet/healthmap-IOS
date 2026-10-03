@@ -11,6 +11,11 @@ import UIKit
 // et le Nutri-Score quand le produit en a un.
 // Ce qui se décide (quel repère, quel sous-titre, quelles sections) vit dans
 // `Core/RechercheVisuelle.swift`.
+//
+// Verre liquide (2 octobre 2026) : la ligne reprend la typographie des lignes
+// de la maquette (15 / 600 puis 13 secondaire), la vignette porte le liseré
+// blanc du verre au lieu d'un filet gris, et les titres de section passent au
+// 15 / 600 secondaire des feuilles.
 
 /// Le contenu d'une ligne : vignette + textes. L'enveloppe (carte, bouton
 /// d'ajout, chevron) reste à l'écran qui l'accueille.
@@ -22,7 +27,8 @@ struct FoodHitContenu: View {
             VignetteAliment(repere: hit.repere)
             VStack(alignment: .leading, spacing: 3) {
                 Text(hit.name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -32,7 +38,7 @@ struct FoodHitContenu: View {
                         NutriScoreBadge(lettre: lettre)
                     }
                     Text(hit.sousTitre)
-                        .font(.system(size: 13))
+                        .font(.dsLegende)
                         .foregroundStyle(Color.dsSecondaire)
                         .lineLimit(1)
                 }
@@ -45,6 +51,7 @@ struct FoodHitContenu: View {
 
 /// La vignette 48 pt. Une photo d'emballage se pose sur du BLANC, y compris en
 /// mode sombre : les photos d'Open Food Facts sont détourées sur fond blanc.
+/// Sinon, la pastille neutre du verre (12 %), bordée du liseré blanc.
 struct VignetteAliment: View {
     let repere: RepereAliment
     var cote: CGFloat = 48
@@ -59,14 +66,14 @@ struct VignetteAliment: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.dsTexte.opacity(0.06), lineWidth: 1)
+                .strokeBorder(Color.white.opacity(0.7), lineWidth: 0.5)
         )
         .accessibilityHidden(true)
     }
 
     private var fond: Color {
         if case .photo = repere { return .white }
-        return .dsRemplissage
+        return Verre.remplissage
     }
 
     @ViewBuilder
@@ -105,7 +112,7 @@ struct VignetteAliment: View {
     private func symbole(_ nom: String) -> some View {
         Image(systemName: nom)
             .font(.system(size: cote * 0.36, weight: .medium))
-            .foregroundStyle(Color.dsSecondaire)
+            .foregroundStyle(Verre.iconeNeutre)
     }
 }
 
@@ -140,8 +147,8 @@ struct RechercheSectionTitre: View {
 
     var body: some View {
         Text(titre)
-            .font(.dsLegende.weight(.semibold))
-            .tracking(DSTracking.legende)
+            .font(.dsSousTitreFort)
+            .tracking(DSTracking.sousTitre)
             .foregroundStyle(Color.dsSecondaire)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 6)
@@ -154,9 +161,11 @@ struct RechercheSectionTitre: View {
 /// Facts (base ouverte, licences ODbL et CC BY-SA) : on le dit.
 struct RechercheCreditPhotos: View {
     var body: some View {
+        // Secondaire et non tertiaire : à 30 %, une mention de 12 pt ne se lit
+        // pas sur le verre (le tertiaire reste aux chevrons).
         Text("Photos et données des produits : Open Food Facts")
-            .font(.system(size: 11))
-            .foregroundStyle(Color.dsTertiaire)
+            .font(.system(.caption, design: .default))
+            .foregroundStyle(Color.dsSecondaire)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 4)
             .padding(.horizontal, 2)

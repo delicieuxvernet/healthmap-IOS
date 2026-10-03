@@ -46,13 +46,14 @@ struct PrecisionPicker: View {
                 }
             }
         } label: {
-            // Refonte 23 août 2026 : puce blanche sans ombre ni emoji ; la
-            // sélection se dit par le liseré accent et la coche.
+            // Verre liquide (2 octobre 2026) : puce de verre clair, sans
+            // emoji ; cochée, elle passe au verre vert pâle, avec le liseré
+            // accent et la coche.
             HStack(spacing: 6) {
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.dsAccent)
+                        .foregroundStyle(Color.teinteKiwiTexte)
                         .accessibilityHidden(true)
                 }
                 Text(option.label)
@@ -64,15 +65,15 @@ struct PrecisionPicker: View {
             .padding(.horizontal, Theme.spacingMD)
             .padding(.vertical, Theme.spacingSM)
             .frame(maxWidth: .infinity, minHeight: 44)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.dsCarte)
+            .verre(
+                isSelected ? VerreMatiere.clairActif : VerreMatiere.clair,
+                forme: RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isSelected ? Color.dsAccent : Color.clear, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                    .strokeBorder(isSelected ? Color.dsAccent : Color.clear, lineWidth: 1.5)
             )
-            .foregroundStyle(Color.dsTexte)
+            .foregroundStyle(isSelected ? Color.teinteKiwiTexte : Color.dsTexte)
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel("\(option.label), \(isSelected ? "sélectionné" : "non sélectionné")")

@@ -7,6 +7,9 @@ import SwiftUI
 // où la personne l'a déclarée, et — pour ce qui se change — par où commencer.
 //
 // Gratuit : tout est en clair sauf « Par où commencer », qui est un geste.
+//
+// Verre liquide (2 octobre 2026) : feuille de verre, cartes de verre, la marge
+// en jeu se remplit en 0,8 s comme les barres de poids de la fiche.
 
 /// De quoi ouvrir la feuille depuis la cascade.
 struct CauseOuverte: Identifiable {
@@ -113,7 +116,7 @@ struct CauseApportSheet: View {
                     .padding(.horizontal, 13)
                     .padding(.vertical, 11)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .dsCard(rayon: 12)
+                    .dsCard(rayon: Verre.rayonTuile)
                     .padding(.top, 14)
                 }
             }
@@ -122,14 +125,15 @@ struct CauseApportSheet: View {
             .padding(.bottom, 28)
             .containerRelativeFrame(.horizontal, alignment: .leading)
         }
-        .background(Color.dsFond.ignoresSafeArea())
         .presentationDetents([.fraction(0.72), .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(34)
+        // Feuille de verre : plus d'aplat, le fond et les coins de 38 viennent
+        // du socle.
+        .verreFeuille()
         .onAppear {
             guard !rempli else { return }
             if reduceMotion { rempli = true }
-            else { withAnimation(.easeOut(duration: 0.9).delay(0.3)) { rempli = true } }
+            else { withAnimation(.easeOut(duration: 0.8).delay(0.35)) { rempli = true } }
         }
     }
 
@@ -137,15 +141,15 @@ struct CauseApportSheet: View {
 
     private var enTete: some View {
         HStack(alignment: .top, spacing: 12) {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(cause.teinte)
                 .frame(width: 14, height: 14)
                 .padding(.top, 7)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(contribution.libelle)
-                    .font(.system(.title2, design: .default).weight(.bold))
-                    .tracking(-0.7)
+                    .font(.dsSection)
+                    .tracking(DSTracking.section)
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("\(PointsApport.signe(contribution.delta)) points sur \(possessif)")
@@ -167,14 +171,14 @@ struct CauseApportSheet: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("\(detail.score)")
-                    .font(.system(.title, design: .default).weight(.bold).monospacedDigit())
+                    .font(.system(.title, design: .rounded).weight(.bold).monospacedDigit())
                     .foregroundStyle(Color.dsTexte)
                 Image(systemName: "arrow.right")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.dsTertiaire)
                     .accessibilityHidden(true)
                 Text("\(scoreSans)")
-                    .font(.system(.title, design: .default).weight(.bold).monospacedDigit())
+                    .font(.system(.title, design: .rounded).weight(.bold).monospacedDigit())
                     .foregroundStyle(estUnFrein ? Color.dsAccent : Color.dsSecondaire)
                     .contentTransition(.numericText())
                 Spacer(minLength: 8)
@@ -185,7 +189,7 @@ struct CauseApportSheet: View {
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color(uiColor: .systemGray5))
+                    Capsule().fill(Verre.remplissage)
                     // La marge en jeu : entre le score et ce qu'il serait sans ce facteur.
                     Capsule()
                         .fill(estUnFrein ? Color.dsAccent.opacity(0.35) : cause.teinte.opacity(0.35))

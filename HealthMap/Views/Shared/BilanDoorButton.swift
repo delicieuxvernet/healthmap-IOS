@@ -4,10 +4,9 @@ import SwiftUI
 //
 // Le bouton « porte vers le bilan » introduit par le mode découverte du Bilan
 // (#217, `BilanV7ApportsTeaserCard`) : patron du bouton primaire du
-// questionnaire — aplat kiwi, coins continus, ombre verte douce, sparkles.
-// Extrait ici (V12c) pour que Plan, Suivi et Compléments posent la MÊME porte
-// sans recopier le style. Aucun style nouveau : chaque cote vient du CTA
-// d'origine, validé fondateur (12-13 août).
+// questionnaire. Extrait ici (V12c) pour que Plan, Suivi et Compléments posent
+// la MÊME porte sans recopier le style. Depuis le verre liquide (2 octobre
+// 2026), c'est le verre teinté vert de l'action principale (`.verrePrincipal()`).
 struct BilanDoorButton: View {
     /// Libellé affiché — passer un `BilanDoorButton.Libelle` (séparateur
     /// médian « · », jamais de tiret cadratin : TypographieTests).
@@ -28,7 +27,8 @@ struct BilanDoorButton: View {
             action()
         } label: {
             // Refonte 23 août 2026 : bouton capsule du DS (50 pt, 17 / 600,
-            // aucune ombre, aucune icône décorative).
+            // aucune icône décorative). Verre liquide : l'aplat vert devient
+            // le verre teinté de l'action principale, comme `DSCapsuleButton`.
             Text(title)
                 .font(.dsHeadline)
                 .tracking(DSTracking.corps)
@@ -39,7 +39,7 @@ struct BilanDoorButton: View {
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity)
                 .frame(height: DS.hauteurBouton)
-                .background(Capsule().fill(Color.dsAccent))
+                .verrePrincipal()
                 .contentShape(Capsule())
         }
         .buttonStyle(.dsPress)
@@ -58,6 +58,8 @@ extension BilanDoorButton {
         /// Journal avant questionnaire (refonte 23 août 2026) : la porte de
         /// la carte « On ne connaît pas encore tes besoins ».
         static let journal = "Répondre au questionnaire"
+        /// Journal, bilan commencé et pas terminé : on reprend où on en était.
+        static let journalReprise = "Reprendre"
         /// Plan (couronne radiale en mode découverte).
         static let plan = "Construire MON plan · bilan 3 min"
         /// Suivi (sous les carrousels d'exemple).

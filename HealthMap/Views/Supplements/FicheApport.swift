@@ -20,6 +20,11 @@ import SwiftUI
 // La fiche n'invente rien et ne va rien chercher : l'onglet assemble son
 // contexte depuis des sources existantes (registre, bilan v2, moteur de
 // compléments, catalogue) et le lui donne.
+//
+// Verre liquide (2 octobre 2026) : la feuille est en verre (`.verreFeuille()`),
+// la tête devient une carte (anneau de 112 à gauche, le nom et la phrase à
+// lire en premier à droite), chaque frein de la cascade porte sa barre de
+// poids qui se remplit en 0,8 s, et les lignes arrivent l'une après l'autre.
 
 /// Tout ce que la fiche affiche.
 struct FicheApportContexte: Identifiable {
@@ -108,17 +113,19 @@ struct FicheBloc<Contenu: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(titre)
-                    .font(.dsLegende.weight(.semibold))
-                    .tracking(DSTracking.legende)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 if let note {
                     Text(note)
-                        .font(.system(size: 12))
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
                         .foregroundStyle(Color.dsSecondaire)
                 }
             }
-            .padding(.horizontal, 2)
+            .padding(.horizontal, 4)
             .accessibilityAddTraits(.isHeader)
 
             contenu()
@@ -198,14 +205,13 @@ struct FicheApportSheet: View {
             }
             .padding(.horizontal, DS.marge)
             .padding(.top, 8)
-            .padding(.bottom, 28)
+            .padding(.bottom, 40)
             .containerRelativeFrame(.horizontal, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        .background(Color.dsFond)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(34)
+        .verreFeuille()
         .sheet(isPresented: $montreDetailAssiette) {
             if let nutrimentDetail {
                 // Premium : la fiche observe elle-même SubscriptionService.
@@ -214,40 +220,59 @@ struct FicheApportSheet: View {
         }
     }
 
-    // MARK: En-tête : anneau 148 + nom
+    // MARK: En-tête : carte anneau 112 + nom + la phrase à lire en premier
+
+    /// Voie compléments : le constat accordé du registre (« Ta vitamine D est
+    /// un peu juste. Première cause : … »). Voie assiette : l'apport que
+    /// l'aliment sert.
+    private var phrase: String {
+        switch contexte.voie {
+        case .complements:
+            return LectureApport.verdict(id: contexte.id, nom: contexte.titre, detail: detail)
+        case .assiette:
+            return contexte.sousTitre
+        }
+    }
 
     private var enTete: some View {
-        VStack(spacing: 2) {
+        HStack(alignment: .center, spacing: 14) {
             AnneauDeCause(
                 parts: detail.parts,
                 score: detail.score,
                 couleur: contexte.couleur,
-                taille: .fiche,
+                taille: .heros,
                 surligne: surligne
             )
-            HStack(spacing: 8) {
-                Image(systemName: contexte.symbole)
-                    .font(.system(size: 20, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(contexte.couleur)
-                    .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(contexte.titre)
-                    .font(.system(size: 24, weight: .bold))
-                    .tracking(-0.7)
+                    .font(.dsSection)
+                    .tracking(DSTracking.section)
                     .foregroundStyle(Color.dsTexte)
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
+                Text(phrase)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineSpacing(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                if contexte.voie == .complements {
+                    Text(contexte.sousTitre)
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .padding(.top, 10)
-            Text(contexte.sousTitre)
-                .font(.dsSousTitre)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, -8)
+        .padding(DS.paddingCarte)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .padding(.top, 8)
+        .kiwiEntrance(0)
         .accessibilityElement(children: .combine)
     }
 
@@ -271,7 +296,8 @@ struct FicheApportSheet: View {
     private var cascadeCarte: some View {
         VStack(alignment: .leading, spacing: 8) {
             CascadeApport(detail: detail, couleur: contexte.couleur,
-                          apportAvecArticle: contexte.apportAvecArticle, surligne: $surligne)
+                          apportAvecArticle: contexte.apportAvecArticle,
+                          barres: true, surligne: $surligne)
                 .padding(.horizontal, DS.paddingCarte)
                 .padding(.vertical, 4)
                 .dsCard()
@@ -292,7 +318,7 @@ struct FicheApportSheet: View {
                 .padding(.horizontal, 13)
                 .padding(.vertical, 11)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .dsCard(rayon: 12)
+                .dsCard(rayon: Verre.rayonTuile)
             }
         }
     }
@@ -320,7 +346,7 @@ struct FicheApportSheet: View {
                         }
                         VStack(alignment: .leading, spacing: 2) {
                             Text(spec.cle)
-                                .font(.system(size: 11))
+                                .font(.system(.caption, design: .default))
                                 .foregroundStyle(Color.dsSecondaire)
                             Text(spec.valeur)
                                 .font(.dsSousTitreFort)
@@ -339,12 +365,24 @@ struct FicheApportSheet: View {
                 if !contexte.specs.isEmpty {
                     DSSeparator(retrait: 0).padding(.top, 12)
                 }
-                Text(note)
-                    .font(.dsSousTitre)
-                    .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color(uiColor: .secondaryLabel).opacity(0.9))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, contexte.specs.isEmpty ? 0 : 12)
+                // Le conseil : une ampoule à la place du numéro, comme dans
+                // toute liste de gestes.
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "lightbulb")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Color.dsSecondaire)
+                        .frame(width: 30, height: 30)
+                        .accessibilityHidden(true)
+                    Text(note)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsTexte)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 4)
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, contexte.specs.isEmpty ? 0 : 12)
             }
             if contexte.voie == .assiette, nutrimentDetail != nil {
                 DSSeparator(retrait: 0).padding(.top, 12)
@@ -430,12 +468,7 @@ struct FicheApportSheet: View {
             ForEach(Array(contexte.alternatives.enumerated()), id: \.element.id) { index, alt in
                 if index > 0 { DSSeparator(retrait: 0) }
                 HStack(spacing: 12) {
-                    Image(systemName: alt.symbole)
-                        .font(.system(size: 18, weight: .medium))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .frame(width: 22)
-                        .accessibilityHidden(true)
+                    VerrePastilleIcone(symbole: alt.symbole, teinte: contexte.couleur, taille: 36, tailleIcone: 17)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(alt.nom)
                             .font(.dsSousTitre)
@@ -498,12 +531,19 @@ struct CascadeApport: View {
     /// « le fer », « la vitamine D » : donné, chaque cause s'ouvre au toucher
     /// (`CauseApportSheet`). `nil` → la ligne ne fait qu'allumer sa part.
     var apportAvecArticle: String? = nil
+    /// Chaque frein porte sa barre de poids (relative au plus lourd), qui se
+    /// remplit en 0,8 s, et les lignes arrivent en cascade : la fiche des
+    /// Compléments, où ce bloc est celui qu'on lit pour comprendre.
+    var barres: Bool = false
     /// Part de l'anneau allumée (`PartAnneau.id`).
     @Binding var surligne: String?
     /// Ligne touchée. Distincte de `surligne` : plusieurs appuis allument la
     /// même part couverte, une seule ligne doit paraître sélectionnée.
     @State private var ligneActive: String?
     @State private var causeOuverte: CauseOuverte?
+    /// Les lignes sont arrivées, les barres sont pleines.
+    @State private var installe = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private struct Ligne: Identifiable {
         let id: String
@@ -516,9 +556,13 @@ struct CascadeApport: View {
         var contourSeul = false
         /// Le facteur derrière la ligne (absent pour le départ et le bornage).
         var contribution: ContributionApport? = nil
+        /// Longueur de sa barre, de 0 à 1 : sa part du frein le plus lourd.
+        /// `nil` pour tout ce qui n'est pas un frein.
+        var poids: Double? = nil
     }
 
     private var lignes: [Ligne] {
+        let plusLourd = Double(abs(detail.freins.first?.delta ?? 0))
         var sortie: [Ligne] = [
             Ligne(
                 id: "depart",
@@ -537,7 +581,8 @@ struct CascadeApport: View {
                 delta: PointsApport.signe(frein.delta),
                 teinte: AnneauTeintes.cause(rang: rang),
                 cible: frein.id,
-                contribution: frein
+                contribution: frein,
+                poids: plusLourd > 0 ? Double(abs(frein.delta)) / plusLourd : nil
             ))
         }
         for appui in detail.appuis {
@@ -569,7 +614,8 @@ struct CascadeApport: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(lignes.enumerated()), id: \.element.id) { index, ligne in
                 if index > 0 { DSSeparator(retrait: 0) }
-                ligneVue(ligne)
+                ligneVue(ligne, rang: index)
+                    .verreCascade(installe || !barres, delai: 0.2 + Double(min(index, 6)) * 0.07, decalage: 10)
             }
 
             DSSeparator(retrait: 0)
@@ -582,7 +628,7 @@ struct CascadeApport: View {
                     .foregroundStyle(Color.dsTexte)
                 Spacer(minLength: 8)
                 Text(DS.entier(detail.score))
-                    .font(.system(size: 20, weight: .bold).monospacedDigit())
+                    .font(.system(.title3, design: .rounded).weight(.bold).monospacedDigit())
                     .tracking(-0.5)
                     .foregroundStyle(Color.dsTexte)
             }
@@ -600,13 +646,39 @@ struct CascadeApport: View {
                     .padding(.vertical, 12)
             }
         }
+        .onAppear {
+            guard !installe else { return }
+            installe = true
+        }
         .sheet(item: $causeOuverte) { cause in
             CauseApportSheet(cause: cause, detail: detail,
                              apportAvecArticle: apportAvecArticle ?? "cet apport", couleur: couleur)
         }
     }
 
-    private func ligneVue(_ ligne: Ligne) -> some View {
+    /// La barre de poids d'un frein : 5 pt, à la teinte de sa part de l'anneau.
+    /// Même courbe que la fiche du Bilan : elle dépasse à peine sa longueur,
+    /// puis s'y pose. La piste rogne ce qui déborde de la barre la plus longue.
+    private func barre(poids: Double, teinte: Color, rang: Int) -> some View {
+        let remplie = installe || reduceMotion
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Verre.remplissage)
+                Capsule()
+                    .fill(teinte)
+                    .frame(width: max(0, geo.size.width * CGFloat(remplie ? poids : 0)))
+            }
+        }
+        .frame(height: 5)
+        .clipShape(Capsule())
+        .animation(
+            reduceMotion ? nil : Animation.timingCurve(0.3, 1.1, 0.4, 1, duration: 0.8).delay(0.35 + Double(min(rang, 6)) * 0.08),
+            value: installe
+        )
+        .accessibilityHidden(true)
+    }
+
+    private func ligneVue(_ ligne: Ligne, rang: Int) -> some View {
         let actif = ligneActive == ligne.id
         let ouvrable = apportAvecArticle != nil && ligne.contribution != nil
         return Button {
@@ -624,10 +696,10 @@ struct CascadeApport: View {
             }
         } label: {
             HStack(alignment: .center, spacing: 12) {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(ligne.teinte ?? Color.clear)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
                             .strokeBorder(Color(uiColor: .systemGray3), lineWidth: ligne.contourSeul ? 1.5 : 0)
                     )
                     .frame(width: 10, height: 10)
@@ -645,8 +717,14 @@ struct CascadeApport: View {
                         .foregroundStyle(Color.dsSecondaire)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
+                    if barres, let poids = ligne.poids {
+                        barre(poids: poids, teinte: ligne.teinte ?? couleur, rang: rang)
+                            .padding(.top, 7)
+                    }
                 }
-                Spacer(minLength: 8)
+                // La colonne prend toute la largeur libre : la barre de poids
+                // court jusqu'au chiffre.
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Text(ligne.delta)
                     .font(.dsSousTitreFort.monospacedDigit())
                     .foregroundStyle(Color.dsTexte)
@@ -655,9 +733,10 @@ struct CascadeApport: View {
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
             // La surbrillance déborde du contenu jusqu'aux bords de la carte.
+            // Translucide : un aplat opaque trouerait le verre.
             .background(
                 Rectangle()
-                    .fill(actif ? Color.dsFond : Color.clear)
+                    .fill(actif ? Verre.remplissage : Color.clear)
                     .padding(.horizontal, -DS.paddingCarte)
             )
             .contentShape(Rectangle())

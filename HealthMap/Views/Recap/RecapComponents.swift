@@ -188,6 +188,9 @@ extension View {
 /// Le contenu couvert n'est pas rendu du tout — on affiche un substitut. Un
 /// flou visuel par-dessus le vrai texte reste lisible par VoiceOver, ce qui
 /// rendrait le verrou contournable au lecteur d'écran.
+///
+/// Verre liquide : la surface est la carte de verre du DS (pas de `Material` :
+/// rien ne défile dessous que le fond, déjà flou), sans cerclage vert.
 struct RecapVoile<Substitut: View>: View {
     let titre: String
     @ViewBuilder var substitut: Substitut
@@ -198,11 +201,7 @@ struct RecapVoile<Substitut: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.spacingMD)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.dsAccent.opacity(0.22), lineWidth: 1)
-        )
+        .dsCard()
         .overlay(alignment: .topTrailing) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 12, weight: .semibold))

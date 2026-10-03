@@ -2,15 +2,20 @@ import SwiftUI
 
 /// La fonction phare de Kiwio : on dicte son repas, l'app compte les calories.
 ///
-/// L'écoute vit hors de cette feuille (la bulle d'`EcouteDictee.swift`). Ici,
-/// trois états, animés selon la maquette « Motion » du 1er octobre 2026 :
-///   1. analyse  — transcription du vocal, relue mot à mot du flou au net,
-///                 puis « Je reconnais tes aliments… »
-///   2. résultat — lignes compactes posées en cascade, UNE seule carte
-///                 déployée à la fois, total qui compte, « Ce repas t'apporte »
-///                 en barres, CTA bloqué tant qu'il manque une quantité.
-///   3. ajouté   — la célébration (`CelebrationAjout`), puis la feuille
-///                 redescend d'elle-même.
+/// L'écoute ET le calcul vivent hors de cette feuille (la bulle
+/// d'`EcouteDictee.swift`) : une dictée y est transcrite puis chiffrée, et la
+/// feuille ne monte qu'avec le résultat. Maquette « Motion v3 - Verre liquide »
+/// du 2 octobre 2026 : une feuille de verre DÉTACHÉE des bords (marges de 8,
+/// rayon 44), posée en bas, à la taille de ce qu'elle montre.
+///   1. saisie   — « Écrire » du Journal : un champ, clavier levé.
+///   2. analyse  — après une saisie au clavier ou une relance seulement : la
+///                 dictée, elle, est chiffrée sous la bulle.
+///   3. résultat — « Ton déjeuner », lignes posées en cascade, UNE seule
+///                 déployée à la fois, total qui compte, étiquettes de ce que
+///                 le repas apporte, action bloquée tant qu'il manque une
+///                 quantité.
+/// À l'ajout, la feuille redescend aussitôt : c'est la capsule du haut de
+/// l'écran (`PastilleConfirmation`) qui confirme.
 ///
 /// Cette vue ne calcule AUCUNE valeur nutritionnelle de son cru : tout part des
 /// valeurs pour 100 g renvoyées par l'edge function (base CIQUAL/OpenFoodFacts),
@@ -27,21 +32,25 @@ struct VoiceMealSheet: View {
     /// ICI et non sur la page : l'app ignore la zone du clavier à sa racine, un
     /// champ posé sur la page finissait caché derrière lui, sans sortie.
     var saisieAuClavier = false
-    /// Cibles du jour (profil) : les barres de « Ce repas t'apporte » disent
-    /// quelle part de la journée ce repas couvre. `nil` = les grammes seuls,
-    /// sans barre : jamais d'objectif inventé.
+    /// Cibles du jour (profil) : les étiquettes de « ce que le repas apporte »
+    /// disent à VoiceOver quelle part de la journée ce repas couvre. `nil` =
+    /// les grammes seuls : jamais d'objectif inventé.
     var cibleProteines: Int? = nil
     var cibleGlucides: Int? = nil
     var cibleLipides: Int? = nil
     /// Ce que ce repas change aujourd'hui (apports, série), calculé par
     /// l'appelant sur le journal déjà chargé. `nil` = rien d'honnête à dire :
-    /// la célébration se contente alors de confirmer l'ajout.
+    /// la confirmation se contente alors de dire que c'est compté.
     var gratification: ((MealJournalService.MealRecord) -> GratificationRepas?)? = nil
+    /// La dictée, déjà transcrite et chiffrée sous la bulle : la feuille monte
+    /// directement sur son résultat (ou sur l'échec). `nil` : la feuille fait
+    /// le travail elle-même (saisie au clavier).
+    var depart: Depart? = nil
     /// Capture audio possédée par l'appelant. Elle est injectée — et non créée
     /// ici — pour que la dictée puisse DÉMARRER sur l'accueil, le doigt posé sur
     /// « Dicte ton repas », et se terminer dans cette feuille.
     @ObservedObject var speech: SpeechCaptureService
-    /// Appelé après enregistrement, avant que la feuille ne fête puis se ferme.
+    /// Appelé après enregistrement, juste avant que la feuille ne redescende.
     var onAdded: (Ajout) -> Void
 
     /// Ce que la feuille vient d'enregistrer.
@@ -49,11 +58,24 @@ struct VoiceMealSheet: View {
         let nombre: Int
         let kcal: Int
         let creneau: MealJournalService.MealSlot
+        /// « Fer et vitamine C en hausse » : ce que la capsule de confirmation
+        /// dit sous son titre.
+        let sousLigne: String
+    }
+
+    /// Ce qu'une dictée a donné avant que la feuille ne monte.
+    enum Depart {
+        case analyse(VoiceMealService.Analysis, transcript: String)
+        case echec(message: String, transcript: String)
     }
 
     @Environment(\.dismiss) private var dismiss
+    /// L'étape « vérifier » du tutoriel pose sa bulle sous la feuille.
+    @ObservedObject private var tutoriel = TutorielService.partage
 
     @State private var phase: Phase = .analyzing
+    /// `depart` a été appliqué (une fois, à l'apparition).
+    @State private var amorce = false
     @State private var texteEcrit = ""
     @FocusState private var champActif: Bool
     @State private var items: [VoiceMealService.Item] = []
@@ -66,8 +88,8 @@ struct VoiceMealSheet: View {
     @State private var unites: [Int: UnitPortionCatalog.Unite] = [:]
     @State private var tailles: [Int: Int] = [:]
     @State private var enGrammes: Set<Int> = []
-    /// Index de la seule carte déployée. Le design impose « une seule question
-    /// ouverte à la fois » : deux cartes ouvertes, et on ne sait plus à laquelle
+    /// Index de la seule ligne déployée. Le design impose « une seule question
+    /// ouverte à la fois » : deux lignes ouvertes, et on ne sait plus à laquelle
     /// répondre.
     @State private var deployee: Int?
     @State private var quotedTranscript = ""
@@ -95,73 +117,63 @@ struct VoiceMealSheet: View {
 
     // MARK: Révélation des aliments (présentation uniquement)
     //
-    // Ce que la dictée vient de produire mérite d'être VU arriver : les
-    // aliments se posent un par un (~0,25 s d'écart) et le total monte jusqu'à
-    // sa valeur. Aucune donnée n'est touchée — `items`, `grams` et `totaux`
-    // sont exactement ceux d'avant ; seul l'affichage est différé.
+    // Ce que la dictée vient de produire mérite d'être VU arriver : les lignes
+    // remontent en cascade, leurs kcal et le total comptent jusqu'à leur
+    // valeur, les étiquettes surgissent. Aucune donnée n'est touchée —
+    // `items`, `grams` et `totaux` sont exactement ceux d'avant ; seul
+    // l'affichage est différé.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Nombre d'aliments déjà posés à l'écran pendant la révélation.
-    @State private var revelees = 0
-    /// Total affiché pendant la montée du compteur.
-    @State private var kcalAffiche = 0
-    /// Vrai tant que le compteur monte : après quoi c'est le vrai total qui
-    /// s'affiche, y compris quand l'utilisateur ajuste une quantité.
-    @State private var compteurActif = false
+    /// Les lignes sont posées : la cascade se joue.
+    @State private var poses = false
     @State private var revelation: Task<Void, Never>?
-    /// Les aliments sont posés : les barres de « Ce repas t'apporte » se
-    /// remplissent, en cascade.
-    @State private var apportsPoses = false
-    /// Le repas est enregistré : de quoi le fêter dans la feuille.
-    @State private var fete: Fete?
 
     private let journal = MealJournalService.shared
 
     // Plus de phase « écoute » ici : depuis le 2 août 2026, l'enregistrement
-    // vit ENTIÈREMENT sur l'accueil (maintien du doigt sur « Dicte ton
-    // repas », bulle façon WhatsApp). La feuille ne s'ouvre qu'avec un audio
-    // déjà capté et enchaîne directement transcription → analyse. L'ancien
-    // mode écoute (le « popup » ouvert par un appui simple) est supprimé.
-    // `.ajoute` (1er octobre 2026) : le repas est enregistré, la feuille le
-    // fête deux secondes puis redescend d'elle-même.
-    enum Phase { case saisie, analyzing, results, failed, ajoute }
-
-    /// La célébration d'un ajout : où il a été rangé, et ce qu'il change.
-    struct Fete: Equatable {
-        let titre: String
-        let phrase: String
-        let etiquettes: [CelebrationAjout.Etiquette]
-    }
+    // vit ENTIÈREMENT sur l'accueil. Depuis le 2 octobre 2026, la
+    // transcription et l'analyse d'une dictée aussi (sous la bulle) : la
+    // feuille ne s'ouvre qu'avec leur résultat. `.analyzing` ne sert plus
+    // qu'à la saisie au clavier et à la relance après un échec. La phase
+    // « ajouté » (célébration dans la feuille, 1er octobre) a disparu : la
+    // feuille redescend, la capsule du haut de l'écran confirme.
+    enum Phase { case saisie, analyzing, results, failed }
 
     struct RemplacementCible: Identifiable {
         let index: Int
         var id: Int { index }
     }
 
+    /// Marge entre la feuille et les bords de l'écran.
+    private static let marge: CGFloat = 8
+    /// Marge latérale du contenu, dans la feuille.
+    private static let margeInterieure: CGFloat = 20
+
     // MARK: - Corps
 
     var body: some View {
-        Group {
-            switch phaseAffichee {
-            case .saisie:    saisieView
-            case .analyzing: analyzingView
-            case .results:   resultsView
-            case .failed:    errorView
-            case .ajoute:    celebrationView
+        VStack(spacing: 8) {
+            plaque
+            // Étape « vérifier » du tutoriel : la bulle se pose sous la
+            // feuille, sans voile — la seule question posée est déjà mise en
+            // avant, et le bouton d'enregistrement reste accessible.
+            if bulleDuTutoriel {
+                TutorielBulleVerifier(service: tutoriel)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color.dsFond.ignoresSafeArea())
-        // Étape « vérifier » du tutoriel : la bulle se pose sous la liste,
-        // sans voile — la seule question posée est déjà mise en avant, et le
-        // bouton d'enregistrement doit rester accessible (le contenu défile
-        // au-dessus grâce au safeAreaInset).
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if phase == .results {
-                TutorielBulleVerifier(service: TutorielService.partage)
-            }
-        }
-        .presentationDetents(hauteurs)
-        .presentationDragIndicator(.visible)
+        .padding(.horizontal, bulleDuTutoriel ? 0 : Self.marge)
+        .padding(.top, 6)
+        .padding(.bottom, bulleDuTutoriel ? 0 : Self.marge)
+        // La feuille se pose en bas, à la taille de ce qu'elle montre.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        // Au-dessus d'elle, la présentation est vide : presque rien, mais
+        // touchable, pour que le glissé qui referme parte aussi de là.
+        .background(Color.black.opacity(0.001))
+        .ignoresSafeArea(.container, edges: bordsIgnores)
+        // La présentation elle-même est transparente et sans poignée : la
+        // feuille de verre dessine la sienne.
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
+        .presentationBackground(Color.clear)
         .sheet(item: $remplacementPour) { cible in
             RemplacementAlimentSheet(dit: libelleDit(cible.index)) { hit in
                 remplacementPour = nil
@@ -169,7 +181,9 @@ struct VoiceMealSheet: View {
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+            .verreFeuille()
         }
+        .onAppear { amorcer() }
         .task { await demarrer() }
         .onDisappear {
             revelation?.cancel()
@@ -181,19 +195,68 @@ struct VoiceMealSheet: View {
         }
     }
 
-    private var hauteurs: Set<PresentationDetent> {
-        switch phaseAffichee {
-        // Assez haut pour ce qui vient d'être dit, relu mot à mot.
-        case .analyzing: return [.height(340)]
-        case .ajoute: return [.height(430)]
-        case .saisie, .results, .failed: return [.large]
-        }
+    /// La bulle du tutoriel est à l'écran, sous la feuille.
+    private var bulleDuTutoriel: Bool {
+        phaseAffichee == .results && tutoriel.etape == .verifier
+    }
+
+    /// La feuille descend jusqu'à 8 pt du bord bas de l'écran. Avec la bulle
+    /// du tutoriel dessous, elle reste dans la zone sûre.
+    private var bordsIgnores: Edge.Set {
+        bulleDuTutoriel ? [] : .bottom
     }
 
     /// Saisie au clavier : tant que rien n'a été envoyé, la feuille montre le
     /// champ — dès sa première image, sans passer par « analyse en cours ».
+    /// Dictée : dès sa première image aussi, elle montre ce que le calcul a
+    /// donné.
     private var phaseAffichee: Phase {
-        saisieAuClavier && phase == .analyzing && dernierTranscript.isEmpty ? .saisie : phase
+        if !amorce, let depart {
+            switch depart {
+            case .analyse: return .results
+            case .echec: return .failed
+            }
+        }
+        return saisieAuClavier && phase == .analyzing && dernierTranscript.isEmpty ? .saisie : phase
+    }
+
+    // MARK: - La feuille de verre
+
+    private var plaque: some View {
+        VStack(spacing: 0) {
+            poignee
+            contenuDePhase
+        }
+        .frame(maxWidth: .infinity)
+        .verreFeuilleDetachee()
+        .padding(.horizontal, bulleDuTutoriel ? Self.marge : 0)
+        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: phaseAffichee)
+    }
+
+    private var poignee: some View {
+        Capsule(style: .continuous)
+            .fill(Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.25))
+            .frame(width: 36, height: 5)
+            .padding(.top, 12)
+            .frame(maxWidth: .infinity)
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var contenuDePhase: some View {
+        switch phaseAffichee {
+        case .saisie:    saisieView
+        case .analyzing: analyzingView
+        case .results:   resultsView
+        case .failed:    errorView
+        }
+    }
+
+    /// Referme la feuille. Le voile de la dictée s'éteint avec elle, sans
+    /// attendre qu'elle ait fini de descendre.
+    private func fermer() {
+        EcouteCentre.partage.fermer()
+        dismiss()
     }
 
     // MARK: - 1. Saisie au clavier
@@ -207,8 +270,8 @@ struct VoiceMealSheet: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Écris ton repas")
-                        .font(.system(.title2, design: .default).weight(.bold))
-                        .tracking(-0.7)
+                        .font(.system(size: 24, weight: .bold))
+                        .tracking(-0.6)
                         .foregroundStyle(Color.dsTexte)
                     Text("Comme tu le dirais : on identifie les aliments et les quantités.")
                         .font(.dsSousTitre)
@@ -217,7 +280,7 @@ struct VoiceMealSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                DSCloseButton { dismiss() }
+                DSCloseButton { fermer() }
             }
 
             TextField("Ex. : 150 g de poulet, du riz, une orange", text: $texteEcrit, axis: .vertical)
@@ -239,10 +302,13 @@ struct VoiceMealSheet: View {
             .padding(.top, 14)
             .accessibilityIdentifier("journal.texte.analyser")
 
+            // Le clavier est levé : la feuille prend toute la hauteur, le
+            // champ reste en haut.
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, DS.marge)
-        .padding(.top, 22)
+        .padding(.horizontal, Self.margeInterieure)
+        .padding(.top, 14)
+        .padding(.bottom, 16)
         .onAppear { champActif = true }
     }
 
@@ -257,134 +323,287 @@ struct VoiceMealSheet: View {
 
     // MARK: - 2. Analyse
 
-    /// La bulle d'écoute s'est contractée en indicateur de calcul et a disparu
-    /// sous cette feuille : le pépin qui tourne prend son relais. Dès que la
-    /// dictée est transcrite, ce qui a été dit arrive mot à mot, du flou au
-    /// net — la preuve qu'on a été entendu, pendant que le serveur chiffre.
+    /// Seulement après une saisie au clavier, ou une relance : le pépin qui
+    /// tourne, et ce qui a été dit quand il y a une transcription à relire.
     private var analyzingView: some View {
         VStack(spacing: 12) {
-            Spacer(minLength: 0)
             KiwiLoader(size: 60)
-            Text("Je reconnais tes aliments…")
-                .font(.system(size: 18, weight: .bold))
+            Text("Kiwio calcule tes apports…")
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
                 .foregroundStyle(Color.dsTexte)
             if !saisieAuClavier, !dernierTranscript.isEmpty {
                 MotsQuiArrivent(texte: dernierTranscript)
                     .padding(.top, 2)
             } else {
                 Text("kcal, macros et micros compris.")
-                    .font(.footnote)
+                    .font(.dsLegende)
                     .foregroundStyle(Color.dsSecondaire)
             }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20)
-    }
-
-    // MARK: - 4. L'ajout se fête
-
-    @ViewBuilder
-    private var celebrationView: some View {
-        if let fete {
-            CelebrationAjout(titre: fete.titre, phrase: fete.phrase, etiquettes: fete.etiquettes) {
-                dismiss()
-            }
-        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Self.margeInterieure)
+        .padding(.top, 22)
+        .padding(.bottom, 30)
     }
 
     // MARK: - 3. Résultat
 
+    /// À la taille de son contenu tant qu'il tient à l'écran ; au-delà (une
+    /// longue dictée, une ligne déployée), il défile dans la feuille.
     private var resultsView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Voici ce que j'ai compris")
-                    .font(Theme.sheetTitleFont)
-                    .foregroundStyle(Color.dsTexte)
-                    .padding(.top, 18)
-
-                // Ce qui a été dit, avec les aliments reconnus en vert.
-                Text(transcriptSurligne)
-                    .font(.system(size: 14))
-                    .italic()
-                    .foregroundStyle(Color.dsSecondaire)
-                    .accessibilityLabel(quotedTranscript)
-
-                ForEach(itemsAffiches) { item in
-                    VoiceItemRow(
-                        item: item,
-                        grams: grams[item.index],
-                        unite: enGrammes.contains(item.index) ? nil : unites[item.index],
-                        taille: tailles[item.index],
-                        peutBasculer: unites[item.index] != nil,
-                        deployee: deployee == item.index,
-                        aVerifier: aVerifier(item),
-                        remplacementEnCours: remplacementEnCours == item.index,
-                        onGarder: { garder(item.index) },
-                        onRemplacer: { id in Task { await remplacer(item.index, par: id) } },
-                        onChercher: { remplacementPour = RemplacementCible(index: item.index) },
-                        onTap: { basculer(item.index) },
-                        onPick: { choisir($0, pour: item.index) },
-                        onAjuster: { ajuster($0, pour: item.index) },
-                        onTaille: { choisirTaille($0, pour: item.index) },
-                        onCompter: { compter($0, pour: item.index) },
-                        onBasculerUnite: { basculerUnite(item.index) },
-                        onRemove: {
-                            removed.insert(item.index)
-                            if deployee == item.index { deployee = prochainManquant() }
-                        }
-                    )
-                    .transition(.opacity.combined(with: .offset(y: 14)))
-                }
-
-                if !estimatedNames.isEmpty {
-                    bandeau(
-                        estimatedNames.count == 1
-                        ? "« \(estimatedNames[0]) » n'a pas de fiche exacte : les valeurs sont estimées. C'est bien compté dans ta journée."
-                        : "\(estimatedNames.count) aliments n'ont pas de fiche exacte : leurs valeurs sont estimées. Ils sont bien comptés.",
-                        couleur: Color.dsSecondaire,
-                        fond: Color.dsRemplissage
-                    )
-                }
-
-                if !ignoredNames.isEmpty {
-                    bandeau(
-                        ignoredNames.count == 1
-                        ? "Je n'arrive pas à chiffrer « \(ignoredNames[0]) ». Retire-le ou reformule."
-                        : "Je n'arrive pas à chiffrer \(ignoredNames.count) aliments. Retire-les ou reformule.",
-                        couleur: Kiwio.ambre,
-                        fond: Kiwio.ambreFond
-                    )
-                }
-
-                if alimentsIgnoresServeur > 0 {
-                    bandeau(
-                        alimentsIgnoresServeur == 1
-                        ? "Ta dictée était très riche : 1 aliment n'a pas pu être analysé. Redicte-le dans un second repas."
-                        : "Ta dictée était très riche : \(alimentsIgnoresServeur) aliments n'ont pas pu être analysés. Redicte-les dans un second repas.",
-                        couleur: Kiwio.ambre,
-                        fond: Kiwio.ambreFond
-                    )
-                }
-
-                choixRepas
-                totalBlock
-                ctaBlock
+        ViewThatFits(in: .vertical) {
+            resultatsContenu
+            ScrollView {
+                resultatsContenu
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
         }
     }
 
-    /// Choix du repas, en FIN d'écran, juste avant d'ajouter : c'est la dernière
-    /// décision, pas la première. Pré-choisi seulement si le vocal l'a dit.
+    private var resultatsContenu: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            enTeteResultats
+            citation
+            lignesAliments
+            avertissements
+            totalLigne
+            etiquettesApports
+            choixRepas
+            ctaBlock
+        }
+        .padding(.horizontal, Self.margeInterieure)
+        .padding(.top, 14)
+        .padding(.bottom, 16)
+    }
+
+    // MARK: Le titre
+
+    /// « Ton déjeuner » : le repas choisi. Tant qu'il ne l'est pas, « Ton repas ».
+    private var titreRepas: String {
+        guard let slot else { return "Ton repas" }
+        switch slot {
+        case .breakfast: return "Ton petit-déjeuner"
+        case .lunch: return "Ton déjeuner"
+        case .dinner: return "Ton dîner"
+        case .snack: return "Ton encas"
+        }
+    }
+
+    private var compteAliments: String {
+        let nombre = visibleItems.count
+        if nombre == 0 { return "Aucun aliment" }
+        return nombre > 1 ? "\(nombre) aliments reconnus" : "1 aliment reconnu"
+    }
+
+    private var enTeteResultats: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(titreRepas)
+                .font(.system(size: 24, weight: .bold))
+                .tracking(-0.6)
+                .foregroundStyle(Color.dsTexte)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Spacer(minLength: 8)
+            Text(compteAliments)
+                .font(.dsSousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    /// Ce qui a été dit, avec les aliments reconnus en vert.
+    @ViewBuilder
+    private var citation: some View {
+        if !quotedTranscript.isEmpty {
+            Text(transcriptSurligne)
+                .font(.dsLegende)
+                .foregroundStyle(Color.dsSecondaire)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 6)
+                .accessibilityLabel(quotedTranscript)
+        }
+    }
+
+    /// La citation de la dictée, les aliments reconnus passés en vert.
+    private var transcriptSurligne: AttributedString {
+        var texte = AttributedString("« \(quotedTranscript) »")
+        for item in visibleItems {
+            guard let dit = item.libelle, dit.count >= 2,
+                  let plage = texte.range(of: dit, options: [.caseInsensitive, .diacriticInsensitive]) else { continue }
+            texte[plage].swiftUI.foregroundColor = Color.teinteKiwiTexte
+        }
+        return texte
+    }
+
+    // MARK: Les lignes
+
+    private var lignesAliments: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { rang, item in
+                ligne(item, rang: rang)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    /// Une ligne d'aliment. Elle remonte en cascade : 0,15 s, puis 0,09 s
+    /// d'écart, plafonné pour qu'une longue dictée n'attende pas.
+    private func ligne(_ item: VoiceMealService.Item, rang: Int) -> some View {
+        VoiceItemRow(
+            item: item,
+            grams: grams[item.index],
+            unite: enGrammes.contains(item.index) ? nil : unites[item.index],
+            taille: tailles[item.index],
+            peutBasculer: unites[item.index] != nil,
+            deployee: deployee == item.index,
+            aVerifier: aVerifier(item),
+            remplacementEnCours: remplacementEnCours == item.index,
+            posee: poses,
+            teinte: Self.teinte(pour: item),
+            onGarder: { garder(item.index) },
+            onRemplacer: { id in Task { await remplacer(item.index, par: id) } },
+            onChercher: { remplacementPour = RemplacementCible(index: item.index) },
+            onTap: { basculer(item.index) },
+            onPick: { choisir($0, pour: item.index) },
+            onAjuster: { ajuster($0, pour: item.index) },
+            onTaille: { choisirTaille($0, pour: item.index) },
+            onCompter: { compter($0, pour: item.index) },
+            onBasculerUnite: { basculerUnite(item.index) },
+            onRemove: {
+                removed.insert(item.index)
+                if deployee == item.index { deployee = prochainManquant() }
+            }
+        )
+        .verreCascade(poses, delai: 0.15 + Double(min(rang, 8)) * 0.09, decalage: 14)
+    }
+
+    // MARK: Les avertissements
+
+    @ViewBuilder
+    private var avertissements: some View {
+        if !estimatedNames.isEmpty {
+            bandeau(
+                estimatedNames.count == 1
+                ? "« \(estimatedNames[0]) » n'a pas de fiche exacte : les valeurs sont estimées. C'est bien compté dans ta journée."
+                : "\(estimatedNames.count) aliments n'ont pas de fiche exacte : leurs valeurs sont estimées. Ils sont bien comptés.",
+                couleur: Color.dsSecondaire,
+                fond: Color.dsRemplissage
+            )
+        }
+
+        if !ignoredNames.isEmpty {
+            bandeau(
+                ignoredNames.count == 1
+                ? "Je n'arrive pas à chiffrer « \(ignoredNames[0]) ». Retire-le ou reformule."
+                : "Je n'arrive pas à chiffrer \(ignoredNames.count) aliments. Retire-les ou reformule.",
+                couleur: Kiwio.ambre,
+                fond: Kiwio.ambreFond
+            )
+        }
+
+        if alimentsIgnoresServeur > 0 {
+            bandeau(
+                alimentsIgnoresServeur == 1
+                ? "Ta dictée était très riche : 1 aliment n'a pas pu être analysé. Redicte-le dans un second repas."
+                : "Ta dictée était très riche : \(alimentsIgnoresServeur) aliments n'ont pas pu être analysés. Redicte-les dans un second repas.",
+                couleur: Kiwio.ambre,
+                fond: Kiwio.ambreFond
+            )
+        }
+    }
+
+    /// Avertissement de la feuille. Il porte une information que l'utilisateur
+    /// DOIT lire (une valeur estimée, un aliment non chiffré) : il ne peut pas
+    /// rester au plus petit corps de l'écran.
+    private func bandeau(_ texte: String, couleur: Color, fond: Color) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .accessibilityHidden(true)
+            Text(texte)
+                .font(.system(size: 13, weight: .medium))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(couleur)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(fond, in: RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
+        .padding(.top, 10)
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Le total et ce que le repas apporte
+
+    private var totalLigne: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            Text("Total")
+                .font(.dsSousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+            Spacer(minLength: 8)
+            // Il compte jusqu'à sa valeur une fois les lignes posées, puis
+            // suit en direct la moindre quantité corrigée.
+            ChiffreQuiCompte(valeur: Double(poses ? totaux.kcal : 0))
+                .font(.system(.title, design: .rounded).weight(.bold).monospacedDigit())
+                .tracking(-0.9)
+                .foregroundStyle(Color.dsTexte)
+                .animation(reduceMotion ? nil : Animation.kiwiCompteur.delay(0.35), value: poses)
+                .animation(reduceMotion ? nil : Animation.kiwiVif, value: totaux.kcal)
+            Text(" kcal")
+                .font(.dsSousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+        }
+        .padding(.top, 12)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Total du repas : \(totaux.kcal) kilocalories")
+    }
+
+    /// Les macros du repas, face aux cibles du jour quand le profil en donne.
+    /// Mêmes noms, mêmes couleurs et même référence de fibres que la carte
+    /// Énergie du Journal : c'est elle qui va bouger à l'enregistrement.
+    private var apportsDuRepas: [JournalMacrosCard.Ligne] {
+        let repas = totaux
+        return JournalMacrosCard.lignesDuJour(
+            proteines: repas.proteines, glucides: repas.glucides,
+            lipides: repas.lipides, fibres: repas.fibres,
+            cibleProteines: cibleProteines, cibleGlucides: cibleGlucides, cibleLipides: cibleLipides,
+            veutDuMuscle: false
+        )
+    }
+
+    /// « Protéines +42 g » : ce que le repas apporte, en étiquettes qui
+    /// surgissent une fois les lignes posées (0,55 s, puis 0,08 s d'écart).
+    @ViewBuilder
+    private var etiquettesApports: some View {
+        let lignes = apportsDuRepas.filter { $0.grammes >= 0.5 }
+        if !lignes.isEmpty {
+            DSFlow(espacement: 6) {
+                ForEach(Array(lignes.enumerated()), id: \.element.id) { rang, ligne in
+                    EtiquetteApport(ligne: ligne)
+                        .verreSurgir(poses, delai: 0.55 + Double(rang) * 0.08, depart: 0.5)
+                }
+            }
+            .padding(.top, 10)
+        }
+    }
+
+    // MARK: Le repas
+
+    /// Choix du repas, en FIN de feuille, juste avant d'ajouter : c'est la
+    /// dernière décision, pas la première. Pré-choisi seulement si le vocal
+    /// l'a dit.
     private var choixRepas: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("C'est pour quel repas ?")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.dsSousTitreFort)
+                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsTexte)
             if slotDit {
                 Text("Tu l'as dit dans ton vocal.")
-                    .font(.system(size: 13))
+                    .font(.dsLegende)
                     .foregroundStyle(Color.dsSecondaire)
             }
             HStack(spacing: 7) {
@@ -404,148 +623,113 @@ struct VoiceMealSheet: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .background(choisi ? Color.dsAccent : Color.dsRemplissage,
-                                in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(choisi ? .white : Color.dsTexte)
+                    .background(choisi ? Color.dsAccent : Verre.tuileInactive,
+                                in: RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
+                    .foregroundStyle(choisi ? Color.white : Color.dsTexte)
                     .accessibilityLabel(s.titreJournal)
                     .accessibilityAddTraits(choisi ? .isSelected : [])
                 }
             }
         }
-        .padding(.top, 8)
+        .padding(.top, 14)
         .accessibilityElement(children: .contain)
     }
 
-    /// Avertissement de la feuille. Il porte une information que l'utilisateur
-    /// DOIT lire (une valeur estimée, un aliment non chiffré) : il ne peut pas
-    /// rester au plus petit corps de l'écran.
-    private func bandeau(_ texte: String, couleur: Color, fond: Color) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "info.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .accessibilityHidden(true)
-            Text(texte)
-                .font(.system(size: 13, weight: .medium))
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(couleur)
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(fond, in: RoundedRectangle(cornerRadius: 10))
-        .accessibilityElement(children: .combine)
-    }
-
-    private var totalBlock: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Total du repas")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.dsSecondaire)
-                Spacer()
-                Text("\(kcalTotalAffiche)")
-                    .font(.kiwioMono(26, .bold))
-                    .foregroundStyle(Color.dsTexte)
-                Text("kcal")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.dsTertiaire)
-            }
-
-            Rectangle()
-                .fill(Color.dsSeparateur)
-                .frame(height: 0.5)
-
-            // « Ce repas t'apporte » : quatre lignes qui se remplissent en
-            // cascade une fois les aliments posés, puis suivent en direct la
-            // moindre quantité corrigée.
-            Text("Ce repas t'apporte")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.dsSecondaire)
-            VStack(spacing: 10) {
-                ForEach(Array(apportsDuRepas.enumerated()), id: \.element.id) { rang, ligne in
-                    LigneApportRepas(ligne: ligne, posee: apportsPoses, rang: rang)
-                }
-            }
-            if apportsDuRepas.contains(where: { $0.cible != nil }) {
-                Text("Chaque barre : la part de ton objectif du jour.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.dsTertiaire)
-            }
-        }
-        .padding(14)
-        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14))
-        .padding(.top, 4)
-    }
-
-    /// Les macros du repas, face aux cibles du jour quand le profil en donne.
-    /// Mêmes noms, mêmes couleurs et même référence de fibres que la carte des
-    /// macros du Journal : c'est elle qui va bouger à l'enregistrement.
-    private var apportsDuRepas: [JournalMacrosCard.Ligne] {
-        let repas = totaux
-        return JournalMacrosCard.lignesDuJour(
-            proteines: repas.proteines, glucides: repas.glucides,
-            lipides: repas.lipides, fibres: repas.fibres,
-            cibleProteines: cibleProteines, cibleGlucides: cibleGlucides, cibleLipides: cibleLipides,
-            veutDuMuscle: false
-        )
-    }
-
-    /// La citation de la dictée, les aliments reconnus passés en vert.
-    private var transcriptSurligne: AttributedString {
-        var texte = AttributedString("« \(quotedTranscript) »")
-        for item in visibleItems {
-            guard let dit = item.libelle, dit.count >= 2,
-                  let plage = texte.range(of: dit, options: [.caseInsensitive, .diacriticInsensitive]) else { continue }
-            texte[plage].swiftUI.foregroundColor = Color.dsAccent
-        }
-        return texte
-    }
+    // MARK: L'action
 
     @ViewBuilder
     private var ctaBlock: some View {
-        if visibleItems.isEmpty {
-            Text("Plus aucun aliment. Recommence la dictée.")
-                .font(.footnote)
-                .foregroundStyle(Color.dsTertiaire)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
-        } else if let douteux = aVerifierNames.first {
-            // Un aliment incertain ne compte pas tant qu'il n'est pas tranché :
-            // un total incomplet et signalé vaut mieux qu'un total faux.
-            consigne("Vérifie l'aliment : « \(douteux) »")
-        } else if let manquant = missingNames.first {
-            // Bloquant tant qu'une quantité manque : on n'invente pas un grammage.
-            // Un féculent varie du simple au triple selon la portion.
-            consigne("Précise la quantité : \(manquant)")
-        } else if slot == nil {
-            consigne("Choisis le repas juste au-dessus")
-        } else {
-            Button {
-                Task { await save() }
-            } label: {
-                Text(isSaving
-                     ? "Enregistrement…"
-                     : "Ajouter \(savableItems.count) aliment\(savableItems.count > 1 ? "s" : "") · \(totaux.kcal) kcal")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(maxWidth: .infinity, minHeight: 52)
+        Group {
+            if visibleItems.isEmpty {
+                Text("Plus aucun aliment. Recommence la dictée.")
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsTertiaire)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+            } else if let douteux = aVerifierNames.first {
+                // Un aliment incertain ne compte pas tant qu'il n'est pas tranché :
+                // un total incomplet et signalé vaut mieux qu'un total faux.
+                consigne("Vérifie l'aliment : « \(douteux) »")
+            } else if let manquant = missingNames.first {
+                // Bloquant tant qu'une quantité manque : on n'invente pas un grammage.
+                // Un féculent varie du simple au triple selon la portion.
+                consigne("Précise la quantité : \(manquant)")
+            } else if let slot {
+                boutonAjouter(slot)
+            } else {
+                consigne("Choisis le repas juste au-dessus")
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.dsAccent)
-            .disabled(isSaving || savableItems.isEmpty)
+        }
+        .padding(.top, 16)
+
+        if !visibleItems.isEmpty {
+            Button {
+                modifierLesQuantites()
+            } label: {
+                Text("Modifier les quantités")
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsAccent)
+                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Ouvre le réglage du premier aliment")
         }
 
         // La feuille n'écoute plus (2 août 2026) : recommencer = fermer, puis
-        // maintenir à nouveau le micro de l'accueil.
-        Button("Recommencer la dictée") {
+        // dicter à nouveau depuis le Journal.
+        Button {
             HapticService.shared.tap()
-            dismiss()
+            fermer()
+        } label: {
+            Text("Recommencer la dictée")
+                .font(.dsLegendeMoyenne)
+                .foregroundStyle(Color.dsSecondaire)
+                .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                .contentShape(Rectangle())
         }
-        .font(.system(size: 14, weight: .medium))
-        .foregroundStyle(Color.dsSecondaire)
-        .frame(maxWidth: .infinity, minHeight: 44)
+        .buttonStyle(.plain)
+    }
+
+    /// « Ajouter au déjeuner » : l'action principale, en verre vert, traversée
+    /// par un reflet.
+    private func boutonAjouter(_ slot: MealJournalService.MealSlot) -> some View {
+        let nombre = savableItems.count
+        let titre = Self.titreAjout(slot)
+        return Button {
+            Task { await save() }
+        } label: {
+            Text(isSaving ? "Enregistrement…" : titre)
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(Color.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, minHeight: Verre.hauteurAction)
+                .background {
+                    VerrePlaque(forme: Capsule(style: .continuous), matiere: VerreMatiere.principal)
+                        .verreBrillance()
+                }
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.dsPress)
+        .disabled(isSaving || nombre == 0)
+        .accessibilityLabel("\(titre), \(nombre) aliment\(nombre > 1 ? "s" : ""), \(totaux.kcal) kilocalories")
+    }
+
+    /// « Modifier les quantités » : ouvre le réglage du premier aliment, ou
+    /// referme celui qui est ouvert. Chaque ligne s'ouvre aussi d'un toucher.
+    private func modifierLesQuantites() {
+        HapticService.shared.selection()
+        withAnimation(.snappy(duration: 0.22)) {
+            deployee = (deployee == nil) ? visibleItems.first?.index : nil
+        }
     }
 
     /// Ce qui manque avant de pouvoir ajouter. Rendue en gris sur gris, cette
@@ -565,8 +749,8 @@ struct VoiceMealSheet: View {
         .foregroundStyle(Kiwio.ambre)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-        .background(Kiwio.ambreFond, in: RoundedRectangle(cornerRadius: 14))
+        .frame(maxWidth: .infinity, minHeight: Verre.hauteurAction, alignment: .leading)
+        .background(Kiwio.ambreFond, in: RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
@@ -574,44 +758,54 @@ struct VoiceMealSheet: View {
 
     private var errorView: some View {
         VStack(spacing: 14) {
-            Spacer()
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 30))
                 .foregroundStyle(Kiwio.ambre)
+                .accessibilityHidden(true)
             Text(errorMessage ?? "Je n'ai pas réussi à analyser ton repas.")
-                .font(.system(size: 15))
+                .font(.dsSousTitre)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             // Relancer l'ANALYSE sur ce qui a déjà été dit, sans refaire parler :
             // l'échec vient presque toujours du serveur, pas de la dictée, et
             // reparler était le vrai coût de l'erreur.
             if !dernierTranscript.isEmpty {
-                Button("Relancer l'analyse") {
+                DSCapsuleButton(titre: "Relancer l'analyse") {
                     Task { await analyser(dernierTranscript) }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.dsAccent)
 
                 Text("« \(dernierTranscript) »")
-                    .font(.system(size: 13))
+                    .font(.dsLegende)
                     .foregroundStyle(Color.dsTertiaire)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .padding(.horizontal, 8)
 
-                Button("Redire mon repas") { HapticService.shared.tap(); dismiss() }
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.dsSecondaire)
+                Button {
+                    HapticService.shared.tap()
+                    fermer()
+                } label: {
+                    Text("Redire mon repas")
+                        .font(.dsSousTitre)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             } else {
-                // Rien à réanalyser : on referme, l'utilisateur redicte en
-                // maintenant le micro de l'accueil.
-                Button("Réessayer") { HapticService.shared.tap(); dismiss() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color.dsAccent)
+                // Rien à réanalyser : on referme, l'utilisateur redicte depuis
+                // le Journal.
+                DSCapsuleButton(titre: "Réessayer") {
+                    HapticService.shared.tap()
+                    fermer()
+                }
             }
-            Spacer()
         }
-        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Self.margeInterieure)
+        .padding(.top, 22)
+        .padding(.bottom, 20)
     }
 
     // MARK: - Interaction
@@ -757,16 +951,6 @@ struct VoiceMealSheet: View {
     private var visibleItems: [VoiceMealService.Item] {
         items.filter { !removed.contains($0.index) }
     }
-    /// Ce qui est POSÉ à l'écran à cet instant. Sous « Réduire les animations »,
-    /// c'est la liste entière, immédiatement.
-    private var itemsAffiches: [VoiceMealService.Item] {
-        reduceMotion ? visibleItems : Array(visibleItems.prefix(revelees))
-    }
-    /// Total affiché : la valeur qui monte pendant la révélation, la vraie
-    /// ensuite (et donc dès qu'une quantité est ajustée à la main).
-    private var kcalTotalAffiche: Int {
-        compteurActif ? kcalAffiche : totaux.kcal
-    }
     /// Enregistrable = on a un grammage ET de quoi le chiffrer : soit un aliment
     /// de la base, soit l'estimation du serveur. Un aliment absent de la base
     /// n'est plus jeté — le jeter faussait le total de la journée.
@@ -810,9 +994,20 @@ struct VoiceMealSheet: View {
 
     // MARK: - Actions
 
-    /// Saisie au clavier : la feuille attend le texte. Sinon, on transcrit l'audio.
+    /// À l'apparition : la dictée déjà chiffrée sous la bulle se pose telle
+    /// quelle. Fait avant la première image, pour que la feuille monte
+    /// directement sur son contenu.
+    private func amorcer() {
+        guard !amorce else { return }
+        amorce = true
+        guard let depart else { return }
+        appliquer(depart)
+    }
+
+    /// Saisie au clavier : la feuille attend le texte. Dictée déjà chiffrée :
+    /// rien à faire. Sinon (aucun résultat fourni), on transcrit l'audio ici.
     private func demarrer() async {
-        guard !saisieAuClavier else { return }
+        guard depart == nil, !saisieAuClavier else { return }
         await finishListening()
     }
 
@@ -821,15 +1016,25 @@ struct VoiceMealSheet: View {
         // C'est ce qui garantit qu'une pause au milieu de la phrase ne coûte
         // plus rien : il n'y a jamais eu qu'un seul enregistrement.
         phase = .analyzing
-        let text = await speech.finishAndTranscribe()
-        guard !text.isEmpty else {
-            errorMessage = speech.error?.message ?? "Je n'ai rien entendu. Réessaie."
-            phase = .failed
-            return
+        let resultat = await Self.preparer(speech: speech) { texte in
+            dernierTranscript = texte
         }
-        // Conservé pour pouvoir relancer l'analyse sans refaire parler.
-        dernierTranscript = text
-        await analyser(text)
+        appliquer(resultat)
+    }
+
+    /// Pose ce qu'une dictée a donné : ses aliments, ou son échec.
+    private func appliquer(_ depart: Depart) {
+        switch depart {
+        case .analyse(let analyse, let transcript):
+            // Conservé pour pouvoir relancer l'analyse sans refaire parler.
+            dernierTranscript = transcript
+            errorMessage = nil
+            appliquer(analyse)
+        case .echec(let message, let transcript):
+            dernierTranscript = transcript
+            errorMessage = message
+            phase = .failed
+        }
     }
 
     /// Analyse d'un texte déjà transcrit. Séparé de la capture pour qu'un échec
@@ -839,80 +1044,52 @@ struct VoiceMealSheet: View {
         errorMessage = nil
         do {
             let analysis = try await VoiceMealService.shared.analyze(transcript: text)
-            quotedTranscript = analysis.transcript
-            items = analysis.aliments
-            removed = []
-            grams = Dictionary(uniqueKeysWithValues: analysis.aliments.compactMap { item in
-                item.grammes.map { (item.index, $0) }
-            })
-            unites = Dictionary(uniqueKeysWithValues: analysis.aliments.compactMap { item in
-                Self.unite(pour: item).map { (item.index, $0) }
-            })
-            tailles = unites.compactMapValues { $0.tailleParDefaut }
-            enGrammes = []
-            confirmes = []
-            slot = VoiceMealService.slotDit(analysis.repas)
-            slotDit = slot != nil
-            alimentsIgnoresServeur = analysis.alimentsIgnores ?? 0
-            phase = .results
-            // On ouvre d'emblée la première question à laquelle il faut répondre.
-            deployee = prochainManquant()
-            lancerRevelation()
+            appliquer(analysis)
         } catch {
             errorMessage = error.localizedDescription
             phase = .failed
         }
     }
 
-    /// Pose les aliments un par un, puis fait monter le total jusqu'à sa
-    /// valeur. Purement visuel : rien ici ne touche `items`, `grams` ni
-    /// `totaux`. Sous « Réduire les animations », tout est affiché d'emblée.
+    /// Pose le résultat d'une analyse à l'écran.
+    private func appliquer(_ analysis: VoiceMealService.Analysis) {
+        quotedTranscript = analysis.transcript
+        items = analysis.aliments
+        removed = []
+        grams = Dictionary(uniqueKeysWithValues: analysis.aliments.compactMap { item in
+            item.grammes.map { (item.index, $0) }
+        })
+        unites = Dictionary(uniqueKeysWithValues: analysis.aliments.compactMap { item in
+            Self.unite(pour: item).map { (item.index, $0) }
+        })
+        tailles = unites.compactMapValues { $0.tailleParDefaut }
+        enGrammes = []
+        confirmes = []
+        slot = VoiceMealService.slotDit(analysis.repas)
+        slotDit = slot != nil
+        alimentsIgnoresServeur = analysis.alimentsIgnores ?? 0
+        phase = .results
+        // On ouvre d'emblée la première question à laquelle il faut répondre.
+        deployee = prochainManquant()
+        lancerRevelation()
+    }
+
+    /// Joue l'arrivée du résultat : les lignes remontent en cascade, leurs
+    /// kcal et le total comptent, les étiquettes surgissent. Purement visuel :
+    /// rien ici ne touche `items`, `grams` ni `totaux`. Sous « Réduire les
+    /// animations », tout est affiché d'emblée.
     private func lancerRevelation() {
         revelation?.cancel()
         guard !reduceMotion else {
-            revelees = items.count
-            compteurActif = false
-            apportsPoses = true
+            poses = true
             return
         }
-        let nombre = visibleItems.count
-        let cible = totaux.kcal
-        revelees = 0
-        kcalAffiche = 0
-        compteurActif = true
-        apportsPoses = false
-        // Les aliments se posent ET le total monte EN MÊME TEMPS. Avant, le
-        // compteur ne démarrait qu'après les N × 250 ms de la pose : la ligne
-        // « Total du repas » affichait 0 kcal pendant 1 à 6 secondes, juste
-        // au-dessus de pastilles P/G/L qui montraient déjà les vraies valeurs
-        // et d'un bouton d'ajout qui annonçait déjà le vrai total. Trois
-        // chiffres du même bloc se contredisaient à l'écran.
+        poses = false
+        // Un souffle : les lignes sont d'abord rangées, puis elles se posent.
         revelation = Task { @MainActor in
-            let intervalle: Double = 0.03            // 30 ms
-            // Cascade de la maquette « Motion » : un aliment toutes les 80 ms,
-            // le total qui compte un peu plus longtemps qu'eux.
-            let posePar: Double = 0.08
-            let duree = max(Double(nombre) * posePar + 0.35, 0.6)
-            let tics = max(1, Int((duree / intervalle).rounded()))
-            for tic in 1...tics {
-                try? await Task.sleep(nanoseconds: UInt64(intervalle * 1_000_000_000))
-                guard !Task.isCancelled else { return }
-                let poses = min(nombre, Int(Double(tic) * intervalle / posePar))
-                if poses != revelees {
-                    withAnimation(.kiwiFluide) {
-                        revelees = poses
-                    }
-                }
-                // Le dernier aliment est posé : les barres se remplissent.
-                if poses >= nombre, !apportsPoses { apportsPoses = true }
-                if cible > 0 {
-                    kcalAffiche = Int((Double(cible) * Double(tic) / Double(tics)).rounded())
-                }
-            }
+            try? await Task.sleep(for: .milliseconds(60))
             guard !Task.isCancelled else { return }
-            revelees = items.count
-            compteurActif = false
-            apportsPoses = true
+            poses = true
         }
     }
 
@@ -987,16 +1164,11 @@ struct VoiceMealSheet: View {
             MealJournalViewModel.signalerEcriture()
             NotificationCenter.default.post(name: .healthmapMealScanned, object: nil)
 
-            // Pendant le tutoriel, c'est lui qui prend la suite ; en mode Zen,
-            // on ne fête rien. Dans les deux cas la feuille redescend aussitôt.
-            let sansFete = TutorielService.partage.etape != nil || GamificationService.shared.isZenMode
+            // Le repas compte : vibration de succès, puis la feuille redescend
+            // aussitôt. C'est la capsule du haut de l'écran qui confirme, avec
+            // ce que ce repas change aujourd'hui.
+            HapticService.shared.success()
             let kcal = totaux.kcal
-            TutorielService.partage.repasEnregistre()
-            onAdded(Ajout(nombre: entries.count, kcal: kcal, creneau: slot))
-            guard !sansFete else {
-                dismiss()
-                return
-            }
             let agregats = MealJournalService.aggregatesFromItems(entries)
             let repas = MealJournalService.MealRecord(
                 id: "ajout-\(UUID().uuidString)",
@@ -1006,8 +1178,10 @@ struct VoiceMealSheet: View {
                 macros: agregats.macros,
                 micros: agregats.micros
             )
-            fete = Self.composerFete(creneau: slot, kcal: kcal, gratification: gratification?(repas))
-            phase = .ajoute
+            let sousLigne = Self.sousLigneAjout(gratification: gratification?(repas))
+            TutorielService.partage.repasEnregistre()
+            onAdded(Ajout(nombre: entries.count, kcal: kcal, creneau: slot, sousLigne: sousLigne))
+            fermer()
         } catch {
             errorMessage = "L'enregistrement a échoué. Réessaie."
             phase = .failed
@@ -1015,89 +1189,74 @@ struct VoiceMealSheet: View {
     }
 }
 
-// MARK: - La fête d'un ajout
+// MARK: - Ce que la feuille dit du repas
 
 extension VoiceMealSheet {
-    /// Titre, phrase et étiquettes de la célébration. Le total du repas est
-    /// toujours là ; l'apport qui remonte et la série seulement s'ils existent.
-    static func composerFete(creneau: MealJournalService.MealSlot,
-                             kcal: Int,
-                             gratification: GratificationRepas?) -> Fete {
-        var etiquettes = [
-            CelebrationAjout.Etiquette(id: "kcal", symbole: "fork.knife",
-                                       texte: "+\(DS.entier(kcal)) kcal", teinte: Color.dsCalories),
-        ]
-        if let gain = gratification?.gains.first {
-            etiquettes.append(CelebrationAjout.Etiquette(
-                id: "apport", symbole: "arrow.up.right",
-                texte: "\(gain.nom) \(DS.delta(gain.apres - gain.avant))",
-                teinte: Color.nutrientColor(for: gain.id)
-            ))
-        }
-        if let jours = gratification?.serie {
-            etiquettes.append(CelebrationAjout.Etiquette(
-                id: "jours", symbole: "flame.fill", texte: "\(jours) jours", teinte: Color.dsCalories
-            ))
-        }
-        return Fete(titre: creneau.libelleAjout,
-                    phrase: gratification?.phrase ?? "C'est compté dans ta journée.",
-                    etiquettes: etiquettes)
-    }
-}
-
-// MARK: - Une ligne de « Ce repas t'apporte »
-
-/// Le nom, la valeur qui compte, et — quand le profil donne une cible — une
-/// barre qui se remplit à hauteur de la part de l'objectif du jour. Les lignes
-/// arrivent en cascade (80 ms) une fois les aliments posés.
-private struct LigneApportRepas: View {
-    let ligne: JournalMacrosCard.Ligne
-    /// Les aliments sont posés : la ligne peut se remplir.
-    let posee: Bool
-    let rang: Int
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var grammes: Int { Int(ligne.grammes.rounded()) }
-
-    private var fraction: Double {
-        guard let cible = ligne.cible, cible > 0 else { return 0 }
-        return min(1, ligne.grammes / cible)
+    /// « Fer et vitamine C en hausse » : ce que la capsule de confirmation dit
+    /// sous « Ajouté au déjeuner ». Les apports nommés sont ceux que ce repas
+    /// fait réellement bouger aujourd'hui ; sans rien d'honnête à en dire, la
+    /// capsule confirme seulement que c'est compté.
+    static func sousLigneAjout(gratification: GratificationRepas?) -> String {
+        let noms = (gratification?.gains ?? []).map(\.nom)
+        guard let premier = noms.first else { return "C'est compté dans ta journée." }
+        guard noms.count > 1 else { return "\(premier) en hausse" }
+        let second = noms[1]
+        let suite = second.prefix(1).lowercased() + String(second.dropFirst())
+        return "\(premier) et \(suite) en hausse"
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(ligne.nom)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.dsTexte)
-                Spacer(minLength: 8)
-                ChiffreQuiCompte(valeur: posee ? Double(grammes) : 0, format: { "\(DS.entier($0)) g" })
-                    .font(.kiwioMono(14, .semibold))
-                    .foregroundStyle(Color.dsTexte)
-            }
-            if ligne.cible != nil {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.dsRemplissage)
-                        Capsule()
-                            .fill(LinearGradient(colors: ligne.teintes, startPoint: .leading, endPoint: .trailing))
-                            .frame(width: geo.size.width * (posee ? fraction : 0))
-                    }
-                }
-                .frame(height: 6)
-            }
+    /// « Ajouter au déjeuner » : l'action de la feuille. Même formulation que
+    /// la confirmation (`libelleAjout`), à l'infinitif.
+    static func titreAjout(_ slot: MealJournalService.MealSlot) -> String {
+        switch slot {
+        case .breakfast: return "Ajouter au petit-déjeuner"
+        case .lunch: return "Ajouter au déjeuner"
+        case .dinner: return "Ajouter au dîner"
+        case .snack: return "Ajouter en encas"
         }
-        .animation(reduceMotion ? nil : Animation.kiwiFluide.delay(0.08 * Double(rang)), value: posee)
-        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: grammes)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(libelleVocal)
     }
 
-    private var libelleVocal: String {
-        guard let cible = ligne.cible, cible > 0 else { return "\(ligne.nom) : \(grammes) grammes." }
-        let part = Int((fraction * 100).rounded())
-        return "\(ligne.nom) : \(grammes) grammes, \(part) pour cent de ton objectif du jour."
+    /// La teinte de la pastille d'une ligne. Le serveur ne dit pas la famille
+    /// de l'aliment : on lit ses valeurs pour 100 g. Les protéines d'abord
+    /// (viande, poisson, œufs), puis le peu d'énergie (fruits, légumes), sinon
+    /// la macro qui porte le plus de calories. `nil` : pastille neutre.
+    static func teinte(pour item: VoiceMealService.Item) -> Color? {
+        guard let cent = item.per100 else { return nil }
+        let proteines = cent.proteines * 4
+        let glucides = cent.glucides * 4
+        let lipides = cent.lipides * 9
+        if proteines > 0, proteines >= glucides, proteines >= lipides { return Color.teinteEnergie }
+        if cent.kcal < 90 { return Color.teinteVitamineC }
+        if glucides >= lipides { return Color.teinteGlucidesTrait }
+        return Color.teinteLipides
+    }
+
+    /// Transcrit puis chiffre une dictée, AVANT que la feuille ne monte : la
+    /// bulle se contracte et tourne pendant ce temps (`EcouteDictee.swift`).
+    /// `onTranscrit` reçoit ce qui a été dit dès que la transcription existe,
+    /// pour que la carte le relise pendant que le serveur chiffre.
+    @MainActor
+    static func preparer(speech: SpeechCaptureService,
+                         onTranscrit: (String) -> Void) async -> Depart {
+        // L'audio est transcrit en une fois, sur le fichier complet : une
+        // pause au milieu de la phrase ne coûte rien.
+        let texte = await speech.finishAndTranscribe()
+        guard !texte.isEmpty else {
+            return .echec(message: speech.error?.message ?? "Je n'ai rien entendu. Réessaie.",
+                          transcript: "")
+        }
+        // La dictée a été abandonnée entre-temps : on ne relit rien (une
+        // nouvelle dictée a pu commencer) et on n'appelle pas le serveur.
+        guard !Task.isCancelled else {
+            return .echec(message: "", transcript: texte)
+        }
+        onTranscrit(texte)
+        do {
+            let analyse = try await VoiceMealService.shared.analyze(transcript: texte)
+            return .analyse(analyse, transcript: texte)
+        } catch {
+            return .echec(message: error.localizedDescription, transcript: texte)
+        }
     }
 }
 
@@ -1105,10 +1264,10 @@ private struct LigneApportRepas: View {
 
 /// Ligne compacte qui se déploie au tap.
 ///
-/// Repliée, elle tient sur une ligne : icône, nom, `150 g · 285 kcal`. Déployée,
-/// elle porte la question de quantité, les portions concrètes et l'ajustement
-/// fin. C'est le point clé du design : une liste lisible d'un coup d'œil, et une
-/// seule chose à décider à la fois.
+/// Repliée, elle tient sur une ligne : pastille, nom, quantité dessous, kcal à
+/// droite, puis un filet. Déployée, elle porte la question de quantité, les
+/// portions concrètes et l'ajustement fin. C'est le point clé du design : une
+/// liste lisible d'un coup d'œil, et une seule chose à décider à la fois.
 private struct VoiceItemRow: View {
     let item: VoiceMealService.Item
     let grams: Double?
@@ -1123,6 +1282,10 @@ private struct VoiceItemRow: View {
     /// n'a pas choisi.
     let aVerifier: Bool
     let remplacementEnCours: Bool
+    /// La ligne est posée : ses kcal comptent jusqu'à leur valeur.
+    let posee: Bool
+    /// Teinte de la pastille (`nil` : neutre).
+    let teinte: Color?
     let onGarder: () -> Void
     let onRemplacer: (String) -> Void
     let onChercher: () -> Void
@@ -1162,22 +1325,46 @@ private struct VoiceItemRow: View {
                                           portions: item.portions.map { (label: $0.label, grammes: $0.grammes) })
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button(action: onTap) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(alerte ? Kiwio.ambreFond : Color.dsRemplissage)
-                        Image(systemName: alerte ? "questionmark" : "fork.knife")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(alerte ? Kiwio.ambre : Color.dsTexte)
-                    }
-                    .frame(width: 38, height: 38)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-                    VStack(alignment: .leading, spacing: 2) {
+    /// Fond de la pastille : l'ambre d'une question, sinon la teinte de
+    /// l'aliment à 12 %, sinon le gris neutre du verre.
+    private var fondPastille: Color {
+        if alerte { return Kiwio.ambreFond }
+        if let teinte { return teinte.opacity(0.12) }
+        return Verre.remplissage
+    }
+
+    private var encrePastille: Color {
+        if alerte { return Kiwio.ambre }
+        return teinte ?? Verre.iconeNeutre
+    }
+
+    /// « 2 œufs · 100 g », ou « 150 g » : la quantité retenue.
+    private var quantite: String {
+        let grammes = "\(Int(grams ?? 0)) g"
+        guard let unite else { return grammes }
+        return "\(unite.libelle(nombre: nombre)) · \(grammes)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(fondPastille)
+                        Image(systemName: alerte ? "questionmark" : "fork.knife")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(encrePastille)
+                    }
+                    .frame(width: 40, height: 40)
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 1) {
                         Text(aVerifier ? dit : item.nom)
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.dsSousTitreFort)
+                            .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsTexte)
                             .lineLimit(1)
                         if aVerifier {
@@ -1187,24 +1374,17 @@ private struct VoiceItemRow: View {
                         } else if manque {
                             // C'est la question qui bloque l'enregistrement :
                             // elle ne peut pas être le plus petit texte de la
-                            // ligne (elle l'était, à 12 pt).
+                            // ligne.
                             Text("quantité ?")
                                 .font(Theme.insightFont)
                                 .foregroundStyle(Kiwio.ambre)
                         } else {
-                            // Quantité en vert kiwi, chiffres en chasse fixe : la
-                            // ligne ne saute pas quand la valeur change sous les yeux.
-                            // En unités : « 2 œufs · 100 g · 150 kcal ».
-                            HStack(spacing: 0) {
-                                Text(unite.map { $0.libelle(nombre: nombre) } ?? "\(Int(grams ?? 0)) g")
-                                    .font(.kiwioMono(12, .bold))
-                                    .foregroundStyle(Color.dsAccent)
-                                Text(unite == nil
-                                     ? " · \(kcalAffichees) kcal"
-                                     : " · \(Int(grams ?? 0)) g · \(kcalAffichees) kcal")
-                                    .font(.kiwioMono(12, .regular))
-                                    .foregroundStyle(Color.dsSecondaire)
-                            }
+                            // Chiffres en chasse fixe : la ligne ne saute pas
+                            // quand la valeur change sous les yeux.
+                            Text(quantite)
+                                .font(Font.dsLegende.monospacedDigit())
+                                .foregroundStyle(Color.dsSecondaire)
+                                .lineLimit(1)
                         }
                         if item.parDefaut && !aVerifier {
                             // Dit vaguement : on a pris la référence la plus
@@ -1216,17 +1396,22 @@ private struct VoiceItemRow: View {
                         }
                     }
 
-                    Spacer()
+                    Spacer(minLength: 8)
 
                     if !alerte {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(Color.dsAccent)
+                        // Les kcal comptent jusqu'à leur valeur quand la ligne
+                        // se pose, puis suivent la quantité corrigée.
+                        ChiffreQuiCompte(valeur: Double(posee ? kcalAffichees : 0),
+                                         format: { "\(DS.entier($0)) kcal" })
+                            .font(.dsValeurLigneForte)
+                            .foregroundStyle(Color.dsTexte)
+                            .lineLimit(1)
+                            .animation(reduceMotion ? nil : Animation.kiwiCompteur.delay(0.35), value: posee)
+                            .animation(reduceMotion ? nil : Animation.kiwiVif, value: kcalAffichees)
                     }
-                    Image(systemName: "pencil")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.dsTertiaire)
                 }
+                .padding(.vertical, 10)
+                .frame(minHeight: DS.cibleTactile)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -1271,15 +1456,16 @@ private struct VoiceItemRow: View {
                     }
                     .buttonStyle(.plain)
                 }
+                .padding(.top, 2)
+                .padding(.bottom, 8)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
+
+            Rectangle()
+                .fill(Color.dsSeparateur)
+                .frame(height: 0.5)
+                .accessibilityHidden(true)
         }
-        .padding(12)
-        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(alerte ? Kiwio.ambreBordure : Color.clear, lineWidth: 1)
-        )
     }
 
     // MARK: Aliment retenu
@@ -1505,7 +1691,8 @@ private struct BoutonPas: View {
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(actif ? Color.dsTexte : Color.dsTertiaire)
                 .frame(width: 44, height: 44)
-                .background(Color.dsRemplissage, in: Circle())
+                .verreClair(Circle())
+                .contentShape(Circle())
         }
         .buttonStyle(.dsPress)
         .buttonRepeatBehavior(.enabled)
@@ -1513,25 +1700,48 @@ private struct BoutonPas: View {
     }
 }
 
-// MARK: - Point d'enregistrement
+// MARK: - Une étiquette de « ce que le repas apporte »
 
-/// Point rouge qui bat, comme sur un enregistreur. Première preuve que l'app
-/// écoute vraiment — avant même que la waveform ne bouge.
-struct PointEnregistrement: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var actif = false
+/// « Protéines +42 g » : le nom et les grammes, dans la teinte de la macro
+/// (fond à 10 %, texte dans sa version foncée). Quand le profil donne une
+/// cible, VoiceOver dit aussi la part de l'objectif du jour.
+private struct EtiquetteApport: View {
+    let ligne: JournalMacrosCard.Ligne
+
+    private var grammes: Int { Int(ligne.grammes.rounded()) }
+
+    private var teinte: Color { ligne.teintes.first ?? Color.teinteKiwi }
+
+    private var encre: Color {
+        switch ligne.id {
+        case "proteines": return Color.teinteProteinesTexte
+        case "glucides": return Color.teinteGlucidesTexte
+        case "lipides": return Color.teinteLipidesTexte
+        case "fibres": return Color.teinteFibresTexte
+        default: return Color.teinteKiwiTexte
+        }
+    }
 
     var body: some View {
-        Circle()
-            .fill(Kiwio.rouge)
-            .frame(width: 9, height: 9)
-            .opacity(actif ? 0.35 : 1)
-            .animation(
-                reduceMotion ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
-                value: actif
-            )
-            .onAppear { actif = true }
-            .accessibilityHidden(true)
+        HStack(spacing: 5) {
+            Text(ligne.nom)
+                .font(.system(.footnote, design: .default).weight(.semibold))
+            Text("+\(DS.entier(grammes)) g")
+                .font(.system(.footnote, design: .default).weight(.bold).monospacedDigit())
+        }
+        .foregroundStyle(encre)
+        .lineLimit(1)
+        .padding(.horizontal, 11)
+        .frame(minHeight: 30)
+        .background(Capsule(style: .continuous).fill(teinte.opacity(0.10)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(libelleVocal)
+    }
+
+    private var libelleVocal: String {
+        guard let cible = ligne.cible, cible > 0 else { return "\(ligne.nom) : \(grammes) grammes." }
+        let part = Int((min(1, ligne.grammes / cible) * 100).rounded())
+        return "\(ligne.nom) : \(grammes) grammes, \(part) pour cent de ton objectif du jour."
     }
 }
 
@@ -1548,49 +1758,20 @@ private struct RemplacementAlimentSheet: View {
     @StateObject private var vm = FoodSearchViewModel()
     @Environment(\.dismiss) private var dismiss
 
+    // Même habillage que `FoodSearchSheet` (JournalEditorComponents.swift) :
+    // le champ en capsule de verre clair, puis UNE carte de verre par section
+    // de résultats, les lignes séparées d'un filet. Pas de « + » ni de
+    // chevron : toucher une ligne la choisit et referme la feuille.
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 10) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(Color.dsSecondaire)
-                            .accessibilityHidden(true)
-                        TextField("Rechercher un aliment", text: $vm.query)
-                            .font(Theme.bodyFont)
-                            .autocorrectionDisabled()
-                            .accessibilityLabel("Rechercher un aliment")
-                            .onChange(of: vm.query) { _, _ in vm.search() }
-                    }
-                    .padding(Theme.spacingSM)
-                    .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                    if vm.isSearching {
-                        ProgressView().tint(Color.dsAccent).padding(.top, 20)
-                    } else if vm.hits.isEmpty && vm.query.count >= 2 {
-                        Text("Aucun résultat. Essaie un autre nom.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.dsSecondaire)
-                            .padding(.top, 20)
-                    } else {
-                        ForEach(vm.hits) { hit in
-                            Button {
-                                HapticService.shared.tap()
-                                onChoisir(hit)
-                            } label: {
-                                FoodHitContenu(hit: hit)
-                                    .padding(12)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            }
-                            .buttonStyle(.healthMapPressed)
-                        }
-                    }
+                VStack(spacing: Theme.spacingMD) {
+                    champ
+                    contenu
                 }
-                .padding(.horizontal, Theme.spacingLG)
+                .padding(.horizontal, DS.marge)
                 .padding(.vertical, Theme.spacingMD)
             }
-            .background(Color.dsFond.ignoresSafeArea())
             .navigationTitle("Changer d'aliment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1605,5 +1786,104 @@ private struct RemplacementAlimentSheet: View {
             vm.query = dit
             vm.search()
         }
+    }
+
+    private var champ: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(Verre.iconeNeutre)
+                .accessibilityHidden(true)
+            TextField("Rechercher un aliment", text: $vm.query)
+                .font(Theme.bodyFont)
+                .autocorrectionDisabled()
+                .accessibilityLabel("Rechercher un aliment")
+                .onChange(of: vm.query) { _, _ in vm.search() }
+        }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 48)
+        .verreClair()
+    }
+
+    /// Sous le champ : l'attente, le vide ou les résultats, rangés dans les
+    /// deux sections de la recherche du Journal.
+    @ViewBuilder
+    private var contenu: some View {
+        if vm.isSearching {
+            ProgressView()
+                .tint(Color.dsAccent)
+                .padding(.top, Theme.spacingLG)
+        } else if vm.hits.isEmpty && vm.query.count >= 2 {
+            Text("Aucun résultat. Essaie un autre nom.")
+                .font(.dsSousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .multilineTextAlignment(.center)
+                .padding(.top, Theme.spacingLG)
+        } else {
+            ForEach(RechercheVisuelle.sections(vm.hits, source: \.source, score: \.score)) { section in
+                VStack(spacing: 8) {
+                    RechercheSectionTitre(titre: section.titre)
+                    sectionCarte(section.lignes)
+                }
+            }
+            if vm.hits.contains(where: { $0.source == "off" }) {
+                RechercheCreditPhotos()
+            }
+        }
+    }
+
+    /// Les lignes d'une section, dans une carte de verre, séparées d'un filet
+    /// aligné sur le texte (12 + vignette 48 + 12).
+    private func sectionCarte(_ lignes: [MealJournalService.FoodHit]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(lignes.enumerated()), id: \.element.id) { index, hit in
+                if index > 0 {
+                    DSSeparator(retrait: 72)
+                }
+                Button {
+                    HapticService.shared.tap()
+                    onChoisir(hit)
+                } label: {
+                    FoodHitContenu(hit: hit)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.dsPress)
+                .kiwiEntrance(index)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .dsCard()
+    }
+}
+
+// MARK: - Feuille de verre détachée des bords
+
+extension VerreMatiere {
+    /// La feuille détachée des bords (résultats de dictée, gratification) :
+    /// blanc 88 → 72 % sur un flou vivant, reflet blanc sur l'arête haute,
+    /// liseré intérieur, et une ombre qui monte vers la page.
+    static let feuilleDetachee: VerreMatiere = {
+        var matiere = VerreMatiere.carteFlottante
+        matiere.arrets = [
+            Gradient.Stop(color: Color.white.opacity(0.88), location: 0),
+            Gradient.Stop(color: Color.white.opacity(0.72), location: 1),
+        ]
+        matiere.refletHaut = 1
+        matiere.lisere = 0.8
+        matiere.ombre = VerreOmbre(couleur: Color.black.opacity(0.16), rayon: 20, y: -10)
+        matiere.opaque = Color(red: 247 / 255, green: 250 / 255, blue: 245 / 255)
+        return matiere
+    }()
+}
+
+extension View {
+    /// Feuille de verre détachée des bords : rayon 44, contenu rogné à la
+    /// feuille. Les marges de 8 pt autour sont à poser par l'appelant.
+    func verreFeuilleDetachee() -> some View {
+        let forme = RoundedRectangle(cornerRadius: Verre.rayonFeuilleDetachee, style: .continuous)
+        return clipShape(forme).verre(VerreMatiere.feuilleDetachee, forme: forme)
     }
 }

@@ -3,13 +3,18 @@ import UserNotifications
 
 // MARK: - Brief du jour (plein écran, première ouverture de la journée)
 //
-// Même grammaire que le récap de fin de questionnaire (fond chaud, barre
+// Même grammaire que le récap de fin de questionnaire (fond de verre, barre
 // segmentée, compteur animé, jauges), mais piloté au DOIGT seulement : un
 // brief se survole, il ne défile pas tout seul. Tap à droite = suivant, à
 // gauche = précédent, glisser vers le bas ou la croix = fermer.
 //
 // Il ne bloque jamais rien : fermable à tout moment, et l'appelant ne le
 // présente que s'il a au moins deux écrans à montrer.
+//
+// Verre liquide (2 octobre 2026) : la chorégraphie ne bouge pas. Seules les
+// surfaces changent : fond de verre (teinte kiwi), cartes de verre (`.dsCard()`),
+// action principale en verre vert (`DSCapsuleButton`), croix en rond de verre
+// clair, feuille d'invitation sur le verre de feuille.
 
 struct BriefDuJourView: View {
     let slides: [BriefSlide]
@@ -105,12 +110,16 @@ struct BriefDuJourView: View {
                 Button {
                     terminer(raison: "croix")
                 } label: {
+                    // Rond de verre clair de 36 pt, cible de 44 pt.
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.dsTexte.opacity(0.6))
+                        .foregroundStyle(Verre.iconeNeutre)
+                        .frame(width: 36, height: 36)
+                        .verreClair(Circle())
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
+                .buttonStyle(.dsPress)
                 .accessibilityLabel("Fermer le brief du jour")
                 Spacer()
             }
@@ -508,7 +517,8 @@ struct InvitationNotificationsSheet: View {
             .padding(.horizontal, Theme.spacingLG)
             .padding(.bottom, Theme.spacingLG)
         }
-        .background(Color.dsFond.ignoresSafeArea())
+        // Plus d'aplat : la feuille porte son fond de verre et ses coins de 38.
+        .verreFeuille()
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }

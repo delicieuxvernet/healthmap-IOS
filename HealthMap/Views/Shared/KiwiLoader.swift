@@ -71,7 +71,8 @@ struct KiwiLoader: View {
 
 #Preview {
     ZStack {
-        Color.dsFond.ignoresSafeArea()
+        // Le loader se pose toujours sur le fond de verre, jamais sur un aplat.
+        VerreFond()
         VStack(spacing: 36) {
             KiwiLoader(size: 72)
             KiwiLoader(size: 52)

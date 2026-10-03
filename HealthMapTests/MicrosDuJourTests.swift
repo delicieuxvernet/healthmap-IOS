@@ -48,14 +48,16 @@ final class MicrosDuJourTests: XCTestCase {
     }
 
     private func contexte(scores: [String: Int] = [:], symptomes: [String] = [],
-                          couvertureJournal: [String: Int] = [:]) -> ContexteMicros {
+                          couvertureJournal: [String: Int] = [:],
+                          joursJournal: [String: Int] = [:]) -> ContexteMicros {
         var besoins: [String: Double] = [:]
         for micro in Micronutriments.tous { besoins[micro.id] = 100 }
         besoins["vitE"] = 10
         besoins["vitD"] = 600
         besoins["sodium"] = 2300
         return ContexteMicros(besoins: besoins, depense: 2000, scores: scores,
-                              couvertureJournal: couvertureJournal, symptomes: symptomes)
+                              couvertureJournal: couvertureJournal, joursJournal: joursJournal,
+                              symptomes: symptomes)
     }
 
     private func tableau(_ repas: [S.MealRecord], contexte: ContexteMicros,
@@ -151,20 +153,23 @@ final class MicrosDuJourTests: XCTestCase {
         XCTAssertTrue(vitD.partDuQuestionnaire)
     }
 
-    func testLeChiffreDesAutresVientDesRepasEtDemandeTroisJournees() throws {
-        let deux = try (1...2).map { repas($0, [try item(3, grammes: 100, kcal: 2000)]) }
-        XCTAssertNil(try ligne("vitE", dans: tableau(deux, contexte: contexte())).niveau)
+    func testLeChiffreDesAutresVientDesRepasDesLaPremiereJournee() throws {
+        XCTAssertNil(try ligne("vitE", dans: tableau([], contexte: contexte())).niveau)
 
-        let trois = try (1...3).map { repas($0, [try item(3, grammes: 100, kcal: 2000)]) }
-        let vitE = try ligne("vitE", dans: tableau(trois, contexte: contexte()))
+        let une = [repas(1, [try item(3, grammes: 100, kcal: 2000)])]
+        let vitE = try ligne("vitE", dans: tableau(une, contexte: contexte()))
         XCTAssertEqual(vitE.niveau, 10)   // 1 mg sur 10
         XCTAssertFalse(vitE.partDuQuestionnaire)
+        XCTAssertTrue(vitE.faits.contains { $0.texte.contains("1 journée") })
     }
 
-    func testAujourdhuiNEntrePasDansLeChiffre() throws {
-        // Trois journées dont aujourd'hui : il n'en reste que deux de finies.
-        let jours = try (0...2).map { repas($0, [try item(3, grammes: 100, kcal: 2000)]) }
-        let vitE = try ligne("vitE", dans: tableau(jours, contexte: contexte()))
+    func testLaJourneeEnCoursCompteDesQuElleEstAssezNotee() throws {
+        let complete = [repas(0, [try item(3, grammes: 100, kcal: 2000)])]
+        XCTAssertEqual(try ligne("vitE", dans: tableau(complete, contexte: contexte())).niveau, 10)
+
+        // Le matin, 300 kcal notées : pas encore de chiffre…
+        let matin = [repas(0, [try item(3, grammes: 100, kcal: 300)])]
+        let vitE = try ligne("vitE", dans: tableau(matin, contexte: contexte()))
         XCTAssertNil(vitE.niveau)
         // … mais la journée affichée montre bien ce qui a été noté.
         XCTAssertEqual(vitE.quantiteDuJour ?? 0, 1, accuracy: 0.001)
@@ -231,6 +236,54 @@ final class MicrosDuJourTests: XCTestCase {
         XCTAssertEqual(resultat.priorites.map(\.id), ["vitE"])
     }
 
+    // MARK: - Le rapport oméga-6 / oméga-3
+
+    func testLeRapportOmegaSeCalculeSurLesRepasNotes() throws {
+        let compos: Compositions = [
+            "ciqual:5": CompositionAliment(estime: false, apports: ["omega6": 10, "ala": 1]),
+            "ciqual:6": CompositionAliment(estime: false, apports: ["omega6": 2, "ala": 2]),
+        ]
+        // Deux journées : 10 g puis 2 g d'oméga-6, pour 1 g puis 2 g d'oméga-3.
+        // Les grammes s'additionnent : 12 pour 3, soit 4 pour 1.
+        let jours = [repas(1, [try item(5, grammes: 100, kcal: 2000)]), repas(2, [try item(6, grammes: 100, kcal: 2000)])]
+        let resultat = MicrosDuJour.tableau(repas: jours, jourAffiche: maintenant, compositions: compos,
+                                            contexte: contexte(), registre: [:],
+                                            maintenant: maintenant, calendar: calendrier)
+        let rapport = try ligne("rapportOmega", dans: resultat)
+        XCTAssertEqual(rapport.rapport ?? 0, 4, accuracy: 0.001)
+        XCTAssertNil(rapport.niveau)
+        XCTAssertEqual(rapport.statut, .normal)
+        XCTAssertFalse(resultat.priorites.contains { $0.id == "rapportOmega" })
+        XCTAssertFalse(resultat.alertes.contains { $0.id == "rapportOmega" })
+        XCTAssertTrue(rapport.faits.contains { $0.texte.contains("2 journées") })
+        // Jour par jour, en part du repère : 1 pour 1 avant-hier (20), 10 pour 1 hier (200).
+        XCTAssertEqual(rapport.semaine.compactMap(\.couverture), [20, 200])
+        // Les autres lignes ne portent pas de rapport.
+        XCTAssertNil(try ligne("omega6", dans: resultat).rapport)
+    }
+
+    func testLeRapportOmegaResteVideQuandUnDesDeuxManque() throws {
+        // Les oméga-6 sont connus, les oméga-3 ne le sont pas : on ne divise pas.
+        let compos: Compositions = ["ciqual:7": CompositionAliment(estime: false, apports: ["omega6": 10])]
+        let jours = [repas(1, [try item(7, grammes: 100, kcal: 2000)])]
+        let resultat = MicrosDuJour.tableau(repas: jours, jourAffiche: maintenant, compositions: compos,
+                                            contexte: contexte(), registre: [:],
+                                            maintenant: maintenant, calendar: calendrier)
+        let rapport = try ligne("rapportOmega", dans: resultat)
+        XCTAssertNil(rapport.rapport)
+        XCTAssertTrue(rapport.faits.contains { $0.texte.contains("Pas encore") })
+    }
+
+    func testLeRapportOmegaSEcritEnClair() {
+        XCTAssertEqual(MicrosDuJour.texteDuRapport(4.24), "4,2 pour 1")
+        XCTAssertEqual(MicrosDuJour.texteDuRapport(12.4), "12 pour 1")
+        XCTAssertEqual(MicrosDuJour.texteDuRapport(180), "plus de 50 pour 1")
+        XCTAssertNil(MicrosDuJour.rapport(omega6: 0, omega3: 0))
+        // Des oméga-6 sans aucun oméga-3 : le rapport est hors d'échelle, pas vide.
+        XCTAssertEqual(MicrosDuJour.rapport(omega6: 3, omega3: 0), MicrosDuJour.rapportSansOmega3)
+        XCTAssertEqual(MicrosDuJour.rapport(omega6: 10, omega3: 2), 5)
+    }
+
     // MARK: - Les faits
 
     func testChaqueLigneCiteCeQueLaPersonneARepondu() throws {
@@ -247,7 +300,7 @@ final class MicrosDuJourTests: XCTestCase {
         XCTAssertTrue(questionnaire.texte.contains("25 points"))
         // Sans repas notés, on le dit : aucun chiffre inventé.
         let repas = try XCTUnwrap(vitD.faits.first { $0.genre == .repas })
-        XCTAssertTrue(repas.texte.contains("Pas encore assez"))
+        XCTAssertTrue(repas.texte.contains("Pas encore"))
         XCTAssertTrue(vitD.faits.contains { $0.genre == .jour })
     }
 
@@ -260,12 +313,13 @@ final class MicrosDuJourTests: XCTestCase {
             score: 32
         )
         let vitD = try ligne("vitD", dans: tableau(
-            [], contexte: contexte(scores: ["vitD": 32], couvertureJournal: ["vitD": 11]),
+            [], contexte: contexte(scores: ["vitD": 32], couvertureJournal: ["vitD": 11], joursJournal: ["vitD": 6]),
             registre: ["vitD": detail]
         ))
         let repas = try XCTUnwrap(vitD.faits.first { $0.genre == .repas })
         XCTAssertTrue(repas.texte.contains("11"))
         XCTAssertTrue(repas.texte.contains("13 points"))
+        XCTAssertTrue(repas.texte.contains("6 journées"))
         // Le questionnaire ne cite pas la ligne du journal comme une réponse.
         let questionnaire = try XCTUnwrap(vitD.faits.first { $0.genre == .questionnaire })
         XCTAssertFalse(questionnaire.texte.contains(JournalApports.libelle))

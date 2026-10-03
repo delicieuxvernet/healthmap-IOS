@@ -2,32 +2,11 @@ import XCTest
 import SwiftUI
 @testable import HealthMap
 
-/// Les gestes du quotidien (`KiwiGestes.swift`) reposent sur trois petites
-/// règles. Elles ne se voient qu'à l'écran quand elles cassent : un éclat qui
-/// reste dessiné, une valeur qui ne revient pas à sa place, une butée qui
-/// tremble sans fin sous un doigt maintenu. On les verrouille ici.
+/// La butée d'une quantité (`KiwiGestes.swift`) repose sur deux petites
+/// règles. Elles ne se voient qu'à l'écran quand elles cassent : une valeur
+/// qui ne revient pas à sa place, une butée qui tremble sans fin sous un doigt
+/// maintenu. On les verrouille ici.
 final class KiwiGestesTests: XCTestCase {
-
-    private let cadre = CGRect(x: 0, y: 0, width: 72, height: 72)
-
-    // MARK: Éclats
-
-    func testLesEclatsNeLaissentRienAuReposNiALaFin() {
-        XCTAssertTrue(EclatsShape(progres: 0, rayonDepart: 16).path(in: cadre).isEmpty)
-        XCTAssertTrue(EclatsShape(progres: 1, rayonDepart: 16).path(in: cadre).isEmpty)
-        XCTAssertFalse(EclatsShape(progres: 0.5, rayonDepart: 16).path(in: cadre).isEmpty)
-    }
-
-    /// La pastille réserve 20 points autour du rond : les éclats ne doivent
-    /// jamais en sortir, sinon ils sont rognés par la ligne voisine.
-    func testLesEclatsRestentDansLeurCadre() {
-        let tolerant = cadre.insetBy(dx: -0.01, dy: -0.01)
-        for pas in 1..<20 {
-            let progres = CGFloat(pas) / 20
-            let boite = EclatsShape(progres: progres, rayonDepart: 16).path(in: cadre).boundingRect
-            XCTAssertTrue(tolerant.contains(boite), "éclats hors cadre à \(progres) : \(boite)")
-        }
-    }
 
     // MARK: Secousse
 

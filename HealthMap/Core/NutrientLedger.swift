@@ -158,7 +158,9 @@ enum CalculApports {
     /// 2026-10-01 : le journal corrige les scores depuis la composition exacte
     /// des aliments (`MesuresRepas.repasPrecises`), plus depuis les seuls
     /// pourcentages enregistrés avec le repas.
-    static let version = "2026-10-01"
+    /// 2026-10-01.2 : le journal réagit plus vite (une journée suffit, la
+    /// journée en cours compte, son poids grandit avec les journées notées).
+    static let version = "2026-10-01.2"
 }
 
 // MARK: - Le registre

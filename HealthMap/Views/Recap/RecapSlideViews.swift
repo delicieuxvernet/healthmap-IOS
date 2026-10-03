@@ -4,8 +4,12 @@ import SwiftUI
 //
 // Une couleur dominante par TYPE de slide, pas par slide : vert = ce qui va
 // bien, ambre = l'écart, bleu = l'explication, violet = la projection. Le fond
-// reste toujours le crème de l'app — la teinte n'est qu'un halo, jamais un
+// reste toujours celui de l'app — la teinte n'est qu'un halo, jamais un
 // aplat qui écraserait le texte (contraste ≥ 4,5:1 obligatoire).
+//
+// Verre liquide (2 octobre 2026) : la chorégraphie et la typographie de la
+// séquence ne bougent pas. Seules les surfaces changent : cartes de verre,
+// actions principales en verre teinté vert, action secondaire en verre clair.
 
 struct RecapSlideView: View {
     let slide: RecapSlide
@@ -384,12 +388,8 @@ struct RecapSlideView: View {
                 }
                 .foregroundStyle(Color.dsTexte)
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.dsAccent.opacity(0.25), lineWidth: 1)
-                )
-                .contentShape(Rectangle())
+                .verreClair()
+                .contentShape(Capsule())
             }
             .buttonStyle(.healthMapPressed)
             .recapApparition(1)
@@ -422,8 +422,8 @@ struct RecapSlideView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(Color.dsAccent, in: Capsule())
-                    .contentShape(Rectangle())
+                    .verrePrincipal()
+                    .contentShape(Capsule())
             }
             .buttonStyle(.healthMapPressed)
             .recapApparition(3)
@@ -462,8 +462,8 @@ struct RecapSlideView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(Color.dsAccent, in: Capsule())
-                    .contentShape(Rectangle())
+                    .verrePrincipal()
+                    .contentShape(Capsule())
             }
             .buttonStyle(.healthMapPressed)
             .recapApparition(3)
@@ -495,8 +495,8 @@ struct RecapSlideView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(Theme.spacingSM)
-        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(Theme.spacingSM + 4)
+        .dsCard(rayon: 18)
         .accessibilityElement(children: .combine)
     }
 
@@ -510,8 +510,8 @@ struct RecapSlideView: View {
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(Color.dsAccent, in: Capsule())
-            .contentShape(Rectangle())
+            .verrePrincipal()
+            .contentShape(Capsule())
         }
         .buttonStyle(.healthMapPressed)
     }
@@ -521,10 +521,38 @@ struct RecapSlideView: View {
 
 /// Rendue telle quelle dans la séquence ET exportée en image : une seule
 /// source, donc l'image partagée est exactement ce que l'utilisateur a vu.
+///
+/// Verre liquide : c'est une carte de verre. Elle est translucide, donc
+/// l'export lui pose dessous le fond de verre (voir `RecapView.partager`),
+/// sans quoi l'image partagée serait une carte grise.
 struct RecapCartePartage: View {
     let carte: CarteRecap
+    /// Vrai pour l'image exportée. `ImageRenderer` dessine hors écran : on n'y
+    /// fait pas dépendre la carte de l'ombre découpée du verre (un masque en
+    /// `destinationOut`, qui laisserait un aplat noir sous la carte s'il
+    /// n'était pas rendu). Même dégradé, même liseré, sans l'ombre.
+    var pourExport: Bool = false
 
     var body: some View {
+        if pourExport {
+            contenu.background { plaqueExport }
+        } else {
+            contenu.dsCard()
+        }
+    }
+
+    /// La plaque de la carte exportée : le dégradé du verre de carte
+    /// (blanc 80 → 58 %) et son liseré blanc, sans ombre.
+    private var plaqueExport: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                .fill(LinearGradient(stops: VerreMatiere.carte.arrets, startPoint: .top, endPoint: .bottom))
+            RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.7), lineWidth: 0.5)
+        }
+    }
+
+    private var contenu: some View {
         VStack(alignment: .leading, spacing: Theme.spacingMD) {
             HStack {
                 KiwiLockupBarre()
@@ -563,11 +591,6 @@ struct RecapCartePartage: View {
         }
         .padding(Theme.spacingLG)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.dsAccent.opacity(0.18), lineWidth: 1)
-        )
     }
 
     private func chiffre(_ valeur: Int, _ legende: String, _ couleur: Color) -> some View {

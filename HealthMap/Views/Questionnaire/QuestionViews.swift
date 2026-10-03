@@ -1,27 +1,32 @@
 import SwiftUI
 
 // MARK: - Sweep Select Background (animation de sélection « balayé » — option C)
-/// Fond des cartes d'option du questionnaire : à la sélection, le bleu clair
+/// Fond des cartes d'option du questionnaire : à la sélection, la teinte
 /// BALAIE de gauche à droite au lieu d'un simple fondu (choix d'Arthur,
 /// 13 juin). Respecte la loi 17 (`.healthMapQuick`, gelé si reduce-motion) et
-/// reste clippé à la forme arrondie ; ombre douce identique aux autres cartes
-/// (teintée bleu une fois sélectionnée).
+/// reste clippé à la forme arrondie.
+/// Verre liquide (2 octobre 2026) : la carte est une plaque de verre clair, et
+/// c'est le vert kiwi à 16 % qui balaie.
 private struct SweepSelectBackground: View {
     let isSelected: Bool
     let reduceMotion: Bool
 
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+    }
+
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-        return shape
-            .fill(Color.dsCarte)
+        Color.clear
+            .verreClair(shape)
             .overlay(alignment: .leading) {
                 GeometryReader { geo in
-                    Color.dsAccent.opacity(0.08)
+                    Color.teinteKiwi.opacity(0.16)
                         .frame(width: isSelected ? geo.size.width : 0)
                         .animation(reduceMotion ? .none : .healthMapQuick, value: isSelected)
                 }
+                // Seul le balayage est rogné : l'ombre du verre déborde.
+                .clipShape(shape)
             }
-            .clipShape(shape)
     }
 }
 
@@ -177,10 +182,7 @@ struct NumericInputView: View {
         }
         .padding(.horizontal, Theme.spacingLG)
         .padding(.vertical, Theme.spacingLG)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.dsCarte)
-        )
+        .verreClair(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                 .stroke(isFocused ? Color.dsAccent : Color.clear, lineWidth: 1.5)
@@ -248,10 +250,7 @@ struct WheelInputView: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, Theme.spacingLG)
         .padding(.vertical, Theme.spacingSM)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.dsCarte)
-        )
+        .verreClair(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                 .stroke(
@@ -285,10 +284,7 @@ struct TextInputView: View {
             .focused($isFocused)
             .padding(.horizontal, Theme.spacingLG)
             .padding(.vertical, Theme.spacingLG)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .fill(Color.dsCarte)
-            )
+            .verreClair(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
                     .stroke(isFocused ? Color.dsAccent : Color.clear, lineWidth: 1.5)

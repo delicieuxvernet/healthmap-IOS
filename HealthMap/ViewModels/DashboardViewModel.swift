@@ -34,6 +34,10 @@ final class DashboardViewModel: ObservableObject {
     /// MainTabView). Piloté par `demarrerBilan()` ; remis à false à la
     /// fermeture (« Explorer d'abord », la croix, ou fin du questionnaire).
     @Published var questionnaireOuvert = false
+    /// Où en est un bilan commencé et pas terminé (« Étape 2 sur 4 »), pour la
+    /// carte du Journal. `nil` tant que rien n'est commencé. Posé par
+    /// `MainTabView`, qui tient le ViewModel du questionnaire.
+    @Published var repriseBilan: RepriseBilan?
     @Published var errorMessage: String?
     /// Erreur dédiée au bilan v2 (écran de chargement/gate onboarding).
     /// Distincte de `errorMessage` (v7, autre bandeau) pour ne pas faire
@@ -422,8 +426,9 @@ final class DashboardViewModel: ObservableObject {
         JournalApports.appliquer(HealthCalculator.registreApports(profile: profile), observations: observationsJournal)
     }
 
-    /// Le hash du bilan : le profil, la version du calcul, et ce que le journal
-    /// puis la prise de sang changent aux scores (par paliers de 5 points).
+    /// Le hash du bilan : le profil, la version du calcul, ce que le journal
+    /// puis la prise de sang changent aux scores (par paliers de 5 points), et
+    /// la date de la prise de sang — le bilan la cite.
     var hashDuBilan: String {
         let questionnaire = HealthCalculator.registreApports(profile: profile)
         let avecJournal = JournalApports.appliquer(questionnaire, observations: observationsJournal)
@@ -432,7 +437,11 @@ final class DashboardViewModel: ObservableObject {
             avant: avecJournal,
             apres: PriseDeSangApports.appliquer(avecJournal, priseDeSang: priseDeSang)
         )
-        return AIAnalysisService.hashProfile(profile, journal: signature, sang: signatureSang)
+        return AIAnalysisService.hashProfile(
+            profile,
+            journal: signature,
+            sang: PriseDeSangApports.signatureDuBilan(priseDeSang, scores: signatureSang)
+        )
     }
 
     // MARK: - La prise de sang (Premium, 30 sept. 2026)
@@ -442,6 +451,16 @@ final class DashboardViewModel: ObservableObject {
     func chargerPriseDeSang(userId: String) async {
         guard let derniere = try? await PriseDeSangService.shared.derniere(userId: userId) else { return }
         priseDeSang = derniere
+        // Le rappel des 6 mois se planifie sans le bilan en main (retour au
+        // premier plan, onglet Progrès) : la date lui est laissée ici.
+        RappelsPersonnalises.memoriserPriseDeSang(derniere.date)
+    }
+
+    /// La prise de sang a changé (import, suppression) : le rappel des 6 mois
+    /// suit, tout de suite.
+    private func replanifierRappelPriseDeSang() {
+        RappelsPersonnalises.memoriserPriseDeSang(priseDeSang?.date)
+        Task { await RappelsPersonnalises.replanifier() }
     }
 
     /// Ce que la prise de sang change à chaque apport : le score sans elle,
@@ -468,6 +487,7 @@ final class DashboardViewModel: ObservableObject {
         }
         priseDeSang = nouvelle
         computeLocalScores()
+        replanifierRappelPriseDeSang()
         Task { await retryBilanV2() }
     }
 
@@ -481,17 +501,19 @@ final class DashboardViewModel: ObservableObject {
             await chargerPriseDeSang(userId: session.user.id.uuidString)
         }
         computeLocalScores()
+        replanifierRappelPriseDeSang()
         Task { await retryBilanV2() }
     }
 
-    /// Lit les repas notés des 14 derniers jours (aujourd'hui exclu) et en
+    /// Lit les repas notés des 14 derniers jours (aujourd'hui compris) et en
     /// tire les observations. Un échec réseau laisse le calcul au seul
     /// questionnaire, sans message : le journal corrige, il ne bloque jamais.
     func chargerJournal(userId: String) async {
         let calendrier = Calendar.current
         let aujourdhui = calendrier.startOfDay(for: Date())
-        guard let debut = calendrier.date(byAdding: .day, value: -JournalApports.fenetreJours, to: aujourdhui),
-              let repas = try? await MealJournalService.shared.loadRange(userId: userId, from: debut, to: aujourdhui)
+        guard let debut = calendrier.date(byAdding: .day, value: -(JournalApports.fenetreJours - 1), to: aujourdhui),
+              let demain = calendrier.date(byAdding: .day, value: 1, to: aujourdhui),
+              let repas = try? await MealJournalService.shared.loadRange(userId: userId, from: debut, to: demain)
         else { return }
         // Même mesure que le Journal : la composition exacte des aliments
         // quand la base la connaît, ce que le repas avait enregistré sinon.
@@ -500,6 +522,15 @@ final class DashboardViewModel: ObservableObject {
             repas: MesuresRepas.repasPrecises(repas, compositions: compositions),
             profil: profile
         )
+    }
+
+    /// Un repas vient d'être noté, modifié ou retiré : les chiffres se refont
+    /// tout de suite (demande d'Arthur du 1er octobre 2026). Le bilan rédigé,
+    /// lui, attend le prochain lancement : on ne rappelle pas l'IA à chaque repas.
+    func rafraichirApresUnRepas() async {
+        guard profile.completed, let session = await AuthService.shared.currentSession else { return }
+        await chargerJournal(userId: session.user.id.uuidString)
+        computeLocalScores()
     }
 
     #if DEBUG

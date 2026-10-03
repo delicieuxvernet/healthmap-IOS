@@ -8,6 +8,9 @@ import SwiftUI
 /// remplissage.
 ///
 /// Pattern inspiré de Apple Health / Fitness / Music.
+///
+/// Verre liquide (2 octobre 2026) : les cartes fantômes sont des cartes de
+/// verre, posées sur le fond de la page qui l'héberge.
 struct DashboardSkeletonView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shimmerPhase: CGFloat = 0
@@ -18,7 +21,7 @@ struct DashboardSkeletonView: View {
                 // 1. Hero Score Card skeleton (ring + label + subtitle)
                 HStack(spacing: Theme.spacingMD) {
                     Circle()
-                        .fill(Color.dsAccent.opacity(0.15))
+                        .fill(Verre.pisteAnneau)
                         .frame(width: 88, height: 88)
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -40,7 +43,7 @@ struct DashboardSkeletonView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(Theme.spacingMD)
-                .cardStyle()
+                .dsCard()
                 .padding(.horizontal, Theme.spacingLG)
 
                 // 2. Highlight Grid 2x2 skeleton
@@ -61,7 +64,7 @@ struct DashboardSkeletonView: View {
                         }
                         .padding(Theme.spacingMD)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .cardStyle()
+                        .dsCard()
                     }
                 }
                 .padding(.horizontal, Theme.spacingLG)
@@ -85,7 +88,7 @@ struct DashboardSkeletonView: View {
                             Spacer(minLength: 0)
                         }
                         .padding(Theme.spacingMD)
-                        .cardStyle()
+                        .dsCard()
                     }
                 }
                 .padding(.horizontal, Theme.spacingLG)
@@ -126,5 +129,5 @@ struct DashboardSkeletonView: View {
 
 #Preview {
     DashboardSkeletonView()
-        .background(Color.dsFond)
+        .background { DSPageBackground() }
 }

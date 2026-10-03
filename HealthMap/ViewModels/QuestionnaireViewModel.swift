@@ -30,6 +30,10 @@ final class QuestionnaireViewModel: ObservableObject {
     /// première lettre tapée. Non persisté dans le draft, recalculé à chaque
     /// ouverture.
     @Published private(set) var prenomConnuDuCompte = false
+    /// Écran courant du parcours en quatre étapes (refonte du 1er oct. 2026,
+    /// voir `ParcoursBilan`). Persisté dans le draft : on reprend là où on
+    /// s'est arrêté.
+    @Published private(set) var ecran: EcranBilan = .accueil
     @Published var isSubmitting = false
     @Published var errorMessage: String?
 
@@ -68,6 +72,10 @@ final class QuestionnaireViewModel: ObservableObject {
         /// Ids des questions réellement renseignées par l'utilisateur. Optionnel :
         /// un ancien draft sans ce champ décode et on dérive à la reprise.
         let interactedQuestionIds: [String]?
+        /// Écran courant du parcours en quatre étapes (`EcranBilan.rawValue`).
+        /// Optionnel : un draft d'avant la refonte décode, et on reprend alors
+        /// au premier écran qui n'est pas terminé.
+        let currentScreenId: String?
         let savedAt: Date
     }
     /// Bumped 1→2 (userId), 2→3 (refonte nutrition "Faites vos courses"),
@@ -132,6 +140,11 @@ final class QuestionnaireViewModel: ObservableObject {
         // La liste visible vient de perdre une question : on reste sur la même.
         if let courante, let index = visibleQuestions.firstIndex(where: { $0.id == courante }) {
             currentQuestionIndex = index
+        }
+        // Même chose pour le parcours en quatre étapes : son écran « prénom »
+        // vient de sortir de la liste.
+        if ecran == .prenom {
+            ecran = ParcoursBilan.suivant(apres: .prenom, contexteBilan) ?? .reperes
         }
     }
 
@@ -595,6 +608,265 @@ final class QuestionnaireViewModel: ObservableObject {
         return index
     }
 
+    // MARK: - Parcours en quatre étapes (refonte du 1er octobre 2026)
+    //
+    // La navigation écran par écran du nouveau questionnaire. Toutes les règles
+    // (ordre, écrans visibles, ce qu'il faut avoir répondu pour avancer) vivent
+    // dans `ParcoursBilan` ; ici, seulement l'état et les écritures. Les
+    // réponses passent par `updateAnswer`, comme avant : mêmes clés, mêmes
+    // valeurs, même brouillon chiffré.
+
+    /// Ce dont `ParcoursBilan` a besoin pour décider.
+    var contexteBilan: ContexteBilan {
+        ContexteBilan(
+            profil: profile,
+            renseignees: interactedQuestionIds,
+            prenomConnu: prenomConnuDuCompte,
+            approfondi: !unlockedDeepSections.isEmpty
+        )
+    }
+
+    /// Vrai quand l'écran courant a toutes ses réponses : le bouton s'allume.
+    /// Un écran qui vient de sortir du parcours ne retient jamais personne.
+    var ecranComplet: Bool {
+        let contexte = contexteBilan
+        return !ParcoursBilan.visible(ecran, contexte) || ParcoursBilan.estComplet(ecran, contexte)
+    }
+
+    /// « encore ~2 min », pour l'en-tête. Vide sur le dernier écran.
+    var resteDuParcours: String {
+        ParcoursBilan.texteReste(
+            secondes: ParcoursBilan.secondesRestantes(depuis: ecran, contexteBilan)
+        )
+    }
+
+    /// Ce que le mode de vie dit déjà de chaque apport.
+    var lectureBilan: LectureBilan {
+        PistesBilan.lecture(profil: profile)
+    }
+
+    /// La carte à montrer sous les réponses d'un écran. Celle des besoins
+    /// attend que les quatre repères soient donnés.
+    func carte(pour ecran: EcranBilan) -> CartePiste? {
+        if ecran == .reperes && !ParcoursBilan.estComplet(.reperes, contexteBilan) { return nil }
+        return PistesBilan.carte(pour: ecran, profil: profile)
+    }
+
+    /// La carte de l'écran courant.
+    var carteDeLEcran: CartePiste? {
+        carte(pour: ecran)
+    }
+
+    /// Ce que le Journal affiche pendant que le bilan attend.
+    var repriseBilan: RepriseBilan? {
+        ParcoursBilan.reprise(ecran: ecran, contexteBilan)
+    }
+
+    /// Avance d'un écran. Faux si l'écran n'est pas terminé, ou s'il n'y a
+    /// plus rien après (c'est alors le moment d'envoyer).
+    @discardableResult
+    func ecranSuivant() -> Bool {
+        guard ecranComplet else { return false }
+        ecrireLesReponsesTacites()
+        guard let suivant = ParcoursBilan.suivant(apres: ecran, contexteBilan) else { return false }
+
+        // Une étape se termine quand on quitte sa dernière question, pas
+        // quand on quitte son récapitulatif.
+        if let etape = ecran.etape, !ecran.estFinDEtape,
+           suivant.estFinDEtape || suivant.etape != etape {
+            AnalyticsService.shared.track(.questionnaireSectionCompleted, properties: [
+                "section": etape.titre,
+                "index": etape.rawValue,
+            ])
+        }
+
+        ecran = suivant
+        saveDraft()
+        return true
+    }
+
+    /// Recule d'un écran. Sans effet sur l'accueil.
+    func ecranPrecedent() {
+        guard let precedent = ParcoursBilan.precedent(avant: ecran, contexteBilan) else { return }
+        ecran = precedent
+        saveDraft()
+    }
+
+    /// Les onglets des repas : d'un repas à l'autre, dans n'importe quel ordre.
+    func allerAu(repas: RepasBilan) {
+        guard ecran.repas != nil,
+              let cible = EcranBilan.allCases.first(where: { $0.repas == repas }) else { return }
+        ecran = cible
+        saveDraft()
+    }
+
+    /// Ce qu'un écran dit sans geste, écrit au moment de continuer : une
+    /// bascule laissée éteinte vaut « non », une liste où rien n'est coché
+    /// vaut « aucun ». Les valeurs sont celles des options existantes.
+    private func ecrireLesReponsesTacites() {
+        switch ecran {
+        case .motif:
+            aucunSiVide("symptoms", profile.symptoms)
+            // Aucun objectif coché reste une liste vide : la question n'a pas
+            // d'option « aucun ». Elle a été vue, elle compte comme répondue.
+            interactedQuestionIds.insert("goals")
+        case .prenom:
+            // Les espaces tapés autour du prénom ne partent pas en base.
+            let propre = profile.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if propre != profile.firstName { profile.firstName = propre }
+        case .soleil:
+            nonSiVide("indoorWork", profile.indoorWork)
+        case .alcoolTabac:
+            if !interactedQuestionIds.contains("smoking") {
+                updateAnswer(questionId: "smoking", value: "no")
+            }
+        case .ventre:
+            nonSiVide("bloating", profile.bloating)
+            nonSiVide("antibiotics", profile.antibiotics)
+        case .jamais:
+            aucunSiVide("allergies", profile.allergies)
+        case .placard:
+            nonSiVide("eatLiver", profile.eatLiver)
+            nonSiVide("lowCarbDiet", profile.lowCarbDiet)
+        case .complements:
+            aucunSiVide("supplementsCurrent", profile.supplementsCurrent)
+        case .traitements:
+            aucunSiVide("medications", profile.medications)
+        case .digestion:
+            aucunSiVide("digestiveConditions", profile.digestiveConditions)
+            aucunSiVide("surgicalHistory", profile.surgicalHistory)
+        case .antecedents:
+            aucunSiVide("medicalHistory", profile.medicalHistory)
+        default:
+            break
+        }
+    }
+
+    private func nonSiVide(_ id: String, _ valeur: String) {
+        if valeur.isEmpty { updateAnswer(questionId: id, value: "no") }
+    }
+
+    private func aucunSiVide(_ id: String, _ valeurs: [String]) {
+        if valeurs.isEmpty { updateAnswer(questionId: id, value: ["none"]) }
+    }
+
+    /// Coche ou décoche une réponse d'une liste. La réponse « aucun »
+    /// (`"none"`) et les autres s'excluent.
+    func basculer(_ valeur: String, question id: String) {
+        var courant = arrayValue(for: id)
+        if valeur == "none" {
+            courant = courant == ["none"] ? [] : ["none"]
+        } else {
+            courant.removeAll { $0 == "none" }
+            if let index = courant.firstIndex(of: valeur) {
+                courant.remove(at: index)
+            } else {
+                courant.append(valeur)
+            }
+        }
+        updateAnswer(questionId: id, value: courant)
+    }
+
+    /// Le sexe décide si l'écran « ton cycle » existe. S'il disparaît, ses
+    /// réponses repartent avec lui : sinon une grossesse cochée par erreur
+    /// continuerait de peser sur le fer d'un homme.
+    func choisirSexe(_ valeur: String) {
+        updateAnswer(questionId: "gender", value: valeur)
+        guard profile.gender != .femme else { return }
+        profile.periodFlow = UserProfile.empty.periodFlow
+        profile.pregnancyStatus = UserProfile.empty.pregnancyStatus
+        interactedQuestionIds.subtract(["periodFlow", "pregnancyStatus"])
+        saveDraft()
+    }
+
+    /// Le moment du café n'est demandé qu'à partir de trois par jour : en
+    /// dessous, une réponse donnée plus tôt ne doit pas rester.
+    func choisirCafe(_ valeur: String) {
+        updateAnswer(questionId: "caffeineIntake", value: valeur)
+        guard !ParcoursBilan.cafeDemandeLeMoment(profile), !profile.caffeineTiming.isEmpty else { return }
+        profile.caffeineTiming = ""
+        interactedQuestionIds.remove("caffeineTiming")
+        saveDraft()
+    }
+
+    // MARK: Les aliments, en trois mots
+
+    /// Le niveau enregistré pour cet aliment, `nil` s'il n'est pas coché.
+    func niveau(de aliment: String) -> NiveauConsommation? {
+        guard let portions = profile.groceries[aliment], portions > 0 else { return nil }
+        return NiveauConsommation.depuis(portions: portions)
+    }
+
+    /// Coche un aliment, au niveau par défaut.
+    func cocher(_ aliment: String) {
+        regler(aliment, .parDefaut)
+    }
+
+    /// « Pas beaucoup, modérément, beaucoup » : écrit les portions par semaine.
+    func regler(_ aliment: String, _ niveau: NiveauConsommation) {
+        var caddie = profile.groceries
+        caddie[aliment] = niveau.portions
+        updateGroceries(caddie)
+    }
+
+    /// Décoche un aliment.
+    func retirer(_ aliment: String) {
+        var caddie = profile.groceries
+        caddie.removeValue(forKey: aliment)
+        updateGroceries(caddie)
+    }
+
+    // MARK: Affiner
+
+    /// Vrai si la personne a répondu à cette question. Un champ qui porte une
+    /// valeur par défaut ne compte que si elle l'a confirmée d'un geste.
+    func aRepondu(_ question: Question) -> Bool {
+        switch question.type {
+        case .singleChoice:
+            return interactedQuestionIds.contains(question.id)
+                && !(stringValue(for: question.id) ?? "").isEmpty
+        case .multiChoice:
+            return interactedQuestionIds.contains(question.id)
+                || !arrayValue(for: question.id).isEmpty
+        case .textInput, .numericInput:
+            return !inputText(for: question.id).isEmpty
+        case .groceries:
+            return !profile.groceries.isEmpty
+        }
+    }
+
+    /// Combien de questions ont reçu une réponse, sur combien de posables à
+    /// cette personne. C'est ce que dit l'écran de fin : un décompte, pas une
+    /// note de précision qu'on ne saurait pas justifier.
+    var decompteDesReponses: (repondues: Int, total: Int) {
+        let posables = QuestionnaireSection.allQuestions.filter { $0.showIf?(profile) ?? true }
+        let repondues = posables.filter { aRepondu($0) }.count
+        return (repondues, posables.count)
+    }
+
+    private func toutEstRepondu(_ ecran: EcranBilan) -> Bool {
+        ecran.questions.allSatisfy { id in
+            guard let question = QuestionnaireSection.question(id: id) else { return true }
+            if let visible = question.showIf, !visible(profile) { return true }
+            return aRepondu(question)
+        }
+    }
+
+    /// Vrai s'il reste des questions d'approfondissement sans réponse.
+    var resteAAffiner: Bool {
+        EcranBilan.allCases.contains { $0.estAffinage && !toutEstRepondu($0) }
+    }
+
+    /// « Affiner d'abord » : ouvre les écrans d'approfondissement et se place
+    /// sur le premier qui attend encore une réponse. Le bilan devient
+    /// « complet » au sens du champ `pathway`, comme avec les anciens carrefours.
+    func affiner() {
+        unlockedDeepSections = [.nutrition, .medical]
+        let affinage = ParcoursBilan.ecrans(contexteBilan).filter { $0.estAffinage }
+        ecran = affinage.first { !toutEstRepondu($0) } ?? affinage.first ?? .fin
+        saveDraft()
+    }
+
     // MARK: - Submit
 
     func submitQuestionnaire() async {
@@ -704,6 +976,7 @@ final class QuestionnaireViewModel: ObservableObject {
             pathway: pathway,
             unlockedDeepSections: unlockedDeepSections.map { $0.rawValue },
             interactedQuestionIds: Array(interactedQuestionIds),
+            currentScreenId: ecran.rawValue,
             savedAt: Date()
         )
 
@@ -793,7 +1066,13 @@ final class QuestionnaireViewModel: ObservableObject {
                     .map { $0.id }
             )
         }
-        AppLogger.ui.info("Questionnaire draft restored (answers kept, flow reset to start, saved \(draft.savedAt, privacy: .public))")
+        // Parcours en quatre étapes : on rouvre là où la personne s'est arrêtée,
+        // sans jamais sauter un écran qu'elle n'a pas terminé.
+        self.ecran = ParcoursBilan.ecranDeReprise(
+            enregistre: draft.currentScreenId.flatMap { EcranBilan(rawValue: $0) },
+            contexteBilan
+        )
+        AppLogger.ui.info("Questionnaire draft restored (answers kept, saved \(draft.savedAt, privacy: .public))")
     }
 
     /// Removes the stored draft. Called after a successful

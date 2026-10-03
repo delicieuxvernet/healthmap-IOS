@@ -23,7 +23,9 @@ import UserNotifications
 //               que le dîner manque
 //   · dimanche 18 h — la semaine en chiffres
 // Plus un rappel de retour au 7e jour : il ne sonne que si l'app n'a pas été
-// rouverte d'ici là (chaque ouverture replanifie tout).
+// rouverte d'ici là (chaque ouverture replanifie tout). Et, pour qui a importé
+// une prise de sang, un rappel le jour où elle passe 6 mois (elle compte alors
+// moitié moins) : il dit son âge, jamais une valeur.
 //
 // La journée pleine ne vaut que pour AUJOURD'HUI et DEMAIN — la personne
 // vient d'ouvrir l'app. Au-delà, on retombe à trois rappels par jour : celui
@@ -106,6 +108,9 @@ struct ContexteRappels: Equatable {
     /// qu'on cite, pas un recompte : l'app et la notification ne doivent pas
     /// annoncer deux séries différentes.
     var serieDuJour = 0
+    /// Le prélèvement de la dernière prise de sang importée, s'il y en a une :
+    /// le jour où elle passe 6 mois, un rappel le dit.
+    var priseDeSang: Date?
 
     func jour(_ decalage: Int) -> JourNote { jours[decalage] ?? .vide }
 
@@ -169,6 +174,7 @@ enum RappelsPersonnalises {
         static let semaine = (heure: 18, minute: 0)
         static let soir = (heure: 19, minute: 15)
         static let dernierAppel = (heure: 21, minute: 15)
+        static let priseDeSang = (heure: 10, minute: 30)
     }
 
     // MARK: - Planification (pure, testable)
@@ -282,6 +288,29 @@ enum RappelsPersonnalises {
                 corps: texte.corps,
                 ecran: "meal_scan"
             ))
+        }
+
+        // La prise de sang passe 6 mois : dès cet instant elle compte moitié
+        // moins (`PriseDeSangApports.fraicheur`). Un seul rappel, posé des mois
+        // à l'avance s'il le faut — au premier 10 h 30 qui suit le cap, pour
+        // que la phrase soit vraie quand elle sonne.
+        if let prelevement = contexte.priseDeSang,
+           let cap = PriseDeSangApports.finDuPleinEffet(prelevement: prelevement, calendar: calendar),
+           var date = calendar.date(
+               bySettingHour: Moment.priseDeSang.heure, minute: Moment.priseDeSang.minute, second: 0,
+               of: calendar.startOfDay(for: cap)
+           ) {
+            if date < cap, let lendemain = calendar.date(byAdding: .day, value: 1, to: date) { date = lendemain }
+            if date > maintenant {
+                let texte = FormulationsRappel.priseDeSangSixMois()
+                rappels.append(RappelPlanifie(
+                    id: "\(prefixe)sang",
+                    date: date,
+                    titre: texte.titre,
+                    corps: texte.corps,
+                    ecran: "meal_scan"
+                ))
+            }
         }
 
         return rappels.sorted { $0.date < $1.date }
@@ -424,6 +453,26 @@ enum RappelsPersonnalises {
         return cibles
     }
 
+    // MARK: - Mémoire de la prise de sang
+
+    /// Le prélèvement de la dernière prise de sang, pour replanifier le rappel
+    /// des 6 mois sans le bilan en main. Clé préfixée `healthmap_` → effacée
+    /// au changement de compte.
+    static let clePriseDeSang = "healthmap_rappels_prise_de_sang"
+
+    static func memoriserPriseDeSang(_ prelevement: Date?, defaults: UserDefaults = .standard) {
+        if let prelevement {
+            defaults.set(prelevement.timeIntervalSince1970, forKey: clePriseDeSang)
+        } else {
+            defaults.removeObject(forKey: clePriseDeSang)
+        }
+    }
+
+    static func priseDeSangMemorisee(defaults: UserDefaults = .standard) -> Date? {
+        guard let secondes = defaults.object(forKey: clePriseDeSang) as? Double else { return nil }
+        return Date(timeIntervalSince1970: secondes)
+    }
+
     // MARK: - Interrupteur (Réglages → Notifications)
 
     /// Ce que la personne VEUT, distinct de ce qu'iOS autorise. Allumé par
@@ -492,6 +541,7 @@ enum RappelsPersonnalises {
         if let dernier = gamification.lastCheckinDate, calendar.isDate(dernier, inSameDayAs: maintenant) {
             contexte.serieDuJour = gamification.currentStreak
         }
+        contexte.priseDeSang = priseDeSangMemorisee()
 
         let rappels = planifier(contexte: contexte, maintenant: maintenant, calendar: calendar)
 

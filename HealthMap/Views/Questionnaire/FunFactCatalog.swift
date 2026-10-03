@@ -147,20 +147,18 @@ struct FunFactLabel: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.leading)
         }
-        .foregroundStyle(Color.dsAccent)
+        // Du texte, pas une action : la version foncée du vert, sur du verre.
+        .foregroundStyle(Color.teinteKiwiTexte)
         .padding(.horizontal, Theme.spacingMD)
         .padding(.vertical, Theme.spacingSM + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                .fill(Color.dsRemplissage)
-        )
+        .verre(.carte, forme: RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
     }
 }
 
 #Preview {
     ZStack {
-        Color.dsFond.ignoresSafeArea()
+        DSPageBackground()
         VStack(spacing: Theme.spacingMD) {
             FunFactLabel(questionId: "height", value: 184)
             FunFactLabel(questionId: "age", value: 28)

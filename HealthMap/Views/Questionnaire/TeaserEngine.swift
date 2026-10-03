@@ -126,7 +126,7 @@ struct TeaserCardView: View {
             VStack(alignment: .leading, spacing: Theme.spacingXS) {
                 Text("Première piste")
                     .font(Theme.captionBoldFont)
-                    .foregroundStyle(Color.dsAccent)
+                    .foregroundStyle(Color.teinteKiwiTexte)
 
                 Text(teaser.message)
                     .font(.system(size: 14, weight: .medium, design: .default))
@@ -137,14 +137,8 @@ struct TeaserCardView: View {
         }
         .padding(Theme.spacingMD)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.dsRemplissage)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(Color.dsAccent.opacity(0.2), lineWidth: 1)
-        )
+        // Une carte de verre, teintée de vert kiwi dans son coin.
+        .verreCarte(teinte: Color.teinteKiwi)
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared || reduceMotion ? 0 : 12)
         .onAppear {
@@ -158,7 +152,7 @@ struct TeaserCardView: View {
 
 #Preview {
     ZStack {
-        Color.dsFond.ignoresSafeArea()
+        DSPageBackground()
         TeaserCardView(teaser: Teaser(
             id: "vitD",
             emoji: "🔍",

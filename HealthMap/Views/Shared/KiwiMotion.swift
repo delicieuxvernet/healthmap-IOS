@@ -28,30 +28,50 @@ extension Animation {
     static let kiwiSnap = Animation.easeOut(duration: 0.18)
 }
 
-// MARK: - Une seule physique (maquette « Motion », 1er octobre 2026)
+// MARK: - Quatre mouvements, partout (maquette « Motion v3 - Verre liquide », 2 octobre 2026)
 //
-// Ce qui répond au doigt ou fête un geste ne prend AUCUNE durée fixe : trois
-// ressorts, pour que tout s'interrompe et reparte sans saut. Les quatre courbes
-// du dessus restent celles du contenu qui s'installe tout seul (entrée d'une
-// page, jauge qui se remplit à l'ouverture).
+// La maquette nomme quatre mouvements, et rien d'autre :
+//
+//   - GLISSE (pages, onglets) : `.smooth(duration: 0.45)` ;
+//   - RESSORT (feuilles, zoom, bulle) : `.spring(response: 0.5, dampingFraction: 0.82)` ;
+//   - REBOND (coches, icônes, pastilles) : `.bouncy(duration: 0.45, extraBounce: 0.2)` ;
+//   - COMPTEURS : `.contentTransition(.numericText())` sur 0,9 s.
+//
+// `kiwiVif` reste la réponse à l'appui (un ressort court, sans dépassement).
+// Les quatre courbes du dessus restent celles du contenu qui s'installe tout
+// seul (entrée d'une page, jauge qui se remplit à l'ouverture).
+//
+// Sous « Réduire les animations » : fondus seuls, pas de particules ni de
+// rebond.
 extension Animation {
 
     /// Vif : appuis, bascules, sélection.
     static let kiwiVif = Animation.spring(response: 0.28, dampingFraction: 0.86)
 
-    /// Fluide : feuilles, morphing de la bulle d'écoute, recul de la page.
-    static let kiwiFluide = Animation.spring(response: 0.5, dampingFraction: 0.9)
+    /// Glisse : pages et onglets.
+    static let kiwiGlisse = Animation.smooth(duration: 0.45)
 
-    /// Rebond : célébrations uniquement (coche, étiquettes, confirmation).
-    static let kiwiRebond = Animation.spring(response: 0.55, dampingFraction: 0.72)
+    /// Ressort : feuilles, zoom, bulle, grandes surfaces qui s'installent.
+    static let kiwiFluide = Animation.spring(response: 0.5, dampingFraction: 0.82)
 
-    /// Un chiffre qui compte jusqu'à sa nouvelle valeur. Amorti critique : un
-    /// compteur qui dépasse sa cible puis revient afficherait un faux total.
-    static let kiwiCompteur = Animation.spring(response: 0.6, dampingFraction: 1)
+    /// Rebond : coches, icônes, pastilles, étiquettes.
+    static let kiwiRebond = Animation.bouncy(duration: 0.45, extraBounce: 0.2)
+
+    /// La pastille de verre de la barre d'onglets et le curseur d'une bascule :
+    /// elle dépasse à peine sa cible, puis s'y pose.
+    static let kiwiPastille = Animation.spring(response: 0.5, dampingFraction: 0.7)
+
+    /// La remontée d'un élément qui arrive en cascade.
+    static let kiwiCascade = Animation.spring(response: 0.55, dampingFraction: 0.72)
+
+    /// Un chiffre qui compte jusqu'à sa nouvelle valeur, sur 0,9 s. Aucun
+    /// dépassement : un compteur qui dépasse sa cible puis revient afficherait
+    /// un faux total.
+    static let kiwiCompteur = Animation.timingCurve(0.215, 0.61, 0.355, 1, duration: 0.9)
 }
 
-/// Ce qui grandit, et de combien. Rien ne dépasse 1,08 : au-delà, ça devient
-/// un jeu.
+/// Ce qui grandit, et de combien. Rien ne dépasse 1,22 (l'icône d'un onglet
+/// qui rebondit) : au-delà, ça devient un jeu.
 enum KiwiEchelle {
     /// Appui sur tout élément touchable.
     static let appui: CGFloat = 0.96
@@ -60,12 +80,12 @@ enum KiwiEchelle {
     static let recompenseCrete: CGFloat = 1.08
     /// Une carte dont la valeur vient de changer : impulsion, puis retour.
     static let impulsion: CGFloat = 1.035
-    /// La page, quand la bulle d'écoute prend la main.
-    static let recul: CGFloat = 0.94
-    /// La bulle d'écoute, au plus fort de la voix.
-    static let voix: CGFloat = 1.07
+    /// Une coche qui se pose : 1 → 0,75 → 1,2 → 1.
+    static let coche: CGFloat = 1.2
+    /// L'icône de l'onglet qu'on vient de toucher.
+    static let iconeOnglet: CGFloat = 1.22
     /// Le plafond de tout ce qui précède.
-    static let plafond: CGFloat = 1.08
+    static let plafond: CGFloat = 1.22
 }
 
 // MARK: - Un chiffre qui compte
@@ -186,15 +206,10 @@ struct KiwiEntrance: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .opacity(visible ? 1 : 0)
-            .offset(y: visible ? 0 : 8)
+            .verreCascade(visible, delai: delay, decalage: 12)
             .onAppear {
                 guard !visible else { return }
-                if reduceMotion {
-                    visible = true
-                } else {
-                    withAnimation(.kiwiEntrance.delay(delay)) { visible = true }
-                }
+                visible = true
             }
     }
 }

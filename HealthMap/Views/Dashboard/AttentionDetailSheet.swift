@@ -4,12 +4,12 @@ import SwiftUI
 //
 // Ouvert au tap d'un point d'attention du Bilan (Z3b) — remplace l'ancienne
 // bascule sèche vers l'onglet Plan. Ordre de la maquette :
-//   1. header : pastille warning + kicker « Point d'attention » + « Détecté
-//      dans tes réponses » + chip du nutriment concerné (couleur du nutriment)
+//   1. header : pastille warning + libellé « Point d'attention » + « Détecté
+//      dans tes réponses » + chip du nutriment concerné (teinte du nutriment)
 //   2. teasing TOUJOURS en clair : le QUOI est nommé, pas l'habitude — c'est
-//      la CONCLUSION de la feuille, donc son plus gros texte (17 / heavy)
+//      la CONCLUSION de la feuille, donc son plus gros texte (17 / 600)
 //   3. schéma du mécanisme en 3 étapes (habitude → mécanisme → impact chiffré)
-//   4. carte « Ta solution » (fond kiwiTint, ampoule, phrase actionnable)
+//   4. carte « Ta solution » (verre teinté kiwi, ampoule, phrase actionnable)
 //   5. gating (variante B, 18 août 2026) : en gratuit, 2 + 3 + 4 deviennent UN
 //      écrin `PremiumTeaseCard` (zone "point_attention") — le teasing en est
 //      le titre, le mécanisme / la solution / l'effet n'y passent que floutés
@@ -19,6 +19,11 @@ import SwiftUI
 // code-side `AttentionMechanismCatalog`. Interaction hors catalogue → repli
 // sans schéma : teasing + texte existant du contrat (tipBold/tipRest) gaté.
 // Jamais de coquille vide (le Bilan ne liste que des interactions avec texte).
+//
+// Verre liquide (2 octobre 2026) : feuille de verre, schéma et solution sur
+// des cartes de verre, pastilles rondes à 12 % de leur teinte (habitude
+// neutre, mécanisme ambre, impact énergie), les trois étapes arrivent en
+// cascade, le bouton secondaire est en verre clair.
 struct AttentionDetailSheet: View {
     let interaction: InteractionV2
     let onSeePlan: () -> Void
@@ -27,6 +32,8 @@ struct AttentionDetailSheet: View {
     /// Source unique premium (loi 11), OBSERVÉE : un achat depuis le pop-up
     /// défloute le mécanisme en direct, sans réouverture.
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    /// Les étapes du schéma arrivent en cascade une fois la feuille ouverte.
+    @State private var arrive = false
 
     private var mechanism: AttentionMechanism? {
         AttentionMechanismCatalog.entry(for: interaction)
@@ -60,10 +67,10 @@ struct AttentionDetailSheet: View {
 
                 if subscriptionService.isPremium {
                     // 2 · Teasing = la CONCLUSION de la feuille : le plus gros
-                    // texte de la page (17 / heavy), jamais tronqué.
+                    // texte de la page (17 / 600), jamais tronqué.
                     Text(teasing)
-                        .font(Theme.conclusionFont)
-                        .tracking(Theme.conclusionTracking)
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
                         .foregroundStyle(Color.dsTexte)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -86,66 +93,56 @@ struct AttentionDetailSheet: View {
 
                 seePlanButton
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, DS.marge)
             // Marge haute commune aux fiches en bottom sheet (cf. ApportV2DetailSheet).
             .padding(.top, Theme.spacingLG)
             .padding(.bottom, 30)
         }
-        .background(Color.dsFond)
+        // La feuille ne peint plus d'aplat : fond de verre et coins de 38.
+        .verreFeuille()
+        .onAppear { arrive = true }
     }
 
     // MARK: - 1 · Header
 
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .fill(BilanV7.alertInk.opacity(0.12))
-                    .frame(width: 48, height: 48)
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 21))
-                    .foregroundStyle(BilanV7.alertInk)
-            }
-            .accessibilityHidden(true)
+            VerrePastilleIcone(
+                symbole: "exclamationmark.triangle.fill",
+                teinte: Color.teinteEnergie,
+                taille: 44,
+                tailleIcone: 20
+            )
 
-            VStack(alignment: .leading, spacing: 4) {
-                // Libellé générique : il annonce, il ne rivalise pas. Il
-                // passe donc en kicker teinté (11.5 / bold) — la conclusion
-                // de la feuille est le teasing, pas ce mot-là.
+            VStack(alignment: .leading, spacing: 3) {
+                // Libellé de catégorie : il annonce, il ne rivalise pas. La
+                // conclusion de la feuille est le teasing, pas ce mot-là.
                 Text("Point d'attention")
-                    .font(Theme.subLabelFont)
-                    .textCase(.uppercase)
-                    .kerning(0.4)
-                    .foregroundStyle(BilanV7.alertInk)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.teinteEnergieTexte)
                 Text("Détecté dans tes réponses")
-                    .font(Theme.dataSecondaryFont)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
                     .foregroundStyle(Color.dsSecondaire)
                 if let nutrient {
+                    // Étiquette à la teinte de l'apport : fond à 14 %, texte
+                    // dans sa version foncée.
                     Text(nutrient.label)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(nutrient.color)
+                        .font(.dsLegende.weight(.semibold))
+                        .foregroundStyle(Color.teinteApportTexte(for: nutrient.id.rawValue))
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(nutrient.color.opacity(0.14)))
-                        .padding(.top, 2)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule().fill(Color.nutrientColor(for: nutrient.id.rawValue).opacity(0.14))
+                        )
+                        .padding(.top, 3)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.dsSecondaire)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.dsTexte.opacity(0.06)))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.healthMapPressed)
-            .accessibilityLabel("Fermer")
+            DSCloseButton { dismiss() }
         }
     }
 
@@ -157,14 +154,16 @@ struct AttentionDetailSheet: View {
             schemaView(mechanism)
                 .padding(.top, 18)
             solutionCard(text: mechanism.solution)
-                .padding(.top, 14)
+                .padding(.top, DS.interCarte)
+                .verreCascade(arrive, delai: 0.45, decalage: 10)
         } else {
             // Repli hors catalogue : pas de schéma, le texte EXISTANT du
             // contrat fait l'explication et la solution. Jamais inventé.
             if let rest = interaction.tipRest, !rest.isEmpty {
                 Text(rest)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.dsTexte.opacity(0.85))
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 18)
@@ -172,44 +171,47 @@ struct AttentionDetailSheet: View {
             if let bold = interaction.tipBold, !bold.isEmpty {
                 solutionCard(text: bold)
                     .padding(.top, 14)
+                    .verreCascade(arrive, delai: 0.2, decalage: 10)
             }
         }
     }
 
     private func schemaView(_ mechanism: AttentionMechanism) -> some View {
         HStack(alignment: .top, spacing: 4) {
-            stepView(mechanism.habit, tint: Color.dsTexte)
+            stepView(mechanism.habit, teinte: nil)
+                .verreCascade(arrive, delai: 0.2, decalage: 10)
             arrow
-            stepView(mechanism.mechanism, tint: BilanV7.warnInk)
+                .verreCascade(arrive, delai: 0.24, decalage: 10)
+            stepView(mechanism.mechanism, teinte: Color.teinteVitamineD)
+                .verreCascade(arrive, delai: 0.28, decalage: 10)
             arrow
-            stepView(mechanism.impact, tint: BilanV7.alertInk)
+                .verreCascade(arrive, delai: 0.32, decalage: 10)
+            stepView(mechanism.impact, teinte: Color.teinteEnergie)
+                .verreCascade(arrive, delai: 0.36, decalage: 10)
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, DS.paddingCarte)
         .frame(maxWidth: .infinity)
+        .dsCard()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(mechanism.habit.line1) \(mechanism.habit.line2), donc \(mechanism.mechanism.line1) \(mechanism.mechanism.line2). Résultat : \(mechanism.impact.line1) \(mechanism.impact.line2)."
         )
     }
 
-    private func stepView(_ step: AttentionMechanism.Step, tint: Color) -> some View {
+    private func stepView(_ step: AttentionMechanism.Step, teinte: Color?) -> some View {
         VStack(spacing: 7) {
-            ZStack {
-                Circle()
-                    .fill(tint.opacity(0.1))
-                    .frame(width: 44, height: 44)
-                Image(systemName: step.icon)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(tint)
-            }
+            VerrePastilleIcone(symbole: step.icon, teinte: teinte, taille: 44, tailleIcone: 18)
             VStack(spacing: 1) {
                 Text(step.line1)
-                    .font(.system(size: 11.5, weight: .bold))
+                    .font(.system(.caption, design: .default).weight(.semibold))
                     .foregroundStyle(Color.dsTexte)
                 Text(step.line2)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(.caption, design: .default))
                     .foregroundStyle(Color.dsSecondaire)
             }
             .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
     }
@@ -217,35 +219,35 @@ struct AttentionDetailSheet: View {
     private var arrow: some View {
         Image(systemName: "arrow.right")
             .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(Color.dsSecondaire)
+            .foregroundStyle(Color.dsTertiaire)
             .frame(height: 44)
             .accessibilityHidden(true)
     }
 
     private func solutionCard(text: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 7) {
+            HStack(spacing: 5) {
                 Image(systemName: "lightbulb.fill")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.dsTexte)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.teinteKiwi)
                     .accessibilityHidden(true)
-                // Titre de section : teinté, et rangé SOUS son contenu.
+                // Libellé de catégorie : le vert foncé du kiwi.
                 Text("Ta solution")
-                    .font(Theme.subLabelFont)
-                    .textCase(.uppercase)
-                    .kerning(0.4)
-                    .foregroundStyle(Color.dsTexte)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.teinteKiwiTexte)
             }
             // Le geste : c'est la réponse de la carte, donc son pic.
             Text(text)
-                .font(Theme.insightFont)
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
                 .foregroundStyle(Color.dsTexte)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
+        .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.dsRemplissage))
+        .verreCarte(teinte: Color.teinteKiwi)
     }
 
     // MARK: - Promesses de l'écrin (contenu premium RÉEL, toujours flouté)
@@ -294,26 +296,25 @@ struct AttentionDetailSheet: View {
 
     // MARK: - 6 · Bouton secondaire « Voir dans mon plan »
 
+    /// Action secondaire : capsule de verre clair, encre du texte.
     private var seePlanButton: some View {
         Button {
             onSeePlan()
         } label: {
             HStack(spacing: 7) {
                 Text("Voir dans mon plan")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
                 Image(systemName: "arrow.right")
                     .font(.system(size: 15, weight: .semibold))
                     .accessibilityHidden(true)
             }
             .foregroundStyle(Color.dsTexte)
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.dsTexte.opacity(0.05))
-            )
-            .contentShape(Rectangle())
+            .frame(maxWidth: .infinity, minHeight: DS.hauteurBouton)
+            .verreClair()
+            .contentShape(Capsule())
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel("Voir dans mon plan")
         .padding(.top, 18)
     }

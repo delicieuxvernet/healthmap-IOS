@@ -81,16 +81,16 @@ extension Color {
 
     // Nutrient-specific colors — palette variée alignée sur le web (NUTRIENTS dans health.js).
     // Chaque nutriment a SA couleur distincte pour aider la mémorisation utilisateur (façon FoodVisor).
-    static let nutrientVitD = Color(hex: "FF9500")        // orange
-    static let nutrientVitB12 = Color(hex: "FF3B30")      // rouge
-    static let nutrientIron = Color(hex: "AF52DE")        // purple
-    static let nutrientMagnesium = Color(hex: "5AC8FA")   // sky
-    static let nutrientOmega3 = Color(hex: "007AFF")      // blue
-    static let nutrientVitC = Color(hex: "34C759")        // green
+    static let nutrientVitD = Color(hex: "F1961D")        // ambre (verre)
+    static let nutrientVitB12 = Color(hex: "E8605B")      // corail (dérivé)
+    static let nutrientIron = Color(hex: "AF5FC7")        // orchidée (verre)
+    static let nutrientMagnesium = Color(hex: "2FA9CE")   // lagon (dérivé)
+    static let nutrientOmega3 = Color(hex: "3B9CF6")      // azur (dérivé)
+    static let nutrientVitC = Color(hex: "11A6AA")        // sarcelle (verre)
     static let nutrientCalcium = Color(hex: "8E8E93")     // gray
-    static let nutrientZinc = Color(hex: "FF2D55")        // magenta
-    static let nutrientIodine = Color(hex: "5856D6")      // indigo
-    static let nutrientFiber = Color(hex: "A2845E")       // brown
+    static let nutrientZinc = Color(hex: "DB5FA1")        // magenta (dérivé)
+    static let nutrientIodine = Color(hex: "7368D4")      // indigo (verre)
+    static let nutrientFiber = Color(hex: "4CAC91")       // menthe (verre)
 
     // MARK: - Kiwio accent (vert kiwi) + macros FoodVisor
     // Décision produit 26 juin 2026 : la zone alimentation (écran scan repas)
@@ -101,9 +101,9 @@ extension Color {
     static let kiwiInk = Color(hex: "3B6D11")            // texte sur tint kiwi
     // Macros (façon FoodVisor) — couleurs distinctes, hors sémantique de statut
     // (vert/ambre/rouge portent déjà un sens : couvre / à renforcer / à combler).
-    static let macroProtein = Color(hex: "2F6FE0")        // bleu
-    static let macroCarb = Color(hex: "F2B705")           // jaune
-    static let macroFat = Color(hex: "FB8500")            // orange
+    static let macroProtein = Color(hex: "4E82E5")        // bleu (verre)
+    static let macroCarb = Color(hex: "E6B731")           // jaune (verre)
+    static let macroFat = Color(hex: "F18336")            // orange (verre)
     // fibres = kiwiGreen (vert)
 
     // Urgency — red kept ONLY for genuine medical alerts (Apple HIG alert semantic).

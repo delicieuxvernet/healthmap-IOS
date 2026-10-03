@@ -10,10 +10,14 @@ import AppIntents
 // appareil). Elles ne lisent rien : on leur passe l'état à dessiner.
 //
 // Règles reprises de l'app : le vert ne colore que ce qui se touche, les
-// créneaux gardent les symboles et les teintes de la mosaïque du Journal, les
-// chiffres sont à chasse tabulaire, aucun complément ne porte de dose.
+// créneaux gardent les symboles de la mosaïque du Journal, les chiffres sont
+// à chasse tabulaire, aucun complément ne porte de dose.
 // Différence assumée : un widget suit le mode clair ou sombre du téléphone,
-// alors que l'app reste claire. Les couleurs sont donc sémantiques.
+// alors que l'app reste claire. Les couleurs sont donc sémantiques : hors le
+// vert Kiwio, les créneaux, les moments et l'eau gardent les teintes du
+// système, qui s'adaptent seules, là où l'app est passée à la palette du
+// verre. Même famille de couleur (orangé, indigo, rose, bleu), pas la même
+// valeur.
 //
 // Les encres s'écrivent `Color.primary` / `Color.secondary`, jamais `.primary` /
 // `.secondary` : ces derniers sont des NIVEAUX de la teinte courante, et dans
@@ -22,14 +26,19 @@ import AppIntents
 enum TeinteW {
     /// Vert Kiwio (`kiwiGreen`).
     static let vert = Color(red: 0x5D / 255.0, green: 0xA8 / 255.0, blue: 0x38 / 255.0)
-    /// Orangé des calories et de la série (`dsCalories`).
+    /// Orangé des calories et de la série. L'app est passée à `teinteEnergie`
+    /// (#F07040) ; le widget garde l'orangé d'avant le verre (#FF6B35).
     static let calories = Color(red: 1.0, green: 0x6B / 255.0, blue: 0x35 / 255.0)
-    /// Bleu de l'eau : la teinte système du Journal (`eauKiwio`).
+    /// Bleu de l'eau : la teinte système, là où la carte Eau du Journal
+    /// utilise `teinteEau`.
     static let eau = Color.cyan
     /// Fond d'une tuile neutre : une voile de l'encre, lisible en clair comme en sombre.
     static let tuile = Color.primary.opacity(0.07)
 
-    /// Mêmes teintes que `JournalRepasMosaique`.
+    /// Même logique que `JournalRepasMosaique` (orangé le matin, vert Kiwio le
+    /// midi, indigo le soir, rose pour l'encas), mais en teintes système hors
+    /// le vert : le Journal, lui, prend la palette du verre
+    /// (`MealSlot.teinteJournal`).
     static func creneau(_ creneau: CreneauWidget) -> Color {
         switch creneau {
         case .breakfast: return .orange
@@ -39,7 +48,10 @@ enum TeinteW {
         }
     }
 
-    /// Mêmes teintes que `ComplementsRituelStrip`.
+    /// Même logique que `ComplementsRituelStrip` (orangé le matin, jaune le
+    /// midi, indigo le soir), en teintes système : l'onglet Compléments, lui,
+    /// prend la palette du verre (`teinteVitamineD`, `teinteGlucides`,
+    /// `teinteIode`).
     static func moment(_ moment: MomentRituel) -> Color {
         switch moment {
         case .matin: return .orange

@@ -2,10 +2,14 @@ import SwiftUI
 
 // MARK: - Bilan « v4 » (refonte 3D — direction validée juin 2026)
 //
-// Composants de l'onglet Bilan dans le langage v4 : fond crème, cartes
-// blanches arrondies, anneaux pleins, illustrations 3D (Fluent3D), pop-up
-// bottom-sheet. Couleur = sens partout (échelle unique HealthScale).
+// Composants de l'onglet Bilan dans le langage v4 : cartes arrondies, anneaux
+// pleins, illustrations 3D (Fluent3D), pop-up bottom-sheet. Couleur = sens
+// partout (échelle unique HealthScale).
 // Source maquette : « Bilan v4 - 3D » (Corrections design et interface app).
+//
+// Verre liquide (2 octobre 2026) : la feuille est en verre, la liste des
+// fruits est une carte de verre dont les lignes arrivent en cascade, la série
+// porte la teinte « énergie » (flamme) et son compte est en SF Pro Rounded.
 
 
 // MARK: - Pop-up détail de la récolte (au tap sur le bloc récolte)
@@ -15,6 +19,8 @@ import SwiftUI
 struct RecolteDetailSheet: View {
     let streak: Int
     @Environment(\.dismiss) private var dismiss
+    /// Les lignes de fruits arrivent en cascade une fois la feuille ouverte.
+    @State private var arrive = false
 
     private var ladder: [Fluent3D.HarvestRung] { Fluent3D.harvestLadder }
 
@@ -23,67 +29,76 @@ struct RecolteDetailSheet: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     Text("Ta récolte")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.dsSection)
+                        .tracking(DSTracking.section)
                         .foregroundStyle(Color.dsTexte)
+                        .accessibilityAddTraits(.isHeader)
                     Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.dsSecondaire)
-                            .frame(width: 34, height: 34)
-                            .background(Circle().fill(Color.dsTexte.opacity(0.06)))
-                    }
-                    .buttonStyle(.healthMapPressed)
-                    .accessibilityLabel("Fermer")
+                    DSCloseButton { dismiss() }
                 }
 
                 // Série en cours (le « trophée » de jours d'affilée)
                 HStack(spacing: 14) {
-                    ZStack {
-                        Circle().fill(Color.dsRemplissage).frame(width: 56, height: 56)
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 26))
-                            .foregroundStyle(Color.dsAccent)
-                    }
+                    VerrePastilleIcone(
+                        symbole: "flame.fill",
+                        teinte: Color.teinteEnergie,
+                        taille: 56,
+                        tailleIcone: 26
+                    )
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(streak) jour\(streak > 1 ? "s" : "") d'affilée")
-                            .font(.system(size: 22, weight: .bold))
+                        (Text(DS.entier(streak))
+                            .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
+                            + Text(streak > 1 ? " jours d'affilée" : " jour d'affilée")
+                                .font(.dsHeadline))
+                            .tracking(-0.4)
                             .foregroundStyle(Color.dsTexte)
                         Text("Chaque palier de série débloque un fruit.")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.dsLegende)
+                            .tracking(DSTracking.legende)
                             .foregroundStyle(Color.dsSecondaire)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.top, 18)
+                .padding(DS.paddingCarte)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .dsCard()
+                .padding(.top, 12)
+                .accessibilityElement(children: .combine)
 
                 Text("Tes fruits")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.dsTexte)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .padding(.horizontal, 4)
                     .padding(.top, 22)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 8)
+                    .accessibilityAddTraits(.isHeader)
 
                 VStack(spacing: 0) {
                     ForEach(Array(ladder.enumerated()), id: \.element.id) { idx, rung in
                         if idx > 0 {
-                            Divider().background(Color.dsTexte.opacity(0.07))
+                            // Le filet arrive avec sa ligne.
+                            DSSeparator(retrait: 0)
+                                .verreCascade(arrive, delai: 0.2 + Double(min(idx, 8)) * 0.05, decalage: 0)
                         }
                         rungRow(rung)
+                            .verreCascade(arrive, delai: 0.2 + Double(min(idx, 8)) * 0.05, decalage: 10)
                     }
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, DS.paddingCarte)
                 .frame(maxWidth: .infinity)
-                .kiwiCard(radius: 18)
+                .dsCard()
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, DS.marge)
             .padding(.top, 8)
             .padding(.bottom, 30)
         }
-        .background(Color.dsFond)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(30)
+        // La feuille ne peint plus d'aplat : fond de verre et coins de 38.
+        .verreFeuille()
+        .onAppear { arrive = true }
     }
 
     @ViewBuilder
@@ -96,29 +111,34 @@ struct RecolteDetailSheet: View {
                 .opacity(earned ? 1 : 0.35)
             VStack(alignment: .leading, spacing: 2) {
                 Text(rung.name)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
                 Text("Débloqué à \(rung.threshold) jour\(rung.threshold > 1 ? "s" : "") d'affilée")
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
                     .foregroundStyle(Color.dsSecondaire)
             }
             Spacer(minLength: 8)
             if earned {
+                // Étiquette d'état : vert foncé du kiwi sur la teinte à 14 %.
                 HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 12))
-                    Text("Obtenu").font(.system(size: 11, weight: .bold))
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("Obtenu")
+                        .font(.dsLegende.weight(.semibold))
                 }
-                .foregroundStyle(Color.dsTexte)
-                .padding(.horizontal, 9)
+                .foregroundStyle(Color.teinteKiwiTexte)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 4)
-                .background(Capsule().fill(Color.dsRemplissage))
+                .background(Capsule().fill(Color.teinteKiwi.opacity(0.14)))
             } else {
                 Text("Dans \(left) j")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.dsLegende.weight(.semibold))
                     .foregroundStyle(Color.dsSecondaire)
-                    .padding(.horizontal, 9)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.dsTexte.opacity(0.06)))
+                    .background(Capsule().fill(Verre.remplissage))
             }
         }
         .padding(.vertical, 12)

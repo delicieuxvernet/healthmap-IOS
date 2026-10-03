@@ -21,7 +21,8 @@ struct ScoreHistoryView: View {
 
     var body: some View {
         ZStack {
-            WarmBackground()
+            // Page poussée : le fond de verre de l'app, sous son voile.
+            VerrePageFond()
 
             if isLoading {
                 VStack(spacing: Theme.spacingMD) {
@@ -99,7 +100,7 @@ struct ScoreHistoryView: View {
             Spacer()
         }
         .padding(Theme.spacingMD)
-        .cardStyle()
+        .dsCard()
         .padding(.horizontal, Theme.spacingLG)
     }
 
@@ -146,7 +147,7 @@ struct ScoreHistoryView: View {
             .padding(.horizontal, Theme.spacingLG)
         }
         .padding(.vertical, Theme.spacingSM)
-        .cardStyle()
+        .dsCard()
         .padding(.horizontal, Theme.spacingLG)
     }
 
@@ -186,7 +187,7 @@ struct ScoreHistoryView: View {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(Color.dsSecondaire.opacity(0.1))
+                                .fill(Verre.remplissage)
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(Color.globalScoreColor(for: snapshot.score))
                                 .frame(width: geo.size.width * CGFloat(snapshot.score) / 100.0)
@@ -202,7 +203,7 @@ struct ScoreHistoryView: View {
             }
         }
         .padding(Theme.spacingMD)
-        .cardStyle()
+        .dsCard()
         .padding(.horizontal, Theme.spacingLG)
     }
 
