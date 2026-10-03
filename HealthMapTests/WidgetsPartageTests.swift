@@ -1003,7 +1003,11 @@ private struct CasePlanche<Vue: View>: View {
                 .background(Circle().fill(Color.white.opacity(0.16)))
                 .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.6))
         case .rectangulaire:
+            // Même marge intérieure que la plaque posée par le bundle
+            // (`HabillageVerreKiwio`).
             vue()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
                 .frame(width: 160, height: 72)
                 .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white.opacity(0.16)))
                 .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)

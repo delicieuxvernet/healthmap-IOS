@@ -87,8 +87,10 @@ struct FournisseurJour: TimelineProvider {
 /// Le verre des widgets d'accueil, posé ici une fois pour toutes : les vues ne
 /// portent ni leur marge ni leur fond (la configuration désactive les marges
 /// du système, `contentMarginsDisabled`, pour que le verre aille jusqu'au
-/// bord). Les accessoires de l'écran verrouillé restent nus : iOS les dessine
-/// en monochrome, et iOS 17 exige quand même un fond déclaré.
+/// bord). Sur l'écran verrouillé, les rectangulaires reçoivent la plaque de
+/// la maquette (le fond d'accessoire d'iOS) et sa marge intérieure ; les
+/// ronds portent la leur dans leur vue, l'accessoire en ligne n'en a pas.
+/// iOS 17 exige dans tous les cas un fond déclaré.
 private struct HabillageVerreKiwio: ViewModifier {
     @Environment(\.widgetFamily) private var famille
 
@@ -101,7 +103,15 @@ private struct HabillageVerreKiwio: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if accessoire {
+        if famille == .accessoryRectangular {
+            ZStack {
+                AccessoryWidgetBackground()
+                content
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+            }
+            .containerBackground(for: .widget) { Color.clear }
+        } else if accessoire {
             content
                 .containerBackground(for: .widget) { Color.clear }
         } else {

@@ -390,12 +390,16 @@ private struct ApportsGrandContenuW: View {
                         .minimumScaleFactor(0.8)
                         .padding(.top, 3 * k)
                     if let cause = lecture.cause {
+                        // La phrase de cause prend les lignes dont elle a
+                        // besoin (trois au plus) : sans `fixedSize`, la rangée
+                        // de l'anneau la compressait en une seule ligne
+                        // tronquée sur le rendu de la CI.
                         Text(cause)
                             .font(.texteW(13))
                             .foregroundStyle(TeinteW.encre(0.85))
                             .lineSpacing(1.5)
                             .lineLimit(3)
-                            .minimumScaleFactor(0.85)
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 6 * k)
                     }
                 }
