@@ -1051,7 +1051,7 @@ private struct LigneNotifications: View {
 /// d'iOS (celui d'iOS 26 est plus large et n'a plus ce dessin) : piste de
 /// 51 × 31, verte allumée, grise éteinte ; pastille blanche de 27 à 2 pt du
 /// bord. Toute la ligne se touche, comme sur la maquette. VoiceOver lit
-/// toujours un interrupteur système, avec son état.
+/// un interrupteur, avec son état.
 private struct InterrupteurVerreStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 12) {
@@ -1060,12 +1060,11 @@ private struct InterrupteurVerreStyle: ToggleStyle {
         }
         .contentShape(Rectangle())
         .onTapGesture { configuration.isOn.toggle() }
-        .accessibilityRepresentation {
-            // Style système explicite : sans lui, ce Toggle reprendrait ce
-            // style-ci (hérité de l'environnement) et se représenterait sans fin.
-            Toggle(isOn: configuration.$isOn) { configuration.label }
-                .toggleStyle(.switch)
-        }
+        // VoiceOver lit un interrupteur, avec son état, et le bascule.
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isToggle)
+        .accessibilityValue(configuration.isOn ? "Activé" : "Désactivé")
+        .accessibilityAction { configuration.isOn.toggle() }
     }
 }
 
