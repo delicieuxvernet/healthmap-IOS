@@ -622,7 +622,7 @@ if MODE == "apply-app"
     notes: <<~NOTES.strip,
       Kiwio is a French nutrition app. Demo account: audit-b@test.com
 
-      NAVIGATION (new design in this version): five tabs at the bottom -
+      NAVIGATION: five tabs at the bottom -
       Journal, Progres, Plan, Complements, Reglages (= Settings). There is no
       "Profil" tab: the profile and every account setting live in the Reglages
       tab (last tab).
@@ -1004,7 +1004,12 @@ end
 # pas à repasser en review (contrairement à la 1.0, cf. l'épisode des 4 refus).
 # VERSION_STRING (défaut : la version en cours ci-dessous) · WHATS_NEW (défaut : les notes ci-dessous).
 if MODE == "new-version"
-  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.4" : ENV["VERSION_STRING"]
+  # Version 1.0.5 (3 oct. 2026) : widgets en verre, verre liquide, bilan
+  # ludique, dictée en bulle, prise de sang (bêta), icône zoomée. Les textes
+  # de la fiche (description, notes, texte promo, mots-clés) ont été validés
+  # par Arthur avant l'envoi ; VERSION_STRING / WHATS_NEW restent des
+  # surcharges possibles.
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.5" : ENV["VERSION_STRING"]
 
   existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
     .find { |v| v.dig("attributes", "versionString") == vs }
@@ -1020,39 +1025,99 @@ if MODE == "new-version"
     version_id = resp.dig("data", "id")
   end
 
-  notes = ENV["WHATS_NEW"].to_s.empty? ? <<~NOTES.strip : ENV["WHATS_NEW"]
-    Kiwio fait peau neuve, et t'explique enfin le pourquoi.
+  notes_fiche = <<~FICHE.strip
+    Kiwio passe au verre liquide, et vient jusque sur ton écran d'accueil.
 
-    Une nouvelle identité : la tranche de kiwi, de face, partout, jusqu'à l'icône. Pendant un chargement, ses pépins s'allument un à un.
+    Des widgets en verre : tes apports, ta journée, ton eau d'un toucher, ton rituel du jour, et un ajout rapide pour dicter ou photographier un repas sans ouvrir l'app. Ta journée s'affiche aussi en direct sur l'écran verrouillé et dans la Dynamic Island. À partir d'iOS 18, « Dicter un repas » et « Un verre d'eau » se posent dans le Centre de contrôle.
 
-    L'anneau de cause : pour chaque apport, tu vois ce qui pèse sur ton score, de combien, et ce que tu regagnerais en changeant une habitude. Touche une cause pour comprendre.
+    Le verre liquide, partout : des cartes en verre dépoli, un fond qui suit l'onglet, des mouvements tout en douceur. Progrès devient une toile : tes dix apports d'un coup d'œil. Et sur l'icône, le kiwi prend toute la place.
 
-    Un plan qui se lit d'un coup d'œil : tes objectifs, tes symptômes et tes apports reliés entre eux. Touche un point pour voir à quoi il est lié et par où commencer.
+    Un bilan plus ludique : quatre petites étapes, une question à la fois, et le kiwi qui te dit pourquoi il la pose. Tu remplis ta journée repas par repas, et chaque étape se termine par des pistes à retourner.
 
-    Un journal plus rapide : dicte, photographie ou écris ton repas depuis la page. Maintiens le bouton Dicter pour parler, relâche pour envoyer. Après chaque ajout, Kiwio te montre ce que ton repas a fait bouger.
+    La dictée en bulle : maintiens « Dicter », parle, relâche. Ce que tu as dit fait foi, quantités comprises.
 
-    Une recherche où l'on s'y retrouve : la photo du produit, son Nutri-Score, et une illustration par famille d'aliments.
+    Des chiffres plus justes : un seul chiffre par apport, le même partout. Tes repas notés comptent plus vite, et tes besoins suivent ton âge, ton sexe et ta situation.
 
-    Tes progrès en trois lignes : ce qui va mieux, ce qui ne bouge pas encore, et la courbe qui le montre.
+    Poids et eau dans le Journal : règle ton poids souhaité, tes calories et tes macros s'ajustent. L'eau se remplit gobelet par gobelet.
 
-    Ton journal voyage dans le temps : reviens sur les jours passés ou prépare les suivants, un calendrier t'emmène où tu veux.
+    Ton Plan prend vie : attrape une bulle, ses voisines suivent. Et chaque rappel part d'un fait de ta journée.
 
-    Ton brief du jour et des rappels qui te ressemblent : ce qui t'a manqué hier, sur quoi miser aujourd'hui, avec des idées de repas. Tu choisis de les activer.
+    Pour les abonnés Premium : tes micronutriments sous tes macros, avec le rapport oméga-6 / oméga-3, le conseil du jour en widget, une offre à l'année, et, en bêta, la prise de sang. Photographie tes résultats ou dépose le PDF du laboratoire : les valeurs mesurées comptent dans tes apports et ton bilan, et ton document est lu, puis oublié. Elle ne remplace pas l'avis d'un médecin.
 
-    Premium plus fiable, réglages repensés, et des corrections un peu partout.
-  NOTES
+    Et des corrections un peu partout.
+  FICHE
 
+  description_fiche = <<~FICHE.strip
+    Comprends enfin ce que ton alimentation t'apporte, et sache par où commencer aujourd'hui.
+    Des chiffres clairs, et le pourquoi derrière chacun. Sans jargon, sans culpabilité.
+
+    TON BILAN, EN QUATRE PETITES ÉTAPES
+    - Une question à la fois : le kiwi te dit pourquoi il la pose, et tu remplis ta journée type repas par repas.
+    - Kiwio en tire tes dix apports clés : vitamines D, B12 et C, fer, magnésium, calcium, zinc, iode, oméga-3 et fibres.
+    - Chacun a un seul chiffre, le même partout : la part de ton besoin couverte, selon ton âge, ton sexe et ta situation.
+    - L'anneau de cause : pour chaque apport, ce qui pèse dessus, de combien, et ce que tu regagnerais en changeant une habitude.
+
+    NOTER UN REPAS EN QUELQUES SECONDES
+    - Dicte-le : touche ou maintiens « Dicter », et parle. Ce que tu dis fait foi, quantités comprises.
+    - Ou photographie ton assiette, écris-le, cherche un aliment, scanne un code-barres.
+    - Tes repas notés font bouger tes chiffres.
+    - Note ton eau et ton poids, règle ton poids souhaité, et relie Apple Santé : ton activité élargit ton budget du jour.
+
+    SAVOIR QUOI FAIRE AUJOURD'HUI
+    - Ton brief du jour : ta veille en un coup d'œil, et ta priorité du jour.
+    - Ton Plan relie tes objectifs, ce que tu ressens et tes apports, pour voir par où commencer.
+    - Des rappels qui partent d'un fait de ta journée, si tu choisis de les activer.
+
+    SUIVRE SANS Y PENSER
+    - Des widgets en verre pour l'écran d'accueil et l'écran verrouillé : tes apports, ta journée, ton eau d'un toucher, ton rituel du jour, et un ajout rapide pour noter un repas sans ouvrir l'app.
+    - Ta journée en direct sur l'écran verrouillé et dans la Dynamic Island.
+    - Progrès : tes dix apports sur une toile, et un check-in rapide pour suivre ce que tu ressens.
+
+    DES COMPLÉMENTS SANS PARTI PRIS
+    Quand ton bilan en fait ressortir, Kiwio te dit quoi chercher et pourquoi. Quand l'assiette suffit, il te le dit aussi. Kiwio ne gagne rien sur ce qu'il te recommande : aucune commission, aucun partenariat, tu achètes où tu veux.
+
+    KIWIO PREMIUM
+    Ton bilan, ton Journal, tes apports à renforcer et leurs causes restent gratuits. Premium ajoute :
+    - le détail de tes vitamines, minéraux et acides gras dans le Journal, avec le rapport oméga-6 / oméga-3 ;
+    - ce que tu peux faire pour chaque apport, et les solutions de ton Plan ;
+    - tes tendances et ta progression depuis le départ ;
+    - le conseil du jour, à cocher depuis son widget ;
+    - la prise de sang, en bêta : photographie tes résultats ou dépose le PDF du laboratoire, les valeurs mesurées comptent dans tes apports, et ton document est lu, puis oublié ;
+    - plus de dictées, et jusqu'à 30 scans photo par jour.
+
+    Kiwio ne remplace pas un avis médical, et sa lecture d'une prise de sang ne remplace pas celle d'un médecin : montre-lui toujours tes résultats. C'est ton compagnon bien-être au quotidien.
+
+    Conditions d'utilisation (CGU) : https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+    Confidentialité : https://healthmap.fr/privacy
+  FICHE
+
+  promo_fiche = <<~FICHE.strip
+    Comprends ce que ton assiette t'apporte et sache par où commencer. Nouveau : des widgets en verre, un bilan plus ludique et la dictée en bulle.
+  FICHE
+
+  mots_cles_fiche = "nutrition,vitamines,minéraux,micronutriments,calories,repas,alimentation,compléments,fibres,fer"
+
+  notes = ENV["WHATS_NEW"].to_s.empty? ? notes_fiche : ENV["WHATS_NEW"]
+
+  # Les notes partout ; la description, le texte promo et les mots-clés
+  # seulement en fr-FR (langue principale, la seule localisation de la fiche).
   get_all("/v1/appStoreVersions/#{version_id}/appStoreVersionLocalizations?limit=20").each do |l|
     loc = l.dig("attributes", "locale")
-    write("notes de version #{loc}", :patch, "/v1/appStoreVersionLocalizations/#{l["id"]}",
-      { data: { type: "appStoreVersionLocalizations", id: l["id"], attributes: { whatsNew: notes } } })
+    attrs = { whatsNew: notes }
+    if loc == "fr-FR"
+      attrs[:description] = description_fiche
+      attrs[:promotionalText] = promo_fiche
+      attrs[:keywords] = mots_cles_fiche
+    end
+    write("fiche #{loc} (#{attrs.keys.join(", ")})", :patch, "/v1/appStoreVersionLocalizations/#{l["id"]}",
+      { data: { type: "appStoreVersionLocalizations", id: l["id"], attributes: attrs } })
   end
 
   code, v = req(:get, "/v1/appStoreVersions/#{version_id}")
   puts "
 ===== VERSION #{vs} ====="
   puts JSON.pretty_generate(code == 200 ? v["data"]["attributes"] : v)
-  puts "PROCHAINE ÉTAPE : apply-app (build + infos review), puis stage-version + send-submission."
+  puts "PROCHAINE ÉTAPE : apply-app (build + infos review), puis screenshots, stage-version + send-submission."
   exit 0
 end
 
