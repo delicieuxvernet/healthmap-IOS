@@ -166,7 +166,9 @@ private struct PetitConseilW<Pied: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
+            // 10 pt sous l'illustration, comme la maquette : à 158 pt,
+            // 40 + 10 + deux lignes de 20 + 36 de coche tiennent dans les 130.
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 4) {
                     IllustrationW(nom: illustration, taille: 40)
                     Spacer(minLength: 4)
@@ -183,7 +185,9 @@ private struct PetitConseilW<Pied: View>: View {
                     .tracking(-0.3)
                     .lineSpacing(1)
                     .foregroundStyle(TeinteW.encre())
-                    .lineLimit(4)
+                    // Deux lignes dans la maquette ; une troisième au plus, en
+                    // rétrécissant : une quatrième ne tiendrait à aucune échelle.
+                    .lineLimit(3)
                     .minimumScaleFactor(0.75)
             }
             .accessibilityElement(children: .ignore)
@@ -292,7 +296,8 @@ private struct MoyenConseilW<Pied: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
+            // 12 pt sous l'en-tête, comme la maquette.
+            VStack(alignment: .leading, spacing: 12) {
                 EnTeteW(icone: .illustration("fluent_sparkles"), titre: "Conseil du jour") {
                     if let conseil = conseilDuBadge, conseil.points > 0 {
                         BadgeConseilW(conseil: conseil)

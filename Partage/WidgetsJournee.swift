@@ -232,6 +232,9 @@ struct VueIleEtendue: View {
     let maintenant: Date
 
     var body: some View {
+        // La maquette dessine une île de 172 pt, où un espaceur laisse environ
+        // 26 pt entre l'anneau et les boutons. L'île étendue réelle plafonne à
+        // 160 pt, en-tête compris : on serre à 10, l'écart de l'en-tête.
         VStack(alignment: .leading, spacing: 10) {
             chiffres
             gestes
@@ -414,7 +417,9 @@ struct VueJourneeMoyenne: View {
             let calories = FormatW.ligneCalories(etat)
             VStack(alignment: .leading, spacing: 0) {
                 EnTeteW(icone: .signe, titre: "Ta journée") {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    // Mêmes écarts que l'en-tête de la carte W7 : 6 entre le
+                    // chiffre et sa légende, 6 + 6 avant la série.
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(verbatim: calories.nombre)
                             .font(.chiffreW(15))
                             .foregroundStyle(JourneeLectureW.audessus(etat) ? TeinteW.depasse : TeinteW.encre())
@@ -426,7 +431,7 @@ struct VueJourneeMoyenne: View {
                     .minimumScaleFactor(0.8)
                     if etat.serie > 0 {
                         SerieW(serie: etat.serie)
-                            .padding(.leading, 2)
+                            .padding(.leading, 6)
                     }
                 }
                 .accessibilityElement(children: .ignore)
@@ -616,8 +621,9 @@ private struct JourneeTuileRepasW: View {
         .minimumScaleFactor(0.8)
         .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .pastillePaleW(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        // Rayon 18, comme les tuiles pâles de l'Ajout rapide et du Rituel.
+        .pastillePaleW(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(kcal > 0
             ? "\(creneau.libelle), \(kcal) kilocalories. Ajouter un aliment"

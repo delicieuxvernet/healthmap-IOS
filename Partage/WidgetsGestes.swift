@@ -267,7 +267,7 @@ private struct GestesTuile: View {
             switch icone {
             case .symbole(let nom):
                 Image(systemName: nom)
-                    .font(.system(size: 19, weight: .medium))
+                    .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(TeinteW.encre())
                     .frame(height: 20)
                     .accessibilityHidden(true)
@@ -287,6 +287,8 @@ private struct GestesTuile: View {
                     .minimumScaleFactor(0.7)
             }
         }
+        // 10 dans la maquette, pour une tuile de 72 pt ; la vraie en fait 66
+        // (moyen de 338) : la marge suit, et « Chercher » réduit moins.
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .pastillePaleW(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -369,7 +371,7 @@ struct VueEauPetite: View {
                     // l'objectif. Un toucher tombe sur le lien du widget.
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                         Text("Atteint")
                             .font(.texteW(13, .semibold))
                     }
@@ -385,7 +387,7 @@ struct VueEauPetite: View {
                     Button(intent: AjouterVerreIntent()) {
                         HStack(spacing: 3) {
                             Image(systemName: "plus")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 14, weight: .semibold))
                             Text("\(eau.centilitres) cl")
                                 .font(.texteW(14, .semibold))
                         }
@@ -550,7 +552,7 @@ struct VueRituelPetite: View {
                 }
                 HStack(spacing: 10) {
                     IllustrationW(nom: moment.illustration, taille: 38)
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text(moment.libelle)
                             .font(.texteW(17, .bold))
                             .foregroundStyle(TeinteW.encre())
@@ -603,7 +605,7 @@ struct VueRituelMoyenne: View {
 
     var body: some View {
         if let etat = exploitableW(etat), etat.momentEnAvant != nil {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 EnTeteW(icone: .illustration("fluent_pill"), titre: "Rituel du jour") {
                     GestesCompteurRituel(faites: etat.prisesFaites, total: etat.rituel.count)
                 }
@@ -655,7 +657,7 @@ private struct GestesTuileMoment: View {
                     Color.clear
                 } else {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(TeinteW.encre())
                         .frame(width: 30, height: 30)
                         .boutonW(Circle(), fait: pris, ombre: false)

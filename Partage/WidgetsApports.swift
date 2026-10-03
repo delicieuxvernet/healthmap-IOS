@@ -111,8 +111,13 @@ private struct ApportsBoutonCalculW: View {
                 .font(.texteW(taille, .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+            // La maquette pose un chevron Tabler à la taille du texte (13 ou
+            // 15), dont le dessin n'occupe que la moitié de la boîte, d'un
+            // trait fin. Un chevron SF à la même taille sortirait plus grand :
+            // 0,85 de la taille le ramène à la hauteur dessinée, et la graisse
+            // du libellé (600) garde un trait fin, sans gras.
             Image(systemName: "chevron.right")
-                .font(.system(size: taille * 0.85, weight: .bold))
+                .font(.system(size: taille * 0.85, weight: .semibold))
                 .accessibilityHidden(true)
         }
         .foregroundStyle(TeinteW.encre())
@@ -307,7 +312,10 @@ private struct ApportsAnneauLegendeW: View {
                     .contentTransition(.numericText())
             }
             HStack(spacing: 3) {
+                // Dans la maquette, l'opacité 0,88 du libellé vaut aussi pour
+                // son illustration (elles partagent le même conteneur).
                 IllustrationW(nom: ApportsOutilsW.illustration(apport.id), taille: 13)
+                    .opacity(0.88)
                 Text(apport.court)
                     .font(.texteW(11, .semibold))
                     .foregroundStyle(TeinteW.encre(0.88))
