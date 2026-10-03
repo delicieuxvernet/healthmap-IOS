@@ -3,11 +3,17 @@ import SwiftUI
 // MARK: - Tutoriel du premier lancement (maquette « Kiwio - Tutoriel », 23 août 2026)
 //
 // Quatre gestes appris en trente secondes : le tutoriel ne raconte pas
-// l'application, il FAIT FAIRE. À chaque étape, l'écran s'assombrit sauf la
-// cible (voile 64 % découpé par `.blendMode(.destinationOut)`), une bulle dit
+// l'application, il FAIT FAIRE. À chaque étape, l'écran se voile sauf la
+// cible (voile découpé par `.blendMode(.destinationOut)`), une bulle dit
 // quoi en attendre, et la personne touche la VRAIE commande — jamais un
 // bouton « Suivant » factice. Elle apprend en produisant sa première donnée,
 // ce qui règle du même coup l'écran vide.
+//
+// Verre liquide (2 octobre 2026) : le voile est celui du système (`VerreVoile` :
+// encre vert-noir à 22 % sur un flou vivant), et non plus une encre à 64 %.
+// La cible ressort parce qu'elle est la seule chose NETTE de l'écran. La bulle
+// et la carte de bienvenue sont du verre flottant ; leurs actions, le verre
+// teinté vert de l'action principale.
 //
 // Règles de la maquette :
 //   • « Passer » visible à chaque étape ;
@@ -183,15 +189,19 @@ enum TutorielDecoupe {
                                width: cote, height: cote)
             return Path(ellipseIn: carre)
         case .arrondi(let rayon):
-            return Path(roundedRect: rect, cornerRadius: rayon)
+            // Jamais plus que la demi-hauteur : au-delà, la découpe est une
+            // capsule (le bouton « Dicter » et la barre d'onglets en sont).
+            let borne = max(0, min(rayon, min(rect.width, rect.height) / 2))
+            return Path(roundedRect: rect, cornerRadius: borne, style: .continuous)
         }
     }
 }
 
-/// Le voile de la maquette : encre à 64 %, la cible restant nette et
-/// touchable. Pas de calque troué au hit-testing : le visuel ignore les
-/// touches, et quatre bloqueurs transparents entourent la découpe — le voile
-/// ne bloque que ce qui n'est pas la cible.
+/// Le voile du tutoriel : le voile de verre du système (flou vivant, encre à
+/// 22 %), la cible restant nette et touchable. Pas de calque troué au
+/// hit-testing : le visuel ignore les touches, et quatre bloqueurs
+/// transparents entourent la découpe — le voile ne bloque que ce qui n'est
+/// pas la cible.
 struct TutorielVoile: View {
     /// Cadre de la cible en coordonnées GLOBALES (écran) ; nil = voile plein.
     var trou: CGRect?
@@ -209,18 +219,23 @@ struct TutorielVoile: View {
                 .offsetBy(dx: -origine.x, dy: -origine.y)
                 .insetBy(dx: -marge, dy: -marge)
             ZStack {
-                // Visuel : voile + découpe (destinationOut dans un
-                // compositingGroup, comme spécifié par la maquette).
-                Rectangle()
-                    .fill(Color(hex: "1C1C1E").opacity(0.64))
-                    .overlay {
-                        if let trouElargi {
-                            forme.chemin(dans: trouElargi)
-                                .fill(Color.black)
-                                .blendMode(.destinationOut)
-                        }
+                // Visuel : le voile de verre, MASQUÉ par un plein dont on a
+                // retiré la cible (destinationOut dans un compositingGroup).
+                // Un masque et non une surimpression : le flou vivant ne se
+                // troue pas autrement.
+                VerreVoile()
+                    .mask {
+                        Rectangle()
+                            .fill(Color.black)
+                            .overlay {
+                                if let trouElargi {
+                                    forme.chemin(dans: trouElargi)
+                                        .fill(Color.black)
+                                        .blendMode(.destinationOut)
+                                }
+                            }
+                            .compositingGroup()
                     }
-                    .compositingGroup()
                     .allowsHitTesting(false)
 
                 // Bloqueurs : tout sauf la découpe absorbe les touches.
@@ -252,7 +267,8 @@ struct TutorielVoile: View {
 
 // MARK: - Bulle
 
-/// La bulle blanche de la maquette : points de progression + « Passer »,
+/// La bulle de la maquette, en verre flottant (elle se pose sur le voile,
+/// au-dessus d'un contenu vivant) : points de progression + « Passer »,
 /// titre 19/700, texte 15 secondaire, CTA capsule optionnel (dernière étape).
 struct TutorielBulle: View {
     let etape: TutorielEtape
@@ -281,10 +297,21 @@ struct TutorielBulle: View {
                     }
                     Spacer(minLength: 8)
                     if let onPasser {
-                        Button("Passer", action: onPasser)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color.dsSecondaire)
-                            .buttonStyle(.plain)
+                        Button(action: onPasser) {
+                            Text("Passer")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.dsSecondaire)
+                                // La cible déborde du libellé pour atteindre
+                                // 44 pt sans grandir l'en-tête : la marge est
+                                // DANS le label (posée sur le bouton, elle
+                                // n'étendrait pas la zone touchable), puis
+                                // reprise à l'extérieur. Elle reste dans les
+                                // 16 pt de marge de la bulle, qui rogne.
+                                .padding(13)
+                                .contentShape(Rectangle())
+                                .padding(-13)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -311,8 +338,9 @@ struct TutorielBulle: View {
                         .tracking(-0.4)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Capsule().fill(Color.dsAccent))
+                        .frame(minHeight: 48)
+                        .verrePrincipal()
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.dsPress)
                 .padding(.top, 14)
@@ -320,7 +348,7 @@ struct TutorielBulle: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .verreCarteFlottante(rayon: Verre.rayonCarte)
         .accessibilitySortPriority(1)
         .accessibilityElement(children: .contain)
     }
@@ -366,8 +394,9 @@ struct TutorielCarteBienvenue: View {
                     .tracking(-0.4)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Capsule().fill(Color.dsAccent))
+                    .frame(minHeight: DS.hauteurBouton)
+                    .verrePrincipal()
+                    .contentShape(Capsule())
             }
             .buttonStyle(.dsPress)
             .padding(.top, 20)
@@ -384,7 +413,7 @@ struct TutorielCarteBienvenue: View {
         .padding(.horizontal, 22)
         .padding(.top, 26)
         .padding(.bottom, 12)
-        .background(Color.dsCarte, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .verreCarteFlottante()
         .accessibilitySortPriority(1)
     }
 }
@@ -417,6 +446,18 @@ struct TutorielOverlayPrincipal: View {
         ancres[cible].map { proxy[$0] }
     }
 
+    /// Le cadre de la barre d'onglets comprend ses marges (12 pt de chaque
+    /// côté et dessous) : on les retire pour retrouver la capsule de verre.
+    private func capsuleDeLaBarre(_ cadre: CGRect?) -> CGRect? {
+        guard let cadre else { return nil }
+        return CGRect(
+            x: cadre.minX + KiwiFloatingTabBar.margeLaterale,
+            y: cadre.minY,
+            width: max(0, cadre.width - 2 * KiwiFloatingTabBar.margeLaterale),
+            height: max(0, cadre.height - KiwiFloatingTabBar.margeBas)
+        )
+    }
+
     var body: some View {
         if let etape = service.etape,
            journalVisible || etape == .bienvenue || etape == .suite {
@@ -441,7 +482,9 @@ struct TutorielOverlayPrincipal: View {
         case .bouton:
             let trou = cadreLocal(.boutonDicter)
             ZStack(alignment: .bottom) {
-                TutorielVoile(trou: cadre(.boutonDicter), forme: .arrondi(22), marge: 6)
+                // Le bouton « Dicter » est une capsule de 60 pt : rayon 30, plus
+                // la marge de la découpe.
+                TutorielVoile(trou: cadre(.boutonDicter), forme: .arrondi(36), marge: 6)
                 TutorielBulle(
                     etape: etape,
                     titre: "Parle-lui comme à un ami",
@@ -455,7 +498,7 @@ struct TutorielOverlayPrincipal: View {
         case .valeur:
             let trou = cadreLocal(.carteApports)
             ZStack(alignment: .top) {
-                TutorielVoile(trou: cadre(.carteApports), forme: .arrondi(DS.rayonCarte), marge: 4)
+                TutorielVoile(trou: cadre(.carteApports), forme: .arrondi(DS.rayonCarte + 4), marge: 4)
                 TutorielBulle(
                     etape: etape,
                     titre: "Voilà pourquoi tu es là",
@@ -469,7 +512,13 @@ struct TutorielOverlayPrincipal: View {
         case .suite:
             let trou = cadreLocal(.barreOnglets)
             ZStack(alignment: .bottom) {
-                TutorielVoile(trou: cadre(.barreOnglets), forme: .arrondi(32), marge: 4)
+                // La découpe épouse la capsule de verre de la barre, pas son
+                // cadre (qui compte ses marges).
+                TutorielVoile(
+                    trou: capsuleDeLaBarre(cadre(.barreOnglets)),
+                    forme: .arrondi(KiwiFloatingTabBar.barHeight),
+                    marge: 4
+                )
                 TutorielBulle(
                     etape: etape,
                     titre: "Reviens demain",
@@ -513,12 +562,13 @@ struct TutorielBulleVerifier: View {
             TutorielBulle(
                 etape: .verifier,
                 titre: "On ne te demande que ce qui manque",
-                texte: Text("Ce qui est identifié porte une coche verte. S'il reste une quantité à préciser, un appui suffit."),
+                texte: Text("Ce qui est reconnu affiche sa quantité et ses calories. S'il manque une quantité, la ligne te la demande : un appui suffit."),
                 onPasser: { service.passer() }
             )
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
-            .shadow(color: Color.black.opacity(0.10), radius: 18, y: 6)
+            // Pas d'ombre ordinaire : la bulle est translucide, elle la
+            // laisserait voir. Le verre porte la sienne, découpée.
             .transition(.opacity)
         }
     }

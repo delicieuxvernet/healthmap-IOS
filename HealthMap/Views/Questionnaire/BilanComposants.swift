@@ -3,12 +3,17 @@ import SwiftUI
 // MARK: - Les composants du questionnaire (refonte du 1er octobre 2026)
 //
 // Tout ce qui se touche dans le nouveau parcours : tuiles, puces, bascules,
-// curseurs, molettes, nuancier. Chacun lit la couleur de l'étape dans
-// l'environnement (`teinteBilan`), tient au moins 44 points de haut, et dit à
-// VoiceOver s'il est choisi.
+// curseurs, molettes, nuancier. Chacun tient au moins 44 points de haut, et
+// dit à VoiceOver s'il est choisi. La couleur de l'étape (`teinteBilan`, dans
+// l'environnement) habille l'écran ; ce qui se touche reste vert kiwi.
 //
 // Mouvement : uniquement les jetons de `KiwiMotion` (rien ne grandit au-delà
 // de 1,08), tous coupés par « Réduire les animations ».
+//
+// Verre liquide (2 octobre 2026) : une réponse est une tuile de verre clair ;
+// choisie, elle passe au verre vert pâle, liseré kiwi. Les contrôles plus
+// grands (curseur, molette, carte de piste) sont des cartes de verre dépoli.
+// Les matières viennent de `KiwiVerre.swift`, via `BilanVerre`.
 
 // MARK: - Titre d'écran
 
@@ -68,30 +73,78 @@ struct BilanEtiquette: View {
 
 // MARK: - Le fond d'une réponse
 
-/// Blanc au repos ; fond pâle et liseré de la couleur de l'étape une fois
-/// choisie.
-private struct FondDeReponse: ViewModifier {
+/// Verre clair au repos ; verre vert pâle et liseré kiwi une fois choisie.
+/// La couleur de l'étape n'entre pas ici : ce qui se touche reste vert.
+struct FondDeReponse: ViewModifier {
     let choisie: Bool
     var rayon: CGFloat = BilanTypo.rayon
-    @Environment(\.teinteBilan) private var teinte
+    /// Épaisseur du liseré d'une réponse choisie.
+    var bord: CGFloat = 1.5
+
+    private var forme: RoundedRectangle {
+        RoundedRectangle(cornerRadius: rayon, style: .continuous)
+    }
 
     func body(content: Content) -> some View {
         content
-            .background(
-                RoundedRectangle(cornerRadius: rayon, style: .continuous)
-                    .fill(choisie ? teinte.pale : Color.dsCarte)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: rayon, style: .continuous)
-                    .strokeBorder(choisie ? teinte.vive : Color.clear, lineWidth: 2)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: rayon, style: .continuous))
+            .verre(BilanVerre.reponse(choisie: choisie), forme: forme)
+            .overlay(forme.strokeBorder(choisie ? BilanVerre.bordChoisi : Color.clear, lineWidth: bord))
+            .contentShape(forme)
     }
 }
 
-private extension View {
-    func fondDeReponse(choisie: Bool, rayon: CGFloat = BilanTypo.rayon) -> some View {
-        modifier(FondDeReponse(choisie: choisie, rayon: rayon))
+extension View {
+    /// Le fond d'une réponse du questionnaire (tuile, ligne à cocher, aliment).
+    func fondDeReponse(choisie: Bool, rayon: CGFloat = BilanTypo.rayon, bord: CGFloat = 1.5) -> some View {
+        modifier(FondDeReponse(choisie: choisie, rayon: rayon, bord: bord))
+    }
+}
+
+// MARK: - Entrée en cascade
+
+/// Un bloc d'écran qui arrive en cascade, aux délais de la maquette : 0,08 s,
+/// puis 0,05 s par rang, remontée de 10 points. Rejouée à chaque arrivée sur
+/// l'écran. Sous « Réduire les animations », un fondu seul (géré par le socle).
+struct BilanCascade: ViewModifier {
+    let rang: Int
+    @State private var visible = false
+
+    /// Au-delà du 8ᵉ rang, tout arrive ensemble : le bas d'une longue liste
+    /// ne doit pas se faire attendre.
+    private var delai: Double {
+        0.08 + Double(min(max(rang, 0), 8)) * 0.05
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .verreCascade(visible, delai: delai, decalage: 10)
+            .onAppear {
+                guard !visible else { return }
+                visible = true
+            }
+    }
+}
+
+extension View {
+    /// Entrée en cascade d'un bloc du questionnaire. `rang` = position à l'écran.
+    func bilanCascade(_ rang: Int = 0) -> some View {
+        modifier(BilanCascade(rang: rang))
+    }
+}
+
+// MARK: - Pastille de verre d'une bascule
+
+/// Le curseur de verre blanc qui glisse d'un segment à l'autre (« c'était
+/// voulu ? », les quatre repas). Posé en fond du segment choisi ; l'espace de
+/// noms partagé fait le glissement.
+struct BilanPastilleDeVerre: View {
+    let espace: Namespace.ID
+    var rayon: CGFloat = 22
+
+    var body: some View {
+        Color.clear
+            .verre(.curseur, forme: RoundedRectangle(cornerRadius: rayon, style: .continuous))
+            .matchedGeometryEffect(id: "pastille", in: espace)
     }
 }
 
@@ -108,7 +161,6 @@ struct BilanTuile: View {
     var serree = false
     let action: () -> Void
 
-    @Environment(\.teinteBilan) private var teinte
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -117,7 +169,7 @@ struct BilanTuile: View {
             action()
         } label: {
             contenu
-                .foregroundStyle(choisie ? teinte.encre : Color.dsTexte)
+                .foregroundStyle(choisie ? BilanVerre.encreChoisie : Color.dsTexte)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 8)
                 // Hauteur libre vers le haut : dans une rangée, toutes les
@@ -126,7 +178,7 @@ struct BilanTuile: View {
                 .fondDeReponse(choisie: choisie)
         }
         .buttonStyle(.dsPress)
-        .animation(reduceMotion ? nil : .kiwiVif, value: choisie)
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: choisie)
         .accessibilityLabel(titre)
         .accessibilityAddTraits(choisie ? [.isSelected] : [])
     }
@@ -316,7 +368,6 @@ struct BilanPuce: View {
     let cochee: Bool
     let action: () -> Void
 
-    @Environment(\.teinteBilan) private var teinte
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -333,18 +384,22 @@ struct BilanPuce: View {
                     .lineLimit(1)
             }
             .font(BilanTypo.tuile)
-            .foregroundStyle(cochee ? teinte.encre : Color.dsTexte)
-            .padding(.horizontal, 11)
+            .foregroundStyle(cochee ? BilanVerre.encreChoisie : Color.dsTexte)
+            .padding(.horizontal, 12)
             .frame(minHeight: 36)
-            .background(Capsule().fill(cochee ? teinte.pale : Color.dsCarte))
-            .overlay(Capsule().strokeBorder(cochee ? teinte.vive : Color.clear, lineWidth: 1.5))
+            // Une puce de verre clair, en capsule ; cochée, le verre vert pâle.
+            .verre(BilanVerre.reponse(choisie: cochee), forme: Capsule(style: .continuous))
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(cochee ? BilanVerre.bordChoisi : Color.clear, lineWidth: 1.5)
+            )
             // La cible tactile déborde de la puce : 44 points de haut.
             .padding(.vertical, 4)
             .padding(.horizontal, 2)
             .contentShape(Rectangle())
         }
         .buttonStyle(.dsPress)
-        .animation(reduceMotion ? nil : .kiwiVif, value: cochee)
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: cochee)
         .accessibilityLabel(choix.titre)
         .accessibilityAddTraits(cochee ? [.isSelected] : [])
     }
@@ -356,7 +411,7 @@ struct BilanLigneACocher: View {
     let cochee: Bool
     let action: () -> Void
 
-    @Environment(\.teinteBilan) private var teinte
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button {
@@ -376,16 +431,17 @@ struct BilanLigneACocher: View {
                 Spacer(minLength: 8)
                 Image(systemName: cochee ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(cochee ? teinte.vive : Color.dsTertiaire)
+                    .foregroundStyle(cochee ? BilanVerre.bordChoisi : Color.dsTertiaire)
                     .accessibilityHidden(true)
             }
-            .foregroundStyle(cochee ? teinte.encre : Color.dsTexte)
-            .padding(.horizontal, 14)
+            .foregroundStyle(cochee ? BilanVerre.encreChoisie : Color.dsTexte)
+            .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-            .fondDeReponse(choisie: cochee, rayon: 14)
+            .fondDeReponse(choisie: cochee)
         }
         .buttonStyle(.dsPress)
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: cochee)
         .accessibilityLabel(choix.titre)
         .accessibilityAddTraits(cochee ? [.isSelected] : [])
     }
@@ -399,8 +455,6 @@ struct BilanBascule: View {
     let titre: String
     let active: Bool
     let regler: (Bool) -> Void
-
-    @Environment(\.teinteBilan) private var teinte
 
     var body: some View {
         Toggle(isOn: Binding(
@@ -416,14 +470,13 @@ struct BilanBascule: View {
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .tint(teinte.vive)
-        .padding(.horizontal, 14)
+        // L'interrupteur se touche : il s'allume en vert kiwi, quelle que
+        // soit l'étape.
+        .tint(Color.dsAccent)
+        .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .frame(minHeight: 52)
-        .background(
-            RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                .fill(Color.dsCarte)
-        )
+        .verreClair(RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous))
     }
 }
 
@@ -435,47 +488,51 @@ struct BilanSegments: View {
     let valeur: String
     let choisir: (String) -> Void
 
+    @Namespace private var espace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var tailleDeTexte
 
     var body: some View {
         Group {
             if tailleDeTexte.isAccessibilitySize {
-                VStack(spacing: 3) { boutons }
+                VStack(spacing: 0) { boutons }
             } else {
-                HStack(spacing: 3) { boutons }
+                HStack(spacing: 0) { boutons }
             }
         }
         .padding(3)
-        .background(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(Color.dsBoutonNeutre)
-        )
-        .animation(reduceMotion ? nil : .kiwiVif, value: valeur)
+        // Une bascule en verre : piste translucide, curseur de verre blanc qui
+        // glisse avec un ressort. Rien n'est allumé tant qu'on n'a pas choisi.
+        .verre(BilanVerre.piste, forme: RoundedRectangle(cornerRadius: 25, style: .continuous))
+        .animation(reduceMotion ? nil : Animation.kiwiPastille, value: valeur)
     }
 
     private var boutons: some View {
         ForEach(choix) { option in
+            let choisie = option.id == valeur
             Button {
                 HapticService.shared.selection()
                 choisir(option.id)
             } label: {
+                // Comme la bascule du socle : le choix se lit à la graisse
+                // et au curseur, pas à un gris qui manquerait de contraste.
                 Text(option.titre)
-                    .font(BilanTypo.tuile)
+                    .font(.system(.footnote, design: .default).weight(choisie ? .semibold : .medium))
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
-                    .foregroundStyle(option.id == valeur ? Color.dsTexte : Color.dsSecondaire)
+                    .foregroundStyle(Color.dsTexte)
                     .padding(.horizontal, 4)
                     .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(option.id == valeur ? Color.dsCarte : Color.clear)
-                    )
+                    .background {
+                        if choisie {
+                            BilanPastilleDeVerre(espace: espace)
+                        }
+                    }
                     .contentShape(Rectangle())
             }
             .buttonStyle(.dsPress)
-            .accessibilityAddTraits(option.id == valeur ? [.isSelected] : [])
+            .accessibilityAddTraits(choisie ? [.isSelected] : [])
         }
     }
 }
@@ -496,7 +553,6 @@ struct BilanCurseur: View {
     let choisir: (String) -> Void
 
     @State private var position: Double
-    @Environment(\.teinteBilan) private var teinte
 
     init(titre: String, choix: [ChoixBilan], valeur: String, choisir: @escaping (String) -> Void) {
         self.titre = titre
@@ -542,18 +598,16 @@ struct BilanCurseur: View {
                         if !enCours { valider() }
                     }
                 )
-                .tint(teinte.vive)
+                // Le curseur se touche : vert kiwi, quelle que soit l'étape.
+                .tint(Color.dsAccent)
                 .opacity(repondu ? 1 : 0.5)
                 .accessibilityLabel(titre)
                 .accessibilityValue(repondu ? choix[index].titre : "Pas encore répondu")
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                .fill(Color.dsCarte)
-        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .verreCarte()
         .onChange(of: position) { _, _ in valider() }
     }
 
@@ -641,18 +695,15 @@ struct BilanMolette: View {
             .dynamicTypeSize(...DynamicTypeSize.xxLarge)
             .contentShape(Rectangle())
             .gesture(glissement)
-            .animation(reduceMotion ? nil : .kiwiVif, value: valeur)
+            .animation(reduceMotion ? nil : Animation.kiwiVif, value: valeur)
 
             Text(unite)
                 .font(.dsLegendeMoyenne)
                 .foregroundStyle(Color.dsSecondaire)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                .fill(Color.dsCarte)
-        )
+        .verreCarte()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(titre)
         .accessibilityValue(touchee ? "\(valeur) \(unite)" : "\(valeur) \(unite), à confirmer")
@@ -734,7 +785,6 @@ struct BilanNuancier: View {
     let valeur: String
     let choisir: (String) -> Void
 
-    @Environment(\.teinteBilan) private var teinte
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -749,13 +799,14 @@ struct BilanNuancier: View {
                         .fill(Color(hex: LibellesBilan.nuancesDePeau[option.id] ?? "C99873"))
                         .frame(maxWidth: .infinity)
                         .frame(height: DS.cibleTactile)
+                        // Le liseré blanc du verre, puis l'anneau kiwi du choix.
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .strokeBorder(Color.dsCarte, lineWidth: 3)
+                                .strokeBorder(Color.white.opacity(0.9), lineWidth: 3)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(choisie ? teinte.vive : Color.clear, lineWidth: 2.5)
+                                .strokeBorder(choisie ? BilanVerre.bordChoisi : Color.clear, lineWidth: 2.5)
                                 .padding(-3)
                         )
                         .scaleEffect(choisie && !reduceMotion ? 1.06 : 1)
@@ -766,7 +817,7 @@ struct BilanNuancier: View {
             }
         }
         .padding(.horizontal, 3)
-        .animation(reduceMotion ? nil : .kiwiVif, value: valeur)
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: valeur)
     }
 }
 
@@ -796,7 +847,7 @@ struct BilanCartePiste: View {
             Text(emoji)
                 .font(.system(.title3, design: .default))
                 .frame(width: 40, height: 40)
-                .background(Circle().fill(Color.dsCarte))
+                .background(Circle().fill(teinte.pale))
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -823,11 +874,9 @@ struct BilanCartePiste: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(teinte.pale)
-        )
+        .padding(14)
+        // Une carte de verre, teintée de la couleur de l'apport dans son coin.
+        .verreCarte(teinte: teinte.vive)
         .accessibilityElement(children: .combine)
     }
 
@@ -861,14 +910,14 @@ struct BilanCartePiste: View {
             .padding(.vertical, 3)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.dsCarte)
+                    .fill(Verre.remplissage)
             )
     }
 }
 
 // MARK: - Ligne de parcours
 
-/// Une ligne blanche à pastille : les étapes de l'accueil, ce qu'on sait déjà
+/// Une ligne de verre à pastille : les étapes de l'accueil, ce qu'on sait déjà
 /// à la fin d'une étape.
 struct BilanLigne: View {
     let emoji: String
@@ -886,7 +935,7 @@ struct BilanLigne: View {
             Text(emoji)
                 .font(.system(.title3, design: .default))
                 .frame(width: 38, height: 38)
-                .background(Circle().fill(teintee ? Color.dsCarte : teinte.pale))
+                .background(Circle().fill(teinte.pale))
                 .accessibilityHidden(true)
             Text(titre)
                 .font(.dsSousTitreFort)
@@ -904,9 +953,11 @@ struct BilanLigne: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                .fill(teintee ? teinte.pale : Color.dsCarte)
+        // Verre dépoli ; la ligne « Ensuite » prend la couleur de l'étape qui
+        // vient dans son coin.
+        .verre(
+            teintee ? VerreMatiere.carteTeintee(teinte.vive) : VerreMatiere.carte,
+            forme: RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
         )
         .accessibilityElement(children: .combine)
     }
@@ -928,7 +979,7 @@ struct BilanSegmentsDEtapes: View {
                 let fraction = avancements.indices.contains(etape.rawValue) ? avancements[etape.rawValue] : 0
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.dsTrait.opacity(0.6))
+                        Capsule().fill(Verre.remplissage)
                         Capsule()
                             .fill(etape.teinte.vive)
                             .frame(width: geo.size.width * CGFloat(min(1, max(0, fraction))))
@@ -937,7 +988,7 @@ struct BilanSegmentsDEtapes: View {
                 .frame(height: hauteur)
             }
         }
-        .animation(reduceMotion ? nil : .kiwiFluide, value: avancements)
+        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: avancements)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Progression du bilan")
         .accessibilityValue(descriptionVocale)
@@ -951,25 +1002,29 @@ struct BilanSegmentsDEtapes: View {
 
 // MARK: - Gerbe
 
-/// Huit points de couleur qui s'envolent une fois, à la fin d'une étape.
-/// Rien sous « Réduire les animations ».
+/// Huit points de couleur qui s'envolent une fois, à la fin d'une étape :
+/// les teintes de la palette, des particules de 4, 6 ou 8 points qui
+/// rétrécissent en s'éloignant (la gerbe du verre). Rien sous « Réduire les
+/// animations ».
 struct BilanGerbe: View {
     @State private var partie = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let points: [(x: CGFloat, y: CGFloat, couleur: String)] = [
-        (-78, -22, "FF9500"), (-52, -52, "AF52DE"), (-14, -66, "007AFF"), (30, -62, "5DA838"),
-        (64, -40, "FF2D55"), (82, -6, "5AC8FA"), (-88, 16, "34C759"), (90, 24, "FF9500"),
+    private static let points: [(x: CGFloat, y: CGFloat, couleur: Color)] = [
+        (-78, -22, Color.teinteVitamineD), (-52, -52, Color.teinteFer),
+        (-14, -66, Color.teinteProteines), (30, -62, Color.teinteKiwi),
+        (64, -40, Color.teinteSymptomes), (82, -6, Color.teinteEau),
+        (-88, 16, Color.teinteFibres), (90, 24, Color.teinteGlucides),
     ]
 
     var body: some View {
         ZStack {
             if !reduceMotion {
-                ForEach(Array(Self.points.enumerated()), id: \.offset) { _, point in
+                ForEach(Array(Self.points.enumerated()), id: \.offset) { rang, point in
                     Circle()
-                        .fill(Color(hex: point.couleur))
-                        .frame(width: 9, height: 9)
-                        .scaleEffect(partie ? 1 : 0.3)
+                        .fill(point.couleur)
+                        .frame(width: Self.taille(rang), height: Self.taille(rang))
+                        .scaleEffect(partie ? 0.3 : 1)
                         .offset(x: partie ? point.x : 0, y: partie ? point.y : 0)
                         .opacity(partie ? 0 : 1)
                 }
@@ -980,7 +1035,12 @@ struct BilanGerbe: View {
         .accessibilityHidden(true)
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.easeOut(duration: 0.9).delay(0.15)) { partie = true }
+            withAnimation(Animation.timingCurve(0.2, 0.8, 0.3, 1, duration: 0.9).delay(0.15)) { partie = true }
         }
+    }
+
+    /// 4, 6 ou 8 points, à tour de rôle.
+    private static func taille(_ rang: Int) -> CGFloat {
+        CGFloat(4 + (rang % 3) * 2)
     }
 }

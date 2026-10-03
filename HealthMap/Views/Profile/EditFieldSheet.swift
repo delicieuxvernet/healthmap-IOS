@@ -34,6 +34,9 @@ struct EditableField: Identifiable, Equatable {
 // MARK: - Edit Field Sheet
 /// Sheet contextuel d'édition d'un field. Appelé depuis EditProfileView.
 /// Commit les changements via le callback `onSave` qui reçoit la nouvelle value.
+///
+/// Verre liquide (2 octobre 2026) : la feuille est en verre (`.verreFeuille()`),
+/// un champ de saisie en verre clair, un choix dans une carte de verre.
 struct EditFieldSheet: View {
     let field: EditableField
     let currentValue: Any  // String, [String], Bool, selon le kind
@@ -77,32 +80,27 @@ struct EditFieldSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.dsFond.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: Theme.spacingLG) {
-                        // Header emoji + label (cohérent avec le fieldRow)
-                        HStack(spacing: Theme.spacingSM) {
-                            Text(field.emoji)
-                                .font(.system(size: 32))
-                                .accessibilityHidden(true)
-                            Text(field.label)
-                                .font(.system(.title2, design: .default).weight(.bold))
-                                .foregroundStyle(Color.dsTexte)
-                        }
+            // Verre liquide : plus d'aplat sous le contenu, c'est la feuille
+            // qui est en verre (`.verreFeuille()` plus bas).
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.spacingLG) {
+                    // Le libellé du champ, en titre de section (22 / 700).
+                    // L'emoji du descripteur n'est plus affiché : aucun emoji
+                    // dans l'interface.
+                    Text(field.label)
+                        .font(.dsSection)
+                        .tracking(DSTracking.section)
+                        .foregroundStyle(Color.dsTexte)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, Theme.spacingSM)
+                        .accessibilityAddTraits(.isHeader)
 
-                        // Éditeur selon le kind
-                        editor
-                            .padding(Theme.spacingMD)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.dsCarte)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-                    }
-                    .padding(.horizontal, Theme.spacingLG)
-                    .padding(.bottom, Theme.spacingXXL)
+                    // Éditeur selon le kind
+                    editeurHabille
                 }
+                .padding(.horizontal, DS.marge)
+                .padding(.bottom, Theme.spacingXXL)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .navigationTitle("Modifier")
             .navigationBarTitleDisplayMode(.inline)
@@ -127,7 +125,26 @@ struct EditFieldSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(28)
+        .verreFeuille()
+    }
+
+    // MARK: - Habillage de l'éditeur
+
+    /// Un champ de saisie est en verre clair ; un choix, un compteur ou un
+    /// interrupteur se pose dans une carte de verre.
+    @ViewBuilder
+    private var editeurHabille: some View {
+        switch field.kind {
+        case .text, .decimal:
+            editor
+                .reglageChampVerre()
+        case .number, .pickerSingle, .pickerMulti, .toggle:
+            editor
+                .padding(.horizontal, DS.paddingCarte)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .dsCard()
+        }
     }
 
     // MARK: - Editor switch
@@ -193,7 +210,7 @@ struct EditFieldSheet: View {
                     }
                     .buttonStyle(.healthMapPressed)
                     if idx < options.count - 1 {
-                        Divider()
+                        DSSeparator(retrait: 0)
                     }
                 }
             }
@@ -216,14 +233,16 @@ struct EditFieldSheet: View {
                             Spacer()
                             Image(systemName: arrayValue.contains(opt.value) ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 20))
-                                .foregroundStyle(arrayValue.contains(opt.value) ? Color.dsAccent : Color.dsSecondaire.opacity(0.4))
+                                .foregroundStyle(arrayValue.contains(opt.value) ? Color.dsAccent : Color.dsTertiaire)
+                                .accessibilityHidden(true)
                         }
                         .padding(.vertical, 12)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.healthMapPressed)
+                    .accessibilityAddTraits(arrayValue.contains(opt.value) ? [.isButton, .isSelected] : .isButton)
                     if idx < options.count - 1 {
-                        Divider()
+                        DSSeparator(retrait: 0)
                     }
                 }
             }

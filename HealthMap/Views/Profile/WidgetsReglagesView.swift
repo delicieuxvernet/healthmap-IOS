@@ -9,6 +9,10 @@ import UIKit
 //
 // Les aperçus sont les VRAIES vues des widgets (`Partage/VuesWidgets.swift`),
 // nourries par la journée en cours quand elle existe, par un exemple sinon.
+//
+// Verre liquide (2 octobre 2026) : page poussée sur `VerrePageFond()`, aperçus
+// posés dans des cartes de verre, étapes numérotées avec la pastille de la
+// maquette (rond vert pâle, chiffre vert foncé).
 
 struct WidgetsReglagesView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -28,7 +32,7 @@ struct WidgetsReglagesView: View {
 
     var body: some View {
         ZStack {
-            Color.dsFond.ignoresSafeArea()
+            VerrePageFond()
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     DSSectionHeader(titre: "Sur l'écran verrouillé")
@@ -46,11 +50,11 @@ struct WidgetsReglagesView: View {
 
                     DSSectionHeader(titre: "Ajouter un widget")
                     DSGroupedList {
-                        DSRow(icone: "1.circle", titre: "Appuie longuement sur ton écran d'accueil") { EmptyView() }
-                        DSSeparator(retrait: DS.retraitSeparateurIcone)
-                        DSRow(icone: "2.circle", titre: "Touche Modifier, puis Ajouter un widget") { EmptyView() }
-                        DSSeparator(retrait: DS.retraitSeparateurIcone)
-                        DSRow(icone: "3.circle", titre: "Cherche Kiwio et choisis ton widget") { EmptyView() }
+                        etape(1, "Appuie longuement sur ton écran d'accueil")
+                        DSSeparator(retrait: Self.retraitEtape)
+                        etape(2, "Touche Modifier, puis Ajouter un widget")
+                        DSSeparator(retrait: Self.retraitEtape)
+                        etape(3, "Cherche Kiwio et choisis ton widget")
                     }
                     legende("Sur l'écran verrouillé : appui long, Personnaliser, puis Ajouter des widgets. À partir d'iOS 18, « Dicter un repas » se pose aussi dans le Centre de contrôle et sur le bouton Action.")
                 }
@@ -78,15 +82,7 @@ struct WidgetsReglagesView: View {
             set: { basculer($0) }
         )) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color(uiColor: .systemGray5))
-                    Image(systemName: "lock.iphone")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color.dsTexte.opacity(0.72))
-                }
-                .frame(width: 29, height: 29)
-                .accessibilityHidden(true)
+                ReglagePastille(symbole: "lock.iphone")
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Ma journée en direct")
@@ -104,7 +100,35 @@ struct WidgetsReglagesView: View {
         .tint(Color.dsAccent)
         .padding(.horizontal, DS.paddingCarte)
         .padding(.vertical, 11)
-        .frame(minHeight: DS.cibleTactile)
+        .frame(minHeight: ReglageMetrique.hauteurLigne)
+    }
+
+    // MARK: Étapes numérotées
+
+    /// Début du texte d'une étape : 16 + 30 + 12.
+    private static let retraitEtape: CGFloat = 58
+
+    /// Une étape : la pastille numérotée de la maquette (rond vert pâle de
+    /// 30 pt, chiffre 15 / 700 en vert foncé), puis la consigne.
+    private func etape(_ numero: Int, _ texte: String) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text("\(numero)")
+                .font(.system(.subheadline, design: .default).weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(Color.teinteKiwiTexte)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(Color.dsAccentPale))
+            Text(texte)
+                .font(.dsCorps)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: ReglageMetrique.hauteurLigne, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     private func basculer(_ allumer: Bool) {
@@ -129,15 +153,14 @@ struct WidgetsReglagesView: View {
 
     // MARK: Aperçus
 
-    /// Un widget tel qu'il se dessine, posé dans sa carte. Un aperçu ne se
-    /// touche pas : ses boutons agiraient pour de vrai.
+    /// Un widget tel qu'il se dessine, posé dans sa carte de verre. Un aperçu
+    /// ne se touche pas : ses boutons agiraient pour de vrai.
     private func apercu<Contenu: View>(hauteur: CGFloat, @ViewBuilder _ contenu: () -> Contenu) -> some View {
         contenu()
             .padding(16)
             .frame(maxWidth: .infinity)
             .frame(height: hauteur)
-            .background(Color.dsCarte)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .dsCard()
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }

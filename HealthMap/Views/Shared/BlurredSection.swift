@@ -2,13 +2,16 @@ import SwiftUI
 
 // MARK: - Blurred Section (PaywallGuard equivalent)
 // Shows blurred preview of premium content with upgrade CTA
+//
+// Verre liquide (2 octobre 2026) : même grammaire que le contenu verrouillé de
+// la maquette — flou 8, opacité 0,5, et la pastille de verre vert de 36 pt
+// (cadenas + libellé) posée dessus. La feuille Premium grandit depuis elle.
 
 struct BlurredSection<Content: View>: View {
     let isPremium: Bool
     let title: String
     @ViewBuilder let content: () -> Content
 
-    @State private var showPaywall = false
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     private var shouldBlur: Bool {
@@ -17,50 +20,16 @@ struct BlurredSection<Content: View>: View {
 
     var body: some View {
         if shouldBlur {
-            ZStack {
-                content()
-                    .blur(radius: 8)
-                    .allowsHitTesting(false)
-
-                // Overlay
-                VStack(spacing: Theme.spacingSM) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(Color.dsAccent)
-
-                    Text(title)
-                        .font(Theme.captionBoldFont)
-                        .foregroundStyle(Color.dsTexte)
-                        .multilineTextAlignment(.center)
-
-                    Button {
-                        showPaywall = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "crown.fill")
-                                .font(.system(size: 12))
-                            Text("Debloquer Premium")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.dsAccent)
-                        .clipShape(Capsule())
-                    }
+            content()
+                .blur(radius: 8)
+                .opacity(0.5)
+                .allowsHitTesting(false)
+                .overlay {
+                    // `title` dit ce que la zone débloque : c'est lui que porte
+                    // la pastille (« Voir ta courbe » sur la maquette).
+                    PremiumPastille(titre: title, zone: "generic")
+                        .padding(.horizontal, Theme.spacingMD)
                 }
-                .padding(Theme.spacingLG)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                )
-                .padding(.horizontal, Theme.spacingMD)
-            }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .healthMapFullSheet()
-            }
         } else {
             content()
         }
@@ -81,22 +50,24 @@ struct PremiumGateModifier: ViewModifier {
                 showPaywall = true
             } label: {
                 content
-                    .blur(radius: 6)
-                    .overlay(
-                        VStack(spacing: 4) {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 16))
+                    .blur(radius: 8)
+                    .opacity(0.5)
+                    .overlay {
+                        HStack(spacing: 6) {
+                            Image(systemName: "lock")
+                                .font(.system(size: 15, weight: .semibold))
+                                .accessibilityHidden(true)
                             Text("Premium")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.dsSousTitreFort)
                         }
-                        .foregroundStyle(Color.dsAccent)
-                    )
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 36)
+                        .verrePrincipal()
+                    }
             }
             .buttonStyle(.plain)
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .healthMapFullSheet()
-            }
+            .feuillePremium(isPresented: $showPaywall)
         }
     }
 }

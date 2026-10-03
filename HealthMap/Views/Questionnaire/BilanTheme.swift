@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 // MARK: - Les couleurs du questionnaire (refonte du 1er octobre 2026)
 //
@@ -10,52 +9,43 @@ import UIKit
 // tape ») : ici la couleur porte un sens, l'étape, comme la couleur d'une jauge
 // porte un statut. Ce qui fait avancer reste vert : le bouton du bas ne change
 // jamais de couleur.
+//
+// ── Verre liquide (2 octobre 2026) ──────────────────────────────────────────
+// Les couleurs sortent de la palette du verre (`Color.teinte…`) : une teinte
+// par étape, sa version foncée pour le texte. L'étape se lit désormais sur le
+// FOND (la teinte des halos, `teinteVerre`), sur le nom du chapitre et sur le
+// segment de la barre. Une réponse choisie, elle, passe au verre vert : le
+// vert kiwi reste la couleur de ce qui se touche.
 
 /// Les trois nuances d'une couleur du questionnaire.
 struct TeinteBilan {
-    /// La couleur vive : liseré d'une réponse choisie, segment de la barre.
+    /// La couleur vive : segment de la barre, coche d'une étape terminée,
+    /// coin teinté d'une carte de verre.
     let vive: Color
-    /// Le fond d'une réponse choisie, le halo du haut d'écran.
+    /// La même à 12 % : la pastille derrière une image. Translucide, pour
+    /// rester juste sur le verre.
     let pale: Color
-    /// Le texte posé sur le fond pâle.
+    /// La version foncée, pour un texte posé sur le verre.
     let encre: Color
 
-    /// Trois hexadécimaux pour le mode clair. En mode sombre le fond pâle
-    /// devient la couleur vive en transparence et l'encre passe au blanc :
-    /// un fond pastel clair y serait illisible.
-    init(vive: String, pale: String, encre: String) {
-        let viveUI = UIColor(Color(hex: vive))
-        let paleUI = UIColor(Color(hex: pale))
-        let encreUI = UIColor(Color(hex: encre))
-        self.vive = Color(hex: vive)
-        self.pale = Color(uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? viveUI.withAlphaComponent(0.26) : paleUI
-        })
-        self.encre = Color(uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? UIColor.white : encreUI
-        })
+    init(vive: Color, encre: Color) {
+        self.vive = vive
+        self.pale = vive.opacity(0.12)
+        self.encre = encre
     }
 
     /// Le vert de la marque : accueil, fin, écrans d'affinage, bons points.
-    static let kiwi = TeinteBilan(vive: "5DA838", pale: "EAF3DE", encre: "2F5A0C")
+    static let kiwi = TeinteBilan(vive: .teinteKiwi, encre: .teinteKiwiTexte)
 
     /// La carte « on vient de l'apprendre ».
-    static let information = TeinteBilan(vive: "007AFF", pale: "E5F1FF", encre: "0A4E9E")
+    static let information = TeinteBilan(vive: .teinteProteines, encre: .teinteProteinesTexte)
 
     /// La couleur d'un apport, alignée sur `Color.nutrientColor(for:)`.
     static func apport(_ id: NutrientID) -> TeinteBilan {
-        switch id {
-        case .vitD: return TeinteBilan(vive: "FF9500", pale: "FFF1DC", encre: "8A4B00")
-        case .vitB12: return TeinteBilan(vive: "FF3B30", pale: "FFE9E7", encre: "9B1C14")
-        case .iron: return TeinteBilan(vive: "AF52DE", pale: "F5E9FB", encre: "6A2496")
-        case .magnesium: return TeinteBilan(vive: "5AC8FA", pale: "E3F4FC", encre: "0B5E86")
-        case .omega3: return TeinteBilan(vive: "007AFF", pale: "E5F1FF", encre: "0A4E9E")
-        case .vitC: return TeinteBilan(vive: "34C759", pale: "E4F7E9", encre: "1B6B30")
-        case .calcium: return TeinteBilan(vive: "8E8E93", pale: "EFEFF4", encre: "4A4A4F")
-        case .zinc: return TeinteBilan(vive: "FF2D55", pale: "FFE7EC", encre: "A01536")
-        case .iodine: return TeinteBilan(vive: "5856D6", pale: "ECECFB", encre: "2F2E8F")
-        case .fiber: return TeinteBilan(vive: "A2845E", pale: "F4EDE4", encre: "5E4526")
-        }
+        TeinteBilan(
+            vive: Color.nutrientColor(for: id.rawValue),
+            encre: Color.teinteApportTexte(for: id.rawValue)
+        )
     }
 }
 
@@ -63,9 +53,22 @@ extension EtapeBilan {
     /// La couleur de l'étape.
     var teinte: TeinteBilan {
         switch self {
-        case .toi: return TeinteBilan(vive: "007AFF", pale: "E5F1FF", encre: "0A4E9E")
-        case .quotidien: return TeinteBilan(vive: "FF9500", pale: "FFF1DC", encre: "8A4B00")
-        case .forme: return TeinteBilan(vive: "AF52DE", pale: "F5E9FB", encre: "6A2496")
+        case .toi: return TeinteBilan(vive: .teinteProteines, encre: .teinteProteinesTexte)
+        // L'orange le plus foncé de la palette : le nom du chapitre se lit
+        // sur le halo pêche du fond (contraste supérieur à 4,5 pour 1).
+        case .quotidien: return TeinteBilan(vive: .teinteLipides, encre: .teinteLipidesTexte)
+        case .forme: return TeinteBilan(vive: .teinteFer, encre: .teinteFerTexte)
+        case .assiette: return .kiwi
+        }
+    }
+
+    /// La teinte du fond de verre pendant l'étape : ciel, aube, orchidée,
+    /// kiwi. Les halos fondent de l'une à l'autre en 0,9 s (`VerreFond`).
+    var teinteVerre: VerreTeinte {
+        switch self {
+        case .toi: return .ciel
+        case .quotidien: return .aube
+        case .forme: return .orchidee
         case .assiette: return .kiwi
         }
     }
@@ -75,6 +78,12 @@ extension EcranBilan {
     /// La couleur de l'écran : celle de son étape, le vert de la marque sinon.
     var teinte: TeinteBilan {
         etape?.teinte ?? .kiwi
+    }
+
+    /// La teinte du fond : celle de son étape, kiwi sinon (accueil, fin,
+    /// écrans d'affinage).
+    var teinteVerre: VerreTeinte {
+        etape?.teinteVerre ?? .kiwi
     }
 }
 
@@ -90,6 +99,55 @@ extension EnvironmentValues {
     var teinteBilan: TeinteBilan {
         get { self[TeinteBilanKey.self] }
         set { self[TeinteBilanKey.self] = newValue }
+    }
+}
+
+// MARK: - Le verre du questionnaire
+
+/// Les matières propres au questionnaire, toutes dérivées de celles du socle
+/// (`VerreMatiere`) : on ne redéfinit ni dégradé ni reflet ici.
+enum BilanVerre {
+
+    /// Une réponse : verre clair au repos, verre vert pâle une fois choisie.
+    static func reponse(choisie: Bool) -> VerreMatiere {
+        choisie ? VerreMatiere.clairActif : VerreMatiere.clair
+    }
+
+    /// Le texte d'une réponse choisie, posé sur le verre vert pâle : le vert
+    /// foncé de la palette (contraste supérieur à 4,5 pour 1).
+    static let encreChoisie = Color.teinteKiwiTexte
+
+    /// Le liseré d'une réponse choisie.
+    static let bordChoisi = Color.teinteKiwi
+
+    /// Une tuile choisie à l'intérieur d'une carte de verre : le vert kiwi à
+    /// 16 %, comme le créneau coché du rituel.
+    static let tuileChoisie = Color.teinteKiwi.opacity(0.16)
+
+    /// La piste d'une bascule, sans flou vivant : elle défile avec le contenu,
+    /// et ce qu'elle recouvre est déjà un dégradé flou.
+    static let piste: VerreMatiere = {
+        var matiere = VerreMatiere.piste
+        matiere.flouVivant = false
+        return matiere
+    }()
+
+    /// Un disque de verre teinté d'une couleur d'étape (la coche d'une étape
+    /// terminée) : la recette de l'action principale, dans une autre couleur.
+    /// On part de `principal` et on ne change que ce qui porte la couleur :
+    /// les reflets et le liseré restent ceux du socle, quoi qu'il devienne.
+    static func disque(_ couleur: Color) -> VerreMatiere {
+        var matiere = VerreMatiere.principal
+        matiere.arrets = [
+            Gradient.Stop(color: couleur.opacity(0.82), location: 0),
+            Gradient.Stop(color: couleur, location: 0.6),
+            Gradient.Stop(color: couleur, location: 1),
+        ]
+        matiere.refletBasCouleur = Color.black
+        matiere.eclat = 0.3
+        matiere.ombre = VerreOmbre(couleur: couleur.opacity(0.42), rayon: 12, y: 9)
+        matiere.opaque = couleur
+        return matiere
     }
 }
 
@@ -109,11 +167,13 @@ enum BilanTypo {
     static let echelle: Font = .system(.caption, design: .default).weight(.semibold)
     /// L'emoji d'une tuile.
     static let emoji: Font = .system(.title2, design: .default)
-    /// La valeur centrale d'une molette.
-    static let molette: Font = .system(.title, design: .default).weight(.bold).monospacedDigit()
+    /// La valeur centrale d'une molette : un grand chiffre, en SF Pro Rounded.
+    static let molette: Font = .system(.title, design: .rounded).weight(.bold).monospacedDigit()
     /// Les valeurs voisines d'une molette.
-    static let moletteVoisine: Font = .system(.subheadline, design: .default).weight(.semibold).monospacedDigit()
+    static let moletteVoisine: Font = .system(.subheadline, design: .rounded).weight(.semibold).monospacedDigit()
 
-    /// Rayon des tuiles et des cartes du questionnaire.
-    static let rayon: CGFloat = 16
+    /// Rayon d'une réponse en verre clair (tuile, ligne, champ).
+    static let rayon: CGFloat = 22
+    /// Rayon d'une petite case posée sur le fond (les dix apports).
+    static let rayonCase: CGFloat = 16
 }

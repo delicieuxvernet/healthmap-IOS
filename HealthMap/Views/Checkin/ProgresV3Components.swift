@@ -1,71 +1,72 @@
 import SwiftUI
 
-// MARK: - Progrès v3 (maquette du 20 septembre 2026) : sous-vues
+// MARK: - Progrès : les cartes de « Ce qui a changé » (maquette « Verre liquide », 2 octobre 2026)
 //
-// Le verdict d'abord, en trois phrases ; un seul graphe à la fois ; les apports
-// en « avant → après » plutôt qu'en série temporelle. Les calculs vivent dans
-// `ProgresVerdict` et `SuiviEngineV4` : ici, on ne fait que dessiner.
+// La toile d'abord (`ProgresComponents.swift`), puis une carte de verre par
+// évolution réelle : un symptôme et sa courbe, la semaine des apports, celle
+// des calories, et ce qui bouge en coulisses depuis le premier jour. Les
+// calculs vivent dans `ProgresVerdict` et `SuiviEngineV4` : ici, on ne fait
+// que dessiner.
 
-// MARK: - Le verdict de la semaine
+// MARK: - Outils
 
-struct ProgresVerdictCard: View {
-    let lignes: [ProgresVerdict.Ligne]
+enum ProgresDates {
+    /// « 17 sept. » — le formatter est coûteux, les cartes se redessinent souvent.
+    private static let formatJour: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "fr_FR")
+        f.dateFormat = "d MMM"
+        return f
+    }()
 
-    private var titre: String {
-        lignes.count == 3 ? "Cette semaine, en trois lignes" : "Cette semaine, en bref"
+    static func jourCourt(_ date: Date) -> String {
+        formatJour.string(from: date)
     }
+}
+
+/// Les teintes d'un sujet suivi : le trait (icône, courbe) et sa version
+/// foncée pour le texte posé sur le verre.
+enum ProgresTeintes {
+    struct Paire {
+        let trait: Color
+        let texte: Color
+    }
+
+    /// L'énergie garde le jaune de la maquette ; tout autre symptôme, le rose.
+    static func symptome(_ trend: SymptomTrend) -> Paire {
+        if trend.noun == "ton énergie" {
+            return Paire(trait: Color.teinteGlucidesTrait, texte: Color.teinteGlucidesTexte)
+        }
+        return Paire(trait: Color.teinteSymptomes, texte: Color.teinteSymptomesTexte)
+    }
+
+    /// « tes ongles » → « Ongles » : le sujet seul, pour une puce d'en-tête.
+    static func sujetCourt(_ trend: SymptomTrend) -> String {
+        let mots = trend.noun.split(separator: " ", maxSplits: 1)
+        let sujet = mots.count == 2 ? String(mots[1]) : trend.noun
+        return ProgresVerdict.majuscule(sujet)
+    }
+}
+
+// MARK: - En-tête d'une carte : l'icône dans la teinte, le libellé dans sa version foncée
+
+struct ProgresCarteEntete: View {
+    let symbole: String
+    let titre: String
+    let teinte: Color
+    let teinteTexte: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(titre)
-                .font(.dsLegende.weight(.semibold))
-                .foregroundStyle(Color.dsSecondaire)
-                .padding(.bottom, 2)
-
-            ForEach(lignes) { ligne in
-                HStack(alignment: .center, spacing: 12) {
-                    pastille(ligne.genre)
-                    // Une seule phrase, deux encres : la réponse en gras.
-                    (Text(ligne.gras).fontWeight(.semibold) + Text(ligne.suite))
-                        .font(.dsCorps)
-                        .tracking(DSTracking.corps)
-                        .foregroundStyle(Color.dsTexte)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .accessibilityElement(children: .combine)
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dsCard()
-    }
-
-    private func pastille(_ genre: ProgresVerdict.Genre) -> some View {
-        let teinte = Self.teinte(genre)
-        return ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(teinte.opacity(0.12))
-            Image(systemName: Self.symbole(genre))
-                .font(.system(size: 17, weight: .medium))
+        HStack(spacing: 5) {
+            Image(systemName: symbole)
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(teinte)
-        }
-        .frame(width: 36, height: 36)
-        .accessibilityHidden(true)
-    }
-
-    private static func symbole(_ genre: ProgresVerdict.Genre) -> String {
-        switch genre {
-        case .symptome: return "chart.line.uptrend.xyaxis"
-        case .apport: return "drop"
-        case .calories: return "flame"
-        }
-    }
-
-    private static func teinte(_ genre: ProgresVerdict.Genre) -> Color {
-        switch genre {
-        case .symptome: return .dsAccent
-        case .apport(let id): return Color.nutrientColor(for: id)
-        case .calories: return .dsCalories
+                .accessibilityHidden(true)
+            Text(titre)
+                .font(.dsSousTitreFort)
+                .foregroundStyle(teinteTexte)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
     }
 }
@@ -75,57 +76,64 @@ struct ProgresVerdictCard: View {
 struct ProgresSymptomeEntete: View {
     let noms: [String]
     @Binding var index: Int
-    /// Le verdict écrit ; `nil` = pas encore de tendance, ou tendance gatée.
+    let symbole: String
+    let teinte: Color
+    let teinteTexte: Color
+    /// Le verdict écrit (« Ta tendance » quand elle est gatée, « Ton suivi
+    /// démarre » avant la première réponse).
     let verdict: String
     /// Crans gagnés ; `nil` = on ne l'affiche pas (gratuit, ou pas de réponse).
     let niveaux: Int?
 
+    private var nomCourant: String {
+        noms.isEmpty ? "" : noms[min(max(0, index), noms.count - 1)]
+    }
+
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                if noms.count > 1 {
-                    Menu {
-                        ForEach(Array(noms.enumerated()), id: \.offset) { position, nom in
-                            Button(nom) { index = position }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(noms[min(index, noms.count - 1)])
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 11, weight: .semibold))
-                                .accessibilityHidden(true)
-                        }
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .frame(minHeight: 28)
-                        .contentShape(Rectangle())
+        VStack(alignment: .leading, spacing: 4) {
+            if noms.count > 1 {
+                Menu {
+                    ForEach(Array(noms.enumerated()), id: \.offset) { position, nom in
+                        Button(nom) { index = position }
                     }
-                    .accessibilityLabel("Symptôme affiché")
-                    .accessibilityValue(noms[min(index, noms.count - 1)])
-                } else if let nom = noms.first {
-                    Text(nom)
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
+                } label: {
+                    HStack(spacing: 5) {
+                        ProgresCarteEntete(symbole: symbole, titre: nomCourant, teinte: teinte, teinteTexte: teinteTexte)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(teinteTexte)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(minHeight: 28)
+                    // 28 pt de haut : la cible tactile déborde de 8 pt en haut
+                    // et en bas pour atteindre 44.
+                    .contentShape(Rectangle().inset(by: -8))
                 }
+                .accessibilityLabel("Symptôme affiché")
+                .accessibilityValue(nomCourant)
+            } else {
+                ProgresCarteEntete(symbole: symbole, titre: nomCourant, teinte: teinte, teinteTexte: teinteTexte)
+            }
+
+            HStack(alignment: .center, spacing: 10) {
                 Text(verdict)
-                    .font(.system(.title3, design: .default).weight(.bold))
-                    .tracking(-0.55)
+                    .font(.dsSection)
+                    .tracking(DSTracking.section)
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 8)
-            if let niveaux {
-                pilule(niveaux)
+                Spacer(minLength: 8)
+                if let niveaux {
+                    pilule(niveaux)
+                }
             }
         }
     }
 
     private func pilule(_ niveaux: Int) -> some View {
-        let encre: Color = niveaux > 0 ? .kiwiGreenInk : (niveaux < 0 ? Color(hex: "B36B00") : .dsSecondaire)
-        let fond: Color = niveaux > 0 ? Color.dsAccent.opacity(0.12)
-            : (niveaux < 0 ? Color.dsCalories.opacity(0.14) : Color(uiColor: .systemGray5))
+        let encre: Color = niveaux > 0 ? Color.teinteKiwiTexte
+            : (niveaux < 0 ? Color.dsARenforcerTexte : Color.dsSecondaire)
+        let fond: Color = niveaux > 0 ? Color.teinteKiwi.opacity(0.14)
+            : (niveaux < 0 ? Color.dsARenforcer.opacity(0.16) : Verre.remplissage)
         return HStack(spacing: 5) {
             if niveaux != 0 {
                 Image(systemName: niveaux > 0 ? "arrow.up.right" : "arrow.down.right")
@@ -142,25 +150,88 @@ struct ProgresSymptomeEntete: View {
     }
 }
 
-// MARK: - La courbe d'un symptôme : une ligne, trois paliers nommés
+// MARK: - Un chiffre de la semaine (tiret de teinte, libellé, valeur, précision)
+
+struct ProgresChiffreSemaine: View {
+    let teinte: Color
+    let teinteTexte: Color
+    let libelle: String
+    let valeur: String
+    let legende: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(teinte)
+                    .frame(width: 12, height: 4)
+                    .accessibilityHidden(true)
+                Text(libelle)
+                    .font(.dsLegende.weight(.semibold))
+                    .foregroundStyle(teinteTexte)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Text(valeur)
+                .font(.system(.title3, design: .default).weight(.bold).monospacedDigit())
+                .tracking(-0.5)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 3)
+            Text(legende)
+                .font(.system(.caption, design: .default))
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - La courbe d'un symptôme : une ligne qui se dessine
 
 /// Le haut du graphe est TOUJOURS le mieux, quel que soit le sens du symptôme :
-/// une courbe qui monte est une bonne nouvelle, on n'a pas à réfléchir. Les
-/// paliers se lisent en mots, pas sur un axe chiffré — le niveau est un cumul
-/// de ressentis, pas une mesure.
+/// une courbe qui monte est une bonne nouvelle, on n'a pas à réfléchir. Le
+/// niveau est un cumul de ressentis, pas une mesure : aucun axe chiffré.
+///
+/// La courbe partage son axe avec les barres du check-in posées dessous : un
+/// cran par jour, aujourd'hui tout à droite. Un suivi plus jeune que l'axe
+/// commence donc en cours de route, là où il a vraiment commencé.
 struct ProgresCourbeSymptome: View {
+    /// L'axe le plus long : quatre semaines.
+    static let fenetre = 28
+    /// L'axe le plus court : une semaine, même au premier jour.
+    static let axeMinimum = 7
+    static let hauteur: CGFloat = 104
+
+    /// Ordonnées de la maquette : ligne de base, palier bas, palier haut.
+    private static let base: CGFloat = 100
+    private static let bas: CGFloat = 96
+    private static let haut: CGFloat = 12
+    /// Les barres du check-in font 6 pt : la courbe se cale sur leur milieu.
+    private static let retrait: CGFloat = 3
+    /// Écart au départ (en points de niveau) qui touche le bord du graphe : en
+    /// dessous, quatre réponses « mieux » suffisent à atteindre le palier haut.
+    private static let amplitudeMinimale: Double = 12
+
     let jours: [SuiviEngineV4.PointJour]
+    /// Nombre de jours de l'axe (au moins `jours.count`).
+    let axe: Int
     /// Vrai quand « mieux » fait MONTER le niveau du moteur (énergie…) ; faux
     /// quand il le fait descendre (un problème qui recule) : on retourne l'axe.
     let mieuxVersLeHaut: Bool
     let libelleHaut: String
     let libelleBas: String
-    let progress: CGFloat
+    let teinte: Color
+    /// La ligne se dessine quand `trace` passe à vrai.
+    let trace: Bool
+    /// Gratuit : la ligne est floutée, seule la position du jour reste nette.
+    let gatee: Bool
 
-    private static let largeurLibelles: CGFloat = 62
-    /// Écart au départ (en points de niveau) qui touche le bord du graphe : en
-    /// dessous, quatre réponses « mieux » suffisent à atteindre le palier haut.
-    private static let amplitudeMinimale: Double = 12
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var animer: Bool { trace && !reduceMotion }
 
     /// 0 = palier bas, 1 = palier haut, 0,5 = « pareil ».
     private var hauteurs: [Double] {
@@ -170,117 +241,180 @@ struct ProgresCourbeSymptome: View {
         return ecarts.map { 0.5 + $0 / (2 * amplitude) }
     }
 
-    var body: some View {
-        VStack(spacing: 6) {
-            GeometryReader { geo in
-                let zone = CGRect(x: Self.largeurLibelles, y: 8,
-                                  width: geo.size.width - Self.largeurLibelles - 10,
-                                  height: geo.size.height - 16)
-                ZStack(alignment: .topLeading) {
-                    paliers(zone)
-                    trace(zone)
-                }
-            }
-            .frame(height: 128)
-
-            HStack {
-                Text(jours.first.map { Self.jourCourt($0.jour) } ?? "")
-                Spacer(minLength: 8)
-                Text("auj.")
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.dsTexte)
-            }
-            .font(.system(.caption2, design: .default))
-            .foregroundStyle(Color.dsSecondaire)
-            .padding(.leading, Self.largeurLibelles)
-            .padding(.trailing, 4)
+    private func points(largeur: CGFloat) -> [CGPoint] {
+        let valeurs = hauteurs
+        let creneaux = max(axe, valeurs.count, 2)
+        let pas = max(0, largeur - 2 * Self.retrait) / CGFloat(creneaux - 1)
+        let premier = creneaux - valeurs.count
+        return valeurs.enumerated().map { index, hauteur in
+            CGPoint(x: Self.retrait + pas * CGFloat(premier + index),
+                    y: Self.bas - (Self.bas - Self.haut) * CGFloat(min(1, max(0, hauteur))))
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Courbe du symptôme, de \(libelleBas) en bas à \(libelleHaut) en haut")
     }
 
-    private func paliers(_ zone: CGRect) -> some View {
-        let libelles = [libelleHaut, "pareil", libelleBas]
-        return ForEach(0..<3, id: \.self) { rang in
-            let y = zone.minY + zone.height * CGFloat(rang) / 2
-            Text(libelles[rang])
-                .font(.system(.caption2, design: .default))
-                .foregroundStyle(Color.dsSecondaire)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(width: Self.largeurLibelles - 8, alignment: .leading)
-                .position(x: (Self.largeurLibelles - 8) / 2, y: y)
-            Rectangle()
-                .fill(Color.dsSeparateur)
-                .frame(width: zone.width + 10, height: 1)
-                .position(x: zone.minX + (zone.width + 10) / 2, y: y)
+    var body: some View {
+        GeometryReader { geo in
+            let sommets = points(largeur: geo.size.width)
+            ZStack {
+                lignes(sommets, largeur: geo.size.width)
+                    .blur(radius: gatee ? 8 : 0)
+                    .opacity(gatee ? 0.5 : 1)
+
+                // Aujourd'hui : un point plein, cerné de blanc.
+                if let dernier = sommets.last {
+                    Circle()
+                        .fill(teinte)
+                        .frame(width: 12, height: 12)
+                        .overlay(Circle().stroke(Color.white, lineWidth: 2.5))
+                        .position(dernier)
+                        .opacity(trace ? 1 : 0)
+                        .animation(animer ? Animation.easeOut(duration: 0.4).delay(sommets.count > 1 ? 1.3 : 0) : nil,
+                                   value: trace)
+                }
+            }
         }
+        .frame(height: Self.hauteur)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(gatee
+            ? "Courbe du symptôme, réservée à Kiwio Premium"
+            : "Courbe du symptôme, de \(libelleBas) en bas à \(libelleHaut) en haut")
     }
 
     @ViewBuilder
-    private func trace(_ zone: CGRect) -> some View {
-        let valeurs = hauteurs
-        if valeurs.count >= 2 {
-            let points = valeurs.enumerated().map { index, hauteur in
-                CGPoint(x: zone.minX + zone.width * CGFloat(index) / CGFloat(valeurs.count - 1),
-                        y: zone.maxY - zone.height * CGFloat(min(1, max(0, hauteur))))
+    private func lignes(_ sommets: [CGPoint], largeur: CGFloat) -> some View {
+        ZStack {
+            Path { chemin in
+                chemin.move(to: CGPoint(x: 0, y: Self.base))
+                chemin.addLine(to: CGPoint(x: largeur, y: Self.base))
             }
-            let ligne = SuiviCurveMath.smoothPath(points)
+            .stroke(Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.15), lineWidth: 1)
 
-            // Le voile sous la courbe.
-            Path { path in
-                path.addPath(ligne)
-                path.addLine(to: CGPoint(x: points[points.count - 1].x, y: zone.maxY + 8))
-                path.addLine(to: CGPoint(x: points[0].x, y: zone.maxY + 8))
-                path.closeSubpath()
-            }
-            .fill(LinearGradient(colors: [Color.dsAccent.opacity(0.22), Color.dsAccent.opacity(0)],
-                                 startPoint: .top, endPoint: .bottom))
-            .opacity(Double(progress))
+            if sommets.count >= 2 {
+                let ligne = SuiviCurveMath.smoothPath(sommets)
 
-            ligne
-                .trim(from: 0, to: progress)
-                .stroke(Color.dsAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-
-            // Un point par jour répondu ; celui d'aujourd'hui (le dernier) est plein.
-            ForEach(Array(jours.enumerated()), id: \.offset) { index, jour in
-                if index == jours.count - 1 {
-                    ZStack {
-                        Circle().fill(Color.dsAccent.opacity(0.18)).frame(width: 18, height: 18)
-                        Circle().fill(Color.dsAccent).frame(width: 11, height: 11)
-                            .overlay(Circle().stroke(Color.dsCarte, lineWidth: 2.5))
-                    }
-                    .position(points[index])
-                    .opacity(Double(progress))
-                } else if jour.repondu {
-                    Circle()
-                        .fill(Color.dsCarte)
-                        .frame(width: 8, height: 8)
-                        .overlay(Circle().stroke(Color.dsAccent, lineWidth: 2.5))
-                        .position(points[index])
-                        .opacity(Double(progress))
+                // Le voile sous la courbe.
+                Path { chemin in
+                    chemin.addPath(ligne)
+                    chemin.addLine(to: CGPoint(x: sommets[sommets.count - 1].x, y: Self.base))
+                    chemin.addLine(to: CGPoint(x: sommets[0].x, y: Self.base))
+                    chemin.closeSubpath()
                 }
+                .fill(teinte.opacity(0.09))
+                .opacity(trace ? 1 : 0)
+                .animation(animer ? Animation.easeOut(duration: 0.8).delay(0.5) : nil, value: trace)
+
+                ligne
+                    .trim(from: 0, to: trace ? 1 : 0)
+                    .stroke(teinte, style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
+                    .animation(animer ? Animation.timingCurve(0.4, 0, 0.2, 1, duration: 1.4) : nil, value: trace)
             }
-        } else {
-            // Jour 0 : un seul point, posé sur « pareil ».
-            Circle()
-                .fill(Color.dsAccent)
-                .frame(width: 11, height: 11)
-                .overlay(Circle().stroke(Color.dsCarte, lineWidth: 2.5))
-                .position(x: zone.maxX, y: zone.midY)
+        }
+    }
+}
+
+// MARK: - Les réponses au check-in, jour par jour
+
+/// Un jour de l'axe. `ressenti` : 0 = mieux, 1 = pareil, 2 = moins bien ;
+/// `nil` = pas de réponse ce jour-là.
+struct ProgresJourCheckin: Identifiable, Equatable {
+    let id: Int
+    let ressenti: Int?
+}
+
+/// Une barre par jour : haute = mieux, moyenne = pareil, courte = moins bien,
+/// un trait gris = pas de réponse. Aujourd'hui est cerné.
+struct ProgresBarresCheckin: View {
+    let jours: [ProgresJourCheckin]
+    let teinte: Color
+    /// Les barres montent quand `trace` passe à vrai.
+    let trace: Bool
+    /// Gratuit : les jours passés sont floutés, aujourd'hui reste net.
+    let gatee: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let hauteurRangee: CGFloat = 22
+
+    private func hauteur(_ jour: ProgresJourCheckin) -> CGFloat {
+        guard let ressenti = jour.ressenti, trace else { return 3 }
+        switch ressenti {
+        case 0: return 20
+        case 1: return 12
+        default: return 5
         }
     }
 
-    /// « 17 sept. » — le formatter est coûteux, la carte se redessine souvent.
-    private static let formatJour: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
-        f.dateFormat = "d MMM"
-        return f
-    }()
+    private func montee(_ jour: ProgresJourCheckin) -> Animation? {
+        guard trace, !reduceMotion else { return nil }
+        return Animation.timingCurve(0.3, 1.3, 0.5, 1, duration: 0.5).delay(0.3 + Double(jour.id) * 0.015)
+    }
 
-    private static func jourCourt(_ date: Date) -> String {
-        formatJour.string(from: date)
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            rangee(aujourdHui: false)
+                .blur(radius: gatee ? 3 : 0)
+                .opacity(gatee ? 0.5 : 1)
+            rangee(aujourdHui: true)
+        }
+        .frame(height: Self.hauteurRangee, alignment: .bottom)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(libelleVocal)
+    }
+
+    /// Deux couches superposées, pour que le flou des jours passés ne touche
+    /// pas aujourd'hui : l'une ne montre que le dernier jour, l'autre que les
+    /// précédents.
+    private func rangee(aujourdHui: Bool) -> some View {
+        HStack(alignment: .bottom, spacing: 0) {
+            ForEach(jours) { jour in
+                let dernier = jour.id == jours.last?.id
+                Capsule()
+                    .fill(jour.ressenti == nil ? Color.dsTrait : teinte)
+                    .frame(width: 6, height: hauteur(jour))
+                    .background(Capsule().fill(Color.white).padding(-2).opacity(dernier ? 1 : 0))
+                    .background(Capsule().fill(teinte).padding(-3.5).opacity(dernier ? 1 : 0))
+                    .animation(montee(jour), value: trace)
+                    .opacity(dernier == aujourdHui ? 1 : 0)
+                if !dernier {
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .frame(height: Self.hauteurRangee, alignment: .bottom)
+    }
+
+    private var libelleVocal: String {
+        let repondus = jours.filter { $0.ressenti != nil }.count
+        return "Tes réponses au check-in : \(repondus) sur \(jours.count) jours"
+    }
+}
+
+// MARK: - La porte, en bouton de verre vert (« Voir ta courbe »)
+
+struct ProgresBoutonOffre: View {
+    let titre: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "lock")
+                    .font(.system(size: 15, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text(titre)
+                    .font(.dsSousTitreFort)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 36)
+            .verrePrincipal()
+            // 36 pt de haut : la cible tactile monte à 44.
+            .frame(minHeight: DS.cibleTactile)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityLabel("\(titre), réservé à Kiwio Premium")
     }
 }
 
@@ -294,23 +428,82 @@ struct ProgresEncart: View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: symbole)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color.kiwiGreenInk)
+                .foregroundStyle(Color.teinteKiwiTexte)
                 .padding(.top, 1)
                 .accessibilityHidden(true)
             Text(texte)
                 .font(.system(.footnote, design: .default).weight(.medium))
-                .foregroundStyle(Color.kiwiGreenInk)
+                .foregroundStyle(Color.teinteKiwiTexte)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.dsAccent.opacity(0.09)))
+        .background(RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous).fill(Color.teinteKiwi.opacity(0.10)))
     }
 }
 
-// MARK: - « Depuis ton premier jour » : avant → après, et l'écart
+// MARK: - La semaine d'une mesure (apports, calories) : verdict, puis les sept jours
 
+struct ProgresSemaineCard: View {
+    let symbole: String
+    let titre: String
+    let teinte: Color
+    let teinteTexte: Color
+    let verdict: String
+    /// La précision sous le verdict ; `nil` = rien à ajouter.
+    let phrase: String?
+    let points: [ProgresBarPoint]
+    let besoin: Double?
+    /// Les barres montent quand `trace` passe à vrai.
+    let trace: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ProgresCarteEntete(symbole: symbole, titre: titre, teinte: teinte, teinteTexte: teinteTexte)
+
+            Text(verdict)
+                .font(.dsSection)
+                .tracking(DSTracking.section)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
+
+            if let phrase {
+                Text(phrase)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+            }
+
+            // Le point du dernier jour dépasse la plus haute barre : on lui
+            // laisse sa place au-dessus du graphe.
+            ProgresBarChart(points: points, besoin: besoin, teinte: teinte, dessine: trace)
+                .frame(height: 122)
+                .padding(.top, 24)
+
+            HStack(spacing: 16) {
+                Text("Barres : tes apports")
+                Text("Pointillé : tes besoins")
+            }
+            .font(.system(.caption, design: .default))
+            .foregroundStyle(Color.dsSecondaire)
+            .padding(.top, 8)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+    }
+}
+
+// MARK: - « En coulisses » : tes apports depuis ton premier jour
+
+/// Ce qui bouge avant de se sentir : chaque apport suivi, de son score du
+/// premier bilan à celui d'aujourd'hui. En gratuit, la carte nomme les
+/// apports, jamais leur tendance : la vignette est floutée et la ligne ouvre
+/// l'offre.
 struct ProgresDepuisLeDebutCard: View {
     struct Ligne: Identifiable {
         let id: String
@@ -323,79 +516,218 @@ struct ProgresDepuisLeDebutCard: View {
     let lignes: [Ligne]
     /// « 14 jours » ; `nil` = le suivi vient de démarrer.
     let duree: String?
+    var verrouille: Bool = false
     let onLigne: (Ligne) -> Void
 
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Depuis ton premier jour")
-                    .font(.dsLegende.weight(.semibold))
-                Spacer(minLength: 8)
-                if let duree {
-                    Text(duree).font(.dsLegende)
-                }
-            }
-            .foregroundStyle(Color.dsSecondaire)
-            .padding(.top, 14)
-            .padding(.bottom, 8)
+    /// « Progresse » ne s'écrit que si un apport a vraiment monté, et jamais en
+    /// gratuit (la tendance est ce que vend la porte).
+    private var titre: String {
+        let progresse = lignes.contains(where: { $0.ecart >= ProgresVerdict.ecartMinimum })
+        return (!verrouille && progresse)
+            ? "Ce qui progresse avant que tu le sentes."
+            : "Ce qui bouge avant que tu le sentes."
+    }
 
-            ForEach(lignes) { ligne in
-                Rectangle().fill(Color.dsSeparateur).frame(height: 0.5)
-                Button { onLigne(ligne) } label: { rangee(ligne) }
-                    .buttonStyle(.dsPress)
+    private var sousTitre: String {
+        guard let duree else { return "Depuis ton premier jour" }
+        return "Depuis ton premier jour · \(duree)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ProgresCarteEntete(symbole: "hourglass", titre: "En coulisses",
+                               teinte: Color.teinteFer, teinteTexte: Color.teinteFerTexte)
+
+            Text(titre)
+                .font(.dsHeadline)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(Color.dsTexte)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 6)
+
+            Text(sousTitre)
+                .font(.dsLegende)
+                .foregroundStyle(Color.dsSecondaire)
+                .padding(.top, 2)
+
+            ForEach(Array(lignes.enumerated()), id: \.element.id) { position, ligne in
+                if position > 0 {
+                    DSSeparator(retrait: 0)
+                }
+                Button {
+                    onLigne(ligne)
+                } label: {
+                    rangee(ligne)
+                }
+                .buttonStyle(.dsPress)
             }
         }
         .padding(.horizontal, DS.paddingCarte)
+        .padding(.top, DS.paddingCarte)
         .padding(.bottom, 4)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
     }
 
+    private func symbole(_ ligne: Ligne) -> String {
+        if verrouille { return "lock" }
+        if ligne.ecart >= ProgresVerdict.ecartMinimum { return "arrow.up.right" }
+        if ligne.ecart <= -ProgresVerdict.ecartMinimum { return "arrow.down.right" }
+        return "equal"
+    }
+
+    /// Sous l'écart minimum, un mouvement est du bruit : on dit « stable ».
+    private func verdict(_ ligne: Ligne) -> String {
+        if verrouille { return "Ta tendance" }
+        if ligne.ecart >= ProgresVerdict.ecartMinimum { return "En hausse" }
+        if ligne.ecart <= -ProgresVerdict.ecartMinimum { return "En baisse" }
+        return "Stable"
+    }
+
+    private func detail(_ ligne: Ligne) -> String {
+        if verrouille { return "Elle se mesure, repas après repas." }
+        if ligne.ecart == 0 { return "Toujours \(DS.pourcent(ligne.apres)) de ton besoin." }
+        return "De \(ligne.avant) à \(DS.pourcent(ligne.apres)) de ton besoin."
+    }
+
     private func rangee(_ ligne: Ligne) -> some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(Color.nutrientColor(for: ligne.id))
-                .frame(width: 10, height: 10)
-                .accessibilityHidden(true)
-            Text(ligne.nom)
-                .font(.dsCorps)
-                .tracking(DSTracking.corps)
-                .foregroundStyle(Color.dsTexte)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Spacer(minLength: 8)
-            HStack(spacing: 5) {
-                Text("\(ligne.avant)")
-                    .foregroundStyle(Color.dsSecondaire)
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.dsTertiaire)
-                    .accessibilityHidden(true)
-                Text("\(ligne.apres) %")
-                    .fontWeight(.bold)
+        let couleur = Color.nutrientColor(for: ligne.id)
+        let encre = Color.teinteApportTexte(for: ligne.id)
+        return HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 5) {
+                    Image(systemName: symbole(ligne))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(couleur)
+                        .accessibilityHidden(true)
+                    Text(ligne.nom)
+                        .font(.dsSousTitreFort)
+                        .foregroundStyle(encre)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(encre)
+                        .accessibilityHidden(true)
+                }
+                Text(verdict(ligne))
+                    .font(.system(.headline, design: .default).weight(.bold))
+                    .tracking(-0.3)
                     .foregroundStyle(Color.dsTexte)
+                    .padding(.top, 3)
+                Text(detail(ligne))
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
             }
-            .font(.system(.subheadline, design: .default).monospacedDigit())
-            ecart(ligne.ecart)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            vignette(ligne, couleur: couleur)
         }
+        .padding(.top, 14)
+        .padding(.bottom, 12)
         .frame(minHeight: DS.cibleTactile)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(ligne.nom), de \(ligne.avant) à \(ligne.apres) pour cent")
-        .accessibilityHint("Ouvre la fiche de cet apport")
+        .accessibilityLabel(verrouille
+            ? "\(ligne.nom), tendance réservée à Kiwio Premium"
+            : "\(ligne.nom), de \(ligne.avant) à \(ligne.apres) pour cent")
+        .accessibilityHint(verrouille ? "Ouvre l'offre Premium" : "Ouvre la fiche de cet apport")
     }
 
-    private func ecart(_ valeur: Int) -> some View {
-        let baisse = valeur < 0
-        let texte = valeur > 0 ? "+\(valeur)" : (baisse ? "\u{2212}\(abs(valeur))" : "0")
-        return Text(texte)
-            .font(.system(.caption, design: .default).weight(.bold).monospacedDigit())
-            .foregroundStyle(baisse ? Color(hex: "B36B00") : (valeur > 0 ? Color.kiwiGreenInk : Color.dsSecondaire))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .frame(minWidth: 38)
-            .background(Capsule().fill(baisse ? Color.dsCalories.opacity(0.14)
-                                       : (valeur > 0 ? Color.dsAccent.opacity(0.12) : Color(uiColor: .systemGray5))))
+    /// Ordonnée d'un score dans la vignette (46 pt de haut).
+    private static func ordonnee(_ pct: Int) -> CGFloat {
+        37 - CGFloat(min(100, max(0, pct))) / 100 * 28
+    }
+
+    /// Du score de départ (point creux) à celui d'aujourd'hui (point plein).
+    private func vignette(_ ligne: Ligne, couleur: Color) -> some View {
+        let depart = CGPoint(x: 14, y: Self.ordonnee(ligne.avant))
+        let arrivee = CGPoint(x: 82, y: Self.ordonnee(ligne.apres))
+        return ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(couleur.opacity(0.12))
+            Path { chemin in
+                chemin.move(to: depart)
+                chemin.addLine(to: arrivee)
+            }
+            .stroke(couleur, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            Circle()
+                .fill(Color.white)
+                .frame(width: 9, height: 9)
+                .overlay(Circle().strokeBorder(couleur, lineWidth: 2))
+                .position(depart)
+            Circle()
+                .fill(couleur)
+                .frame(width: 9, height: 9)
+                .position(arrivee)
+        }
+        .frame(width: 96, height: 46)
+        .blur(radius: verrouille ? 8 : 0)
+        .opacity(verrouille ? 0.5 : 1)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Une ligne d'action en verre (check-in du jour, récap du jour)
+
+struct ProgresLigneAction: View {
+    let symbole: String
+    let titre: String
+    let sousTitre: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbole)
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(Color.teinteKiwi)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(Color.teinteKiwiPale))
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(titre)
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsTexte)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(sousTitre)
+                        .font(.dsLegende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                DSChevron(couleur: .dsAccent)
+            }
+            .padding(.horizontal, DS.paddingCarte)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .dsCard()
+        }
+        .buttonStyle(.dsPress)
+    }
+}
+
+/// « Comment tu te sens aujourd'hui ? » : ouvre le check-in du jour.
+struct ProgresCheckinRow: View {
+    /// Nombre de symptômes suivis, donc de questions.
+    let questions: Int
+    let action: () -> Void
+
+    var body: some View {
+        ProgresLigneAction(
+            symbole: "face.smiling",
+            titre: "Comment tu te sens aujourd'hui\(DS.fine)?",
+            sousTitre: "\(questions) question\(questions > 1 ? "s" : "") · nourrit tes graphiques",
+            action: action
+        )
     }
 }
 
@@ -405,38 +737,12 @@ struct ProgresRecapRow: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 13) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(LinearGradient(colors: [Color.dsVoile, Color(hex: "CFE6BE")],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                    Image(systemName: "sunrise")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color.kiwiGreenInk)
-                }
-                .frame(width: 42, height: 42)
-                .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Voir mon récap du jour")
-                        .font(.dsHeadline)
-                        .tracking(DSTracking.corps)
-                        .foregroundStyle(Color.dsTexte)
-                    Text("Le brief de ce matin, à nouveau")
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
-                }
-                Spacer(minLength: 8)
-                DSChevron()
-            }
-            .padding(DS.paddingCarte)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.dsPress)
-        .dsCard()
+        ProgresLigneAction(
+            symbole: "sunrise",
+            titre: "Voir mon récap du jour",
+            sousTitre: "Le brief de ce matin, à nouveau",
+            action: action
+        )
     }
 }
 
@@ -498,10 +804,10 @@ struct CheckinSymptomesSheet: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, DS.marge)
-        .background(Color.dsFond.ignoresSafeArea())
         .presentationDetents([.fraction(0.74), .large])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(34)
+        // Fond de verre et coins de 38 : la feuille ne peint plus d'aplat.
+        .verreFeuille()
         .onDisappear { rendre(fermer: false) }
     }
 
@@ -524,14 +830,15 @@ struct CheckinSymptomesSheet: View {
     }
 
     private func question(_ symptome: (id: String, nom: String, trend: SymptomTrend)) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let teintes = ProgresTeintes.symptome(symptome.trend)
+        return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color(uiColor: .systemGray5))
+                        .fill(teintes.trait.opacity(0.12))
                     Image(systemName: symptome.trend.symbole)
                         .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(Color.dsTexte.opacity(0.72))
+                        .foregroundStyle(teintes.trait)
                 }
                 .frame(width: 56, height: 56)
                 .accessibilityHidden(true)
@@ -539,7 +846,7 @@ struct CheckinSymptomesSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(ProgresVerdict.majuscule(symptome.trend.noun)), aujourd'hui")
                         .font(.dsLegende.weight(.semibold))
-                        .foregroundStyle(Color.dsSecondaire)
+                        .foregroundStyle(teintes.texte)
                     Text(symptome.trend.questionVersLeMieux)
                         .font(.system(.title2, design: .default).weight(.bold))
                         .tracking(-0.7)
@@ -570,10 +877,10 @@ struct CheckinSymptomesSheet: View {
         } label: {
             HStack(spacing: 14) {
                 ZStack {
-                    Circle().fill(choisie ? Color.white.opacity(0.22) : Color(uiColor: .systemGray5))
+                    Circle().fill(choisie ? Color.white.opacity(0.22) : Verre.remplissage)
                     Image(systemName: symbole)
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(choisie ? Color.white : Color.dsSecondaire)
+                        .foregroundStyle(choisie ? Color.white : Verre.iconeNeutre)
                 }
                 .frame(width: 40, height: 40)
                 .accessibilityHidden(true)
@@ -598,10 +905,9 @@ struct CheckinSymptomesSheet: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(choisie ? Color.dsAccent : Color.dsCarte)
-            )
+            // Verre clair au repos, verre vert une fois choisie.
+            .verre(choisie ? VerreMatiere.principal : VerreMatiere.clair,
+                   forme: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.dsPress)

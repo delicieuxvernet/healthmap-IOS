@@ -165,30 +165,38 @@ struct ContentView: View {
 }
 
 // MARK: - Offline Banner
-/// Thin red pill shown at the top of the screen while `ConnectivityService`
-/// reports no reachability. Non-blocking — the user can still tap underneath,
-/// which is the correct behavior because cached data (questionnaire progress,
-/// dashboard snapshot, score history) remains usable offline.
+/// Bandeau de verre flottant shown at the top of the screen while
+/// `ConnectivityService` reports no reachability. Non-blocking — the user can
+/// still tap underneath, which is the correct behavior because cached data
+/// (questionnaire progress, dashboard snapshot, score history) remains usable
+/// offline.
+///
+/// Verre liquide : plus d'aplat rouge. La capsule est en verre flottant (flou
+/// vivant, elle passe au-dessus de contenus qui défilent) ; l'alerte tient
+/// dans la pastille rouge de l'icône, le texte reste à l'encre.
 private struct OfflineBanner: View {
     @State private var showReconnected = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: "wifi.slash")
-                    .font(.system(size: 13, weight: .semibold))
+                VerrePastilleIcone(
+                    symbole: "wifi.slash",
+                    teinte: Color.teinteSymptomes,
+                    taille: 26,
+                    tailleIcone: 12
+                )
                 Text("Hors ligne. Certaines données ne sont pas à jour")
                     .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(Color.urgencyImmediate)
-            )
+            .padding(.leading, 6)
+            .padding(.trailing, 14)
+            .padding(.vertical, 6)
+            .verre(.carteFlottante, forme: Capsule(style: .continuous))
 
             if showReconnected {
                 HStack(spacing: 6) {
@@ -197,7 +205,10 @@ private struct OfflineBanner: View {
                     Text("Reconnecté. Synchronisation...")
                         .font(.system(size: 12, weight: .medium))
                 }
-                .foregroundStyle(Color.dsAccent)
+                .foregroundStyle(Color.teinteKiwiTexte)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .verre(.carteFlottante, forme: Capsule(style: .continuous))
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -205,11 +216,14 @@ private struct OfflineBanner: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Hors ligne. Certaines données ne sont pas à jour.")
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("healthmapDidReconnect"))) { _ in
-            withAnimation(.easeInOut(duration: 0.3)) {
+            // Sous « Réduire les animations », la ligne se pose et s'en va
+            // sans glisser.
+            let fondu: Animation? = reduceMotion ? nil : Animation.easeInOut(duration: 0.3)
+            withAnimation(fondu) {
                 showReconnected = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(.easeInOut(duration: 0.3)) {
+                withAnimation(fondu) {
                     showReconnected = false
                 }
             }
@@ -225,10 +239,16 @@ private struct OfflineBanner: View {
 /// (Info.plist, image `LaunchSigne`) l'a déjà posé : le passage de l'un à
 /// l'autre ne bouge pas d'un point, les pépins se mettent simplement à charger.
 /// Le nom se pose 12 pt dessous sans décaler le signe.
+///
+/// Verre liquide : le fond est celui de l'app (`VerreFond`), à la teinte kiwi
+/// IMPOSÉE et non lue dans l'environnement. Cet écran est affiché à deux
+/// endroits (le splash racine, puis le chargement du profil dans
+/// `MainTabView`) qui doivent montrer les mêmes pixels : la position des halos
+/// ne dépend que de l'heure, la teinte ne dépend plus de rien.
 struct LaunchScreenView: View {
     var body: some View {
         ZStack {
-            Color.dsFond
+            VerreFond(teinte: VerreTeinte.kiwi)
             KiwiLoader(size: 72)
                 .overlay(alignment: .bottom) {
                     KiwiWordmark(taille: 22)
@@ -319,6 +339,18 @@ struct MainTabView: View {
             }
         }
 
+        /// Teinte du fond de verre : elle suit l'onglet (maquette « Verre
+        /// liquide ») — kiwi, aube, ciel, orchidée, neutre.
+        var teinteVerre: VerreTeinte {
+            switch self {
+            case .journal: return .kiwi
+            case .progres: return .aube
+            case .plan: return .ciel
+            case .complements: return .orchidee
+            case .reglages: return .neutre
+            }
+        }
+
         /// Identifiant partagé avec les deep links (`NavCardDestination`), pour
         /// que les écrans puissent réagir à leur propre apparition. Les
         /// identifiants historiques sont conservés (contrats analytics et
@@ -396,13 +428,13 @@ struct MainTabView: View {
     /// survit au changement d'onglet. Seuls l'offset, l'opacité et la capture
     /// tactile changent.
     /// Décalage horizontal d'un onglet. L'onglet courant est à 0 ; les autres
-    /// attendent hors écran, du côté qui correspond à leur position dans la
+    /// attendent à 28 pt, du côté qui correspond à leur position dans la
     /// barre — c'est ce qui produit un sens de glissement toujours cohérent.
-    /// Le sortant ne parcourt que 35 % de la largeur (effet de parallaxe).
-    private func decalage(for tab: Tab, largeur: CGFloat) -> CGFloat {
-        guard tab != selectedTab else { return 0 }
-        let aGauche = tab.position < selectedTab.position
-        return aGauche ? -largeur * 0.35 : largeur
+    /// Verre liquide : la page n'arrive plus de l'autre bout de l'écran, elle
+    /// arrive de côté en sortant d'un léger flou (28 pt, échelle 0,985, flou 8).
+    private func decalage(for tab: Tab) -> CGFloat {
+        guard tab != selectedTab, !reduceMotion else { return 0 }
+        return tab.position < selectedTab.position ? -28 : 28
     }
 
     /// Contenu d'un onglet. Entrée libre (V12a) : plus AUCUN verrou — les cinq
@@ -432,25 +464,40 @@ struct MainTabView: View {
     private var mainInterface: some View {
         GeometryReader { geo in
             ZStack {
+                // Le fond de verre, une fois pour les cinq onglets : il reste
+                // en place pendant que les pages glissent, et sa teinte fond
+                // vers celle de l'onglet courant. Chaque page peint le même
+                // (mêmes halos au même instant) : aucune couture.
+                VerreFond()
                 ForEach(Tab.allCases) { tab in
+                    let actif = tab == selectedTab
                     tabContent(tab)
-                        .environment(\.estOngletActif, tab == selectedTab)
-                        // Parallaxe : le sortant part à 35 % de la course, ce
-                        // qui donne la profondeur (l'entrant « pousse »).
-                        .offset(x: decalage(for: tab, largeur: geo.size.width))
-                        .opacity(tab == selectedTab ? 1 : 0)
-                        .allowsHitTesting(tab == selectedTab)
-                        .accessibilityHidden(tab != selectedTab)
+                        .environment(\.estOngletActif, actif)
+                        // La page arrive de côté en sortant d'un léger flou :
+                        // flou 0,35 s, fondu 0,3 s, glisse 0,45 s.
+                        .blur(radius: (actif || reduceMotion) ? 0 : 8)
+                        .animation(reduceMotion ? nil : Animation.easeInOut(duration: 0.35), value: selectedTab)
+                        .opacity(actif ? 1 : 0)
+                        .animation(reduceMotion ? nil : Animation.easeInOut(duration: 0.3), value: selectedTab)
+                        .scaleEffect((actif || reduceMotion) ? 1 : 0.985)
+                        .offset(x: decalage(for: tab))
+                        .animation(reduceMotion ? nil : Animation.kiwiGlisse, value: selectedTab)
+                        .allowsHitTesting(actif)
+                        .accessibilityHidden(!actif)
                 }
+                // Bord haut flouté : le contenu qui défile se fond sous
+                // l'heure au lieu d'y passer net.
+                VerreBordHaut()
             }
             .frame(width: geo.size.width, height: geo.size.height)
             // Pas de `.clipped()` ici : il rognait les fonds `ignoresSafeArea`
             // des onglets à la ligne de la barre d'état (bande blanche « hors
             // de l'app » en haut de chaque onglet). Rien à rogner par ailleurs :
-            // les onglets non sélectionnés sont invisibles (opacity 0) et les
-            // décalages horizontaux sortent de l'écran.
-            .animation(reduceMotion ? .none : .easeOut(duration: 0.28), value: selectedTab)
+            // les onglets non sélectionnés sont invisibles (opacity 0).
         }
+        // La teinte du fond suit l'onglet, pour toute la hiérarchie (pages
+        // poussées et feuilles comprises).
+        .environment(\.verreTeinte, selectedTab.teinteVerre)
         // Les cinq onglets restent montés : `onAppear` ne se déclenche qu'une
         // fois, au lancement. Un écran qui rejoue une entrée à chaque visite
         // (le graphe du Plan, qui met aussi son horloge en pause) a besoin de ce signal-là.
@@ -562,8 +609,8 @@ struct MainTabView: View {
         // `mainInterface`). Ne jamais le remonter dans un onglet. Les cibles
         // (bouton +, carte apports, barre d'onglets) remontent par préférence.
         //
-        // La scène d'écoute de la dictée partage ce repère : la bulle kiwi s'y
-        // pose juste au-dessus du bouton « Dicter », d'après son cadre exact.
+        // La scène d'écoute de la dictée partage ce repère : la bulle part du
+        // cadre exact du bouton « Dicter », puis grandit au centre de l'écran.
         .overlayPreferenceValue(TutorielCibleKey.self) { ancres in
             GeometryReader { proxy in
                 TutorielOverlayPrincipal(service: tutoriel, ancres: ancres, proxy: proxy,

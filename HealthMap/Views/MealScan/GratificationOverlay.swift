@@ -15,6 +15,11 @@ import SwiftUI
 // UNE seule couleur héros : le vert du gain. L'apport n'est qu'une pastille.
 // Reduce Motion : tout est posé d'un coup, sans trajet, onde, étincelle ni éclat.
 //
+// Verre liquide (2 octobre 2026) : la carte est la même feuille de verre
+// détachée des bords que les résultats de la dictée (marges de 8, rayon 44),
+// posée sur le voile flou du verre. Un repas dicté, lui, n'ouvre plus cette
+// carte : la capsule du haut de l'écran le confirme (`PastilleConfirmation`).
+//
 // Surcouche de la racine, pas une `.sheet` : voir `GratificationCentre`.
 
 struct GratificationOverlay: View {
@@ -38,13 +43,19 @@ struct GratificationOverlay: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color.black.opacity(etape >= 1 ? 0.22 : 0)
-                .ignoresSafeArea()
+            // Le voile du verre : la page se floute derrière la carte.
+            VerreVoile()
+                .opacity(etape >= 1 ? 1 : 0)
                 .onTapGesture { fermer() }
-                .accessibilityHidden(true)
 
             if etape >= 1 {
+                // Détachée des bords : 8 pt de chaque côté, et 8 pt du bord
+                // bas de l'écran (elle descend sous la zone sûre).
                 carte
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea(.container, edges: .bottom)
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom))
             }
         }
@@ -85,8 +96,7 @@ struct GratificationOverlay: View {
         }
         .padding(.leading, 12)
         .padding(.trailing, 14)
-        .background(Capsule().fill(.ultraThinMaterial))
-        .overlay(Capsule().stroke(Color.white.opacity(0.6), lineWidth: 0.5))
+        .verre(VerreMatiere.carteFlottante, forme: Capsule(style: .continuous))
     }
 
     // MARK: La carte
@@ -138,7 +148,7 @@ struct GratificationOverlay: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(Capsule().fill(Color.dsCarte))
+                .verreClair()
                 .padding(.top, 16)
                 .apparait(etape >= 7, sansTrajet: reduceMotion)
             }
@@ -148,24 +158,20 @@ struct GratificationOverlay: View {
                 .apparait(etape >= 8, sansTrajet: reduceMotion)
         }
         .padding(.horizontal, DS.marge)
-        .padding(.bottom, 30)
+        .padding(.bottom, 24)
         .frame(maxWidth: .infinity)
         .background(alignment: .top) {
-            ZStack(alignment: .top) {
-                UnevenRoundedRectangle(topLeadingRadius: 34, topTrailingRadius: 34, style: .continuous)
-                    .fill(Color.dsFond)
-                    .ignoresSafeArea(edges: .bottom)
-                // Le halo qui respire derrière la coche.
-                Circle()
-                    .fill(RadialGradient(colors: [Color.dsAccent.opacity(0.18), Color.dsAccent.opacity(0)],
-                                         center: .center, startRadius: 0, endRadius: 160))
-                    .frame(width: 320, height: 320)
-                    .offset(y: -80)
-                    .opacity(etape >= 2 ? 1 : 0)
-                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 34, topTrailingRadius: 34, style: .continuous))
-                    .allowsHitTesting(false)
-            }
+            // Le halo qui respire derrière la coche. La feuille le rogne.
+            Circle()
+                .fill(RadialGradient(colors: [Color.dsAccent.opacity(0.18), Color.dsAccent.opacity(0)],
+                                     center: .center, startRadius: 0, endRadius: 160))
+                .frame(width: 320, height: 320)
+                .offset(y: -80)
+                .opacity(etape >= 2 ? 1 : 0)
+                .allowsHitTesting(false)
         }
+        // La même feuille de verre détachée que les résultats de la dictée.
+        .verreFeuilleDetachee()
     }
 
     // MARK: « Bien joué », traversé par un éclat
@@ -318,7 +324,7 @@ private struct LigneGain: View {
 
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color(uiColor: .systemGray5))
+                        Capsule().fill(Verre.remplissage)
                         Capsule()
                             .fill(LinearGradient(colors: [Color(hex: "8FD460"), Color.dsAccent],
                                                  startPoint: .leading, endPoint: .trailing))
@@ -405,8 +411,7 @@ private struct EtincelleVolante: View {
 
 // MARK: - Le tracé de la coche
 
-/// Partagé avec la célébration de la dictée (`CelebrationAjout`) : une seule
-/// coche dans l'app.
+/// Le tracé d'une coche qui se dessine (`trim`) : une seule dans l'app.
 struct TraceCoche: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()

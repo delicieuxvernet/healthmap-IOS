@@ -9,6 +9,11 @@ import SwiftUI
 // Ce que l'écran écrit n'a pas changé : `profile.groceries[id] = portions par
 // semaine`. Les repas sont une façon de ranger les aliments (`RepasCatalog`),
 // pas une donnée : un aliment coché au petit déj l'est aussi au soir.
+//
+// Verre liquide (2 octobre 2026) : un aliment est une tuile de verre clair,
+// verte une fois coché ; les quatre repas sont une bascule de verre dont le
+// curseur glisse ; la barre des trois mots est une carte de verre qui flotte
+// au-dessus de la grille ; le catalogue complet s'ouvre sur une feuille de verre.
 
 struct BilanRepasView: View {
     let repas: RepasBilan
@@ -19,6 +24,8 @@ struct BilanRepasView: View {
     /// L'aliment dont on règle la quantité.
     @State private var selection: String?
     @State private var catalogueOuvert = false
+    /// Le curseur de verre des quatre repas glisse d'un onglet à l'autre.
+    @Namespace private var espaceOnglets
 
     private var caddie: [String: Int] { viewModel.profile.groceries }
     private var regime: String { viewModel.profile.dietType }
@@ -50,7 +57,7 @@ struct BilanRepasView: View {
             }
             aliments
         }
-        .animation(reduceMotion ? nil : .kiwiVif, value: selection)
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: selection)
         .onChange(of: repas) { _, _ in selection = nil }
         .sheet(isPresented: $catalogueOuvert) {
             BilanCatalogueView(repas: repas)
@@ -58,6 +65,8 @@ struct BilanRepasView: View {
                 .environment(\.teinteBilan, .kiwi)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                // Fond de verre et coins de 38 : la vue ne peint plus d'aplat.
+                .verreFeuille()
         }
     }
 
@@ -68,9 +77,14 @@ struct BilanRepasView: View {
 
             BilanJauges(jauges: PistesBilan.jauges(profil: viewModel.profile))
 
+            // La zone tactile des onglets déborde déjà de 3 points : 5 + 3
+            // laissent 8 points d'air autour de la piste.
             onglets
-                .padding(.vertical, 8)
+                .padding(.vertical, 5)
         }
+        // L'écran reste en place d'un repas à l'autre : la cascade ne se joue
+        // qu'à l'arrivée sur le premier.
+        .bilanCascade(0)
     }
 
     private var aliments: some View {
@@ -93,11 +107,13 @@ struct BilanRepasView: View {
                         }
                         .id(aliment.id)
                     }
+                    .bilanCascade(1)
 
                     Button {
                         HapticService.shared.tap()
                         catalogueOuvert = true
                     } label: {
+                        // Une action secondaire : verre clair, en capsule.
                         HStack(spacing: 6) {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 14, weight: .semibold))
@@ -106,12 +122,13 @@ struct BilanRepasView: View {
                                 .font(.dsSousTitreFort)
                                 .tracking(DSTracking.sousTitre)
                         }
-                        .foregroundStyle(Color.dsAccent)
+                        .foregroundStyle(Color.dsTexte)
                         .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                        .contentShape(Rectangle())
+                        .verreClair()
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.dsPress)
-                    .padding(.top, 6)
+                    .padding(.top, 10)
 
                     Text(note)
                         .font(.dsLegende)
@@ -119,10 +136,13 @@ struct BilanRepasView: View {
                         .foregroundStyle(Color.dsSecondaire)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 2)
+                        .padding(.top, 8)
                 }
                 .padding(.horizontal, DS.marge)
-                .padding(.bottom, 10)
+                // Le verre porte une ombre : la grille garde de l'air en haut
+                // et en bas pour qu'elle ne soit pas rognée par le défilement.
+                .padding(.top, 2)
+                .padding(.bottom, 14)
             }
             .scrollBounceBehavior(.basedOnSize)
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -135,7 +155,8 @@ struct BilanRepasView: View {
                         retirer: { retirer(aliment.id) }
                     )
                     .padding(.horizontal, DS.marge)
-                    .padding(.bottom, 6)
+                    .padding(.top, 4)
+                    .padding(.bottom, 16)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
@@ -146,7 +167,7 @@ struct BilanRepasView: View {
                 guard let nouvelle else { return }
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(300))
-                    withAnimation(reduceMotion ? nil : .kiwiFluide) {
+                    withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
                         defilement.scrollTo(nouvelle)
                     }
                 }
@@ -156,8 +177,12 @@ struct BilanRepasView: View {
 
     // MARK: Les onglets des quatre repas
 
+    /// Une bascule en verre, aux cotes de la maquette : piste translucide de
+    /// 38 points, curseur de verre blanc de 32 points (rayon 16) qui glisse
+    /// d'un repas à l'autre avec un ressort. La cible tactile de chaque repas
+    /// déborde de la piste, 3 points en haut et en bas : 44 points.
     private var onglets: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 0) {
             ForEach(RepasBilan.allCases) { autre in
                 let actif = autre == repas
                 Button {
@@ -165,15 +190,18 @@ struct BilanRepasView: View {
                     viewModel.allerAu(repas: autre)
                 } label: {
                     Text(autre.onglet)
-                        .font(BilanTypo.echelle)
+                        .font(.system(.subheadline, design: .default).weight(actif ? .semibold : .medium))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .foregroundStyle(actif ? Color.white : Color.dsSecondaire)
+                        .minimumScaleFactor(0.7)
+                        .foregroundStyle(Color.dsTexte)
                         .padding(.horizontal, 2)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .background(Capsule().fill(actif ? Color.dsAccent : Color.dsCarte))
-                        // 44 points de cible autour de la capsule.
-                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, minHeight: Verre.hauteurBascule - 6)
+                        .background {
+                            if actif {
+                                BilanPastilleDeVerre(espace: espaceOnglets, rayon: 16)
+                            }
+                        }
+                        .padding(.vertical, 6)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.dsPress)
@@ -181,6 +209,14 @@ struct BilanRepasView: View {
                 .accessibilityAddTraits(actif ? [.isSelected] : [])
             }
         }
+        .padding(.horizontal, 3)
+        .background {
+            // La piste est plus basse que la zone qu'on touche.
+            Color.clear
+                .verre(BilanVerre.piste, forme: Capsule(style: .continuous))
+                .padding(.vertical, 3)
+        }
+        .animation(reduceMotion ? nil : Animation.kiwiPastille, value: repas)
     }
 
     // MARK: Ce qu'on dit sous la grille
@@ -251,13 +287,10 @@ struct BilanJauges: View {
                 .accessibilityValue("\(Int((fraction * 100).rounded())) pour cent de la cible de la semaine")
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.dsCarte)
-        )
-        .animation(reduceMotion ? nil : .kiwiFluide, value: jauges)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .verre(.carte, forme: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: jauges)
     }
 }
 
@@ -274,7 +307,6 @@ struct BilanTuileAliment: View {
     let enReglage: Bool
     let action: () -> Void
 
-    @Environment(\.teinteBilan) private var teinte
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var coche: Bool { niveau != nil }
@@ -294,28 +326,23 @@ struct BilanTuileAliment: View {
                     .lineLimit(nom.contains(" ") ? 2 : 1)
                     .minimumScaleFactor(nom.contains(" ") ? 0.8 : 0.65)
             }
-            .foregroundStyle(coche ? teinte.encre : Color.dsTexte)
+            .foregroundStyle(coche ? BilanVerre.encreChoisie : Color.dsTexte)
             .padding(.horizontal, 5)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, minHeight: 64, maxHeight: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                    .fill(coche ? teinte.pale : Color.dsCarte)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                    .strokeBorder(coche ? teinte.vive : Color.clear, lineWidth: enReglage ? 3 : 2)
-            )
+            // Verre clair ; coché, verre vert pâle. Le liseré s'épaissit
+            // pendant qu'on règle la quantité.
+            .fondDeReponse(choisie: coche, bord: enReglage ? 2.5 : 1.5)
             .overlay(alignment: .topTrailing) {
                 if let niveau {
                     points(niveau)
-                        .padding(6)
+                        .padding(9)
                 }
             }
-            .contentShape(RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous))
         }
         .buttonStyle(.dsPress)
-        .animation(reduceMotion ? nil : .kiwiVif, value: niveau)
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: niveau)
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: enReglage)
         .accessibilityLabel(nom)
         .accessibilityValue(niveau?.libelle ?? "Pas coché")
         .accessibilityAddTraits(coche ? [.isSelected] : [])
@@ -326,8 +353,8 @@ struct BilanTuileAliment: View {
         HStack(spacing: 2) {
             ForEach(NiveauConsommation.allCases) { rang in
                 Circle()
-                    .fill(rang.rawValue <= niveau.rawValue ? teinte.encre : Color.dsCarte)
-                    .overlay(Circle().strokeBorder(teinte.vive, lineWidth: 1))
+                    .fill(rang.rawValue <= niveau.rawValue ? BilanVerre.encreChoisie : Color.white.opacity(0.9))
+                    .overlay(Circle().strokeBorder(BilanVerre.bordChoisi, lineWidth: 1))
                     .frame(width: 6, height: 6)
             }
         }
@@ -346,7 +373,6 @@ struct BilanBarreNiveau: View {
     let regler: (NiveauConsommation) -> Void
     let retirer: () -> Void
 
-    @Environment(\.teinteBilan) private var teinte
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -366,7 +392,9 @@ struct BilanBarreNiveau: View {
                         .font(.dsLegendeMoyenne)
                         .foregroundStyle(Color.dsSecondaire)
                         .frame(minWidth: DS.cibleTactile, minHeight: 30)
-                        .contentShape(Rectangle())
+                        // La cible déborde du mot, 7 points en haut et en
+                        // bas, sans épaissir la barre : 44 points.
+                        .contentShape(Rectangle().inset(by: -7))
                 }
                 .buttonStyle(.dsPress)
                 .accessibilityLabel("Retirer \(nom)")
@@ -389,12 +417,18 @@ struct BilanBarreNiveau: View {
                             .font(BilanTypo.tuile)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
-                            .foregroundStyle(actif ? Color.white : Color.dsTexte)
+                            .foregroundStyle(actif ? BilanVerre.encreChoisie : Color.dsTexte)
                             .padding(.horizontal, 4)
                             .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                            // Une tuile dans une carte : creuse au repos,
+                            // vert kiwi à 16 % une fois choisie.
                             .background(
-                                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                    .fill(actif ? teinte.vive : Color.dsRemplissage)
+                                RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                                    .fill(actif ? BilanVerre.tuileChoisie : Verre.tuileInactive)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                                    .strokeBorder(actif ? BilanVerre.bordChoisi : Color.clear, lineWidth: 1.5)
                             )
                             .contentShape(Rectangle())
                     }
@@ -410,14 +444,12 @@ struct BilanBarreNiveau: View {
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: BilanTypo.rayon, style: .continuous)
-                .fill(Color.dsCarte)
-                .shadow(color: Color.black.opacity(0.08), radius: 10, y: 2)
-        )
-        .animation(reduceMotion ? nil : .kiwiVif, value: niveau)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        // Elle flotte au-dessus de la grille qui défile : verre dépoli à flou
+        // vivant, comme la carte du Plan.
+        .verreCarteFlottante()
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: niveau)
     }
 }
 
@@ -466,7 +498,7 @@ struct BilanCatalogueView: View {
                 .padding(.horizontal, DS.marge)
                 .padding(.vertical, 12)
             }
-            .background(Color.dsFond.ignoresSafeArea())
+            // Pas de fond ici : la feuille porte le verre (`verreFeuille`).
             .navigationTitle("Tous les aliments")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(
@@ -490,11 +522,12 @@ struct BilanCatalogueView: View {
                         retirer: { retirer(aliment.id) }
                     )
                     .padding(.horizontal, DS.marge)
-                    .padding(.bottom, 6)
+                    .padding(.top, 4)
+                    .padding(.bottom, 16)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
-            .animation(reduceMotion ? nil : .kiwiVif, value: selection)
+            .animation(reduceMotion ? nil : Animation.kiwiVif, value: selection)
         }
     }
 

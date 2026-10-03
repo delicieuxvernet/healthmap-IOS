@@ -9,6 +9,10 @@ import SwiftUI
 //
 // La couche données (réponses, validation, draft, soumission) vit dans
 // QuestionnaireViewModel — cette vue ne fait QUE la présentation.
+//
+// Depuis la refonte du 1er octobre 2026, l'app présente `BilanParcoursView` ;
+// cet ancien flux n'est plus atteint. Il reste habillé comme le reste (verre
+// liquide, 2 octobre 2026) tant qu'il n'est pas supprimé.
 struct QuestionnaireContainerView: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
     @EnvironmentObject var dashboardVM: DashboardViewModel
@@ -467,16 +471,19 @@ struct QuestionnaireContainerView: View {
                 advance()
             }
         } label: {
-            // Bouton capsule du DS (refonte 23 août 2026) : 50 pt, sans ombre.
-            // État envoi / choix non renseigné → gris tertiaire.
+            // Action principale en verre teinté vert. État envoi / choix non
+            // renseigné → verre clair, libellé estompé.
             let inactive = viewModel.isSubmitting || isBlockedOnSingleChoice
             Text(primaryButtonLabel)
                 .font(.dsHeadline)
                 .tracking(DSTracking.corps)
-                .foregroundStyle(.white)
+                .foregroundStyle(inactive ? Color.dsTertiaire : Color.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: DS.hauteurBouton)
-                .background(Capsule().fill(inactive ? Color.dsTertiaire : Color.dsAccent))
+                .frame(height: Verre.hauteurAction)
+                .verre(
+                    inactive ? VerreMatiere.clair : VerreMatiere.principal,
+                    forme: Capsule(style: .continuous)
+                )
                 .contentShape(Capsule())
         }
         .buttonStyle(.dsPress)
@@ -532,11 +539,8 @@ struct QuestionnaireContainerView: View {
     }
 
     // MARK: - Fond dégradé par section
-    /// Léger lavis de la teinte de la section courante en haut de l'écran,
-    /// fondu vers le crème de base. L'accent vert kiwi reste la seule couleur
-    /// « active » (barre + CTA) — la teinte n'est qu'une ambiance douce.
-    /// Refonte 23 août 2026 : plus de teinte par section, le fond neutre et
-    /// le voile de marque, comme partout.
+    /// Le fond de verre de l'app (halos qui respirent), comme partout.
+    /// L'accent vert kiwi reste la seule couleur « active » (barre + CTA).
     private var sectionBackground: some View {
         DSPageBackground()
     }
@@ -970,8 +974,8 @@ private struct QuestionnaireGateView: View {
 }
 
 // MARK: - Section Completion Overlay (animation de fin de section)
-/// Transition « premium » de fin de section : l'écran se vide (fond crème
-/// uni), il ne reste que la barre de progression qui glisse au centre,
+/// Transition « premium » de fin de section : l'écran se vide (il ne reste
+/// que le fond de verre), et la barre de progression glisse au centre,
 /// s'épaissit et s'arrondit, se remplit à 100 % avec une coche, puis remonte —
 /// après quoi seulement la nouvelle section est révélée. Une chose à la fois,
 /// rien d'autre à l'écran (pas de surcharge). Reduce Motion → simple fondu +
@@ -997,8 +1001,8 @@ private struct SectionCompletionOverlay: View {
 
     var body: some View {
         ZStack {
-            // Écran « blanc » : crème de base (adaptatif dark).
-            Color.healthMapWarm.ignoresSafeArea()
+            // Écran « vide » : le fond de verre seul, sans rien dessus.
+            DSPageBackground()
 
             GeometryReader { geo in
                 VStack(spacing: 16) {

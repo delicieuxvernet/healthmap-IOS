@@ -3,10 +3,10 @@ import SwiftUI
 // MARK: - Nutrient Detail Sheet (fiche nutriment — refonte « valeur d'abord »)
 // Sheet TERMINALE (niveau 2, jamais de niveau 3) : X visible 44 pt réels.
 // Hiérarchie « valeur -> comprendre -> agir » :
-//   1. HERO : grande jauge centrée du score (la VALEUR domine) + emoji/nom +
-//      état FR (HealthScale) + verdict. Couleur = échelle score (lois 3 & 13).
+//   1. HERO : grande jauge centrée du score (la VALEUR domine) + icône/nom +
+//      état FR (HealthScale) + verdict
 //   2. « Pourquoi ce score » : pourquoiCeScore + signals en chips + fiabilité
-//   3. « Ta solution » (carte teintée verte douce) — AGIR. Premium : nette
+//   3. « Ta solution » (carte de verre teintée kiwi) — AGIR. Premium : nette
 //      ici ; gratuit : elle descend dans la case gatée du bloc 7 (le geste
 //      ne s'affiche jamais en clair — principe « le gratuit nomme le
 //      problème, jamais la solution »)
@@ -15,6 +15,12 @@ import SwiftUI
 //   6. Recherche approfondie (validate-hypotheses + web, à la demande)
 //   7. Hack + synergie (+ solution en gratuit) : premium via GatedOverlay +
 //      UnlockDoor partagés (loi 11)
+//
+// Verre liquide (2 octobre 2026) : la feuille est en verre (`verreFeuille`),
+// chaque bloc est une carte de verre qui arrive en cascade, l'anneau prend la
+// teinte de l'apport (`Color.nutrientColor`) sur une piste neutre et son
+// chiffre compte jusqu'au score. L'état garde sa couleur d'échelle
+// (`HealthScale`) dans l'étiquette, sous l'anneau.
 struct NutrientDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -26,24 +32,54 @@ struct NutrientDetailSheet: View {
 
     /// État de la « Recherche approfondie » (validate-hypotheses + web).
     @State private var deepState: DeepSearchState = .idle
+    /// Les pastilles de signaux surgissent une fois la fiche ouverte.
+    @State private var arrive = false
 
-    /// Couleur d'état : échelle unique score (lois 3 & 13) — jamais la
-    /// couleur d'identité du nutriment dans cette fiche.
+    /// Couleur d'état : échelle unique score (lois 3 & 13). Elle teinte
+    /// l'étiquette d'état, jamais l'anneau.
     private var statusColor: Color {
         Color.scoreColor(for: nutrient.score)
+    }
+
+    /// Encre de l'étiquette d'état : la version foncée de la couleur d'échelle,
+    /// lisible sur le verre. Les paliers restent ceux de `HealthScale`.
+    private var statusInk: Color {
+        if statusColor == Color.scoreLow { return Color.dsARenforcerTexte }
+        if statusColor == Color.scoreExcellent { return Color.teinteKiwiTexte }
+        return statusColor
+    }
+
+    /// Fond de l'étiquette d'état : la teinte de la palette qui répond à la
+    /// couleur d'échelle (ambre, kiwi), à 14 %.
+    private var statusFond: Color {
+        if statusColor == Color.scoreLow { return Color.teinteVitamineD.opacity(0.14) }
+        if statusColor == Color.scoreExcellent { return Color.teinteKiwi.opacity(0.14) }
+        return statusColor.opacity(0.14)
+    }
+
+    /// Teinte de l'apport (palette par catégorie) : anneau, icône, filet.
+    private var teinte: Color {
+        Color.nutrientColor(for: nutrient.id)
+    }
+
+    /// Sa version foncée, pour un libellé posé sur le verre.
+    private var teinteTexte: Color {
+        Color.teinteApportTexte(for: nutrient.id)
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: Theme.spacingLG) {
+                VStack(alignment: .leading, spacing: 22) {
                     // 1. HERO — la VALEUR d'abord : grande jauge centrée du score
                     heroSection
+                        .kiwiEntrance(0)
 
                     // 2. Pourquoi ce score — COMPRENDRE : explication + preuve
                     // (signals + fiabilité). Sort pourquoiCeScore du repliable.
                     if hasPourquoi {
                         pourquoiSection
+                            .kiwiEntrance(1)
                     }
 
                     // 3. « Ta solution » — AGIR. Le geste (action, dosage,
@@ -53,16 +89,19 @@ struct NutrientDetailSheet: View {
                     if subscriptionService.isPremium,
                        let solution = nutrient.solution, hasSolutionContent(solution) {
                         solutionCard(solution)
+                            .kiwiEntrance(2)
                     }
 
                     // 4. Le déclic : comparaison mémorable, APRÈS l'action
                     if let comparaison = nutrient.comparaison, !comparaison.isEmpty {
                         comparisonQuote(comparaison)
+                            .kiwiEntrance(3)
                     }
 
                     // 5. Repliables fermés (un seul composant réutilisé)
                     if hasMechanism || hasSymptoms {
                         collapsibleGroup
+                            .kiwiEntrance(4)
                     }
 
                     // 6. Recherche approfondie (validate-hypotheses + web) —
@@ -72,71 +111,76 @@ struct NutrientDetailSheet: View {
                     // 7. Hack + synergie — LA case premium floutée de la fiche
                     if let premium = premiumSection {
                         premium
+                            .kiwiEntrance(5)
                     }
                 }
-                .padding(.horizontal, Theme.spacingLG)
-                .padding(.vertical, Theme.spacingMD)
+                .padding(.horizontal, DS.marge)
+                .padding(.top, 8)
+                .padding(.bottom, 40)
             }
-            .background(Color.dsFond)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(Color.dsSecondaire)
-                            // Zone tactile ≥ 44 pt RÉELLE (loi 20) — l'icône
-                            // seule fait ~20 pt (même fix qu'AllNutrientsSheet).
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.healthMapPressed)
-                    .accessibilityLabel("Fermer")
+                    // Rond de verre clair, cible tactile de 44 pt (loi 20).
+                    DSCloseButton { dismiss() }
                 }
             }
         }
+        // La feuille ne peint plus d'aplat : fond de verre et coins de 38.
+        .verreFeuille()
+        .onAppear { arrive = true }
     }
 
     // MARK: - 1. HERO (bloc 1) — la VALEUR d'abord
-    // Refonte « valeur d'abord » : le score devient l'élément dominant (grande
-    // jauge centrée ~128 pt, vs 52 pt à droite avant). Couleur = échelle score
-    // (lois 3 & 13), jamais la couleur d'identité. Statut FR via HealthScale
-    // (lois 3 & 4). On ACTIVE enfin `verdict` (présent mais inutilisé) ; masqué
-    // si vide (jamais de coquille — loi 11).
+    // Carte de verre centrée : anneau dans 150 pt (trait de 14, piste neutre,
+    // arc à la teinte de l'apport, chiffre SF Pro Rounded qui compte), le nom
+    // précédé de son icône, l'état FR via HealthScale (lois 3 & 4) dans une
+    // étiquette teintée, puis le `verdict` ; masqué si vide (jamais de
+    // coquille — loi 11).
     private var heroSection: some View {
-        VStack(spacing: Theme.spacingSM) {
-            MiniScoreRing(score: nutrient.score, color: statusColor, size: 128, lineWidth: 11)
-                .padding(.top, Theme.spacingXS)
+        VStack(spacing: 12) {
+            // L'anneau de la maquette : rayon 66, trait de 14, dans une boîte
+            // de 150 pt. Le trait est centré sur le cercle : 132 + 14 = 146 pt
+            // hors tout, plus 2 pt de marge de chaque côté.
+            MiniScoreRing(score: nutrient.score, color: teinte, size: 132, lineWidth: 14,
+                          taillePolice: 34, interlettrage: -1)
+                .padding(9)
 
             HStack(spacing: 6) {
-                Text(nutrient.emoji)
-                    .font(.system(size: 20))
+                Image(systemName: BilanV7Nutrient.icon(for: nutrient.id))
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(teinte)
                     .accessibilityHidden(true)
                 Text(nutrient.label)
-                    .font(Theme.headlineFont)
+                    .font(.dsSection)
+                    .tracking(DSTracking.section)
                     .foregroundStyle(Color.dsTexte)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Text(HealthScale.nutrientLabel(for: nutrient.score))
-                .font(Theme.captionBoldFont)
-                .foregroundStyle(statusColor)
-                .padding(.horizontal, 12)
+                .font(.dsLegende.weight(.semibold))
+                .foregroundStyle(statusInk)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 4)
-                .background(statusColor.opacity(Theme.opacityLight))
-                .clipShape(Capsule())
+                .background(statusFond, in: Capsule())
 
             if let verdict = heroVerdict {
                 Text(verdict)
-                    .font(Theme.bodyFont)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .lineSpacing(2)
                     .foregroundStyle(Color.dsTexte)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
             }
         }
+        .padding(.vertical, 20)
+        .padding(.horizontal, DS.paddingCarte)
         .frame(maxWidth: .infinity)
+        .dsCard()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(nutrient.label), \(HealthScale.nutrientLabel(for: nutrient.score)), score \(nutrient.score) sur 100\(heroVerdict.map { ". \($0)" } ?? "")")
     }
@@ -147,6 +191,17 @@ struct NutrientDetailSheet: View {
     private var heroVerdict: String? {
         guard let v = nutrient.verdict, !v.isEmpty else { return nil }
         return v
+    }
+
+    /// Petit titre d'un bloc de la fiche : 15 / 600, secondaire, posé au-dessus
+    /// de sa carte (il annonce, il ne rivalise pas).
+    private func titreDeBloc(_ titre: String) -> some View {
+        Text(titre)
+            .font(.dsSousTitreFort)
+            .tracking(DSTracking.sousTitre)
+            .foregroundStyle(Color.dsSecondaire)
+            .padding(.horizontal, 4)
+            .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: - 2. « Pourquoi ce score » (bloc 2) — COMPRENDRE
@@ -160,59 +215,70 @@ struct NutrientDetailSheet: View {
     }
 
     private var pourquoiSection: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            // Charte : le titre annonce, il ne rivalise pas. Il était à la
-            // même taille que l'explication qu'il introduit (delta 0).
-            Text("Pourquoi ce score")
-                .font(Theme.subLabelFont)
-                .foregroundStyle(Color.dsAccent)
+        VStack(alignment: .leading, spacing: 8) {
+            titreDeBloc("Pourquoi ce score")
 
-            if let pourquoi = nutrient.pourquoiCeScore, !pourquoi.isEmpty {
-                Text(pourquoi)
-                    .font(Theme.insightFont)
-                    .foregroundStyle(Color.dsTexte)
-                    .lineLimit(4)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 10) {
+                if let pourquoi = nutrient.pourquoiCeScore, !pourquoi.isEmpty {
+                    Text(pourquoi)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .lineSpacing(2)
+                        .foregroundStyle(Color.dsTexte)
+                        .lineLimit(4)
+                        .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let signals = nutrient.signals, !signals.isEmpty {
+                    signauxEnTete
+                    signauxPastilles(Array(signals.prefix(4)))
+                }
             }
+            .padding(DS.paddingCarte)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .dsCard()
+        }
+        .accessibilityElement(children: .combine)
+    }
 
-            if let signals = nutrient.signals, !signals.isEmpty {
-                HStack(spacing: Theme.spacingXS) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.dsAccent)
-                        .accessibilityHidden(true)
-                    Text("Détecté dans tes réponses")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.dsSecondaire)
-                    Spacer()
-                    if let fiabilite = reliabilityBadge {
-                        Text(fiabilite)
-                            .pillStyle(color: Color.dsAccent)
-                    }
-                }
-                .padding(.top, 2)
-
-                VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                    ForEach(Array(signals.prefix(4).enumerated()), id: \.offset) { _, signal in
-                        // Signal — texte libre IA : 1 ligne max (loi 9)
-                        Text(signal)
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Color.dsTexte)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .padding(.horizontal, Theme.pillPaddingH)
-                            .padding(.vertical, Theme.pillPaddingV)
-                            .background(Color.dsRemplissage)
-                            .clipShape(Capsule())
-                    }
-                }
+    private var signauxEnTete: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Verre.iconeNeutre)
+                .accessibilityHidden(true)
+            Text("Détecté dans tes réponses")
+                .font(.dsLegende.weight(.semibold))
+                .foregroundStyle(Color.dsSecondaire)
+            Spacer(minLength: 8)
+            if let fiabilite = reliabilityBadge {
+                Text(fiabilite)
+                    .font(.dsLegendeMoyenne)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Verre.remplissage, in: Capsule())
             }
         }
-        .padding(Theme.spacingMD)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
-        .accessibilityElement(children: .combine)
+    }
+
+    private func signauxPastilles(_ signals: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(signals.enumerated()), id: \.offset) { index, signal in
+                // Signal — texte libre IA : 1 ligne max (loi 9)
+                Text(signal)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Verre.remplissage, in: Capsule())
+                    .verreSurgir(arrive, delai: 0.3 + Double(index) * 0.06)
+            }
+        }
     }
 
     /// Badge fiabilité : mapping vulgarisé du champ `confidence` (vocabulaire
@@ -228,18 +294,18 @@ struct NutrientDetailSheet: View {
 
     // MARK: - 3. Comparaison en citation (bloc 3)
     // Source : nutrient.comparaison — phrase mémorable, en citation discrète :
-    // barre latérale fine + italique, 3 lignes max (loi 9).
+    // filet latéral à la teinte de l'apport + italique, 3 lignes max (loi 9).
     private func comparisonQuote(_ comparaison: String) -> some View {
-        HStack(alignment: .top, spacing: Theme.spacingSM) {
+        HStack(alignment: .top, spacing: 10) {
             RoundedRectangle(cornerRadius: 1.5)
-                .fill(Color.dsAccent.opacity(Theme.opacityOverlay))
+                .fill(teinte.opacity(0.5))
                 .frame(width: 3)
                 .accessibilityHidden(true)
 
             Text(comparaison)
                 // Le serif était la seule occurrence de cette famille dans toute
                 // l'app : l'italique suffit à marquer la citation.
-                .font(.system(size: 14, weight: .regular))
+                .font(.dsSousTitre)
                 .italic()
                 .foregroundStyle(Color.dsSecondaire)
                 .lineLimit(3)
@@ -247,32 +313,33 @@ struct NutrientDetailSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, Theme.spacingXS)
+        .padding(.horizontal, 4)
     }
 
     // MARK: - 4. « Ta solution » (bloc 4)
-    // Sources : solution.action (3 lignes max), dosage + quand (lignes
-    // secondaires, 2 lignes max), « Effet attendu : [delai] » avec icône
-    // horloge — le delai est la promesse motivationnelle. Carte teintée
-    // verte douce (tokens scoreExcellent existants).
+    // Sources : solution.action (3 lignes max), quand (ligne secondaire,
+    // 2 lignes max), « Effet attendu : [delai] » avec icône horloge — le delai
+    // est la promesse motivationnelle. Carte de verre teintée kiwi dans son
+    // coin ; le libellé porte le vert foncé du kiwi.
     private func solutionCard(_ solution: NutrientSolutionAI) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 5) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.scoreExcellent)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.teinteKiwi)
                     .accessibilityHidden(true)
 
                 Text("Ta solution")
-                    .font(Theme.subLabelFont)
-                    .foregroundStyle(Color.scoreExcellent)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.teinteKiwiTexte)
             }
 
             // Le geste : donnée-héros textuelle de la carte.
             if let action = solution.action, !action.isEmpty {
                 Text(action)
-                    .font(Theme.heroTextFont)
-                    .tracking(Theme.conclusionTracking)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(3)
                     .truncationMode(.tail)
@@ -290,7 +357,8 @@ struct NutrientDetailSheet: View {
             // donnée-héros de ligne ne descend jamais sous 15 pt.
             if let quand = solution.quand, !quand.isEmpty {
                 Text(quand)
-                    .font(Theme.heroValueRowFont)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(2)
                     .truncationMode(.tail)
@@ -298,30 +366,23 @@ struct NutrientDetailSheet: View {
             }
 
             if let delai = solution.delai, !delai.isEmpty {
-                HStack(spacing: Theme.spacingXS) {
+                HStack(spacing: 5) {
                     Image(systemName: "clock")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.scoreExcellent)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.teinteKiwi)
                         .accessibilityHidden(true)
 
                     Text("Effet attendu\u{202F}: \(delai)")
-                        .font(Theme.subLabelFont)
-                        .foregroundStyle(Color.scoreExcellent)
+                        .font(.dsLegende.weight(.semibold))
+                        .foregroundStyle(Color.teinteKiwiTexte)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
             }
         }
-        .padding(Theme.spacingMD)
+        .padding(DS.paddingCarte)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .fill(Color.scoreExcellent.opacity(Theme.opacityLight))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .stroke(Color.scoreExcellent.opacity(Theme.opacityMedium), lineWidth: 1)
-        )
+        .verreCarte(teinte: Color.teinteKiwi)
         .accessibilityElement(children: .combine)
     }
 
@@ -345,7 +406,7 @@ struct NutrientDetailSheet: View {
     }
 
     private var collapsibleGroup: some View {
-        VStack(spacing: Theme.spacingSM) {
+        VStack(spacing: DS.interCarte) {
             if hasMechanism, let mecanisme = nutrient.mecanisme {
                 FicheCollapsible(title: "Comprendre le mécanisme", icon: "gearshape.2") {
                     collapsibleBody(mecanisme)
@@ -364,7 +425,9 @@ struct NutrientDetailSheet: View {
     /// déclarée pour le niveau détail).
     private func collapsibleBody(_ text: String) -> some View {
         Text(text)
-            .font(Theme.captionFont)
+            .font(.dsLegende)
+            .tracking(DSTracking.legende)
+            .lineSpacing(2)
             .foregroundStyle(Color.dsSecondaire)
             .lineLimit(4)
             .truncationMode(.tail)
@@ -390,33 +453,34 @@ struct NutrientDetailSheet: View {
         // Famille 1 (fiche apport) : le hack + la synergie sont l'ordonnance —
         // floutés en teaser (6px) sous une porte verte au bénéfice spécifique.
         // Premium → rendu net, sans porte.
-        let rows = VStack(alignment: .leading, spacing: Theme.spacingSM) {
+        let rows = VStack(alignment: .leading, spacing: 0) {
             if let hack {
-                premiumRow(icon: "lightbulb.fill", tint: Color.accentSky, label: "Astuce", text: hack)
+                premiumRow(icon: "lightbulb", label: "Astuce", text: hack)
             }
 
             if hack != nil && synergie != nil {
-                Divider()
+                DSSeparator(retrait: 0)
             }
 
             if let synergie {
-                premiumRow(icon: "arrow.triangle.merge", tint: Color.accentIndigo, label: "Synergie", text: synergie)
+                premiumRow(icon: "arrow.triangle.merge", label: "Synergie", text: synergie)
             }
         }
-        .padding(Theme.spacingMD)
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
 
         if subscriptionService.isPremium {
             // (solution est nil en premium : la garde d'entrée vaut hack/synergie)
-            return AnyView(rows.cardStyle())
+            return AnyView(rows.dsCard())
         }
 
-        let gatedContent = VStack(spacing: Theme.spacingSM) {
+        let gatedContent = VStack(spacing: DS.interCarte) {
             if let solution {
                 solutionCard(solution)
             }
             if hack != nil || synergie != nil {
-                rows.cardStyle()
+                rows.dsCard()
             }
         }
 
@@ -437,7 +501,7 @@ struct NutrientDetailSheet: View {
         }
 
         return AnyView(
-            VStack(spacing: Theme.spacingSM) {
+            VStack(spacing: DS.interCarte) {
                 GatedOverlay(intensity: .teaser) { gatedContent }
                 UnlockDoor(icon: "lock.fill", title: doorTitle, subtitle: doorSubtitle, zone: "fiche_apport")
             }
@@ -445,31 +509,30 @@ struct NutrientDetailSheet: View {
     }
 
     /// Ligne premium (hack ou synergie) — texte libre IA : 3 lignes max
-    /// (loi 9), borné même flouté.
-    private func premiumRow(icon: String, tint: Color, label: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: Theme.spacingSM) {
-            Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundStyle(tint)
-                .accessibilityHidden(true)
+    /// (loi 9), borné même flouté. Pastille neutre de 36 pt, titre 15 / 600,
+    /// texte secondaire de 13.
+    private func premiumRow(icon: String, label: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VerrePastilleIcone(symbole: icon, taille: 36, tailleIcone: 18)
 
-            VStack(alignment: .leading, spacing: Theme.spacingXS) {
-                // Titre de section : plus petit que ce qu'il annonce. La
-                // couleur du domaine reste portée par l'icône : `accentSky`
-                // (#5AC8FA) ne tient pas 4,5:1 sur blanc à 11,5 pt, et
-                // l'accessibilité passe avant la règle de couleur.
+            VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                    .font(Theme.subLabelFont)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
 
                 Text(text)
-                    .font(Theme.captionFont)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .lineSpacing(2)
                     .foregroundStyle(Color.dsSecondaire)
                     .lineLimit(3)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 0)
         }
+        .padding(.vertical, 12)
     }
 
     // MARK: - 4b. Recherche approfondie (validate-hypotheses + recherche web)
@@ -480,52 +543,63 @@ struct NutrientDetailSheet: View {
     @ViewBuilder
     private var deepSearchSection: some View {
         if let hypotheses = nutrient.hypotheses, !hypotheses.isEmpty {
-            VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                switch deepState {
-                case .idle:
-                    deepSearchButton(title: "Recherche approfondie",
-                                     subtitle: "Croise tes données avec des articles scientifiques")
-                case .loading:
-                    HStack(spacing: Theme.spacingSM) {
-                        ProgressView()
-                        Text("Recherche en cours\u{2026} environ une minute")
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Color.dsSecondaire)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                case .loaded(let result):
-                    deepResult(result)
-                case .failed(let message):
-                    VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                        Text(message)
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Color.dsSecondaire)
-                            .fixedSize(horizontal: false, vertical: true)
-                        deepSearchButton(title: "Réessayer", subtitle: nil)
-                    }
+            switch deepState {
+            case .idle:
+                // L'action principale de la fiche : une capsule de verre vert,
+                // seule, sans carte autour.
+                deepSearchButton(title: "Recherche approfondie",
+                                 subtitle: "Croise tes données avec des articles scientifiques")
+            case .loading:
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .tint(Color.dsAccent)
+                    Text("Recherche en cours\u{2026} environ une minute")
+                        .font(.dsLegende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(DS.paddingCarte)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .dsCard()
+            case .loaded(let result):
+                deepResult(result)
+                    .padding(DS.paddingCarte)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .dsCard()
+            case .failed(let message):
+                VStack(alignment: .leading, spacing: DS.interCarte) {
+                    Text(message)
+                        .font(.dsLegende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
+                    deepSearchButton(title: "Réessayer", subtitle: nil)
                 }
             }
-            .padding(Theme.spacingMD)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .cardStyle()
         }
     }
 
+    /// Capsule de verre vert, sur le patron du bouton « Dicter » : icône dans
+    /// un rond blanc à 22 %, titre 17 / 600, précision de 12 dessous.
     private func deepSearchButton(title: String, subtitle: String?) -> some View {
         Button {
             runDeepSearch()
         } label: {
-            HStack(spacing: Theme.spacingSM) {
+            HStack(spacing: 10) {
                 Image(systemName: "sparkle.magnifyingglass")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.white.opacity(0.22)))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
                     if let subtitle {
                         Text(subtitle)
-                            .font(.system(size: 11))
-                            .opacity(0.9)
+                            .font(.system(.caption, design: .default))
+                            .opacity(0.88)
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
                     }
@@ -533,50 +607,51 @@ struct NutrientDetailSheet: View {
                 Spacer(minLength: 0)
             }
             .foregroundStyle(.white)
-            .padding(Theme.spacingMD)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                    .fill(Color.dsAccent)
-            )
-            .contentShape(Rectangle())
+            .padding(.leading, 12)
+            .padding(.trailing, 18)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: Verre.hauteurSaisie, alignment: .leading)
+            .verrePrincipal()
+            .contentShape(Capsule())
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
     }
 
     private func deepResult(_ result: ValidateHypothesesResponse) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            HStack(spacing: Theme.spacingSM) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 5) {
                 Image(systemName: "sparkle.magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.dsAccent)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(teinte)
                     .accessibilityHidden(true)
                 Text("Recherche approfondie")
-                    .font(Theme.subLabelFont)
-                    .foregroundStyle(Color.dsAccent)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(teinteTexte)
                 Spacer()
                 if let n = result.meta?.webResults, n > 0 {
                     Text("\(n) sources")
-                        .font(.system(size: 11))
+                        .font(.system(.caption, design: .default))
                         .foregroundStyle(Color.dsSecondaire)
                 }
             }
 
             if let confirmed = result.confirmedHypothesis, let label = confirmed.label, !label.isEmpty {
-                HStack(alignment: .top, spacing: Theme.spacingXS) {
+                HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.scoreExcellent)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.teinteKiwi)
                         .padding(.top, 1)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(label)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.dsSousTitreFort)
+                            .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsTexte)
                             .fixedSize(horizontal: false, vertical: true)
                         if let reason = confirmed.reason, !reason.isEmpty {
                             Text(reason)
-                                .font(Theme.captionFont)
+                                .font(.dsLegende)
                                 .foregroundStyle(Color.dsSecondaire)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -586,21 +661,22 @@ struct NutrientDetailSheet: View {
 
             if let synthesis = result.synthesis, !synthesis.isEmpty {
                 Text(synthesis)
-                    .font(Theme.captionFont)
+                    .font(.dsLegende)
+                    .lineSpacing(2)
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if let evidence = result.webEvidence, !evidence.isEmpty {
-                Divider()
-                HStack(spacing: Theme.spacingXS) {
+                DSSeparator(retrait: 0)
+                HStack(spacing: 5) {
                     Image(systemName: "link")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.dsAccent)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Verre.iconeNeutre)
                         .accessibilityHidden(true)
                     Text("Sources scientifiques")
-                        .font(Theme.subLabelFont)
-                        .foregroundStyle(Color.dsAccent)
+                        .font(.dsLegende.weight(.semibold))
+                        .foregroundStyle(Color.dsSecondaire)
                 }
                 ForEach(evidence.prefix(6)) { source in
                     sourceRow(source)
@@ -608,7 +684,7 @@ struct NutrientDetailSheet: View {
             }
 
             Text("Informatif\u{202F}: ne remplace pas un avis médical.")
-                .font(.system(size: 10))
+                .font(.dsLegende)
                 .foregroundStyle(Color.dsSecondaire)
                 .padding(.top, 2)
         }
@@ -620,32 +696,34 @@ struct NutrientDetailSheet: View {
                 openURL(url)
             }
         } label: {
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(source.title ?? source.host)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.dsLegendeMoyenne)
                     .foregroundStyle(Color.dsAccent)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 4) {
                     Text(source.host)
-                        .font(.system(size: 10))
+                        .font(.system(.caption, design: .default))
                         .foregroundStyle(Color.dsSecondaire)
                         .lineLimit(1)
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.up.right")
-                        .font(.system(size: 10))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.dsAccent)
                         .accessibilityHidden(true)
                 }
             }
-            .padding(Theme.spacingSM)
+            .padding(10)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(Color.dsRemplissage)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                    .fill(Verre.tuileInactive)
+            )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.healthMapPressed)
+        .buttonStyle(.dsPress)
         .accessibilityLabel("Source\u{202F}: \(source.title ?? source.host). Ouvre le lien.")
     }
 
@@ -677,10 +755,11 @@ private enum DeepSearchState {
 }
 
 // MARK: - Fiche Collapsible (bloc 5 — composant repliable UNIQUE de la fiche)
-/// Repliable fermé par défaut : header 44 pt réels dans le label (loi 20),
-/// chevron, expansion EN PLACE avec `.healthMapSpring` gelée si Reduce
-/// Motion (loi 17), haptic léger au toggle (loi 18). Réutilisé pour
-/// « Comprendre le mécanisme » et « Symptômes possibles » (loi 22).
+/// Repliable fermé par défaut : carte de verre, header 44 pt réels dans le
+/// label (loi 20), chevron qui pivote, expansion EN PLACE sur le ressort
+/// `kiwiFluide`, gelée si Reduce Motion (loi 17), haptic léger au toggle
+/// (loi 18). Réutilisé pour « Comprendre le mécanisme » et « Symptômes
+/// possibles » (loi 22).
 private struct FicheCollapsible<Content: View>: View {
     let title: String
     let icon: String
@@ -693,43 +772,45 @@ private struct FicheCollapsible<Content: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
                 HapticService.shared.tap()
-                withAnimation(reduceMotion ? .none : .healthMapSpring) {
+                withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: Theme.spacingSM) {
+                HStack(spacing: 10) {
                     Image(systemName: icon)
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.dsAccent)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Verre.iconeNeutre)
                         .accessibilityHidden(true)
 
-                    // Titre de section : teinté comme son icône, jamais neutre.
                     Text(title)
-                        .font(Theme.subLabelFont)
-                        .foregroundStyle(Color.dsAccent)
+                        .font(.dsSousTitreFort)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsTexte)
+                        .multilineTextAlignment(.leading)
 
-                    Spacer()
+                    Spacer(minLength: 8)
 
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.dsSecondaire)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.dsTertiaire)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                         .accessibilityHidden(true)
                 }
                 // Zone tactile ≥ 44 pt RÉELLE dans le label (loi 20).
-                .frame(minHeight: 44)
+                .frame(minHeight: 48)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.healthMapPressed)
+            .buttonStyle(.dsPress)
             .accessibilityValue(isExpanded ? "déplié" : "replié")
             .accessibilityHint("Touche deux fois pour \(isExpanded ? "replier" : "déplier") la section.")
 
             if isExpanded {
                 content()
-                    .padding(.bottom, Theme.spacingSM)
+                    .padding(.bottom, 14)
             }
         }
-        .padding(.horizontal, Theme.spacingMD)
-        .cardStyle()
+        .padding(.horizontal, DS.paddingCarte)
+        .dsCard()
     }
 }
 

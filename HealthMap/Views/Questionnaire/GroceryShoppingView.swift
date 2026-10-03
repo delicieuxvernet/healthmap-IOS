@@ -6,6 +6,9 @@ import SwiftUI
 // `groceries`). 8 rayons à cocher (GroceryCatalog) -> page finale des quantités
 // par semaine -> `onDone(selections)`. Remplace les 10 anciennes questions de
 // quantités. Les sélections sont [id aliment : portions/semaine].
+//
+// Verre liquide (2 octobre 2026) : fond de verre, aliments en tuiles de verre
+// clair (vert pâle une fois cochés), actions du bas en verre teinté vert.
 struct GroceryShoppingView: View {
     let onDone: ([String: Int]) -> Void
     let onCancel: () -> Void
@@ -34,7 +37,7 @@ struct GroceryShoppingView: View {
 
     var body: some View {
         ZStack {
-            Color.dsFond.ignoresSafeArea()
+            DSPageBackground()
             if showQuantities { quantitiesScreen } else { aisleScreen }
         }
     }
@@ -63,8 +66,8 @@ struct GroceryShoppingView: View {
                 }
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.dsSecondaire.opacity(0.12))
-                        Capsule().fill(LinearGradient.healthMapBrand)
+                        Capsule().fill(Verre.remplissage)
+                        Capsule().fill(Color.dsAccent)
                             .frame(width: max(geo.size.width * CGFloat(aisleIndex + 1) / CGFloat(aisles.count), 6))
                             .animation(reduceMotion ? .none : .healthMapSpring, value: aisleIndex)
                     }
@@ -109,9 +112,9 @@ struct GroceryShoppingView: View {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(Color.dsAccent)
-                            .frame(width: 56, height: 56)
-                            .background(Color.dsCarte)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                            .frame(width: Verre.hauteurAction, height: Verre.hauteurAction)
+                            .verreClair(Circle())
+                            .contentShape(Circle())
                     }
                     .buttonStyle(.healthMapPressed)
                     .accessibilityLabel("Rayon précédent")
@@ -121,9 +124,9 @@ struct GroceryShoppingView: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(LinearGradient.healthMapBrand)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                        .frame(height: Verre.hauteurAction)
+                        .verrePrincipal()
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.healthMapPressed)
             }
@@ -150,17 +153,20 @@ struct GroceryShoppingView: View {
             .padding(.vertical, 10)
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, minHeight: 80)
-            .background(on ? Color.dsRemplissage : Color.dsCarte)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous)
-                    .stroke(on ? Color.dsAccent : Color.clear, lineWidth: 1.5)
+            .verre(
+                on ? VerreMatiere.clairActif : VerreMatiere.clair,
+                forme: RoundedRectangle(cornerRadius: 22, style: .continuous)
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(on ? Color.dsAccent : Color.clear, lineWidth: 1.5)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(alignment: .topTrailing) {
                 Image(systemName: on ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 16))
                     .foregroundStyle(on ? Color.dsAccent : Color.dsSecondaire.opacity(0.4))
-                    .padding(5)
+                    .padding(8)
             }
         }
         .buttonStyle(.healthMapPressed)
@@ -253,11 +259,14 @@ struct GroceryShoppingView: View {
                 } label: {
                     Text(isLast ? "Valider mon caddie" : "Suivant")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(families.isEmpty ? Color.dsTertiaire : Color.white)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(families.isEmpty ? AnyShapeStyle(Color.dsSecondaire) : AnyShapeStyle(LinearGradient.healthMapBrand))
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                        .frame(height: Verre.hauteurAction)
+                        .verre(
+                            families.isEmpty ? VerreMatiere.clair : VerreMatiere.principal,
+                            forme: Capsule(style: .continuous)
+                        )
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.healthMapPressed)
                 .disabled(families.isEmpty)
@@ -279,7 +288,7 @@ struct GroceryShoppingView: View {
         HStack(spacing: 5) {
             ForEach(0..<count, id: \.self) { i in
                 Capsule()
-                    .fill(i <= current ? Color.dsAccent : Color.dsSecondaire.opacity(0.18))
+                    .fill(i <= current ? Color.dsAccent : Verre.remplissage)
                     .frame(height: 6)
             }
         }
@@ -320,8 +329,8 @@ struct GroceryShoppingView: View {
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.dsSecondaire.opacity(0.12))
-                    Capsule().fill(LinearGradient.healthMapBrand)
+                    Capsule().fill(Verre.remplissage)
+                    Capsule().fill(Color.dsAccent)
                         .frame(width: max(geo.size.width * CGFloat(covered) / CGFloat(total), 6))
                         .animation(reduceMotion ? .none : .healthMapSpring, value: covered)
                 }
@@ -335,8 +344,7 @@ struct GroceryShoppingView: View {
             }
         }
         .padding(Theme.spacingMD)
-        .background(Color.dsCarte)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+        .dsCard()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Précision du bilan : \(covered) familles sur \(total)")
     }
@@ -371,8 +379,7 @@ struct GroceryShoppingView: View {
             }
         }
         .padding(Theme.spacingMD)
-        .background(Color.dsCarte)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSM, style: .continuous))
+        .dsCard()
     }
 
     private func bracketButton(item: GroceryItem, bracket: QuantityBracket, selected: Bool) -> some View {
@@ -383,16 +390,18 @@ struct GroceryShoppingView: View {
             Text(bracket.label)
                 .font(.system(size: 15, weight: .semibold))
                 .monospacedDigit()
-                .foregroundStyle(selected ? .white : Color.dsTexte)
+                .foregroundStyle(selected ? Color.teinteKiwiTexte : Color.dsTexte)
                 .frame(maxWidth: .infinity)
-                .frame(height: 40)
+                .frame(height: 44)
+                // Une tuile dans une carte de verre : creuse au repos, vert
+                // kiwi à 16 % et liseré une fois choisie.
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(selected ? Color.dsAccent : Color.dsFond)
+                    RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                        .fill(selected ? Color.teinteKiwi.opacity(0.16) : Verre.tuileInactive)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(selected ? Color.clear : Color.dsSecondaire.opacity(0.35), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                        .strokeBorder(selected ? Color.dsAccent : Color.clear, lineWidth: 1.5)
                 )
         }
         .buttonStyle(.healthMapPressed)
@@ -459,8 +468,7 @@ struct GroceryQuestionControl: View {
                 }
                 .padding(Theme.spacingMD)
                 .frame(maxWidth: .infinity)
-                .background(Color.dsCarte)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                .dsCard()
                 .accessibilityElement(children: .combine)
             } else {
                 Button { HapticService.shared.primary(); showCaddie = true } label: {
@@ -472,10 +480,11 @@ struct GroceryQuestionControl: View {
                         Spacer()
                         Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
                     }
-                    .padding(Theme.spacingMD)
+                    .padding(.horizontal, Theme.spacingLG)
                     .frame(maxWidth: .infinity)
-                    .background(LinearGradient.healthMapBrand)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                    .frame(minHeight: Verre.hauteurAction)
+                    .verrePrincipal()
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.healthMapPressed)
             }

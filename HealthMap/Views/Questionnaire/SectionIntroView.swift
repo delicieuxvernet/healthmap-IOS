@@ -63,7 +63,7 @@ struct SectionIntroView: View {
                 .foregroundStyle(Color.dsSecondaire)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Capsule().fill(Color.dsRemplissage))
+                .verreClair()
 
             // Teaser bienveillant (Lot E) — apparaît en différé sous le
             // pill, sans modifier le reste de l'écran d'intro existant.
@@ -127,7 +127,7 @@ private extension QuestionnaireSection {
 
 #Preview {
     ZStack {
-        Color.dsFond.ignoresSafeArea()
+        DSPageBackground()
         SectionIntroView(
             section: .nutrition,
             questionCount: 23,

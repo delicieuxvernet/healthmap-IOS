@@ -25,6 +25,16 @@ import RevenueCat
 // et « Revoir mon bilan animé ». Partis de cet écran, comme demandé : évolution
 // du score, série, badges, total des check-ins, et l'interrupteur du mode Zen —
 // c'est la ligne Notifications qui porte désormais le sien.
+//
+// ── Verre liquide (2 octobre 2026) ──────────────────────────────────────────
+// La maquette « Motion v3 - Verre liquide » garde l'ordre et change la matière :
+// le fond respire (teinte neutre), les cartes sont en verre de rayon 24, et les
+// deux en-têtes disparaissent — les groupes se lisent par l'écart entre cartes.
+// Le bloc Premium devient UNE ligne de verre : la mascotte (44 pt, immobile),
+// « Kiwio Premium », l'essai en vert foncé, un chevron vert. Le prix reste
+// juste dessous, toujours lu chez Apple. Chaque ligne porte une pastille carrée
+// de 30 pt et son filet, aligné sur le libellé ; elles arrivent en cascade à
+// chaque visite de l'onglet (0,08 s, puis 0,05 s par ligne).
 struct ReglagesView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var dashboardVM: DashboardViewModel
@@ -39,18 +49,30 @@ struct ReglagesView: View {
     @State private var isExportingData = false
     @State private var showExportOfflineAlert = false
 
-    /// Retrait du filet sous une ligne à pastille : 16 + 29 + 12.
-    private static let retraitPastille: CGFloat = 57
+    /// Les lignes arrivent en cascade à chaque visite de l'onglet. Les cinq
+    /// onglets restent montés : c'est `estOngletActif` qui dit qu'on arrive.
+    @State private var lignesVisibles = false
+    @Environment(\.estOngletActif) private var estOngletActif
+
+    /// La feuille Premium grandit depuis la carte touchée (iOS 18 et plus ;
+    /// une feuille simple avant). La feuille reste présentée par la page, pas
+    /// par la carte : après l'achat la carte disparaît, la feuille doit rester.
+    @Namespace private var espacePremium
 
     /// La porte premium n'apparaît qu'une fois le bilan fait (V12a).
     private var montreOffre: Bool {
         !subscriptionService.isPremium && dashboardVM.bilanComplete
     }
 
+    /// Une carte Premium (offre ou abonnement actif) coiffe-t-elle la page ?
+    private var aCartePremium: Bool {
+        subscriptionService.isPremium || montreOffre
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.dsFond.ignoresSafeArea()
+                DSPageBackground()
                 ScrollView {
                     VStack(spacing: 0) {
                         if subscriptionService.isPremium {
@@ -63,7 +85,8 @@ struct ReglagesView: View {
                                                                      produits: subscriptionService.directProducts),
                                 prix: PremiumOffre.lignePrix(offerings: subscriptionService.offerings,
                                                              produits: subscriptionService.directProducts),
-                                nombreApports: dashboardVM.analysisV2?.bilan?.apports?.count
+                                nombreApports: dashboardVM.analysisV2?.bilan?.apports?.count,
+                                origine: espacePremium
                             ) {
                                 HapticService.shared.tap()
                                 showPaywall = true
@@ -76,17 +99,19 @@ struct ReglagesView: View {
                                     await subscriptionService.loadOfferings()
                                 }
                             }
-                            liensLegaux.padding(.top, 6)
+                            liensLegaux.padding(.top, 2)
                         }
 
-                        DSSectionHeader(titre: "Compte")
+                        // Plus d'en-tête : 24 pt sous la carte Premium, comme
+                        // la maquette ; 14 pt sous le titre quand elle n'y est pas.
                         compteList
+                            .padding(.top, aCartePremium ? 24 : 14)
 
                         questionnaireCarte
                             .padding(.top, DS.interCarte)
 
-                        DSSectionHeader(titre: "Application")
                         applicationList
+                            .padding(.top, 24)
 
                         // Restaurer un achat doit rester atteignable, toujours
                         // (App Review 3.1.1) : sous l'offre quand elle est là,
@@ -106,6 +131,9 @@ struct ReglagesView: View {
                     .containerRelativeFrame(.horizontal)
                 }
             }
+            .onChange(of: estOngletActif, initial: true) { _, actif in
+                if actif { rejouerCascade() }
+            }
             .kiwiTabBarBottomInset()
             .navigationTitle("Réglages")
             .navigationBarTitleDisplayMode(.large)
@@ -113,6 +141,7 @@ struct ReglagesView: View {
             .sheet(isPresented: $showPaywall) {
                 PaywallView(source: "reglages")
                     .healthMapFullSheet()
+                    .premiumDepuis("premium", dans: espacePremium)
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
             .alerteRestauration(restauration)
@@ -121,6 +150,25 @@ struct ReglagesView: View {
             } message: {
                 Text("L'export a besoin d'une connexion internet pour récupérer toutes tes données. Reconnecte-toi puis réessaie.")
             }
+        }
+    }
+
+    // MARK: - Cascade des lignes
+
+    /// Retard de la ligne `index` : 0,08 s, puis 0,05 s par ligne (maquette).
+    /// Plafonné à la 9e : le bas de la page, hors écran à l'arrivée, ne doit
+    /// pas se faire attendre si on défile tout de suite.
+    private func delai(_ index: Int) -> Double {
+        0.08 + Double(min(max(index, 0), 8)) * 0.05
+    }
+
+    /// Les lignes s'effacent d'un coup, puis reviennent en cascade : la sortie
+    /// est sèche, c'est l'entrée qui se joue (`VerreCascade`).
+    private func rejouerCascade() {
+        lignesVisibles = false
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(60))
+            lignesVisibles = true
         }
     }
 
@@ -148,21 +196,38 @@ struct ReglagesView: View {
     private var premiumActif: some View {
         VStack(alignment: .leading, spacing: 8) {
             DSGroupedList {
-                ReglageLigne(symbole: "sparkles", sens: .actif, titre: "Premium actif",
-                             sousTitre: echeance ?? "Tout est débloqué", grande: true) { EmptyView() }
+                // La même carte que l'offre, mascotte comprise ; pas de
+                // chevron : cette ligne dit un état, elle ne mène nulle part.
+                CartePremiumEntete(titre: "Premium actif",
+                                   sousLigne: echeance ?? "Tout est débloqué",
+                                   chevron: false)
+                    .accessibilityElement(children: .combine)
 
-                DSSeparator(retrait: Self.retraitPastille)
+                DSSeparator(retrait: ReglageMetrique.retraitMascotte)
 
                 Button {
                     HapticService.shared.tap()
                     showManageSubscriptions = true
                 } label: {
-                    ReglageLigne(symbole: nil, titre: "Gérer mon abonnement") {
+                    HStack(spacing: 8) {
+                        Text("Gérer mon abonnement")
+                            .font(.dsCorps)
+                            .tracking(DSTracking.corps)
+                            .foregroundStyle(Color.dsTexte)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Color.dsTertiaire)
                             .accessibilityHidden(true)
                     }
+                    // Le libellé s'aligne sur celui de la ligne du dessus.
+                    .padding(.leading, ReglageMetrique.retraitMascotte)
+                    .padding(.trailing, DS.paddingCarte)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, minHeight: ReglageMetrique.hauteurLigne, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.dsPress)
                 .accessibilityHint("Ouvre la gestion de ton abonnement (modifier ou annuler) dans les réglages Apple.")
@@ -190,23 +255,21 @@ struct ReglagesView: View {
                     .environmentObject(dashboardVM)
             } label: {
                 LigneIdentite(prenom: prenom, email: authViewModel.userEmail,
-                              avatarKey: dashboardVM.profile.avatarKey)
+                              avatarKey: dashboardVM.profile.avatarKey, filet: true)
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.compte")
-
-            DSSeparator(retrait: Self.retraitPastille + 11)
+            .verreCascade(lignesVisibles, delai: delai(0), decalage: 10)
 
             NavigationLink {
                 ObjectifsReglagesView()
                     .environmentObject(dashboardVM)
             } label: {
-                ReglageLigne(symbole: "target", titre: "Mes objectifs", valeur: objectifPrincipal)
+                ReglageLigne(symbole: "target", titre: "Mes objectifs", valeur: objectifPrincipal, filet: true)
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.objectifs")
-
-            DSSeparator(retrait: Self.retraitPastille)
+            .verreCascade(lignesVisibles, delai: delai(1), decalage: 10)
 
             // Abonné : le bloc du haut porte déjà l'abonnement.
             if !subscriptionService.isPremium {
@@ -214,12 +277,11 @@ struct ReglagesView: View {
                     AbonnementReglagesView()
                         .environmentObject(dashboardVM)
                 } label: {
-                    ReglageLigne(symbole: "crown", titre: "Abonnement", valeur: "Gratuit")
+                    ReglageLigne(symbole: "crown", titre: "Abonnement", valeur: "Gratuit", filet: true)
                 }
                 .buttonStyle(.dsPress)
                 .accessibilityIdentifier("reglages.abonnement")
-
-                DSSeparator(retrait: Self.retraitPastille)
+                .verreCascade(lignesVisibles, delai: delai(2), decalage: 10)
             }
 
             // La liaison Apple Santé se fait dans l'éditeur (import poids, pas,
@@ -229,11 +291,11 @@ struct ReglagesView: View {
                     .environmentObject(dashboardVM)
             } label: {
                 ReglageLigne(symbole: "heart", sens: healthLinked ? .actif : .neutre,
-                             titre: "Apple Santé", valeur: healthLinked ? "Connecté" : "Non connecté")
+                             titre: "Apple Santé", valeur: healthLinked ? "Connecté" : "Non connecté",
+                             filet: true)
             }
             .buttonStyle(.dsPress)
-
-            DSSeparator(retrait: Self.retraitPastille)
+            .verreCascade(lignesVisibles, delai: delai(3), decalage: 10)
 
             Button {
                 Task { await exportUserData() }
@@ -245,6 +307,7 @@ struct ReglagesView: View {
             .buttonStyle(.dsPress)
             .disabled(isExportingData)
             .accessibilityHint("Télécharge toutes tes données Kiwio au format JSON (RGPD Article 20).")
+            .verreCascade(lignesVisibles, delai: delai(4), decalage: 10)
         }
     }
 
@@ -263,6 +326,7 @@ struct ReglagesView: View {
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.questionnaire")
+            .verreCascade(lignesVisibles, delai: delai(5), decalage: 10)
         }
     }
 
@@ -271,18 +335,16 @@ struct ReglagesView: View {
     private var applicationList: some View {
         DSGroupedList {
             LigneNotifications()
-
-            DSSeparator(retrait: Self.retraitPastille)
+                .verreCascade(lignesVisibles, delai: delai(6), decalage: 10)
 
             NavigationLink {
                 WidgetsReglagesView()
             } label: {
-                ReglageLigne(symbole: "square.grid.2x2", titre: "Widgets et écran verrouillé")
+                ReglageLigne(symbole: "square.grid.2x2", titre: "Widgets et écran verrouillé", filet: true)
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.widgets")
-
-            DSSeparator(retrait: Self.retraitPastille)
+            .verreCascade(lignesVisibles, delai: delai(7), decalage: 10)
 
             Button {
                 HapticService.shared.tap()
@@ -291,11 +353,10 @@ struct ReglagesView: View {
                 NotificationCenter.default.post(name: .healthmapNavigateToTab,
                                                 object: MainTabView.Tab.journal.route)
             } label: {
-                ReglageLigne(symbole: "graduationcap", titre: "Revoir le tutoriel")
+                ReglageLigne(symbole: "graduationcap", titre: "Revoir le tutoriel", filet: true)
             }
             .buttonStyle(.dsPress)
-
-            DSSeparator(retrait: Self.retraitPastille)
+            .verreCascade(lignesVisibles, delai: delai(8), decalage: 10)
 
             // Rejouer le récap : présenté par la racine (MainTabView), une
             // feuille plein écran ouverte depuis un onglet ne s'ouvrait pas.
@@ -304,11 +365,10 @@ struct ReglagesView: View {
                     HapticService.shared.tap()
                     NotificationCenter.default.post(name: .healthmapRejouerRecap, object: nil)
                 } label: {
-                    ReglageLigne(symbole: "play.circle", titre: "Revoir mon bilan animé")
+                    ReglageLigne(symbole: "play.circle", titre: "Revoir mon bilan animé", filet: true)
                 }
                 .buttonStyle(.dsPress)
-
-                DSSeparator(retrait: Self.retraitPastille)
+                .verreCascade(lignesVisibles, delai: delai(9), decalage: 10)
             }
 
             NavigationLink {
@@ -318,6 +378,7 @@ struct ReglagesView: View {
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.methode")
+            .verreCascade(lignesVisibles, delai: delai(10), decalage: 10)
         }
     }
 
@@ -377,11 +438,11 @@ struct ReglagesView: View {
                     await authViewModel.signOut()
                 }
             } label: {
-                ReglageLigne(symbole: "rectangle.portrait.and.arrow.right", titre: "Se déconnecter") { EmptyView() }
+                ReglageLigne(symbole: "rectangle.portrait.and.arrow.right", titre: "Se déconnecter",
+                             filet: true) { EmptyView() }
             }
             .buttonStyle(.dsPress)
-
-            DSSeparator(retrait: Self.retraitPastille)
+            .verreCascade(lignesVisibles, delai: delai(11), decalage: 10)
 
             NavigationLink {
                 SuppressionCompteView()
@@ -391,6 +452,7 @@ struct ReglagesView: View {
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.suppression")
+            .verreCascade(lignesVisibles, delai: delai(12), decalage: 10)
         }
     }
 
@@ -438,11 +500,66 @@ struct ReglagesView: View {
     }
 }
 
+// MARK: - Grammaire d'une ligne (pastille carrée, libellé, filet)
+
+/// Les cotes d'une ligne de réglage, lues sur la maquette.
+enum ReglageMetrique {
+    /// Pastille d'icône : 30 × 30, rayon 8.
+    static let pastille: CGFloat = 30
+    static let rayonPastille: CGFloat = 8
+    /// Hauteur minimale d'une ligne.
+    static let hauteurLigne: CGFloat = 50
+    /// Début du libellé d'une ligne à mascotte : 16 + 44 + 12.
+    static let retraitMascotte: CGFloat = 72
+}
+
+/// La pastille d'icône d'une ligne : un carré arrondi translucide, l'icône de
+/// 17 pt. Neutre par défaut ; une teinte n'y entre que pour porter un sens.
+struct ReglagePastille: View {
+    let symbole: String
+    var fond: Color = Verre.remplissage
+    var encre: Color = Verre.iconeNeutre
+
+    var body: some View {
+        Image(systemName: symbole)
+            .font(.system(size: 17, weight: .medium))
+            .foregroundStyle(encre)
+            .frame(width: ReglageMetrique.pastille, height: ReglageMetrique.pastille)
+            .background(
+                RoundedRectangle(cornerRadius: ReglageMetrique.rayonPastille, style: .continuous)
+                    .fill(fond)
+            )
+            .accessibilityHidden(true)
+    }
+}
+
+/// Le filet de 0,5 pt d'une ligne. Il se pose sous le LIBELLÉ : il part du
+/// texte et s'arrête avant l'accessoire, jamais sous la pastille.
+struct ReglageFilet: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.dsSeparateur)
+            .frame(height: 0.5)
+            .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// Habille un champ de saisie des Réglages en verre clair : la même plaque
+    /// que les champs de connexion (rayon d'une tuile). La hauteur est un
+    /// plancher : en grande taille de texte, le champ grandit.
+    func reglageChampVerre() -> some View {
+        padding(.horizontal, DS.paddingCarte)
+            .frame(minHeight: ReglageMetrique.hauteurLigne)
+            .verreClair(RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
+    }
+}
+
 // MARK: - Ligne de réglage (pastille à trois sens + libellé)
 
-/// La ligne de la page : une pastille 29 pt (36 en version `grande`), le
-/// libellé, un sous-titre ou une valeur, un accessoire. La couleur de la
-/// pastille porte un SENS, jamais une décoration.
+/// La ligne de la page : une pastille carrée de 30 pt, le libellé, un
+/// sous-titre ou une valeur, un accessoire. La couleur de la pastille porte un
+/// SENS, jamais une décoration. `grande` met le libellé en avant (17 / 600).
 struct ReglageLigne<Accessoire: View>: View {
     enum Sens { case neutre, actif, destructif }
 
@@ -454,23 +571,43 @@ struct ReglageLigne<Accessoire: View>: View {
     var sousTitre: String? = nil
     var valeur: String? = nil
     var grande = false
+    /// Filet sous le libellé : vrai pour toute ligne suivie d'une autre dans
+    /// la même carte.
+    var filet = false
     @ViewBuilder var accessoire: () -> Accessoire
-
-    private var cote: CGFloat { grande ? 36 : 29 }
 
     private var fond: Color {
         switch sens {
-        case .neutre: return Color(uiColor: .systemGray5)
-        case .actif: return Color.dsAccent.opacity(0.14)
+        case .neutre: return Verre.remplissage
+        case .actif: return Color.teinteKiwi.opacity(0.14)
         case .destructif: return Color.dsACombler.opacity(0.12)
         }
     }
 
     private var encre: Color {
         switch sens {
-        case .neutre: return Color.dsTexte.opacity(0.72)
-        case .actif: return Color.kiwiGreenInk
+        case .neutre: return Verre.iconeNeutre
+        case .actif: return Color.teinteKiwiTexte
         case .destructif: return Color.dsACombler
+        }
+    }
+
+    private var libelles: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(titre)
+                .font(grande ? Font.dsHeadline : Font.dsCorps)
+                .tracking(DSTracking.corps)
+                .foregroundStyle(sens == .destructif ? Color.dsACombler : Color.dsTexte)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            if let sousTitre {
+                Text(sousTitre)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -478,45 +615,33 @@ struct ReglageLigne<Accessoire: View>: View {
         HStack(alignment: .center, spacing: 12) {
             ZStack {
                 if let symbole {
-                    RoundedRectangle(cornerRadius: grande ? 9 : 7, style: .continuous)
-                        .fill(fond)
-                    Image(systemName: symbole)
-                        .font(.system(size: grande ? 18 : 15, weight: .medium))
-                        .foregroundStyle(encre)
+                    ReglagePastille(symbole: symbole, fond: fond, encre: encre)
                 }
             }
-            .frame(width: cote, height: cote)
+            .frame(width: ReglageMetrique.pastille, height: ReglageMetrique.pastille)
             .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(titre)
-                    .font(grande ? Font.dsHeadline : Font.dsCorps)
-                    .tracking(DSTracking.corps)
-                    .foregroundStyle(sens == .destructif ? Color.dsACombler : Color.dsTexte)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let sousTitre {
-                    Text(sousTitre)
-                        .font(.dsLegende)
-                        .tracking(DSTracking.legende)
+            HStack(alignment: .center, spacing: 8) {
+                libelles
+                Spacer(minLength: 8)
+                if let valeur {
+                    Text(valeur)
+                        .font(.dsValeurLigne)
+                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsSecondaire)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
                 }
             }
-            Spacer(minLength: 8)
-            if let valeur {
-                Text(valeur)
-                    .font(.dsValeurLigne)
-                    .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .layoutPriority(1)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: ReglageMetrique.hauteurLigne, alignment: .leading)
+            .overlay(alignment: .bottom) {
+                if filet { ReglageFilet() }
             }
+
             accessoire()
         }
         .padding(.horizontal, DS.paddingCarte)
-        .padding(.vertical, grande ? 13 : 11)
-        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
     }
 }
@@ -528,9 +653,10 @@ extension ReglageLigne where Accessoire == DSChevron {
          titre: String,
          sousTitre: String? = nil,
          valeur: String? = nil,
-         grande: Bool = false) {
+         grande: Bool = false,
+         filet: Bool = false) {
         self.init(symbole: symbole, sens: sens, titre: titre, sousTitre: sousTitre,
-                  valeur: valeur, grande: grande) {
+                  valeur: valeur, grande: grande, filet: filet) {
             DSChevron()
         }
     }
@@ -543,6 +669,8 @@ struct LigneIdentite: View {
     let avatarKey: String?
     var taille: CGFloat = 40
     var chevron = true
+    /// Filet sous le prénom et l'e-mail (même règle que `ReglageLigne`).
+    var filet = false
 
     private var initiales: String {
         let mots = prenom.split(separator: " ").prefix(2)
@@ -550,10 +678,15 @@ struct LigneIdentite: View {
         return lettres.isEmpty ? "?" : lettres.joined()
     }
 
+    /// L'avatar garde 11 pt d'air au-dessus et au-dessous, quelle que soit sa taille.
+    private var hauteurMinimale: CGFloat {
+        max(ReglageMetrique.hauteurLigne, taille + 22)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                Circle().fill(Color(uiColor: .systemGray5))
+                Circle().fill(Verre.remplissage)
                 if let avatarKey, let variant = AvatarVariant(key: avatarKey) {
                     Image(variant.imageName)
                         .resizable()
@@ -562,41 +695,86 @@ struct LigneIdentite: View {
                 } else {
                     Text(initiales)
                         .font(.system(size: taille * 0.38, weight: .semibold))
-                        .foregroundStyle(Color.dsTexte.opacity(0.72))
+                        .foregroundStyle(Verre.iconeNeutre)
                 }
             }
             .frame(width: taille, height: taille)
             .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(prenom)
-                    .font(.dsHeadline)
-                    .tracking(DSTracking.corps)
-                    .foregroundStyle(Color.dsTexte)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let email, !email.isEmpty {
-                    Text(email)
-                        .font(.dsLegende)
-                        .tracking(DSTracking.legende)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(prenom)
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
+                        .foregroundStyle(Color.dsTexte)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let email, !email.isEmpty {
+                        Text(email)
+                            .font(.dsLegende)
+                            .tracking(DSTracking.legende)
+                            .foregroundStyle(Color.dsSecondaire)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                 }
+                Spacer(minLength: 8)
             }
-            Spacer(minLength: 8)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, minHeight: hauteurMinimale, alignment: .leading)
+            .overlay(alignment: .bottom) {
+                if filet { ReglageFilet() }
+            }
+
             if chevron { DSChevron() }
         }
         .padding(.horizontal, DS.paddingCarte)
-        .padding(.vertical, 11)
-        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(email.map { "Mon compte, \(prenom), \($0)" } ?? "Mon compte, \(prenom)")
     }
 }
 
-// MARK: - Bloc Premium (carte sobre sur voile, une promesse)
+// MARK: - Bloc Premium (une ligne de verre, la mascotte, le prix dessous)
 
+/// L'en-tête de la carte Premium : la mascotte de 44 pt, immobile, le titre
+/// (17 / 600), une sous-ligne de 13 dans la teinte kiwi foncée, et le chevron
+/// vert quand la carte se touche.
+struct CartePremiumEntete: View {
+    let titre: String
+    let sousLigne: String
+    var chevron = true
+
+    var body: some View {
+        HStack(spacing: 12) {
+            KiwiMascotte()
+                .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(titre)
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(sousLigne)
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.teinteKiwiTexte)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if chevron { DSChevron(couleur: .teinteKiwi) }
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// La porte vers Premium, pour qui ne paie pas : une seule ligne de verre, qui
+/// ouvre la feuille Premium. L'argumentaire vit désormais dans cette feuille ;
+/// ici, il reste ce qui engage : l'essai lu chez Apple, et le prix dessous.
 struct BlocPremiumReglages: View {
     /// « 7 jours », lu chez Apple ; `nil` = pays ou formule sans essai.
     let essai: String?
@@ -604,6 +782,9 @@ struct BlocPremiumReglages: View {
     let prix: PremiumOffre.LignePrix
     /// Nombre d'apports prioritaires du bilan, pour parler des SIENS.
     let nombreApports: Int?
+    /// L'espace partagé avec la feuille Premium : elle grandit depuis la carte
+    /// (`premiumOrigine` ici, `premiumDepuis` sur le contenu de la feuille).
+    let origine: Namespace.ID
     let action: () -> Void
 
     private var lignePlan: String {
@@ -611,69 +792,28 @@ struct BlocPremiumReglages: View {
         return "Le plan complet pour tes \(nombreApports) apports prioritaires"
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.dsSecondaire)
-                    .accessibilityHidden(true)
-                Text("Kiwio Premium")
-                    .font(.dsLegende.weight(.semibold))
-                    .foregroundStyle(Color.dsSecondaire)
-                Spacer(minLength: 8)
-                if let essai {
-                    Text("\(essai) offerts")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.dsTexte)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.dsFond))
-                }
-            }
-
-            Text("Tu sais ce qui manque. Premium te dit quoi faire, apport par apport.")
-                .font(.system(.title2, design: .default).weight(.bold))
-                .tracking(-0.7)
-                .foregroundStyle(Color.dsTexte)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 14)
-
-            VStack(alignment: .leading, spacing: 9) {
-                promesse("checklist", lignePlan)
-                promesse("chart.xyaxis.line", "Ton évolution dans le temps")
-                promesse("bell", "Des rappels au bon moment")
-            }
-            .padding(.top, 14)
-
-            DSCapsuleButton(titre: titreBouton, action: action)
-                .padding(.top, 16)
-
-            LignePrixPremium(prix: prix)
-                .padding(.top, 9)
-        }
-        .padding(DS.paddingCarte)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dsCard()
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: DS.rayonCarte + 6, style: .continuous)
-                .fill(LinearGradient(colors: [Color.dsVoile, Color.dsFond], startPoint: .top, endPoint: .bottom))
-        )
+    /// L'essai quand Apple en propose un ; sinon la promesse, jamais un essai
+    /// inventé.
+    private var sousLigne: String {
+        if let essai { return "\(essai) offerts" }
+        return lignePlan
     }
 
-    private func promesse(_ symbole: String, _ texte: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbole)
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(Color.dsSecondaire)
-                .frame(width: 22)
-                .accessibilityHidden(true)
-            Text(texte)
-                .font(.dsSousTitre)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsTexte)
-                .fixedSize(horizontal: false, vertical: true)
+    var body: some View {
+        VStack(spacing: 8) {
+            Button(action: action) {
+                CartePremiumEntete(titre: "Kiwio Premium", sousLigne: sousLigne)
+                    .dsCard()
+                    .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+            }
+            .buttonStyle(.dsPress)
+            // Le libellé d'action reste celui de l'ancien bouton (« Essayer
+            // 7 jours gratuits ») : c'est lui que VoiceOver annonce.
+            .accessibilityLabel(titreBouton)
+            .accessibilityHint("Ouvre l'offre Kiwio Premium.")
+            .premiumOrigine("premium", dans: origine)
+
+            LignePrixPremium(prix: prix)
         }
     }
 }
@@ -695,7 +835,7 @@ struct LignePrixPremium: View {
                 HStack(spacing: 6) {
                     Text("puis")
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color(uiColor: .systemGray5))
+                        .fill(Verre.remplissage)
                         .frame(width: 96, height: 12)
                         .opacity(pulse ? 0.45 : 1)
                         .accessibilityHidden(true)
@@ -832,15 +972,7 @@ private struct LigneNotifications: View {
             set: { nouveau in Task { await basculer(nouveau) } }
         )) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color(uiColor: .systemGray5))
-                    Image(systemName: "bell")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color.dsTexte.opacity(0.72))
-                }
-                .frame(width: 29, height: 29)
-                .accessibilityHidden(true)
+                ReglagePastille(symbole: "bell")
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Notifications")
@@ -853,12 +985,15 @@ private struct LigneNotifications: View {
                         .foregroundStyle(Color.dsSecondaire)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, minHeight: ReglageMetrique.hauteurLigne, alignment: .leading)
+                // Le filet court sous le libellé et s'arrête avant
+                // l'interrupteur, comme sous une ligne à chevron.
+                .overlay(alignment: .bottom) { ReglageFilet() }
             }
         }
         .tint(Color.dsAccent)
         .padding(.horizontal, DS.paddingCarte)
-        .padding(.vertical, 11)
-        .frame(minHeight: DS.cibleTactile)
         .task { await relire() }
         // Retour des réglages de l'iPhone : l'état a pu changer.
         .onChange(of: scenePhase) { _, phase in

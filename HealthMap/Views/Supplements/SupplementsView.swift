@@ -20,9 +20,18 @@ import SwiftUI
 //
 // Sources INCHANGÉES : `SupplementEngine` (produits, prix, interactions) et le
 // bilan v2 déjà chargé (`AIAnalysisV2`). Aucun nouvel appel.
+//
+// Verre liquide (2 octobre 2026) : le titre devient une ligne de 17 / 600 qui
+// défile avec la page (la barre de navigation est masquée, le bord haut flouté
+// de la racine fait le reste), la bascule est en verre, la voie assiette une
+// seule carte de lignes. À chaque arrivée sur l'onglet et à chaque bascule,
+// les anneaux se retracent et les causes reviennent en cascade.
 struct SupplementsView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Les onglets restent montés : c'est ce signal, pas `onAppear`, qui dit
+    /// qu'on vient d'arriver sur la page.
+    @Environment(\.estOngletActif) private var estOngletActif
 
     /// Voie affichée — pilote TOUTE la page (mosaïque + fiche + note de pied).
     @State private var voie: ComplementsVoie = .complements
@@ -43,6 +52,9 @@ struct SupplementsView: View {
     /// Amorçage fait une seule fois quand les chaînes arrivent : panier
     /// pré-rempli avec le plan proposé (la recommandation EST le plan par défaut).
     @State private var defaultsSeeded = false
+    /// Compte les arrivées sur l'onglet : la mosaïque est reconstruite à
+    /// chacune, donc ses anneaux et ses cascades se rejouent.
+    @State private var passage = 0
 
     private var complementsV2: ComplementsV2? { dashboardVM.analysisV2?.complements }
 
@@ -183,14 +195,16 @@ struct SupplementsView: View {
                 } else if hasContent {
                     mainContent
                 } else if dashboardVM.isLoadingAnalysis {
-                    VStack(spacing: 16) {
-                        KiwiLoader(size: 72)
-                        Text("Chargement...")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color.dsSecondaire)
+                    sousLeTitre {
+                        VStack(spacing: 16) {
+                            KiwiLoader(size: 72)
+                            Text("Chargement...")
+                                .font(.dsSousTitreMoyen)
+                                .foregroundStyle(Color.dsSecondaire)
+                        }
                     }
                 } else {
-                    emptyState
+                    sousLeTitre { emptyState }
                 }
             }
             .kiwiTabBarBottomInset()
@@ -198,15 +212,20 @@ struct SupplementsView: View {
                 refreshRituel()
                 seedDefaults()
             }
+            .onChange(of: estOngletActif) { _, actif in
+                if actif { passage += 1 }
+            }
             .onChange(of: complementsSignature) { _, _ in refreshRituel() }
             // Le rituel a été coché depuis un widget : les coches se relisent.
             .onReceive(NotificationCenter.default.publisher(for: .healthmapRituelModifie)) { _ in
                 refreshRituel()
             }
             .onChange(of: chainsSignature) { _, _ in seedDefaults() }
-            // Grand titre natif (se replie en inline au défilement).
+            // Le titre est une ligne de la page (17 / 600, voir `titreOnglet`) :
+            // la barre native poserait son propre fond flou par-dessus le verre.
             .navigationTitle("Compléments")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $fiche) { contexte in
                 FicheApportSheet(
                     contexte: contexte,
@@ -227,7 +246,7 @@ struct SupplementsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header.kiwiEntrance(0)
-                chainHeader.padding(.top, 20).kiwiEntrance(1)
+                chainHeader.padding(.top, 22).kiwiEntrance(1)
                 ComplementsTeaserCard { dashboardVM.demarrerBilan() }
                     .padding(.top, 12)
                     .kiwiEntrance(2)
@@ -254,12 +273,12 @@ struct SupplementsView: View {
                 // du jour, et la bascule ne doit pas sauter sous le doigt.
                 if let rituel {
                     ComplementsRituelStrip(rituel: rituel) { toggleRituel($0) }
-                        .padding(.top, 14)
+                        .padding(.top, 12)
                         .kiwiEntrance(1)
                 }
 
                 ComplementsVoieSwitch(voie: $voie)
-                    .padding(.top, 18)
+                    .padding(.top, 16)
                     .kiwiEntrance(2)
 
                 if items.isEmpty {
@@ -269,14 +288,21 @@ struct SupplementsView: View {
                 } else {
                     enTeteMosaique(nombre: items.count).kiwiEntrance(3)
 
-                    mosaique(items).padding(.top, 11)
+                    // Reconstruit à chaque bascule et à chaque arrivée sur
+                    // l'onglet : les anneaux se retracent part par part, les
+                    // causes et les lignes reviennent en cascade.
+                    corps(items)
+                        .id("\(voie.rawValue)#\(passage)")
+                        .modifier(EchangeDuCorps(cle: voie))
+                        .padding(.top, 12)
 
                     Text(noteMosaique(items))
                         .font(.dsLegende)
                         .tracking(DSTracking.legende)
                         .foregroundStyle(Color.dsSecondaire)
+                        .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 12)
+                        .padding(.top, 10)
                         .padding(.horizontal, 2)
 
                     // Le panier, derrière : une ligne discrète vers la sélection.
@@ -322,15 +348,41 @@ struct SupplementsView: View {
 
     // MARK: - En-têtes
 
-    /// Le titre « Compléments » est porté par la barre de navigation (grand
-    /// titre natif) ; ici, l'engagement de transparence, en secondaire.
+    /// Le titre de l'onglet : une ligne de 17 / 600 centrée, haute de 44,
+    /// qui défile avec la page.
+    private var titreOnglet: some View {
+        Text("Compléments")
+            .font(.dsTitreInline)
+            .tracking(DSTracking.corps)
+            .foregroundStyle(Color.dsTexte)
+            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .center)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    /// Le titre, puis l'engagement de transparence, en secondaire.
     private var header: some View {
-        Text("Kiwio ne gagne rien sur ce qu'il te recommande")
-            .font(.dsSousTitre)
-            .tracking(DSTracking.sousTitre)
-            .foregroundStyle(Color.dsSecondaire)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 8) {
+            titreOnglet
+            Text("Kiwio ne gagne rien sur ce qu'il te recommande")
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// Un état sans liste (chargement, rien à proposer) : le titre reste en
+    /// haut, le contenu se centre dans ce qui reste.
+    private func sousLeTitre<Contenu: View>(@ViewBuilder _ contenu: () -> Contenu) -> some View {
+        VStack(spacing: 0) {
+            titreOnglet
+                .padding(.horizontal, DS.marge)
+                .padding(.top, 4)
+            Spacer(minLength: 0)
+            contenu()
+            Spacer(minLength: 0)
+        }
     }
 
     /// Kicker de la carte d'exemple (mode découverte).
@@ -358,17 +410,31 @@ struct SupplementsView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
             Text("\(nombre) \(unite)\(nombre > 1 ? "s" : "")")
-                .font(.dsLegende)
-                .tracking(DSTracking.legende)
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
+                .contentTransition(.numericText())
         }
-        .padding(.top, 18)
-        .padding(.horizontal, 2)
+        .padding(.top, 22)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
 
-    // MARK: - La mosaïque (1 héros, puis deux par deux)
+    // MARK: - Le corps (mosaïque d'anneaux, ou lignes de l'assiette)
+
+    /// Voie compléments : la mosaïque. Voie assiette : une seule carte, une
+    /// ligne par apport.
+    @ViewBuilder
+    private func corps(_ items: [Tuile]) -> some View {
+        if voie == .complements {
+            mosaique(items)
+        } else {
+            ComplementsAssietteCarte(lignes: lignesAssiette(items)) { id in
+                guard let item = items.first(where: { $0.id == id }) else { return }
+                ouvrir(item)
+            }
+        }
+    }
 
     /// Trois apports : un héros et une rangée de deux. Deux apports : un héros
     /// et une tuile pleine largeur, en ligne. Un seul : le héros. Jamais de trou.
@@ -377,7 +443,7 @@ struct SupplementsView: View {
         let rangs = Array(stride(from: 0, to: reste.count, by: 2))
         return VStack(spacing: 10) {
             if let premier = items.first {
-                heros(premier).kiwiEntrance(4)
+                heros(premier)
             }
             ForEach(rangs, id: \.self) { rang in
                 if rang + 1 < reste.count {
@@ -386,12 +452,32 @@ struct SupplementsView: View {
                         tuile(reste[rang + 1])
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    .kiwiEntrance(5 + rang / 2)
                 } else {
                     tuile(reste[rang], enLigne: true)
-                        .kiwiEntrance(5 + rang / 2)
                 }
             }
+        }
+    }
+
+    /// Une ligne par apport : son premier aliment en titre (le même que celui
+    /// de sa fiche), les suivants en précision. Sans autre aliment, la ligne
+    /// dit l'apport qu'elle sert. Ni portion ni fréquence : la donnée n'existe
+    /// pas par aliment.
+    private func lignesAssiette(_ items: [Tuile]) -> [LigneAssiette] {
+        items.map { item in
+            let autres = aliments(for: item.chain).dropFirst().map { LectureApport.enCoursDePhrase($0) }
+            let precision = autres.isEmpty
+                ? "pour \(item.chain.avecArticle)"
+                : "ou " + autres.joined(separator: ", ")
+            return LigneAssiette(
+                id: item.id,
+                symbole: symbole(item),
+                teinte: item.chain.tint,
+                teinteTexte: Color.teinteApportTexte(for: item.chain.id),
+                titre: titre(item),
+                sousTitre: precision,
+                apport: item.chain.nom
+            )
         }
     }
 
@@ -634,9 +720,10 @@ struct SupplementsView: View {
         taken = Set(chiffrableChains.map(\.id))
     }
 
+    /// Le retour haptique est donné par la tuile du créneau (réussite à la
+    /// coche), une fois par geste et non une fois par prise.
     private func toggleRituel(_ id: String) {
-        HapticService.shared.selection()
-        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
+        withAnimation(reduceMotion ? .none : Animation.kiwiVif) {
             rituel = SuiviEngineV4.toggleRituel(id: id, complements: complementsV2)
         }
         // Les widgets montrent le même rituel : ils suivent la coche.
@@ -645,17 +732,16 @@ struct SupplementsView: View {
 
     private func toggleCart(_ id: String) {
         HapticService.shared.selection()
-        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.22)) {
+        withAnimation(reduceMotion ? .none : Animation.kiwiVif) {
             if taken.contains(id) { taken.remove(id) } else { taken.insert(id) }
         }
     }
 
-    /// Le lien de fin de fiche : on referme, et la page passe sur l'autre voie.
+    /// Le lien de fin de fiche : on referme, et la page passe sur l'autre voie
+    /// (le curseur de la bascule et l'échange du corps s'animent d'eux-mêmes).
     private func basculerVoie() {
         fiche = nil
-        withAnimation(reduceMotion ? .none : .easeOut(duration: 0.18)) {
-            voie = voie == .complements ? .assiette : .complements
-        }
+        voie = voie == .complements ? .assiette : .complements
     }
 
     // MARK: - Repli planning IA (rare : moteur vide mais analyse présente)
@@ -675,12 +761,13 @@ struct SupplementsView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 8) {
                                 Image(systemName: block.1)
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Color.dsAccent)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(Color.dsSecondaire)
                                     .accessibilityHidden(true)
                                 Text(block.0)
-                                    .font(Theme.sectionLabelFont)
-                                    .foregroundStyle(Color.dsTexte)
+                                    .font(.dsSousTitreFort)
+                                    .tracking(DSTracking.sousTitre)
+                                    .foregroundStyle(Color.dsSecondaire)
                                 Spacer()
                             }
                             ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
@@ -691,19 +778,21 @@ struct SupplementsView: View {
                                             .frame(width: 40, height: 40)
                                         Image(systemName: "pills.fill")
                                             .font(.system(size: 18))
-                                            .foregroundStyle(Color.dsAccent)
+                                            .foregroundStyle(Verre.iconeNeutre)
                                     }
                                     .accessibilityHidden(true)
                                     Text(entry.displayText)
-                                        .font(Theme.insightFont)
+                                        .font(.dsSousTitreFort)
+                                        .tracking(DSTracking.sousTitre)
                                         .foregroundStyle(Color.dsTexte)
+                                        .fixedSize(horizontal: false, vertical: true)
                                     Spacer()
                                 }
                             }
                         }
-                        .padding(16)
+                        .padding(DS.paddingCarte)
                         .frame(maxWidth: .infinity)
-                        .kiwiCard(radius: 20)
+                        .dsCard()
                     }
                 }
             }
@@ -719,7 +808,7 @@ struct SupplementsView: View {
                 .foregroundStyle(Color.dsSecondaire)
                 .accessibilityHidden(true)
             Text("Ces suggestions viennent de ton bilan. Elles ne remplacent pas l'avis d'un médecin.")
-                .font(.system(size: 11.5, weight: .medium))
+                .font(.system(.caption, design: .default).weight(.medium))
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -737,7 +826,7 @@ struct SupplementsView: View {
                     .frame(width: 88, height: 88)
                 Image(systemName: "pills.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(Color.dsAccent)
+                    .foregroundStyle(Verre.iconeNeutre)
             }
             .accessibilityHidden(true)
             Text("Rien à ajouter pour l'instant")
@@ -751,6 +840,35 @@ struct SupplementsView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
         }
+    }
+}
+
+// MARK: - L'échange du corps (à la bascule)
+
+/// Ce qui vient de remplacer l'autre voie arrive en fondu, remonte de 8 pt et
+/// sort d'un flou de 4 pt, en 0,38 s. Sous « Réduire les animations », un
+/// fondu seul.
+private struct EchangeDuCorps<Cle: Equatable>: ViewModifier {
+    let cle: Cle
+
+    @State private var pose = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(pose ? 1 : 0)
+            .offset(y: (pose || reduceMotion) ? 0 : 8)
+            .blur(radius: (pose || reduceMotion) ? 0 : 4)
+            .onChange(of: cle) { _, _ in
+                // Le départ est sec : c'est l'arrivée qui se joue.
+                var seche = Transaction()
+                seche.disablesAnimations = true
+                withTransaction(seche) { pose = false }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(30))
+                    withAnimation(.timingCurve(0.2, 0.8, 0.3, 1, duration: 0.38)) { pose = true }
+                }
+            }
     }
 }
 

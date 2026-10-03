@@ -11,6 +11,10 @@ import UIKit
 //    une séquence vide, et l'appelant enchaîne directement sur le Bilan.
 //  · une alternative « Voir en liste » est toujours accessible. Certains
 //    détestent les stories, et c'est aussi le filet si une animation coince.
+//
+// Verre liquide (2 octobre 2026) : la chorégraphie ne bouge pas. Le fond est
+// le fond de verre (teinte kiwi), la croix un rond de verre clair, les
+// feuilles (liste, offre) portent le verre de feuille.
 
 struct RecapView: View {
     let slides: [RecapSlide]
@@ -80,6 +84,7 @@ struct RecapView: View {
         }
         .sheet(isPresented: $afficheListe) {
             RecapListeView(slides: slides, onDeverrouiller: { affichePaywall = true })
+                .verreFeuille()
         }
         .sheet(isPresented: $affichePaywall) {
             PaywallView(source: "recap")
@@ -161,12 +166,16 @@ struct RecapView: View {
                     progression.mettreEnPause()
                     afficheSortie = true
                 } label: {
+                    // Rond de verre clair de 36 pt, cible de 44 pt.
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.dsTexte.opacity(0.6))
+                        .foregroundStyle(Verre.iconeNeutre)
+                        .frame(width: 36, height: 36)
+                        .verreClair(Circle())
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
+                .buttonStyle(.dsPress)
                 .accessibilityLabel("Fermer le bilan animé")
 
                 Spacer()
@@ -261,11 +270,14 @@ struct RecapView: View {
     @MainActor
     private func partager() {
         guard let slide = progression.slideCourant, case .carte(let carte) = slide else { return }
+        // La carte est en verre, donc translucide : on lui pose dessous le
+        // fond de verre de l'app, figé (teinte kiwi, halos à leur position de
+        // repos), pour que l'image partagée soit bien ce qui était à l'écran.
         let rendu = ImageRenderer(content:
-            RecapCartePartage(carte: carte)
+            RecapCartePartage(carte: carte, pourExport: true)
                 .frame(width: 360)
                 .padding(Theme.spacingLG)
-                .background(Color.healthMapWarm)
+                .background { RecapFondPartage() }
         )
         rendu.scale = 3
         guard let image = rendu.uiImage else { return }
@@ -275,6 +287,21 @@ struct RecapView: View {
 }
 
 // MARK: - Partage
+
+/// Le fond de l'image partagée : le fond de verre de l'app, dessiné UNE fois
+/// (pas d'horloge, pas d'environnement : `ImageRenderer` rend hors écran).
+/// La base pâle est posée dessous en aplat : si le dessin des halos n'était
+/// pas rendu hors écran, l'image garderait un fond clair et non un vide.
+private struct RecapFondPartage: View {
+    var body: some View {
+        ZStack {
+            VerreTeinte.kiwi.palette.base.couleur
+            Canvas { contexte, taille in
+                VerreFond.peindre(&contexte, taille: taille, palette: VerreTeinte.kiwi.palette, temps: 0)
+            }
+        }
+    }
+}
 
 /// `UIImage` n'est pas `Identifiable` : on l'enveloppe pour `sheet(item:)`
 /// plutôt que d'étendre un type du système.
@@ -319,7 +346,8 @@ struct RecapListeView: View {
                 }
                 .padding(.vertical, Theme.spacingLG)
             }
-            .background(Color.healthMapWarm.ignoresSafeArea())
+            // Plus d'aplat : la feuille porte le verre (`.verreFeuille()`,
+            // posé par `RecapView` qui la présente).
             .navigationTitle("Ton bilan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

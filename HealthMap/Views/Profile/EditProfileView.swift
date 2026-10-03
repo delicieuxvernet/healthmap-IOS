@@ -7,6 +7,10 @@ import SwiftUI
 ///
 /// Pattern Apple Health : edit field-by-field en sheet, pas un gros formulaire.
 /// Respecte CLAUDE.md §2.4 (audit-a/b/c), §2.5 (non-modification hors scope).
+///
+/// Verre liquide (2 octobre 2026) : page poussée sur `VerrePageFond()`, cartes
+/// de verre (rayon 24), pastilles carrées de 30 pt comme sur l'onglet Réglages,
+/// actions en verre vert. Aucun champ, aucune valeur, aucune écriture ne change.
 struct EditProfileView: View {
     @EnvironmentObject var dashboardVM: DashboardViewModel
     @Environment(\.dismiss) private var dismiss
@@ -55,10 +59,14 @@ struct EditProfileView: View {
             }
         }
 
-        /// Refonte 23 août 2026 : les icônes de section sont neutres
-        /// (`secondaryLabel`), jamais colorées « pour décorer ».
-        var color: Color { .dsSecondaire }
+        /// Refonte 23 août 2026 : les icônes de section sont neutres, jamais
+        /// colorées « pour décorer ». Verre liquide : l'encre neutre d'une
+        /// pastille (`ReglagePastille`).
+        var color: Color { Verre.iconeNeutre }
     }
+
+    /// Retrait d'un filet sous une ligne à pastille : 16 + 30 + 12.
+    private static let retraitPastille: CGFloat = 58
 
     private var profile: UserProfile { dashboardVM.profile }
 
@@ -70,10 +78,10 @@ struct EditProfileView: View {
 
     var body: some View {
         ZStack {
-            Color.dsFond.ignoresSafeArea()
+            VerrePageFond()
 
             ScrollView {
-                VStack(spacing: Theme.spacingSM) {
+                VStack(spacing: DS.interCarte) {
                     // Toujours visible (même sur iPad où HealthKit est indisponible) pour
                     // identifier clairement la fonctionnalité Apple Santé — App Review 2.5.1.
                     appleHealthCard
@@ -99,8 +107,12 @@ struct EditProfileView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .animation(reduceMotion ? .none : .spring(response: 0.4, dampingFraction: 0.85), value: hasUnsavedChanges)
+            .animation(reduceMotion ? nil : Animation.kiwiFluide, value: hasUnsavedChanges)
         }
+        // Page poussée dans la pile des Réglages : la barre d'onglets reste
+        // au-dessus. Sans cette réserve, le bouton de sauvegarde collé en bas
+        // se retrouvait dessous, hors d'atteinte.
+        .kiwiTabBarBottomInset()
         .navigationTitle("Mon questionnaire")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -109,6 +121,7 @@ struct EditProfileView: View {
             }
         }
         .sheet(item: $editingField) { field in
+            // La feuille pose elle-même son fond de verre (`.verreFeuille()`).
             EditFieldSheet(
                 field: field,
                 currentValue: currentValueForField(field.id),
@@ -133,12 +146,12 @@ struct EditProfileView: View {
     // MARK: - Carte Apple Santé (liaison HealthKit)
     private var appleHealthCard: some View {
         VStack(spacing: 0) {
-            HStack(spacing: Theme.spacingSM) {
-                Image(systemName: "heart")
-                    .font(.system(size: 21, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .frame(width: 21)
+            HStack(spacing: 12) {
+                // Même règle que sur l'onglet : la pastille ne verdit que
+                // quand Apple Santé est relié.
+                ReglagePastille(symbole: "heart",
+                                fond: healthLinked ? Color.teinteKiwi.opacity(0.14) : Verre.remplissage,
+                                encre: healthLinked ? Color.teinteKiwiTexte : Verre.iconeNeutre)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Apple Santé")
@@ -160,21 +173,28 @@ struct EditProfileView: View {
                 Spacer()
 
                 if healthLinked {
-                    Button("Gérer") { showHealthManage = true }
-                        .font(.dsSousTitreFort)
-                        .foregroundStyle(Color.dsAccent)
-                        .buttonStyle(.dsPress)
+                    Button {
+                        showHealthManage = true
+                    } label: {
+                        Text("Gérer")
+                            .font(.dsSousTitreFort)
+                            .foregroundStyle(Color.dsAccent)
+                            // Un mot seul : la cible tactile fait 44 pt.
+                            .frame(minWidth: DS.cibleTactile, minHeight: DS.cibleTactile)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.dsPress)
                 }
             }
-            .padding(Theme.spacingMD)
+            .padding(DS.paddingCarte)
 
             if healthLinked {
-                Divider().padding(.horizontal, Theme.spacingMD)
+                DSSeparator(retrait: Self.retraitPastille)
                 VStack(spacing: 0) {
                     healthRow(icon: "figure.walk", label: "Activité", value: stepsDisplay(healthSnapshot))
-                    Divider().padding(.horizontal, Theme.spacingMD)
+                    DSSeparator(retrait: Self.retraitPastille)
                     healthRow(icon: "scalemass", label: "Poids", value: weightDisplay(healthSnapshot))
-                    Divider().padding(.horizontal, Theme.spacingMD)
+                    DSSeparator(retrait: Self.retraitPastille)
                     healthRow(icon: "moon.fill", label: "Sommeil", value: sleepDisplay(healthSnapshot))
                 }
             } else if HealthKitService.shared.isAvailable {
@@ -190,13 +210,16 @@ struct EditProfileView: View {
                     .font(.dsHeadline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: DS.hauteurBouton)
-                    .background(Capsule().fill(Color.dsAccent))
+                    .frame(minHeight: DS.hauteurBouton)
+                    .verrePrincipal()
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.dsPress)
                 .disabled(healthSyncing)
-                .padding(.horizontal, Theme.spacingMD)
-                .padding(.bottom, Theme.spacingMD)
+                .padding(.horizontal, DS.paddingCarte)
+                // Un peu plus d'air dessous : l'ombre verte du bouton tient
+                // dans la carte, qui rogne son contenu.
+                .padding(.bottom, DS.marge)
             } else {
                 // HealthKit indisponible (ex. iPad) : l'encart reste affiché avec sa
                 // description, on indique juste que la connexion se fait sur iPhone.
@@ -208,9 +231,13 @@ struct EditProfileView: View {
                 .foregroundStyle(Color.dsSecondaire)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.dsFond))
-                .padding(.horizontal, Theme.spacingMD)
-                .padding(.bottom, Theme.spacingMD)
+                // Tuile dans la carte : translucide, pour rester juste sur le verre.
+                .background(
+                    RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
+                        .fill(Verre.tuileInactive)
+                )
+                .padding(.horizontal, DS.paddingCarte)
+                .padding(.bottom, DS.paddingCarte)
             }
 
             if let note = healthNote {
@@ -219,14 +246,12 @@ struct EditProfileView: View {
                     .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
-                    .padding(.horizontal, Theme.spacingMD)
-                    .padding(.bottom, Theme.spacingMD)
+                    .padding(.horizontal, DS.paddingCarte)
+                    .padding(.bottom, DS.paddingCarte)
             }
         }
-        .background(Color.dsCarte)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-        // (ombre retirée, refonte 23 août 2026)
-        .padding(.horizontal, Theme.spacingLG)
+        .dsCard()
+        .padding(.horizontal, DS.marge)
         .confirmationDialog("Apple Santé", isPresented: $showHealthManage, titleVisibility: .visible) {
             Button("Délier Apple Santé", role: .destructive) { disconnectHealth() }
             Button("Annuler", role: .cancel) {}
@@ -236,21 +261,23 @@ struct EditProfileView: View {
     }
 
     private func healthRow(icon: String, label: String, value: String) -> some View {
-        HStack(spacing: Theme.spacingSM) {
+        HStack(spacing: 12) {
+            // L'icône s'aligne sur la pastille de l'en-tête (30 pt de large).
             Image(systemName: icon)
                 .font(.system(size: 17, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.dsSecondaire)
-                .frame(width: 21)
+                .foregroundStyle(Verre.iconeNeutre)
+                .frame(width: ReglageMetrique.pastille)
+                .accessibilityHidden(true)
             Text(label)
                 .font(.dsCorps)
+                .tracking(DSTracking.corps)
                 .foregroundStyle(Color.dsTexte)
             Spacer()
             Text(value)
                 .font(.dsValeurLigne)
                 .foregroundStyle(Color.dsSecondaire)
         }
-        .padding(.horizontal, Theme.spacingMD)
+        .padding(.horizontal, DS.paddingCarte)
         .padding(.vertical, 12)
     }
 
@@ -323,16 +350,12 @@ struct EditProfileView: View {
         VStack(spacing: 0) {
             // Header
             Button {
-                withAnimation(reduceMotion ? .none : .spring(response: 0.3)) {
+                withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
                     expandedSection = expandedSection == section ? nil : section
                 }
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: section.icon)
-                        .font(.system(size: 21, weight: .medium))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(section.color)
-                        .frame(width: 21)
+                    ReglagePastille(symbole: section.icon, encre: section.color)
 
                     Text(section.rawValue)
                         .font(.dsCorps)
@@ -345,35 +368,32 @@ struct EditProfileView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.dsTertiaire)
                         .rotationEffect(.degrees(expandedSection == section ? 90 : 0))
+                        .accessibilityHidden(true)
                 }
                 .padding(.horizontal, DS.paddingCarte)
-                .padding(.vertical, 14)
-                .frame(minHeight: DS.cibleTactile)
+                .padding(.vertical, 10)
+                .frame(minHeight: ReglageMetrique.hauteurLigne)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.dsPress)
 
             // Content
             if expandedSection == section {
-                Divider()
-                    .padding(.horizontal, Theme.spacingMD)
+                DSSeparator(retrait: Self.retraitPastille)
 
                 VStack(spacing: 0) {
                     let fields = fieldsForSection(section)
                     ForEach(Array(fields.enumerated()), id: \.element.id) { idx, field in
                         fieldRow(field)
                         if idx < fields.count - 1 {
-                            Divider()
-                                .padding(.horizontal, Theme.spacingMD)
+                            DSSeparator()
                         }
                     }
                 }
             }
         }
-        .background(Color.dsCarte)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-        // (ombre retirée, refonte 23 août 2026)
-        .padding(.horizontal, Theme.spacingLG)
+        .dsCard()
+        .padding(.horizontal, DS.marge)
     }
 
     // MARK: - Field Row (tap-able, ouvre EditFieldSheet)
@@ -431,23 +451,18 @@ struct EditProfileView: View {
             .font(.dsHeadline)
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: DS.hauteurBouton)
-            .background(Capsule().fill(Color.dsAccent))
+            .frame(minHeight: DS.hauteurBouton)
+            .verrePrincipal()
+            .contentShape(Capsule())
         }
         .buttonStyle(.dsPress)
         .disabled(isSaving || showSaved)
-        .padding(.horizontal, Theme.spacingLG)
+        .padding(.horizontal, DS.marge)
+        .padding(.top, Theme.spacingLG)
         .padding(.bottom, Theme.spacingMD)
-        .background(
-            LinearGradient(
-                colors: [Color.dsFond.opacity(0), Color.dsFond],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 60)
-            .offset(y: -60),
-            alignment: .top
-        )
+        // Le formulaire qui défile se fond dans un flou sous le bouton, au
+        // lieu de disparaître derrière un aplat.
+        .background { EditProfileBordBas() }
     }
 
     // MARK: - Save to Supabase
@@ -489,7 +504,7 @@ struct EditProfileView: View {
             originalProfile = dashboardVM.profile
 
             HapticService.shared.success()
-            withAnimation(reduceMotion ? .none : .spring(response: 0.4)) {
+            withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
                 showSaved = true
             }
             isSaving = false
@@ -505,7 +520,7 @@ struct EditProfileView: View {
             // Auto-hide "Sauvegardé" confirmation
             Task {
                 try? await Task.sleep(for: .seconds(2))
-                withAnimation(reduceMotion ? .none : .spring(response: 0.4)) {
+                withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
                     showSaved = false
                 }
             }
@@ -724,6 +739,39 @@ struct EditProfileView: View {
     private func friendlyLabel(_ fieldId: String, _ value: String) -> String {
         guard !value.isEmpty else { return "-" }
         return QuestionnaireSection.optionPairs(id: fieldId).first { $0.0 == value }?.1 ?? value
+    }
+}
+
+// MARK: - Bord bas flouté
+
+/// Le pendant bas de `VerreBordHaut`, sous le bouton de sauvegarde : un flou
+/// qui se lève de transparent à plein. Sous « Réduire la transparence », un
+/// dégradé opaque de la base pâle.
+private struct EditProfileBordBas: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduireTransparence
+
+    var body: some View {
+        ZStack {
+            if reduireTransparence {
+                Color.dsFond
+            } else {
+                Rectangle().fill(.ultraThinMaterial)
+            }
+        }
+        .mask {
+            LinearGradient(
+                stops: [
+                    Gradient.Stop(color: Color.black.opacity(0), location: 0),
+                    Gradient.Stop(color: Color.black, location: 0.4),
+                    Gradient.Stop(color: Color.black, location: 1),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .ignoresSafeArea(edges: .bottom)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

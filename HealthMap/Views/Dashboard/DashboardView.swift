@@ -47,7 +47,9 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                DSPageBackground(voile: false)
+                // Le Bilan complet est une page présentée en feuille : le fond
+                // de l'app, sous un voile de verre presque opaque.
+                VerrePageFond()
                 content
             }
             // Recharge le journal dès qu'un scan est persisté ailleurs (onglet
@@ -64,9 +66,8 @@ struct DashboardView: View {
             .kiwiNavigationBarBackground()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }
-                        .foregroundStyle(Color.dsAccent)
-                        .accessibilityLabel("Fermer")
+                    // Rond de verre clair, libellé VoiceOver « Fermer ».
+                    DSCloseButton { dismiss() }
                 }
             }
             .navigationDestination(isPresented: $showScoreDetail) {
@@ -486,26 +487,23 @@ struct DashboardView: View {
 }
 
 // MARK: - Staggered Appear (loi 17)
-/// Apparition des sections en léger stagger : fondu + petite montée, une
-/// seule courbe (`.healthMapSpring`), délai croissant par index. Reduce
-/// Motion → affichage immédiat sans animation.
+/// Apparition des sections en cascade : fondu de 0,4 s et remontée de 10 pt
+/// sur un ressort (`verreCascade`), 50 ms entre deux cartes — les délais de la
+/// maquette « Verre liquide » (0,08 + i × 0,05). Plafonné au 7ᵉ élément : le
+/// bas de la page ne se fait pas attendre. Sous « Réduire les animations »,
+/// le socle ne garde que le fondu.
 private struct StaggeredAppear: ViewModifier {
     let index: Int
     @State private var appeared = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var delai: Double { 0.08 + Double(min(max(index, 0), 6)) * 0.05 }
 
     func body(content: Content) -> some View {
         content
-            .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 10)
+            .verreCascade(appeared, delai: delai, decalage: 10)
             .onAppear {
-                if reduceMotion {
-                    appeared = true
-                } else {
-                    withAnimation(.healthMapSpring.delay(Double(index) * 0.04)) {
-                        appeared = true
-                    }
-                }
+                guard !appeared else { return }
+                appeared = true
             }
     }
 }
@@ -540,11 +538,14 @@ struct FullAnalysisLoadingView: View {
 
             VStack(spacing: Theme.spacingSM) {
                 Text("On analyse ton profil…")
-                    .font(Theme.headlineFont)
+                    .font(.dsSection)
+                    .tracking(DSTracking.section)
                     .foregroundStyle(Color.dsTexte)
+                    .multilineTextAlignment(.center)
 
                 Text(messages[messageIndex])
-                    .font(Theme.bodyFont)
+                    .font(.dsCorps)
+                    .tracking(DSTracking.corps)
                     .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -560,12 +561,14 @@ struct FullAnalysisLoadingView: View {
                 .animation(.easeInOut(duration: 0.4), value: progress)
 
             VStack(spacing: Theme.spacingSM) {
+                // Une étiquette, pas un bouton : le vert foncé du texte, sur
+                // la teinte kiwi à 12 %.
                 Text("Compte 2 à 3 minutes")
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Color.dsAccent)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 5)
-                    .background(Color.dsAccent.opacity(0.12), in: Capsule())
+                    .font(.dsLegende.weight(.semibold))
+                    .foregroundStyle(Color.teinteKiwiTexte)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.teinteKiwi.opacity(0.12), in: Capsule())
 
                 Text("Tu peux laisser l'app ouverte, on s'occupe de tout.")
                     .font(Theme.captionFont)

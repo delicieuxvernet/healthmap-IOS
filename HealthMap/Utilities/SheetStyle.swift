@@ -13,12 +13,14 @@ import SwiftUI
 /// ```
 extension View {
     /// Pour les sheets contenant du contenu riche (NutrientDetail, Paywall).
-    /// Supporte medium ET large, drag indicator visible, corner radius 28.
+    /// Supporte medium ET large, drag indicator visible, coins de 38 (verre).
+    /// Le FOND de verre se pose à part, avec `.verreFeuille()`, une fois que
+    /// le contenu de la feuille ne peint plus d'aplat opaque.
     func healthMapSheet(_ initialDetent: PresentationDetent = .large) -> some View {
         self
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
-            .presentationCornerRadius(28)
+            .presentationCornerRadius(Verre.rayonFeuille)
     }
 
     /// Pour les sheets d'action courte (ForgotPassword, confirmations).
@@ -27,7 +29,7 @@ extension View {
         self
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
-            .presentationCornerRadius(28)
+            .presentationCornerRadius(Verre.rayonFeuille)
     }
 
     /// Pour les sheets plein écran (Questionnaire édition, détails critiques).
@@ -36,7 +38,7 @@ extension View {
         self
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
-            .presentationCornerRadius(28)
+            .presentationCornerRadius(Verre.rayonFeuille)
     }
 
     /// Pour le questionnaire : plein écran, et le glissement vers le bas NE
@@ -48,7 +50,7 @@ extension View {
         self
             .presentationDetents([.large])
             .presentationDragIndicator(.hidden)
-            .presentationCornerRadius(28)
+            .presentationCornerRadius(Verre.rayonFeuille)
             .interactiveDismissDisabled()
     }
 }

@@ -23,13 +23,23 @@ import UIKit
 // Les tokens historiques (`Theme`, `Kiwio`, `Color.kiwi*`) restent en place
 // pour les écrans pas encore migrés ; ce fichier est la source de vérité des
 // écrans refondus et ne redéfinit aucun d'eux.
+//
+// ── Verre liquide (2 octobre 2026) ──────────────────────────────────────────
+// La maquette « Motion v3 - Verre liquide » remplace la règle 1 et la carte :
+// le fond est un dégradé qui respire et change de teinte avec l'onglet
+// (`VerreFond`), les cartes sont en verre dépoli de rayon 24, les boutons en
+// verre clair ou teinté vert, et chaque catégorie garde UNE couleur
+// (`Color.teinte…`). Les matières vivent dans `KiwiVerre.swift` ; les
+// composants ci-dessous (`.dsCard()`, `DSCapsuleButton`, `DSPageBackground`,
+// `DSCloseButton`) les consomment, donc tout écran qui passe par eux est en
+// verre sans rien changer. Les règles 2 et 3 tiennent toujours.
 
 enum DS {
 
     // MARK: Métriques
 
-    /// Rayon des cartes (Santé / Fitness).
-    static let rayonCarte: CGFloat = 14
+    /// Rayon des cartes en verre.
+    static let rayonCarte: CGFloat = Verre.rayonCarte
     /// Marge latérale de page.
     static let marge: CGFloat = 20
     /// Padding intérieur standard d'une carte.
@@ -104,8 +114,10 @@ enum DS {
 extension Color {
     // Neutres sémantiques (s'adaptent seuls au mode sombre et à l'accessibilité).
 
-    /// Fond groupé de page — `#F2F2F7` en clair.
-    static let dsFond = Color(uiColor: .systemGroupedBackground)
+    /// Base pâle du fond de verre (`#EEF2EC`). Un écran racine ne peint pas
+    /// cet aplat : il pose `DSPageBackground()`, le fond qui respire. La
+    /// couleur ne sert qu'aux surfaces qui doivent rester opaques.
+    static let dsFond = Color(hex: "EEF2EC")
     /// Surface d'une carte — blanc en clair.
     static let dsCarte = Color(uiColor: .secondarySystemGroupedBackground)
     /// Texte principal.
@@ -120,12 +132,9 @@ extension Color {
     static let dsTrait = Color(uiColor: .systemGray4)
     /// Fond d'un bouton circulaire neutre (fermer) — `#E5E5EA` en clair.
     static let dsBoutonNeutre = Color(uiColor: .systemGray5)
-    /// Piste inactive d'une jauge, pastille de l'onglet actif — `#EFEFF4`.
-    static let dsRemplissage = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor.tertiarySystemFill
-            : UIColor(red: 0xEF / 255, green: 0xEF / 255, blue: 0xF4 / 255, alpha: 1)
-    })
+    /// Piste inactive d'une jauge, pastille d'icône neutre —
+    /// `rgba(120,120,128,.12)` : translucide, pour rester juste sur le verre.
+    static let dsRemplissage = Verre.remplissage
     /// Disque du jour courant dans le semainier — `#1C1C1E`.
     static let dsEncre = Color(uiColor: UIColor { trait in
         trait.userInterfaceStyle == .dark ? UIColor.white : UIColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1E / 255, alpha: 1)
@@ -137,23 +146,29 @@ extension Color {
     static let dsAccent = Color.kiwiGreen
     /// Voile de marque (haut d'écran) — `#E9F2E2`, fondu vers le transparent.
     static let dsVoile = Color(hex: "E9F2E2")
-    /// Pastille de l'avatar (Réglages).
-    static let dsAccentPale = Color(hex: "E9F2E2")
+    /// Pastille de l'avatar (Réglages), pastille d'un conseil numéroté.
+    static let dsAccentPale = Color.teinteKiwiPale
 
     // Statut (jauges seulement).
 
     /// À combler.
     static let dsACombler = Color(hex: "FF3B30")
-    /// À renforcer.
-    static let dsARenforcer = Color(hex: "FF9500")
-    /// Anneau des calories, barre du jour hors cible.
-    static let dsCalories = Color(hex: "FF6B35")
+    /// Texte « à combler » posé sur fond clair : le rouge, assez dense pour
+    /// se lire en petit corps sur le verre (`#C0322A`).
+    static let dsAComblerTexte = Color(hex: "C0322A")
+    /// À renforcer — l'ambre de la palette (`#F1961D`).
+    static let dsARenforcer = Color.teinteVitamineD
+    /// Texte « à renforcer » posé sur fond clair (`#995600`).
+    static let dsARenforcerTexte = Color.teinteVitamineDTexte
+    /// Énergie : flamme, barre du jour hors cible (`#F07040`).
+    static let dsCalories = Color.teinteEnergie
 
-    // Macros : la couleur = le sens.
+    // Macros : la couleur = le sens (palette du verre).
 
-    static let dsProteines = Color(hex: "3B82F6")
-    static let dsGlucides = Color(hex: "34C759")
-    static let dsLipides = Color(hex: "FFCC00")
+    static let dsProteines = Color.teinteProteines
+    static let dsGlucides = Color.teinteGlucides
+    static let dsLipides = Color.teinteLipides
+    static let dsFibres = Color.teinteFibres
 
     /// Couleur de statut d'une part de besoin couverte (0-100). Même seuils
     /// que le reste de l'app : ≥ 60 couvert, ≥ 30 à renforcer, sinon à combler.
@@ -222,19 +237,18 @@ enum DSTracking {
     static let valeur24: CGFloat = -0.8
 }
 
-// MARK: - Carte (blanc posé sur gris, sans ombre ni bordure)
+// MARK: - Carte (verre dépoli posé sur le fond qui respire)
 
 struct DSCardStyle: ViewModifier {
     var rayon: CGFloat = DS.rayonCarte
     func body(content: Content) -> some View {
-        content
-            .background(Color.dsCarte)
-            .clipShape(RoundedRectangle(cornerRadius: rayon, style: .continuous))
+        content.verreCarte(rayon: rayon)
     }
 }
 
 extension View {
-    /// Carte du DS refonte : fond `dsCarte`, rayon 14 continu, AUCUNE ombre.
+    /// Carte du DS : verre dépoli (blanc 80 → 58 %), liseré blanc intérieur,
+    /// rayon 24 continu, ombre douce découpée.
     func dsCard(rayon: CGFloat = DS.rayonCarte) -> some View {
         modifier(DSCardStyle(rayon: rayon))
     }
@@ -279,14 +293,13 @@ struct DSBrandWash: View {
     }
 }
 
-/// Fond complet d'un onglet refondu : gris groupé + voile de marque.
+/// Fond complet d'une page : le fond de verre qui respire (`VerreFond`), à la
+/// teinte de l'onglet courant. Le paramètre `voile` reste pour les appelants ;
+/// le voile de marque n'est plus rendu (le fond porte déjà la teinte).
 struct DSPageBackground: View {
     var voile: Bool = true
     var body: some View {
-        ZStack {
-            Color.dsFond.ignoresSafeArea()
-            if voile { DSBrandWash() }
-        }
+        VerreFond()
     }
 }
 
@@ -404,7 +417,7 @@ struct DSRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.dsRemplissage, lineWidth: epaisseur)
+                .stroke(Verre.pisteAnneau, lineWidth: epaisseur)
             Circle()
                 .trim(from: 0, to: remplie ? cible : 0)
                 .stroke(couleur, style: StrokeStyle(lineWidth: epaisseur, lineCap: .round))
@@ -423,11 +436,16 @@ struct DSRing: View {
     }
 }
 
-// MARK: - Bouton capsule (50 pt, vert, texte 17 / 600)
+// MARK: - Bouton capsule (50 pt, verre vert, texte 17 / 600)
 
 struct DSCapsuleButton: View {
     let titre: String
     var chargement: Bool = false
+    /// 50 pt par défaut ; l'action principale d'une feuille fait 54
+    /// (`Verre.hauteurAction`).
+    var hauteur: CGFloat = DS.hauteurBouton
+    /// Reflet périodique de la maquette, pour l'action qui conclut une feuille.
+    var brillance: Bool = false
     let action: () -> Void
 
     var body: some View {
@@ -443,8 +461,14 @@ struct DSCapsuleButton: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: DS.hauteurBouton)
-            .background(Capsule().fill(Color.dsAccent))
+            .frame(height: hauteur)
+            .background {
+                // Le reflet passe SOUS le libellé, comme sur la maquette.
+                if brillance && !chargement {
+                    Color.clear.verreBrillance()
+                }
+            }
+            .verrePrincipal()
             .contentShape(Capsule())
         }
         .buttonStyle(.dsPress)
@@ -548,17 +572,17 @@ extension DSRow where Accessoire == DSChevron {
     }
 }
 
-// MARK: - Bouton fermer circulaire (32 pt)
+// MARK: - Bouton fermer circulaire (36 pt, verre clair)
 
 struct DSCloseButton: View {
     let action: () -> Void
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color.dsSecondaire)
-                .frame(width: 32, height: 32)
-                .background(Circle().fill(Color.dsBoutonNeutre))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Verre.iconeNeutre)
+                .frame(width: 36, height: 36)
+                .verreClair(Circle())
                 .frame(width: DS.cibleTactile, height: DS.cibleTactile)
                 .contentShape(Circle())
         }

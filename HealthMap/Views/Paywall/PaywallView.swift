@@ -6,6 +6,14 @@ import RevenueCat
 // (annuelle mise en avant, hebdomadaire) pilotées par l'offering courante
 // RevenueCat. Les prix et l'essai gratuit sont lus depuis StoreKit —
 // jamais codés en dur, ils suivent App Store Connect.
+//
+// Verre liquide (2 octobre 2026) : la feuille Premium de la maquette « Motion
+// v3 ». Feuille de verre presque blanche (coins de 38), la mascotte de 84 pt
+// qui éclot sur son halo tournant, « Kiwio Premium » en vert foncé, les
+// bénéfices en cascade (pastilles teintées), l'action principale en verre vert
+// de 54 pt avec son reflet, la mention de prix, « Plus tard » en vert. Seule
+// la présentation change : formules, prix, essai, mentions d'abonnement,
+// code promo, restauration et liens sont ceux d'avant, lus aux mêmes endroits.
 /// Une formule affichable par le paywall : soit un package de l'offering
 /// RevenueCat, soit un produit lu DIRECTEMENT depuis StoreKit (repli quand
 /// l'offering est vide ou incomplète). Le paywall ne manipule que ce type, ce
@@ -59,6 +67,17 @@ struct PaywallView: View {
     /// Durée max d'attente des offerings avant de basculer en état d'échec.
     private static let offeringsTimeout: Duration = .seconds(10)
 
+    /// La feuille est installée : la mascotte éclot, le contenu suit en
+    /// cascade (délais de la maquette : 0,05 · 0,12 · 0,22 + 0,06 par ligne ·
+    /// 0,42).
+    @State private var revele = false
+
+    /// Titre de la feuille : 24 / 700, qui suit la taille de texte choisie.
+    @ScaledMetric(relativeTo: .title2) private var tailleTitre: CGFloat = 24
+
+    /// Marge latérale de la feuille (maquette : 24).
+    private static let marge: CGFloat = 24
+
     init(source: String = "generic") {
         self.source = source
     }
@@ -87,36 +106,37 @@ struct PaywallView: View {
     private var shortPlan: PlanOption? { weeklyPlan }
 
     var body: some View {
-        ZStack {
-            // Refonte 23 août 2026 : fond neutre, ton calme, sans capitales ni
-            // compte à rebours (§3 du document).
-            Color.dsFond
-                .ignoresSafeArea()
+        // Ton calme, sans capitales ni compte à rebours (refonte du 23 août
+        // 2026). Aucun aplat en fond : la feuille est en verre (`verreFeuille`).
+        ScrollView {
+            VStack(spacing: 0) {
+                embleme
+                    .padding(.top, 39)
 
-            ScrollView {
-                VStack(spacing: Theme.spacingMD) {
-                    closeRow
-                    header
-                    featureList
+                header
+                    .padding(.top, 16)
+                    .verreCascade(revele, delai: 0.12, decalage: 10)
 
-                    if annualPlan == nil && shortPlan == nil {
-                        if offeringsFailed {
-                            offeringsErrorState
-                        } else {
-                            loadingState
-                        }
-                    } else {
-                        planCards
-                        ctaButton
-                    }
+                featureList
+                    .padding(.top, 20)
 
-                    footerLinks
-                }
-                .padding(.bottom, Theme.spacingMD)
+                achat
+                    .verreCascade(revele, delai: 0.42)
             }
+            .padding(.horizontal, Self.marge)
+            .padding(.bottom, Theme.spacingMD)
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .topTrailing) { closeButton }
         }
+        .verreFeuille()
         .task {
             await loadOfferingsWithTimeout()
+        }
+        .task {
+            // La maquette laisse la feuille s'installer 200 ms avant de jouer
+            // l'éclosion et la cascade.
+            try? await Task.sleep(for: .milliseconds(200))
+            revele = true
         }
         .onAppear {
             AnalyticsService.shared.track(.paywallShown, properties: ["source": source])
@@ -157,80 +177,80 @@ struct PaywallView: View {
 
     // MARK: - Header
 
-    private var closeRow: some View {
-        HStack {
-            Spacer()
-            Button {
-                AnalyticsService.shared.track(.paywallDismissed, properties: [
-                    "source": source,
-                    "outcome": "closed",
-                ])
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.dsSecondaire)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color.dsBoutonNeutre))
-                    // Zone tactile ≥ 44 pt (HIG).
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.dsPress)
-            .accessibilityLabel("Fermer")
-        }
-        .padding(.horizontal, Theme.spacingMD)
-        .padding(.top, Theme.spacingSM)
+    /// Ferme la feuille sans achat (croix ou « Plus tard »).
+    private func fermer() {
+        AnalyticsService.shared.track(.paywallDismissed, properties: [
+            "source": source,
+            "outcome": "closed",
+        ])
+        dismiss()
     }
 
+    /// La croix : un rond de verre, dans le coin de la feuille. Elle défile
+    /// avec le contenu, comme avant.
+    private var closeButton: some View {
+        DSCloseButton { fermer() }
+            .padding(.top, Theme.spacingSM)
+            .padding(.trailing, 12)
+    }
+
+    /// La mascotte de 84 pt sur son halo tournant (il déborde de 14) : elle
+    /// éclot de 0,4 à 1 sur un ressort vif. Immobile, sans rebond, sous
+    /// « Réduire les animations » (le socle s'en charge).
+    private var embleme: some View {
+        ZStack {
+            KiwiMascotteHalo()
+            KiwiMascotte(animee: true)
+        }
+        .frame(width: 84, height: 84)
+        .verreSurgir(revele, delai: 0.05, depart: 0.4)
+        .accessibilityHidden(true)
+    }
+
+    /// « Kiwio Premium » en vert foncé (13 / 700), puis la promesse en titre
+    /// (24 / 700). Les mots sont ceux d'avant ; seule la coupe des lignes suit
+    /// les virgules, pour qu'un titre de 24 ne laisse pas un mot seul.
     private var header: some View {
-        VStack(spacing: Theme.spacingSM) {
-            KiwiSigne(taille: 56)
-
+        VStack(spacing: 4) {
             Text("Kiwio Premium")
-                .font(.dsGrandTitre)
-                .tracking(DSTracking.grandTitre)
-                .foregroundStyle(Color.dsTexte)
+                .font(.system(.footnote, design: .default).weight(.bold))
+                .foregroundStyle(Color.teinteKiwiTexte)
 
-            Text("Ton bilan complet, tes solutions\net tes scans, sans limite.")
-                .font(.dsSousTitre)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsSecondaire)
+            Text("Ton bilan complet,\ntes solutions et tes scans,\nsans limite.")
+                .font(.system(size: tailleTitre, weight: .bold))
+                .tracking(-0.6)
+                .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
         }
+        .frame(maxWidth: .infinity)
     }
 
     /// Ce que Premium change, avec le contraste gratuit là où il existe :
     /// « 30 scans par jour » ne dit rien tant qu'on ignore qu'on en a 3.
+    /// Une pastille teintée par ligne (symptômes, ambre, bleu, puis violet),
+    /// les lignes arrivent en cascade.
     private var featureList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            featureRow("camera", "30 scans repas par jour", "3 par jour en gratuit")
-            featureRow("chart.xyaxis.line", "Tes tendances détaillées", "semaine après semaine")
-            featureRow("testtube.2", "Le pourquoi de chaque apport", "et le geste qui le comble")
-            featureRow("map", "Ton plan complet, pas à pas", "compléments et solutions")
+            featureRow(0, "camera", Color.teinteSymptomes, "30 scans repas par jour", "3 par jour en gratuit")
+            featureRow(1, "chart.xyaxis.line", Color.teinteVitamineD, "Tes tendances détaillées", "semaine après semaine")
+            featureRow(2, "testtube.2", Color.teinteProteines, "Le pourquoi de chaque apport", "et le geste qui le comble")
+            featureRow(3, "map", Color.teinteIode, "Ton plan complet, pas à pas", "compléments et solutions")
         }
-        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .dsCard()
-        .padding(.horizontal, DS.marge)
     }
 
     /// Une seule icône par ligne : la coche à gauche ET le symbole à droite
     /// faisaient doublon, pour deux fois plus de bruit visuel.
-    private func featureRow(_ icon: String, _ title: String, _ detail: String) -> some View {
-        HStack(spacing: 11) {
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.dsAccent)
-                .frame(width: 24)
-                .accessibilityHidden(true)
+    private func featureRow(_ rang: Int, _ icon: String, _ teinte: Color, _ title: String, _ detail: String) -> some View {
+        HStack(spacing: 12) {
+            VerrePastilleIcone(symbole: icon, teinte: teinte, taille: 36, tailleIcone: 19)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.dsCorps)
-                    .tracking(DSTracking.corps)
+                    .font(.dsSousTitreMoyen)
+                    .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
                 Text(detail)
                     .font(.dsLegende)
@@ -242,6 +262,41 @@ struct PaywallView: View {
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
+        .verreCascade(revele, delai: 0.22 + Double(rang) * 0.06)
+    }
+
+    /// Le bas de la feuille : les formules et l'achat (ou l'attente, ou
+    /// l'échec), « Plus tard », puis le code promo, la restauration et les
+    /// liens. Un seul bloc : il arrive d'un trait, en dernier.
+    private var achat: some View {
+        VStack(spacing: 0) {
+            if annualPlan == nil && shortPlan == nil {
+                if offeringsFailed {
+                    offeringsErrorState
+                } else {
+                    loadingState
+                }
+            } else {
+                planCards
+                ctaButton
+            }
+
+            Button {
+                fermer()
+            } label: {
+                Text("Plus tard")
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsAccent)
+                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.dsPress)
+            .padding(.top, 2)
+
+            footerLinks
+                .padding(.top, Theme.spacingSM)
+        }
     }
 
     // MARK: - Plans
@@ -258,7 +313,7 @@ struct PaywallView: View {
     }
 
     private var planCards: some View {
-        VStack(spacing: Theme.spacingMD) {
+        VStack(spacing: DS.interCarte) {
             if let annual = annualPlan {
                 planCard(
                     plan: annual,
@@ -279,16 +334,16 @@ struct PaywallView: View {
                 )
             }
         }
-        .padding(.horizontal, DS.marge)
-        .padding(.top, Theme.spacingSM)
+        .padding(.top, 24)
     }
 
     /// Une carte de formule. Le PRIX est l'information principale : la durée
     /// seule ne se compare pas, et c'est le prix qu'on vient chercher ici.
     /// Le badge est posé à GAUCHE — à droite il chevauchait la coche de
-    /// sélection.
+    /// sélection. Carte de verre ; la formule choisie porte un liseré vert.
     private func planCard(plan: PlanOption, title: String, detail: String?, badge: String?) -> some View {
         let isSelected = selectedPlan?.id == plan.id
+        let forme = RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
 
         return Button {
             selectedPlan = plan
@@ -337,12 +392,12 @@ struct PaywallView: View {
                 }
             }
             .padding(DS.paddingCarte)
-            .background(Color.dsCarte)
-            .clipShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+            .dsCard()
             .overlay(
-                RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
-                    .strokeBorder(isSelected ? Color.dsAccent : Color.clear, lineWidth: 1.5)
+                forme.strokeBorder(isSelected ? Color.dsAccent : Color.clear, lineWidth: 1.5)
             )
+            // Le verre ne capte pas les touches : toute la carte reste la cible.
+            .contentShape(forme)
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel([title, priceLabel(for: plan), detail, badge].compactMap { $0 }.joined(separator: ", "))
@@ -351,39 +406,23 @@ struct PaywallView: View {
 
     // MARK: - CTA
 
+    /// L'action principale en verre vert (54 pt, reflet qui passe), puis la
+    /// mention de prix et d'abonnement, inchangée.
     private var ctaButton: some View {
         VStack(spacing: Theme.spacingSM) {
-            Button {
+            PremiumAction(titre: ctaTitle, chargement: isPurchasing) {
                 Task { await purchaseSelected() }
-            } label: {
-                Group {
-                    if isPurchasing {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Text(ctaTitle)
-                            .font(.dsHeadline)
-                            .tracking(DSTracking.corps)
-                    }
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: DS.hauteurBouton)
-                .background(Capsule().fill(Color.dsAccent))
-                .contentShape(Capsule())
             }
-            .buttonStyle(.dsPress)
             .disabled(isPurchasing || selectedPlan == nil)
-            .padding(.horizontal, DS.marge)
 
             Text(ctaNote)
                 .font(.dsLegende)
                 .tracking(DSTracking.legende)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, DS.marge)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.top, Theme.spacingSM)
+        .padding(.top, 24)
     }
 
     private var loadingState: some View {
@@ -418,8 +457,9 @@ struct PaywallView: View {
                     .font(.dsSousTitreFort)
                     .foregroundStyle(.white)
                     .frame(minWidth: 140)
-                    .frame(height: 44)
-                    .background(Capsule().fill(Color.dsAccent))
+                    .frame(minHeight: 44)
+                    .verrePrincipal()
+                    .contentShape(Capsule())
             }
             .buttonStyle(.dsPress)
         }
@@ -451,7 +491,6 @@ struct PaywallView: View {
             }
             .buttonStyle(.dsPress)
             .disabled(isRedeemingPromo)
-            .padding(.horizontal, DS.marge)
             .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
 
             if let promoNotice {
@@ -460,25 +499,29 @@ struct PaywallView: View {
                     .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, Theme.spacingLG)
                     .accessibilityAddTraits(.isStaticText)
             }
 
             Button {
                 Task { await restore() }
             } label: {
-                if isRestoring {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
-                    Text("Restaurer mes achats")
-                        .font(.dsLegende)
-                        .underline()
-                        .foregroundStyle(Color.dsSecondaire)
+                // La hauteur de 44 pt est DANS le libellé : posée sur le
+                // bouton, elle réservait la place sans agrandir la cible.
+                Group {
+                    if isRestoring {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Text("Restaurer mes achats")
+                            .font(.dsLegende)
+                            .underline()
+                            .foregroundStyle(Color.dsSecondaire)
+                    }
                 }
+                .frame(minHeight: DS.cibleTactile)
+                .contentShape(Rectangle())
             }
             .disabled(isRestoring)
-            .frame(minHeight: 44)
             .accessibilityHint("Restaure un abonnement Premium acheté précédemment avec ce même identifiant Apple.")
 
             HStack(spacing: 8) {
@@ -845,63 +888,47 @@ private struct PremiumPurchaseSuccessView: View {
                             .foregroundStyle(Color.dsTexte)
                             .padding(.horizontal, Theme.spacingSM)
                             .padding(.vertical, 5)
-                            .background(Capsule().fill(Color.dsRemplissage))
+                            .background(Capsule().fill(Verre.remplissage))
                             .padding(.top, Theme.spacingXS)
                     }
                 }
 
                 VStack(spacing: 0) {
                     benefitRow(icon: "camera.fill", title: "Jusqu’à 30 scans par jour")
-                    Divider().padding(.leading, 44)
+                    DSSeparator(retrait: 36)
                     benefitRow(icon: "chart.xyaxis.line", title: "Tendances détaillées de tes apports")
-                    Divider().padding(.leading, 44)
+                    DSSeparator(retrait: 36)
                     benefitRow(icon: "list.bullet.clipboard.fill", title: "Rituels et solutions détaillés")
                 }
                 .padding(.horizontal, Theme.spacingMD)
-                .background(
-                    Color.dsCarte,
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                )
+                .dsCard()
 
-                Button(action: onExplore) {
-                    Text("Découvrir mes avantages")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(
-                            Color.dsAccent,
-                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        )
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.healthMapPressed)
+                // Verre liquide : l'action principale en verre vert de 54 pt,
+                // la sortie secondaire en verre clair.
+                PremiumAction(titre: "Découvrir mes avantages", action: onExplore)
 
                 Button(action: onBilan) {
                     Text("Continuer sur mon bilan")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.dsSousTitreFort)
                         .foregroundStyle(Color.dsTexte)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.dsAccent.opacity(0.18), lineWidth: 1)
-                        )
-                        .contentShape(Rectangle())
+                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                        .verreClair()
+                        .contentShape(Capsule())
                 }
-                .buttonStyle(.healthMapPressed)
+                .buttonStyle(.dsPress)
             }
             .padding(.horizontal, Theme.spacingLG)
             .padding(.top, Theme.spacingLG)
             .padding(.bottom, Theme.spacingMD)
             .containerRelativeFrame(.horizontal)
         }
-        .background(Color.healthMapWarm.ignoresSafeArea())
+        .verreFeuille()
         .onAppear {
             HapticService.shared.success()
             if reduceMotion {
                 revealed = true
             } else {
-                withAnimation(.healthMapSpring) {
+                withAnimation(.kiwiFluide) {
                     revealed = true
                 }
             }

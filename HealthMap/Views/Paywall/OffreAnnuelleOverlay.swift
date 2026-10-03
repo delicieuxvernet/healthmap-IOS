@@ -8,6 +8,12 @@ import SwiftUI
 // referme. Ton calme, sans capitales ni compte à rebours, comme le paywall.
 //
 // Surcouche de la racine, pas une `.sheet` : voir `OffreCentre`.
+//
+// Verre liquide (2 octobre 2026) : même grammaire que la feuille Premium de la
+// maquette — voile vert-noir flouté, feuille de verre presque blanche aux
+// coins de 38, titre 24 / 700, action principale en verre vert de 54 pt avec
+// son reflet, « Plus tard » en vert. La mascotte, elle, reste réservée à la
+// feuille Premium et à Réglages.
 
 struct OffreAnnuelleOverlay: View {
     let offre: OffrePremium
@@ -19,19 +25,21 @@ struct OffreAnnuelleOverlay: View {
     @State private var montee = false
     @State private var ferme = false
 
+    /// Titre de la feuille : 24 / 700, qui suit la taille de texte choisie.
+    @ScaledMetric(relativeTo: .title2) private var tailleTitre: CGFloat = 24
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color.black.opacity(montee ? 0.28 : 0)
-                .ignoresSafeArea()
+            VerreVoile()
+                .opacity(montee ? 1 : 0)
                 .onTapGesture { fermer(puis: onFermer) }
-                .accessibilityHidden(true)
 
             if montee {
                 carte
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom))
             }
         }
-        .animation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.86), value: montee)
+        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: montee)
         .onAppear { montee = true }
         .accessibilityAddTraits(.isModal)
     }
@@ -39,27 +47,27 @@ struct OffreAnnuelleOverlay: View {
     private var carte: some View {
         VStack(alignment: .leading, spacing: 0) {
             Capsule()
-                .fill(Color.dsTrait)
+                .fill(Color.dsSecondaire.opacity(0.4))
                 .frame(width: 36, height: 5)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 10)
+                .padding(.top, 12)
                 .accessibilityHidden(true)
 
             HStack {
                 Text("Premium")
-                    .font(.dsLegendeMoyenne)
-                    .foregroundStyle(Color.dsAccent)
+                    .font(.system(.footnote, design: .default).weight(.bold))
+                    .foregroundStyle(Color.teinteKiwiTexte)
                     .padding(.horizontal, 11)
                     .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.dsAccent.opacity(0.12)))
+                    .background(Capsule().fill(Color.teinteKiwi.opacity(0.12)))
                 Spacer(minLength: 8)
                 DSCloseButton { fermer(puis: onFermer) }
             }
             .padding(.top, 8)
 
             Text(offre.titre)
-                .font(.dsSection)
-                .tracking(DSTracking.section)
+                .font(.system(size: tailleTitre, weight: .bold))
+                .tracking(-0.6)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
@@ -68,34 +76,49 @@ struct OffreAnnuelleOverlay: View {
             Text(offre.detail)
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
+                .lineSpacing(2)
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 8)
+                .padding(.top, 6)
 
-            DSCapsuleButton(titre: "Voir l'offre") { fermer(puis: onVoir) }
-                .padding(.top, 20)
+            PremiumAction(titre: "Voir l'offre") { fermer(puis: onVoir) }
+                .padding(.top, 24)
 
             Button {
                 fermer(puis: onFermer)
             } label: {
                 Text("Plus tard")
-                    .font(.dsSousTitreMoyen)
+                    .font(.dsSousTitre)
                     .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
+                    .foregroundStyle(Color.dsAccent)
                     .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.dsPress)
-            .padding(.top, 6)
+            .padding(.top, 2)
         }
-        .padding(.horizontal, DS.marge)
-        .padding(.bottom, 24)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 18)
         .frame(maxWidth: .infinity)
-        .background(alignment: .top) {
-            UnevenRoundedRectangle(topLeadingRadius: 34, topTrailingRadius: 34, style: .continuous)
-                .fill(Color.dsFond)
-                .ignoresSafeArea(edges: .bottom)
+        .background(alignment: .top) { fond }
+    }
+
+    /// Le verre de la feuille, découpé aux coins de 38. Le fond du socle ne
+    /// capte pas les touches : la couche du dessous le fait, sinon un appui
+    /// dans la carte traverserait jusqu'au voile et la refermerait.
+    private var fond: some View {
+        ZStack {
+            Color.white.opacity(0.001)
+            VerreFeuilleFond()
         }
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: Verre.rayonFeuille,
+                topTrailingRadius: Verre.rayonFeuille,
+                style: .continuous
+            )
+        )
+        .ignoresSafeArea(edges: .bottom)
     }
 
     private func fermer(puis suite: @escaping () -> Void) {
