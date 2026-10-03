@@ -122,7 +122,9 @@ final class KiwiSigneTests: XCTestCase {
     }
 
     /// L'icône Apple est le signe « sur-vert » : 1024 px, opaque, fond chair,
-    /// cœur au centre, halo autour.
+    /// cœur au centre, halo autour. Zoomé à 1,75 (3 oct. 2026, demande
+    /// d'Arthur : « le kiwi est trop loin ») : 12,6 px par unité au lieu de
+    /// 7,2, le kiwi couvre 78 % de la largeur.
     func testLIconeEstLeSigneSurVert() throws {
         let icone = try XCTUnwrap(image(catalogue.appendingPathComponent("AppIcon.appiconset/AppIcon.png")))
         XCTAssertEqual(icone.width, 1024)
@@ -131,8 +133,8 @@ final class KiwiSigneTests: XCTestCase {
                       "l'App Store refuse une icône avec transparence")
         XCTAssertTrue(proche(pixel(icone, x: 8, y: 8), KiwiMarque.hexChair), "fond")
         XCTAssertTrue(proche(pixel(icone, x: 512, y: 512), KiwiMarque.hexCoeur), "cœur")
-        // Entre le cœur (r 12,8 → 92 px) et le halo (r 22,5 → 162 px).
-        XCTAssertTrue(proche(pixel(icone, x: 512 + 130, y: 512), KiwiMarque.hexHalo), "halo")
+        // Entre le cœur (r 12,8 → 161 px) et le halo (r 22,5 → 284 px).
+        XCTAssertTrue(proche(pixel(icone, x: 512 + 220, y: 512), KiwiMarque.hexHalo), "halo")
     }
 
     /// L'écran de lancement statique affiche le signe, en trois résolutions.
