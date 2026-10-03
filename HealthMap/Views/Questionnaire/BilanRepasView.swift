@@ -10,16 +10,20 @@ import SwiftUI
 // semaine`. Les repas sont une façon de ranger les aliments (`RepasCatalog`),
 // pas une donnée : un aliment coché au petit déj l'est aussi au soir.
 //
-// Verre liquide (2 octobre 2026) : un aliment est une tuile de verre clair,
-// verte une fois coché ; les quatre repas sont une bascule de verre dont le
-// curseur glisse ; la barre des trois mots est une carte de verre qui flotte
-// au-dessus de la grille ; le catalogue complet s'ouvre sur une feuille de verre.
+// Questionnaire ludique (3 octobre 2026, maquette validée par Arthur) :
+//   - « remplis ta journée » : la frise des quatre repas, avec ce qu'on a
+//     coché à chacun, et le ciel qui passe du matin au soir (`teinteVerre`) ;
+//   - une assiette en dix parts qui se remplit (`BilanAssiette`), à la place
+//     des dix petites jauges, et une bulle qui dit ce que l'aliment apporte ;
+//   - les trois mots s'ouvrent SOUS la rangée de l'aliment touché
+//     (`BilanGrilleAliments`) : plus de barre flottante qui cache la grille.
 
 struct BilanRepasView: View {
     let repas: RepasBilan
 
     @EnvironmentObject var viewModel: QuestionnaireViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var tailleDeTexte
 
     /// L'aliment dont on règle la quantité.
     @State private var selection: String?
@@ -34,17 +38,14 @@ struct BilanRepasView: View {
         RepasCatalog.grille(repas, caddie: caddie, regime: regime)
     }
 
-    /// L'aliment en cours de réglage, s'il est toujours coché.
-    private var enReglage: GroceryItem? {
-        guard let selection, viewModel.niveau(de: selection) != nil else { return nil }
-        return GroceryCatalog.item(id: selection)
+    /// Nombre d'aliments cochés, tous repas confondus.
+    private var coches: Int {
+        caddie.filter { $0.value > 0 }.count
     }
 
-    @Environment(\.dynamicTypeSize) private var tailleDeTexte
-
-    /// Le titre, les jauges et les onglets restent en place pendant qu'on
-    /// parcourt les aliments : c'est en voyant la jauge se remplir qu'on a
-    /// envie de cocher le suivant. Aux très grandes tailles de texte, ils
+    /// La frise, l'assiette et sa bulle restent en place pendant qu'on
+    /// parcourt les aliments : c'est en voyant l'assiette se remplir qu'on a
+    /// envie de cocher le suivant. Aux très grandes tailles de texte, elles
     /// défilent avec le reste pour laisser la place à la grille.
     private var enTeteFixe: Bool { !tailleDeTexte.isAccessibilitySize }
 
@@ -53,11 +54,11 @@ struct BilanRepasView: View {
             if enTeteFixe {
                 enTete
                     .padding(.horizontal, DS.marge)
-                    .padding(.top, 10)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
             }
             aliments
         }
-        .animation(reduceMotion ? nil : Animation.kiwiVif, value: selection)
         .onChange(of: repas) { _, _ in selection = nil }
         .sheet(isPresented: $catalogueOuvert) {
             BilanCatalogueView(repas: repas)
@@ -71,21 +72,67 @@ struct BilanRepasView: View {
     }
 
     private var enTete: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            BilanTitre(titre: repas.titre, pourquoi: "Coche ce que tu prends d'habitude.")
-                .padding(.bottom, 10)
-
-            BilanJauges(jauges: PistesBilan.jauges(profil: viewModel.profile))
-
-            // La zone tactile des onglets déborde déjà de 3 points : 5 + 3
-            // laissent 8 points d'air autour de la piste.
+        VStack(alignment: .leading, spacing: 10) {
             onglets
-                .padding(.vertical, 5)
+            HStack(alignment: .center, spacing: 10) {
+                BilanAssiette(jauges: PistesBilan.jauges(profil: viewModel.profile), nombre: coches)
+                bulle
+            }
+            // La bulle se renouvelle avec un petit rebond à chaque phrase.
+            .animation(reduceMotion ? Animation.kiwiSoft : Animation.kiwiRebond, value: message)
         }
         // L'écran reste en place d'un repas à l'autre : la cascade ne se joue
         // qu'à l'arrivée sur le premier.
         .bilanCascade(0)
     }
+
+    // MARK: La bulle de l'assiette
+
+    private var bulle: some View {
+        Text(message)
+            .font(.dsSousTitre)
+            .tracking(DSTracking.sousTitre)
+            .foregroundStyle(Color.dsTexte)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .verre(.carte, forme: BilanKiwi.bulle)
+            .id(message)
+            .transition(
+                reduceMotion
+                    ? AnyTransition.opacity
+                    : AnyTransition.scale(scale: 0.94, anchor: .leading).combined(with: .opacity)
+            )
+    }
+
+    /// Ce que dit la bulle : ce que l'aliment qu'on règle apporte, sinon où
+    /// en est l'assiette.
+    private var message: String {
+        if let selection, viewModel.niveau(de: selection) != nil, let aliment = GroceryCatalog.item(id: selection) {
+            let apports = aliment.nutrients.compactMap { NutrientID(rawValue: $0.rawValue) }
+            let nom = RepasCatalog.nomCourt(aliment)
+            guard !apports.isEmpty else { return "\(aliment.emoji) \(nom) : noté, dans ton assiette." }
+            let possessifs = apports.prefix(3).map(PistesBilan.possessif)
+            return "\(aliment.emoji) \(nom) : \(Self.liste(possessifs)) en \(possessifs.count > 1 ? "profitent" : "profite")."
+        }
+        if coches == 0 {
+            return repas == .soir
+                ? "Tu n'as rien coché : ton bilan se fera sans ton assiette, il sera moins précis."
+                : "\(repas.titre) : touche ce que tu prends d'habitude, je remplis l'assiette."
+        }
+        let aliments = coches == 1 ? "1 aliment" : "\(coches) aliments"
+        return "\(aliments) dans ton assiette. \(repas.titre), qu'est-ce que tu prends ?"
+    }
+
+    /// « a », « a et b », « a, b et c ».
+    private static func liste(_ mots: [String]) -> String {
+        guard let dernier = mots.last else { return "" }
+        guard mots.count > 1 else { return dernier }
+        return mots.dropLast().joined(separator: ", ") + " et " + dernier
+    }
+
+    // MARK: La grille
 
     private var aliments: some View {
         ScrollViewReader { defilement in
@@ -94,20 +141,11 @@ struct BilanRepasView: View {
                     if !enTeteFixe {
                         enTete
                             .padding(.top, 10)
+                            .padding(.bottom, 10)
                     }
 
-                    BilanGrilleEgale(elements: grille) { aliment in
-                        BilanTuileAliment(
-                            emoji: aliment.emoji,
-                            nom: RepasCatalog.nomCourt(aliment),
-                            niveau: viewModel.niveau(de: aliment.id),
-                            enReglage: selection == aliment.id
-                        ) {
-                            toucher(aliment.id)
-                        }
-                        .id(aliment.id)
-                    }
-                    .bilanCascade(1)
+                    BilanGrilleAliments(aliments: grille, selection: $selection)
+                        .bilanCascade(1)
 
                     Button {
                         HapticService.shared.tap()
@@ -118,7 +156,7 @@ struct BilanRepasView: View {
                             Image(systemName: "magnifyingglass")
                                 .font(.system(size: 14, weight: .semibold))
                                 .accessibilityHidden(true)
-                            Text("Voir tous les aliments")
+                            Text("Chercher un autre aliment")
                                 .font(.dsSousTitreFort)
                                 .tracking(DSTracking.sousTitre)
                         }
@@ -128,169 +166,86 @@ struct BilanRepasView: View {
                         .contentShape(Capsule())
                     }
                     .buttonStyle(.dsPress)
-                    .padding(.top, 10)
-
-                    Text(note)
-                        .font(.dsLegende)
-                        .tracking(DSTracking.legende)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 8)
+                    .padding(.top, 12)
                 }
                 .padding(.horizontal, DS.marge)
                 // Le verre porte une ombre : la grille garde de l'air en haut
                 // et en bas pour qu'elle ne soit pas rognée par le défilement.
-                .padding(.top, 2)
+                .padding(.top, 4)
                 .padding(.bottom, 14)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if let aliment = enReglage {
-                    BilanBarreNiveau(
-                        nom: RepasCatalog.nomCourt(aliment),
-                        apports: PistesBilan.apports(de: aliment),
-                        niveau: viewModel.niveau(de: aliment.id) ?? .parDefaut,
-                        regler: { viewModel.regler(aliment.id, $0) },
-                        retirer: { retirer(aliment.id) }
-                    )
-                    .padding(.horizontal, DS.marge)
-                    .padding(.top, 4)
-                    .padding(.bottom, 16)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-            }
-            // L'aliment qu'on vient de toucher reste visible quand la barre des
-            // trois mots monte par-dessus le bas de la grille : on défile du
-            // strict nécessaire, une fois la barre en place.
+            // Les trois mots s'ouvrent sous la rangée : on défile du strict
+            // nécessaire pour qu'ils restent à l'écran.
             .onChange(of: selection) { _, nouvelle in
-                guard let nouvelle else { return }
+                guard nouvelle != nil else { return }
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(300))
+                    try? await Task.sleep(for: .milliseconds(320))
                     withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
-                        defilement.scrollTo(nouvelle)
+                        defilement.scrollTo(BilanGrilleAliments.idDuTiroir)
                     }
                 }
             }
         }
     }
 
-    // MARK: Les onglets des quatre repas
+    // MARK: La frise des quatre repas
 
-    /// Une bascule en verre, aux cotes de la maquette : piste translucide de
-    /// 38 points, curseur de verre blanc de 32 points (rayon 16) qui glisse
-    /// d'un repas à l'autre avec un ressort. La cible tactile de chaque repas
-    /// déborde de la piste, 3 points en haut et en bas : 44 points.
+    /// Une bascule en verre : piste translucide, curseur de verre blanc qui
+    /// glisse d'un repas à l'autre avec un ressort. Chaque repas porte son
+    /// emoji et le nombre d'aliments qu'on y a cochés.
     private var onglets: some View {
         HStack(spacing: 0) {
             ForEach(RepasBilan.allCases) { autre in
                 let actif = autre == repas
+                let nombre = RepasCatalog.grille(autre, caddie: caddie, regime: regime)
+                    .filter { (caddie[$0.id] ?? 0) > 0 }
+                    .count
                 Button {
                     HapticService.shared.selection()
                     viewModel.allerAu(repas: autre)
                 } label: {
-                    Text(autre.onglet)
-                        .font(.system(.subheadline, design: .default).weight(actif ? .semibold : .medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .foregroundStyle(Color.dsTexte)
-                        .padding(.horizontal, 2)
-                        .frame(maxWidth: .infinity, minHeight: Verre.hauteurBascule - 6)
-                        .background {
-                            if actif {
-                                BilanPastilleDeVerre(espace: espaceOnglets, rayon: 16)
+                    VStack(spacing: 1) {
+                        Text(autre.emoji)
+                            .font(.system(size: 15))
+                            .accessibilityHidden(true)
+                        HStack(spacing: 3) {
+                            Text(autre.onglet)
+                                .font(.system(.footnote, design: .default).weight(actif ? .semibold : .medium))
+                                .foregroundStyle(Color.dsTexte)
+                            if nombre > 0 {
+                                Text("\(nombre)")
+                                    .font(.system(.caption, design: .rounded).weight(.bold).monospacedDigit())
+                                    .foregroundStyle(BilanVerre.encreChoisie)
+                                    .contentTransition(.numericText())
                             }
                         }
-                        .padding(.vertical, 6)
-                        .contentShape(Rectangle())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    }
+                    .padding(.horizontal, 2)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background {
+                        if actif {
+                            BilanPastilleDeVerre(espace: espaceOnglets, rayon: 18)
+                        }
+                    }
+                    .padding(.vertical, 3)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.dsPress)
-                .accessibilityLabel(autre.titre)
+                .accessibilityLabel(nombre > 0 ? "\(autre.titre), \(nombre) cochés" : autre.titre)
                 .accessibilityAddTraits(actif ? [.isSelected] : [])
             }
         }
         .padding(.horizontal, 3)
         .background {
-            // La piste est plus basse que la zone qu'on touche.
             Color.clear
-                .verre(BilanVerre.piste, forme: Capsule(style: .continuous))
-                .padding(.vertical, 3)
+                .verre(BilanVerre.piste, forme: RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .animation(reduceMotion ? nil : Animation.kiwiPastille, value: repas)
-    }
-
-    // MARK: Ce qu'on dit sous la grille
-
-    private var note: String {
-        let coches = caddie.filter { $0.value > 0 }.count
-        if coches == 0 {
-            // Au dernier repas, rien de coché : on dit ce que ça coûte.
-            return repas == .soir
-                ? "Tu n'as rien coché : ton bilan se fera sans ton assiette, il sera moins précis."
-                : "Touche un aliment pour le cocher."
-        }
-        let aliments = coches == 1 ? "1 aliment coché" : "\(coches) aliments cochés"
-        return "\(aliments). Touche-en un pour dire combien tu en manges."
-    }
-
-    // MARK: Gestes
-
-    /// Un aliment pas coché se coche ; un aliment coché se sélectionne pour
-    /// être réglé ; l'aliment déjà sélectionné se décoche.
-    private func toucher(_ id: String) {
-        if viewModel.niveau(de: id) == nil {
-            viewModel.cocher(id)
-            selection = id
-        } else if selection == id {
-            retirer(id)
-        } else {
-            selection = id
-        }
-    }
-
-    private func retirer(_ id: String) {
-        viewModel.retirer(id)
-        if selection == id { selection = nil }
-    }
-}
-
-// MARK: - Les dix jauges
-
-/// Ce que l'assiette couvre déjà : une jauge par apport, qui se remplit à
-/// mesure qu'on coche. Pleine = la cible de la semaine est atteinte.
-struct BilanJauges: View {
-    let jauges: [NutrientID: Double]
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(NutrientData.all) { apport in
-                let fraction = jauges[apport.id] ?? 0
-                VStack(spacing: 3) {
-                    Text(apport.emoji)
-                        .font(.system(.subheadline, design: .default))
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Color.dsRemplissage)
-                            Capsule()
-                                .fill(apport.color)
-                                .frame(width: geo.size.width * CGFloat(min(1, max(0, fraction))))
-                        }
-                    }
-                    .frame(height: 5)
-                }
-                .frame(maxWidth: .infinity)
-                .kiwiImpulsion(fraction)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(apport.label)
-                .accessibilityValue("\(Int((fraction * 100).rounded())) pour cent de la cible de la semaine")
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .verre(.carte, forme: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: jauges)
+        .animation(reduceMotion ? nil : Animation.kiwiVif, value: caddie)
     }
 }
 
@@ -318,7 +273,7 @@ struct BilanTuileAliment: View {
         } label: {
             VStack(spacing: 3) {
                 Text(emoji)
-                    .font(BilanTypo.emoji)
+                    .font(BilanTypo.grandEmoji)
                     .accessibilityHidden(true)
                 Text(nom)
                     .font(BilanTypo.tuile)
@@ -329,7 +284,7 @@ struct BilanTuileAliment: View {
             .foregroundStyle(coche ? BilanVerre.encreChoisie : Color.dsTexte)
             .padding(.horizontal, 5)
             .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 64, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 78, maxHeight: .infinity)
             // Verre clair ; coché, verre vert pâle. Le liseré s'épaissit
             // pendant qu'on règle la quantité.
             .fondDeReponse(choisie: coche, bord: enReglage ? 2.5 : 1.5)
@@ -337,8 +292,11 @@ struct BilanTuileAliment: View {
                 if let niveau {
                     points(niveau)
                         .padding(9)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
             }
+            // L'aliment « saute » dans l'assiette quand on le coche.
+            .kiwiImpulsion(niveau)
         }
         .buttonStyle(.dsPress)
         .animation(reduceMotion ? nil : Animation.kiwiVif, value: niveau)
@@ -362,97 +320,6 @@ struct BilanTuileAliment: View {
     }
 }
 
-// MARK: - « Pas beaucoup, modérément, beaucoup »
-
-/// Sous l'aliment coché : ce qu'il apporte, et les trois boutons.
-struct BilanBarreNiveau: View {
-    let nom: String
-    /// « Apporte fer, magnésium, fibres. »
-    let apports: String
-    let niveau: NiveauConsommation
-    let regler: (NiveauConsommation) -> Void
-    let retirer: () -> Void
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(nom)
-                    .font(.dsSousTitreFort)
-                    .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsTexte)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                Button {
-                    HapticService.shared.selection()
-                    retirer()
-                } label: {
-                    Text("Retirer")
-                        .font(.dsLegendeMoyenne)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .frame(minWidth: DS.cibleTactile, minHeight: 30)
-                        // La cible déborde du mot, 7 points en haut et en
-                        // bas, sans épaissir la barre : 44 points.
-                        .contentShape(Rectangle().inset(by: -7))
-                }
-                .buttonStyle(.dsPress)
-                .accessibilityLabel("Retirer \(nom)")
-            }
-
-            Text(apports)
-                .font(.dsLegende)
-                .tracking(DSTracking.legende)
-                .foregroundStyle(Color.dsSecondaire)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 5) {
-                ForEach(NiveauConsommation.allCases) { choix in
-                    let actif = choix == niveau
-                    Button {
-                        HapticService.shared.selection()
-                        regler(choix)
-                    } label: {
-                        Text(choix.libelle)
-                            .font(BilanTypo.tuile)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                            .foregroundStyle(actif ? BilanVerre.encreChoisie : Color.dsTexte)
-                            .padding(.horizontal, 4)
-                            .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                            // Une tuile dans une carte : creuse au repos,
-                            // vert kiwi à 16 % une fois choisie.
-                            .background(
-                                RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
-                                    .fill(actif ? BilanVerre.tuileChoisie : Verre.tuileInactive)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous)
-                                    .strokeBorder(actif ? BilanVerre.bordChoisi : Color.clear, lineWidth: 1.5)
-                            )
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.dsPress)
-                    .accessibilityHint(choix.precision)
-                    .accessibilityAddTraits(actif ? [.isSelected] : [])
-                }
-            }
-
-            Text("\(niveau.libelle) : \(niveau.precision).")
-                .font(.dsLegende)
-                .tracking(DSTracking.legende)
-                .foregroundStyle(Color.dsSecondaire)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        // Elle flotte au-dessus de la grille qui défile : verre dépoli à flou
-        // vivant, comme la carte du Plan.
-        .verreCarteFlottante()
-        .animation(reduceMotion ? nil : Animation.kiwiVif, value: niveau)
-    }
-}
-
 // MARK: - Tout le catalogue, avec une recherche
 
 /// Les 194 aliments du catalogue, les rayons du repas en tête. C'est ici que
@@ -467,36 +334,42 @@ struct BilanCatalogueView: View {
     @State private var recherche = ""
     @State private var selection: String?
 
-    private var enReglage: GroceryItem? {
-        guard let selection, viewModel.niveau(de: selection) != nil else { return nil }
-        return GroceryCatalog.item(id: selection)
-    }
-
     private var cherche: Bool {
         !recherche.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 18) {
-                    if cherche {
-                        resultats
-                    } else {
-                        ForEach(RepasCatalog.rayons(repas, regime: viewModel.profile.dietType)) { rayon in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("\(rayon.emoji) \(rayon.label)")
-                                    .font(.dsHeadline)
-                                    .tracking(DSTracking.corps)
-                                    .foregroundStyle(Color.dsTexte)
-                                    .accessibilityAddTraits(.isHeader)
-                                grilleDe(rayon.items)
+            ScrollViewReader { defilement in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 18) {
+                        if cherche {
+                            resultats
+                        } else {
+                            ForEach(RepasCatalog.rayons(repas, regime: viewModel.profile.dietType)) { rayon in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("\(rayon.emoji) \(rayon.label)")
+                                        .font(.dsHeadline)
+                                        .tracking(DSTracking.corps)
+                                        .foregroundStyle(Color.dsTexte)
+                                        .accessibilityAddTraits(.isHeader)
+                                    BilanGrilleAliments(aliments: rayon.items, nomsCourts: false, selection: $selection)
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, DS.marge)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, DS.marge)
-                .padding(.vertical, 12)
+                .onChange(of: selection) { _, nouvelle in
+                    guard nouvelle != nil else { return }
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(320))
+                        withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
+                            defilement.scrollTo(BilanGrilleAliments.idDuTiroir)
+                        }
+                    }
+                }
             }
             // Pas de fond ici : la feuille porte le verre (`verreFeuille`).
             .navigationTitle("Tous les aliments")
@@ -512,22 +385,6 @@ struct BilanCatalogueView: View {
                         .tint(Color.dsAccent)
                 }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if let aliment = enReglage {
-                    BilanBarreNiveau(
-                        nom: aliment.name,
-                        apports: PistesBilan.apports(de: aliment),
-                        niveau: viewModel.niveau(de: aliment.id) ?? .parDefaut,
-                        regler: { viewModel.regler(aliment.id, $0) },
-                        retirer: { retirer(aliment.id) }
-                    )
-                    .padding(.horizontal, DS.marge)
-                    .padding(.top, 4)
-                    .padding(.bottom, 16)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-            }
-            .animation(reduceMotion ? nil : Animation.kiwiVif, value: selection)
         }
     }
 
@@ -542,36 +399,7 @@ struct BilanCatalogueView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 20)
         } else {
-            grilleDe(trouves)
+            BilanGrilleAliments(aliments: trouves, nomsCourts: false, selection: $selection)
         }
-    }
-
-    private func grilleDe(_ aliments: [GroceryItem]) -> some View {
-        BilanGrilleEgale(elements: aliments) { aliment in
-            BilanTuileAliment(
-                emoji: aliment.emoji,
-                nom: aliment.name,
-                niveau: viewModel.niveau(de: aliment.id),
-                enReglage: selection == aliment.id
-            ) {
-                toucher(aliment.id)
-            }
-        }
-    }
-
-    private func toucher(_ id: String) {
-        if viewModel.niveau(de: id) == nil {
-            viewModel.cocher(id)
-            selection = id
-        } else if selection == id {
-            retirer(id)
-        } else {
-            selection = id
-        }
-    }
-
-    private func retirer(_ id: String) {
-        viewModel.retirer(id)
-        if selection == id { selection = nil }
     }
 }

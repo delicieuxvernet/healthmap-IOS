@@ -782,6 +782,27 @@ lisent ces colonnes) ; les clés annexes de l'Edge (`ciqual_code`, `confidence`,
 > refonte ne change que l'ordre, le regroupement et les mots. `ParcoursBilanTests` et
 > `LibellesBilanTests` le vérifient.
 
+**Questionnaire ludique (3 octobre 2026, maquette avant / après validée par Arthur : « c'est top »)**
+— retour : « trop de freins, trop générique, pas assez ludique », surtout les aliments. Ce qui
+change, présentation seule (`Views/Questionnaire/BilanLudique.swift`) :
+- **le kiwi parle** : `KiwiMascotte` (animée) en haut de chaque écran, sa bulle (`BilanKiwi`) dit
+  pourquoi on demande, puis la piste que les réponses font apparaître (elle remplace la carte de
+  piste du bas) ; elle fête aussi la fin d'une étape et l'écran de fin ;
+- **une question à la fois** (`BilanQuestions`) : sur un écran à thème, la réponse donnée se range
+  en pastille (touchable pour corriger) et la suivante arrive seule après 0,55 s (1,1 s pour un
+  curseur) ; le bouton du bas ne sert qu'en fin d'écran ;
+- **un chemin à quatre stations** (`BilanChemin`) remplace la barre à quatre segments dans
+  l'en-tête (le Journal garde ses segments) ;
+- **grandes cartes** (`BilanCartes`) ; les bascules oui / non deviennent deux cartes (mêmes
+  valeurs `yes` / `no`) ; le stress et le réveil font vivre un visage (`BilanVisage`) ;
+- **aliments, « remplis ta journée »** : frise des quatre repas avec le nombre d'aliments cochés,
+  ciel qui passe du matin au soir (aube, ciel, kiwi, orchidée via `EcranBilan.teinteVerre`),
+  assiette en dix parts (`BilanAssiette`, même mesure que les dix jauges d'avant) avec une bulle
+  qui dit ce que l'aliment apporte, et les trois mots qui s'ouvrent **sous la rangée** de
+  l'aliment touché (`BilanGrilleAliments`, `BilanTiroirNiveau`) au lieu d'une barre flottante qui
+  cachait la grille ; boutons « Repas suivant : Midi » … « J'ai fini ma journée » ;
+- **fin d'étape** : les pistes arrivent face cachée (`BilanCartePisteCachee`), on les retourne.
+
 Code : `Views/Questionnaire/Bilan*.swift` (vue), `Core/ParcoursBilan.swift` (ordre, écrans
 visibles, ce qu'il faut avoir répondu), `Core/PistesBilan.swift` (ce que les réponses apprennent),
 `Core/RepasCatalog.swift` (aliments par repas), `Core/NiveauConsommation.swift` (les trois mots),

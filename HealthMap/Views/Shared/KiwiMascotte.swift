@@ -3,11 +3,14 @@ import SwiftUI
 // MARK: - Mascotte « Le regard » (maquette « Kiwio - Mascotte clay », variante B1)
 //
 // La tranche de kiwi du signe, avec deux yeux et un sourire. Elle n'apparaît
-// qu'à deux endroits (maquette « Motion v3 - Verre liquide ») :
+// qu'à trois endroits (maquette « Motion v3 - Verre liquide ») :
 //
 //   - Réglages, ligne « Kiwio Premium » : petite et immobile (44 pt) ;
 //   - feuille Premium : grande (84 pt) et animée — un petit saut avec l'ombre
-//     qui suit, un clignement, et un halo qui tourne derrière elle.
+//     qui suit, un clignement, et un halo qui tourne derrière elle ;
+//   - le questionnaire (décision d'Arthur, 3 octobre 2026, « questionnaire
+//     ludique ») : c'est elle qui parle, en haut de chaque écran, et qui fête
+//     la fin d'une étape.
 //
 // Partout ailleurs, l'identité reste le signe (`KiwiSigne`).
 //

@@ -8,7 +8,7 @@ import SwiftUI
 //   • on sait où on en est : quatre segments qui ne repartent jamais de zéro,
 //     le nom de l'étape, le temps qui reste ;
 //   • on sait à quoi ça sert : une raison sous chaque titre, et une carte qui
-//     dit ce que la réponse vient d'apprendre (`BilanCartePiste`) ;
+//     dit ce que la réponse vient d'apprendre (la bulle du kiwi, `BilanKiwi`) ;
 //   • ça paraît plus court : une vingtaine d'écrans à thème au lieu d'une
 //     trentaine de questions, sans animation imposée entre deux sections ;
 //   • on ne le quitte plus par accident, et on reprend là où on s'est arrêté.
@@ -21,6 +21,11 @@ import SwiftUI
 // respirent, et c'est LEUR teinte qui dit l'étape (ciel, aube, orchidée, kiwi),
 // en fondu de 0,9 s. Les réponses sont en verre clair, l'action du bas en
 // verre vert. Les écrans se suivent sur la glisse des pages (`kiwiGlisse`).
+//
+// Questionnaire ludique (3 octobre 2026) : un chemin à quatre stations dans
+// l'en-tête, le kiwi qui parle sur chaque écran, une question à la fois, et
+// une journée de repas sous un ciel qui passe du matin au soir
+// (`BilanLudique.swift`).
 struct BilanParcoursView: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
     @EnvironmentObject var dashboardVM: DashboardViewModel
@@ -115,8 +120,11 @@ struct BilanParcoursView: View {
                     .buttonStyle(.dsPress)
                     .accessibilityLabel("Retour")
 
-                    BilanSegmentsDEtapes(
-                        avancements: ParcoursBilan.avancements(ecran: ecran, viewModel.contexteBilan)
+                    // Le chemin des quatre étapes (questionnaire ludique,
+                    // 3 octobre 2026) à la place de la barre à segments.
+                    BilanChemin(
+                        avancements: ParcoursBilan.avancements(ecran: ecran, viewModel.contexteBilan),
+                        courante: ParcoursBilan.rangEtape(ecran)
                     )
                 }
 
@@ -282,7 +290,10 @@ struct BilanParcoursView: View {
         switch ecran {
         case .accueil: return "Commencer"
         case .provisoire: return "Passer à table"
-        case .petitDej, .midi, .gouter: return "Repas suivant"
+        case .petitDej, .midi, .gouter:
+            let suivant = ParcoursBilan.suivant(apres: ecran, viewModel.contexteBilan)?.repas
+            return suivant.map { "Repas suivant : \($0.onglet)" } ?? "Repas suivant"
+        case .soir: return "J'ai fini ma journée"
         case .fin: return viewModel.errorMessage == nil ? "Voir mon bilan" : "Réessayer"
         default:
             return ParcoursBilan.suivant(apres: ecran, viewModel.contexteBilan) == .fin ? "Terminer" : "Continuer"
