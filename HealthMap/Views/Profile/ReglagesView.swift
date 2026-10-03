@@ -1053,7 +1053,9 @@ private struct LigneNotifications: View {
 /// bord. Toute la ligne se touche, comme sur la maquette. VoiceOver lit
 /// un interrupteur, avec son état.
 private struct InterrupteurVerreStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
+    // `ToggleStyleConfiguration` en toutes lettres : ce fichier importe
+    // RevenueCat, qui a aussi un type `Configuration`.
+    func makeBody(configuration: ToggleStyleConfiguration) -> some View {
         HStack(spacing: 12) {
             configuration.label
             InterrupteurVerre(allume: configuration.isOn)
