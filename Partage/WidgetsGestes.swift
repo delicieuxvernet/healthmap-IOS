@@ -316,13 +316,13 @@ private struct GestesOnde: View {
 
 // MARK: - Eau (W4)
 
-/// Part de l'objectif d'eau bue, bornée à 0...1 (l'objectif sert aussi de
-/// plafond, comme dans le Journal).
 /// « 1 verre », « 3 verres » : pour VoiceOver.
 private func gestesVerres(_ nombre: Int) -> String {
     "\(nombre) \(nombre > 1 ? "verres" : "verre")"
 }
 
+/// Part de l'objectif d'eau bue, bornée à 0...1 (l'objectif sert aussi de
+/// plafond, comme dans le Journal).
 private func gestesFractionEau(_ eau: InstantaneJour.Eau) -> Double {
     guard eau.objectif > 0 else { return 0 }
     return min(1, max(0, Double(eau.verres) / Double(eau.objectif)))
