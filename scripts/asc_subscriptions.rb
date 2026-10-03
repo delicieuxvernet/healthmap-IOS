@@ -350,6 +350,36 @@ abort_with("apps", code, body) unless code == 200 && body["data"]&.any?
 app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
+# ── MODE offer-codes : relit TOUS les codes d'offre (lecture seule) ──────────
+# Pour vérifier un code créé à la main dans l'UI App Store Connect : campagne,
+# durée, éligibilité, codes personnalisés et à usage unique, état « actif ».
+if MODE == "offer-codes"
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      sa = s["attributes"]
+      puts "\n===== #{sa["productId"]} (état abonnement : #{sa["state"]}) ====="
+      get_all("/v1/subscriptions/#{s["id"]}/offerCodes?limit=200").each do |oc|
+        a = oc["attributes"]
+        puts "  Campagne « #{a["name"]} » : #{a["offerMode"]} #{a["duration"]} x#{a["numberOfPeriods"]}" \
+             " | éligibles=#{Array(a["customerEligibilities"]).join("/")} | #{a["offerEligibility"]} | active=#{a["active"].inspect}"
+        get_all("/v1/subscriptionOfferCodes/#{oc["id"]}/customCodes?limit=200").each do |c|
+          ca = c["attributes"]
+          puts "    code perso #{ca["customCode"]} : #{ca["numberOfCodes"]} utilisations, créé #{ca["createdDate"]}," \
+               " expire #{ca["expirationDate"]}, active=#{ca["active"].inspect}"
+        end
+        get_all("/v1/subscriptionOfferCodes/#{oc["id"]}/oneTimeUseCodes?limit=200").each do |c|
+          ca = c["attributes"]
+          puts "    lot à usage unique : #{ca["numberOfCodes"]} codes, créé #{ca["createdDate"]}," \
+               " expire #{ca["expirationDate"]}, active=#{ca["active"].inspect}"
+        end
+      end
+    end
+  end
+  versions = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=5")
+  puts "\nVersions : " + versions.map { |v| "#{v.dig("attributes", "versionString")}=#{v.dig("attributes", "appStoreState")}" }.join(" | ")
+  exit 0
+end
+
 # ── MODE app-audit : état de préparation à la soumission App Store ──────────
 # ── MODE fix-subs : corrige la config des abonnements (défauts deep-audit) ──
 #    1) reviewNote : App Review y cherche le chemin de l'achat dans l'app —
