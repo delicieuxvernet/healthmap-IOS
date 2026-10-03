@@ -48,20 +48,21 @@ struct PriseDeSangSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    contenu
+            VStack(spacing: 0) {
+                // Titre et fermeture hors de la barre d'outils : un seul rond
+                // de verre, comme la fiche d'un apport (voir
+                // `FeuilleEnTeteFermer`).
+                FeuilleEnTeteFermer(titre: titre) { dismiss() }
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        contenu
+                    }
+                    .padding(.horizontal, DS.marge)
+                    .padding(.bottom, 40)
                 }
-                .padding(.horizontal, DS.marge)
-                .padding(.bottom, 40)
             }
-            .navigationTitle(titre)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    DSCloseButton { dismiss() }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
         }
         // La feuille ne peint plus d'aplat : fond de verre et coins de 38.
         .verreFeuille()

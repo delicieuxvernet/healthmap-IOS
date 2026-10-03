@@ -82,13 +82,17 @@ struct JournalAnneau: View {
     var delai: Double = 0
     /// L'entrée de la page est jouée. À faux, l'anneau se vide d'un coup.
     var trace: Bool = true
+    /// À faux, l'anneau est posé plein dès l'apparition et ne bouge qu'avec
+    /// sa valeur : c'est l'anneau de la carte Énergie, que la maquette ne
+    /// retrace pas (seuls ceux des apports suivent l'entrée de la page).
+    var traceALApparition: Bool = true
 
     @State private var apparu = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var cible: CGFloat { CGFloat(min(1, max(0, fraction))) }
 
-    private var rempli: Bool { reduceMotion || (trace && apparu) }
+    private var rempli: Bool { reduceMotion || !traceALApparition || (trace && apparu) }
 
     /// `cubic-bezier(.3,.85,.3,1)` sur 1 s : la courbe de la maquette.
     private var courbe: Animation {
@@ -330,7 +334,9 @@ struct JournalEnergieCard: View {
                 couleur: depasse ? Color.dsACombler : Color.teinteKiwi,
                 taille: 70,
                 epaisseur: 8,
-                delai: 0.2
+                delai: 0.2,
+                // Posé plein : il ne bouge qu'avec un repas ajouté (maquette).
+                traceALApparition: false
             )
             ChiffreQuiCompte(valeur: Double(min(pourcent, 999)), format: { DS.pourcent($0) })
                 .font(.system(.subheadline, design: .default).weight(.bold).monospacedDigit())
@@ -410,14 +416,14 @@ struct JournalMacrosCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            ForEach(Array(lignes.enumerated()), id: \.element.id) { index, ligne in
-                colonne(ligne, delai: 0.35 + Double(index) * DS.cascade)
+            ForEach(lignes) { ligne in
+                colonne(ligne)
             }
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func colonne(_ ligne: Ligne, delai: Double) -> some View {
+    private func colonne(_ ligne: Ligne) -> some View {
         let grammes = Int(ligne.grammes.rounded())
         let ratio: Double = (ligne.cible ?? 0) > 0 ? ligne.grammes / (ligne.cible ?? 1) : 0
         let surplus = max(0, ratio - 1)
@@ -447,8 +453,7 @@ struct JournalMacrosCard: View {
                     fraction: min(1, ratio),
                     surplus: min(1, surplus),
                     teintes: ligne.teintes,
-                    surplusFavorable: ligne.surplusFavorable,
-                    delai: delai
+                    surplusFavorable: ligne.surplusFavorable
                 )
                 .padding(.top, 6)
             }
@@ -475,15 +480,14 @@ struct JournalMacrosCard: View {
 
 /// Barre d'une macro : sa teinte jusqu'à l'objectif, puis le surplus en
 /// hachures posé par-dessus depuis la gauche (sa largeur dit de combien on
-/// dépasse, plafonnée à une fois l'objectif).
+/// dépasse, plafonnée à une fois l'objectif). Elle est posée pleine dès
+/// l'apparition, comme dans la maquette : seul un repas ajouté la fait bouger.
 private struct BarreMacro: View {
     let fraction: Double
     let surplus: Double
     let teintes: [Color]
     let surplusFavorable: Bool
-    let delai: Double
 
-    @State private var remplie = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let hauteur: CGFloat = 4
@@ -501,26 +505,18 @@ private struct BarreMacro: View {
                 Capsule().fill(Verre.remplissage)
                 Capsule()
                     .fill(LinearGradient(colors: teintes, startPoint: .leading, endPoint: .trailing))
-                    .frame(width: largeur * (remplie ? fraction : 0))
+                    .frame(width: largeur * fraction)
                 if surplus > 0 {
                     Hachures(fond: hachures.fond, raie: hachures.raie)
-                        .frame(width: largeur * (remplie ? surplus : 0))
+                        .frame(width: largeur * surplus)
                         .clipShape(Capsule())
                 }
             }
         }
         .frame(height: Self.hauteur)
-        // La barre suit le repas ajouté en ressort ; son premier remplissage, à
-        // l'ouverture de la page, garde la courbe longue (`DS.remplissage`).
+        // La barre suit le repas ajouté en ressort.
         .animation(reduceMotion ? nil : Animation.kiwiFluide, value: fraction)
         .animation(reduceMotion ? nil : Animation.kiwiFluide, value: surplus)
-        .onAppear {
-            if reduceMotion {
-                remplie = true
-            } else {
-                withAnimation(DS.remplissage.delay(delai)) { remplie = true }
-            }
-        }
         .accessibilityHidden(true)
     }
 }
@@ -1036,11 +1032,12 @@ struct JournalSaisieBloc: View {
     private var boutonDicter: some View {
         ZStack {
             // Pendant l'écoute, le bouton DEVIENT la bulle : la scène part de
-            // son cadre exact. Il s'efface d'un coup sous elle, et revient
-            // d'un coup quand elle l'a quitté ou s'y est reposée.
+            // son cadre exact. Il s'efface d'un coup sous elle, reste caché
+            // pendant le calcul et sous la feuille de résultats, et revient en
+            // fondu de 0,2 s une fois la scène au repos (maquette : `dicterOp`).
             boutonDicterVisuel
                 .opacity(ecoute.boutonCache ? 0 : 1)
-                .animation(nil, value: ecoute.boutonCache)
+                .animation(ecoute.boutonCache ? nil : Animation.easeOut(duration: 0.2), value: ecoute.boutonCache)
             // La cible du geste ne dépend PAS du visuel : une vue invisible
             // n'est plus touchable, et l'appui maintenu serait coupé à
             // l'instant où le bouton s'efface sous la bulle.

@@ -386,12 +386,12 @@ final class MotionDicteeTests: XCTestCase {
         XCTAssertEqual(termines, 1)
     }
 
-    func testContracterRendLeBoutonEtPasseAuCalcul() {
+    func testContracterGardeLeBoutonCacheEtPasseAuCalcul() {
         let centre = EcouteCentre()
         ouvrir(centre, mainsLibres: true)
         centre.contracter()
         XCTAssertEqual(centre.phase, .calcul)
-        XCTAssertFalse(centre.boutonCache, "La bulle a quitté le bouton : il revient à sa place.")
+        XCTAssertTrue(centre.boutonCache, "Le bouton reste caché jusqu'au repos.")
         // Une scène qui calcule n'écoute plus les touchers de l'écoute.
         var annules = 0
         var termines = 0
@@ -442,7 +442,7 @@ final class MotionDicteeTests: XCTestCase {
         centre.transcrire("une pomme")
         centre.livrer()
         XCTAssertEqual(centre.phase, .resultat)
-        XCTAssertFalse(centre.boutonCache)
+        XCTAssertTrue(centre.boutonCache, "Le bouton reste caché jusqu'au repos.")
         XCTAssertNotNil(centre.speech, "La scène reste montée sous la feuille.")
 
         // Sous la feuille, plus rien ne ramène la bulle dans son bouton.

@@ -43,9 +43,10 @@ struct ScanCardHeader: View {
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(teinte ?? color)
                 .accessibilityHidden(true)
+            // Libellé de catégorie 15 / 600 sans approche, comme partout dans
+            // la maquette.
             Text(title)
                 .font(.dsSousTitreFort)
-                .tracking(DSTracking.sousTitre)
                 .foregroundStyle(color)
         }
     }

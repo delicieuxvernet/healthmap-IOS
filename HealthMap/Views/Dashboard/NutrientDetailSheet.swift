@@ -70,61 +70,64 @@ struct NutrientDetailSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    // 1. HERO — la VALEUR d'abord : grande jauge centrée du score
-                    heroSection
-                        .kiwiEntrance(0)
+                VStack(spacing: 0) {
+                    // Le rond « Fermer » dans le contenu, en haut à droite, comme la
+                    // fiche d'un apport : hors de la barre d'outils, il n'a qu'un
+                    // anneau (voir `FeuilleEnTeteFermer`). Cible de 44 pt (loi 20).
+                    FeuilleEnTeteFermer { dismiss() }
 
-                    // 2. Pourquoi ce score — COMPRENDRE : explication + preuve
-                    // (signals + fiabilité). Sort pourquoiCeScore du repliable.
-                    if hasPourquoi {
-                        pourquoiSection
-                            .kiwiEntrance(1)
+                    VStack(alignment: .leading, spacing: 22) {
+                        // 1. HERO — la VALEUR d'abord : grande jauge centrée du score
+                        heroSection
+                            .kiwiEntrance(0)
+
+                        // 2. Pourquoi ce score — COMPRENDRE : explication + preuve
+                        // (signals + fiabilité). Sort pourquoiCeScore du repliable.
+                        if hasPourquoi {
+                            pourquoiSection
+                                .kiwiEntrance(1)
+                        }
+
+                        // 3. « Ta solution » — AGIR. Le geste (action, dosage,
+                        // moment) est l'ordonnance : net en premium uniquement.
+                        // En gratuit, la carte rejoint la case gatée du bloc 7
+                        // (un seul voile, une seule porte) — jamais en clair.
+                        if subscriptionService.isPremium,
+                           let solution = nutrient.solution, hasSolutionContent(solution) {
+                            solutionCard(solution)
+                                .kiwiEntrance(2)
+                        }
+
+                        // 4. Le déclic : comparaison mémorable, APRÈS l'action
+                        if let comparaison = nutrient.comparaison, !comparaison.isEmpty {
+                            comparisonQuote(comparaison)
+                                .kiwiEntrance(3)
+                        }
+
+                        // 5. Repliables fermés (un seul composant réutilisé)
+                        if hasMechanism || hasSymptoms {
+                            collapsibleGroup
+                                .kiwiEntrance(4)
+                        }
+
+                        // 6. Recherche approfondie (validate-hypotheses + web) —
+                        // présente seulement si le nutriment a des hypothèses v1.
+                        deepSearchSection
+
+                        // 7. Hack + synergie — LA case premium floutée de la fiche
+                        if let premium = premiumSection {
+                            premium
+                                .kiwiEntrance(5)
+                        }
                     }
-
-                    // 3. « Ta solution » — AGIR. Le geste (action, dosage,
-                    // moment) est l'ordonnance : net en premium uniquement.
-                    // En gratuit, la carte rejoint la case gatée du bloc 7
-                    // (un seul voile, une seule porte) — jamais en clair.
-                    if subscriptionService.isPremium,
-                       let solution = nutrient.solution, hasSolutionContent(solution) {
-                        solutionCard(solution)
-                            .kiwiEntrance(2)
-                    }
-
-                    // 4. Le déclic : comparaison mémorable, APRÈS l'action
-                    if let comparaison = nutrient.comparaison, !comparaison.isEmpty {
-                        comparisonQuote(comparaison)
-                            .kiwiEntrance(3)
-                    }
-
-                    // 5. Repliables fermés (un seul composant réutilisé)
-                    if hasMechanism || hasSymptoms {
-                        collapsibleGroup
-                            .kiwiEntrance(4)
-                    }
-
-                    // 6. Recherche approfondie (validate-hypotheses + web) —
-                    // présente seulement si le nutriment a des hypothèses v1.
-                    deepSearchSection
-
-                    // 7. Hack + synergie — LA case premium floutée de la fiche
-                    if let premium = premiumSection {
-                        premium
-                            .kiwiEntrance(5)
-                    }
+                    .padding(.horizontal, DS.marge)
+                    // 8 sous le rond visible, comme la maquette : la cible de
+                    // 44 déborde déjà de 4 sous le rond de 36.
+                    .padding(.top, 4)
+                    .padding(.bottom, 40)
                 }
-                .padding(.horizontal, DS.marge)
-                .padding(.top, 8)
-                .padding(.bottom, 40)
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    // Rond de verre clair, cible tactile de 44 pt (loi 20).
-                    DSCloseButton { dismiss() }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
         }
         // La feuille ne peint plus d'aplat : fond de verre et coins de 38.
         .verreFeuille()

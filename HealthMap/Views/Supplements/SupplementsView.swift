@@ -10,7 +10,8 @@ import SwiftUI
 //   • la bascule Compléments / Par l'assiette, qui pilote toute la page ;
 //   • la mosaïque : un héros pleine largeur (l'anneau et ses freins nommés),
 //     puis des tuiles deux par deux. Ni dose, ni prix, ni marque sur une tuile ;
-//   • la fiche, au toucher : six blocs, dont la cascade du calcul.
+//   • la fiche, au toucher : la tête, ce qui pèse, ce que tu peux faire,
+//     puis la prise, les précautions, l'autre voie et le calcul replié.
 //
 // Le chiffre affiché est le SCORE DÉTERMINISTE du registre
 // (`HealthCalculator.registreApports`) : le seul dont les parts de l'anneau
@@ -55,6 +56,10 @@ struct SupplementsView: View {
     /// Compte les arrivées sur l'onglet : la mosaïque est reconstruite à
     /// chacune, donc ses anneaux et ses cascades se rejouent.
     @State private var passage = 0
+    /// Rythme du retracé des anneaux : la maquette ne le joue pas à la même
+    /// vitesse à l'arrivée sur l'onglet (1,1 s) et au retour par la bascule
+    /// (0,9 s). Posé AVANT le changement qui reconstruit la mosaïque.
+    @State private var cadenceAnneaux: AnneauDeCause.Cadence = .ongletArrivee
 
     private var complementsV2: ComplementsV2? { dashboardVM.analysisV2?.complements }
 
@@ -213,7 +218,9 @@ struct SupplementsView: View {
                 seedDefaults()
             }
             .onChange(of: estOngletActif) { _, actif in
-                if actif { passage += 1 }
+                guard actif else { return }
+                cadenceAnneaux = .ongletArrivee
+                passage += 1
             }
             .onChange(of: complementsSignature) { _, _ in refreshRituel() }
             // Le rituel a été coché depuis un widget : les coches se relisent.
@@ -253,7 +260,9 @@ struct SupplementsView: View {
                 infoCard.padding(.top, 18)
             }
             .padding(.horizontal, DS.marge)
-            .padding(.top, 4)
+            // Ligne de titre à 54 pt du haut, comme la maquette (la zone sûre
+            // en fait 59).
+            .padding(.top, -5)
             .padding(.bottom, 16)
             // Même verrou anti-dérive horizontale que mainContent.
             .containerRelativeFrame(.horizontal, alignment: .leading)
@@ -267,26 +276,25 @@ struct SupplementsView: View {
         let items = tuiles
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                header.kiwiEntrance(0)
+                // L'en-tête, le rituel et la bascule sont posés d'emblée :
+                // dans la maquette, seuls les anneaux et les causes se rejouent.
+                header
 
                 // Le rituel reste en tête dans les deux voies : c'est l'action
                 // du jour, et la bascule ne doit pas sauter sous le doigt.
                 if let rituel {
                     ComplementsRituelStrip(rituel: rituel) { toggleRituel($0) }
                         .padding(.top, 12)
-                        .kiwiEntrance(1)
                 }
 
-                ComplementsVoieSwitch(voie: $voie)
+                ComplementsVoieSwitch(voie: voieParLaBascule)
                     .padding(.top, 16)
-                    .kiwiEntrance(2)
 
                 if items.isEmpty {
                     aiFallbackSection
                         .padding(.top, 18)
-                        .kiwiEntrance(3)
                 } else {
-                    enTeteMosaique(nombre: items.count).kiwiEntrance(3)
+                    enTeteMosaique(nombre: items.count)
 
                     // Reconstruit à chaque bascule et à chaque arrivée sur
                     // l'onglet : les anneaux se retracent part par part, les
@@ -321,7 +329,9 @@ struct SupplementsView: View {
                 infoCard.padding(.top, 18)
             }
             .padding(.horizontal, DS.marge)
-            .padding(.top, 4)
+            // Ligne de titre à 54 pt du haut, comme la maquette (la zone sûre
+            // en fait 59).
+            .padding(.top, -5)
             .padding(.bottom, 16)
             // Le contenu fait EXACTEMENT la largeur du conteneur, jamais plus.
             .containerRelativeFrame(.horizontal, alignment: .leading)
@@ -344,6 +354,18 @@ struct SupplementsView: View {
                 onToggle: { toggleCart($0) }
             )
         }
+    }
+
+    /// La bascule passe par ici : le rythme du retracé est posé avant que
+    /// la voie change (et donc avant que la mosaïque se reconstruise).
+    private var voieParLaBascule: Binding<ComplementsVoie> {
+        Binding(
+            get: { voie },
+            set: { nouvelle in
+                cadenceAnneaux = .bascule
+                voie = nouvelle
+            }
+        )
     }
 
     // MARK: - En-têtes
@@ -378,7 +400,7 @@ struct SupplementsView: View {
         VStack(spacing: 0) {
             titreOnglet
                 .padding(.horizontal, DS.marge)
-                .padding(.top, 4)
+                .padding(.top, -5)
             Spacer(minLength: 0)
             contenu()
             Spacer(minLength: 0)
@@ -400,16 +422,17 @@ struct SupplementsView: View {
         .padding(.horizontal, 2)
     }
 
+    /// Le même dans les deux voies : la maquette le pose hors du corps qui
+    /// bascule. `nombre` compte des apports, quelle que soit la voie.
     private func enTeteMosaique(nombre: Int) -> some View {
-        let unite = voie == .complements ? "apport" : "aliment"
-        return HStack(alignment: .firstTextBaseline) {
-            Text(voie == .complements ? "Recommandés pour toi" : "Par l'assiette")
+        HStack(alignment: .firstTextBaseline) {
+            Text("Recommandés pour toi")
                 .font(.dsSection)
                 .tracking(DSTracking.section)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            Text("\(nombre) \(unite)\(nombre > 1 ? "s" : "")")
+            Text("\(nombre) apport\(nombre > 1 ? "s" : "")")
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
@@ -472,6 +495,7 @@ struct SupplementsView: View {
             return LigneAssiette(
                 id: item.id,
                 symbole: symbole(item),
+                iconeAliment: iconeAliment(for: item.chain),
                 teinte: item.chain.tint,
                 teinteTexte: Color.teinteApportTexte(for: item.chain.id),
                 titre: titre(item),
@@ -490,7 +514,8 @@ struct SupplementsView: View {
             parts: item.detail.parts,
             score: item.detail.score,
             lignes: lignesHeros(item),
-            cta: ctaHeros(item)
+            cta: ctaHeros(item),
+            cadence: cadenceAnneaux
         ) { ouvrir(item) }
     }
 
@@ -502,7 +527,9 @@ struct SupplementsView: View {
             statutLigne: statutLigne(item, complet: false),
             parts: item.detail.parts,
             score: item.detail.score,
-            enLigne: enLigne
+            enLigne: enLigne,
+            statutMot: FicheApportContexte.statutMot(forScore: item.detail.score),
+            cadence: cadenceAnneaux
         ) { ouvrir(item) }
     }
 
@@ -514,20 +541,47 @@ struct SupplementsView: View {
         return aliment.capitalizedFirstLetter
     }
 
+    /// Le symbole de l'apport, dans les deux voies : en voie assiette, il
+    /// n'est plus que le repli d'une ligne dont l'aliment n'a pas d'illustration.
     private func symbole(_ item: Tuile) -> String {
-        voie == .assiette ? "fork.knife" : item.chain.symbol
+        item.chain.symbol
     }
 
-    /// « à combler · 3 causes » sur une tuile, « … causes nommées » sur le
-    /// héros ; en voie assiette, l'apport que l'aliment sert.
+    /// L'illustration du premier aliment (celui qui donne son titre à la
+    /// ligne) : l'icône rédigée par le bilan, sinon celle du catalogue. Gardée
+    /// seulement si l'asset existe dans le bundle — sinon, le symbole de l'apport.
+    private func iconeAliment(for chain: ComplementChain) -> String? {
+        let brute: String?
+        if let aliments = chain.apport?.aliments, !aliments.isEmpty {
+            brute = aliments.first { !($0.nom ?? "").isEmpty }?.icone
+        } else {
+            brute = Fluent3D.foodSources(for: chain.id).first?.asset
+        }
+        // Un autre nom que `brute` : un `guard let` ne peut pas redéclarer une
+        // constante de la même portée.
+        guard let nom = brute, !nom.isEmpty else { return nil }
+        let asset = nom.hasPrefix("fluent_") ? nom : "fluent_\(nom)"
+        return UIImage(named: asset) == nil ? nil : asset
+    }
+
+    /// « à combler · 3 causes nommées » sur le héros ; « 3 causes » seul sur
+    /// une tuile, comme la maquette (le mot du statut passe à VoiceOver par
+    /// `TuileApport.statutMot`). En voie assiette, l'apport que l'aliment sert.
     private func statutLigne(_ item: Tuile, complet: Bool) -> String {
         guard voie == .complements else { return "pour \(item.chain.avecArticle)" }
-        let mot = FicheApportContexte.statutMot(forScore: item.detail.score)
         let causes = item.detail.freins.count
+        guard complet else {
+            switch causes {
+            case 0: return "sans cause nommée"
+            case 1: return "1 cause"
+            default: return "\(causes) causes"
+            }
+        }
+        let mot = FicheApportContexte.statutMot(forScore: item.detail.score)
         switch causes {
         case 0: return "\(mot) · sans cause nommée"
-        case 1: return "\(mot) · 1 cause\(complet ? " nommée" : "")"
-        default: return "\(mot) · \(causes) causes\(complet ? " nommées" : "")"
+        case 1: return "\(mot) · 1 cause nommée"
+        default: return "\(mot) · \(causes) causes nommées"
         }
     }
 
@@ -548,11 +602,9 @@ struct SupplementsView: View {
         return item.detail.contributions.isEmpty ? "Voir la fiche" : "Voir le calcul"
     }
 
+    /// La même dans les deux voies : la maquette la pose hors du corps qui bascule.
     private func noteMosaique(_ items: [Tuile]) -> String {
-        if voie == .assiette {
-            return "Aucun aliment ne se compte en pourcentage : c'est la régularité qui remonte un apport."
-        }
-        return items.contains { !$0.detail.freins.isEmpty }
+        items.contains { !$0.detail.freins.isEmpty }
             ? "Le creux de l'anneau, ce sont tes réponses. Touche un apport pour voir le calcul."
             : "Touche un apport pour voir comment le renforcer."
     }
@@ -611,8 +663,9 @@ struct SupplementsView: View {
                     FicheApportContexte.Spec(cle: "prise", valeur: precisionLabel(for: produit)),
                 ]
                 // Pourquoi CETTE forme. Le « pourquoi toi » du moteur n'est pas
-                // repris ici : la cascade (bloc 02) et l'éclairage (bloc 01) le
-                // disent déjà, et il porte la même phrase sur les symptômes.
+                // repris ici : les freins (« Ce qui pèse le plus ») et
+                // l'éclairage le disent déjà, et il porte la même phrase sur
+                // les symptômes.
                 let forme = KiwiProse.lisible(produit.whyBrand)
                 note = forme.isEmpty ? nil : forme
             } else {
@@ -644,8 +697,23 @@ struct SupplementsView: View {
             precautions: precautions,
             conseilPrecautions: precautions.isEmpty ? nil : SupplementsV4.tip(for: precautions),
             alternatives: alternatives,
-            ctaAlternative: cta
+            ctaAlternative: cta,
+            // La quantité dit l'APPORT : sous le nom d'un aliment (voie
+            // assiette), elle se lirait comme celle de l'aliment.
+            quantite: enAssiette ? nil : QuantiteApport.libelle(
+                id: chain.id, score: item.detail.score, profil: dashboardVM.profile
+            ),
+            // Voie assiette : le conseil du bilan est déjà la note de « Comment
+            // l'intégrer », on ne le redit pas dans les gestes.
+            conseil: enAssiette ? nil : texteOuNil(chain.apport?.tipBold),
+            conseilSuite: enAssiette ? nil : texteOuNil(chain.apport?.tipRest)
         )
+    }
+
+    /// Un texte du bilan, nettoyé ; `nil` s'il est vide.
+    private func texteOuNil(_ texte: String?) -> String? {
+        let propre = KiwiProse.lisible(texte ?? "")
+        return propre.isEmpty ? nil : propre
     }
 
     /// Ce que les symptômes déclarés permettent d'éclairer sur cet apport bas,
@@ -741,6 +809,7 @@ struct SupplementsView: View {
     /// (le curseur de la bascule et l'échange du corps s'animent d'eux-mêmes).
     private func basculerVoie() {
         fiche = nil
+        cadenceAnneaux = .bascule
         voie = voie == .complements ? .assiette : .complements
     }
 

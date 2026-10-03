@@ -1351,7 +1351,7 @@ private struct VoiceItemRow: View {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .fill(fondPastille)
                         Image(systemName: alerte ? "questionmark" : "fork.knife")
-                            .font(.system(size: 17, weight: .medium))
+                            .font(.system(size: 21, weight: .medium))
                             .foregroundStyle(encrePastille)
                     }
                     .frame(width: 40, height: 40)

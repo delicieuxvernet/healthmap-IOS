@@ -56,12 +56,17 @@ enum DS {
     static let hauteurBouton: CGFloat = 50
     /// Cible tactile minimale.
     static let cibleTactile: CGFloat = 44
+    /// Espace entre la barre d'état et le grand titre d'un onglet (Journal,
+    /// Progrès, Plan, Réglages) : la place d'une barre de navigation, comme
+    /// l'app Santé. Demandé par Arthur le 3 oct. 2026 (« le haut est trop
+    /// condensé, il faut un petit bloc qui aère »).
+    static let hautTitreOnglet: CGFloat = 46
     /// Hauteur du voile de marque en haut d'écran.
     static let hauteurVoile: CGFloat = 240
 
     // MARK: Mouvement
 
-    /// État d'appui : 0,96 + assombrissement, ressort « vif » (`KiwiMotion`).
+    /// État d'appui : 0,96, ressort « vif » (`KiwiMotion`).
     static let ressortAppui = Animation.kiwiVif
     /// Remplissage des jauges et anneaux à l'apparition.
     static let remplissage = Animation.easeOut(duration: 1.0)
@@ -121,13 +126,23 @@ extension Color {
     /// Surface d'une carte — blanc en clair.
     static let dsCarte = Color(uiColor: .secondarySystemGroupedBackground)
     /// Texte principal.
-    static let dsTexte = Color(uiColor: .label)
+    static let dsTexte = Color(uiColor: UIColor { trait in
+        // La maquette écrit en #1C1C1E, pas en noir pur ; le mode sombre garde
+        // l'encre système.
+        trait.userInterfaceStyle == .dark
+            ? UIColor.label
+            : UIColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1E / 255, alpha: 1)
+    })
     /// Texte secondaire — `rgba(60,60,67,.6)`.
     static let dsSecondaire = Color(uiColor: .secondaryLabel)
     /// Texte tertiaire, chevron passif, jour futur — `rgba(60,60,67,.3)`.
     static let dsTertiaire = Color(uiColor: .tertiaryLabel)
     /// Filet séparateur — `rgba(60,60,67,.22)` sur 0,5 pt.
-    static let dsSeparateur = Color(uiColor: .separator)
+    static let dsSeparateur = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor.separator
+            : UIColor(red: 60 / 255, green: 60 / 255, blue: 67 / 255, alpha: 0.22)
+    })
     /// Traits de liaison, grabber — `#D1D1D6` en clair.
     static let dsTrait = Color(uiColor: .systemGray4)
     /// Fond d'un bouton circulaire neutre (fermer) — `#E5E5EA` en clair.
@@ -254,7 +269,7 @@ extension View {
     }
 }
 
-// MARK: - État d'appui (0,96 + assombrissement, ressort « vif »)
+// MARK: - État d'appui (0,96, ressort « vif »)
 
 struct DSPressStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -262,13 +277,12 @@ struct DSPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? KiwiEchelle.appui : 1))
-            .brightness(configuration.isPressed ? -0.04 : 0)
             .animation(DS.ressortAppui, value: configuration.isPressed)
     }
 }
 
 extension ButtonStyle where Self == DSPressStyle {
-    /// Style d'appui du DS refonte : `scaleEffect(0.96)` + assombrissement.
+    /// Style d'appui du DS : `scaleEffect(0.96)`, rien d'autre (maquette).
     static var dsPress: DSPressStyle { DSPressStyle() }
 }
 
@@ -579,7 +593,7 @@ struct DSCloseButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(Verre.iconeNeutre)
                 .frame(width: 36, height: 36)
                 .verreClair(Circle())
