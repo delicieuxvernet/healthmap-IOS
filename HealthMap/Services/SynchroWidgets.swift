@@ -64,6 +64,7 @@ enum SynchroWidgets {
     static func synchroniser(_ dashboardVM: DashboardViewModel) async {
         guard AuthService.shared.cachedCurrentUserIdString != nil else { return }
         brancherEau()
+        brancherPremium()
         var neuf = Contexte()
         neuf.bilanFait = dashboardVM.bilanComplete
         neuf.kcalObjectif = dashboardVM.bilanAffichage == .decouverte
@@ -105,6 +106,7 @@ enum SynchroWidgets {
         let (lecture, conseils) = lectureDesApports(dashboardVM)
         contexte?.apports = lecture
         contexte?.conseils = conseils
+        contexte?.premium = SubscriptionService.shared.isPremium
         rafraichir()
     }
 
@@ -163,6 +165,27 @@ enum SynchroWidgets {
         Task { await ActiviteJournee.terminer() }
     }
 
+    // MARK: Premium
+
+    private static var premiumBranche: AnyCancellable?
+
+    /// Un abonnement pris dans l'app (ou une réponse de RevenueCat arrivée
+    /// après la synchro du lancement) ouvre tout de suite le geste du conseil
+    /// sur le widget, sans attendre le prochain retour au premier plan.
+    private static func brancherPremium() {
+        guard premiumBranche == nil else { return }
+        premiumBranche = SubscriptionService.shared.$isPremium
+            .removeDuplicates()
+            .dropFirst()
+            .sink { premium in
+                Task { @MainActor in
+                    guard SynchroWidgets.contexte != nil else { return }
+                    SynchroWidgets.contexte?.premium = premium
+                    SynchroWidgets.rafraichir()
+                }
+            }
+    }
+
     // MARK: Eau
 
     private static var eauBranchee = false
@@ -205,6 +228,7 @@ enum SynchroWidgets {
         }
 
         let budget = contexte.kcalObjectif.map { $0 + (contexte.kcalDepensees ?? 0) }
+        let userId = AuthService.shared.cachedCurrentUserIdString
 
         return InstantaneJour(
             jour: jour,
@@ -221,7 +245,8 @@ enum SynchroWidgets {
             rituel: prises(contexte.complements),
             apports: contexte.apports,
             conseils: contexte.conseils.isEmpty ? nil : contexte.conseils,
-            conseilFait: AuthService.shared.cachedCurrentUserIdString.flatMap { ConseilDuJourStore.fait(userId: $0, jour: jour) },
+            conseilFait: userId.flatMap { ConseilDuJourStore.fait(userId: $0, jour: jour) },
+            conseilChoisi: userId.flatMap { ConseilDuJourStore.retenir(parmi: contexte.conseils, userId: $0, jour: jour) },
             premium: contexte.premium
         )
     }
@@ -331,29 +356,58 @@ final class RouteurWidgets: ObservableObject {
     }
 }
 
-// MARK: - Le conseil du jour coché
+// MARK: - Le conseil du jour (retenu, coché)
 
-/// « C'est fait » sur le conseil du jour : l'id du conseil coché, par compte
-/// et par jour. Préfixe `healthmap_` : la coche part avec le compte à la
-/// déconnexion. Elle ne change aucun score : le registre se nourrit du
-/// questionnaire et du journal, pas d'une coche.
+/// Le conseil du jour d'un compte : celui que l'app a retenu pour aujourd'hui
+/// et, s'il y a lieu, sa coche « C'est fait ». Une seule entrée par compte,
+/// réécrite chaque jour (rien ne s'accumule) ; préfixe `healthmap_` : elle
+/// part avec le compte à la déconnexion. La coche ne change aucun score : le
+/// registre se nourrit du questionnaire et du journal, pas d'une coche.
 enum ConseilDuJourStore {
-    private static func cle(userId: String, jour: String) -> String {
-        "healthmap_conseil_fait_\(userId)_\(jour)"
+    private struct Etat: Codable {
+        var jour: String
+        var choisi: String? = nil
+        var fait: String? = nil
+    }
+
+    private static func cle(_ userId: String) -> String {
+        "healthmap_conseil_du_jour_\(userId)"
+    }
+
+    /// L'état du jour demandé ; celui d'un autre jour ne compte plus.
+    private static func lire(userId: String, jour: String) -> Etat {
+        guard let donnees = UserDefaults.standard.data(forKey: cle(userId)),
+              let etat = try? JSONDecoder().decode(Etat.self, from: donnees),
+              etat.jour == jour else { return Etat(jour: jour) }
+        return etat
+    }
+
+    private static func ecrire(_ etat: Etat, userId: String) {
+        UserDefaults.standard.set(try? JSONEncoder().encode(etat), forKey: cle(userId))
     }
 
     /// L'id du conseil coché ce jour-là, s'il y en a un.
     static func fait(userId: String, jour: String) -> String? {
-        UserDefaults.standard.string(forKey: cle(userId: userId, jour: jour))
+        lire(userId: userId, jour: jour).fait
     }
 
     /// Coche ce conseil ; s'il l'était déjà, le décoche.
     static func basculer(_ id: String, userId: String, jour: String) {
-        let cleDuJour = cle(userId: userId, jour: jour)
-        if UserDefaults.standard.string(forKey: cleDuJour) == id {
-            UserDefaults.standard.removeObject(forKey: cleDuJour)
-        } else {
-            UserDefaults.standard.set(id, forKey: cleDuJour)
-        }
+        var etat = lire(userId: userId, jour: jour)
+        etat.fait = etat.fait == id ? nil : id
+        ecrire(etat, userId: userId)
+    }
+
+    /// Le conseil retenu pour ce jour : celui déjà retenu s'il est encore
+    /// parmi les candidats (un repas noté ne le change pas en cours de
+    /// journée), sinon celui du rang du jour, comme le widget le choisirait.
+    static func retenir(parmi conseils: [ConseilW], userId: String, jour: String) -> String? {
+        guard !conseils.isEmpty else { return nil }
+        var etat = lire(userId: userId, jour: jour)
+        if let choisi = etat.choisi, conseils.contains(where: { $0.id == choisi }) { return choisi }
+        let id = conseils[BoiteCommune.rangDuJour(jour) % conseils.count].id
+        etat.choisi = id
+        ecrire(etat, userId: userId)
+        return id
     }
 }

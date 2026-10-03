@@ -274,6 +274,26 @@ final class WidgetsPartageTests: XCTestCase {
         XCTAssertEqual(aujourdhui.apports, hier.apports, "Les apports sont ceux du registre : minuit n'y change rien")
     }
 
+    func testLeConseilRetenuNeChangePasDansLaJournee() {
+        // L'app a retenu « b » ce matin ; un repas noté a depuis réordonné les
+        // candidats : le conseil du jour reste « b », et sa coche avec.
+        var etat = journee(jour: "2026-10-03")
+        etat.conseils = [conseil("c"), conseil("a"), conseil("b")]
+        etat.conseilChoisi = "b"
+        etat.conseilFait = "b"
+        XCTAssertEqual(etat.conseilDuJour?.id, "b")
+        XCTAssertTrue(etat.conseilDuJourFait)
+
+        // Retenu mais plus candidat (l'apport est remonté) : le rang du jour.
+        etat.conseilChoisi = "disparu"
+        XCTAssertEqual(etat.conseilDuJour?.id, "a", "Rang 9406 modulo 3 = 1 : le deuxième")
+
+        // À minuit, le choix d'hier ne vaut plus : le rang du jour reprend.
+        etat.conseilChoisi = "c"
+        XCTAssertEqual(etat.affiche(pour: "2026-10-04", attente: nil).conseilDuJour?.id, "b",
+                       "Rang 9407 modulo 3 = 2 : le troisième")
+    }
+
     func testLAttenteDesConseilsGardeLOrdreEtLesDoublons() {
         var etat = journee(jour: "2026-10-01")
         etat.conseils = [conseil("a")]

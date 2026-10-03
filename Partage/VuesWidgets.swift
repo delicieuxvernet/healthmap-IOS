@@ -371,7 +371,7 @@ struct SerieW: View {
                     .foregroundStyle(TeinteW.encre())
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Série : \(serie) jours")
+            .accessibilityLabel("Série : \(serie) \(serie > 1 ? "jours" : "jour")")
         }
     }
 }

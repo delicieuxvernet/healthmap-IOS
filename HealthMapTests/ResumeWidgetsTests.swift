@@ -76,7 +76,10 @@ final class ResumeWidgetsTests: XCTestCase {
     }
 
     func testUnApportCouvertNADePasDeCause() {
-        XCTAssertNil(ResumeWidgets.cause(detail([("Beaucoup de café", -3, .nutrition)])))
+        // 70 + 8 − 3 = 75 : couvert, malgré un frein qu'on pourrait montrer.
+        // (Le café seul ferait 67, encore « un peu juste ».)
+        XCTAssertNil(ResumeWidgets.cause(detail([("Sport régulier", 8, .modeDeVie),
+                                                 ("Beaucoup de café", -3, .nutrition)])))
     }
 
     func testLesVoisinsSAccordent() {

@@ -653,7 +653,7 @@ private enum JourneeLectureW {
     static func resume(_ etat: InstantaneJour) -> String {
         var morceaux = ["Ta journée", calories(etat)]
         if etat.serie > 0 {
-            morceaux.append("série de \(etat.serie) jours")
+            morceaux.append("série de \(etat.serie) \(etat.serie > 1 ? "jours" : "jour")")
         }
         return morceaux.joined(separator: ", ")
     }

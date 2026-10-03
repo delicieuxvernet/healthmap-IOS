@@ -82,6 +82,10 @@ struct InstantaneJour: Codable, Hashable {
     var conseils: [ConseilW]? = nil
     /// Id du conseil coché « C'est fait » ce jour-là.
     var conseilFait: String? = nil
+    /// Id du conseil que l'app a retenu pour ce jour-là. Un repas noté peut
+    /// changer la liste des candidats en cours de journée : le conseil du
+    /// jour, lui, ne change pas sous les yeux de la personne (ni sa coche).
+    var conseilChoisi: String? = nil
     /// Abonnement actif : le geste du conseil est réservé au Premium, comme
     /// « Ce que tu peux faire » dans la fiche d'un apport.
     var premium: Bool? = nil
@@ -133,6 +137,9 @@ struct InstantaneJour: Codable, Hashable {
     /// écrits, choisi par le rang du jour. Demain, un autre.
     var conseilDuJour: ConseilW? {
         guard let conseils, !conseils.isEmpty else { return nil }
+        if let choisi = conseilChoisi, let retenu = conseils.first(where: { $0.id == choisi }) {
+            return retenu
+        }
         return conseils[BoiteCommune.rangDuJour(jour) % conseils.count]
     }
 
@@ -177,6 +184,7 @@ struct InstantaneJour: Codable, Hashable {
             // d'ailleurs plus le même conseil). Les apports, eux, ne bougent
             // pas à minuit : ce sont ceux du registre.
             etat.conseilFait = nil
+            etat.conseilChoisi = nil
         }
         guard let attente, attente.jour == jourDemande else { return etat }
         if let eau = etat.eau, attente.verres != 0 {
