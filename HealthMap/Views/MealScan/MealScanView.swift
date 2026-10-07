@@ -118,11 +118,14 @@ struct JournalView: View {
         nonmutating set { dicteeBox.geste.glissement = newValue }
     }
     @State private var demarrageDictee: Task<Void, Never>?
-    /// Fin d'écoute : la transcription puis l'analyse tournent ici, sous la
-    /// bulle contractée. La feuille ne monte qu'avec leur résultat.
+    /// Fin d'écoute : la transcription tourne ici, sous la bulle contractée.
+    /// La feuille ne monte qu'avec son texte, à relire avant toute analyse.
     @State private var calculDictee: Task<Void, Never>?
-    /// Ce que le calcul a donné : la feuille de dictée s'ouvre dessus.
+    /// Ce que la transcription a donné : la feuille de dictée s'ouvre dessus.
     @State private var departDictee: VoiceMealSheet.Depart?
+    /// « Recommencer la dictée » depuis la feuille : la bulle se rouvre dès
+    /// que la feuille est redescendue.
+    @State private var redicterApresFeuille = false
     /// Le repas que la feuille de dictée vient d'enregistrer. La page ne bouge
     /// qu'à la fermeture de la feuille : c'est là que la pastille confirme et
     /// que la carte des calories compte jusqu'à sa nouvelle valeur.
@@ -261,6 +264,12 @@ struct JournalView: View {
         // doit pas resservir à la prochaine.
         EcouteCentre.partage.fermer()
         departDictee = nil
+        if redicterApresFeuille {
+            redicterApresFeuille = false
+            // Mains libres : aucun doigt ne tient le bouton.
+            demarrerDictee(verrouillee: true)
+            return
+        }
         guard let ajout = ajoutVocal else { return }
         ajoutVocal = nil
         // Pendant le tutoriel, c'est lui qui parle : pas de pastille par-dessus.
@@ -379,9 +388,10 @@ struct JournalView: View {
                             cibleGlucides: mesures.macros?.carbs,
                             cibleLipides: mesures.macros?.fat,
                             gratification: { gratificationDe($0) },
-                            // Déjà transcrite et chiffrée sous la bulle : la
-                            // feuille monte directement sur son résultat.
+                            // Déjà transcrite sous la bulle : la feuille monte
+                            // sur le texte, à relire avant l'analyse.
                             depart: departDictee,
+                            onRedicter: { redicterApresFeuille = true },
                             speech: speech
                         ) { ajout in
                             ajoutVocal = ajout
@@ -1516,8 +1526,9 @@ struct JournalView: View {
 
     /// Clôt la dictée : trop courte, la bulle retourne dans son bouton sans
     /// faire attendre ; sinon elle se contracte et tourne, le temps de
-    /// transcrire puis de chiffrer ce qui vient d'être dit, et la feuille
-    /// monte avec le résultat.
+    /// transcrire ce qui vient d'être dit, et la feuille monte avec le texte.
+    /// L'analyse (payante) n'est lancée que depuis la feuille, une fois le
+    /// texte relu.
     private func terminerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
@@ -1534,13 +1545,13 @@ struct JournalView: View {
         }
         HapticService.shared.lightTap()
         EcouteCentre.partage.contracter()
-        // Le calcul se fait ICI, sous la bulle : on referme le micro, on
-        // transcrit l'enregistrement entier, la carte le relit, puis le
-        // serveur chiffre. La feuille ne monte qu'avec le résultat (ou
-        // l'échec, qu'elle sait rejouer).
+        // La transcription se fait ICI, sous la bulle : on referme le micro,
+        // on transcrit l'enregistrement entier (sur l'appareil) et la carte le
+        // relit. La feuille monte avec ce texte (ou l'échec) : rien n'est
+        // encore parti au serveur.
         calculDictee?.cancel()
         calculDictee = Task { @MainActor in
-            let depart = await VoiceMealSheet.preparer(speech: speech) { texte in
+            let depart = await VoiceMealSheet.transcrire(speech: speech) { texte in
                 EcouteCentre.partage.transcrire(texte)
             }
             // Abandonné entre-temps (« Annuler » sous la bulle) : rien ne monte.
