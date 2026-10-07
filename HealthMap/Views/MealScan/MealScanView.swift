@@ -394,10 +394,9 @@ struct JournalView: View {
                             onRedicter: { redicterApresFeuille = true },
                             speech: speech
                         ) { ajout in
+                            // Le quota se décompte à « Lancer l'analyse », comme
+                            // sur le serveur (VoiceMealService.analyze).
                             ajoutVocal = ajout
-                            // Le quota ne se décompte QUE si la dictée a abouti
-                            // à un enregistrement — un essai annulé ne coûte rien.
-                            VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
                         }
                     }
                 }
@@ -413,9 +412,8 @@ struct JournalView: View {
                             gratification: { gratificationDe($0) },
                             speech: speech
                         ) { ajout in
+                            // Même quota que la dictée, décompté au même moment.
                             ajoutVocal = ajout
-                            // Même quota que la dictée : c'est la même analyse.
-                            VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
                         }
                     }
                 }

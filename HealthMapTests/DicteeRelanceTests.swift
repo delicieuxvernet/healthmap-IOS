@@ -22,4 +22,22 @@ final class DicteeRelanceTests: XCTestCase {
         XCTAssertFalse(VoiceMealService.estPassager(VoiceMealService.VoiceError.rateLimited))
         XCTAssertFalse(VoiceMealService.estPassager(NSError(domain: "x", code: 1)))
     }
+
+    // MARK: Quota aligné sur le serveur
+
+    func testLimiteDuServeurEpuiseLeCompteurLocal() {
+        let userId = "test-quota-\(UUID().uuidString)"
+        XCTAssertTrue(VoiceMealService.QuotaStore.peutDicter(userId: userId, isPremium: false))
+        VoiceMealService.QuotaStore.marquerÉpuisé(userId: userId)
+        XCTAssertFalse(VoiceMealService.QuotaStore.peutDicter(userId: userId, isPremium: false))
+        XCTAssertTrue(VoiceMealService.QuotaStore.peutDicter(userId: userId, isPremium: true), "un abonné dicte toujours")
+    }
+
+    func testChaqueEnvoiCompte() {
+        let userId = "test-quota-\(UUID().uuidString)"
+        for _ in 0..<VoiceMealService.QuotaStore.dictéesGratuitesParJour {
+            VoiceMealService.QuotaStore.enregistrerUneDictée(userId: userId)
+        }
+        XCTAssertFalse(VoiceMealService.QuotaStore.peutDicter(userId: userId, isPremium: false))
+    }
 }

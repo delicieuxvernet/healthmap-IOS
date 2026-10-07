@@ -218,6 +218,14 @@ final class VoiceMealService {
             UserDefaults.standard.set(UserDefaults.standard.integer(forKey: k) + 1, forKey: k)
         }
 
+        /// Le serveur a répondu « limite atteinte » : l'app se range à son
+        /// avis, la prochaine dictée ouvrira l'offre au lieu d'échouer.
+        static func marquerÉpuisé(userId: String) {
+            let k = clef(userId)
+            let actuel = UserDefaults.standard.integer(forKey: k)
+            UserDefaults.standard.set(max(actuel, dictéesGratuitesParJour), forKey: k)
+        }
+
         /// Reste-t-il une dictée aujourd'hui ? Toujours vrai pour un abonné.
         static func peutDicter(userId: String, isPremium: Bool) -> Bool {
             isPremium || utiliséesAujourdhui(userId: userId) < dictéesGratuitesParJour
@@ -274,12 +282,23 @@ final class VoiceMealService {
             let analysis: Analysis = try await TacheProtegee.executer("Dictée du repas") {
                 try await envoyerAvecUneRelance(corps)
             }
+            // Aligné sur le serveur (7 oct. 2026) : il a compté cette dictée à
+            // « Lancer l'analyse », le compteur de l'app aussi — même si aucun
+            // repas n'est enregistré ensuite. Avant, l'app ne comptait qu'à
+            // l'enregistrement : elle croyait qu'il restait une dictée, et la
+            // suivante finissait en « limite atteinte ».
+            if let userId = AuthService.shared.cachedCurrentUserIdString {
+                QuotaStore.enregistrerUneDictée(userId: userId)
+            }
             guard !analysis.nonAlimentaire, !analysis.aliments.isEmpty else {
                 throw VoiceError.noFood
             }
             return analysis
         } catch let error as FunctionsError {
             if case .httpError(let code, _) = error, code == 429 {
+                if let userId = AuthService.shared.cachedCurrentUserIdString {
+                    QuotaStore.marquerÉpuisé(userId: userId)
+                }
                 throw VoiceError.rateLimited
             }
             AppLogger.analysis.report(error, context: "parse-meal-voice \(String(describing: error))")
