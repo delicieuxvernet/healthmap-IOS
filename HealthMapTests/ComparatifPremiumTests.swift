@@ -41,6 +41,8 @@ final class ComparatifPremiumTests: XCTestCase {
         let gratuites = VoiceMealService.QuotaStore.dictéesGratuitesParJour
         XCTAssertEqual(gratuites, 2)
         XCTAssertEqual(ligne("dictee")?.gratuit, .valeur("\(gratuites) / jour"))
+        // Jamais « illimitées » : le serveur arrête un abonné à 60 par jour.
+        XCTAssertEqual(ligne("dictee")?.premium, .valeur("60 / jour"))
     }
 
     func testLesPhotosSuiventLesQuotasDuServeur() {

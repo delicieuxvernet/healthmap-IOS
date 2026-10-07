@@ -248,7 +248,7 @@ struct ComparatifPremiumView: View {
         )
     }
 
-    /// « Repas dictés. Gratuit : 2 / jour. Premium : illimités. »
+    /// « Repas dictés. Gratuit : 2 par jour. Premium : 60 par jour. »
     private func descriptionVocale(_ ligne: LigneComparatif) -> String {
         func dire(_ offre: OffreComparee) -> String {
             switch offre {
