@@ -35,6 +35,11 @@ enum UnitPortionCatalog {
         let grammes: Double
         /// Variantes de taille proposées en chips ; vide = on compte seulement.
         let tailles: [Taille]
+        /// Code de l'unité parlée côté serveur (`quantite_dite.unite` de
+        /// parse-meal-voice) : `piece`, `poignee`, `cuillere_soupe`, `carre`…
+        /// Sert à reconnaître, dans la liste d'un aliment, l'unité qui a été
+        /// dite. Les unités qui se comptent (« œuf », « banane ») sont `piece`.
+        var code: String = "piece"
 
         /// Index de la taille proposée d'office (celle du milieu).
         var tailleParDefaut: Int? { tailles.isEmpty ? nil : tailles.count / 2 }
@@ -64,20 +69,75 @@ enum UnitPortionCatalog {
 
     // MARK: - Résolution
 
-    /// Unité pour un aliment, d'après son nom puis, à défaut, les portions
-    /// renvoyées par le serveur (`label` « 1 … », `grammes`).
+    /// Unité proposée d'office pour un aliment : la première de `unites`.
     static func unite(pourNom nom: String,
                       portions: [(label: String, grammes: Double)] = []) -> Unite? {
+        unites(pourNom: nom, portions: portions).first
+    }
+
+    /// Toutes les unités proposées pour un aliment, la première étant celle
+    /// d'office (« pièce » puis « poignée » pour des noix, « carré » puis
+    /// « tablette » pour du chocolat). D'après le nom, puis, à défaut, les
+    /// portions renvoyées par le serveur (`label` « 1 … », `grammes`). Les
+    /// grammes ne sont pas dans la liste : l'écran les propose toujours en
+    /// dernier. Vide = la saisie se fait en grammes.
+    static func unites(pourNom nom: String,
+                       portions: [(label: String, grammes: Double)] = []) -> [Unite] {
         let norme = normaliser(nom)
         if !norme.isEmpty {
             for entree in entrees where norme.contains(entree.motif) {
                 if let sauf = entree.sauf, norme.contains(sauf) { continue }
-                if entree.generique, let serveur = uniteServeur(portions) { return serveur }
-                return entree.unite
+                if entree.generique, let serveur = uniteServeur(portions) { return [serveur] + entree.unites }
+                return entree.unites
             }
         }
-        return uniteServeur(portions)
+        return uniteServeur(portions).map { [$0] } ?? []
     }
+
+    /// Unités d'un aliment DICTÉ : l'unité dite passe en tête, avec le poids
+    /// d'une unité donné par le serveur et sans tailles (le compte dit × ce
+    /// poids doit retomber exactement sur les grammes comptés). On la cherche
+    /// dans la liste de l'aliment par son code ; une « pièce » dite prend, à
+    /// défaut, la première unité qui se compte (« canette », « carré »,
+    /// « tasse »), jamais une mesure (« poignée », « cuillère »). Introuvable,
+    /// elle est créée avec le libellé du serveur. Le mot d'une unité n'est
+    /// donc jamais marié au poids d'une autre (« 2 poignées · 10 g » pour deux
+    /// noix, 7 oct. 2026).
+    static func unites(dites code: String, singulier: String, pluriel: String,
+                       poidsUnite: Double, parmi catalogue: [Unite]) -> [Unite] {
+        guard poidsUnite > 0 else { return catalogue }
+        var liste = catalogue
+        let index = liste.firstIndex { $0.code == code }
+            ?? (code == "piece" ? liste.firstIndex { !codesMesure.contains($0.code) } : nil)
+        let dite: Unite
+        if let index {
+            let u = liste.remove(at: index)
+            dite = Unite(singulier: u.singulier, pluriel: u.pluriel,
+                         grammes: poidsUnite, tailles: [], code: u.code)
+        } else {
+            dite = Unite(singulier: singulier, pluriel: pluriel,
+                         grammes: poidsUnite, tailles: [], code: code)
+        }
+        return [dite] + liste
+    }
+
+    /// Mesures : on en prend une quantité, on ne les compte pas comme des
+    /// pièces. Une « pièce » dite ne tombe jamais dessus.
+    private static let codesMesure: Set<String> = ["poignee", "cuillere_soupe", "cuillere_cafe", "pincee"]
+
+    /// Code serveur d'une unité d'après son mot ; ce qui se compte (« œuf »,
+    /// « pot », « biscuit ») est une `piece`.
+    static func code(pourSingulier singulier: String) -> String {
+        codesServeur[singulier] ?? "piece"
+    }
+
+    private static let codesServeur: [String: String] = [
+        "pièce": "piece", "carré": "carre", "tablette": "tablette",
+        "poignée": "poignee", "pincée": "pincee",
+        "cuillère": "cuillere_soupe", "c. à soupe": "cuillere_soupe", "c. à café": "cuillere_cafe",
+        "tranche": "tranche", "bol": "bol", "verre": "verre", "tasse": "tasse",
+        "assiette": "assiette", "portion": "portion", "part": "part", "canette": "canette",
+    ]
 
     /// Nombre d'unités pour un grammage, arrondi au demi (« 1,5 banane »).
     static func nombre(grammes: Double, poidsUnite: Double) -> Double {
@@ -123,7 +183,8 @@ enum UnitPortionCatalog {
             return Unite(singulier: nomUnite,
                          pluriel: pluriel(de: nomUnite),
                          grammes: p.grammes,
-                         tailles: [])
+                         tailles: [],
+                         code: code(pourSingulier: nomUnite))
         }
         return nil
     }
@@ -165,7 +226,14 @@ enum UnitPortionCatalog {
         let motif: Regex<AnyRegexOutput>
         let sauf: Regex<AnyRegexOutput>?
         let generique: Bool
-        let unite: Unite
+        /// Jamais vide ; la première est l'unité proposée d'office.
+        let unites: [Unite]
+    }
+
+    /// Unité proposée en plus de celle d'office (« poignée » après « pièce »).
+    private static func autre(_ singulier: String, _ pluriel: String, _ grammes: Double) -> Unite {
+        Unite(singulier: singulier, pluriel: pluriel, grammes: grammes, tailles: [],
+              code: code(pourSingulier: singulier))
     }
 
     private static func tailles(_ libelles: (String, String, String),
@@ -181,15 +249,24 @@ enum UnitPortionCatalog {
     private static let contenantM = ("Petit", "Moyen", "Grand")
     private static let contenantF = ("Petite", "Moyenne", "Grande")
 
+    /// Oléagineux qui ne se comptent plus un par un : la noix de coco, et les
+    /// formes en poudre, effilées, hachées, en purée, en lait, en mélange…
+    private static let saufOleagineux = #"coco|poudre|effile|hache|puree|pate|beurre|lait|boisson|creme|huile|melange"#
+    /// Les « noix » qui ne pèsent pas 5 g pièce (Brésil, pécan, macadamia,
+    /// muscade, Saint-Jacques) ne passent pas à la pièce : rien ne change pour elles.
+    private static let saufNoix = #"bresil|pecan|macadamia|muscade|jacques|"# + saufOleagineux
+
     private static let entrees: [Entree] = definitions.compactMap { d in
         guard let motif = try? Regex(d.motif) else {
             assertionFailure("UnitPortionCatalog : motif invalide « \(d.motif) »")
             return nil
         }
         let sauf = d.sauf.flatMap { try? Regex($0) }
+        let principale = Unite(singulier: d.singulier, pluriel: d.pluriel,
+                               grammes: d.grammes, tailles: d.tailles,
+                               code: code(pourSingulier: d.singulier))
         return Entree(motif: motif, sauf: sauf, generique: d.generique,
-                      unite: Unite(singulier: d.singulier, pluriel: d.pluriel,
-                                   grammes: d.grammes, tailles: d.tailles))
+                      unites: [principale] + d.autres)
     }
 
     private struct Definition {
@@ -202,6 +279,8 @@ enum UnitPortionCatalog {
         /// Entrée « filet de sécurité » (portion de viande, de poisson) : la
         /// portion « 1 … » du serveur, plus précise, passe devant.
         var generique = false
+        /// Autres unités proposées en pastilles, après celle d'office.
+        var autres: [Unite] = []
     }
 
     /// Motifs écrits dans l'alphabet normalisé (minuscules, sans accents).
@@ -224,8 +303,11 @@ enum UnitPortionCatalog {
         .init(motif: #"\bcafes?\b|cappuccino|\blatte\b|macchiato"#, singulier: "tasse", pluriel: "tasses", grammes: 200, tailles: tailles(contenantF, 120, 200, 300)),
         .init(motif: #"\bthes?\b|infusions?|tisanes?|rooibos|\bmate\b"#, singulier: "tasse", pluriel: "tasses", grammes: 200, tailles: tailles(contenantF, 150, 200, 300)),
         .init(motif: #"chocolat chaud|chocolat a boire"#, singulier: "tasse", pluriel: "tasses", grammes: 200, tailles: tailles(contenantF, 150, 200, 300)),
-        .init(motif: #"chocolat en poudre|cacao|nesquik|poudre chocolatee|ovomaltine"#, singulier: "cuillère", pluriel: "cuillères", grammes: 10),
-        .init(motif: #"canettes?|\bsodas?\b|\bcola\b|\bcoca\b|limonade|energy|red bull|monster|ice tea|the glace|orangina|fanta|sprite|schweppes|tonic"#, singulier: "canette", pluriel: "canettes", grammes: 330),
+        // « Chocolat noir à 70% cacao…, tablette » nomme son cacao : c'est une
+        // tablette, pas de la poudre (elle tombait en cuillères, 7 oct. 2026).
+        .init(motif: #"chocolat en poudre|cacao|nesquik|poudre chocolatee|ovomaltine"#, sauf: #"tablette|\bcarres?\b|chocolat (noir|au lait|blanc)"#, singulier: "cuillère", pluriel: "cuillères", grammes: 10),
+        .init(motif: #"canettes?|\bsodas?\b|\bcola\b|\bcoca\b|limonade|energy|red bull|monster|ice tea|the glace|orangina|fanta|sprite|schweppes|tonic"#, singulier: "canette", pluriel: "canettes", grammes: 330,
+              autres: [autre("verre", "verres", 200)]),
         .init(motif: #"\bbieres?\b"#, singulier: "verre", pluriel: "verres", grammes: 250, tailles: tailles(("Demi", "Bouteille", "Pinte"), 250, 330, 500)),
         .init(motif: #"\bvins?\b|champagne|prosecco|cremant|\bcidre\b"#, singulier: "verre", pluriel: "verres", grammes: 120, tailles: tailles(contenantM, 100, 120, 150)),
         .init(motif: #"\bjus\b|\bnectar\b|smoothie"#, singulier: "verre", pluriel: "verres", grammes: 200, tailles: tailles(contenantM, 150, 200, 300)),
@@ -247,7 +329,8 @@ enum UnitPortionCatalog {
         .init(motif: #"compotes?|gourde"#, singulier: "pot", pluriel: "pots", grammes: 100),
 
         // ── 4. Pain, viennoiseries, biscuits, céréales ───────────────────
-        .init(motif: #"baguette|ficelle"#, singulier: "morceau", pluriel: "morceaux", grammes: 60, tailles: tailles(contenantM, 40, 60, 125)),
+        .init(motif: #"baguette|ficelle"#, singulier: "morceau", pluriel: "morceaux", grammes: 60, tailles: tailles(contenantM, 40, 60, 125),
+              autres: [autre("baguette", "baguettes", 250)]),
         .init(motif: #"biscottes?|cracottes?|\bwasa\b|krisprolls|pain grille"#, singulier: "biscotte", pluriel: "biscottes", grammes: 10),
         .init(motif: #"croissants?"#, singulier: "croissant", pluriel: "croissants", grammes: 60),
         .init(motif: #"pain au chocolat|chocolatine|pain aux raisins|chausson|viennoiserie"#, singulier: "pièce", pluriel: "pièces", grammes: 65),
@@ -268,11 +351,15 @@ enum UnitPortionCatalog {
         .init(motif: #"barres? (de |aux )?cereales|barre chocolatee|barre proteinee|barres? prot|kinder bueno|\btwix\b|\bmars\b|snickers|kitkat|kit kat|bounty|\blion\b"#, singulier: "barre", pluriel: "barres", grammes: 35),
         .init(motif: #"porridge"#, singulier: "bol", pluriel: "bols", grammes: 250, tailles: tailles(contenantM, 180, 250, 350)),
         .init(motif: #"cereales|muesli|corn ?flakes|chocapic|miel pops|frosties|special k|flocons d'avoine|\bgranola\b"#, singulier: "bol", pluriel: "bols", grammes: 40, tailles: tailles(contenantM, 30, 40, 60)),
-        .init(motif: #"carres? de chocolat|\bchocolat\b"#, singulier: "carré", pluriel: "carrés", grammes: 5),
+        // Chocolat en tablette (noir, au lait, blanc) : le carré pèse 10 g,
+        // comme côté serveur (portion CIQUAL « 2 carrés = 20 g »), la tablette 100 g.
+        .init(motif: #"carres? de chocolat|\bchocolat\b"#, sauf: #"tartiner|poudre"#, singulier: "carré", pluriel: "carrés", grammes: 10,
+              autres: [autre("tablette", "tablettes", 100)]),
         .init(motif: #"bonbons?|haribo|dragibus|tagada|carambar|sucettes?"#, singulier: "bonbon", pluriel: "bonbons", grammes: 5),
 
         // ── 5. Plats composés (avant leurs ingrédients) ──────────────────
-        .init(motif: #"pizzas?"#, singulier: "part", pluriel: "parts", grammes: 100, tailles: tailles(contenantF, 80, 100, 150)),
+        .init(motif: #"pizzas?"#, singulier: "part", pluriel: "parts", grammes: 100, tailles: tailles(contenantF, 80, 100, 150),
+              autres: [autre("pizza", "pizzas", 400)]),
         .init(motif: #"lasagnes?|moussaka|gratin|hachis parmentier|parmentier"#, singulier: "part", pluriel: "parts", grammes: 250, tailles: tailles(contenantF, 180, 250, 350)),
         .init(motif: #"burgers?|hamburger|cheeseburger|big mac|whopper"#, singulier: "burger", pluriel: "burgers", grammes: 200),
         .init(motif: #"sandwichs?|sandwiches|paninis?|croque-?monsieur|croque-?madame|\bcroque\b|jambon-beurre"#, singulier: "sandwich", pluriel: "sandwichs", grammes: 200),
@@ -325,13 +412,26 @@ enum UnitPortionCatalog {
         // 1 c. à soupe = 15 ml × 0,92 g/ml ≈ 14 g : la MÊME cuillère que la
         // saisie vocale (quantities.ts). À 10 g, « deux cuillères » dictées
         // (28 g côté serveur) s'affichaient « 3 cuillères » (30 sept. 2026).
-        .init(motif: #"\bhuiles?\b"#, singulier: "cuillère", pluriel: "cuillères", grammes: 14),
+        // La c. à café : 5 ml × 0,92 g/ml ≈ 4,6 g.
+        .init(motif: #"\bhuiles?\b"#, singulier: "c. à soupe", pluriel: "c. à soupe", grammes: 14,
+              autres: [autre("c. à café", "c. à café", 4.6)]),
         .init(motif: #"sucre (en poudre|semoule|glace|roux|de canne)|cassonade|vergeoise"#, singulier: "cuillère", pluriel: "cuillères", grammes: 5),
         .init(motif: #"\bsucre\b"#, singulier: "morceau", pluriel: "morceaux", grammes: 5),
         .init(motif: #"\bsauces?\b|ketchup|mayonnaise|moutarde|vinaigrette|aioli|pesto|tzatziki|houmous|hummus|guacamole|tapenade|tarama"#, singulier: "cuillère", pluriel: "cuillères", grammes: 15),
         .init(motif: #"creme (fraiche|liquide|epaisse|fleurette|legere)"#, singulier: "cuillère", pluriel: "cuillères", grammes: 15),
 
         // ── 9. Oléagineux, fruits secs (poignée) ─────────────────────────
+        // Ceux qu'on compte aussi un par un : la pièce d'office (« deux noix »),
+        // la poignée ensuite. En poudre, en purée, en lait… : la poignée seule,
+        // plus bas.
+        .init(motif: #"noix de cajou|\bcajou\b"#, sauf: saufOleagineux, singulier: "pièce", pluriel: "pièces", grammes: 1.5,
+              autres: [autre("poignée", "poignées", 30)]),
+        .init(motif: #"\bnoix\b"#, sauf: saufNoix, singulier: "pièce", pluriel: "pièces", grammes: 5,
+              autres: [autre("poignée", "poignées", 30)]),
+        .init(motif: #"amandes?"#, sauf: saufOleagineux, singulier: "pièce", pluriel: "pièces", grammes: 1.2,
+              autres: [autre("poignée", "poignées", 30)]),
+        .init(motif: #"noisettes?"#, sauf: saufOleagineux, singulier: "pièce", pluriel: "pièces", grammes: 1.5,
+              autres: [autre("poignée", "poignées", 30)]),
         .init(motif: #"amandes?|noisettes?|noix de cajou|\bcajou\b|pistaches?|cacahuetes?|cacahouetes?|arachides?|noix (du bresil|de pecan|de macadamia)|\bpecan\b|\bnoix\b|melange de (fruits secs|noix|graines)|graines de|raisins secs|fruits secs"#, singulier: "poignée", pluriel: "poignées", grammes: 30),
 
         // ── 10. Fruits, légumes à la pièce ───────────────────────────────

@@ -86,6 +86,117 @@ final class UnitPortionCatalogTests: XCTestCase {
         XCTAssertEqual(unite("Glace au chocolat")?.singulier, "boule")
     }
 
+    // MARK: - Plusieurs unités par aliment (retour d'Arthur, 7 oct. 2026)
+    // « Deux noix » proposait deux poignées ; une tablette de chocolat se
+    // comptait en cuillères. Chaque aliment a désormais sa liste d'unités, la
+    // première proposée d'office ; « g » est ajouté par l'écran, en dernier.
+
+    private func unites(_ nom: String) -> [UnitPortionCatalog.Unite] {
+        UnitPortionCatalog.unites(pourNom: nom)
+    }
+
+    func testTabletteDeChocolatSeCompteEnCarres() {
+        let tablette = unites("Chocolat noir à 70% cacao minimum, extra, dégustation, tablette")
+        XCTAssertEqual(tablette.map(\.singulier), ["carré", "tablette"],
+                       "« 70% cacao » ne doit plus tomber sur le chocolat en poudre")
+        XCTAssertEqual(tablette.map(\.grammes), [10, 100], "10 g le carré, comme côté serveur")
+        XCTAssertEqual(tablette.first?.code, "carre")
+        XCTAssertEqual(unite("Chocolat au lait, tablette")?.singulier, "carré")
+        XCTAssertEqual(unite("Chocolat blanc, tablette")?.singulier, "carré")
+    }
+
+    func testChocolatEnPoudreResteEnCuilleres() {
+        XCTAssertEqual(unites("Chocolat en poudre").map(\.singulier), ["cuillère"])
+        XCTAssertEqual(unite("Cacao, non sucré, poudre soluble")?.singulier, "cuillère")
+        XCTAssertEqual(unite("Pâte à tartiner au chocolat")?.singulier, "cuillère",
+                       "une pâte à tartiner ne se compte pas en carrés")
+    }
+
+    func testNoixSeComptentALaPieceOuALaPoignee() {
+        let noix = unites("Noix, séchée, cerneaux")
+        XCTAssertEqual(noix.map(\.singulier), ["pièce", "poignée"])
+        XCTAssertEqual(noix.map(\.grammes), [5, 30])
+        XCTAssertEqual(noix.map(\.code), ["piece", "poignee"])
+        XCTAssertEqual(noix.first?.libelle(nombre: 2), "2 pièces")
+
+        XCTAssertEqual(unites("Amande, grillée, salée").map(\.grammes), [1.2, 30])
+        XCTAssertEqual(unites("Noisette").map(\.grammes), [1.5, 30])
+        XCTAssertEqual(unites("Noix de cajou, grillée, salée").map(\.grammes), [1.5, 30])
+    }
+
+    func testOleagineuxQuiNeSeComptentPas() {
+        XCTAssertEqual(unites("Noix de coco, amande mûre, fraîche").map(\.singulier), ["poignée"])
+        XCTAssertEqual(unites("Amande, poudre").map(\.singulier), ["poignée"])
+        XCTAssertEqual(unites("Pistache, grillée, salée").map(\.singulier), ["poignée"])
+    }
+
+    func testHuileEnCuillereASoupeOuACafe() {
+        let huile = unites("Huile d'olive vierge extra")
+        XCTAssertEqual(huile.map(\.singulier), ["c. à soupe", "c. à café"])
+        XCTAssertEqual(huile.map(\.grammes), [14, 4.6])
+        XCTAssertEqual(huile.map(\.code), ["cuillere_soupe", "cuillere_cafe"])
+    }
+
+    func testUneSeuleUniteEtAucune() {
+        XCTAssertEqual(unites("Oeuf, cru").map(\.singulier), ["œuf"])
+        XCTAssertEqual(unites("Oeuf, cru").first?.code, "piece")
+        XCTAssertTrue(unites("Farine de blé").isEmpty)
+        XCTAssertTrue(unites("").isEmpty)
+    }
+
+    // MARK: - Unité dite dans le vocal (code serveur)
+
+    private func dites(_ code: String, _ singulier: String, _ pluriel: String,
+                       _ poids: Double, _ nom: String) -> [UnitPortionCatalog.Unite] {
+        UnitPortionCatalog.unites(dites: code, singulier: singulier, pluriel: pluriel,
+                                  poidsUnite: poids, parmi: unites(nom))
+    }
+
+    func testDeuxNoixDitesSontDeuxPieces() {
+        let liste = dites("piece", "pièce", "pièces", 5, "Noix, séchée, cerneaux")
+        XCTAssertEqual(liste.map(\.singulier), ["pièce", "poignée"])
+        XCTAssertEqual(liste.first?.grammes, 5)
+        XCTAssertEqual(liste.first?.libelle(nombre: 2), "2 pièces", "plus jamais « 2 poignées · 10 g »")
+    }
+
+    func testUnePoigneeDiteRestePoignee() {
+        let liste = dites("poignee", "poignée", "poignées", 30, "Noix, séchée, cerneaux")
+        XCTAssertEqual(liste.map(\.singulier), ["poignée", "pièce"])
+        XCTAssertEqual(liste.map(\.grammes), [30, 5])
+    }
+
+    func testCarresDeChocolatDits() {
+        let tablette = "Chocolat noir à 70% cacao minimum, extra, dégustation, tablette"
+        XCTAssertEqual(dites("carre", "carré", "carrés", 10, tablette).map(\.singulier), ["carré", "tablette"])
+        // Un serveur qui dit encore « piece » pour des carrés : le carré se
+        // compte, il est retenu.
+        let piece = dites("piece", "pièce", "pièces", 10, tablette)
+        XCTAssertEqual(piece.first?.singulier, "carré")
+        XCTAssertEqual(piece.first?.grammes, 10)
+    }
+
+    func testUnePieceDiteNeTombeJamaisSurUneMesure() {
+        // Les pistaches n'ont que la poignée : la pièce dite est créée avec le
+        // libellé et le poids du serveur, la poignée reste proposée ensuite.
+        let liste = dites("piece", "pièce", "pièces", 0.8, "Pistache, grillée, salée")
+        XCTAssertEqual(liste.map(\.singulier), ["pièce", "poignée"])
+        XCTAssertEqual(liste.map(\.grammes), [0.8, 30])
+        XCTAssertEqual(liste.first?.code, "piece")
+    }
+
+    func testUniteDiteInconnueDuCatalogue() {
+        let liste = dites("verre", "verre", "verres", 200, "Noix, séchée, cerneaux")
+        XCTAssertEqual(liste.map(\.singulier), ["verre", "pièce", "poignée"])
+        XCTAssertEqual(liste.first?.code, "verre")
+        XCTAssertTrue(liste.first?.tailles.isEmpty ?? false)
+    }
+
+    func testUniteDiteSansPoidsGardeLeCatalogue() {
+        let liste = dites("piece", "pièce", "pièces", 0, "Noix, séchée, cerneaux")
+        XCTAssertEqual(liste.map(\.singulier), ["pièce", "poignée"])
+        XCTAssertEqual(liste.first?.grammes, 5)
+    }
+
     func testAlimentsPesesN_ontPasD_unite() {
         XCTAssertNil(unite("Lardons"))
         XCTAssertNil(unite("Champignon de Paris"))
@@ -219,7 +330,7 @@ final class UnitPortionCatalogTests: XCTestCase {
             "Oeuf": "œuf", "Banane": "banane", "Pomme": "pomme", "Pain de mie": "tranche",
             "Yaourt nature": "pot", "Camembert": "part", "Jambon blanc": "tranche",
             "Saumon, cuit": "pavé", "Steak haché": "steak", "Riz blanc, cuit": "assiette",
-            "Lentilles, cuites": "portion", "Amandes": "poignée", "Café": "tasse",
+            "Lentilles, cuites": "portion", "Amandes": "pièce", "Café": "tasse",
             "Bière": "verre", "Pizza": "part", "Sandwich jambon": "sandwich",
             "Biscuit petit beurre": "biscuit", "Barre de céréales": "barre", "Carotte": "carotte",
         ]
