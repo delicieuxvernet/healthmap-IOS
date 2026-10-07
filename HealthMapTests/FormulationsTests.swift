@@ -234,7 +234,7 @@ final class FormulationsTests: XCTestCase {
 
     // MARK: - Le brief instantané
 
-    func testRepasMemorises_serecalculentSansReseau() {
+    func testRepasMemorises_serecalculentSansReseau() throws {
         let suite = "formulations-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -258,6 +258,14 @@ final class FormulationsTests: XCTestCase {
         XCTAssertEqual(relus.count, 2)
         XCTAssertEqual(BriefDuJourBuilder.couverture(jour: hier, repas: relus)["iron"], 40,
                        "les apports d'hier doivent survivre au passage sur le disque")
+        XCTAssertEqual(BriefDuJourBuilder.alimentsNotes(jour: hier, repas: relus), ["Repas"],
+                       "le nom des aliments aussi : le récap dit « hier, tu as noté… » sans réseau")
+
+        // Un cache écrit avant le récap (sans aliments) se relit toujours.
+        let ancien = try JSONSerialization.data(withJSONObject: [["jour": hier.timeIntervalSinceReferenceDate, "micros": ["iron": 20]]])
+        let anciensRelus = try JSONDecoder().decode([BriefDuJourStore.RepasMemorise].self, from: ancien)
+        XCTAssertEqual(anciensRelus.count, 1)
+        XCTAssertNil(anciensRelus.first?.aliments)
 
         // Trop vieux : on préfère repasser par le réseau qu'afficher
         // les chiffres d'avant-hier.

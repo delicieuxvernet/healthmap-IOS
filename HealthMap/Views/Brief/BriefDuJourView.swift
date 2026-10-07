@@ -1,42 +1,96 @@
 import SwiftUI
 import UserNotifications
 
-// MARK: - Brief du jour (plein écran, première ouverture de la journée)
+// MARK: - Récap du jour (plein écran, première ouverture de la journée)
 //
-// Même grammaire que le récap de fin de questionnaire (fond de verre, barre
-// segmentée, compteur animé, jauges), mais piloté au DOIGT seulement : un
-// brief se survole, il ne défile pas tout seul. Tap à droite = suivant, à
-// gauche = précédent, glisser vers le bas ou la croix = fermer.
+// Refonte du 7 octobre 2026, demande d'Arthur : « on rentre dans le vif du
+// sujet, pas besoin d'appuyer pour avoir le récap ». Fini les cinq écrans à
+// toucher (bonjour, hier, manques, effort, cible) : UN écran qui arrive d'un
+// coup, en très gros, et dit dans l'ordre
 //
-// Il ne bloque jamais rien : fermable à tout moment, et l'appelant ne le
-// présente que s'il a au moins deux écrans à montrer.
+//   1. ce qui a été noté hier (les aliments, en pastilles) ;
+//   2. les DEUX apports qui ont le plus manqué, et pour chacun L'aliment à
+//      ajouter aujourd'hui ;
+//   3. une raison de revenir demain : un compte à rebours, un progrès, une
+//      série, une stat publique sourcée, sinon une phrase.
 //
-// Verre liquide (2 octobre 2026) : la chorégraphie ne bouge pas. Seules les
-// surfaces changent : fond de verre (teinte kiwi), cartes de verre (`.dsCard()`),
-// action principale en verre vert (`DSCapsuleButton`), croix en rond de verre
-// clair, feuille d'invitation sur le verre de feuille.
+// Tout le contenu vient de `BriefDuJourBuilder` : aucun chiffre inventé.
+// L'invitation aux notifications, quand elle est due, prend le relais après
+// « C'est parti » au lieu de fermer.
+//
+// Il ne bloque jamais rien : la croix et le glissé vers le bas ferment à tout
+// moment.
 
 struct BriefDuJourView: View {
-    let slides: [BriefSlide]
+    let brief: BriefDuJour
+    /// L'invitation aux notifications suit le récap (autorisation jamais
+    /// demandée, pas repoussée récemment).
+    let proposerInvitation: Bool
     /// « Ajouter mes repas d'hier » : le journal s'ouvre sur la veille.
     let onAjouterHier: () -> Void
     let onTerminer: () -> Void
+    var maintenant: Date = Date()
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var index = 0
+    @State private var apparu = false
+    @State private var enInvitation = false
     @State private var demandeEnCours = false
 
-    /// Même partage que le récap : 40 % à gauche reviennent, le reste avance.
-    private static let partRetour: CGFloat = 0.4
+    /// Au plus six pastilles : au-delà, « +3 » dit le reste.
+    private static let pastillesMax = 6
 
-    private var slideCourant: BriefSlide? {
-        slides.indices.contains(index) ? slides[index] : nil
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            WarmBackground().ignoresSafeArea()
+
+            Group {
+                if enInvitation {
+                    ScrollView {
+                        invitation
+                            .padding(.horizontal, DS.marge)
+                            .padding(.top, 64)
+                            .padding(.bottom, Theme.spacingLG)
+                    }
+                    .transition(transitionEcran)
+                } else {
+                    ScrollView {
+                        recap
+                            .padding(.horizontal, DS.marge)
+                            .padding(.top, 56)
+                            .padding(.bottom, Theme.spacingLG)
+                    }
+                    .transition(transitionEcran)
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 60).onEnded { valeur in
+                    guard valeur.translation.height > 80,
+                          abs(valeur.translation.width) < 60 else { return }
+                    terminer(raison: "glisser")
+                }
+            )
+
+            boutonFermer
+                .padding(.leading, Theme.spacingSM)
+                .padding(.top, Theme.spacingSM)
+        }
+        .animation(reduceMotion ? nil : Animation.kiwiFluide, value: enInvitation)
+        .onAppear {
+            AnalyticsService.shared.track(.screenViewed, properties: [
+                "screen": "brief_du_jour",
+                "priorites": brief.priorites.count,
+                "periode": brief.priorites.first?.periode.rawValue ?? "aucune",
+                "accroche": brief.accroche?.genre.rawValue ?? "aucune",
+            ])
+            HapticService.shared.success()
+            apparu = true
+        }
+        .dynamicTypeSize(.large ... .accessibility3)
     }
 
-    private var estDernier: Bool { index >= slides.count - 1 }
-
-    /// Typée `AnyTransition` (comme dans le récap) : en ternaire, `.opacity`
-    /// est ambigu depuis iOS 17 (`AnyTransition` ou `Transition`).
+    /// Typée `AnyTransition` : en ternaire, `.opacity` est ambigu depuis
+    /// iOS 17 (`AnyTransition` ou `Transition`).
     private var transitionEcran: AnyTransition {
         reduceMotion
             ? .opacity
@@ -46,312 +100,275 @@ struct BriefDuJourView: View {
             )
     }
 
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                WarmBackground().ignoresSafeArea()
+    // MARK: - Le récap
 
-                VStack(spacing: Theme.spacingSM) {
-                    entete
+    private var recap: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            titre
+                .padding(.bottom, Theme.spacingLG)
 
-                    if let slide = slideCourant {
-                        ScrollView {
-                            contenu(slide)
-                                .padding(.horizontal, Theme.spacingLG)
-                                .padding(.vertical, Theme.spacingLG)
-                                .frame(maxWidth: .infinity, minHeight: max(geo.size.height - 200, 200), alignment: .topLeading)
-                                .contentShape(Rectangle())
-                                .id(slide.id)
-                                .transition(transitionEcran)
-                                .onTapGesture(coordinateSpace: .local) { point in
-                                    if point.x < geo.size.width * Self.partRetour {
-                                        precedent()
-                                    } else {
-                                        suivant()
-                                    }
-                                }
-                        }
-                        .scrollBounceBehavior(.basedOnSize)
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 60).onEnded { valeur in
-                                guard valeur.translation.height > 80,
-                                      abs(valeur.translation.width) < 60 else { return }
-                                terminer(raison: "glisser")
-                            }
-                        )
+            blocHier
+                .apparitionRecap(apparu, rang: 1)
+                .padding(.bottom, Theme.spacingLG)
+
+            if brief.priorites.isEmpty {
+                carteRienNAManque
+                    .apparitionRecap(apparu, rang: 2)
+                    .padding(.bottom, DS.interCarte)
+            } else {
+                ForEach(Array(brief.priorites.enumerated()), id: \.element.id) { position, priorite in
+                    cartePriorite(priorite, numero: position + 1)
+                        .apparitionRecap(apparu, rang: 2 + position)
+                        .padding(.bottom, DS.interCarte)
+                }
+            }
+
+            if let accroche = brief.accroche {
+                carteAccroche(accroche)
+                    .apparitionRecap(apparu, rang: 4)
+                    .padding(.top, DS.interCarte)
+            }
+
+            VStack(spacing: Theme.spacingSM) {
+                DSCapsuleButton(titre: "C'est parti", brillance: true) {
+                    if proposerInvitation {
+                        HapticService.shared.tap()
+                        AnalyticsService.shared.track(.screenViewed, properties: ["screen": "brief_invitation"])
+                        enInvitation = true
+                    } else {
+                        terminer(raison: "fin")
                     }
-
-                    Text("Calculé sur les repas que tu as notés.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.dsSecondaire)
-                        .padding(.bottom, Theme.spacingSM)
                 }
-                .padding(.top, Theme.spacingSM)
+                Text("Calculé sur les repas que tu as notés.")
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
             }
-        }
-        .animation(reduceMotion ? .none : .easeInOut(duration: 0.25), value: index)
-        .onAppear {
-            AnalyticsService.shared.track(.screenViewed, properties: [
-                "screen": "brief_du_jour",
-                "slides": slides.count,
-            ])
-        }
-        .dynamicTypeSize(.large ... .accessibility3)
-    }
-
-    // MARK: - Chrome
-
-    private var entete: some View {
-        VStack(spacing: Theme.spacingSM) {
-            RecapProgressBar(total: slides.count, index: index, avancee: 1)
-                .padding(.horizontal, Theme.spacingMD)
-
-            HStack {
-                Button {
-                    terminer(raison: "croix")
-                } label: {
-                    // Rond de verre clair de 36 pt, cible de 44 pt.
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Verre.iconeNeutre)
-                        .frame(width: 36, height: 36)
-                        .verreClair(Circle())
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.dsPress)
-                .accessibilityLabel("Fermer le brief du jour")
-                Spacer()
-            }
-            .padding(.horizontal, Theme.spacingSM)
+            .apparitionRecap(apparu, rang: 5)
+            .padding(.top, Theme.spacingXL)
         }
     }
 
-    // MARK: - Navigation
+    // MARK: Titre
 
-    private func suivant() {
-        guard !estDernier else {
-            // Le dernier écran se ferme par son bouton : un tap distrait ne
-            // doit pas faire rater l'invitation ou le conseil du jour.
-            return
+    /// « Récap du jour » en très gros : il arrive en rebond, avant tout le
+    /// reste.
+    private var titre: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(Self.surTitre(prenom: brief.prenom, maintenant: maintenant))
+                .font(.dsSousTitreMoyen)
+                .foregroundStyle(Color.dsSecondaire)
+                .apparitionRecap(apparu, rang: 0)
+
+            Text("Récap\ndu jour")
+                .font(.system(size: 56, weight: .bold))
+                .tracking(-2.2)
+                .lineSpacing(-6)
+                .foregroundStyle(Color.dsTexte)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+                .fixedSize(horizontal: false, vertical: true)
+                .scaleEffect(apparu || reduceMotion ? 1 : 0.6, anchor: .bottomLeading)
+                .opacity(apparu ? 1 : 0)
+                .animation(reduceMotion ? nil : Animation.kiwiRebond, value: apparu)
+                .accessibilityAddTraits(.isHeader)
         }
-        HapticService.shared.tap()
-        index += 1
     }
 
-    private func precedent() {
-        guard index > 0 else { return }
-        HapticService.shared.tap()
-        index -= 1
-    }
-
-    private func terminer(raison: String) {
-        AnalyticsService.shared.track(.screenViewed, properties: [
-            "screen": "brief_du_jour_ferme",
-            "raison": raison,
-            "index": index,
-            "slide": slideCourant?.typeName ?? "",
-        ])
-        onTerminer()
-    }
-
-    // MARK: - Écrans
+    // MARK: Hier
 
     @ViewBuilder
-    private func contenu(_ slide: BriefSlide) -> some View {
-        switch slide {
-        case .intro(let prenom):
-            ecranIntro(prenom: prenom)
-        case .hier(let couverts, let avantHier):
-            ecranHier(couverts: couverts, avantHier: avantHier)
-        case .rienHier(let repas):
-            ecranRienHier(repas: repas)
-        case .manques(let manques):
-            ecranManques(manques)
-        case .effort(let effort):
-            ecranEffort(effort)
-        case .cible(let cible):
-            ecranCible(cible)
-        case .invitation(let cible):
-            ecranInvitation(cible: cible)
-        }
-    }
-
-    private func ecranIntro(prenom: String?) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende(prenom.map { "Bonjour \($0)" } ?? "Bonjour")
-            Text("Voici où tu en étais hier, et ce qui compte aujourd'hui.")
-                .font(.dsSection)
-                .foregroundStyle(Color.dsTexte)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: Theme.spacingXL)
-            HStack {
-                Spacer()
-                KiwiSigne(taille: 72)
-                    .accessibilityHidden(true)
-                Spacer()
+    private var blocHier: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !brief.alimentsHier.isEmpty {
+                legende("Hier, tu as noté")
+                DSFlow(espacement: 8) {
+                    ForEach(Array(brief.alimentsHier.prefix(Self.pastillesMax).enumerated()), id: \.offset) { _, aliment in
+                        pastille(aliment)
+                    }
+                    if brief.alimentsHier.count > Self.pastillesMax {
+                        pastille("+\(brief.alimentsHier.count - Self.pastillesMax)")
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Hier, tu as noté : \(brief.alimentsHier.joined(separator: ", "))")
             }
-            Spacer(minLength: Theme.spacingXL)
-            indiceTap
-        }
-    }
 
-    private func ecranHier(couverts: Int, avantHier: Int?) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Hier")
-            Spacer(minLength: Theme.spacingXL)
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Spacer()
-                RecapCompteur(valeur: couverts, taille: 88, couleur: .dsAccent)
-                Text("/ 10")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(Color.dsSecondaire)
-                Spacer()
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(couverts) besoins sur 10 couverts hier")
-            Text("besoins couverts")
-                .font(.dsHeadline)
-                .foregroundStyle(Color.dsTexte)
-                .frame(maxWidth: .infinity)
-            if let comparaison = Self.comparaison(couverts: couverts, avantHier: avantHier) {
-                Text(comparaison)
+            if let couverts = brief.besoinsCouvertsHier {
+                Text(Self.ligneBesoins(couverts: couverts, avantHier: brief.besoinsCouvertsAvantHier))
                     .font(.dsSousTitre)
                     .foregroundStyle(Color.dsSecondaire)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-            }
-            Spacer(minLength: Theme.spacingXL)
-            if estDernier { boutonFin }
-        }
-    }
-
-    private func ecranRienHier(repas: Int) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Hier")
-            Text(repas == 0 ? "Rien de noté hier." : "Un seul repas noté hier.")
-                .font(.dsSection)
-                .foregroundStyle(Color.dsTexte)
-            Text("Tes repas d'hier comptent encore : ajoute-les, et ton suivi se met à jour.")
-                .font(.dsCorps)
-                .foregroundStyle(Color.dsSecondaire)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: Theme.spacingLG)
-            DSCapsuleButton(titre: "Ajouter mes repas d'hier") {
-                AnalyticsService.shared.track(.screenViewed, properties: ["screen": "brief_ajouter_hier"])
-                onAjouterHier()
-            }
-            if estDernier {
-                boutonFin
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
-                indiceTap
-            }
-        }
-    }
-
-    private func ecranManques(_ manques: [BriefDuJour.Manque]) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Ce qui a manqué hier")
-            ForEach(manques, id: \.id) { manque in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(manque.nom)
+                // Hier trop peu noté : on le dit, et on propose de rattraper.
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(brief.repasHier == 0 ? "Rien de noté hier." : "Un seul repas noté hier.")
                         .font(.dsHeadline)
                         .foregroundStyle(Color.dsTexte)
-                    RecapJaugeApport(
-                        pourcent: manque.pourcent,
-                        couleur: NutrientData.definition(for: manque.id)?.color ?? .dsAccent
-                    )
+                    Button {
+                        AnalyticsService.shared.track(.screenViewed, properties: ["screen": "brief_ajouter_hier"])
+                        onAjouterHier()
+                    } label: {
+                        Label("Ajouter mes repas d'hier", systemImage: "plus")
+                            .font(.dsSousTitreFort)
+                            .foregroundStyle(Color.dsAccent)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: DS.cibleTactile)
+                            .verreClair()
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.dsPress)
                 }
-                .padding(.bottom, Theme.spacingSM)
             }
-            if let plusBas = manques.first, plusBas.pourcent < 100 {
-                Text("Il t'a manqué \(100 - plusBas.pourcent) % \(NomNutriment.complement(id: plusBas.id, nom: plusBas.nom)) : c'est ta priorité du jour.")
+        }
+    }
+
+    private func pastille(_ texte: String) -> some View {
+        Text(texte)
+            .font(.dsSousTitreMoyen)
+            .foregroundStyle(Color.dsTexte)
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .verreClair()
+    }
+
+    // MARK: Les deux priorités
+
+    /// « Il te manquait du fer » → « Ajoute des lentilles ». Le nom de l'apport
+    /// et l'aliment sont les deux plus gros textes de la carte : c'est tout ce
+    /// qu'il faut retenir.
+    private func cartePriorite(_ priorite: BriefDuJour.Priorite, numero: Int) -> some View {
+        let teinte = NutrientData.definition(for: priorite.id)?.color ?? .dsAccent
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                legende(Self.legende(periode: priorite.periode))
+                Spacer(minLength: 8)
+                Text("\(numero)/\(brief.priorites.count)")
+                    .font(.dsLegendeMoyenne)
+                    .monospacedDigit()
+                    .foregroundStyle(Color.dsTertiaire)
+                    .accessibilityHidden(true)
+            }
+
+            HStack(alignment: .center, spacing: 12) {
+                Text(priorite.emoji)
+                    .font(.system(size: 30))
+                    .accessibilityHidden(true)
+                Text(priorite.nom)
+                    .font(.system(size: 34, weight: .bold))
+                    .tracking(-1.2)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Spacer(minLength: 0)
+            }
+
+            if let pourcent = priorite.pourcent {
+                RecapJaugeApport(pourcent: pourcent, couleur: teinte)
+            }
+
+            DSSeparator()
+
+            HStack(alignment: .center, spacing: 14) {
+                Image(systemName: "plus")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(teinte)
+                    .frame(width: 48, height: 48)
+                    .background(Circle().fill(teinte.opacity(0.16)))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ajoute aujourd'hui")
+                        .font(.dsLegendeMoyenne)
+                        .foregroundStyle(Color.dsSecondaire)
+                    Text(priorite.aliment)
+                        .font(.system(size: 28, weight: .bold))
+                        .tracking(-0.8)
+                        .foregroundStyle(Color.dsTexte)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Self.phraseAccessible(priorite))
+    }
+
+    /// Hier assez noté, et tout au-dessus de 70 % : on le fête au lieu
+    /// d'inventer un manque.
+    private var carteRienNAManque: some View {
+        HStack(alignment: .center, spacing: 14) {
+            KiwiSigne(taille: 44)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Rien n'a vraiment manqué")
+                    .font(.dsSection)
+                    .foregroundStyle(Color.dsTexte)
+                Text("Tes apports suivis ont tous passé 70 %. Refais pareil aujourd'hui.")
                     .font(.dsSousTitre)
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if estDernier { boutonFin }
+            Spacer(minLength: 0)
         }
+        .padding(20)
+        .dsCard()
+        .accessibilityElement(children: .combine)
     }
 
-    private func ecranEffort(_ effort: BriefDuJour.Effort) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Ton effort qui paie")
-            Spacer(minLength: Theme.spacingXL)
-            Text("+\(effort.points)")
-                .font(.system(size: 72, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(Color.dsAccent)
-                .frame(maxWidth: .infinity)
-            Text("points \(NomNutriment.complement(id: effort.id, nom: effort.nom)) cette semaine")
-                .font(.dsHeadline)
-                .foregroundStyle(Color.dsTexte)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-            Text("Par rapport à la semaine dernière. Continue comme ça.")
-                .font(.dsSousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-            Spacer(minLength: Theme.spacingXL)
-            if estDernier { boutonFin }
-        }
-    }
+    // MARK: L'accroche
 
-    private func ecranCible(_ cible: CibleNutritionnelle) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Aujourd'hui, mise sur")
-            Text(cible.avecPossessif)
-                .font(.dsGrandTitre)
-                .foregroundStyle(Color.dsTexte)
-
-            if !cible.aliments.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(cible.aliments.enumerated()), id: \.offset) { position, aliment in
-                        if position > 0 { DSSeparator() }
-                        HStack(spacing: 12) {
-                            Image(systemName: "fork.knife")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(Color.dsAccent)
-                                .frame(width: 22)
-                                .accessibilityHidden(true)
-                            Text(NomNutriment.majusculeInitiale(aliment))
-                                .font(.dsCorps)
-                                .foregroundStyle(Color.dsTexte)
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.vertical, 12)
+    private func carteAccroche(_ accroche: BriefDuJour.Accroche) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let prefixe = accroche.prefixe {
+                Text(prefixe)
+                    .font(.dsHeadline)
+                    .foregroundStyle(Color.dsTexte)
+            }
+            if let chiffre = accroche.chiffre {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(chiffre)
+                        .font(.dsHeros48)
+                        .tracking(DSTracking.heros48)
+                        .foregroundStyle(Color.dsTexte)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    if let unite = accroche.unite {
+                        Text(unite)
+                            .font(.dsSection)
+                            .foregroundStyle(Color.dsTexte)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
-                .padding(.horizontal, DS.paddingCarte)
-                .dsCard()
             }
-
-            if let conseil = cible.conseil {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "lightbulb")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color.dsAccent)
-                        .frame(width: 22)
-                        .accessibilityHidden(true)
-                    Text(conseil)
-                        .font(.dsSousTitre)
-                        .foregroundStyle(Color.dsTexte)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                }
-                .padding(DS.paddingCarte)
-                .dsCard()
+            Text(accroche.texte)
+                .font(accroche.chiffre == nil ? Font.dsSection : Font.dsCorps)
+                .foregroundStyle(accroche.chiffre == nil ? Color.dsTexte : Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+            if let source = accroche.source {
+                Text("Source : \(source)")
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsTertiaire)
+                    .padding(.top, 2)
             }
-
-            Spacer(minLength: Theme.spacingLG)
-            if estDernier { boutonFin }
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accroche.phrase + (accroche.source.map { ". Source : \($0)" } ?? ""))
     }
 
-    private func ecranInvitation(cible: CibleNutritionnelle?) -> some View {
+    // MARK: - Invitation (après « C'est parti »)
+
+    private var invitation: some View {
         InvitationNotificationsContenu(
-            cible: cible,
+            cible: brief.cible,
             demandeEnCours: demandeEnCours,
             onAccepter: {
                 Task {
@@ -371,23 +388,76 @@ struct BriefDuJourView: View {
 
     // MARK: - Briques
 
+    private var boutonFermer: some View {
+        Button {
+            terminer(raison: "croix")
+        } label: {
+            // Rond de verre clair de 36 pt, cible de 44 pt.
+            Image(systemName: "xmark")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Verre.iconeNeutre)
+                .frame(width: 36, height: 36)
+                .verreClair(Circle())
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityLabel("Fermer le récap du jour")
+    }
+
     private func legende(_ texte: String) -> some View {
         Text(texte)
             .font(.dsSousTitreMoyen)
             .foregroundStyle(Color.dsSecondaire)
     }
 
-    private var indiceTap: some View {
-        Text("Touche l'écran pour continuer")
-            .font(.dsLegende)
-            .foregroundStyle(Color.dsTertiaire)
-            .frame(maxWidth: .infinity)
+    private func terminer(raison: String) {
+        AnalyticsService.shared.track(.screenViewed, properties: [
+            "screen": "brief_du_jour_ferme",
+            "raison": raison,
+            "etape": enInvitation ? "invitation" : "recap",
+        ])
+        onTerminer()
     }
 
-    private var boutonFin: some View {
-        DSCapsuleButton(titre: "C'est parti") {
-            terminer(raison: "fin")
+    // MARK: - Textes (purs, testés)
+
+    /// « Bonjour Léa · mardi 7 octobre ».
+    static func surTitre(prenom: String?, maintenant: Date) -> String {
+        let formatteur = DateFormatter()
+        formatteur.locale = Locale(identifier: "fr_FR")
+        formatteur.dateFormat = "EEEE d MMMM"
+        let date = formatteur.string(from: maintenant)
+        let bonjour = prenom.map { "Bonjour \($0)" } ?? "Bonjour"
+        return "\(bonjour) · \(date)"
+    }
+
+    static func legende(periode: BriefDuJour.Priorite.Periode) -> String {
+        switch periode {
+        case .hier: return "Hier, il te manquait"
+        case .joursPrecedents: return "Ces derniers jours, il te manquait"
+        case .bilan: return "D'après ton bilan, à renforcer"
         }
+    }
+
+    /// « 6 besoins sur 10 couverts hier. Un de plus qu'avant-hier. »
+    static func ligneBesoins(couverts: Int, avantHier: Int?) -> String {
+        let base = "\(couverts) \(couverts > 1 ? "besoins" : "besoin") sur 10 couverts hier."
+        guard let comparaison = comparaison(couverts: couverts, avantHier: avantHier) else { return base }
+        return "\(base) \(comparaison)"
+    }
+
+    static func phraseAccessible(_ priorite: BriefDuJour.Priorite) -> String {
+        let constat: String
+        switch priorite.periode {
+        case .hier, .joursPrecedents:
+            let quand = priorite.periode == .hier ? "Hier" : "Ces derniers jours"
+            let chiffre = priorite.pourcent.map { ", couvert à \($0) %" } ?? ""
+            constat = "\(quand), il te manquait : \(priorite.nom)\(chiffre)."
+        case .bilan:
+            constat = "D'après ton bilan, à renforcer : \(priorite.nom)."
+        }
+        return "\(constat) Ajoute aujourd'hui : \(priorite.aliment)."
     }
 
     /// « Un de plus qu'avant-hier. » — jamais culpabilisant quand ça baisse.
@@ -401,6 +471,32 @@ struct BriefDuJourView: View {
         case -1: return "Un de moins qu'avant-hier : aujourd'hui, on remonte."
         default: return "\(-ecart) de moins qu'avant-hier : aujourd'hui, on remonte."
         }
+    }
+}
+
+// MARK: - Entrée du récap : chaque bloc monte à son tour
+
+private struct ApparitionRecap: ViewModifier {
+    let visible: Bool
+    let rang: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(visible ? 1 : 0)
+            .offset(y: visible || reduceMotion ? 0 : 28)
+            .animation(
+                reduceMotion
+                    ? Animation.easeOut(duration: 0.2)
+                    : Animation.kiwiCascade.delay(0.12 + Double(rang) * 0.09),
+                value: visible
+            )
+    }
+}
+
+private extension View {
+    func apparitionRecap(_ visible: Bool, rang: Int) -> some View {
+        modifier(ApparitionRecap(visible: visible, rang: rang))
     }
 }
 

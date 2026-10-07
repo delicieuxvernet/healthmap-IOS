@@ -142,26 +142,192 @@ final class BriefDuJourTests: XCTestCase {
         XCTAssertTrue(brief.manquesHier.isEmpty)
         // Sans données d'hier : la priorité du bilan (à combler d'abord).
         XCTAssertEqual(brief.cible?.id, "iron")
-
-        let slides = BriefDuJourBuilder.slides(brief: brief, proposerInvitation: false)
-        XCTAssertEqual(slides.map(\.id), ["intro", "rien-hier", "cible"])
+        XCTAssertTrue(BriefDuJourBuilder.aDeQuoiParler(brief), "le récap propose de rattraper la veille")
     }
 
-    func testSlides_ordre_et_invitationEnDernier() {
+    // MARK: - Récap du jour (refonte du 7 oct. 2026)
+
+    private func repasNomme(
+        jour: Int,
+        heure: Int = 12,
+        aliments: [String],
+        micros: [(String, Int)] = []
+    ) -> MealJournalService.MealRecord {
+        MealJournalService.MealRecord(
+            id: UUID().uuidString,
+            consumedAt: date(jour: jour, heure: heure),
+            slot: heure < 16 ? .lunch : .dinner,
+            foods: aliments,
+            macros: MealJournalService.MealMacros(calories: 500),
+            micros: micros.map { MealJournalService.MicroPct(id: $0.0, pctRDA: $0.1) }
+        )
+    }
+
+    func testRecap_deuxApportsLesPlusBasHier_chacunAvecSonAliment() {
         let brief = BriefDuJourBuilder.construire(
             prenom: "Léa",
-            apports: [apport("iron", .aCombler)],
+            apports: [
+                apport("vitC", .aRenforcer, aliments: ["Kiwi"]),
+                apport("iron", .aCombler, aliments: ["Lentilles", "Épinards"]),
+                apport("vitD", .aRenforcer, aliments: ["Sardines"]),
+            ],
             repas: [
-                repas(jour: 9, micros: [("iron", 40)]),
-                repas(jour: 9, heure: 20, slot: .dinner, micros: [("iron", 10)]),
+                repasNomme(jour: 9, aliments: ["Pâtes", "Salade"], micros: [("iron", 20), ("vitC", 50), ("vitD", 10)]),
+                repasNomme(jour: 9, heure: 20, aliments: ["pâtes", "Yaourt"], micros: [("iron", 10), ("vitC", 40)]),
             ],
             maintenant: date(heure: 8)
         )
-        let slides = BriefDuJourBuilder.slides(brief: brief, proposerInvitation: true)
-        XCTAssertEqual(slides.first?.id, "intro")
-        XCTAssertEqual(slides.last?.id, "invitation")
-        XCTAssertTrue(slides.map(\.id).contains("hier"))
-        XCTAssertTrue(slides.map(\.id).contains("manques"))
+        // Hier : vitD 10, fer 30, vitC 90 (couverte, jamais citée).
+        XCTAssertEqual(brief.priorites.map(\.id), ["vitD", "iron"])
+        XCTAssertEqual(brief.priorites.map(\.pourcent), [10, 30])
+        XCTAssertEqual(brief.priorites.map(\.aliment), ["Sardines", "Lentilles"])
+        XCTAssertTrue(brief.priorites.allSatisfy { $0.periode == .hier })
+        // Ce qui a été noté, sans doublon (« Pâtes » et « pâtes »).
+        XCTAssertEqual(brief.alimentsHier, ["Pâtes", "Salade", "Yaourt"])
+    }
+
+    func testRecap_neProposePasUnAlimentDejaMangeHier_niDeuxFoisLeMeme() {
+        XCTAssertEqual(
+            BriefDuJourBuilder.choisirAliment(
+                parmi: ["Lentilles", "Épinards"],
+                mangesHier: ["Salade de lentilles"],
+                dejaProposes: []
+            ),
+            "Épinards"
+        )
+        XCTAssertEqual(
+            BriefDuJourBuilder.choisirAliment(
+                parmi: ["Amandes", "Yaourt"],
+                mangesHier: [],
+                dejaProposes: ["amandes"]
+            ),
+            "Yaourt"
+        )
+        // Tout a été mangé : on garde la meilleure piste plutôt que rien.
+        XCTAssertEqual(
+            BriefDuJourBuilder.choisirAliment(parmi: ["Kiwi"], mangesHier: ["kiwi"], dejaProposes: []),
+            "Kiwi"
+        )
+        XCTAssertNil(BriefDuJourBuilder.choisirAliment(parmi: [" "], mangesHier: [], dejaProposes: []))
+    }
+
+    func testRecap_hierTropPeuNote_lisLesJoursPrecedents_puisLeBilan() {
+        let apports = [apport("iron", .aCombler), apport("vitD", .aRenforcer)]
+        // Avant-hier bien noté, hier non : moyenne des jours précédents.
+        let precedents = BriefDuJourBuilder.construire(
+            prenom: nil,
+            apports: apports,
+            repas: [
+                repas(jour: 8, micros: [("iron", 20), ("vitD", 30)]),
+                repas(jour: 8, heure: 20, slot: .dinner, micros: [("iron", 20)]),
+            ],
+            maintenant: date(heure: 8)
+        )
+        XCTAssertEqual(precedents.priorites.map(\.id), ["vitD", "iron"])
+        XCTAssertEqual(precedents.priorites.map(\.pourcent), [30, 40])
+        XCTAssertTrue(precedents.priorites.allSatisfy { $0.periode == .joursPrecedents })
+
+        // Rien d'exploitable : l'ordre du bilan, sans chiffre inventé.
+        let bilan = BriefDuJourBuilder.priorites(
+            cibles: BriefDuJourBuilder.cibles(depuis: apports),
+            repas: [],
+            aujourdhui: date(heure: 8)
+        )
+        XCTAssertEqual(bilan.map(\.id), ["iron", "vitD"])
+        XCTAssertTrue(bilan.allSatisfy { $0.pourcent == nil && $0.periode == .bilan })
+        // Repli écrit à la main : jamais d'apport sans aliment.
+        XCTAssertEqual(bilan.first?.aliment, "Lentilles")
+    }
+
+    func testRecap_toutCouvert_neCiteAucunManque() {
+        let brief = BriefDuJourBuilder.construire(
+            prenom: nil,
+            apports: [apport("iron", .aCombler)],
+            repas: [
+                repas(jour: 9, micros: NutrientData.all.map { ($0.id.rawValue, 50) }),
+                repas(jour: 9, heure: 20, slot: .dinner, micros: NutrientData.all.map { ($0.id.rawValue, 40) }),
+            ],
+            maintenant: date(heure: 8)
+        )
+        XCTAssertTrue(brief.priorites.isEmpty, "rien sous 70 % : on n'invente pas de manque")
+    }
+
+    func testRecap_completeAvecLApportLePlusBasHorsBilan() {
+        let brief = BriefDuJourBuilder.construire(
+            prenom: nil,
+            apports: [apport("iron", .aCombler)],
+            repas: [
+                repas(jour: 9, micros: NutrientData.all.map { ($0.id.rawValue, $0.id.rawValue == "omega3" ? 5 : 80) }),
+                repas(jour: 9, heure: 20, slot: .dinner, micros: [("iron", 0)]),
+            ],
+            maintenant: date(heure: 8)
+        )
+        // Le fer du bilan est couvert (80) ; les oméga-3 (5) prennent la place.
+        XCTAssertEqual(brief.priorites.map(\.id), ["omega3"])
+        XCTAssertEqual(brief.priorites.first?.nom, "Oméga-3")
+    }
+
+    func testAccroche_compteARebours_puisEffort_serie_stat_phrase() {
+        let cibles = BriefDuJourBuilder.cibles(depuis: [apport("omega3", .aCombler)])
+        let aujourdhui = date(heure: 8)
+
+        // Un seul jour noté sur sept : plus que 2 avant que Progrès compare.
+        let unJour = BriefDuJourBuilder.accroche(
+            repas: [repas(jour: 9)], aujourdhui: aujourdhui, effort: nil, priorites: []
+        )
+        XCTAssertEqual(unJour.genre, .apportsBientot)
+        XCTAssertEqual(unJour.chiffre, "2")
+        XCTAssertEqual(unJour.unite, "jours")
+        XCTAssertEqual(unJour.phrase, "Plus que 2 jours de repas notés avant de voir tes apports évoluer dans Progrès.")
+
+        let quatreJours = [repas(jour: 6), repas(jour: 7), repas(jour: 8), repas(jour: 9)]
+        let effort = BriefDuJour.Effort(id: "iron", nom: "Fer", points: 12)
+        let avecEffort = BriefDuJourBuilder.accroche(
+            repas: quatreJours, aujourdhui: aujourdhui, effort: effort, priorites: []
+        )
+        XCTAssertEqual(avecEffort.genre, .effort)
+        XCTAssertEqual(avecEffort.chiffre, "+12")
+        XCTAssertTrue(avecEffort.texte.contains("ton fer"))
+
+        let serie = BriefDuJourBuilder.accroche(
+            repas: quatreJours, aujourdhui: aujourdhui, effort: nil, priorites: []
+        )
+        XCTAssertEqual(serie.genre, .serie)
+        XCTAssertEqual(serie.chiffre, "4")
+
+        // Trois jours notés mais pas d'affilée jusqu'à hier : la stat publique.
+        let troue = [repas(jour: 4), repas(jour: 5), repas(jour: 6)]
+        let priorites = BriefDuJourBuilder.priorites(cibles: cibles, repas: [], aujourdhui: aujourdhui)
+        let stat = BriefDuJourBuilder.accroche(
+            repas: troue, aujourdhui: aujourdhui, effort: nil, priorites: priorites
+        )
+        XCTAssertEqual(stat.genre, .stat)
+        XCTAssertEqual(stat.chiffre, TeaserStatsCatalog.stat(for: "omega3").fraction)
+        XCTAssertEqual(stat.source, "INCA3")
+
+        // Un apport sans chiffre national : une phrase, sans chiffre.
+        let sansStat = BriefDuJourBuilder.accroche(
+            repas: troue, aujourdhui: aujourdhui, effort: nil,
+            priorites: BriefDuJourBuilder.priorites(
+                cibles: BriefDuJourBuilder.cibles(depuis: [apport("zinc", .aCombler)]),
+                repas: [], aujourdhui: aujourdhui
+            )
+        )
+        XCTAssertEqual(sansStat.genre, .phrase)
+        XCTAssertNil(sansStat.chiffre)
+        XCTAssertTrue(BriefDuJourBuilder.phrasesDeMotivation.contains(sansStat.texte))
+    }
+
+    func testRecap_textes() {
+        XCTAssertEqual(BriefDuJourView.ligneBesoins(couverts: 6, avantHier: 5),
+                       "6 besoins sur 10 couverts hier. Un de plus qu'avant-hier.")
+        XCTAssertEqual(BriefDuJourView.ligneBesoins(couverts: 1, avantHier: nil),
+                       "1 besoin sur 10 couverts hier.")
+        let priorite = BriefDuJour.Priorite(id: "iron", nom: "Fer", pourcent: 30, periode: .hier, aliment: "Lentilles")
+        XCTAssertEqual(BriefDuJourView.phraseAccessible(priorite),
+                       "Hier, il te manquait : Fer, couvert à 30 %. Ajoute aujourd'hui : Lentilles.")
+        XCTAssertTrue(BriefDuJourView.surTitre(prenom: "Léa", maintenant: date(heure: 8))
+            .hasPrefix("Bonjour Léa · jeudi 10 septembre"))
     }
 
     func testComparaison_jamaisCulpabilisante() {

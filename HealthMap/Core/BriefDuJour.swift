@@ -12,6 +12,11 @@ import Foundation
 // Les idées de repas et le conseil viennent du bilan de l'utilisateur, déjà
 // rédigé et affiché ailleurs dans l'app. Les libellés de nutriments viennent
 // TOUJOURS de `NutrientData` (règle projet : jamais de l'IA).
+//
+// 7 oct. 2026 : le brief devient le « Récap du jour », un seul écran sans
+// tap (aliments notés hier · deux apports manquants avec chacun un aliment à
+// ajouter · une accroche). Voir `priorites` et `accroche` plus bas, et la
+// section 9 de DESIGN-PAGES.md.
 
 /// Un apport du bilan réduit à ce dont le brief et les rappels ont besoin.
 /// `Codable` : les rappels le mémorisent pour se replanifier sans le bilan.
@@ -148,7 +153,82 @@ struct BriefDuJour: Equatable {
     /// L'apport sur lequel miser aujourd'hui.
     let cible: CibleNutritionnelle?
 
+    // MARK: Récap du jour (refonte du 7 oct. 2026)
+
+    /// Ce qui a été noté hier, aliment par aliment, dans l'ordre des repas et
+    /// sans doublon. Vide si rien n'a été noté (ou cache d'avant la refonte).
+    var alimentsHier: [String] = []
+    /// Les deux apports à remonter aujourd'hui, chacun avec L'aliment à
+    /// ajouter. Vide = rien n'a manqué (tout au-dessus de 70 %).
+    var priorites: [Priorite] = []
+    /// La phrase qui donne envie de revenir demain.
+    var accroche: Accroche? = nil
+
     var hierAssezNote: Bool { besoinsCouvertsHier != nil }
+
+    /// Un apport qui a manqué, et l'aliment qui le remonte.
+    struct Priorite: Equatable {
+        /// D'où vient le constat : il se dit différemment selon la période.
+        enum Periode: String, Equatable {
+            /// Hier assez noté (2 repas ou plus).
+            case hier
+            /// Hier trop peu noté : moyenne des derniers jours bien notés.
+            case joursPrecedents
+            /// Aucun jour exploitable : la priorité du bilan, sans chiffre.
+            case bilan
+        }
+
+        let id: String
+        /// Libellé canonique (`NutrientData`), ex. « Vitamine D ».
+        let nom: String
+        /// Part du besoin couverte sur la période (0-100). `nil` en mode
+        /// `.bilan` : aucun repas ne permet de chiffrer, on n'invente rien.
+        let pourcent: Int?
+        let periode: Periode
+        /// L'aliment à ajouter aujourd'hui (« Lentilles »).
+        let aliment: String
+
+        var emoji: String { NutrientData.definition(for: id)?.emoji ?? "" }
+    }
+
+    /// Le bas du récap : un chiffre héros (facultatif) et une phrase. Chaque
+    /// chiffre est tiré des repas notés ou d'une étude publique citée, jamais
+    /// inventé.
+    struct Accroche: Equatable {
+        enum Genre: String, Equatable {
+            /// Moins de 3 jours notés sur 7 : le compte à rebours avant que
+            /// Progrès ne compare les apports (`ProgresVerdict`).
+            case apportsBientot
+            /// Un apport à travailler a gagné des points cette semaine.
+            case effort
+            /// Plusieurs jours notés d'affilée.
+            case serie
+            /// Une stat France sourcée (`TeaserStatsCatalog`).
+            case stat
+            /// Rien de chiffré à dire : une phrase écrite à la main.
+            case phrase
+        }
+
+        let genre: Genre
+        /// Le chiffre héros, déjà écrit (« 2 », « +12 », « 9 sur 10 »).
+        let chiffre: String?
+        /// Collée au chiffre (« jours », « points »).
+        let unite: String?
+        /// La suite de la phrase, sous le chiffre.
+        let texte: String
+        /// Au-dessus du chiffre (« Plus que »).
+        var prefixe: String? = nil
+        /// Source publique, affichée en petit.
+        var source: String? = nil
+
+        /// La phrase entière, telle que VoiceOver la lit.
+        var phrase: String {
+            [prefixe, chiffre, unite, texte]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+        }
+    }
 }
 
 enum BriefDuJourBuilder {
@@ -344,6 +424,15 @@ enum BriefDuJourBuilder {
         // d'une semaine sur l'autre — seulement s'il a VRAIMENT progressé.
         let effortDeLaSemaine = Self.effort(cibles: toutesLesCibles, repas: repas, maintenant: maintenant)
 
+        let mangesHier = alimentsNotes(jour: hier, repas: repas, calendar: calendar)
+        let lesPriorites = priorites(
+            cibles: toutesLesCibles,
+            repas: repas,
+            aujourdhui: aujourdhui,
+            mangesHier: mangesHier,
+            calendar: calendar
+        )
+
         let prenomPropre = prenom?.trimmingCharacters(in: .whitespacesAndNewlines)
         return BriefDuJour(
             prenom: (prenomPropre?.isEmpty ?? true) ? nil : prenomPropre,
@@ -352,64 +441,307 @@ enum BriefDuJourBuilder {
             besoinsCouvertsAvantHier: repasAvantHier >= repasMinimum ? besoinsCouverts(couvertureAvantHier) : nil,
             manquesHier: manques,
             effort: effortDeLaSemaine,
-            cible: cible
+            cible: cible,
+            alimentsHier: mangesHier,
+            priorites: lesPriorites,
+            accroche: accroche(
+                repas: repas,
+                aujourdhui: aujourdhui,
+                effort: effortDeLaSemaine,
+                priorites: lesPriorites,
+                calendar: calendar
+            )
         )
     }
 
-    // MARK: Séquence
+    // MARK: - Récap du jour (refonte du 7 oct. 2026)
+    //
+    // Demande d'Arthur : « on rentre dans le vif du sujet ». Le récap dit, en
+    // un seul écran, ce qui a été noté hier, les DEUX apports qui ont le plus
+    // manqué et, pour chacun, UN aliment à ajouter aujourd'hui, puis une
+    // raison de revenir demain. Même doctrine que le reste du brief : chaque
+    // chiffre vient des repas notés, aucun n'est inventé.
 
-    /// Les écrans du brief, dans l'ordre. Moins de deux écrans = rien à dire :
-    /// l'appelant ne présente alors pas le brief.
-    static func slides(brief: BriefDuJour, proposerInvitation: Bool) -> [BriefSlide] {
-        var slides: [BriefSlide] = [.intro(prenom: brief.prenom)]
-        if let couverts = brief.besoinsCouvertsHier {
-            slides.append(.hier(couverts: couverts, avantHier: brief.besoinsCouvertsAvantHier))
-            if !brief.manquesHier.isEmpty {
-                slides.append(.manques(brief.manquesHier))
+    /// Deux apports, pas plus : au-delà, on relit une liste au lieu d'agir.
+    static let prioritesMax = 2
+    /// Fenêtre des « jours précédents » quand hier est trop peu noté.
+    static let joursPrecedentsMax = 7
+    /// Jours notés sur sept à partir desquels Progrès compare les apports
+    /// (`ProgresVerdict.joursMinimumPourComparer`, qu'on recopie ici pour
+    /// garder ce moteur pur et testable sans les services).
+    static let joursPourComparer = 3
+    /// Une série commence à se dire à partir de deux jours.
+    static let serieMinimum = 2
+
+    /// Les aliments notés ce jour-là, dans l'ordre des repas, sans doublon
+    /// (« Pâtes » et « pâtes » sont le même aliment).
+    static func alimentsNotes(
+        jour: Date,
+        repas: [MealJournalService.MealRecord],
+        calendar: Calendar = .current
+    ) -> [String] {
+        var vus = Set<String>()
+        var aliments: [String] = []
+        let duJour = repas
+            .filter { calendar.isDate($0.consumedAt, inSameDayAs: jour) }
+            .sorted { $0.consumedAt < $1.consumedAt }
+        for record in duJour {
+            for nom in record.foods {
+                let propre = nom.trimmingCharacters(in: .whitespacesAndNewlines)
+                let clef = Self.cle(propre)
+                guard !propre.isEmpty, !vus.contains(clef) else { continue }
+                vus.insert(clef)
+                aliments.append(NomNutriment.majusculeInitiale(propre))
+            }
+        }
+        return aliments
+    }
+
+    /// Les deux apports à remonter aujourd'hui, du plus bas au moins bas.
+    ///
+    /// · Hier assez noté → la couverture d'hier.
+    /// · Sinon, les derniers jours bien notés (2 repas ou plus, 7 jours au
+    ///   plus) → la couverture moyenne de ces jours.
+    /// · Sinon → les priorités du bilan, sans chiffre.
+    ///
+    /// Les apports du bilan passent d'abord : ce sont ceux que le profil
+    /// expose. Un apport mesuré à 70 % ou plus n'a pas « manqué » et n'est
+    /// jamais cité ; si les cibles ne suffisent pas à remplir deux places,
+    /// l'apport le plus bas parmi les dix complète.
+    static func priorites(
+        cibles: [CibleNutritionnelle],
+        repas: [MealJournalService.MealRecord],
+        aujourdhui: Date,
+        mangesHier: [String] = [],
+        calendar: Calendar = .current
+    ) -> [BriefDuJour.Priorite] {
+        let debut = calendar.startOfDay(for: aujourdhui)
+        let hier = calendar.date(byAdding: .day, value: -1, to: debut) ?? debut
+
+        // 1) La période mesurée, s'il y en a une.
+        var mesure: [String: Int]?
+        var periode: BriefDuJour.Priorite.Periode = .bilan
+        let repasHier = repas.filter { calendar.isDate($0.consumedAt, inSameDayAs: hier) }.count
+        if repasHier >= Self.repasMinimum {
+            mesure = Self.couverture(jour: hier, repas: repas, calendar: calendar)
+            periode = .hier
+        } else {
+            var jours: [Date] = []
+            for ecart in 1...Self.joursPrecedentsMax {
+                guard let jour = calendar.date(byAdding: .day, value: -ecart, to: debut) else { continue }
+                let n = repas.filter { calendar.isDate($0.consumedAt, inSameDayAs: jour) }.count
+                if n >= Self.repasMinimum { jours.append(jour) }
+            }
+            if !jours.isEmpty {
+                var somme: [String: Int] = [:]
+                for jour in jours {
+                    for (id, pct) in Self.couverture(jour: jour, repas: repas, calendar: calendar) {
+                        somme[id, default: 0] += pct
+                    }
+                }
+                let nombre = Double(jours.count)
+                mesure = somme.mapValues { Int((Double($0) / nombre).rounded()) }
+                periode = .joursPrecedents
+            }
+        }
+
+        // 2) Les candidats, du plus bas au moins bas.
+        var candidats: [CandidatPriorite] = []
+        if let mesure {
+            var duBilan: [CandidatPriorite] = []
+            for (rang, cible) in cibles.enumerated() {
+                let pct = mesure[cible.id] ?? 0
+                guard pct < Self.seuilCouvert else { continue }
+                duBilan.append(CandidatPriorite(id: cible.id, nom: cible.nom, pourcent: pct,
+                                                rang: rang, aliments: cible.alimentsAffichables))
+            }
+            candidats = duBilan.sorted(by: CandidatPriorite.avant)
+            if candidats.count < Self.prioritesMax {
+                let dejaLa = Set(candidats.map(\.id))
+                var autres: [CandidatPriorite] = []
+                for (rang, definition) in NutrientData.all.enumerated() {
+                    let id = definition.id.rawValue
+                    let pct = mesure[id] ?? 0
+                    guard !dejaLa.contains(id), pct < Self.seuilCouvert else { continue }
+                    autres.append(CandidatPriorite(id: id, nom: definition.label, pourcent: pct,
+                                                   rang: rang, aliments: SourcesAlimentaires.pour(id: id, duBilan: [])))
+                }
+                candidats += autres.sorted(by: CandidatPriorite.avant)
             }
         } else {
-            slides.append(.rienHier(repas: brief.repasHier))
+            for (rang, cible) in cibles.enumerated() {
+                candidats.append(CandidatPriorite(id: cible.id, nom: cible.nom, pourcent: nil,
+                                                  rang: rang, aliments: cible.alimentsAffichables))
+            }
         }
-        if let effort = brief.effort {
-            slides.append(.effort(effort))
-        }
-        if let cible = brief.cible {
-            slides.append(.cible(cible))
-        }
-        if proposerInvitation {
-            slides.append(.invitation(cible: brief.cible))
-        }
-        return slides
-    }
-}
 
-// MARK: - Écrans du brief
-
-enum BriefSlide: Equatable, Identifiable {
-    case intro(prenom: String?)
-    case hier(couverts: Int, avantHier: Int?)
-    /// Hier trop peu noté : on propose d'ajouter les repas de la veille.
-    case rienHier(repas: Int)
-    case manques([BriefDuJour.Manque])
-    case effort(BriefDuJour.Effort)
-    case cible(CibleNutritionnelle)
-    /// Invitation aux notifications, avant l'alerte d'iOS.
-    case invitation(cible: CibleNutritionnelle?)
-
-    var id: String {
-        switch self {
-        case .intro: return "intro"
-        case .hier: return "hier"
-        case .rienHier: return "rien-hier"
-        case .manques: return "manques"
-        case .effort: return "effort"
-        case .cible: return "cible"
-        case .invitation: return "invitation"
+        // 3) Un aliment par apport : le premier de la liste (le bilan les
+        //    classe, le repli aussi), sauf s'il a déjà été mangé hier ou
+        //    proposé pour l'autre apport. Deux fois « Amandes », ce serait une
+        //    seule idée.
+        var proposes: [String] = []
+        var resultat: [BriefDuJour.Priorite] = []
+        for candidat in candidats where resultat.count < prioritesMax {
+            let pistes = candidat.aliments + SourcesAlimentaires.pour(id: candidat.id, duBilan: [])
+            guard let aliment = Self.choisirAliment(parmi: pistes, mangesHier: mangesHier, dejaProposes: proposes) else { continue }
+            proposes.append(aliment)
+            resultat.append(BriefDuJour.Priorite(
+                id: candidat.id,
+                nom: candidat.nom,
+                pourcent: candidat.pourcent,
+                periode: periode,
+                aliment: aliment
+            ))
         }
+        return resultat
     }
 
-    /// Nom stable pour l'analytics.
-    var typeName: String { id }
+    /// Un apport candidat au récap, avant le choix de son aliment.
+    struct CandidatPriorite {
+        let id: String
+        let nom: String
+        let pourcent: Int?
+        /// Rang d'origine (ordre du bilan) : départage deux apports au même
+        /// pourcentage.
+        let rang: Int
+        let aliments: [String]
+
+        static func avant(_ a: CandidatPriorite, _ b: CandidatPriorite) -> Bool {
+            let pa = a.pourcent ?? 100
+            let pb = b.pourcent ?? 100
+            return pa != pb ? pa < pb : a.rang < b.rang
+        }
+    }
+
+    /// Le premier aliment ni mangé hier ni déjà proposé ; à défaut, le premier
+    /// pas encore proposé ; `nil` seulement si la liste est vide.
+    static func choisirAliment(
+        parmi pistes: [String],
+        mangesHier: [String],
+        dejaProposes: [String]
+    ) -> String? {
+        let propres = pistes
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let manges = mangesHier.map { Self.cle($0) }
+        let proposes = Set(dejaProposes.map { Self.cle($0) })
+        let pasProposes = propres.filter { !proposes.contains(Self.cle($0)) }
+        let neufs = pasProposes.filter { piste in
+            let c = Self.cle(piste)
+            // « Lentilles » est mangé si « Salade de lentilles » l'a été.
+            return !manges.contains { $0.contains(c) || c.contains($0) }
+        }
+        return (neufs.first ?? pasProposes.first ?? propres.first).map(NomNutriment.majusculeInitiale)
+    }
+
+    /// Clé de comparaison d'un nom d'aliment : sans casse ni accents.
+    static func cle(_ texte: String) -> String {
+        texte
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "fr_FR"))
+    }
+
+    /// Jours des sept derniers (aujourd'hui compris) où au moins un repas a
+    /// été noté : le même compte que l'onglet Progrès.
+    static func joursNotes(
+        repas: [MealJournalService.MealRecord],
+        aujourdhui: Date,
+        calendar: Calendar = .current
+    ) -> Int {
+        let debut = calendar.startOfDay(for: aujourdhui)
+        return (0..<7).filter { ecart in
+            guard let jour = calendar.date(byAdding: .day, value: -ecart, to: debut) else { return false }
+            return repas.contains { calendar.isDate($0.consumedAt, inSameDayAs: jour) }
+        }.count
+    }
+
+    /// Jours notés d'affilée jusqu'à hier (aujourd'hui ne compte pas encore :
+    /// le récap s'ouvre le matin, avant le premier repas).
+    static func serie(
+        repas: [MealJournalService.MealRecord],
+        aujourdhui: Date,
+        calendar: Calendar = .current
+    ) -> Int {
+        let debut = calendar.startOfDay(for: aujourdhui)
+        var jours = 0
+        while let jour = calendar.date(byAdding: .day, value: -(jours + 1), to: debut),
+              repas.contains(where: { calendar.isDate($0.consumedAt, inSameDayAs: jour) }) {
+            jours += 1
+        }
+        return jours
+    }
+
+    /// Phrases sans chiffre, quand il n'y a rien de mesuré à dire. Elles
+    /// tournent avec le jour : une semaine de récaps n'est pas sept fois la
+    /// même phrase.
+    static let phrasesDeMotivation: [String] = [
+        "Pas besoin d'une journée parfaite : un bon choix par repas suffit.",
+        "Tes apports se construisent repas après repas. Le prochain compte.",
+        "Chaque repas noté rend ton suivi plus juste. On s'y remet ?",
+    ]
+
+    /// Ce qu'on dit en bas du récap, dans l'ordre de ce qui pousse le plus :
+    /// un compte à rebours réel, un progrès réel, une série réelle, une stat
+    /// publique sourcée, et seulement ensuite une phrase.
+    static func accroche(
+        repas: [MealJournalService.MealRecord],
+        aujourdhui: Date,
+        effort: BriefDuJour.Effort?,
+        priorites: [BriefDuJour.Priorite],
+        calendar: Calendar = .current
+    ) -> BriefDuJour.Accroche {
+        let notes = joursNotes(repas: repas, aujourdhui: aujourdhui, calendar: calendar)
+        if notes < joursPourComparer {
+            let reste = joursPourComparer - notes
+            return BriefDuJour.Accroche(
+                genre: .apportsBientot,
+                chiffre: "\(reste)",
+                unite: reste > 1 ? "jours" : "jour",
+                texte: "de repas notés avant de voir tes apports évoluer dans Progrès.",
+                prefixe: "Plus que"
+            )
+        }
+        if let effort {
+            return BriefDuJour.Accroche(
+                genre: .effort,
+                chiffre: "+\(effort.points)",
+                unite: "points",
+                texte: "pour \(NomNutriment.possessif(id: effort.id, nom: effort.nom)) cette semaine, par rapport à la précédente. Garde le rythme."
+            )
+        }
+        let enSerie = serie(repas: repas, aujourdhui: aujourdhui, calendar: calendar)
+        if enSerie >= serieMinimum {
+            return BriefDuJour.Accroche(
+                genre: .serie,
+                chiffre: "\(enSerie)",
+                unite: "jours d'affilée",
+                texte: "à noter tes repas. Ne casse pas la série aujourd'hui."
+            )
+        }
+        if let premiere = priorites.first {
+            let stat = TeaserStatsCatalog.stat(for: premiere.id)
+            if let fraction = stat.fraction {
+                return BriefDuJour.Accroche(
+                    genre: .stat,
+                    chiffre: fraction,
+                    unite: nil,
+                    texte: "\(stat.texte) en \(NomNutriment.minusculeInitiale(premiere.nom)), en France. Toi, tu t'en occupes déjà.",
+                    source: stat.source
+                )
+            }
+        }
+        let jour = calendar.ordinality(of: .day, in: .era, for: aujourdhui) ?? 0
+        let phrase = phrasesDeMotivation[FormulationsRappel.indexVariante(jour: jour, parmi: phrasesDeMotivation.count)]
+        return BriefDuJour.Accroche(genre: .phrase, chiffre: nil, unite: nil, texte: phrase)
+    }
+
+    // MARK: Présentation
+
+    /// Le récap a-t-il de quoi parler ? Un aliment noté hier, un apport à
+    /// remonter, ou des repas à rattraper : sinon, on ne l'ouvre pas.
+    static func aDeQuoiParler(_ brief: BriefDuJour) -> Bool {
+        !brief.priorites.isEmpty || !brief.alimentsHier.isEmpty || brief.repasHier < repasMinimum
+    }
 }
 
 // MARK: - Mémoire du brief
@@ -464,10 +796,13 @@ enum BriefDuJourStore {
     /// le réseau plutôt que d'afficher des chiffres d'avant-hier.
     static let fraicheurRepas: TimeInterval = 3 * 24 * 60 * 60
 
-    /// Un repas réduit à ce que le brief lit : le jour et les apports.
+    /// Un repas réduit à ce que le brief lit : le jour, les apports et,
+    /// depuis le récap du 7 oct. 2026, le nom des aliments (« hier, tu as
+    /// noté… »). `nil` pour un cache écrit avant : le récap s'en passe.
     struct RepasMemorise: Codable, Equatable {
         let jour: Date
         let micros: [String: Int]
+        var aliments: [String]? = nil
     }
 
     static func memoriserRepas(
@@ -478,7 +813,8 @@ enum BriefDuJourStore {
         let compact = repas.map { record in
             RepasMemorise(
                 jour: record.consumedAt,
-                micros: Dictionary(record.micros.map { ($0.id, $0.pctRDA) }, uniquingKeysWith: +)
+                micros: Dictionary(record.micros.map { ($0.id, $0.pctRDA) }, uniquingKeysWith: +),
+                aliments: record.foods
             )
         }
         guard let data = try? JSONEncoder().encode(compact) else { return }
@@ -501,7 +837,7 @@ enum BriefDuJourStore {
                 id: UUID().uuidString,
                 consumedAt: memo.jour,
                 slot: MealJournalService.MealSlot.from(date: memo.jour),
-                foods: [],
+                foods: memo.aliments ?? [],
                 macros: MealJournalService.MealMacros(),
                 micros: memo.micros.map { MealJournalService.MicroPct(id: $0.key, pctRDA: $0.value) }
             )

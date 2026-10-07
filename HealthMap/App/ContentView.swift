@@ -299,7 +299,9 @@ struct MainTabView: View {
     @State private var afficheRecap = false
 
     /// Brief du jour : première ouverture de chaque journée (11 sept. 2026).
-    @State private var slidesBrief: [BriefSlide] = []
+    @State private var briefCourant: BriefDuJour?
+    /// L'invitation aux notifications suit le récap du jour.
+    @State private var briefAvecInvitation = false
     @State private var afficheBrief = false
     /// Ouverture par une notification ou un lien : on respecte l'intention
     /// (scanner, check-in…) et on garde le brief pour la prochaine ouverture.
@@ -408,11 +410,14 @@ struct MainTabView: View {
         // qu'une fois l'écran de lancement passé — le retard qu'on corrige.
         .task { proposerBrief() }
         .fullScreenCover(isPresented: $afficheBrief) {
-            BriefDuJourView(
-                slides: slidesBrief,
-                onAjouterHier: ajouterRepasDHier,
-                onTerminer: { afficheBrief = false }
-            )
+            if let brief = briefCourant {
+                BriefDuJourView(
+                    brief: brief,
+                    proposerInvitation: briefAvecInvitation,
+                    onAjouterHier: ajouterRepasDHier,
+                    onTerminer: { afficheBrief = false }
+                )
+            }
         }
     }
 
@@ -967,13 +972,10 @@ struct MainTabView: View {
     private func presenter(_ brief: BriefDuJour) {
         let jamaisDemande = BriefDuJourStore.statutNotificationsMemorise()
             == UNAuthorizationStatus.notDetermined.rawValue
-        let slides = BriefDuJourBuilder.slides(
-            brief: brief,
-            proposerInvitation: jamaisDemande && BriefDuJourStore.invitationAProposer()
-        )
-        guard slides.count >= 2 else { return }
+        guard BriefDuJourBuilder.aDeQuoiParler(brief) else { return }
         BriefDuJourStore.marquerVu()
-        slidesBrief = slides
+        briefCourant = brief
+        briefAvecInvitation = jamaisDemande && BriefDuJourStore.invitationAProposer()
         afficheBrief = true
     }
 

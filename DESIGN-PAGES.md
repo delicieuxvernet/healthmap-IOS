@@ -888,6 +888,46 @@ pas validé sur appareil ; il part ensuite dans une PR à part.
 
 ---
 
+## 9. RÉCAP DU JOUR (plein écran, première ouverture de la journée — refonte du 7 octobre 2026)
+
+> Remplace le « Brief du jour » en cinq écrans à toucher (bonjour · hier · manques · effort ·
+> cible). Demande d'Arthur : « on rentre dans le vif du sujet, pas besoin d'appuyer pour avoir le
+> récap ». Vue : `Views/Brief/BriefDuJourView.swift` ; moteur pur : `Core/BriefDuJour.swift`
+> (`BriefDuJourBuilder`), testé par `BriefDuJourTests`.
+
+**Un seul écran, qui arrive d'un coup** (titre en rebond `kiwiRebond`, blocs en cascade
+`kiwiCascade`, tout coupé par « Réduire les animations ») :
+
+1. **Sur-titre** « Bonjour Léa · jeudi 10 septembre », puis **« Récap du jour » en 56 pt**.
+2. **Hier, tu as noté** : les aliments de la veille en pastilles de verre (6 au plus, puis « +N »),
+   et « N besoins sur 10 couverts hier. » avec la comparaison à avant-hier. Hier trop peu noté
+   (moins de 2 repas) : « Rien de noté hier. » + « Ajouter mes repas d'hier ».
+3. **Deux cartes, une par apport qui a manqué** (jamais plus de deux) : légende de période,
+   emoji + nom de l'apport en 34 pt, jauge `RecapJaugeApport`, puis **« Ajoute aujourd'hui » +
+   l'aliment en 28 pt**. Règles du moteur :
+   - période : **hier** (2 repas ou plus) → sinon la **moyenne des derniers jours bien notés**
+     (7 jours au plus) → sinon **l'ordre du bilan, sans chiffre** ;
+   - un apport à 70 % ou plus n'a pas manqué et n'est jamais cité ; les apports du bilan passent
+     d'abord, le plus bas des dix complète s'il manque une place ; rien sous 70 % → carte
+     « Rien n'a vraiment manqué » ;
+   - l'aliment : le premier du bilan (personnalisé, respecte le régime), à défaut
+     `SourcesAlimentaires` ; jamais un aliment déjà mangé hier ni deux fois le même.
+4. **L'accroche** (une carte, chiffre héros 48 pt), dans cet ordre, la première qui s'applique :
+   - moins de 3 jours notés sur 7 → « Plus que **N jours** de repas notés avant de voir tes
+     apports évoluer dans Progrès » (même seuil que `ProgresVerdict`) ;
+   - progrès de la semaine ≥ 5 points → « **+N points** pour ton fer cette semaine » ;
+   - 2 jours notés d'affilée ou plus → « **N jours d'affilée** à noter tes repas » ;
+   - stat France sourcée du premier apport (`TeaserStatsCatalog`, ex. « **9 sur 10** · INCA3 ») ;
+   - sinon une phrase écrite à la main, qui tourne avec le jour.
+5. **« C'est parti »** ferme ; si l'invitation aux notifications est due, elle prend le relais
+   sur le même écran au lieu de fermer.
+
+**Aucun chiffre inventé** : tout vient des repas notés, du bilan ou d'une étude publique citée.
+Pas de « les gens qui notent ont X % de résultats en plus » tant qu'on n'a pas une source
+(ou nos propres données agrégées) pour l'écrire.
+
+---
+
 *Maquettes de référence : session du 11 juin 2026 (« rendu_final_4_ecrans_reference »
 + correctifs « Pourquoi ? » et règles déterministes). Contrat IA : prompt v35
 (generate-analysis v40), harnais de conformité sur audit-a/b/c obligatoire avant
