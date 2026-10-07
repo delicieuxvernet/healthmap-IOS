@@ -72,6 +72,9 @@ struct JournalView: View {
     @State private var showPhotoLibrary = false
     @State private var addFoodConfirmation: String?
     @State private var showPaywall = false
+    /// Carte des micronutriments touchée en gratuit : l'abonnement, avec sa
+    /// zone de suivi (`journal_micros`).
+    @State private var porteMicros = false
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
     /// Repas ouvert depuis la mosaïque (« Midi » → la fiche du déjeuner).
@@ -1086,21 +1089,24 @@ struct JournalView: View {
     @ViewBuilder
     private var microsSection: some View {
         if dashboardVM.premiumVisible {
-            // Porte Premium (décision d'Arthur du 1er octobre 2026) : la carte
-            // reste devinable derrière le voile, rien ne s'ouvre, et la page
-            // d'un micronutriment n'est donc pas atteignable. Même geste que
-            // dans Progrès (`GatedOverlay` + `UnlockDoor`).
-            GatedOverlay(intensity: .locked) {
-                JournalMicrosCard(tableau: tableauMicros) { _ in }
-            }
-            .padding(.top, DS.interCarte)
-            UnlockDoor(
-                icon: "chart.bar.xaxis",
-                title: "Débloque tes micronutriments",
-                subtitle: "Vitamines, minéraux et acides gras, calculés sur tes repas",
-                zone: "journal_micros"
+            // Porte Premium (décision d'Arthur du 1er octobre 2026) : en
+            // gratuit, la page d'un micronutriment n'est pas atteignable. Depuis le 7
+            // octobre (variante B), la carte n'est plus floutée : la liste se
+            // lit, noms nets, et chaque ligne dit « Débloquer avec Premium » ;
+            // aucun chiffre de la personne n'est affiché.
+            JournalMicrosCard(
+                tableau: tableauMicros,
+                onLigne: { _ in porteMicros = true },
+                verrouille: true,
+                titrePorte: PremiumOffre.titreEssai(offerings: subscriptionService.offerings,
+                                                    produits: subscriptionService.directProducts),
+                onDebloquer: { porteMicros = true }
             )
             .padding(.top, DS.interCarte)
+            .sheet(isPresented: $porteMicros) {
+                PaywallView(source: "journal_micros")
+                    .healthMapFullSheet()
+            }
         } else {
             JournalMicrosCard(tableau: tableauMicros) { ligne in
                 HapticService.shared.tap()
