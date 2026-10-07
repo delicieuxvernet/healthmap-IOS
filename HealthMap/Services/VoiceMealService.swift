@@ -274,13 +274,6 @@ final class VoiceMealService {
             let analysis: Analysis = try await TacheProtegee.executer("Dictée du repas") {
                 try await envoyerAvecUneRelance(corps)
             }
-            // Le serveur a compté cette dictée : le compteur local aussi, même
-            // si elle n'aboutit à aucun enregistrement. Sinon l'app croyait
-            // qu'il en restait une, et la suivante finissait en « limite
-            // atteinte » côté serveur.
-            if let userId = AuthService.shared.cachedCurrentUserIdString {
-                QuotaStore.enregistrerUneDictée(userId: userId)
-            }
             guard !analysis.nonAlimentaire, !analysis.aliments.isEmpty else {
                 throw VoiceError.noFood
             }

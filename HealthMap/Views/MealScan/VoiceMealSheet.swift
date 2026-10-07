@@ -42,16 +42,10 @@ struct VoiceMealSheet: View {
     /// l'appelant sur le journal déjà chargé. `nil` = rien d'honnête à dire :
     /// la confirmation se contente alors de dire que c'est compté.
     var gratification: ((MealJournalService.MealRecord) -> GratificationRepas?)? = nil
-    /// La dictée, déjà transcrite sous la bulle : la feuille monte directement
-    /// sur sa relecture (ou sur l'échec). `nil` : la feuille fait le travail
-    /// elle-même (saisie au clavier).
+    /// La dictée, déjà transcrite et chiffrée sous la bulle : la feuille monte
+    /// directement sur son résultat (ou sur l'échec). `nil` : la feuille fait
+    /// le travail elle-même (saisie au clavier).
     var depart: Depart? = nil
-    /// Dictées gratuites qu'il reste aujourd'hui, dites sur la relecture.
-    /// `nil` : abonné, rien à dire.
-    var dicteesGratuitesRestantes: Int? = nil
-    /// « Redire » sur la relecture : la feuille se referme et l'appelant
-    /// rouvre la bulle d'écoute (l'enregistrement vit sur l'accueil).
-    var onRedire: (() -> Void)? = nil
     /// Capture audio possédée par l'appelant. Elle est injectée — et non créée
     /// ici — pour que la dictée puisse DÉMARRER sur l'accueil, le doigt posé sur
     /// « Dicte ton repas », et se terminer dans cette feuille.
@@ -71,8 +65,7 @@ struct VoiceMealSheet: View {
 
     /// Ce qu'une dictée a donné avant que la feuille ne monte.
     enum Depart {
-        /// Le texte compris, à relire. Rien n'est encore parti au serveur.
-        case relecture(transcript: String)
+        case analyse(VoiceMealService.Analysis, transcript: String)
         case echec(message: String, transcript: String)
     }
 
@@ -125,11 +118,6 @@ struct VoiceMealSheet: View {
     /// Dernière transcription obtenue : permet de relancer l'analyse après un
     /// échec serveur sans redemander à l'utilisateur de reparler.
     @State private var dernierTranscript = ""
-    /// Le texte de la dictée tel que la personne le relit, et le corrige.
-    @State private var texteRelu = ""
-    /// La relecture est passée au clavier (« Modifier » ou toucher le texte).
-    @State private var correctionRelecture = false
-    @FocusState private var champRelecture: Bool
 
     // MARK: Révélation des aliments (présentation uniquement)
     //
@@ -146,14 +134,13 @@ struct VoiceMealSheet: View {
     private let journal = MealJournalService.shared
 
     // Plus de phase « écoute » ici : depuis le 2 août 2026, l'enregistrement
-    // vit ENTIÈREMENT sur l'accueil. La transcription aussi (sous la bulle).
-    // Depuis le 7 octobre 2026 (demande d'Arthur), la feuille s'ouvre sur la
-    // RELECTURE : rien ne part au serveur, rien n'est décompté, tant que la
-    // personne n'a pas touché « Envoyer en analyse ». `.analyzing` sert après
-    // cet envoi, à la saisie au clavier et à la relance après un échec. La phase
+    // vit ENTIÈREMENT sur l'accueil. Depuis le 2 octobre 2026, la
+    // transcription et l'analyse d'une dictée aussi (sous la bulle) : la
+    // feuille ne s'ouvre qu'avec leur résultat. `.analyzing` ne sert plus
+    // qu'à la saisie au clavier et à la relance après un échec. La phase
     // « ajouté » (célébration dans la feuille, 1er octobre) a disparu : la
     // feuille redescend, la capsule du haut de l'écran confirme.
-    enum Phase { case saisie, relecture, analyzing, results, failed }
+    enum Phase { case saisie, analyzing, results, failed }
 
     struct RemplacementCible: Identifiable {
         let index: Int
@@ -230,7 +217,7 @@ struct VoiceMealSheet: View {
     private var phaseAffichee: Phase {
         if !amorce, let depart {
             switch depart {
-            case .relecture: return .relecture
+            case .analyse: return .results
             case .echec: return .failed
             }
         }
@@ -263,7 +250,6 @@ struct VoiceMealSheet: View {
     private var contenuDePhase: some View {
         switch phaseAffichee {
         case .saisie:    saisieView
-        case .relecture: relectureView
         case .analyzing: analyzingView
         case .results:   resultsView
         case .failed:    errorView
@@ -335,165 +321,6 @@ struct VoiceMealSheet: View {
         guard !texte.isEmpty else { return }
         HapticService.shared.primary()
         champActif = false
-        dernierTranscript = texte
-        Task { await analyser(texte) }
-    }
-
-    // MARK: - 1 bis. Relecture de la dictée (7 oct. 2026)
-
-    private var texteReluUtile: String {
-        texteRelu.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// « C'est bien ça ? » : ce que la dictée a compris, avant tout envoi.
-    /// Quatre choix : envoyer, corriger au clavier, redire, annuler. Seul
-    /// « Envoyer en analyse » appelle le serveur et décompte une dictée.
-    private var relectureView: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(correctionRelecture ? "Corrige ton repas" : "C'est bien ça ?")
-                        .font(.system(size: 24, weight: .bold))
-                        .tracking(-0.6)
-                        .foregroundStyle(Color.dsTexte)
-                    Text(correctionRelecture
-                         ? "Écris comme tu le dirais."
-                         : "Voilà ce que j'ai compris. Touche le texte pour corriger.")
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                DSCloseButton { fermer() }
-            }
-
-            Group {
-                if correctionRelecture {
-                    TextField("Ex. : 150 g de poulet, du riz, une orange", text: $texteRelu, axis: .vertical)
-                        .font(.dsCorps)
-                        .lineLimit(3...8)
-                        .focused($champRelecture)
-                        .padding(DS.paddingCarte)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .dsCard()
-                        .accessibilityLabel("Corrige ce que tu as dit")
-                        .accessibilityIdentifier("dictee.relecture.champ")
-                } else {
-                    Button {
-                        corrigerRelecture()
-                    } label: {
-                        Text("« \(texteRelu) »")
-                            .font(.dsCorps)
-                            .foregroundStyle(Color.dsTexte)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(DS.paddingCarte)
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-                            .dsCard()
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityHint("Touche pour corriger le texte")
-                    .accessibilityIdentifier("dictee.relecture.texte")
-                }
-            }
-            .padding(.top, 18)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Rien n'est envoyé tant que tu ne valides pas.", systemImage: "lock")
-                if let reste = dicteesGratuitesRestantes {
-                    Label(reste > 1
-                          ? "Gratuit : il te reste \(reste) dictées aujourd'hui."
-                          : "Gratuit : il te reste \(reste) dictée aujourd'hui.",
-                          systemImage: "mic")
-                }
-            }
-            .font(.dsLegende)
-            .foregroundStyle(Color.dsSecondaire)
-            .padding(.top, 10)
-
-            DSCapsuleButton(titre: "Envoyer en analyse") {
-                envoyerRelecture()
-            }
-            .disabled(texteReluUtile.count < 3)
-            .opacity(texteReluUtile.count < 3 ? 0.5 : 1)
-            .padding(.top, 16)
-            .accessibilityIdentifier("dictee.relecture.envoyer")
-
-            if !correctionRelecture {
-                HStack(spacing: 8) {
-                    boutonSecondaire("Modifier", icone: "pencil") { corrigerRelecture() }
-                        .accessibilityIdentifier("dictee.relecture.modifier")
-                    if onRedire != nil {
-                        boutonSecondaire("Redire", icone: "mic") { redire() }
-                            .accessibilityIdentifier("dictee.relecture.redire")
-                    }
-                }
-                .padding(.top, 8)
-            }
-
-            Button {
-                HapticService.shared.tap()
-                if correctionRelecture {
-                    // « Revenir » : on garde la correction, on quitte le clavier.
-                    champRelecture = false
-                    correctionRelecture = false
-                } else {
-                    fermer()
-                }
-            } label: {
-                Text(correctionRelecture ? "Revenir" : "Annuler")
-                    .font(.dsSousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
-            .accessibilityIdentifier("dictee.relecture.annuler")
-        }
-        .padding(.horizontal, Self.margeInterieure)
-        .padding(.top, 14)
-        .padding(.bottom, 16)
-    }
-
-    private func boutonSecondaire(_ titre: String, icone: String, action: @escaping () -> Void) -> some View {
-        Button {
-            HapticService.shared.tap()
-            action()
-        } label: {
-            Label(titre, systemImage: icone)
-                .font(.dsHeadline)
-                .tracking(DSTracking.corps)
-                .foregroundStyle(Kiwio.vertFonce)
-                .frame(maxWidth: .infinity)
-                .frame(height: DS.hauteurBouton)
-                .verreClair()
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.dsPress)
-    }
-
-    private func corrigerRelecture() {
-        HapticService.shared.tap()
-        correctionRelecture = true
-        champRelecture = true
-    }
-
-    /// La feuille se referme ; l'appelant rouvre la bulle d'écoute.
-    private func redire() {
-        let relancer = onRedire
-        fermer()
-        relancer?()
-    }
-
-    /// Le seul moment où la dictée part au serveur, et compte.
-    private func envoyerRelecture() {
-        let texte = texteReluUtile
-        guard texte.count >= 3 else { return }
-        HapticService.shared.primary()
-        champRelecture = false
-        correctionRelecture = false
         dernierTranscript = texte
         Task { await analyser(texte) }
     }
@@ -1221,13 +1048,11 @@ struct VoiceMealSheet: View {
     /// Pose ce qu'une dictée a donné : ses aliments, ou son échec.
     private func appliquer(_ depart: Depart) {
         switch depart {
-        case .relecture(let transcript):
+        case .analyse(let analyse, let transcript):
             // Conservé pour pouvoir relancer l'analyse sans refaire parler.
             dernierTranscript = transcript
-            texteRelu = transcript
-            correctionRelecture = false
             errorMessage = nil
-            phase = .relecture
+            appliquer(analyse)
         case .echec(let message, let transcript):
             dernierTranscript = transcript
             errorMessage = message
@@ -1456,8 +1281,12 @@ extension VoiceMealSheet {
             return .echec(message: "", transcript: texte)
         }
         onTranscrit(texte)
-        // Pas d'appel au serveur ici : la personne relit d'abord, et décide.
-        return .relecture(transcript: texte)
+        do {
+            let analyse = try await VoiceMealService.shared.analyze(transcript: texte)
+            return .analyse(analyse, transcript: texte)
+        } catch {
+            return .echec(message: error.localizedDescription, transcript: texte)
+        }
     }
 }
 
