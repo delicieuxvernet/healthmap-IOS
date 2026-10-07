@@ -70,9 +70,6 @@ struct JournalView: View {
     @State private var showCaptureChoice = false
     @State private var showCamera = false
     @State private var showPhotoLibrary = false
-    /// Fiche 100 g de l'aliment tapé dans la recherche (fetch `get_food`).
-    @State private var selectedSearchDetail: MealJournalService.FoodDetail?
-    @State private var isAddingFood = false
     @State private var addFoodConfirmation: String?
     @State private var showPaywall = false
     @State private var selectedFood: MealScanViewModel.DetectedFood?
@@ -506,26 +503,18 @@ struct JournalView: View {
         }
     }
 
-    // MARK: - Sheet recherche d'aliment (logique de recherche inchangée)
+    // MARK: - Sheet recherche d'aliment
+    //
+    // La même feuille que « Ajouter » d'un repas (`FoodSearchSheet`) : récents,
+    // favoris, « Tes aliments » et la recherche rapide. Le créneau se déduit
+    // de l'heure, comme avant.
     private var searchSheet: some View {
-        NavigationStack {
-            ScrollView {
-                searchTab
-                    .padding(.vertical, Theme.spacingMD)
-            }
-            .navigationTitle("Rechercher")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { showSearch = false }
-                        .foregroundStyle(Color.dsTexte)
-                        .accessibilityLabel("Fermer")
-                }
-            }
+        let slot = MealJournalService.MealSlot.from(date: Date())
+        return FoodSearchSheet(slot: slot, recents: AlimentsHabituels.recents(journal.fortnight)) { detail, grammes in
+            await journal.addFood(detail: detail, grams: grammes, slot: slot)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .verreFeuille()
     }
 
     // MARK: - Scaffold
@@ -2157,164 +2146,10 @@ struct JournalView: View {
         .padding(.horizontal, Theme.spacingLG)
     }
 
-    // MARK: - Search Tab
-    //
-    // Même habillage que `FoodSearchSheet` (JournalEditorComponents.swift) :
-    // champ et exemples en verre clair, confirmation en capsule de verre vert
-    // pâle, UNE carte de verre par section de résultats, lignes séparées d'un
-    // filet. La logique ne bouge pas : toucher une ligne ouvre la fiche
-    // portion ; il n'y a pas d'ajout rapide ici, donc pas de « + ».
-    private var searchTab: some View {
-        VStack(spacing: Theme.spacingMD) {
-            champRecherche
+    // MARK: - Ajout depuis le code-barres
 
-            if viewModel.searchQuery.isEmpty {
-                exemplesRecherche
-            }
-
-            if let confirmation = addFoodConfirmation {
-                confirmationRecherche(confirmation)
-            }
-
-            if viewModel.isSearching {
-                ProgressView()
-                    .tint(Color.dsAccent)
-                    .padding()
-            } else {
-                // La même ligne à vignette que la recherche du journal
-                // (`FoodHitContenu`), rangée dans les deux mêmes sections.
-                ForEach(RechercheVisuelle.sections(viewModel.searchResults, source: \.source, score: \.score)) { section in
-                    VStack(spacing: 8) {
-                        RechercheSectionTitre(titre: section.titre)
-                        carteResultats(section.lignes)
-                    }
-                }
-                if viewModel.searchResults.contains(where: { $0.source == "off" }) {
-                    RechercheCreditPhotos()
-                }
-            }
-        }
-        .padding(.horizontal, DS.marge)
-        // Fiche portion unifiée (quantité libre) — l'ajout passe par le VM
-        // journal (ligne riche éditable), créneau déduit de l'heure.
-        .sheet(item: $selectedSearchDetail) { detail in
-            ajoutPortionSheet(detail)
-        }
-    }
-
-    /// Le champ, en capsule de verre clair de 48 pt.
-    private var champRecherche: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(Verre.iconeNeutre)
-                .accessibilityHidden(true)
-            TextField("Rechercher un aliment…", text: $viewModel.searchQuery)
-                .font(Theme.bodyFont)
-                .accessibilityIdentifier("recherche.champ")
-                .autocorrectionDisabled()
-                .onChange(of: viewModel.searchQuery) { _, _ in
-                    Task { await viewModel.searchFoods() }
-                }
-            if !viewModel.searchQuery.isEmpty {
-                Button {
-                    viewModel.searchQuery = ""
-                    viewModel.searchResults = []
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Color.dsTertiaire)
-                        .frame(width: DS.cibleTactile, height: DS.cibleTactile)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.dsPress)
-                // Nommé : sans libellé, la croix se lirait comme un second
-                // « Fermer » à côté de celui de la barre.
-                .accessibilityLabel("Effacer la recherche")
-            }
-        }
-        .padding(.leading, 16)
-        .padding(.trailing, viewModel.searchQuery.isEmpty ? 16 : 2)
-        .frame(minHeight: 48)
-        .verreClair()
-    }
-
-    private var exemplesRecherche: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            Text("Essaie par exemple :")
-                .font(.dsSousTitreFort)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .padding(.horizontal, 2)
-            HStack(spacing: 8) {
-                quickSearchButton("Épinards", index: 0)
-                quickSearchButton("Saumon", index: 1)
-                quickSearchButton("Lentilles", index: 2)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// « Yaourt ajouté · 96 kcal » : une capsule de verre vert pâle, la coche
-    /// dans sa pastille.
-    private func confirmationRecherche(_ texte: String) -> some View {
-        HStack(spacing: 8) {
-            VerrePastilleIcone(symbole: "checkmark", teinte: Color.teinteKiwi, taille: 30, tailleIcone: 14)
-            Text(texte)
-                .font(.dsLegende.weight(.semibold))
-                .foregroundStyle(Color.dsTexte)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            Spacer(minLength: 0)
-        }
-        .padding(.leading, 8)
-        .padding(.trailing, 16)
-        .frame(minHeight: 46)
-        .verre(.clairActif, forme: Capsule(style: .continuous))
-        .accessibilityElement(children: .combine)
-        .transition(.opacity)
-    }
-
-    /// Les lignes d'une section, dans une carte de verre, séparées d'un filet
-    /// aligné sur le texte (12 + vignette 48 + 12).
-    private func carteResultats(_ lignes: [MealJournalService.FoodHit]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(lignes.enumerated()), id: \.element.id) { index, hit in
-                if index > 0 {
-                    DSSeparator(retrait: 72)
-                }
-                ligneResultat(hit)
-                    .kiwiEntrance(index)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .dsCard()
-    }
-
-    /// Une ligne de résultat : toute la ligne ouvre la fiche portion.
-    private func ligneResultat(_ hit: MealJournalService.FoodHit) -> some View {
-        Button {
-            openSearchDetail(hit)
-        } label: {
-            HStack(spacing: 8) {
-                FoodHitContenu(hit: hit)
-                if isAddingFood {
-                    ProgressView().tint(Color.dsAccent).scaleEffect(0.8)
-                } else {
-                    DSChevron()
-                }
-            }
-            .padding(.leading, 12)
-            .padding(.trailing, 14)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.dsPress)
-        .disabled(isAddingFood)
-    }
-
-    /// Fiche portion d'ajout — partagée par la recherche texte et le scan de
-    /// code-barres : un seul chemin d'ajout, donc un seul comportement à tester.
+    /// Fiche portion d'ajout du scan de code-barres. La recherche par nom passe
+    /// par `FoodSearchSheet`, qui ajoute par le même `journal.addFood`.
     private func ajoutPortionSheet(_ detail: MealJournalService.FoodDetail) -> some View {
         PortionSheet(mode: .add(detail: detail,
                                 slot: MealJournalService.MealSlot.from(date: Date())),
@@ -2349,41 +2184,6 @@ struct JournalView: View {
             AppLogger.analysis.report(error, context: "MealScan code-barres")
             barcodeIntrouvable = "Aucun produit ne correspond au code \(code). Essaie la recherche par nom."
         }
-    }
-
-    private func openSearchDetail(_ hit: MealJournalService.FoodHit) {
-        guard !isAddingFood else { return }
-        HapticService.shared.selection()
-        isAddingFood = true
-        Task {
-            defer { isAddingFood = false }
-            do {
-                selectedSearchDetail = try await MealJournalService.shared.foodDetail(id: hit.id)
-            } catch {
-                AppLogger.analysis.report(error, context: "MealScan get_food")
-            }
-        }
-    }
-
-    /// Puce de verre clair (36 pt, 15 / 500), comme les aliments suggérés de
-    /// la maquette ; la cible tactile déborde pour atteindre 44 pt.
-    private func quickSearchButton(_ text: String, index: Int) -> some View {
-        Button {
-            viewModel.searchQuery = text
-            Task { await viewModel.searchFoods() }
-        } label: {
-            Text(text)
-                .font(.dsSousTitreMoyen)
-                .foregroundStyle(Color.dsTexte)
-                .lineLimit(1)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 36)
-                .verreClair()
-                .frame(minHeight: DS.cibleTactile)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.dsPress)
-        .kiwiEntrance(index)
     }
 }
 
