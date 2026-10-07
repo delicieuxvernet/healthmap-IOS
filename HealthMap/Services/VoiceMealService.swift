@@ -218,6 +218,12 @@ final class VoiceMealService {
             UserDefaults.standard.set(UserDefaults.standard.integer(forKey: k) + 1, forKey: k)
         }
 
+        /// Le serveur a répondu 429 : plus aucune dictée aujourd'hui.
+        static func marquerEpuise(userId: String) {
+            let k = clef(userId)
+            UserDefaults.standard.set(max(UserDefaults.standard.integer(forKey: k), dictéesGratuitesParJour), forKey: k)
+        }
+
         /// Reste-t-il une dictée aujourd'hui ? Toujours vrai pour un abonné.
         static func peutDicter(userId: String, isPremium: Bool) -> Bool {
             isPremium || utiliséesAujourdhui(userId: userId) < dictéesGratuitesParJour
@@ -267,26 +273,47 @@ final class VoiceMealService {
         fmt.locale = Locale(identifier: "fr_FR")
         fmt.dateFormat = "EEEE d MMMM, HH:mm"
 
-        do {
-            let analysis: Analysis = try await client.functions.invoke(
-                "parse-meal-voice",
-                options: .init(body: Body(transcript: clean, heureLocale: fmt.string(from: Date())))
-            )
-            guard !analysis.nonAlimentaire, !analysis.aliments.isEmpty else {
-                throw VoiceError.noFood
+        let body = Body(transcript: clean, heureLocale: fmt.string(from: Date()))
+        let uid = AuthService.shared.cachedCurrentUserIdString
+        var essai = 0
+        while true {
+            essai += 1
+            do {
+                // Téléphone verrouillé pendant les 10-20 s d'analyse : iOS
+                // laisse l'app finir au lieu de couper la requête.
+                let analysis: Analysis = try await EnvoiFiable.proteger("parse-meal-voice") {
+                    try await client.functions.invoke("parse-meal-voice", options: .init(body: body))
+                }
+                // Le serveur décompte chaque analyse aboutie, enregistrée ou
+                // non : le compteur local suit la même règle (7 oct. 2026).
+                // Il ne la décomptait qu'à l'enregistrement du repas, et
+                // laissait dicter alors que le serveur avait déjà dit stop.
+                if let uid { QuotaStore.enregistrerUneDictée(userId: uid) }
+                guard !analysis.nonAlimentaire, !analysis.aliments.isEmpty else {
+                    throw VoiceError.noFood
+                }
+                return analysis
+            } catch let error as VoiceError {
+                throw error
+            } catch {
+                if EnvoiFiable.estAnnulation(error) { throw CancellationError() }
+                if EnvoiFiable.codeHTTP(error) == 429 {
+                    // Le serveur a fermé le quota du jour : le téléphone s'aligne,
+                    // la prochaine dictée ouvre l'offre au lieu d'échouer.
+                    if let uid { QuotaStore.marquerEpuise(userId: uid) }
+                    throw VoiceError.rateLimited
+                }
+                // Connexion morte au réveil, réseau pas encore revenu : la
+                // requête n'est pas partie, un second essai ne coûte rien.
+                if essai == 1, EnvoiFiable.estCoupureAvantEnvoi(error) {
+                    AppLogger.analysis.notice("parse-meal-voice : coupure avant envoi, nouvel essai")
+                    try? await Task.sleep(for: .milliseconds(1200))
+                    try Task.checkCancellation()
+                    continue
+                }
+                AppLogger.analysis.error("parse-meal-voice a échoué: \(String(describing: error), privacy: .public)")
+                throw VoiceError.unavailable
             }
-            return analysis
-        } catch let error as FunctionsError {
-            if case .httpError(let code, _) = error, code == 429 {
-                throw VoiceError.rateLimited
-            }
-            AppLogger.analysis.error("parse-meal-voice a échoué: \(String(describing: error), privacy: .public)")
-            throw VoiceError.unavailable
-        } catch let error as VoiceError {
-            throw error
-        } catch {
-            AppLogger.analysis.error("parse-meal-voice a échoué: \(error.localizedDescription, privacy: .public)")
-            throw VoiceError.unavailable
         }
     }
 

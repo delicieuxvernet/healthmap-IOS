@@ -5,6 +5,7 @@ import XCTest
 // Un bilan que seul le journal a rendu périmé attend 24 h avant d'être
 // régénéré ; un questionnaire modifié le régénère tout de suite.
 
+@MainActor
 final class FraicheurBilanTests: XCTestCase {
 
     private var defaults: UserDefaults!

@@ -428,7 +428,10 @@ final class MealScanViewModel: ObservableObject {
     // MARK: - Analyze Photo
 
     func analyzePhoto() async {
-        guard let imageData = selectedImage else { return }
+        // Double toucher sur « Analyser ce repas » : chaque appel enregistre un
+        // repas côté serveur et consomme un scan. Le second s'arrête ici —
+        // `isAnalyzing` passe à vrai avant le premier `await`.
+        guard !isAnalyzing, let imageData = selectedImage else { return }
 
         isAnalyzing = true
         errorMessage = nil
@@ -473,27 +476,32 @@ final class MealScanViewModel: ObservableObject {
                 consumedAt: consumedAtÀEnvoyer
             )
 
-            let response: EdgeMealResponse = try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
-                group.addTask { [client] in
-                    try await client.functions.invoke(
-                        "analyze-meal-photo",
-                        options: .init(body: requestBody)
-                    )
-                }
+            // Téléphone verrouillé pendant l'analyse : iOS laisse l'app finir.
+            // Le serveur, lui, enregistre le repas quoi qu'il arrive ; perdre
+            // sa réponse menait à un second scan, donc à un repas en double.
+            let response: EdgeMealResponse = try await EnvoiFiable.proteger("analyze-meal-photo") {
+                try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
+                    group.addTask { [client] in
+                        try await client.functions.invoke(
+                            "analyze-meal-photo",
+                            options: .init(body: requestBody)
+                        )
+                    }
 
-                // Timeout task
-                group.addTask {
-                    try await Task.sleep(nanoseconds: 130_000_000_000) // 130 seconds
-                    throw MealScanError.timeout
-                }
+                    // Timeout task
+                    group.addTask {
+                        try await Task.sleep(nanoseconds: 130_000_000_000) // 130 seconds
+                        throw MealScanError.timeout
+                    }
 
-                // Return whichever finishes first; cancel the other
-                guard let result = try await group.next() else {
+                    // Return whichever finishes first; cancel the other
+                    guard let result = try await group.next() else {
+                        group.cancelAll()
+                        throw MealScanError.timeout
+                    }
                     group.cancelAll()
-                    throw MealScanError.timeout
+                    return result
                 }
-                group.cancelAll()
-                return result
             }
 
             // 5. Check for Edge Function error in response body
@@ -634,15 +642,22 @@ final class MealScanViewModel: ObservableObject {
                 AppLogger.analysis.warning("MealScan server error: \(msg, privacy: .public)")
                 errorMessage = "L'analyse n'a pas abouti. Réessaie dans un instant."
             }
+        } catch let error where EnvoiFiable.estAnnulation(error) {
+            errorMessage = nil // Requête annulée (écran quitté) : pas une erreur
         } catch {
-            // Handle HTTP / Supabase errors by inspecting the error description
-            let desc = String(describing: error).lowercased()
-            if desc.contains("429") || desc.contains("quota") || desc.contains("rate") {
+            // Tri par TYPE d'erreur, plus par mots dans sa description (7 oct.
+            // 2026) : `contains("rate")` pouvait prendre n'importe quel texte
+            // contenant « rate » pour un quota atteint, et une annulation
+            // finissait en « Vérifie ta connexion ».
+            let code = EnvoiFiable.codeHTTP(error)
+            if code == 429 {
                 handleDailyQuotaReached()
-            } else if desc.contains("413") || desc.contains("too large") || desc.contains("payload") {
+            } else if code == 413 {
                 errorMessage = "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère."
-            } else if desc.contains("timeout") || desc.contains("timed out") {
+            } else if (error as? URLError)?.code == .timedOut {
                 errorMessage = "L'analyse a pris trop de temps. Réessaie avec une photo plus simple."
+            } else if let code, code >= 500 {
+                errorMessage = "L'analyse n'a pas abouti. Réessaie dans un instant."
             } else {
                 errorMessage = "L'analyse n'a pas abouti. Vérifie ta connexion et réessaie."
             }

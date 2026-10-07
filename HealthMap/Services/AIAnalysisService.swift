@@ -113,6 +113,10 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             @unknown default:
                 throw AIAnalysisError.invalidResponse
             }
+        } catch let error as URLError where error.code == .cancelled {
+            // Requête annulée (écran quitté) : ni un échec du service, ni une
+            // raison d'ouvrir le circuit (7 oct. 2026).
+            throw CancellationError()
         } catch let error as URLError where error.code == .timedOut {
             recordFailure()
             throw AIAnalysisError.timeout
@@ -240,23 +244,29 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
 
         let analysis: AIAnalysisV2
         do {
-            analysis = try await withThrowingTaskGroup(of: AIAnalysisV2.self) { group in
-                group.addTask {
-                    try await self.client.functions.invoke(
-                        "generate-analysis",
-                        options: .init(body: requestBody)
-                    )
-                }
-                group.addTask {
-                    try await Task.sleep(for: .seconds(185))
-                    throw AIAnalysisError.timeout
-                }
-                guard let result = try await group.next() else {
+            // Le premier bilan se rédige pendant que la personne attend : si
+            // elle verrouille son téléphone, iOS laisse encore un peu de temps
+            // à la requête. S'il ne suffit pas, le serveur termine quand même
+            // et la gate relit la base (`DashboardViewModel.verifierBilanEnBase`).
+            analysis = try await EnvoiFiable.proteger("generate-analysis-bilan") {
+                try await withThrowingTaskGroup(of: AIAnalysisV2.self) { group in
+                    group.addTask {
+                        try await self.client.functions.invoke(
+                            "generate-analysis",
+                            options: .init(body: requestBody)
+                        )
+                    }
+                    group.addTask {
+                        try await Task.sleep(for: .seconds(185))
+                        throw AIAnalysisError.timeout
+                    }
+                    guard let result = try await group.next() else {
+                        group.cancelAll()
+                        throw AIAnalysisError.timeout
+                    }
                     group.cancelAll()
-                    throw AIAnalysisError.timeout
+                    return result
                 }
-                group.cancelAll()
-                return result
             }
         } catch let error as FunctionsError {
             // Même mapping HTTP → AIAnalysisError que le flux v7.
@@ -279,6 +289,9 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
             @unknown default:
                 throw AIAnalysisError.invalidResponse
             }
+        } catch let error as URLError where error.code == .cancelled {
+            // Même règle que le v7 : une annulation ne compte pas comme échec.
+            throw CancellationError()
         } catch let error as URLError where error.code == .timedOut {
             recordFailure()
             throw AIAnalysisError.timeout

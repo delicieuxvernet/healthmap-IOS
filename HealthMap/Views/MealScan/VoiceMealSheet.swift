@@ -106,6 +106,9 @@ struct VoiceMealSheet: View {
     @State private var remplacementPour: RemplacementCible?
     @State private var remplacementEnCours: Int?
     @State private var errorMessage: String?
+    /// L'écriture du repas a échoué : dit sous les aliments, qui restent là
+    /// pour un nouvel essai (« Ajouter » se retouche tel quel).
+    @State private var erreurEnregistrement: String?
     @State private var isSaving = false
     /// Aliments extraits au-delà du plafond serveur, donc non analysés.
     /// La coupe ne doit JAMAIS être silencieuse (règle du 2 août 2026).
@@ -184,6 +187,7 @@ struct VoiceMealSheet: View {
             .verreFeuille()
         }
         .onAppear { amorcer() }
+        .onChange(of: depart != nil) { _, _ in amorcer() }
         .task { await demarrer() }
         .onDisappear {
             revelation?.cancel()
@@ -369,6 +373,9 @@ struct VoiceMealSheet: View {
             totalLigne
             etiquettesApports
             choixRepas
+            if let erreurEnregistrement {
+                bandeau(erreurEnregistrement, couleur: Kiwio.ambre, fond: Kiwio.ambreFond)
+            }
             ctaBlock
         }
         .padding(.horizontal, Self.margeInterieure)
@@ -997,17 +1004,28 @@ struct VoiceMealSheet: View {
     /// À l'apparition : la dictée déjà chiffrée sous la bulle se pose telle
     /// quelle. Fait avant la première image, pour que la feuille monte
     /// directement sur son contenu.
+    ///
+    /// `amorce` ne se pose qu'avec un `depart` en main : la feuille est
+    /// présentée dans le même cycle que `departDictee` est écrit, et SwiftUI
+    /// peut la construire une première fois avec `depart == nil`. Le résultat
+    /// arrive alors au rendu suivant (`onChange`), et doit encore s'appliquer.
     private func amorcer() {
-        guard !amorce else { return }
+        guard !amorce, let depart else { return }
         amorce = true
-        guard let depart else { return }
         appliquer(depart)
     }
 
     /// Saisie au clavier : la feuille attend le texte. Dictée déjà chiffrée :
-    /// rien à faire. Sinon (aucun résultat fourni), on transcrit l'audio ici.
+    /// rien à faire. Sinon, seulement si un enregistrement est VRAIMENT en
+    /// cours, on le transcrit ici.
+    ///
+    /// ⚠️ Garde `speech.state == .listening` (7 oct. 2026) : construite une
+    /// première fois sans son `depart` (voir `amorcer`), la feuille relançait
+    /// toute la préparation sur la dictée déjà analysée — une seconde analyse
+    /// 0,2 s après la première, vue dans les journaux du serveur. Elle coûtait
+    /// une dictée du quota et finissait en « limite de dictées atteinte ».
     private func demarrer() async {
-        guard depart == nil, !saisieAuClavier else { return }
+        guard depart == nil, !saisieAuClavier, speech.state == .listening else { return }
         await finishListening()
     }
 
@@ -1045,6 +1063,9 @@ struct VoiceMealSheet: View {
         do {
             let analysis = try await VoiceMealService.shared.analyze(transcript: text)
             appliquer(analysis)
+        } catch is CancellationError {
+            // Feuille refermée pendant l'analyse : personne à prévenir.
+            return
         } catch {
             errorMessage = error.localizedDescription
             phase = .failed
@@ -1097,6 +1118,7 @@ struct VoiceMealSheet: View {
         guard !isSaving, let slot else { return }
         isSaving = true
         defer { isSaving = false }
+        erreurEnregistrement = nil
 
         // On enregistre le grammage choisi à l'écran, qui peut différer de celui
         // résolu par le serveur.
@@ -1107,13 +1129,18 @@ struct VoiceMealSheet: View {
             if let foodId = item.foodId {
                 // Aliment de la base : on repasse par get_food, le MÊME chemin
                 // que l'ajout depuis la recherche (micros et arrondis identiques).
-                do {
-                    let detail = try await journal.foodDetail(id: foodId)
-                    if let entry = MealJournalService.entry(for: detail, grams: g) {
-                        entries.append(entry)
-                        continue
-                    }
-                } catch {
+                // Lecture sans effet de bord : un raté réseau se retente une
+                // fois avant de retomber sur l'estimation du serveur.
+                var detail = try? await journal.foodDetail(id: foodId)
+                if detail == nil {
+                    try? await Task.sleep(for: .milliseconds(600))
+                    detail = try? await journal.foodDetail(id: foodId)
+                }
+                if let detail, let entry = MealJournalService.entry(for: detail, grams: g) {
+                    entries.append(entry)
+                    continue
+                }
+                if detail == nil {
                     AppLogger.analysis.error("get_food(\(foodId, privacy: .public)) indisponible")
                 }
             }
@@ -1147,12 +1174,14 @@ struct VoiceMealSheet: View {
         }
 
         do {
-            try await journal.insertFoods(
-                userId: userId,
-                entries: entries,
-                slot: slot,
-                consumedAt: MealJournalService.horodatage(jour: jour, slot: slot)
-            )
+            _ = try await EnvoiFiable.proteger("dictee-enregistrement") {
+                try await journal.insertFoods(
+                    userId: userId,
+                    entries: entries,
+                    slot: slot,
+                    consumedAt: MealJournalService.horodatage(jour: jour, slot: slot)
+                )
+            }
 
             // Parité avec le scan photo (MealScanViewModel) : un repas dicté est
             // un repas comme un autre. Avant le 2 août 2026, la voix ne postait
@@ -1183,8 +1212,13 @@ struct VoiceMealSheet: View {
             onAdded(Ajout(nombre: entries.count, kcal: kcal, creneau: slot, sousLigne: sousLigne))
             fermer()
         } catch {
-            errorMessage = "L'enregistrement a échoué. Réessaie."
-            phase = .failed
+            // On reste sur le repas, quantités comprises : « Ajouter » se
+            // retouche tel quel. L'ancien écran d'échec ne proposait que
+            // « Relancer l'analyse » — une dictée de plus sur le quota, et les
+            // quantités réglées perdues, pour un simple raté d'écriture.
+            AppLogger.analysis.report(error, context: "Dictée : enregistrement du repas")
+            HapticService.shared.error()
+            erreurEnregistrement = "Repas non enregistré. Vérifie ta connexion, puis touche à nouveau le bouton."
         }
     }
 }
@@ -1254,6 +1288,9 @@ extension VoiceMealSheet {
         do {
             let analyse = try await VoiceMealService.shared.analyze(transcript: texte)
             return .analyse(analyse, transcript: texte)
+        } catch is CancellationError {
+            // Abandonnée pendant le calcul : l'appelant ne montre rien.
+            return .echec(message: "", transcript: texte)
         } catch {
             return .echec(message: error.localizedDescription, transcript: texte)
         }

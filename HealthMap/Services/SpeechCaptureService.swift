@@ -178,9 +178,13 @@ final class SpeechCaptureService: ObservableObject {
 
     /// Termine l'enregistrement et transcrit l'enregistrement ENTIER.
     /// Renvoie le texte, ou une chaîne vide si rien n'a été compris.
+    ///
+    /// Hors enregistrement, rend une chaîne vide (plus le dernier texte) : une
+    /// dictée ne se transcrit qu'UNE fois. Rendre l'ancien texte faisait
+    /// renvoyer au serveur une dictée déjà analysée (7 oct. 2026).
     @discardableResult
     func finishAndTranscribe() async -> String {
-        guard state == .listening, let rec = recorder, let url = fichier else { return transcript }
+        guard state == .listening, let rec = recorder, let url = fichier else { return "" }
 
         rec.stop()
         horloge?.invalidate(); horloge = nil

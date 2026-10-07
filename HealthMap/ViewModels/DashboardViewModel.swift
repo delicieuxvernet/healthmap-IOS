@@ -857,6 +857,9 @@ final class DashboardViewModel: ObservableObject {
 /// flux v7) et finissait en « Trop de demandes ». On retient donc, par compte,
 /// sur quel questionnaire le bilan affiché a été rédigé : tant que c'est le
 /// même et que le bilan a moins de 24 h, il attend.
+///
+/// `@MainActor` : `AIAnalysisService.hashProfile` l'est.
+@MainActor
 enum FraicheurBilan {
     static let delaiMaximum: TimeInterval = 24 * 3600
 
