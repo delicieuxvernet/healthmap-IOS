@@ -170,17 +170,25 @@
 >      « Terminer »** (toucher la bulle termine aussi). Quand le doigt tient encore le bouton, ces
 >      deux boutons deviennent « Glisse pour annuler » et « Relâche pour terminer », et la bulle
 >      suit le doigt à l'horizontale en s'estompant vers l'annulation ;
->   3. **le calcul, sous la bulle** : elle se contracte à 66 pt, trois points tournent autour
->      d'elle (un tour en 1,2 s), les couches accélèrent, « Kiwio calcule tes apports… ». La
->      transcription PUIS l'analyse se font là, avant que la feuille ne monte
->      (`VoiceMealSheet.preparer` : mêmes appels, même ordre, mêmes données envoyées). Dès que la
->      transcription existe, la carte la relit **mot à mot, du flou au net** (`MotsQuiArrivent`).
+>   3. **la transcription, sous la bulle** : elle se contracte à 66 pt, trois points tournent
+>      autour d'elle (un tour en 1,2 s), les couches accélèrent, « Kiwio relit ta dictée… ». SEULE
+>      la transcription se fait là, sur l'appareil, gratuite (`VoiceMealSheet.transcrire`). Dès
+>      qu'elle existe, la carte la relit **mot à mot, du flou au net** (`MotsQuiArrivent`).
 >      ⚠️ Les mots n'arrivent PAS pendant qu'on parle : la capture enregistre d'abord et transcrit
 >      ensuite (voir `SpeechCaptureService`), décision conservée. Un « Annuler » réapparaît après
->      4 s de calcul : la scène couvre tout l'écran, il faut une sortie ;
->   4. **les résultats** : la bulle s'efface et **une feuille de verre DÉTACHÉE des bords** monte
->      (marges de 8, rayon 44, posée en bas à la taille de ce qu'elle montre ; elle défile si le
->      contenu dépasse) ; le voile reste jusqu'à ce qu'elle redescende. « Ton déjeuner » en 24/700
+>      4 s : la scène couvre tout l'écran, il faut une sortie ;
+>   3'. **la relecture, AVANT tout appel serveur** (retour d'Arthur, 7 octobre 2026 : une dictée
+>      ratée partait quand même à `parse-meal-voice`, payant, et ne se corrigeait qu'après) : la
+>      bulle s'efface et la feuille de verre (ci-dessous) monte sur « Dictée terminée », « Vérifie
+>      ce que j'ai compris… », **le texte transcrit dans un champ modifiable** (crayon en coin),
+>      puis le pied commun à « Écrire » (variante B, 7 octobre 2026) : « C'est bien ça ? Rien ne
+>      part avant ton feu vert. », **« Effacer »** (verre clair) et **« Lancer l'analyse »** (le seul
+>      geste qui appelle le serveur), et dessous **« Recommencer la
+>      dictée »** (la feuille redescend et la bulle se rouvre d'elle-même, mains libres). Après un
+>      échec d'analyse, « Corriger le texte » ramène ce champ au lieu d'imposer de tout redire ;
+>   4. **les résultats** : après « Lancer l'analyse », le pépin tourne dans **une feuille de verre
+>      DÉTACHÉE des bords** (marges de 8, rayon 44, posée en bas à la taille de ce qu'elle montre ;
+>      elle défile si le contenu dépasse) ; le voile reste jusqu'à ce qu'elle redescende. « Ton déjeuner » en 24/700
 >      (« Ton repas » tant que le repas n'est pas choisi) et « 3 aliments reconnus », les lignes en
 >      cascade (pastille de 40, nom, quantité, kcal ; UNE seule déployée à la fois pour régler sa
 >      quantité), le total qui compte, **les étiquettes de ce que le repas apporte** (« Protéines
@@ -205,12 +213,17 @@
 >   `kiwiCompteur`) et `kiwiVif` pour l'appui (0,96) ; rien ne dépasse 1,22 (`KiwiEchelle.plafond`).
 >   **Réduire les animations** : la bulle est posée d'emblée à sa place, liquide figé, ni onde ni
 >   trajet ; la capsule arrive dépliée ; tout se fait en fondu.
->   « Écrire » ouvre la même feuille détachée sur un champ, sans la bulle. Les autres ajouts
+>   « Écrire » ouvre la même feuille détachée sur un champ, sans la bulle, avec le même pied que la
+>   relecture : « C'est bien ça ? Rien ne part avant ton feu vert. », « Effacer » et « Lancer
+>   l'analyse ». Les autres ajouts
 >   (photo, recherche, code-barres) gardent la gratification décrite plus bas.
 > - **Micronutriments** (1er octobre 2026, verre le 2 ; `JournalMicrosComponents.swift`, calcul
->   `Core/MicrosDuJour.swift`) — sous la saisie. **Réservé au Premium** : en gratuit, la carte
->   reste devinable derrière le flou, et une porte « Débloque tes micronutriments » la suit (zone
->   `journal_micros`). La carte porte son en-tête (feuille verte, « Micronutriments », « touche
+>   `Core/MicrosDuJour.swift`) — sous la saisie. **Réservé au Premium** : en gratuit (variante B,
+>   7 octobre 2026), la carte n'est PAS floutée : « N micronutriments calculés sur tes repas »,
+>   les filtres, toute la liste dans l'ordre du catalogue, noms nets, et sur chaque ligne une
+>   pastille « 🔒 Débloquer avec Premium » à la place de la jauge et du chiffre ; ni priorités, ni
+>   repère « bas », ni phrase sur la personne (rien ne se devine). Le bouton d'essai (StoreKit)
+>   clôt la carte ; toucher une ligne ou ce bouton ouvre l'abonnement (zone `journal_micros`). La carte porte son en-tête (feuille verte, « Micronutriments », « touche
 >   pour le détail ») ; **les trois apports qui comptent le plus pour la personne**, puis tous les
 >   autres derrière « Voir les N micronutriments ». Une ligne = le nom, un point et une jauge à la
 >   TEINTE de l'apport, le pourcentage, un chevron ; un apport bas porte un petit signe rouge ou

@@ -76,6 +76,8 @@ struct PortionSheet: View {
     var onSave: ((Double) -> Void)? = nil
     /// edit/info : suppression de la ligne.
     var onDelete: (() -> Void)? = nil
+    /// add : l'étoile des favoris dans l'en-tête (nil = pas d'étoile).
+    var favori: Binding<Bool>? = nil
 
     @State private var grams: Int
     @State private var isWorking = false
@@ -90,14 +92,19 @@ struct PortionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// - Parameter grammesProposes: add : la quantité de la dernière fois
+    ///   (un récent, un favori), au lieu de la portion courante.
     init(mode: Mode,
          onAdd: ((Double) async -> Bool)? = nil,
          onSave: ((Double) -> Void)? = nil,
-         onDelete: (() -> Void)? = nil) {
+         onDelete: (() -> Void)? = nil,
+         favori: Binding<Bool>? = nil,
+         grammesProposes: Double? = nil) {
         self.mode = mode
         self.onAdd = onAdd
         self.onSave = onSave
         self.onDelete = onDelete
+        self.favori = favori
         let unite: UnitPortionCatalog.Unite?
         switch mode {
         case .add(let detail, _):
@@ -114,7 +121,7 @@ struct PortionSheet: View {
         case .add:
             // Un aliment à l'unité démarre à UNE unité (« 1 œuf » = 50 g),
             // pas à 100 g : c'est la quantité que la personne a en tête.
-            _grams = State(initialValue: Int((unite?.grammes ?? 100).rounded()))
+            _grams = State(initialValue: Int((grammesProposes ?? unite?.grammes ?? 100).rounded()))
         case .edit(let row):
             _grams = State(initialValue: Int((row.grams ?? 100).rounded()))
         case .info:
@@ -173,17 +180,34 @@ struct PortionSheet: View {
 
     @ViewBuilder
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(titleText)
-                .font(.dsTitreInline)
-                .tracking(DSTracking.corps)
-                .foregroundStyle(Color.dsTexte)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(subtitleText)
-                .font(.dsLegende)
-                .foregroundStyle(Color.dsSecondaire)
-                .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(titleText)
+                    .font(.dsTitreInline)
+                    .tracking(DSTracking.corps)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitleText)
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let favori {
+                Button {
+                    HapticService.shared.selection()
+                    favori.wrappedValue.toggle()
+                } label: {
+                    Image(systemName: favori.wrappedValue ? "star.fill" : "star")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(favori.wrappedValue ? Color.teinteVitamineD : Verre.iconeNeutre)
+                        .frame(width: DS.cibleTactile, height: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.dsPress)
+                .accessibilityLabel(favori.wrappedValue ? "Retirer des favoris" : "Ajouter aux favoris")
+            }
         }
     }
 
@@ -627,47 +651,118 @@ struct PortionSheet: View {
 
 // MARK: - Recherche d'aliment (page « Ajouter — [repas] »)
 
-/// Debounce + appels à la RPC unifiée `search_foods` (CIQUAL ∪ OFF).
+/// Frappe → le catalogue du téléphone (`CatalogueRecherche`), le serveur
+/// (`search_foods_rapide`) seulement en secours ; et les fiches `get_food`
+/// gardées en mémoire le temps de la feuille.
+///
+/// Retour d'Arthur (7 oct. 2026) : « la recherche est extrêmement lente ».
+/// Ce qui pesait le plus n'était pas la base : chaque lettre EFFAÇAIT la
+/// liste pour un sablier. La liste reste donc à l'écran pendant qu'on cherche
+/// (un petit indicateur dans le champ suffit), l'attente après la frappe
+/// passe de 300 à 150 ms, et les fiches des premiers résultats, des récents
+/// et des favoris sont chargées d'avance : toucher « + » n'attend plus.
 @MainActor
 final class FoodSearchViewModel: ObservableObject {
     @Published var query = ""
     @Published var hits: [MealJournalService.FoodHit] = []
     @Published var isSearching = false
+    /// La requête dont `hits` est la réponse : « aucun résultat » ne se dit
+    /// que pour elle, pas pour la lettre d'avant.
+    @Published private(set) var requeteServie = ""
     private var searchTask: Task<Void, Never>?
+    private var fiches: [String: MealJournalService.FoodDetail] = [:]
+    private var fichesEnCours: [String: Task<MealJournalService.FoodDetail, Error>] = [:]
 
     func search() {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         searchTask?.cancel()
         guard q.count >= 2 else {
             hits = []
+            requeteServie = ""
             isSearching = false
             return
         }
+        isSearching = true
         searchTask = Task {
-            isSearching = true
-            defer { if !Task.isCancelled { isSearching = false } }
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            // 1. Le catalogue du téléphone (`CatalogueRecherche`) : aucune
+            //    attente, aucun réseau, à chaque lettre.
+            var locaux: [MealJournalService.FoodHit] = []
+            if let trouves = await CatalogueRecherche.shared.chercher(q) {
+                guard !Task.isCancelled else { return }
+                locaux = trouves
+                hits = trouves
+                requeteServie = q
+                prechauffer(trouves.prefix(2).map(\.id))
+                // Assez de résultats : le serveur n'apporterait rien de plus.
+                if trouves.count >= Self.assezDeResultats {
+                    isSearching = false
+                    return
+                }
+            }
+            // 2. Le serveur, seulement si le catalogue n'est pas encore là ou
+            //    trouve peu (faute de frappe : le serveur tolère les fautes).
+            try? await Task.sleep(nanoseconds: locaux.isEmpty ? 150_000_000 : 300_000_000)
             guard !Task.isCancelled else { return }
             do {
-                let results = try await MealJournalService.shared.searchFoodsVisuel(query: q)
+                let distants = try await MealJournalService.shared.searchFoodsRapide(query: q)
                 guard !Task.isCancelled else { return }
-                hits = results
+                let dejaLa = Set(locaux.map(\.id))
+                hits = locaux + distants.filter { !dejaLa.contains($0.id) }
+                requeteServie = q
+                isSearching = false
+                if locaux.isEmpty { prechauffer(distants.prefix(2).map(\.id)) }
             } catch {
                 guard !Task.isCancelled else { return }
-                hits = []
+                hits = locaux
+                requeteServie = q
+                isSearching = false
                 AppLogger.database.warning("search_foods failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
+
+    /// En dessous, on demande aussi au serveur (fautes de frappe).
+    private static let assezDeResultats = 3
+
+    /// La fiche 100 g d'un aliment, une seule fois par feuille.
+    func fiche(_ id: String) async throws -> MealJournalService.FoodDetail {
+        if let connue = fiches[id] { return connue }
+        if let enCours = fichesEnCours[id] { return try await enCours.value }
+        let tache = Task { try await MealJournalService.shared.foodDetail(id: id) }
+        fichesEnCours[id] = tache
+        defer { fichesEnCours[id] = nil }
+        let fiche = try await tache.value
+        fiches[id] = fiche
+        return fiche
+    }
+
+    /// Charge d'avance les fiches qu'on a toutes les chances de toucher.
+    func prechauffer(_ ids: [String]) {
+        for id in ids where fiches[id] == nil && fichesEnCours[id] == nil {
+            Task { _ = try? await fiche(id) }
+        }
+    }
+}
+
+/// Ce que la fiche portion ouvre : l'aliment, et la quantité de la dernière
+/// fois quand on vient d'un récent ou d'un favori.
+private struct FicheAjout: Identifiable {
+    let detail: MealJournalService.FoodDetail
+    let grammes: Double?
+    var id: String { detail.id }
 }
 
 struct FoodSearchSheet: View {
     let slot: MealJournalService.MealSlot
+    /// Les derniers aliments notés (`AlimentsHabituels.recents`), du plus
+    /// récent au plus ancien : la feuille s'ouvre sur eux.
+    var recents: [AlimentHabituel] = []
     /// Persiste l'ajout ; renvoie false si l'écriture a échoué.
     let onAdd: (MealJournalService.FoodDetail, Double) async -> Bool
 
     @StateObject private var vm = FoodSearchViewModel()
-    @State private var selectedDetail: MealJournalService.FoodDetail?
+    @ObservedObject private var habituels = AlimentsHabituelsStore.shared
+    @State private var ficheOuverte: FicheAjout?
     @State private var loadingHitId: String?
     @State private var confirmation: String?
     @Environment(\.dismiss) private var dismiss
@@ -698,6 +793,7 @@ struct FoodSearchSheet: View {
                 .padding(.vertical, Theme.spacingMD)
                 .padding(.horizontal, DS.marge)
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Ajouter : \(slot.label)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -708,42 +804,105 @@ struct FoodSearchSheet: View {
             }
         }
         .verreFeuille()
-        .sheet(item: $selectedDetail) { detail in
-            PortionSheet(mode: .add(detail: detail, slot: slot),
+        .task {
+            // Lancé au démarrage de l'app ; ici seulement s'il manquait encore.
+            Task.detached(priority: .userInitiated) { await CatalogueRecherche.shared.preparer() }
+            habituels.charger()
+            vm.prechauffer((habituels.favoris.prefix(6) + recents.prefix(6)).map(\.id))
+        }
+        .sheet(item: $ficheOuverte) { fiche in
+            PortionSheet(mode: .add(detail: fiche.detail, slot: slot),
                          onAdd: { grams in
-                             let ok = await onAdd(detail, grams)
-                             if ok { showConfirmation(for: detail, grams: grams) }
+                             let ok = await onAdd(fiche.detail, grams)
+                             if ok {
+                                 habituels.apresAjout(fiche.detail, grammes: grams)
+                                 showConfirmation(for: fiche.detail, grams: grams)
+                             }
                              return ok
-                         })
+                         },
+                         favori: favoriBinding(fiche),
+                         grammesProposes: fiche.grammes)
             .presentationDetents([.height(500)])
             .presentationDragIndicator(.visible)
         }
     }
 
-    /// Sous le champ : les exemples, l'attente, le vide ou les résultats.
+    /// Les récents, habillés de la photo et de la famille vues en recherche.
+    private var recentsHabilles: [AlimentHabituel] {
+        recents.map { habituels.habiller($0) }
+    }
+
+    /// Sous le champ : l'accueil (récents, favoris), puis pendant la frappe
+    /// « Tes aliments » (instantané, sans réseau) et les résultats de la base.
+    /// La liste n'est JAMAIS remplacée par un sablier.
     @ViewBuilder
     private var contenu: some View {
-        if vm.query.trimmingCharacters(in: .whitespaces).count < 2 {
-            examples
-        } else if vm.isSearching {
-            ProgressView()
-                .tint(Color.dsAccent)
-                .padding(.top, Theme.spacingLG)
-        } else if vm.hits.isEmpty {
-            Text("Aucun résultat. Essaie un autre nom.")
-                .font(.dsSousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .multilineTextAlignment(.center)
-                .padding(.top, Theme.spacingLG)
+        let requete = vm.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if requete.count < 2 {
+            accueil
         } else {
-            ForEach(RechercheVisuelle.sections(vm.hits, source: \.source, score: \.score)) { section in
+            let locaux = AlimentsHabituels.correspondances(requete, favoris: habituels.favoris,
+                                                           recents: recentsHabilles)
+            let idsLocaux = Set(locaux.map(\.id))
+            let distants = vm.hits.filter { !idsLocaux.contains($0.id) }
+            if !locaux.isEmpty {
                 VStack(spacing: 8) {
-                    RechercheSectionTitre(titre: section.titre)
-                    sectionCarte(section.lignes)
+                    RechercheSectionTitre(titre: "Tes aliments")
+                    carteHabituels(locaux)
                 }
             }
-            if vm.hits.contains(where: { $0.source == "off" }) {
-                RechercheCreditPhotos()
+            if distants.isEmpty {
+                if vm.isSearching {
+                    if locaux.isEmpty {
+                        ProgressView()
+                            .tint(Color.dsAccent)
+                            .padding(.top, Theme.spacingLG)
+                    }
+                } else if locaux.isEmpty && vm.requeteServie == requete {
+                    Text("Aucun résultat. Essaie un autre nom.")
+                        .font(.dsSousTitre)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, Theme.spacingLG)
+                }
+            } else {
+                ForEach(RechercheVisuelle.sections(distants, source: \.source, score: \.score,
+                                                   sousGroupe: { $0.sousGroupe })) { section in
+                    VStack(spacing: 8) {
+                        RechercheSectionTitre(titre: section.titre)
+                        sectionCarte(section.lignes)
+                    }
+                }
+                if distants.contains(where: { $0.source == "off" }) {
+                    RechercheCreditPhotos()
+                }
+            }
+        }
+    }
+
+    /// Avant de taper : ce qu'on a mangé ces derniers jours, puis les favoris.
+    /// Rien encore (premier jour) : les exemples d'avant.
+    @ViewBuilder
+    private var accueil: some View {
+        let recentsVus = recentsHabilles
+        if recentsVus.isEmpty && habituels.favoris.isEmpty {
+            examples
+        } else {
+            if !recentsVus.isEmpty {
+                VStack(spacing: 8) {
+                    RechercheSectionTitre(titre: "Récents")
+                    carteHabituels(recentsVus)
+                }
+            }
+            if !habituels.favoris.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    RechercheSectionTitre(titre: "Favoris")
+                    DSFlow(espacement: 8) {
+                        ForEach(Array(habituels.favoris.enumerated()), id: \.element.id) { index, favori in
+                            favoriChip(favori, index: index)
+                        }
+                    }
+                }
             }
         }
     }
@@ -764,6 +923,24 @@ struct FoodSearchSheet: View {
         .dsCard()
     }
 
+    /// Même carte, pour ses aliments : la ligne dit la quantité de la
+    /// dernière fois, et le « + » la remet telle quelle.
+    private func carteHabituels(_ aliments: [AlimentHabituel]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(aliments.enumerated()), id: \.element.id) { index, aliment in
+                if index > 0 {
+                    DSSeparator(retrait: 72)
+                }
+                ligne(hit: aliment.hit, sousTitre: aliment.sousTitre,
+                      ouvrir: { ouvrir(aliment) }, ajouter: { ajouter(aliment) },
+                      libelleAjout: "Ajouter \(aliment.nom), \(Int(aliment.grammes.rounded())) grammes")
+                    .kiwiEntrance(index)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .dsCard()
+    }
+
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
@@ -775,6 +952,12 @@ struct FoodSearchSheet: View {
                 .accessibilityIdentifier("recherche.champ")
                 .autocorrectionDisabled()
                 .onChange(of: vm.query) { _, _ in vm.search() }
+            // La recherche tourne : un indicateur discret, la liste reste là.
+            if vm.isSearching {
+                ProgressView()
+                    .scaleEffect(0.8)
+                    .accessibilityLabel("Recherche en cours")
+            }
             if !vm.query.isEmpty {
                 Button {
                     vm.query = ""
@@ -833,19 +1016,75 @@ struct FoodSearchSheet: View {
         .kiwiEntrance(index)
     }
 
-    private func hitRow(_ hit: MealJournalService.FoodHit) -> some View {
-        HStack(spacing: 8) {
+    /// Un favori : une puce étoilée. La toucher l'ajoute tout de suite, à la
+    /// quantité de la dernière fois ; l'appui long la retire des favoris.
+    private func favoriChip(_ favori: AlimentHabituel, index: Int) -> some View {
+        Button {
+            ajouter(favori)
+        } label: {
+            HStack(spacing: 6) {
+                if loadingHitId == favori.id {
+                    ProgressView().scaleEffect(0.7)
+                } else {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.teinteVitamineD)
+                        .accessibilityHidden(true)
+                }
+                Text(favori.nom)
+                    .font(.dsSousTitreMoyen)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: 240, minHeight: 36)
+            .verreClair()
+            .frame(minHeight: DS.cibleTactile)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.dsPress)
+        .disabled(loadingHitId != nil)
+        .contextMenu {
             Button {
-                openDetail(hit)
+                ouvrir(favori)
             } label: {
-                FoodHitContenu(hit: hit)
+                Label("Choisir la quantité", systemImage: "slider.horizontal.3")
+            }
+            Button(role: .destructive) {
+                habituels.basculer(favori)
+            } label: {
+                Label("Retirer des favoris", systemImage: "star.slash")
+            }
+        }
+        .accessibilityLabel("Ajouter \(favori.nom), \(Int(favori.grammes.rounded())) grammes")
+        .kiwiEntrance(index)
+    }
+
+    private func hitRow(_ hit: MealJournalService.FoodHit) -> some View {
+        ligne(hit: hit, sousTitre: nil,
+              ouvrir: { openDetail(hit) }, ajouter: { quickAdd(hit) },
+              libelleAjout: UnitPortionCatalog.unite(pourNom: hit.name).map { "Ajouter \(hit.name), \($0.libelle(nombre: 1))" }
+                  ?? "Ajouter \(hit.name), 100 grammes")
+    }
+
+    /// Une ligne : toucher ouvre la fiche portion, le « + » ajoute d'un geste,
+    /// l'appui long met en favori (ou l'en retire).
+    private func ligne(hit: MealJournalService.FoodHit, sousTitre: String?,
+                       ouvrir: @escaping () -> Void, ajouter: @escaping () -> Void,
+                       libelleAjout: String) -> some View {
+        let estFavori = habituels.estFavori(hit.id)
+        return HStack(spacing: 8) {
+            Button {
+                ouvrir()
+            } label: {
+                FoodHitContenu(hit: hit, sousTitre: sousTitre, favori: estFavori)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.dsPress)
 
             // Ajout direct : un rond de verre vert, la seule action de la ligne.
             Button {
-                quickAdd(hit)
+                ajouter()
             } label: {
                 ZStack {
                     if loadingHitId == hit.id {
@@ -863,48 +1102,117 @@ struct FoodSearchSheet: View {
             }
             .buttonStyle(.dsPress)
             .disabled(loadingHitId != nil)
-            .accessibilityLabel(UnitPortionCatalog.unite(pourNom: hit.name).map { "Ajouter \(hit.name), \($0.libelle(nombre: 1))" }
-                                ?? "Ajouter \(hit.name), 100 grammes")
+            .accessibilityLabel(libelleAjout)
         }
         .padding(.leading, 12)
         .padding(.trailing, 6)
         .padding(.vertical, 10)
+        .contextMenu {
+            Button {
+                basculerFavori(hit)
+            } label: {
+                if estFavori {
+                    Label("Retirer des favoris", systemImage: "star.slash")
+                } else {
+                    Label("Ajouter aux favoris", systemImage: "star")
+                }
+            }
+        }
     }
 
-    /// Tap sur la ligne → fiche portion (fetch `get_food` d'abord).
+    // MARK: - Favoris
+
+    /// Un résultat devient favori à la quantité courante (1 unité pour ce qui
+    /// se compte, 100 g sinon) ; un récent garde la sienne.
+    private func basculerFavori(_ hit: MealJournalService.FoodHit) {
+        HapticService.shared.selection()
+        if let deja = habituels.favoris.first(where: { $0.id == hit.id }) {
+            habituels.basculer(deja)
+            return
+        }
+        habituels.retenir(hit)
+        let grammes = recents.first(where: { $0.id == hit.id })?.grammes
+            ?? UnitPortionCatalog.unite(pourNom: hit.name)?.grammes ?? 100
+        habituels.basculer(AlimentHabituel(id: hit.id, nom: hit.name, marque: hit.brand, grammes: grammes,
+                                           kcal100g: hit.kcal100g, image: hit.image,
+                                           groupe: hit.groupe, sousGroupe: hit.sousGroupe))
+    }
+
+    /// L'étoile de la fiche portion.
+    private func favoriBinding(_ fiche: FicheAjout) -> Binding<Bool> {
+        Binding(
+            get: { habituels.estFavori(fiche.detail.id) },
+            set: { _ in
+                let detail = fiche.detail
+                let grammes = fiche.grammes
+                    ?? UnitPortionCatalog.unite(pourNom: detail.name,
+                                                portions: detail.portions.map { (label: $0.label, grammes: $0.grammes) })?.grammes
+                    ?? 100
+                habituels.basculer(AlimentHabituel(id: detail.id, nom: detail.name, marque: detail.brand,
+                                                   grammes: grammes, kcal100g: detail.kcal100g))
+            }
+        )
+    }
+
+    // MARK: - Ouvrir, ajouter
+
+    /// Tap sur la ligne → fiche portion (fiche déjà chargée d'avance, le plus souvent).
     private func openDetail(_ hit: MealJournalService.FoodHit) {
+        habituels.retenir(hit)
+        ouvrirFiche(id: hit.id, grammes: nil)
+    }
+
+    private func ouvrir(_ aliment: AlimentHabituel) {
+        ouvrirFiche(id: aliment.id, grammes: aliment.grammes)
+    }
+
+    private func ouvrirFiche(id: String, grammes: Double?) {
         guard loadingHitId == nil else { return }
         HapticService.shared.selection()
-        loadingHitId = hit.id
+        loadingHitId = id
         Task {
             defer { loadingHitId = nil }
             do {
-                selectedDetail = try await MealJournalService.shared.foodDetail(id: hit.id)
+                let detail = try await vm.fiche(id)
+                ficheOuverte = FicheAjout(detail: detail, grammes: grammes)
             } catch {
                 AppLogger.database.warning("get_food failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
 
-    /// ⊕ = ajout direct à 100 g (ajustable ensuite depuis le journal).
+    /// ⊕ = ajout direct d'une portion courante (ajustable ensuite depuis le journal).
     private func quickAdd(_ hit: MealJournalService.FoodHit) {
+        habituels.retenir(hit)
+        ajouterDirect(id: hit.id, grammes: nil)
+    }
+
+    /// Un récent ou un favori : la quantité de la dernière fois.
+    private func ajouter(_ aliment: AlimentHabituel) {
+        ajouterDirect(id: aliment.id, grammes: aliment.grammes)
+    }
+
+    private func ajouterDirect(id: String, grammes demandes: Double?) {
         guard loadingHitId == nil else { return }
         HapticService.shared.selection()
-        loadingHitId = hit.id
+        loadingHitId = id
         Task {
             defer { loadingHitId = nil }
             do {
-                let detail = try await MealJournalService.shared.foodDetail(id: hit.id)
+                let detail = try await vm.fiche(id)
                 guard detail.kcal100g != nil else {
-                    selectedDetail = detail   // fiche → note « incomptable »
+                    ficheOuverte = FicheAjout(detail: detail, grammes: nil)   // fiche → note « incomptable »
                     return
                 }
                 // Le « + » rapide ajoute une portion courante : 1 unité pour
                 // un aliment qui se compte (1 œuf = 50 g, pas 100 g), 100 g sinon.
-                let grams = UnitPortionCatalog.unite(pourNom: detail.name,
-                                                     portions: detail.portions.map { (label: $0.label, grammes: $0.grammes) })?.grammes ?? 100
+                let grams = demandes
+                    ?? UnitPortionCatalog.unite(pourNom: detail.name,
+                                                portions: detail.portions.map { (label: $0.label, grammes: $0.grammes) })?.grammes
+                    ?? 100
                 if await onAdd(detail, grams) {
                     HapticService.shared.success()
+                    habituels.apresAjout(detail, grammes: grams)
                     showConfirmation(for: detail, grams: grams)
                 }
             } catch {

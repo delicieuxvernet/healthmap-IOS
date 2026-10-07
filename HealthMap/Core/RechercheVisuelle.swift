@@ -200,21 +200,51 @@ enum RechercheVisuelle {
     }
 
     static let titreAliments = "Aliments"
-    static let titreProduits = "Produits de marque"
+    static let titreProduits = "Marques"
 
-    /// Deux sections, chacune dans l'ordre du classement serveur. Celle qui
-    /// porte le MEILLEUR résultat passe devant : chercher « nutella » ne doit
-    /// pas faire défiler des génériques avant le pot.
+    /// Les familles qu'on achète DE MARQUE (retour d'Arthur, 7 oct. 2026 :
+    /// « les céréales, on va mettre les Trésor ; pareil pour les yaourts »).
+    /// Pour elles, les marques passent devant les génériques. Pour le reste
+    /// (fruits, légumes, viandes, poissons, œufs, riz…), les aliments simples
+    /// restent devant.
+    static let famillesDeMarque: Set<String> = [
+        "cereales de petit-dejeuner", "produits laitiers frais et assimiles",
+        "chocolats et produits a base de chocolat", "biscuits sucres", "biscuits aperitifs",
+        "barres cerealieres", "confiseries non chocolatees", "confitures et assimiles",
+        "boissons sans alcool", "boisson alcoolisees", "glaces", "desserts glaces", "sorbets",
+        "sauces", "condiments", "aides culinaires", "margarines", "substitus de produits carnes",
+        "cereales et biscuits infantiles", "desserts infantiles", "laits et boissons infantiles",
+        "petits pots sales et plats infantiles",
+    ]
+
+    /// Écart de score au-delà duquel une marque cherchée par son nom passe
+    /// devant des génériques qui ne lui ressemblent que de loin (« nutella »).
+    static let ecartMarqueCherchee = 0.6
+
+    /// Deux sections, chacune dans l'ordre du classement serveur.
+    /// - Famille du meilleur générique connue : une famille « de marque » met
+    ///   les marques devant ; une autre garde les génériques devant, sauf si la
+    ///   marque cherchée les dépasse nettement.
+    /// - Famille inconnue (ancienne RPC) : celle qui porte le MEILLEUR résultat
+    ///   passe devant.
     static func sections<Ligne>(_ lignes: [Ligne], source: (Ligne) -> String,
-                                score: (Ligne) -> Double?) -> [Section<Ligne>] {
+                                score: (Ligne) -> Double?,
+                                sousGroupe: ((Ligne) -> String?)? = nil) -> [Section<Ligne>] {
         let aliments = lignes.filter { source($0) != "off" }
         let produits = lignes.filter { source($0) == "off" }
         var sortie: [Section<Ligne>] = []
         if !aliments.isEmpty { sortie.append(Section(id: "aliments", titre: titreAliments, lignes: aliments)) }
         if !produits.isEmpty { sortie.append(Section(id: "produits", titre: titreProduits, lignes: produits)) }
-        guard sortie.count == 2,
-              let meilleurAliment = aliments.compactMap(score).max(),
-              let meilleurProduit = produits.compactMap(score).max(),
+        guard sortie.count == 2 else { return sortie }
+        let meilleurProduit = produits.compactMap(score).max()
+        let meilleur = aliments.max { (score($0) ?? -Double.infinity) < (score($1) ?? -Double.infinity) }
+        if let sousGroupe, let meilleur, let famille = sousGroupe(meilleur) {
+            if famillesDeMarque.contains(cle(famille)) { return sortie.reversed() }
+            guard let scoreAliment = score(meilleur), let meilleurProduit,
+                  meilleurProduit > scoreAliment + ecartMarqueCherchee else { return sortie }
+            return sortie.reversed()
+        }
+        guard let meilleur, let meilleurAliment = score(meilleur), let meilleurProduit,
               meilleurProduit > meilleurAliment else { return sortie }
         return sortie.reversed()
     }

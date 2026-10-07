@@ -62,9 +62,6 @@ final class MealScanViewModel: ObservableObject {
     @Published var isAnalyzing = false
     @Published var analysisResult: MealAnalysisResult?
     @Published var errorMessage: String?
-    @Published var searchQuery = ""
-    @Published var searchResults: [MealJournalService.FoodHit] = []
-    @Published var isSearching = false
     @Published var selectedTab: MealScanTab = .analyze
     /// Scans restants aujourd’hui, renvoyés par la fonction pour TOUS les
     /// tiers (gratuit 3/j, premium 30/j) ; nil tant que le serveur n’a rien
@@ -75,7 +72,6 @@ final class MealScanViewModel: ObservableObject {
     @Published var quotaExhausted = false
 
     private var client: SupabaseClient { SupabaseService.shared.client }
-    private var searchTask: Task<Void, Never>?
 
     init() {
         let defaults = UserDefaults.standard
@@ -671,47 +667,10 @@ final class MealScanViewModel: ObservableObject {
         return image.preparingThumbnail(of: taille) ?? image
     }
 
-    // MARK: - Search Foods
-
-    func searchFoods() async {
-        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard query.count >= 2 else {
-            searchResults = []
-            return
-        }
-
-        // Cancel any in-flight search
-        searchTask?.cancel()
-
-        searchTask = Task {
-            isSearching = true
-
-            do {
-                // Small debounce to avoid hammering on every keystroke
-                try await Task.sleep(nanoseconds: 300_000_000) // 300ms
-                guard !Task.isCancelled else { return }
-
-                // RPC unifiée `search_foods` (CIQUAL ∪ Open Food Facts,
-                // scoring server-side) — remplace l'ancien ilike sur
-                // `ciqual_foods` seul : les produits de marque arrivent d'OFF.
-                let results = try await MealJournalService.shared.searchFoodsVisuel(query: query)
-
-                guard !Task.isCancelled else { return }
-                searchResults = results
-            } catch is CancellationError {
-                // Cancelled by new search, ignore
-            } catch {
-                guard !Task.isCancelled else { return }
-                searchResults = []
-            }
-
-            if !Task.isCancelled {
-                isSearching = false
-            }
-        }
-
-        await searchTask?.value
-    }
+    // MARK: - Recherche d'aliment
+    //
+    // La recherche par nom vit dans `FoodSearchViewModel` (feuille partagée
+    // `FoodSearchSheet`, 7 oct. 2026) : plus de second moteur ici.
 
     // L'ancien chemin d'ajout manuel (searchCiqualTable + FoodItem +
     // PortionSize + addManualFood) est REMPLACÉ par la pile journal :

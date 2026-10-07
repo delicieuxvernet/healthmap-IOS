@@ -14,7 +14,10 @@ import SwiftUI
 // dans le détail.
 //
 // Toute cette partie est réservée au Premium (décision d'Arthur du même
-// jour) : la porte se pose dans `MealScanView.microsSection`.
+// jour) : la porte se pose dans `MealScanView.microsSection`. Depuis le 7
+// octobre 2026, la carte gratuite n'est plus floutée : `verrouille` montre la
+// liste, noms nets, avec « Débloquer avec Premium » sur chaque ligne et aucun
+// chiffre de la personne.
 //
 // Un seul chiffre par apport : la part du besoin couverte. C'est le même que
 // dans Progrès et dans la fiche de l'apport.
@@ -155,6 +158,18 @@ struct JournalMicrosAlerte: View {
 struct JournalMicrosCard: View {
     let tableau: TableauMicros
     let onLigne: (LigneMicro) -> Void
+    /// Compte gratuit (variante B validée par Arthur le 7 octobre 2026) : la
+    /// liste entière se lit, noms nets, pour montrer tout ce que Premium
+    /// apporte ; mais aucune donnée de la personne ne transparaît. Pas de
+    /// chiffre ni de jauge (pas même floutée : sa longueur se devinerait),
+    /// pas de priorités ni de repère « bas » (leur ordre trahirait les
+    /// apports les plus faibles), pas de phrase sur ce qui est bas. Chaque
+    /// ligne porte « Débloquer avec Premium ».
+    var verrouille = false
+    /// Libellé du bouton d'essai, lu depuis StoreKit (`PremiumOffre`).
+    var titrePorte = ""
+    /// Ligne ou bouton touché en gratuit : la page d'abonnement.
+    var onDebloquer: () -> Void = {}
 
     @State private var deplie = false
     @State private var famille: FamilleMicro?
@@ -181,6 +196,12 @@ struct JournalMicrosCard: View {
     /// micronutriment de plus.
     private var nombreDeMicros: Int {
         tableau.toutes.filter { $0.sens != .rapport }.count
+    }
+
+    /// Le nombre du bouton « Voir les … » : en gratuit, celui de la famille
+    /// filtrée, puisque les filtres sont visibles avant le dépli.
+    private var nombreAffiche: Int {
+        verrouille ? listeVerrouillee.filter { $0.sens != .rapport }.count : nombreDeMicros
     }
 
     /// La phrase de tête nomme les priorités qui sont basses, comme la
@@ -227,27 +248,61 @@ struct JournalMicrosCard: View {
         return possessif(ligne).hasPrefix("ta ")
     }
 
+    /// Gratuit : tout le catalogue, dans son ordre, filtré par famille.
+    private var listeVerrouillee: [LigneMicro] {
+        tableau.toutes.filter { famille == nil || $0.famille == famille }
+    }
+
+    /// Gratuit : les six premières lignes, puis « Voir les … ».
+    private static let lignesAvantDepli = 6
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             enTete
 
-            if !tableau.priorites.isEmpty {
-                priorites
-                DSSeparator()
-            }
-            boutonToutVoir
-
-            if deplie {
-                DSSeparator()
-                filtres
-                ForEach(autres) { ligne in
-                    LigneMicroVue(ligne: ligne, enAvant: false) { onLigne(ligne) }
+            if verrouille {
+                corpsVerrouille
+            } else {
+                if !tableau.priorites.isEmpty {
+                    priorites
+                    DSSeparator()
                 }
-                legende
+                boutonToutVoir
+
+                if deplie {
+                    DSSeparator()
+                    filtres
+                    ForEach(autres) { ligne in
+                        LigneMicroVue(ligne: ligne, enAvant: false) { onLigne(ligne) }
+                    }
+                    legende
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
+    }
+
+    /// Gratuit : filtres, lignes verrouillées, « Voir les … », puis l'essai.
+    @ViewBuilder
+    private var corpsVerrouille: some View {
+        let liste = listeVerrouillee
+        filtres
+        ForEach(deplie ? liste : Array(liste.prefix(Self.lignesAvantDepli))) { ligne in
+            LigneMicroVue(ligne: ligne, enAvant: false, verrouille: true) { onDebloquer() }
+        }
+        if liste.count > Self.lignesAvantDepli {
+            DSSeparator()
+            boutonToutVoir
+        }
+        DSCapsuleButton(titre: titrePorte) {
+            HapticService.shared.tap()
+            onDebloquer()
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.top, 8)
+        .padding(.bottom, DS.paddingCarte)
+        .accessibilityIdentifier("journal.micros.debloquer")
     }
 
     /// L'en-tête de la carte : la catégorie (feuille dans la teinte, libellé
@@ -265,7 +320,7 @@ struct JournalMicrosCard: View {
                         .foregroundStyle(Color.teinteKiwiTexte)
                 }
                 Spacer(minLength: 8)
-                if !tableau.priorites.isEmpty {
+                if !verrouille, !tableau.priorites.isEmpty {
                     Text("touche pour le détail")
                         .font(.system(.caption, design: .default))
                         .foregroundStyle(Color.dsSecondaire)
@@ -273,7 +328,21 @@ struct JournalMicrosCard: View {
                 }
             }
 
-            if tableau.priorites.isEmpty {
+            if verrouille {
+                // Rien sur la personne : ce que la liste contient, et à quoi
+                // elle s'ouvre.
+                Text("\(nombreDeMicros) micronutriments calculés sur tes repas")
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .lineSpacing(2)
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Vitamines, minéraux et acides gras. Tes chiffres s'ouvrent avec Premium.")
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if tableau.priorites.isEmpty {
                 Text("Tes micronutriments se calculent à partir de tes repas notés. Une journée assez notée suffit pour un premier chiffre.")
                     .font(.dsSousTitre)
                     .tracking(DSTracking.sousTitre)
@@ -292,7 +361,7 @@ struct JournalMicrosCard: View {
         }
         .padding(.horizontal, DS.paddingCarte)
         .padding(.top, 14)
-        .padding(.bottom, tableau.priorites.isEmpty ? 12 : 6)
+        .padding(.bottom, verrouille ? 2 : (tableau.priorites.isEmpty ? 12 : 6))
     }
 
     /// Les priorités, séparées d'un filet sur toute la largeur de la carte.
@@ -313,7 +382,7 @@ struct JournalMicrosCard: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(deplie ? "Masquer le détail" : "Voir les \(nombreDeMicros) micronutriments")
+                Text(deplie ? "Masquer le détail" : "Voir les \(nombreAffiche) micronutriments")
                     .font(.dsSousTitreMoyen)
                     .tracking(DSTracking.sousTitre)
                 Image(systemName: deplie ? "chevron.up" : "chevron.down")
@@ -436,6 +505,9 @@ private struct LigneMicroVue: View {
     let ligne: LigneMicro
     /// Priorité : nom en gras.
     let enAvant: Bool
+    /// Compte gratuit : « Débloquer avec Premium » à la place de la jauge et
+    /// du chiffre, sans repère de statut ni chevron. Rien de la ligne n'est lu.
+    var verrouille = false
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -453,6 +525,7 @@ private struct LigneMicroVue: View {
     }
 
     private var libelleVocal: String {
+        if verrouille { return "\(ligne.nom), réservé à Kiwio Premium" }
         var morceaux: [String] = [ligne.nom]
         if let niveau = ligne.niveau {
             morceaux.append("\(niveau) pour cent de ton besoin")
@@ -477,14 +550,18 @@ private struct LigneMicroVue: View {
                         .foregroundStyle(Color.dsTexte)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    if ligne.statut != .normal {
+                    if !verrouille, ligne.statut != .normal {
                         RepereDeStatut(couleur: ligne.statut.couleurDeRepere)
                     }
                 }
                 Spacer(minLength: 8)
-                valeur
-                // Le chevron : la ligne entière ouvre le détail, il le dit.
-                DSChevron()
+                if verrouille {
+                    pastillePremium
+                } else {
+                    valeur
+                    // Le chevron : la ligne entière ouvre le détail, il le dit.
+                    DSChevron()
+                }
             }
             .padding(.horizontal, DS.paddingCarte)
             .padding(.vertical, 4)
@@ -495,7 +572,25 @@ private struct LigneMicroVue: View {
         .buttonStyle(LigneMicroPressStyle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(libelleVocal)
-        .accessibilityHint("Ouvre les informations sur cet apport")
+        .accessibilityHint(verrouille ? "Ouvre l'abonnement Premium" : "Ouvre les informations sur cet apport")
+    }
+
+    /// « Débloquer avec Premium », dans le vert kiwi de la carte.
+    private var pastillePremium: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .accessibilityHidden(true)
+            Text("Débloquer avec Premium")
+                .font(.dsLegendeMoyenne)
+                .tracking(DSTracking.legende)
+                .lineLimit(1)
+        }
+        .foregroundStyle(Color.teinteKiwiTexte)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Capsule(style: .continuous).fill(Color.dsVoile))
+        .fixedSize()
     }
 
     /// Après un repas, la jauge et le chiffre glissent ENSEMBLE vers leur
