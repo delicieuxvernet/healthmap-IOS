@@ -1770,21 +1770,23 @@ private struct RemplacementAlimentSheet: View {
     }
 
     /// Sous le champ : l'attente, le vide ou les résultats, rangés dans les
-    /// deux sections de la recherche du Journal.
+    /// deux sections de la recherche du Journal. Comme elle, la liste reste à
+    /// l'écran pendant qu'une nouvelle frappe cherche.
     @ViewBuilder
     private var contenu: some View {
-        if vm.isSearching {
+        if vm.hits.isEmpty && vm.isSearching {
             ProgressView()
                 .tint(Color.dsAccent)
                 .padding(.top, Theme.spacingLG)
-        } else if vm.hits.isEmpty && vm.query.count >= 2 {
+        } else if vm.hits.isEmpty && vm.query.count >= 2 && !vm.isSearching {
             Text("Aucun résultat. Essaie un autre nom.")
                 .font(.dsSousTitre)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .padding(.top, Theme.spacingLG)
         } else {
-            ForEach(RechercheVisuelle.sections(vm.hits, source: \.source, score: \.score)) { section in
+            ForEach(RechercheVisuelle.sections(vm.hits, source: \.source, score: \.score,
+                                               sousGroupe: { $0.sousGroupe })) { section in
                 VStack(spacing: 8) {
                     RechercheSectionTitre(titre: section.titre)
                     sectionCarte(section.lignes)

@@ -33,6 +33,11 @@ struct HealthMapApp: App {
         //    Migration depuis Clerk : 2026-06-06.
         SupabaseService.shared.configure()
 
+        // 4. Cache HTTP partagé (photos des produits dans la recherche) : celui
+        //    par défaut (512 Ko en mémoire) les retéléchargeait à chaque frappe.
+        URLCache.shared = URLCache(memoryCapacity: 32 * 1024 * 1024,
+                                   diskCapacity: 150 * 1024 * 1024)
+
         // 5. Configure RevenueCat (reads from AppConfig).
         Purchases.logLevel = AppConfig.shared.environment == .production ? .error : .info
         Purchases.configure(withAPIKey: AppConfig.shared.revenueCatAPIKey)

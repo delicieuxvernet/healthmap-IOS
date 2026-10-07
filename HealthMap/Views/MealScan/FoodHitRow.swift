@@ -21,12 +21,16 @@ import UIKit
 /// d'ajout, chevron) reste à l'écran qui l'accueille.
 struct FoodHitContenu: View {
     let hit: MealJournalService.FoodHit
+    /// Remplace « marque · kcal » : un récent dit sa quantité (« Kellogg's · 40 g »).
+    var sousTitre: String? = nil
+    /// Petite étoile après le nom d'un favori.
+    var favori = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             VignetteAliment(repere: hit.repere)
             VStack(alignment: .leading, spacing: 3) {
-                Text(hit.name)
+                (Text(hit.name) + (favori ? Text("  ") + Text(Image(systemName: "star.fill")).foregroundColor(Color.teinteVitamineD) : Text("")))
                     .font(.dsSousTitreFort)
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
@@ -37,7 +41,7 @@ struct FoodHitContenu: View {
                     if let lettre = hit.nutriscore {
                         NutriScoreBadge(lettre: lettre)
                     }
-                    Text(hit.sousTitre)
+                    Text(sousTitre ?? hit.sousTitre)
                         .font(.dsLegende)
                         .foregroundStyle(Color.dsSecondaire)
                         .lineLimit(1)
@@ -141,7 +145,7 @@ struct NutriScoreBadge: View {
     }
 }
 
-/// « Aliments », « Produits de marque ».
+/// « Aliments », « Marques », « Récents ».
 struct RechercheSectionTitre: View {
     let titre: String
 

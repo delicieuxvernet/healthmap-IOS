@@ -108,7 +108,7 @@ struct FicheRepasSheet: View {
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $ajout) {
-            FoodSearchSheet(slot: slot) { detail, grammes in
+            FoodSearchSheet(slot: slot, recents: AlimentsHabituels.recents(journal.fortnight)) { detail, grammes in
                 await journal.addFood(detail: detail, grams: grammes, slot: slot)
             }
             .presentationDetents([.large])
