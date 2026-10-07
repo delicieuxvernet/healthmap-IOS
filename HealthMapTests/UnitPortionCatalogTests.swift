@@ -114,14 +114,14 @@ final class UnitPortionCatalogTests: XCTestCase {
 
     func testNoixSeComptentALaPieceOuALaPoignee() {
         let noix = unites("Noix, séchée, cerneaux")
-        XCTAssertEqual(noix.map(\.singulier), ["pièce", "poignée"])
-        XCTAssertEqual(noix.map(\.grammes), [5, 30])
-        XCTAssertEqual(noix.map(\.code), ["piece", "poignee"])
-        XCTAssertEqual(noix.first?.libelle(nombre: 2), "2 pièces")
+        XCTAssertEqual(noix.map(\.singulier), ["poignée", "pièce"])
+        XCTAssertEqual(noix.map(\.grammes), [30, 5])
+        XCTAssertEqual(noix.map(\.code), ["poignee", "piece"])
+        XCTAssertEqual(noix.last?.libelle(nombre: 2), "2 pièces")
 
-        XCTAssertEqual(unites("Amande, grillée, salée").map(\.grammes), [1.2, 30])
-        XCTAssertEqual(unites("Noisette").map(\.grammes), [1.5, 30])
-        XCTAssertEqual(unites("Noix de cajou, grillée, salée").map(\.grammes), [1.5, 30])
+        XCTAssertEqual(unites("Amande, grillée, salée").map(\.grammes), [30, 1.2])
+        XCTAssertEqual(unites("Noisette").map(\.grammes), [30, 1.5])
+        XCTAssertEqual(unites("Noix de cajou, grillée, salée").map(\.grammes), [30, 1.5])
     }
 
     func testOleagineuxQuiNeSeComptentPas() {
@@ -186,15 +186,15 @@ final class UnitPortionCatalogTests: XCTestCase {
 
     func testUniteDiteInconnueDuCatalogue() {
         let liste = dites("verre", "verre", "verres", 200, "Noix, séchée, cerneaux")
-        XCTAssertEqual(liste.map(\.singulier), ["verre", "pièce", "poignée"])
+        XCTAssertEqual(liste.map(\.singulier), ["verre", "poignée", "pièce"])
         XCTAssertEqual(liste.first?.code, "verre")
         XCTAssertTrue(liste.first?.tailles.isEmpty ?? false)
     }
 
     func testUniteDiteSansPoidsGardeLeCatalogue() {
         let liste = dites("piece", "pièce", "pièces", 0, "Noix, séchée, cerneaux")
-        XCTAssertEqual(liste.map(\.singulier), ["pièce", "poignée"])
-        XCTAssertEqual(liste.first?.grammes, 5)
+        XCTAssertEqual(liste.map(\.singulier), ["poignée", "pièce"])
+        XCTAssertEqual(liste.first?.grammes, 30)
     }
 
     func testAlimentsPesesN_ontPasD_unite() {
@@ -330,7 +330,7 @@ final class UnitPortionCatalogTests: XCTestCase {
             "Oeuf": "œuf", "Banane": "banane", "Pomme": "pomme", "Pain de mie": "tranche",
             "Yaourt nature": "pot", "Camembert": "part", "Jambon blanc": "tranche",
             "Saumon, cuit": "pavé", "Steak haché": "steak", "Riz blanc, cuit": "assiette",
-            "Lentilles, cuites": "portion", "Amandes": "pièce", "Café": "tasse",
+            "Lentilles, cuites": "portion", "Amandes": "poignée", "Café": "tasse",
             "Bière": "verre", "Pizza": "part", "Sandwich jambon": "sandwich",
             "Biscuit petit beurre": "biscuit", "Barre de céréales": "barre", "Carotte": "carotte",
         ]

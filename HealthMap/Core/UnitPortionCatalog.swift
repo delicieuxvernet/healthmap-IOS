@@ -76,7 +76,7 @@ enum UnitPortionCatalog {
     }
 
     /// Toutes les unités proposées pour un aliment, la première étant celle
-    /// d'office (« pièce » puis « poignée » pour des noix, « carré » puis
+    /// d'office (« poignée » puis « pièce » pour des noix, « carré » puis
     /// « tablette » pour du chocolat). D'après le nom, puis, à défaut, les
     /// portions renvoyées par le serveur (`label` « 1 … », `grammes`). Les
     /// grammes ne sont pas dans la liste : l'écran les propose toujours en
@@ -421,17 +421,18 @@ enum UnitPortionCatalog {
         .init(motif: #"creme (fraiche|liquide|epaisse|fleurette|legere)"#, singulier: "cuillère", pluriel: "cuillères", grammes: 15),
 
         // ── 9. Oléagineux, fruits secs (poignée) ─────────────────────────
-        // Ceux qu'on compte aussi un par un : la pièce d'office (« deux noix »),
-        // la poignée ensuite. En poudre, en purée, en lait… : la poignée seule,
-        // plus bas.
-        .init(motif: #"noix de cajou|\bcajou\b"#, sauf: saufOleagineux, singulier: "pièce", pluriel: "pièces", grammes: 1.5,
-              autres: [autre("poignée", "poignées", 30)]),
-        .init(motif: #"\bnoix\b"#, sauf: saufNoix, singulier: "pièce", pluriel: "pièces", grammes: 5,
-              autres: [autre("poignée", "poignées", 30)]),
-        .init(motif: #"amandes?"#, sauf: saufOleagineux, singulier: "pièce", pluriel: "pièces", grammes: 1.2,
-              autres: [autre("poignée", "poignées", 30)]),
-        .init(motif: #"noisettes?"#, sauf: saufOleagineux, singulier: "pièce", pluriel: "pièces", grammes: 1.5,
-              autres: [autre("poignée", "poignées", 30)]),
+        // Ceux qu'on compte aussi un par un : la poignée d'office (le « + » de
+        // la recherche ajoute une poignée, pas une amande de 1,2 g), la pièce
+        // juste à côté. Une pièce DITE (« deux noix ») passe en tête par son
+        // code serveur. En poudre, en purée, en lait… : la poignée seule, plus bas.
+        .init(motif: #"noix de cajou|\bcajou\b"#, sauf: saufOleagineux, singulier: "poignée", pluriel: "poignées", grammes: 30,
+              autres: [autre("pièce", "pièces", 1.5)]),
+        .init(motif: #"\bnoix\b"#, sauf: saufNoix, singulier: "poignée", pluriel: "poignées", grammes: 30,
+              autres: [autre("pièce", "pièces", 5)]),
+        .init(motif: #"amandes?"#, sauf: saufOleagineux, singulier: "poignée", pluriel: "poignées", grammes: 30,
+              autres: [autre("pièce", "pièces", 1.2)]),
+        .init(motif: #"noisettes?"#, sauf: saufOleagineux, singulier: "poignée", pluriel: "poignées", grammes: 30,
+              autres: [autre("pièce", "pièces", 1.5)]),
         .init(motif: #"amandes?|noisettes?|noix de cajou|\bcajou\b|pistaches?|cacahuetes?|cacahouetes?|arachides?|noix (du bresil|de pecan|de macadamia)|\bpecan\b|\bnoix\b|melange de (fruits secs|noix|graines)|graines de|raisins secs|fruits secs"#, singulier: "poignée", pluriel: "poignées", grammes: 30),
 
         // ── 10. Fruits, légumes à la pièce ───────────────────────────────
