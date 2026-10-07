@@ -166,11 +166,13 @@ struct JournalView: View {
     @State private var showActivite = false
     /// Fiche apport ouverte depuis « Apports à renforcer ».
     @State private var selectedApport: ApportV2?
-    /// Micronutriment touché dans la carte du Journal. Il reste en place
-    /// pendant que sa page se referme : c'est `microPoussee` qui la pousse.
+    /// Micronutriment touché dans la carte du Journal : sa présence OUVRE sa
+    /// page. `.sheet(isPresented:)` lisait une capture encore vide au premier
+    /// toucher → feuille blanche, il fallait la rouvrir (retour d'Arthur du
+    /// 7 oct. 2026). Même correctif que le Bilan en juin : `.sheet(item:)`.
     @State private var selectedMicro: LigneMicro?
-    /// La page d'un micronutriment est poussée dans la pile du Journal.
-    @State private var microPoussee = false
+    /// La page d'un micronutriment est ouverte.
+    private var microPoussee: Bool { selectedMicro != nil }
     /// Bilan complet (ex-onglet), présenté par « Tout afficher ».
     @State private var showBilanComplet = false
     /// Prise de sang (Premium) : import + « Tes repères ».
@@ -342,8 +344,8 @@ struct JournalView: View {
                 // La page d'un micronutriment s'ouvre en FEUILLE de verre :
                 // on la referme en la balayant vers le bas (demande d'Arthur
                 // du 3 oct. 2026, plutôt que le retour « ‹ Journal »).
-                .sheet(isPresented: $microPoussee) {
-                    pageMicro
+                .sheet(item: $selectedMicro) { ligne in
+                    pageMicro(ligne)
                 }
                 // Le Bilan complet garde sa propre pile de navigation : on le
                 // présente en feuille, jamais poussé (pile dans la pile).
@@ -576,7 +578,7 @@ struct JournalView: View {
         // La page d'un micronutriment est poussée : elle se referme d'abord,
         // le geste demandé se sert sur le Journal une fois revenu.
         guard !microPoussee else {
-            microPoussee = false
+            selectedMicro = nil
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(500))
                 servirLienWidget(lien)
@@ -986,7 +988,7 @@ struct JournalView: View {
             } else if microPoussee {
                 // On quitte l'onglet : la page d'un micronutriment se referme
                 // (maquette), le Journal se retrouve sur sa racine au retour.
-                microPoussee = false
+                selectedMicro = nil
             }
         }
         .onChange(of: journal.selectedDay) { _, _ in
@@ -1119,21 +1121,17 @@ struct JournalView: View {
     /// Un micronutriment vient d'être touché : sa page entre par la droite.
     private func ouvrirMicro(_ ligne: LigneMicro) {
         selectedMicro = ligne
-        microPoussee = true
     }
 
     /// La page d'un micronutriment, en feuille de verre pleine hauteur : on
     /// la referme en la balayant vers le bas, ou par sa croix. La vue vit
     /// dans `JournalMicrosComponents.swift`.
-    @ViewBuilder
-    private var pageMicro: some View {
-        if let ligne = selectedMicro {
-            MicroDuJourSheet(ligne: ligne, apportDuBilan: apportDuBilan(pour: ligne))
-                .environmentObject(dashboardVM)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .verreFeuille()
-        }
+    private func pageMicro(_ ligne: LigneMicro) -> some View {
+        MicroDuJourSheet(ligne: ligne, apportDuBilan: apportDuBilan(pour: ligne))
+            .environmentObject(dashboardVM)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .verreFeuille()
     }
 
     /// La fiche des causes n'existe que pour les apports du bilan.
