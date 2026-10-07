@@ -4,6 +4,7 @@ import XCTest
 // MARK: - Dictée : quels ratés méritent une seconde tentative (7 oct. 2026)
 // Un raté réseau au retour dans l'app affichait directement « L'analyse n'a
 // pas abouti ». Seuls les ratés passagers sont retentés : jamais un refus.
+@MainActor
 final class DicteeRelanceTests: XCTestCase {
 
     func testReseauCoupeOuEndormiEstRetente() {

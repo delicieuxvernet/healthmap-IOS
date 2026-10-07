@@ -123,6 +123,9 @@ struct JournalView: View {
     @State private var calculDictee: Task<Void, Never>?
     /// Ce que le calcul a donné : la feuille de dictée s'ouvre dessus.
     @State private var departDictee: VoiceMealSheet.Depart?
+    /// « Redire » touché sur la relecture : à la fermeture de la feuille, la
+    /// bulle d'écoute se rouvre.
+    @State private var redireApresFeuille = false
     /// Le repas que la feuille de dictée vient d'enregistrer. La page ne bouge
     /// qu'à la fermeture de la feuille : c'est là que la pastille confirme et
     /// que la carte des calories compte jusqu'à sa nouvelle valeur.
@@ -259,6 +262,17 @@ struct JournalView: View {
         // doit pas resservir à la prochaine.
         EcouteCentre.partage.fermer()
         departDictee = nil
+        // « Redire » sur la relecture : la bulle se rouvre, mains libres.
+        if redireApresFeuille {
+            redireApresFeuille = false
+            // Un temps de pause : la feuille relâche le micro en disparaissant
+            // (`speech.reset()`), il ne doit pas couper la nouvelle écoute.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(350))
+                demarrerDictee(verrouillee: true)
+            }
+            return
+        }
         guard let ajout = ajoutVocal else { return }
         ajoutVocal = nil
         // Pendant le tutoriel, c'est lui qui parle : pas de pastille par-dessus.
@@ -377,15 +391,19 @@ struct JournalView: View {
                             cibleGlucides: mesures.macros?.carbs,
                             cibleLipides: mesures.macros?.fat,
                             gratification: { gratificationDe($0) },
-                            // Déjà transcrite et chiffrée sous la bulle : la
-                            // feuille monte directement sur son résultat.
+                            // Déjà transcrite sous la bulle : la feuille monte
+                            // directement sur sa relecture.
                             depart: departDictee,
+                            dicteesGratuitesRestantes: subscriptionService.isPremium
+                                ? nil
+                                : max(0, VoiceMealService.QuotaStore.dictéesGratuitesParJour
+                                      - VoiceMealService.QuotaStore.utiliséesAujourdhui(userId: uid)),
+                            onRedire: { redireApresFeuille = true },
                             speech: speech
                         ) { ajout in
+                            // Le quota se décompte à l'ENVOI en analyse
+                            // (VoiceMealService.analyze), comme sur le serveur.
                             ajoutVocal = ajout
-                            // Le quota ne se décompte QUE si la dictée a abouti
-                            // à un enregistrement — un essai annulé ne coûte rien.
-                            VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
                         }
                     }
                 }
@@ -401,9 +419,8 @@ struct JournalView: View {
                             gratification: { gratificationDe($0) },
                             speech: speech
                         ) { ajout in
+                            // Même quota que la dictée, décompté à l'envoi.
                             ajoutVocal = ajout
-                            // Même quota que la dictée : c'est la même analyse.
-                            VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
                         }
                     }
                 }
@@ -1541,10 +1558,10 @@ struct JournalView: View {
         }
         HapticService.shared.lightTap()
         EcouteCentre.partage.contracter()
-        // Le calcul se fait ICI, sous la bulle : on referme le micro, on
-        // transcrit l'enregistrement entier, la carte le relit, puis le
-        // serveur chiffre. La feuille ne monte qu'avec le résultat (ou
-        // l'échec, qu'elle sait rejouer).
+        // La transcription se fait ICI, sous la bulle : on referme le micro, on
+        // transcrit l'enregistrement entier (sur l'iPhone, rien ne part), la
+        // carte le relit, et la feuille monte sur la RELECTURE. Le serveur
+        // n'est appelé que si la personne touche « Envoyer en analyse ».
         calculDictee?.cancel()
         calculDictee = Task { @MainActor in
             let depart = await VoiceMealSheet.preparer(speech: speech) { texte in
