@@ -266,17 +266,19 @@ final class MealJournalViewModel: ObservableObject {
         writeInFlight = true
         defer { writeInFlight = false }
         do {
-            try await service.insertFood(
-                userId: userId,
-                entry: entry,
-                slot: slot,
-                consumedAt: horodatageDeSaisie(slot: slot)
-            )
+            try await TacheProtegee.executer("Ajout d'un aliment") {
+                try await service.insertFood(
+                    userId: userId,
+                    entry: entry,
+                    slot: slot,
+                    consumedAt: horodatageDeSaisie(slot: slot)
+                )
+            }
             await load()
             Self.postJournalChanged()
             return true
         } catch {
-            AppLogger.database.warning("Journal addFood failed: \(error.localizedDescription, privacy: .public)")
+            AppLogger.database.report(error, context: "Journal addFood")
             return false
         }
     }

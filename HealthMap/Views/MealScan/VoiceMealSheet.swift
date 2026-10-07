@@ -107,6 +107,10 @@ struct VoiceMealSheet: View {
     @State private var remplacementEnCours: Int?
     @State private var errorMessage: String?
     @State private var isSaving = false
+    /// L'analyse a réussi, c'est l'ENREGISTREMENT qui a échoué : on propose de
+    /// réenregistrer le repas tel qu'il a été corrigé, pas de relancer
+    /// l'analyse (qui coûte une dictée et efface les corrections).
+    @State private var echecEnregistrement = false
     /// Aliments extraits au-delà du plafond serveur, donc non analysés.
     /// La coupe ne doit JAMAIS être silencieuse (règle du 2 août 2026).
     @State private var alimentsIgnoresServeur = 0
@@ -767,10 +771,29 @@ struct VoiceMealSheet: View {
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            // Relancer l'ANALYSE sur ce qui a déjà été dit, sans refaire parler :
-            // l'échec vient presque toujours du serveur, pas de la dictée, et
-            // reparler était le vrai coût de l'erreur.
-            if !dernierTranscript.isEmpty {
+            if echecEnregistrement {
+                DSCapsuleButton(titre: "Réessayer l'enregistrement") {
+                    echecEnregistrement = false
+                    phase = .results
+                    Task { await save() }
+                }
+
+                Button {
+                    HapticService.shared.tap()
+                    echecEnregistrement = false
+                    phase = .results
+                } label: {
+                    Text("Revenir à mon repas")
+                        .font(.dsSousTitre)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else if !dernierTranscript.isEmpty {
+                // Relancer l'ANALYSE sur ce qui a déjà été dit, sans refaire parler :
+                // l'échec vient presque toujours du serveur, pas de la dictée, et
+                // reparler était le vrai coût de l'erreur.
                 DSCapsuleButton(titre: "Relancer l'analyse") {
                     Task { await analyser(dernierTranscript) }
                 }
@@ -1142,17 +1165,22 @@ struct VoiceMealSheet: View {
 
         guard !entries.isEmpty else {
             errorMessage = "Je n'ai pas réussi à enregistrer ces aliments."
+            echecEnregistrement = true
             phase = .failed
             return
         }
 
         do {
-            try await journal.insertFoods(
-                userId: userId,
-                entries: entries,
-                slot: slot,
-                consumedAt: MealJournalService.horodatage(jour: jour, slot: slot)
-            )
+            // Protégé : verrouiller le téléphone pendant l'enregistrement ne
+            // le coupe plus.
+            _ = try await TacheProtegee.executer("Enregistrement du repas dicté") {
+                try await journal.insertFoods(
+                    userId: userId,
+                    entries: entries,
+                    slot: slot,
+                    consumedAt: MealJournalService.horodatage(jour: jour, slot: slot)
+                )
+            }
 
             // Parité avec le scan photo (MealScanViewModel) : un repas dicté est
             // un repas comme un autre. Avant le 2 août 2026, la voix ne postait
@@ -1183,7 +1211,9 @@ struct VoiceMealSheet: View {
             onAdded(Ajout(nombre: entries.count, kcal: kcal, creneau: slot, sousLigne: sousLigne))
             fermer()
         } catch {
+            AppLogger.database.report(error, context: "Enregistrement du repas dicté")
             errorMessage = "L'enregistrement a échoué. Réessaie."
+            echecEnregistrement = true
             phase = .failed
         }
     }

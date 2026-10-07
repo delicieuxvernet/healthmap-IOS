@@ -267,11 +267,13 @@ final class VoiceMealService {
         fmt.locale = Locale(identifier: "fr_FR")
         fmt.dateFormat = "EEEE d MMMM, HH:mm"
 
+        let corps = Body(transcript: clean, heureLocale: fmt.string(from: Date()))
         do {
-            let analysis: Analysis = try await client.functions.invoke(
-                "parse-meal-voice",
-                options: .init(body: Body(transcript: clean, heureLocale: fmt.string(from: Date())))
-            )
+            // Protégée : verrouiller le téléphone pendant l'analyse ne coupe
+            // plus l'envoi.
+            let analysis: Analysis = try await TacheProtegee.executer("Dictée du repas") {
+                try await envoyerAvecUneRelance(corps)
+            }
             guard !analysis.nonAlimentaire, !analysis.aliments.isEmpty else {
                 throw VoiceError.noFood
             }
@@ -280,14 +282,53 @@ final class VoiceMealService {
             if case .httpError(let code, _) = error, code == 429 {
                 throw VoiceError.rateLimited
             }
-            AppLogger.analysis.error("parse-meal-voice a échoué: \(String(describing: error), privacy: .public)")
+            AppLogger.analysis.report(error, context: "parse-meal-voice \(String(describing: error))")
             throw VoiceError.unavailable
         } catch let error as VoiceError {
             throw error
         } catch {
-            AppLogger.analysis.error("parse-meal-voice a échoué: \(error.localizedDescription, privacy: .public)")
+            AppLogger.analysis.report(error, context: "parse-meal-voice")
             throw VoiceError.unavailable
         }
+    }
+
+    /// Une seconde chance, 1,5 s plus tard, pour les seuls ratés passagers :
+    /// réseau coupé ou endormi au retour dans l'app, serveur qui hoquette
+    /// (5xx, relais), session expirée pendant que l'app dormait (401 : la
+    /// session se rafraîchit entre les deux). Jamais pour un quota atteint
+    /// (429) ni une demande refusée (autre 4xx). Un raté unique affichait
+    /// directement « L'analyse n'a pas abouti » (incident du 7 oct. 2026).
+    private func envoyerAvecUneRelance(_ corps: Body) async throws -> Analysis {
+        do {
+            return try await client.functions.invoke("parse-meal-voice", options: .init(body: corps))
+        } catch {
+            guard Self.estPassager(error) else { throw error }
+            AppLogger.analysis.warning("parse-meal-voice : raté passager, seconde tentative (\(String(describing: error), privacy: .public))")
+            if let erreur = error as? FunctionsError, case .httpError(let code, _) = erreur, code == 401 {
+                try? await AuthService.shared.refreshSession()
+            }
+            try await Task.sleep(for: .milliseconds(1500))
+            return try await client.functions.invoke("parse-meal-voice", options: .init(body: corps))
+        }
+    }
+
+    /// Un raté qui a des chances de passer à la seconde tentative.
+    static func estPassager(_ error: Error) -> Bool {
+        if let erreur = error as? FunctionsError {
+            switch erreur {
+            case .httpError(let code, _): return code == 401 || code >= 500
+            case .relayError: return true
+            @unknown default: return false
+            }
+        }
+        if let erreur = error as? URLError {
+            let passagers: [URLError.Code] = [
+                .networkConnectionLost, .notConnectedToInternet, .timedOut,
+                .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+            ]
+            return passagers.contains(erreur.code)
+        }
+        return false
     }
 
     /// Convertit le repas dicté en items du journal.

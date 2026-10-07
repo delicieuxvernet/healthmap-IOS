@@ -473,27 +473,32 @@ final class MealScanViewModel: ObservableObject {
                 consumedAt: consumedAtÀEnvoyer
             )
 
-            let response: EdgeMealResponse = try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
-                group.addTask { [client] in
-                    try await client.functions.invoke(
-                        "analyze-meal-photo",
-                        options: .init(body: requestBody)
-                    )
-                }
+            // Protégée : verrouiller le téléphone pendant l'analyse ne coupe
+            // plus l'envoi (le serveur enregistre le repas lui-même ; une
+            // réponse perdue faisait croire à un échec, puis à un doublon).
+            let response: EdgeMealResponse = try await TacheProtegee.executer("Photo du repas") {
+                try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
+                    group.addTask { [client] in
+                        try await client.functions.invoke(
+                            "analyze-meal-photo",
+                            options: .init(body: requestBody)
+                        )
+                    }
 
-                // Timeout task
-                group.addTask {
-                    try await Task.sleep(nanoseconds: 130_000_000_000) // 130 seconds
-                    throw MealScanError.timeout
-                }
+                    // Timeout task
+                    group.addTask {
+                        try await Task.sleep(nanoseconds: 130_000_000_000) // 130 seconds
+                        throw MealScanError.timeout
+                    }
 
-                // Return whichever finishes first; cancel the other
-                guard let result = try await group.next() else {
+                    // Return whichever finishes first; cancel the other
+                    guard let result = try await group.next() else {
+                        group.cancelAll()
+                        throw MealScanError.timeout
+                    }
                     group.cancelAll()
-                    throw MealScanError.timeout
+                    return result
                 }
-                group.cancelAll()
-                return result
             }
 
             // 5. Check for Edge Function error in response body
