@@ -881,6 +881,12 @@ Lois de l'écran :
 9. **Mouvement** : jetons de `KiwiMotion` uniquement, rien au-delà du plafond `KiwiEchelle.plafond`
    (1,22 depuis le verre), tout coupé par « Réduire les animations ». La gerbe de fin d'étape se
    joue une fois.
+10. **L'attente du bilan** (7 oct. 2026) : après « Voir mon bilan », la gate plein écran
+    (`FullAnalysisLoadingView`) garde le signe qui charge, la phrase qui tourne et la barre ; en
+    bas, une **carte d'astuces** (`AstucesAttenteCarte`, `Views/Dashboard/AstucesAttente.swift`)
+    change toutes les **17 s**, ou au toucher. Ordre fixe : « Bon à savoir » × 2 (ne remplace pas
+    un avis médical ; les compléments ne remplacent pas l'assiette), puis « Kiwio Premium » × 4,
+    chacune un avantage RÉEL du paywall. Un abonné ne voit que les deux mises en garde.
 
 L'ancien flux (`QuestionnaireContainerView`, `GroceryShoppingView`, `SectionIntroView`,
 `TeaserEngine`, `QuantityBracket`) reste dans le dépôt, plus présenté, tant que le nouveau n'est

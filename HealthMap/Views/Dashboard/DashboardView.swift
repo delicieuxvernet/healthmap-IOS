@@ -518,8 +518,11 @@ private extension View {
 // Tant que le bilan IA n'est pas prêt, on n'affiche AUCUN résultat : juste le
 // signe Kiwio et ses pépins qui chargent + un message qui tourne. Référencé par
 // ContentView (AnalysisGateView) : NE PAS retirer.
+// 7 octobre 2026 : une carte d'astuces tourne en bas (`AstucesAttente.swift`) —
+// mises en garde d'abord, puis Kiwio Premium, une toutes les 17 s.
 struct FullAnalysisLoadingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
     @State private var messageIndex = 0
     @State private var progress: Double = 0
 
@@ -534,6 +537,40 @@ struct FullAnalysisLoadingView: View {
         VStack(spacing: Theme.spacingLG) {
             Spacer()
 
+            enAttente
+
+            Spacer()
+
+            // Les astuces de l'attente : mises en garde d'abord, puis Premium.
+            AstucesAttenteCarte(astuces: AstucesAttente.suite(estPremium: subscriptionService.isPremium))
+                .padding(.bottom, Theme.spacingMD)
+        }
+        .padding(.horizontal, Theme.spacingLG)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            // Progression calibrée sur la durée réelle (~2-3 min) : montée douce qui
+            // plafonne vers 90 % et n'atteint JAMAIS 100 % — la barre disparaît quand
+            // le vrai bilan arrive (la vue est remplacée par le contenu). Fini le
+            // « 95 % figé en 25 s » suivi d'une fausse erreur réseau.
+            var ticks = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(0.5))
+                if Task.isCancelled { break }
+                ticks += 1
+                progress = min(0.9, progress + (0.9 - progress) * 0.012)
+                if !reduceMotion && ticks % 8 == 0 {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        messageIndex = (messageIndex + 1) % messages.count
+                    }
+                }
+            }
+        }
+    }
+
+    /// Le signe qui charge, le message qui tourne, la barre et la durée : un
+    /// seul élément VoiceOver, la carte d'astuces reste lisible à part.
+    private var enAttente: some View {
+        VStack(spacing: Theme.spacingLG) {
             KiwiLoader(size: 72)
 
             VStack(spacing: Theme.spacingSM) {
@@ -575,32 +612,9 @@ struct FullAnalysisLoadingView: View {
                     .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
             }
-
-            Spacer()
-            Spacer()
         }
-        .padding(.horizontal, Theme.spacingLG)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Analyse de ton profil en cours. Compte deux à trois minutes.")
-        .task {
-            // Progression calibrée sur la durée réelle (~2-3 min) : montée douce qui
-            // plafonne vers 90 % et n'atteint JAMAIS 100 % — la barre disparaît quand
-            // le vrai bilan arrive (la vue est remplacée par le contenu). Fini le
-            // « 95 % figé en 25 s » suivi d'une fausse erreur réseau.
-            var ticks = 0
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(0.5))
-                if Task.isCancelled { break }
-                ticks += 1
-                progress = min(0.9, progress + (0.9 - progress) * 0.012)
-                if !reduceMotion && ticks % 8 == 0 {
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        messageIndex = (messageIndex + 1) % messages.count
-                    }
-                }
-            }
-        }
     }
 }
 
