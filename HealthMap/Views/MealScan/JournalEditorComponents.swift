@@ -651,7 +651,8 @@ struct PortionSheet: View {
 
 // MARK: - Recherche d'aliment (page « Ajouter — [repas] »)
 
-/// Frappe → `search_foods_rapide` (CIQUAL ∪ OFF), et les fiches `get_food`
+/// Frappe → le catalogue du téléphone (`CatalogueRecherche`), le serveur
+/// (`search_foods_rapide`) seulement en secours ; et les fiches `get_food`
 /// gardées en mémoire le temps de la feuille.
 ///
 /// Retour d'Arthur (7 oct. 2026) : « la recherche est extrêmement lente ».
@@ -683,24 +684,45 @@ final class FoodSearchViewModel: ObservableObject {
         }
         isSearching = true
         searchTask = Task {
-            try? await Task.sleep(nanoseconds: 150_000_000)
+            // 1. Le catalogue du téléphone (`CatalogueRecherche`) : aucune
+            //    attente, aucun réseau, à chaque lettre.
+            var locaux: [MealJournalService.FoodHit] = []
+            if let trouves = await CatalogueRecherche.shared.chercher(q) {
+                guard !Task.isCancelled else { return }
+                locaux = trouves
+                hits = trouves
+                requeteServie = q
+                prechauffer(trouves.prefix(2).map(\.id))
+                // Assez de résultats : le serveur n'apporterait rien de plus.
+                if trouves.count >= Self.assezDeResultats {
+                    isSearching = false
+                    return
+                }
+            }
+            // 2. Le serveur, seulement si le catalogue n'est pas encore là ou
+            //    trouve peu (faute de frappe : le serveur tolère les fautes).
+            try? await Task.sleep(nanoseconds: locaux.isEmpty ? 150_000_000 : 300_000_000)
             guard !Task.isCancelled else { return }
             do {
-                let results = try await MealJournalService.shared.searchFoodsRapide(query: q)
+                let distants = try await MealJournalService.shared.searchFoodsRapide(query: q)
                 guard !Task.isCancelled else { return }
-                hits = results
+                let dejaLa = Set(locaux.map(\.id))
+                hits = locaux + distants.filter { !dejaLa.contains($0.id) }
                 requeteServie = q
                 isSearching = false
-                prechauffer(results.prefix(2).map(\.id))
+                if locaux.isEmpty { prechauffer(distants.prefix(2).map(\.id)) }
             } catch {
                 guard !Task.isCancelled else { return }
-                hits = []
+                hits = locaux
                 requeteServie = q
                 isSearching = false
                 AppLogger.database.warning("search_foods failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
+
+    /// En dessous, on demande aussi au serveur (fautes de frappe).
+    private static let assezDeResultats = 3
 
     /// La fiche 100 g d'un aliment, une seule fois par feuille.
     func fiche(_ id: String) async throws -> MealJournalService.FoodDetail {
@@ -783,6 +805,8 @@ struct FoodSearchSheet: View {
         }
         .verreFeuille()
         .task {
+            // Lancé au démarrage de l'app ; ici seulement s'il manquait encore.
+            Task.detached(priority: .userInitiated) { await CatalogueRecherche.shared.preparer() }
             habituels.charger()
             vm.prechauffer((habituels.favoris.prefix(6) + recents.prefix(6)).map(\.id))
         }

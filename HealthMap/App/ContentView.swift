@@ -71,6 +71,11 @@ struct ContentView: View {
                 await SubscriptionService.shared.checkPremiumStatus()
                 await SubscriptionService.shared.loadOfferings()
             }
+            // Le catalogue de recherche (≈ 4 Mo, une fois) : la recherche
+            // d'aliment se fait ensuite dans le téléphone, sans réseau.
+            Task.detached(priority: .utility) {
+                await CatalogueRecherche.shared.preparer()
+            }
             // Durée plancher du splash (≈0,9 s) — le réveil du kiwi est toujours vu.
             try? await Task.sleep(for: .seconds(0.9))
             minSplashElapsed = true
