@@ -508,7 +508,7 @@
   par semaine (`RythmeComparatif`), un tableau en très gros caractères passe AVANT les formules —
   libellé (19), colonne Gratuit, colonne Premium sur un aplat vert pâle. Gratuit : 2 dictées et
   3 photos par jour, calories et macros, compléments ; Premium : tout le reste (30 photos par jour,
-  dictées illimitées, micros du jour, plan, gestes, progression, prise de sang, récap). « Passer à
+  60 dictées par jour, micros du jour, plan, gestes, progression, prise de sang, récap). « Passer à
   Premium » mène aux formules de la même feuille, « Plus tard » referme. Une ligne qui change de
   camp se change dans le fichier des lignes ET dans le gating.
 >

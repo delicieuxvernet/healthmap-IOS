@@ -19,7 +19,7 @@ enum OffreComparee: Equatable {
     case inclus
     /// Pas inclus.
     case absent
-    /// Inclus avec une limite à lire (« 2 / jour », « Illimitées »).
+    /// Inclus avec une limite à lire (« 2 / jour », « 30 / jour »).
     case valeur(String)
 }
 
@@ -39,6 +39,13 @@ enum ComparatifPremium {
     static let photosGratuitesParJour = 3
     static let photosPremiumParJour = 30
 
+    /// Dictées par jour en Premium. ⚠️ Pas « illimitées » : `parse-meal-voice`
+    /// plafonne le Premium à 200 par jour, et un second plafond de 60 par jour
+    /// et par adresse IP (`checkIpRateLimit`) s'applique avant lui. C'est donc
+    /// 60 qu'un abonné atteint en vrai (lu sur les fonctions déployées le
+    /// 7 octobre 2026).
+    static let dicteesPremiumParJour = 60
+
     /// Les lignes, dans l'ordre d'affichage : d'abord ce que le gratuit a
     /// (avec ses limites), puis tout ce que Premium ajoute.
     static var lignes: [LigneComparatif] {
@@ -48,7 +55,7 @@ enum ComparatifPremium {
                 symbole: "mic.fill",
                 libelle: "Repas dictés",
                 gratuit: .valeur("\(VoiceMealService.QuotaStore.dictéesGratuitesParJour) / jour"),
-                premium: .valeur("Illimités")
+                premium: .valeur("\(dicteesPremiumParJour) / jour")
             ),
             LigneComparatif(
                 id: "photo",
