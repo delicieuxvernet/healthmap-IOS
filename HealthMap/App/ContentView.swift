@@ -1097,5 +1097,15 @@ private struct AnalysisGateView: View {
                 FullAnalysisLoadingView()
             }
         }
+        // Le serveur finit le bilan même quand la requête du téléphone a été
+        // coupée (app quittée, arrière-plan, réseau perdu) : on relit la base
+        // toutes les 10 s tant que la gate est là. Lecture seule, aucun appel IA.
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { return }
+                await dashboardVM.verifierBilanEnBase()
+            }
+        }
     }
 }

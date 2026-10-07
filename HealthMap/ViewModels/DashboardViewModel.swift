@@ -331,21 +331,35 @@ final class DashboardViewModel: ObservableObject {
             await chargerPriseDeSang(userId: userId)
         }
 
-        // Hydrate le bilan v2 depuis le CACHE DB si le profil n'a pas changé
-        // (hash identique) — AVANT de débloquer le routing et de lancer
-        // l'analyse. Sinon `analysisV2` reste nil pendant le round-trip de
-        // `fetchBilanV2`, et la gate de chargement plein écran (AnalysisGateView,
-        // condition `analysisV2 == nil && isLoadingAnalysisV2`) CLIGNOTE à chaque
-        // ouverture. En posant le bilan caché ici, la gate ne s'affiche plus que
-        // pour un tout premier bilan (aucun cache) ou un profil modifié (hash
-        // différent). Lecture DB pure — aucun appel IA. `triggerAnalysis()`
-        // rafraîchira ensuite en arrière-plan sans re-vider `analysisV2`.
+        // Hydrate le bilan v2 depuis le CACHE DB — AVANT de débloquer le routing
+        // et de lancer l'analyse. Sinon `analysisV2` reste nil pendant le
+        // round-trip de `fetchBilanV2`, et la gate de chargement plein écran
+        // (AnalysisGateView, condition `analysisV2 == nil && isLoadingAnalysisV2`)
+        // CLIGNOTE à chaque ouverture. Lecture DB pure — aucun appel IA.
+        // `triggerAnalysis()` rafraîchit ensuite en arrière-plan sans re-vider
+        // `analysisV2`.
+        //
+        // ⚠️ Le bilan caché est posé MÊME SI son hash ne correspond plus (7 oct.
+        // 2026, « les 2-3 minutes de chargement reviennent à l'ouverture ») : le
+        // hash suit le journal des repas, sur une fenêtre glissante de 14 jours,
+        // donc il change presque chaque jour chez qui note ses repas — et dès
+        // qu'une lecture du journal échoue. Chaque fois, la gate plein écran
+        // revenait pour 2-3 minutes. Désormais on montre le dernier bilan tout
+        // de suite et on le rafraîchit derrière : la gate ne couvre plus que le
+        // tout PREMIER bilan d'un compte.
         if hasCompletedQuestionnaire, analysisV2 == nil {
-            let hash = hashDuBilan
-            // `(try? …) ?? nil` aplatit le double-optionnel (la fonction rend déjà
-            // `AIAnalysisV2?`) — même motif que dans AIAnalysisService.fetchBilanV2.
-            if let cached = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil,
-               cached.meta?.profileHash == hash {
+            // Une lecture ratée au réveil (réseau pas encore revenu) ne doit pas
+            // suffire à rouvrir la gate : une seconde chance, puis on renonce.
+            let cached: AIAnalysisV2?
+            do {
+                cached = try await databaseService.loadAIAnalysisV2(userId: userId)
+            } catch {
+                try? await Task.sleep(for: .milliseconds(800))
+                // `(try? …) ?? nil` aplatit le double-optionnel (la fonction rend
+                // déjà `AIAnalysisV2?`) — même motif que dans AIAnalysisService.
+                cached = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil
+            }
+            if let cached, cached.isValidV2 {
                 analysisV2 = cached
             }
         }
@@ -379,9 +393,11 @@ final class DashboardViewModel: ObservableObject {
         // Runs concurrently — does not block AI analysis loading
         Task { await gamificationService.configure(userId: userId) }
 
-        // If questionnaire completed, trigger AI analysis
+        // If questionnaire completed, trigger AI analysis. À l'ouverture, un
+        // bilan récent que seul le journal a rendu périmé attend (cf.
+        // `FraicheurBilan`) : 5 analyses par jour pour un compte gratuit.
         if hasCompletedQuestionnaire {
-            await triggerAnalysis()
+            await triggerAnalysis(differerBilanRecent: true)
         }
 
         analyticsService.track(.dashboardViewed, properties: nil)
@@ -576,7 +592,11 @@ final class DashboardViewModel: ObservableObject {
 
     // MARK: - Trigger AI Analysis
 
-    func triggerAnalysis() async {
+    /// - Parameter differerBilanRecent: `true` à l'ouverture seulement — le
+    ///   bilan v2 n'est pas régénéré s'il a moins de 24 h et que seuls le
+    ///   journal ou le poids ont bougé depuis (`FraicheurBilan`). Toute
+    ///   demande explicite (questionnaire, tirer pour rafraîchir) le régénère.
+    func triggerAnalysis(differerBilanRecent: Bool = false) async {
         // Même logique que computeLocalScores : l'analyse doit pouvoir démarrer
         // pendant la célébration post-questionnaire, avant le flip du flag UI.
         guard profile.completed else { return }
@@ -600,7 +620,7 @@ final class DashboardViewModel: ObservableObject {
         // Bilan v2 : part EN PARALLÈLE de l'appel v7 (deux tâches distinctes
         // sur le même endpoint). v2 nourrit le nouvel écran Bilan et n'est pas
         // bloqué par le v7 ; il gère son propre état (isLoadingAnalysisV2).
-        Task { await self.fetchBilanV2(userId: userId, forceRefresh: false) }
+        Task { await self.fetchBilanV2(userId: userId, forceRefresh: false, differerSiRecent: differerBilanRecent) }
 
         do {
             let merged = try await aiAnalysisService.fetchFullAnalysis(
@@ -680,12 +700,27 @@ final class DashboardViewModel: ObservableObject {
 
     /// Charge le bilan v2 : cache DB d'abord (géré par le service), sinon
     /// Edge Function (tache "bilan"). Tourne en parallèle du flux v7.
-    private func fetchBilanV2(userId: String, forceRefresh: Bool) async {
+    private func fetchBilanV2(userId: String, forceRefresh: Bool, differerSiRecent: Bool = false) async {
         // Mêmes gardes que triggerAnalysis : l'analyse doit pouvoir démarrer
         // pendant la célébration post-questionnaire.
         guard profile.completed else { return }
         // Re-entrancy guard (reconnect + loadProfile + regenerate).
         guard !isLoadingAnalysisV2 else { return }
+
+        let profileHash = hashDuBilan
+        let cleQuestionnaire = FraicheurBilan.cleQuestionnaire(profile)
+
+        // Un bilan déjà à l'écran, rédigé il y a moins de 24 h sur le même
+        // questionnaire : seuls le journal (fenêtre glissante) ou le poids ont
+        // bougé. On ne brûle pas une analyse du quota pour si peu — les
+        // chiffres, eux, sont déjà à jour (`computeLocalScores`).
+        if differerSiRecent, !forceRefresh, let affiche = analysisV2,
+           affiche.meta?.profileHash != profileHash,
+           FraicheurBilan.peutAttendre(affiche, cleQuestionnaire: cleQuestionnaire, userId: userId) {
+            AppLogger.analysis.info("Bilan v2 récent, seul le journal a bougé : régénération différée")
+            return
+        }
+
         isLoadingAnalysisV2 = true
         errorMessageV2 = nil
         defer { isLoadingAnalysisV2 = false }
@@ -695,10 +730,9 @@ final class DashboardViewModel: ObservableObject {
         let localScores = registre.mapValues(\.score)
         let localHealthScore = HealthCalculator.calculateHealthScore(profile: profile)
         let localFlags = RedFlagDetector.detect(profile: profile)
-        let profileHash = hashDuBilan
 
         do {
-            analysisV2 = try await aiAnalysisService.fetchBilanV2(
+            let bilan = try await aiAnalysisService.fetchBilanV2(
                 userId: userId,
                 profileHash: profileHash,
                 scores: localScores,
@@ -706,6 +740,8 @@ final class DashboardViewModel: ObservableObject {
                 redFlags: localFlags,
                 forceRefresh: forceRefresh
             )
+            analysisV2 = bilan
+            FraicheurBilan.memoriser(bilan, cleQuestionnaire: cleQuestionnaire, userId: userId)
         } catch {
             AppLogger.analysis.report(error, context: "Dashboard bilan v2")
             // Surface une erreur exploitable par la gate onboarding UNIQUEMENT
@@ -728,6 +764,30 @@ final class DashboardViewModel: ObservableObject {
     func retryBilanV2() async {
         guard let session = await AuthService.shared.currentSession else { return }
         await fetchBilanV2(userId: session.user.id.uuidString, forceRefresh: false)
+    }
+
+    /// Relit le bilan en base pendant que la gate attend le premier bilan.
+    ///
+    /// L'Edge Function termine et enregistre le bilan même si l'app a été
+    /// quittée ou mise en arrière-plan pendant les 2-3 minutes de rédaction
+    /// (la requête du téléphone, elle, est coupée par iOS : « Problème de
+    /// connexion »). Sans cette relecture, on relançait une rédaction complète
+    /// — et une analyse de plus sur le quota — pour un bilan déjà prêt.
+    /// Lecture DB pure, aucun appel IA.
+    func verifierBilanEnBase() async {
+        guard analysisV2 == nil, hasCompletedQuestionnaire || profile.completed,
+              let session = await AuthService.shared.currentSession else { return }
+        let userId = session.user.id.uuidString
+        guard let enBase = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil,
+              enBase.isValidV2,
+              // Seulement le bilan de CE profil : un ancien bilan d'un
+              // questionnaire refait ne doit pas refermer la gate.
+              enBase.meta?.profileHash == hashDuBilan,
+              analysisV2 == nil else { return }
+        AppLogger.analysis.info("Bilan v2 trouvé en base pendant l'attente")
+        analysisV2 = enBase
+        errorMessageV2 = nil
+        FraicheurBilan.memoriser(enBase, cleQuestionnaire: FraicheurBilan.cleQuestionnaire(profile), userId: userId)
     }
 
     // MARK: - Save Avatar Choice
@@ -784,5 +844,68 @@ final class DashboardViewModel: ObservableObject {
             ToastService.shared.confirmer("Poids non enregistré. Vérifie ta connexion et réessaie.")
             AppLogger.database.report(error, context: "Save weight")
         }
+    }
+}
+
+// MARK: - Fraîcheur du bilan rédigé (7 oct. 2026)
+
+/// Décide si un bilan v2 périmé peut attendre avant d'être régénéré.
+///
+/// Le hash du bilan suit le journal des repas sur 14 jours glissants : chez qui
+/// note ses repas, il change presque chaque jour. Régénérer à chaque ouverture
+/// coûtait une analyse (5 par jour pour un compte gratuit, partagées avec le
+/// flux v7) et finissait en « Trop de demandes ». On retient donc, par compte,
+/// sur quel questionnaire le bilan affiché a été rédigé : tant que c'est le
+/// même et que le bilan a moins de 24 h, il attend.
+enum FraicheurBilan {
+    static let delaiMaximum: TimeInterval = 24 * 3600
+
+    /// Le questionnaire seul (sans journal, sans prise de sang, sans le poids
+    /// réglé depuis le Journal) : ce qui, s'il change, rend le bilan faux.
+    static func cleQuestionnaire(_ profil: UserProfile) -> String {
+        var copie = profil
+        copie.weight = ""
+        return AIAnalysisService.hashProfile(copie)
+    }
+
+    static func memoriser(
+        _ bilan: AIAnalysisV2,
+        cleQuestionnaire: String,
+        userId: String,
+        defaults: UserDefaults = .standard
+    ) {
+        guard let hash = bilan.meta?.profileHash else { return }
+        defaults.set(["bilan": hash, "questionnaire": cleQuestionnaire], forKey: cle(userId))
+    }
+
+    static func peutAttendre(
+        _ bilan: AIAnalysisV2,
+        cleQuestionnaire: String,
+        userId: String,
+        maintenant: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        guard let hash = bilan.meta?.profileHash,
+              let memo = defaults.dictionary(forKey: cle(userId)) as? [String: String],
+              memo["bilan"] == hash,
+              memo["questionnaire"] == cleQuestionnaire,
+              let redige = date(bilan.meta?.generatedAt) else { return false }
+        let age = maintenant.timeIntervalSince(redige)
+        // Une date dans le futur (horloge du téléphone décalée) ne vaut rien.
+        return age >= -300 && age < delaiMaximum
+    }
+
+    /// Préfixe `healthmap_` : vidé à la déconnexion (`clearLocalCaches`).
+    private static func cle(_ userId: String) -> String {
+        "healthmap_bilan_v2_redige_sur_\(userId)"
+    }
+
+    /// `generated_at` vient de `new Date().toISOString()` côté serveur
+    /// (millisecondes comprises) ; on accepte aussi la forme sans fraction.
+    static func date(_ iso: String?) -> Date? {
+        guard let iso else { return nil }
+        let avecFraction = ISO8601DateFormatter()
+        avecFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return avecFraction.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
     }
 }
