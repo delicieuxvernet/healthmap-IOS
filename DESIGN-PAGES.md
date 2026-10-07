@@ -170,17 +170,23 @@
 >      « Terminer »** (toucher la bulle termine aussi). Quand le doigt tient encore le bouton, ces
 >      deux boutons deviennent « Glisse pour annuler » et « Relâche pour terminer », et la bulle
 >      suit le doigt à l'horizontale en s'estompant vers l'annulation ;
->   3. **le calcul, sous la bulle** : elle se contracte à 66 pt, trois points tournent autour
->      d'elle (un tour en 1,2 s), les couches accélèrent, « Kiwio calcule tes apports… ». La
->      transcription PUIS l'analyse se font là, avant que la feuille ne monte
->      (`VoiceMealSheet.preparer` : mêmes appels, même ordre, mêmes données envoyées). Dès que la
->      transcription existe, la carte la relit **mot à mot, du flou au net** (`MotsQuiArrivent`).
+>   3. **la transcription, sous la bulle** : elle se contracte à 66 pt, trois points tournent
+>      autour d'elle (un tour en 1,2 s), les couches accélèrent, « Kiwio relit ta dictée… ». SEULE
+>      la transcription se fait là, sur l'appareil, gratuite (`VoiceMealSheet.transcrire`). Dès
+>      qu'elle existe, la carte la relit **mot à mot, du flou au net** (`MotsQuiArrivent`).
 >      ⚠️ Les mots n'arrivent PAS pendant qu'on parle : la capture enregistre d'abord et transcrit
 >      ensuite (voir `SpeechCaptureService`), décision conservée. Un « Annuler » réapparaît après
->      4 s de calcul : la scène couvre tout l'écran, il faut une sortie ;
->   4. **les résultats** : la bulle s'efface et **une feuille de verre DÉTACHÉE des bords** monte
->      (marges de 8, rayon 44, posée en bas à la taille de ce qu'elle montre ; elle défile si le
->      contenu dépasse) ; le voile reste jusqu'à ce qu'elle redescende. « Ton déjeuner » en 24/700
+>      4 s : la scène couvre tout l'écran, il faut une sortie ;
+>   3'. **la relecture, AVANT tout appel serveur** (retour d'Arthur, 7 octobre 2026 : une dictée
+>      ratée partait quand même à `parse-meal-voice`, payant, et ne se corrigeait qu'après) : la
+>      bulle s'efface et la feuille de verre (ci-dessous) monte sur « Dictée terminée », « Vérifie
+>      ce que j'ai compris… », **le texte transcrit dans un champ modifiable** (crayon en coin),
+>      **« Lancer l'analyse »** (le seul geste qui appelle le serveur) et **« Recommencer la
+>      dictée »** (la feuille redescend et la bulle se rouvre d'elle-même, mains libres). Après un
+>      échec d'analyse, « Corriger le texte » ramène ce champ au lieu d'imposer de tout redire ;
+>   4. **les résultats** : après « Lancer l'analyse », le pépin tourne dans **une feuille de verre
+>      DÉTACHÉE des bords** (marges de 8, rayon 44, posée en bas à la taille de ce qu'elle montre ;
+>      elle défile si le contenu dépasse) ; le voile reste jusqu'à ce qu'elle redescende. « Ton déjeuner » en 24/700
 >      (« Ton repas » tant que le repas n'est pas choisi) et « 3 aliments reconnus », les lignes en
 >      cascade (pastille de 40, nom, quantité, kcal ; UNE seule déployée à la fois pour régler sa
 >      quantité), le total qui compte, **les étiquettes de ce que le repas apporte** (« Protéines

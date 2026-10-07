@@ -2,15 +2,19 @@ import SwiftUI
 
 /// La fonction phare de Kiwio : on dicte son repas, l'app compte les calories.
 ///
-/// L'écoute ET le calcul vivent hors de cette feuille (la bulle
-/// d'`EcouteDictee.swift`) : une dictée y est transcrite puis chiffrée, et la
-/// feuille ne monte qu'avec le résultat. Maquette « Motion v3 - Verre liquide »
-/// du 2 octobre 2026 : une feuille de verre DÉTACHÉE des bords (marges de 8,
-/// rayon 44), posée en bas, à la taille de ce qu'elle montre.
-///   1. saisie   — « Écrire » du Journal : un champ, clavier levé.
-///   2. analyse  — après une saisie au clavier ou une relance seulement : la
-///                 dictée, elle, est chiffrée sous la bulle.
-///   3. résultat — « Ton déjeuner », lignes posées en cascade, UNE seule
+/// L'écoute vit hors de cette feuille (la bulle d'`EcouteDictee.swift`) : une
+/// dictée y est transcrite, sur l'appareil, et la feuille monte avec ce texte.
+/// Maquette « Motion v3 - Verre liquide » du 2 octobre 2026 : une feuille de
+/// verre DÉTACHÉE des bords (marges de 8, rayon 44), posée en bas, à la taille
+/// de ce qu'elle montre.
+///   1. saisie    — « Écrire » du Journal : un champ, clavier levé.
+///   1'. relecture — après une dictée : ce qui a été compris, modifiable, puis
+///                  « Lancer l'analyse » ou « Recommencer la dictée ». Rien ne
+///                  part au serveur (`parse-meal-voice`, payant) sans ce
+///                  geste : une dictée ratée se corrige AVANT l'appel
+///                  (retour d'Arthur, 7 octobre 2026).
+///   2. analyse   — le texte relu ou écrit part au serveur.
+///   3. résultat  — « Ton déjeuner », lignes posées en cascade, UNE seule
 ///                 déployée à la fois, total qui compte, étiquettes de ce que
 ///                 le repas apporte, action bloquée tant qu'il manque une
 ///                 quantité.
@@ -42,10 +46,14 @@ struct VoiceMealSheet: View {
     /// l'appelant sur le journal déjà chargé. `nil` = rien d'honnête à dire :
     /// la confirmation se contente alors de dire que c'est compté.
     var gratification: ((MealJournalService.MealRecord) -> GratificationRepas?)? = nil
-    /// La dictée, déjà transcrite et chiffrée sous la bulle : la feuille monte
-    /// directement sur son résultat (ou sur l'échec). `nil` : la feuille fait
-    /// le travail elle-même (saisie au clavier).
+    /// La dictée, déjà transcrite sous la bulle : la feuille monte directement
+    /// sur sa relecture (ou sur l'échec). `nil` : la feuille fait le travail
+    /// elle-même (saisie au clavier).
     var depart: Depart? = nil
+    /// « Recommencer la dictée » : la feuille redescend et l'appelant rouvre
+    /// aussitôt la bulle. `nil` (saisie au clavier) : la feuille se referme
+    /// seulement.
+    var onRedicter: (() -> Void)? = nil
     /// Capture audio possédée par l'appelant. Elle est injectée — et non créée
     /// ici — pour que la dictée puisse DÉMARRER sur l'accueil, le doigt posé sur
     /// « Dicte ton repas », et se terminer dans cette feuille.
@@ -63,9 +71,11 @@ struct VoiceMealSheet: View {
         let sousLigne: String
     }
 
-    /// Ce qu'une dictée a donné avant que la feuille ne monte.
-    enum Depart {
-        case analyse(VoiceMealService.Analysis, transcript: String)
+    /// Ce qu'une dictée a donné avant que la feuille ne monte : un texte à
+    /// relire, ou un échec de transcription. Jamais une analyse : le serveur
+    /// n'est appelé qu'une fois le texte relu.
+    enum Depart: Equatable {
+        case transcription(String)
         case echec(message: String, transcript: String)
     }
 
@@ -78,6 +88,9 @@ struct VoiceMealSheet: View {
     @State private var amorce = false
     @State private var texteEcrit = ""
     @FocusState private var champActif: Bool
+    /// « Recommencer la dictée » : à la disparition, la feuille passe la main
+    /// à l'appelant au lieu de clore la dictée.
+    @State private var redicter = false
     @State private var items: [VoiceMealService.Item] = []
     @State private var grams: [Int: Double] = [:]      // index item → grammes retenus
     @State private var removed: Set<Int> = []
@@ -131,12 +144,11 @@ struct VoiceMealSheet: View {
 
     // Plus de phase « écoute » ici : depuis le 2 août 2026, l'enregistrement
     // vit ENTIÈREMENT sur l'accueil. Depuis le 2 octobre 2026, la
-    // transcription et l'analyse d'une dictée aussi (sous la bulle) : la
-    // feuille ne s'ouvre qu'avec leur résultat. `.analyzing` ne sert plus
-    // qu'à la saisie au clavier et à la relance après un échec. La phase
-    // « ajouté » (célébration dans la feuille, 1er octobre) a disparu : la
-    // feuille redescend, la capsule du haut de l'écran confirme.
-    enum Phase { case saisie, analyzing, results, failed }
+    // transcription d'une dictée aussi (sous la bulle). Depuis le 7 octobre,
+    // la feuille s'ouvre sur `.relecture` : l'analyse n'est lancée qu'à la
+    // demande. La phase « ajouté » (célébration dans la feuille, 1er octobre)
+    // a disparu : la feuille redescend, la capsule du haut de l'écran confirme.
+    enum Phase { case saisie, relecture, analyzing, results, failed }
 
     struct RemplacementCible: Identifiable {
         let index: Int
@@ -188,6 +200,10 @@ struct VoiceMealSheet: View {
         .onDisappear {
             revelation?.cancel()
             revelation = nil
+            // On redicte : l'appelant rouvre la bulle, qui remet la capture à
+            // zéro elle-même, et le tutoriel reste à son étape — la nouvelle
+            // dictée y mène toujours.
+            guard !redicter else { return }
             speech.reset()
             // Feuille refermée sans enregistrement : le tutoriel saute la
             // « valeur » (aucun repas) et passe à la suite.
@@ -208,12 +224,12 @@ struct VoiceMealSheet: View {
 
     /// Saisie au clavier : tant que rien n'a été envoyé, la feuille montre le
     /// champ — dès sa première image, sans passer par « analyse en cours ».
-    /// Dictée : dès sa première image aussi, elle montre ce que le calcul a
-    /// donné.
+    /// Dictée : dès sa première image aussi, elle montre ce que la bulle a
+    /// compris.
     private var phaseAffichee: Phase {
         if !amorce, let depart {
             switch depart {
-            case .analyse: return .results
+            case .transcription: return .relecture
             case .echec: return .failed
             }
         }
@@ -246,6 +262,7 @@ struct VoiceMealSheet: View {
     private var contenuDePhase: some View {
         switch phaseAffichee {
         case .saisie:    saisieView
+        case .relecture: relectureView
         case .analyzing: analyzingView
         case .results:   resultsView
         case .failed:    errorView
@@ -319,6 +336,96 @@ struct VoiceMealSheet: View {
         champActif = false
         dernierTranscript = texte
         Task { await analyser(texte) }
+    }
+
+    /// Referme la feuille pour redicter. Avec un appelant qui sait rouvrir la
+    /// bulle, elle se rouvre d'elle-même ; sinon on redicte depuis le Journal.
+    private func recommencerDictee() {
+        HapticService.shared.tap()
+        champActif = false
+        redicter = onRedicter != nil
+        fermer()
+        onRedicter?()
+    }
+
+    // MARK: - 1'. Relecture de la dictée
+
+    /// La dictée est transcrite (sur l'appareil, gratuitement) mais rien n'est
+    /// encore parti au serveur. On montre ce qui a été compris, on laisse le
+    /// corriger au clavier, et l'analyse ne part que sur « Lancer l'analyse ».
+    private var relectureView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Dictée terminée")
+                        .font(.system(size: 24, weight: .bold))
+                        .tracking(-0.6)
+                        .foregroundStyle(Color.dsTexte)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Vérifie ce que j'ai compris. Touche le texte pour le corriger, puis lance l'analyse.")
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                DSCloseButton { fermer() }
+            }
+
+            TextField("Ce que tu as mangé", text: $texteEcrit, axis: .vertical)
+                .font(.dsCorps)
+                .lineLimit(3...8)
+                .focused($champActif)
+                .padding(DS.paddingCarte)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .overlay(alignment: .bottomTrailing) {
+                    // Le crayon dit que le texte se corrige ; il disparaît
+                    // pendant qu'on écrit.
+                    if !champActif {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.dsTertiaire)
+                            .padding(10)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .dsCard()
+                .padding(.top, 18)
+                .accessibilityLabel("Ta dictée, modifiable")
+                .accessibilityIdentifier("dictee.relecture.texte")
+
+            DSCapsuleButton(titre: "Lancer l'analyse") {
+                envoyerLeTexte()
+            }
+            .disabled(texteUtile.isEmpty)
+            .opacity(texteUtile.isEmpty ? 0.5 : 1)
+            .padding(.top, 14)
+            .accessibilityHint("Envoie ce texte pour identifier les aliments et les quantités")
+            .accessibilityIdentifier("dictee.relecture.analyser")
+
+            Button {
+                recommencerDictee()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .accessibilityHidden(true)
+                    Text("Recommencer la dictée")
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                }
+                .foregroundStyle(Color.dsAccent)
+                .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 6)
+            .accessibilityHint("Jette ce texte et rouvre le micro")
+            .accessibilityIdentifier("dictee.relecture.redicter")
+        }
+        .padding(.horizontal, Self.margeInterieure)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
     }
 
     // MARK: - 2. Analyse
@@ -681,11 +788,10 @@ struct VoiceMealSheet: View {
             .accessibilityHint("Ouvre le réglage du premier aliment")
         }
 
-        // La feuille n'écoute plus (2 août 2026) : recommencer = fermer, puis
-        // dicter à nouveau depuis le Journal.
+        // La feuille n'écoute plus (2 août 2026) : recommencer = fermer, et
+        // le Journal rouvre la bulle.
         Button {
-            HapticService.shared.tap()
-            fermer()
+            recommencerDictee()
         } label: {
             Text("Recommencer la dictée")
                 .font(.dsLegendeMoyenne)
@@ -782,9 +888,21 @@ struct VoiceMealSheet: View {
                     .lineLimit(3)
                     .padding(.horizontal, 8)
 
+                // Le serveur n'a rien reconnu dans ce texte : on le corrige
+                // plutôt que de tout redire.
                 Button {
-                    HapticService.shared.tap()
-                    fermer()
+                    corrigerLeTexte()
+                } label: {
+                    Text("Corriger le texte")
+                        .font(.dsSousTitre)
+                        .foregroundStyle(Color.dsAccent)
+                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    recommencerDictee()
                 } label: {
                     Text("Redire mon repas")
                         .font(.dsSousTitre)
@@ -794,11 +912,9 @@ struct VoiceMealSheet: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                // Rien à réanalyser : on referme, l'utilisateur redicte depuis
-                // le Journal.
+                // Rien à réanalyser (rien entendu) : on redicte.
                 DSCapsuleButton(titre: "Réessayer") {
-                    HapticService.shared.tap()
-                    fermer()
+                    recommencerDictee()
                 }
             }
         }
@@ -1004,8 +1120,8 @@ struct VoiceMealSheet: View {
         appliquer(depart)
     }
 
-    /// Saisie au clavier : la feuille attend le texte. Dictée déjà chiffrée :
-    /// rien à faire. Sinon (aucun résultat fourni), on transcrit l'audio ici.
+    /// Saisie au clavier : la feuille attend le texte. Dictée déjà transcrite :
+    /// rien à faire. Sinon (aucun texte fourni), on transcrit l'audio ici.
     private func demarrer() async {
         guard depart == nil, !saisieAuClavier else { return }
         await finishListening()
@@ -1016,25 +1132,32 @@ struct VoiceMealSheet: View {
         // C'est ce qui garantit qu'une pause au milieu de la phrase ne coûte
         // plus rien : il n'y a jamais eu qu'un seul enregistrement.
         phase = .analyzing
-        let resultat = await Self.preparer(speech: speech) { texte in
-            dernierTranscript = texte
-        }
+        let resultat = await Self.transcrire(speech: speech) { _ in }
         appliquer(resultat)
     }
 
-    /// Pose ce qu'une dictée a donné : ses aliments, ou son échec.
+    /// Pose ce qu'une dictée a donné : le texte à relire, ou son échec.
     private func appliquer(_ depart: Depart) {
         switch depart {
-        case .analyse(let analyse, let transcript):
-            // Conservé pour pouvoir relancer l'analyse sans refaire parler.
-            dernierTranscript = transcript
+        case .transcription(let texte):
+            texteEcrit = texte
             errorMessage = nil
-            appliquer(analyse)
+            phase = .relecture
         case .echec(let message, let transcript):
             dernierTranscript = transcript
             errorMessage = message
             phase = .failed
         }
+    }
+
+    /// Après un échec d'analyse : le texte envoyé revient dans le champ, à
+    /// corriger avant de relancer.
+    private func corrigerLeTexte() {
+        HapticService.shared.tap()
+        texteEcrit = dernierTranscript
+        errorMessage = nil
+        phase = saisieAuClavier ? .saisie : .relecture
+        champActif = true
     }
 
     /// Analyse d'un texte déjà transcrit. Séparé de la capture pour qu'un échec
@@ -1231,13 +1354,19 @@ extension VoiceMealSheet {
         return Color.teinteLipides
     }
 
-    /// Transcrit puis chiffre une dictée, AVANT que la feuille ne monte : la
-    /// bulle se contracte et tourne pendant ce temps (`EcouteDictee.swift`).
+    /// Transcrit une dictée, AVANT que la feuille ne monte : la bulle se
+    /// contracte et tourne pendant ce temps (`EcouteDictee.swift`).
     /// `onTranscrit` reçoit ce qui a été dit dès que la transcription existe,
-    /// pour que la carte le relise pendant que le serveur chiffre.
+    /// pour que la carte le relise.
+    ///
+    /// ⚠️ N'appelle PAS le serveur : la transcription se fait sur l'appareil
+    /// et ne coûte rien ; `parse-meal-voice`, lui, est payant. La feuille
+    /// montre d'abord le texte (`.relecture`) et l'analyse ne part que quand
+    /// la personne l'a relu — une dictée ratée se corrige ou se refait sans
+    /// rien coûter (retour d'Arthur, 7 octobre 2026).
     @MainActor
-    static func preparer(speech: SpeechCaptureService,
-                         onTranscrit: (String) -> Void) async -> Depart {
+    static func transcrire(speech: SpeechCaptureService,
+                           onTranscrit: (String) -> Void) async -> Depart {
         // L'audio est transcrit en une fois, sur le fichier complet : une
         // pause au milieu de la phrase ne coûte rien.
         let texte = await speech.finishAndTranscribe()
@@ -1246,17 +1375,12 @@ extension VoiceMealSheet {
                           transcript: "")
         }
         // La dictée a été abandonnée entre-temps : on ne relit rien (une
-        // nouvelle dictée a pu commencer) et on n'appelle pas le serveur.
+        // nouvelle dictée a pu commencer).
         guard !Task.isCancelled else {
             return .echec(message: "", transcript: texte)
         }
         onTranscrit(texte)
-        do {
-            let analyse = try await VoiceMealService.shared.analyze(transcript: texte)
-            return .analyse(analyse, transcript: texte)
-        } catch {
-            return .echec(message: error.localizedDescription, transcript: texte)
-        }
+        return .transcription(texte)
     }
 }
 
