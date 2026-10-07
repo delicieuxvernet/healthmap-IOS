@@ -208,9 +208,12 @@
 >   « Écrire » ouvre la même feuille détachée sur un champ, sans la bulle. Les autres ajouts
 >   (photo, recherche, code-barres) gardent la gratification décrite plus bas.
 > - **Micronutriments** (1er octobre 2026, verre le 2 ; `JournalMicrosComponents.swift`, calcul
->   `Core/MicrosDuJour.swift`) — sous la saisie. **Réservé au Premium** : en gratuit, la carte
->   reste devinable derrière le flou, et une porte « Débloque tes micronutriments » la suit (zone
->   `journal_micros`). La carte porte son en-tête (feuille verte, « Micronutriments », « touche
+>   `Core/MicrosDuJour.swift`) — sous la saisie. **Réservé au Premium** : en gratuit (variante B,
+>   7 octobre 2026), la carte n'est PAS floutée : « N micronutriments calculés sur tes repas »,
+>   les filtres, toute la liste dans l'ordre du catalogue, noms nets, et sur chaque ligne une
+>   pastille « 🔒 Débloquer avec Premium » à la place de la jauge et du chiffre ; ni priorités, ni
+>   repère « bas », ni phrase sur la personne (rien ne se devine). Le bouton d'essai (StoreKit)
+>   clôt la carte ; toucher une ligne ou ce bouton ouvre l'abonnement (zone `journal_micros`). La carte porte son en-tête (feuille verte, « Micronutriments », « touche
 >   pour le détail ») ; **les trois apports qui comptent le plus pour la personne**, puis tous les
 >   autres derrière « Voir les N micronutriments ». Une ligne = le nom, un point et une jauge à la
 >   TEINTE de l'apport, le pourcentage, un chevron ; un apport bas porte un petit signe rouge ou
