@@ -503,6 +503,14 @@
 >   et plus, feuille simple sur iOS 17 : `feuillePremium`, `premiumOrigine` / `premiumDepuis` dans
 >   `PremiumGating.swift`). **Contenu verrouillé, partout** : un seul traitement, flou 8 et opacité
 >   0,5, sans voile blanc ; portes (`UnlockDoor`), jauges de quota et écrin Premium en verre.
+  **Étape « Gratuit ou Premium ? »** (7 oct. 2026, `ComparatifPremiumView.swift`, lignes dans
+  `Core/ComparatifPremium.swift`) : la première fois que la feuille s'ouvre, puis au plus une fois
+  par semaine (`RythmeComparatif`), un tableau en très gros caractères passe AVANT les formules —
+  libellé (19), colonne Gratuit, colonne Premium sur un aplat vert pâle. Gratuit : 2 dictées et
+  3 photos par jour, calories et macros, compléments ; Premium : tout le reste (30 photos par jour,
+  dictées illimitées, micros du jour, plan, gestes, progression, prise de sang, récap). « Passer à
+  Premium » mène aux formules de la même feuille, « Plus tard » referme. Une ligne qui change de
+  camp se change dans le fichier des lignes ET dans le gating.
 >
 > - **Widgets, écran verrouillé, activité en direct** (refonte « en verre » du 3 oct. 2026, maquette
 >   Claude Design « Kiwio - Widgets », W1 à W7 ; briques dans `Partage/VuesWidgets.swift`, vues dans
