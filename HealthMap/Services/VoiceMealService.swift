@@ -218,6 +218,16 @@ final class VoiceMealService {
             UserDefaults.standard.set(UserDefaults.standard.integer(forKey: k) + 1, forKey: k)
         }
 
+        /// Le serveur a répondu 429 : son compteur (qui compte CHAQUE analyse,
+        /// même non enregistrée) est au bout. On aligne le compteur local, pour
+        /// que le prochain appui ouvre la feuille Premium tout de suite au lieu
+        /// de faire parler la personne pour rien.
+        static func marquerEpuisees(userId: String) {
+            let k = clef(userId)
+            let actuel = UserDefaults.standard.integer(forKey: k)
+            UserDefaults.standard.set(max(actuel, dictéesGratuitesParJour), forKey: k)
+        }
+
         /// Reste-t-il une dictée aujourd'hui ? Toujours vrai pour un abonné.
         static func peutDicter(userId: String, isPremium: Bool) -> Bool {
             isPremium || utiliséesAujourdhui(userId: userId) < dictéesGratuitesParJour

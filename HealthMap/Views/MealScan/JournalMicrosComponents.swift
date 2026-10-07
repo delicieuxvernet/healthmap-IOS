@@ -16,6 +16,15 @@ import SwiftUI
 // Toute cette partie est réservée au Premium (décision d'Arthur du même
 // jour) : la porte se pose dans `MealScanView.microsSection`.
 //
+// Verrou défloué (7 octobre 2026, demande d'Arthur) : la carte entière était
+// floutée, et un compte gratuit ne voyait pas CE que Premium débloque. Elle
+// est désormais nette : chaque micronutriment est nommé, la liste se déplie,
+// les filtres marchent. Seuls les CHIFFRES sont brouillés — une jauge
+// factice, floutée, que rien ne relie à la personne — et chaque ligne porte
+// « Premium ». La phrase de tête, l'ordre des priorités et les repères de
+// statut disent quelque chose de la personne : en verrouillé, ils sont
+// remplacés par l'ordre du catalogue et une phrase neutre.
+//
 // Un seul chiffre par apport : la part du besoin couverte. C'est le même que
 // dans Progrès et dans la fiche de l'apport.
 //
@@ -154,7 +163,13 @@ struct JournalMicrosAlerte: View {
 
 struct JournalMicrosCard: View {
     let tableau: TableauMicros
+    /// Compte gratuit : noms nets, chiffres brouillés, « Premium » sur chaque
+    /// ligne. Toucher une ligne appelle `onLigne` (l'appelant ouvre Premium).
+    var verrouille = false
     let onLigne: (LigneMicro) -> Void
+
+    /// Lignes montrées d'emblée en verrouillé, avant « Voir les … ».
+    private static let lignesVerrouilleesVisibles = 6
 
     @State private var deplie = false
     @State private var famille: FamilleMicro?
@@ -227,7 +242,68 @@ struct JournalMicrosCard: View {
         return possessif(ligne).hasPrefix("ta ")
     }
 
+    /// Verrouillé : l'ordre du catalogue (l'ordre des priorités et des
+    /// alertes dirait déjà ce qui est bas), filtré par famille.
+    private var lignesVerrouillees: [LigneMicro] {
+        tableau.toutes.filter { famille == nil || $0.famille == famille }
+    }
+
     var body: some View {
+        if verrouille {
+            corpsVerrouille
+        } else {
+            corps
+        }
+    }
+
+    private var corpsVerrouille: some View {
+        let lignes = lignesVerrouillees
+        let visibles = deplie ? lignes : Array(lignes.prefix(Self.lignesVerrouilleesVisibles))
+        return VStack(alignment: .leading, spacing: 0) {
+            enTeteVerrouille
+            filtres
+            ForEach(visibles) { ligne in
+                LigneMicroVerrouillee(ligne: ligne) { onLigne(ligne) }
+            }
+            if lignes.count > Self.lignesVerrouilleesVisibles {
+                DSSeparator()
+                boutonToutVoir
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+    }
+
+    /// En-tête verrouillé : la catégorie, la pastille Premium, une phrase qui
+    /// dit ce que la carte contient — rien sur la personne.
+    private var enTeteVerrouille: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .center, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Image(systemName: "leaf")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.teinteKiwi)
+                        .accessibilityHidden(true)
+                    Text("Micronutriments")
+                        .font(.dsSousTitreFort)
+                        .foregroundStyle(Color.teinteKiwiTexte)
+                }
+                Spacer(minLength: 8)
+                PastillePremiumMicro()
+            }
+            Text("Tes \(nombreDeMicros) micronutriments, calculés sur tes repas. Les chiffres se débloquent avec Premium.")
+                .font(.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 3)
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.top, 14)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var corps: some View {
         VStack(alignment: .leading, spacing: 0) {
             enTete
 
@@ -303,6 +379,15 @@ struct JournalMicrosCard: View {
         }
     }
 
+    private var titreToutVoir: String {
+        if deplie { return "Masquer le détail" }
+        if verrouille {
+            let reste = lignesVerrouillees.count - Self.lignesVerrouilleesVisibles
+            return "Voir les \(reste) autres"
+        }
+        return "Voir les \(nombreDeMicros) micronutriments"
+    }
+
     private var boutonToutVoir: some View {
         Button {
             HapticService.shared.tap()
@@ -313,7 +398,7 @@ struct JournalMicrosCard: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(deplie ? "Masquer le détail" : "Voir les \(nombreDeMicros) micronutriments")
+                Text(titreToutVoir)
                     .font(.dsSousTitreMoyen)
                     .tracking(DSTracking.sousTitre)
                 Image(systemName: deplie ? "chevron.up" : "chevron.down")
@@ -392,6 +477,107 @@ struct JournalMicrosCard: View {
                 .font(.system(.caption, design: .default))
                 .foregroundStyle(Color.dsSecondaire)
         }
+    }
+}
+
+// MARK: - Une ligne verrouillée (compte gratuit)
+
+/// Ce qu'une ligne verrouillée montre à la place du chiffre.
+enum MicroVerrouille {
+    /// Longueur de la jauge factice, de 0,25 à 0,90. Tirée du SEUL identifiant
+    /// de l'apport (hachage stable, pas `hashValue` qui change à chaque
+    /// lancement) : déterministe, et indépendante de toute donnée de la
+    /// personne — on ne peut rien en deviner.
+    static func partFactice(id: String) -> Double {
+        let graine = id.unicodeScalars.reduce(UInt32(7)) { ($0 &* 31) &+ $1.value }
+        return Double(25 + Int(graine % 66)) / 100
+    }
+}
+
+/// « Premium », avec son cadenas : sur l'en-tête et sur chaque jauge brouillée.
+private struct PastillePremiumMicro: View {
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 9, weight: .bold))
+            Text("Premium")
+                .font(.system(.caption2, design: .default).weight(.semibold))
+        }
+        .foregroundStyle(Color.teinteKiwiTexte)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Capsule(style: .continuous).fill(Color.teinteKiwi.opacity(0.16)))
+        .overlay(Capsule(style: .continuous).strokeBorder(Color.teinteKiwi.opacity(0.35), lineWidth: 0.5))
+        .fixedSize()
+        .accessibilityHidden(true)
+    }
+}
+
+/// Le chiffre d'une ligne verrouillée : une jauge FACTICE et un faux
+/// pourcentage, floutés, sous la pastille « Premium ». La longueur ne vient
+/// que du nom de l'apport (hachage stable) : elle ne dit rien de la personne,
+/// et ne bouge pas d'un affichage à l'autre.
+private struct ChiffreBrouille: View {
+    let id: String
+    let teinte: Color
+
+    private var partFactice: CGFloat { CGFloat(MicroVerrouille.partFactice(id: id)) }
+
+    var body: some View {
+        ZStack {
+            HStack(spacing: 8) {
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.dsRemplissage)
+                    Capsule()
+                        .fill(teinte)
+                        .frame(width: 80 * partFactice)
+                }
+                .frame(width: 80, height: 6)
+                Text("00 %")
+                    .font(.dsValeurLigneForte)
+                    .foregroundStyle(Color.dsTexte)
+                    .frame(minWidth: 36, alignment: .trailing)
+            }
+            .blur(radius: 4)
+            .opacity(0.55)
+
+            PastillePremiumMicro()
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Ligne d'un compte gratuit : le point et le NOM nets, le chiffre brouillé.
+/// Toute la ligne ouvre Premium.
+private struct LigneMicroVerrouillee: View {
+    let ligne: LigneMicro
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(ligne.teinte)
+                    .frame(width: 8, height: 8)
+                Text(ligne.nom)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 8)
+                ChiffreBrouille(id: ligne.id, teinte: ligne.teinte)
+            }
+            .padding(.horizontal, DS.paddingCarte)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(LigneMicroPressStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(ligne.nom). Chiffre réservé à Premium.")
+        .accessibilityHint("Ouvre Kiwio Premium")
+        .accessibilityAddTraits(.isButton)
     }
 }
 

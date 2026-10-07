@@ -75,6 +75,15 @@ struct JournalView: View {
     @State private var isAddingFood = false
     @State private var addFoodConfirmation: String?
     @State private var showPaywall = false
+    /// Une limite gratuite du jour vient d'être atteinte (scans, dictées,
+    /// repas écrits) : la feuille Premium s'ouvre sur « Oups ! » et ses
+    /// captures (`LimiteDuJour.swift`), jamais sur un simple message d'erreur.
+    @State private var limiteAtteinte: LimiteDuJour?
+    /// Limite constatée DANS la feuille de dictée : elle redescend d'abord,
+    /// la feuille Premium monte à sa fermeture (jamais deux feuilles à la fois).
+    @State private var limiteApresFeuille: LimiteDuJour?
+    /// Une ligne de la carte Micronutriments verrouillée a été touchée.
+    @State private var showPaywallMicros = false
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
     /// Repas ouvert depuis la mosaïque (« Midi » → la fiche du déjeuner).
@@ -259,6 +268,10 @@ struct JournalView: View {
         // doit pas resservir à la prochaine.
         EcouteCentre.partage.fermer()
         departDictee = nil
+        if let limite = limiteApresFeuille {
+            limiteApresFeuille = nil
+            limiteAtteinte = limite
+        }
         guard let ajout = ajoutVocal else { return }
         ajoutVocal = nil
         // Pendant le tutoriel, c'est lui qui parle : pas de pastille par-dessus.
@@ -386,6 +399,8 @@ struct JournalView: View {
                             // Le quota ne se décompte QUE si la dictée a abouti
                             // à un enregistrement — un essai annulé ne coûte rien.
                             VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
+                        } onLimiteAtteinte: {
+                            limiteApresFeuille = .dictees
                         }
                     }
                 }
@@ -404,6 +419,8 @@ struct JournalView: View {
                             ajoutVocal = ajout
                             // Même quota que la dictée : c'est la même analyse.
                             VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid)
+                        } onLimiteAtteinte: {
+                            limiteApresFeuille = .ecrits
                         }
                     }
                 }
@@ -415,6 +432,9 @@ struct JournalView: View {
                 ))
                 .sheet(isPresented: $showPaywall) {
                     PaywallView().healthMapFullSheet()
+                }
+                .sheet(item: $limiteAtteinte) { limite in
+                    PaywallView(limite: limite).healthMapFullSheet()
                 }
                 .sheet(item: $repasOuvert) { slot in
                     // La fiche de CE repas. Cibles réelles du profil : jamais
@@ -1021,14 +1041,11 @@ struct JournalView: View {
         .onChange(of: viewModel.quotaExhausted) { _, exhausted in
             guard exhausted else { return }
             viewModel.quotaExhausted = false
-            // Décision V12a : aucune porte premium tant que le bilan n'est pas
-            // fait. Le message posé par `handleDailyQuotaReached()` reste
-            // affiché dans tous les cas.
-            guard ScanQuotaUI.gateEnabled(
-                bilanComplete: dashboardVM.bilanComplete,
-                isPremium: subscriptionService.isPremium
-            ) else { return }
-            showPaywall = true
+            // Limite atteinte : « Oups ! » et la feuille Premium, pour tout
+            // non-abonné (demande d'Arthur du 7 oct. 2026 — un message
+            // d'erreur seul était une impasse). Un abonné lit le message de
+            // `handleDailyQuotaReached()` : il n'y a rien à lui vendre.
+            ouvrirLimiteScans()
         }
     }
 
@@ -1097,13 +1114,16 @@ struct JournalView: View {
     @ViewBuilder
     private var microsSection: some View {
         if dashboardVM.premiumVisible {
-            // Porte Premium (décision d'Arthur du 1er octobre 2026) : la carte
-            // reste devinable derrière le voile, rien ne s'ouvre, et la page
-            // d'un micronutriment n'est donc pas atteignable. Même geste que
-            // dans Progrès (`GatedOverlay` + `UnlockDoor`).
-            GatedOverlay(intensity: .locked) {
-                JournalMicrosCard(tableau: tableauMicros) { _ in }
+            // Porte Premium (décision d'Arthur du 1er octobre 2026, défloutée
+            // le 7 octobre) : la carte est NETTE — chaque micronutriment est
+            // nommé, la liste se déplie — mais ses chiffres sont brouillés et
+            // portent « Premium ». Une ligne touchée ouvre la feuille Premium,
+            // jamais la page du micronutriment.
+            JournalMicrosCard(tableau: tableauMicros, verrouille: true) { _ in
+                HapticService.shared.tap()
+                showPaywallMicros = true
             }
+            .feuillePremium(isPresented: $showPaywallMicros, source: "journal_micros")
             .padding(.top, DS.interCarte)
             UnlockDoor(
                 icon: "chart.bar.xaxis",
@@ -1345,6 +1365,13 @@ struct JournalView: View {
                 }
             },
             onPhotographier: {
+                // Plus aucun scan aujourd'hui (le serveur l'a dit au dernier
+                // scan) : « Oups ! » tout de suite, plutôt qu'une photo prise
+                // pour rien puis un refus.
+                if !subscriptionService.isPremium, viewModel.scansRemaining == 0 {
+                    ouvrirLimiteScans()
+                    return
+                }
                 HapticService.shared.tap()
                 if CameraPicker.isAvailable {
                     showCaptureChoice = true
@@ -1361,11 +1388,20 @@ struct JournalView: View {
     /// « Écrire » : le texte suit l'analyse de la dictée, donc son quota aussi.
     private func ecrireUnRepas() {
         guard peutDicter else {
-            showPaywall = true
+            HapticService.shared.warning()
+            limiteAtteinte = .ecrits
             return
         }
         HapticService.shared.primary()
         showTexte = true
+    }
+
+    /// Scans du jour épuisés : la feuille Premium « Oups ! ». Jamais pour un
+    /// abonné (il n'y a rien à lui vendre).
+    private func ouvrirLimiteScans() {
+        guard !subscriptionService.isPremium else { return }
+        HapticService.shared.warning()
+        limiteAtteinte = .scans(limite: viewModel.scanDailyLimit ?? 3)
     }
 
     /// Compteur de scans (info neutre dès le bilan fait, premium inclus).
@@ -1478,7 +1514,8 @@ struct JournalView: View {
         // Une dictée en cours de calcul garde la main : sa feuille va monter.
         guard !dicteeEnCours, calculDictee == nil else { return }
         guard peutDicter else {
-            showPaywall = true
+            HapticService.shared.warning()
+            limiteAtteinte = .dictees
             return
         }
         guard SpeechCaptureService.autorisationsAccordees else {
@@ -1553,6 +1590,20 @@ struct JournalView: View {
             // Abandonné entre-temps (« Annuler » sous la bulle) : rien ne monte.
             guard !Task.isCancelled else { return }
             calculDictee = nil
+            // Le serveur refuse : limite gratuite du jour atteinte. Pas de
+            // feuille d'erreur (« relance l'analyse » ne pouvait qu'échouer) :
+            // la bulle rentre, « Oups ! » et la feuille Premium montent.
+            if case .limiteAtteinte = depart, !subscriptionService.isPremium {
+                if let uid = AuthService.shared.cachedCurrentUserIdString {
+                    VoiceMealService.QuotaStore.marquerEpuisees(userId: uid)
+                }
+                speech.reset()
+                EcouteCentre.partage.rendreLeBouton()
+                TutorielService.partage.dicteeJetee()
+                HapticService.shared.warning()
+                limiteAtteinte = .dictees
+                return
+            }
             departDictee = depart
             EcouteCentre.partage.livrer()
             showVoice = true
@@ -2096,7 +2147,7 @@ struct JournalView: View {
                     escapeText: "ou reviens demain, 3 nouveaux scans t’attendent",
                     zone: "scan_quota"
                 ) {
-                    showPaywall = true
+                    ouvrirLimiteScans()
                 }
                 .padding(.horizontal, Theme.spacingLG)
             } else {

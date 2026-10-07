@@ -64,6 +64,10 @@ struct PaywallView: View {
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     let source: String
+    /// Ouverte parce qu'une limite du jour vient d'être atteinte : la feuille
+    /// commence par « Oups ! » et montre les captures de Premium
+    /// (`LimiteDuJour.swift`). `nil` : la feuille Premium habituelle.
+    let limite: LimiteDuJour?
 
     @State private var selectedPlan: PlanOption?
     @State private var isPurchasing = false
@@ -105,8 +109,9 @@ struct PaywallView: View {
     /// Marge latérale de la feuille (maquette : 24).
     private static let marge: CGFloat = 24
 
-    init(source: String = "generic") {
-        self.source = source
+    init(source: String = "generic", limite: LimiteDuJour? = nil) {
+        self.source = limite?.source ?? source
+        self.limite = limite
     }
 
     /// Formules disponibles : celles de l'offering RevenueCat, COMPLÉTÉES par
@@ -137,15 +142,33 @@ struct PaywallView: View {
         // 2026). Aucun aplat en fond : la feuille est en verre (`FeuillePremiumFond`).
         ScrollView {
             VStack(spacing: 0) {
-                embleme
-                    .padding(.top, 39)
+                if let limite {
+                    // Limite du jour atteinte : « Oups ! » d'abord, en très
+                    // grand, puis les captures de ce que Premium montre.
+                    OupsEnTete(limite: limite)
+                        .padding(.top, 44)
+                        .verreCascade(revele, delai: 0.05, decalage: 10)
 
-                header
-                    .padding(.top, 16)
-                    .verreCascade(revele, delai: 0.12, decalage: 10)
+                    ApercuCapturesPremium()
+                        .padding(.top, 24)
+                        .verreCascade(revele, delai: 0.14, decalage: 14)
+
+                    Text("Avec Kiwio Premium")
+                        .font(.dsSousTitreFort)
+                        .foregroundStyle(Color.teinteKiwiTexte)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 26)
+                } else {
+                    embleme
+                        .padding(.top, 39)
+
+                    header
+                        .padding(.top, 16)
+                        .verreCascade(revele, delai: 0.12, decalage: 10)
+                }
 
                 featureList
-                    .padding(.top, 20)
+                    .padding(.top, limite == nil ? 20 : 12)
 
                 achat
                     .verreCascade(revele, delai: 0.42)
@@ -271,10 +294,24 @@ struct PaywallView: View {
     /// les lignes arrivent en cascade.
     private var featureList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            featureRow(0, "camera", Color.teinteSymptomes, "30 scans repas par jour", "3 par jour en gratuit")
-            featureRow(1, "chart.xyaxis.line", Color.teinteVitamineD, "Tes tendances détaillées", "semaine après semaine")
-            featureRow(2, "testtube.2", Color.teinteProteines, "Le pourquoi de chaque apport", "et le geste qui le comble")
-            featureRow(3, "map", Color.teinteIode, "Ton plan complet, pas à pas", "compléments et solutions")
+            if limite != nil {
+                // Arrivé au bout d'une limite : TOUT ce que Premium débloque,
+                // à commencer par ce qui vient de manquer. Plafonds réels du
+                // serveur : 30 scans (`analyze-meal-photo`), 200 analyses de
+                // repas (`parse-meal-voice`, RATE_LIMIT_PREMIUM) — on ne dit
+                // donc pas « illimité ».
+                featureRow(0, "camera", Color.teinteSymptomes, "30 scans repas par jour", "3 par jour en gratuit")
+                featureRow(1, "mic", Color.teinteEau, "Dicte et écris tous tes repas", "2 analyses par jour en gratuit")
+                featureRow(2, "chart.bar.xaxis", Color.teinteKiwi, "Tes \(LimiteDuJour.nombreDeMicros) micronutriments chiffrés", "vitamines, minéraux, acides gras")
+                featureRow(3, "chart.xyaxis.line", Color.teinteVitamineD, "Tes tendances détaillées", "semaine après semaine")
+                featureRow(4, "testtube.2", Color.teinteProteines, "Le pourquoi de chaque apport", "et le geste qui le comble")
+                featureRow(5, "map", Color.teinteIode, "Ton plan complet, pas à pas", "compléments et solutions")
+            } else {
+                featureRow(0, "camera", Color.teinteSymptomes, "30 scans repas par jour", "3 par jour en gratuit")
+                featureRow(1, "chart.xyaxis.line", Color.teinteVitamineD, "Tes tendances détaillées", "semaine après semaine")
+                featureRow(2, "testtube.2", Color.teinteProteines, "Le pourquoi de chaque apport", "et le geste qui le comble")
+                featureRow(3, "map", Color.teinteIode, "Ton plan complet, pas à pas", "compléments et solutions")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -31,6 +31,12 @@ struct ScanQuotaPresentation: Equatable {
 /// Avant le bilan, aucune trace premium à l'écran (décision fondateur V12a —
 /// `premiumVisible`) ; un abonné n'est jamais confronté à une porte : à bout
 /// de quota il lit un message honnête « ça se recharge demain » (V10 #1).
+///
+/// Exception (Arthur, 7 oct. 2026) : le MOMENT où une limite tombe (429 du
+/// serveur, appui sur un bouton dont le quota est épuisé) ouvre la feuille
+/// Premium « Oups ! » (`LimiteDuJour`) pour TOUT non-abonné, bilan fait ou
+/// non : un message d'erreur seul était une impasse. La matrice ci-dessus
+/// régit ce qui est affiché en permanence, pas cet événement.
 enum ScanQuotaUI {
     /// Le compteur (pastille + QuotaMeter) s'affiche dès que le bilan est fait
     /// ET que le serveur a communiqué un quota — premium inclus.
@@ -738,11 +744,12 @@ final class MealScanViewModel: ObservableObject {
             }
             errorMessage = "Tu as utilisé tes \(limit) scans du jour. Ça se recharge demain."
         } else {
-            // Toujours DIRE ce qui se passe avant d'ouvrir une porte : le
-            // paywall surgissait sans un mot, parfois même sans que le testeur
-            // ait jamais vu de compteur (la pastille est conditionnée au bilan).
-            let limite = scanDailyLimit ?? 3
-            errorMessage = "Tes \(limite) scans du jour sont utilisés. Ça se recharge demain."
+            // Pas de message d'erreur : c'est la feuille Premium « Oups ! »
+            // (`LimiteDuJour`) qui DIT ce qui se passe (« Tu as utilisé tes 3
+            // scans photo du jour », « ça se recharge demain »), puis montre ce
+            // que Premium débloque. Un message rouge sous la photo, avec un
+            // bouton « Réessayer » voué à l'échec, était une impasse.
+            errorMessage = nil
             quotaExhausted = true
         }
     }
