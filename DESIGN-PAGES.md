@@ -181,7 +181,9 @@
 >      ratée partait quand même à `parse-meal-voice`, payant, et ne se corrigeait qu'après) : la
 >      bulle s'efface et la feuille de verre (ci-dessous) monte sur « Dictée terminée », « Vérifie
 >      ce que j'ai compris… », **le texte transcrit dans un champ modifiable** (crayon en coin),
->      **« Lancer l'analyse »** (le seul geste qui appelle le serveur) et **« Recommencer la
+>      puis le pied commun à « Écrire » (variante B, 7 octobre 2026) : « C'est bien ça ? Rien ne
+>      part avant ton feu vert. », **« Effacer »** (verre clair) et **« Lancer l'analyse »** (le seul
+>      geste qui appelle le serveur), et dessous **« Recommencer la
 >      dictée »** (la feuille redescend et la bulle se rouvre d'elle-même, mains libres). Après un
 >      échec d'analyse, « Corriger le texte » ramène ce champ au lieu d'imposer de tout redire ;
 >   4. **les résultats** : après « Lancer l'analyse », le pépin tourne dans **une feuille de verre
@@ -211,7 +213,9 @@
 >   `kiwiCompteur`) et `kiwiVif` pour l'appui (0,96) ; rien ne dépasse 1,22 (`KiwiEchelle.plafond`).
 >   **Réduire les animations** : la bulle est posée d'emblée à sa place, liquide figé, ni onde ni
 >   trajet ; la capsule arrive dépliée ; tout se fait en fondu.
->   « Écrire » ouvre la même feuille détachée sur un champ, sans la bulle. Les autres ajouts
+>   « Écrire » ouvre la même feuille détachée sur un champ, sans la bulle, avec le même pied que la
+>   relecture : « C'est bien ça ? Rien ne part avant ton feu vert. », « Effacer » et « Lancer
+>   l'analyse ». Les autres ajouts
 >   (photo, recherche, code-barres) gardent la gratification décrite plus bas.
 > - **Micronutriments** (1er octobre 2026, verre le 2 ; `JournalMicrosComponents.swift`, calcul
 >   `Core/MicrosDuJour.swift`) — sous la saisie. **Réservé au Premium** : en gratuit, la carte

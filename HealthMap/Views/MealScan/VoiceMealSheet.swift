@@ -311,13 +311,8 @@ struct VoiceMealSheet: View {
                 .accessibilityLabel("Écris ce que tu as mangé")
                 .accessibilityIdentifier("journal.texte")
 
-            DSCapsuleButton(titre: "Analyser") {
-                envoyerLeTexte()
-            }
-            .disabled(texteUtile.isEmpty)
-            .opacity(texteUtile.isEmpty ? 0.5 : 1)
-            .padding(.top, 14)
-            .accessibilityIdentifier("journal.texte.analyser")
+            piedDEnvoi(identifiant: "journal.texte")
+                .padding(.top, 12)
 
             // Le clavier est levé : la feuille prend toute la hauteur, le
             // champ reste en haut.
@@ -336,6 +331,55 @@ struct VoiceMealSheet: View {
         champActif = false
         dernierTranscript = texte
         Task { await analyser(texte) }
+    }
+
+    /// Le pied commun à « Écrire » et à la relecture d'une dictée (variante B
+    /// validée par Arthur le 7 octobre 2026) : la même phrase, puis « Effacer »
+    /// et « Lancer l'analyse ». Le texte se corrige à la main dans le champ
+    /// au-dessus ; seul « Lancer l'analyse » appelle `parse-meal-voice`.
+    private func piedDEnvoi(identifiant: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("C'est bien ça ? Rien ne part avant ton feu vert.")
+                .font(.dsLegende)
+                .tracking(DSTracking.legende)
+                .foregroundStyle(Color.dsSecondaire)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                Button {
+                    effacerLeTexte()
+                } label: {
+                    Text("Effacer")
+                        .font(.dsHeadline)
+                        .tracking(DSTracking.corps)
+                        .foregroundStyle(Color.dsTexte)
+                        .padding(.horizontal, 22)
+                        .frame(height: DS.hauteurBouton)
+                        .background { Color.clear.verreClair() }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.dsPress)
+                .disabled(texteEcrit.isEmpty)
+                .opacity(texteEcrit.isEmpty ? 0.5 : 1)
+                .accessibilityHint("Vide le champ pour tout réécrire")
+                .accessibilityIdentifier("\(identifiant).effacer")
+
+                DSCapsuleButton(titre: "Lancer l'analyse") {
+                    envoyerLeTexte()
+                }
+                .disabled(texteUtile.isEmpty)
+                .opacity(texteUtile.isEmpty ? 0.5 : 1)
+                .accessibilityHint("Envoie ce texte pour identifier les aliments et les quantités")
+                .accessibilityIdentifier("\(identifiant).analyser")
+            }
+        }
+    }
+
+    /// « Effacer » : le champ se vide et le clavier se lève pour réécrire.
+    private func effacerLeTexte() {
+        HapticService.shared.tap()
+        texteEcrit = ""
+        champActif = true
     }
 
     /// Referme la feuille pour redicter. Avec un appelant qui sait rouvrir la
@@ -394,14 +438,8 @@ struct VoiceMealSheet: View {
                 .accessibilityLabel("Ta dictée, modifiable")
                 .accessibilityIdentifier("dictee.relecture.texte")
 
-            DSCapsuleButton(titre: "Lancer l'analyse") {
-                envoyerLeTexte()
-            }
-            .disabled(texteUtile.isEmpty)
-            .opacity(texteUtile.isEmpty ? 0.5 : 1)
-            .padding(.top, 14)
-            .accessibilityHint("Envoie ce texte pour identifier les aliments et les quantités")
-            .accessibilityIdentifier("dictee.relecture.analyser")
+            piedDEnvoi(identifiant: "dictee.relecture")
+                .padding(.top, 12)
 
             Button {
                 recommencerDictee()
