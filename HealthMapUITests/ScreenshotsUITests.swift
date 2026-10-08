@@ -559,6 +559,224 @@ final class ScreenshotsUITests: XCTestCase {
         snap("99-bilan-journal-reprise")
     }
 
+    // MARK: - 6. Parcours complet d'un nouvel arrivant (profil d'Arthur, 8 oct. 2026)
+    //
+    // De l'onboarding à la fin du questionnaire, une capture par étape, avec
+    // le profil d'Arthur : homme, 24 ans, 182 cm, 75 kg ; le reste en réponses
+    // standards (bureau, sport 3-4 fois, omnivore, ni symptôme ni allergie).
+    // Comme le test 5 : `-captureDecouverte` et JAMAIS « Voir mon bilan » —
+    // rien n'est envoyé, le compte d'audit n'est pas réécrit.
+
+    func test06_ParcoursCompletArthur() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "NO", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES", "-captureDecouverte", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+        fermerAlerteApple()
+
+        // Onboarding
+        if app.buttons["Passer"].waitForExistence(timeout: 15) {
+            snap("01-onboarding-garde")
+            // Les pages de l'onboarding portent toutes « Passer » : on avance
+            // tant qu'il est là (6 pages au plus), puis on le touche.
+            for page in 2...7 {
+                let suivant = ["C'est parti", "Continuer", "Suivant"]
+                    .map { app.buttons[$0].firstMatch }
+                    .first { $0.exists }
+                guard app.buttons["Passer"].firstMatch.exists, let suivant else { break }
+                taper(suivant)
+                sleep(1)
+                snap(String(format: "%02d-onboarding-page", page))
+            }
+            if app.buttons["Passer"].firstMatch.exists { app.buttons["Passer"].firstMatch.tap() }
+        }
+
+        // Page de garde, puis l'écran de connexion vide (jamais rempli à l'image).
+        if app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 30) {
+            snap("08-page-de-garde")
+            app.buttons["J'ai déjà un compte"].tap()
+            sleep(1)
+            snap("09-connexion")
+            app.swipeDown(velocity: .fast)
+            sleep(1)
+        }
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120))
+        attendreChargement()
+        snap("10-journal-avant-bilan")
+
+        let porte = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "questionnaire")).firstMatch
+        guard porte.waitForExistence(timeout: 10) else {
+            XCTFail("La porte vers le questionnaire est introuvable sur le Journal.")
+            return
+        }
+        taper(porte)
+        sleep(2)
+
+        snap("11-bilan-accueil")
+        guard bilanSuite("Commencer") else { return quitterLeBilan() }
+
+        // Étape 1 · Toi
+        bilanToucherPremier(["Rien de tout ça"])
+        bilanToucherPremier(["Plus d'énergie"])
+        snap("12-bilan-motif")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        let prenom = app.textFields["Ton prénom"]
+        if prenom.waitForExistence(timeout: 2) {
+            prenom.tap()
+            prenom.typeText("Arthur")
+            snap("13-bilan-prenom")
+            guard bilanSuite() else { return quitterLeBilan() }
+        }
+
+        bilanToucher("Homme")
+        sleep(1)
+        bilanMolette("Âge", 24)
+        bilanMolette("Taille", 182)
+        bilanMolette("Poids", 75)
+        snap("14-bilan-reperes")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        snap("15-bilan-fin-etape-1")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        // Étape 2 · Ton quotidien
+        bilanToucher("Surtout en intérieur")
+        bilanToucherPremier(["Un peu", "Très peu"])
+        bilanToucherPremier(["Claire", "Mate"])
+        snap("16-bilan-soleil")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        bilanToucher("3-4 fois")
+        bilanToucher("Stable")
+        snap("17-bilan-bouger")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        bilanToucher("1 à 2")
+        bilanToucher("Entre les repas")
+        bilanToucher("6 à 7")
+        snap("18-bilan-boire")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        bilanToucher("Rarement")
+        bilanToucherPremier(["Non", "Jamais", "Non-fumeur"])
+        snap("19-bilan-alcool-tabac")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        snap("20-bilan-fin-etape-2")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        // Étape 3 · Ta forme
+        bilanGlisser("Ton stress", 0.5)
+        bilanGlisser("Au réveil", 0.6)
+        snap("21-bilan-ressenti")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        bilanGlisser("Écrans avant de dormir", 0.5)
+        bilanGlisser("Tu dors", 0.6)
+        snap("22-bilan-nuits")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        bilanToucherPremier(["Rarement", "Non", "Jamais", "Parfois"])
+        snap("23-bilan-ventre")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        // Homme : pas d'écran sur le cycle ; s'il apparaît quand même, on le
+        // photographie et on répond « Non concernée ».
+        if app.buttons["Non concernée"].firstMatch.waitForExistence(timeout: 2) {
+            bilanToucher("Non concernée")
+            snap("24-bilan-cycle")
+            guard bilanSuite() else { return quitterLeBilan() }
+        }
+
+        snap("25-bilan-fin-etape-3")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        // Étape 4 · Ton assiette
+        bilanToucherPremier(["Omnivore", "Je mange de tout", "De tout"])
+        snap("26-bilan-regime")
+        guard bilanSuite() else { return quitterLeBilan() }
+
+        snap("27-bilan-provisoire")
+        guard bilanSuite("Passer à table") else { return quitterLeBilan() }
+
+        bilanToucherPremier(["Pain complet", "Pain"])
+        bilanToucherPremier(["Œufs", "Oeufs", "Yaourt"])
+        bilanToucherPremier(["Kiwis", "Banane"])
+        snap("28-bilan-repas-petit-dej")
+        guard bilanSuite("Repas suivant : Midi") else { return quitterLeBilan() }
+
+        bilanToucherPremier(["Poulet", "Viande blanche", "Lentilles"])
+        bilanToucherPremier(["Riz", "Pâtes"])
+        bilanToucherPremier(["Brocoli", "Haricots verts", "Légumes"])
+        snap("29-bilan-repas-midi")
+        guard bilanSuite("Repas suivant : Goûter") else { return quitterLeBilan() }
+
+        bilanToucherPremier(["Amandes", "Fruit"])
+        snap("30-bilan-repas-gouter")
+        guard bilanSuite("Repas suivant : Soir") else { return quitterLeBilan() }
+
+        bilanToucherPremier(["Saumon", "Poisson", "Épinards"])
+        bilanToucherPremier(["Pommes de terre", "Riz"])
+        snap("31-bilan-repas-soir")
+        guard bilanSuite("J'ai fini ma journée") else { return quitterLeBilan() }
+
+        bilanToucherPremier(["Je mange de tout"])
+        snap("32-bilan-jamais")
+        guard bilanSuite("Terminer") else { return quitterLeBilan() }
+
+        // Fin : on photographie, on n'envoie pas.
+        sleep(2)
+        snap("33-bilan-fin")
+        quitterLeBilan()
+    }
+
+    /// Touche le premier libellé présent parmi `libelles` (les intitulés
+    /// exacts varient d'un écran à l'autre).
+    private func bilanToucherPremier(_ libelles: [String]) {
+        for libelle in libelles {
+            let bouton = app.buttons[libelle].firstMatch
+            if bouton.waitForExistence(timeout: 1.5) {
+                taper(bouton)
+                usleep(350_000)
+                return
+            }
+        }
+        NSLog("captures: aucun de « %@ »", libelles.joined(separator: " / "))
+    }
+
+    /// Amène une molette du bilan sur `cible` : un toucher dans son tiers
+    /// haut retire 1, dans son tiers bas ajoute 1 (`BilanMolette`). La valeur
+    /// lue par VoiceOver (« 24 ans ») dit quand s'arrêter.
+    private func bilanMolette(_ libelle: String, _ cible: Int) {
+        let molette = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", libelle)).firstMatch
+        guard molette.waitForExistence(timeout: 3) else {
+            NSLog("captures: molette introuvable « %@ »", libelle)
+            return
+        }
+        // Zone des chiffres : 104 pt sous le titre (≈ 30 pt du haut).
+        let haut = molette.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 45))
+        let bas = molette.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 118))
+        for _ in 0..<60 {
+            let lue = ((molette.value as? String) ?? "")
+                .split(separator: " ").first.flatMap { Int($0) }
+            guard let lue else { break }
+            if lue == cible { break }
+            (lue > cible ? haut : bas).tap()
+            usleep(250_000)
+        }
+        // Déjà sur la bonne valeur sans avoir été touchée : on la confirme
+        // par un toucher au milieu.
+        if ((molette.value as? String) ?? "").contains("à confirmer") {
+            molette.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 82)).tap()
+            usleep(250_000)
+        }
+    }
+
     /// Touche un bouton du questionnaire par son libellé, s'il est là.
     private func bilanToucher(_ libelle: String) {
         let bouton = app.buttons[libelle].firstMatch
