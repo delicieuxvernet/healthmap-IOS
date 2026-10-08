@@ -245,6 +245,40 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertEqual(vm.overallScore, 8, "Should use AI overall score when available")
     }
 
+    /// Audit de fiabilité du 8 oct. 2026 : le v7 garde ses textes, mais le
+    /// chiffre et le statut de chaque apport sont ceux du registre (un seul
+    /// chiffre partout, Plan et PDF compris).
+    func testLesNutrimentsDuV7PortentLeChiffreDuRegistre() throws {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.computeLocalScores()
+        let duRegistre = try XCTUnwrap(vm.nutrientScores["iron"])
+        let autre = duRegistre >= 50 ? 5 : 95
+
+        let merged = MergedAnalysis(
+            healthScore: vm.healthScore,
+            scores: ["iron": autre],
+            nutrients: [EnrichedNutrient(id: "iron", label: "Fer", emoji: "", color: "", score: autre,
+                                         status: NutrientStatus(score: autre).rawValue, confidence: nil,
+                                         verdict: "Texte du v7")],
+            redFlags: [],
+            summary: nil,
+            bilanDetail: nil,
+            interactions: [],
+            pepites: [],
+            priorityActions: [],
+            positiveFindings: [],
+            supplementsSchedule: nil,
+            bloodTests: nil,
+            meta: nil
+        )
+        vm.aiAnalysis = merged
+
+        let fer = try XCTUnwrap(vm.nutrients.first { $0.id == "iron" })
+        XCTAssertEqual(fer.score, duRegistre)
+        XCTAssertEqual(fer.status, NutrientStatus(score: duRegistre).rawValue)
+        XCTAssertEqual(fer.verdict, "Texte du v7", "les textes du v7 restent")
+    }
+
     /// Without AI analysis, overallScore should fall back to local healthScore / 10.
     func testOverallScore_withoutAI_fallsBackToLocal() {
         let vm = makeVM(profile: makeProfileThomas())
@@ -275,7 +309,9 @@ final class DashboardViewModelTests: XCTestCase {
     /// Nutrients below 60 should appear in the deficiencies list.
     func testDeficiencies_filtersBelowThreshold() {
         let vm = makeVM(profile: makeProfileThomas())
-        vm.computeLocalScores()
+        // Pas de registre local ici : on teste le filtre seul. Avec un
+        // registre, ses chiffres remplaceraient ceux injectés (un seul
+        // chiffre par apport, cf. testLesNutrimentsDuV7PortentLeChiffreDuRegistre).
 
         // Inject an AI analysis with a mix of scores
         let nutrients = [
