@@ -50,6 +50,14 @@ final class DashboardViewModel: ObservableObject {
     /// attendre : la gate plein écran (`AnalysisGateView`) ne se rouvre plus de
     /// la session. Le bilan continue d'arriver en tâche de fond.
     @Published var gateContournee = false
+    /// Le journal et la prise de sang, qui entrent dans le hash du bilan, ont
+    /// été lus au moins une fois. Sans eux, le hash serait faux.
+    private var donneesDuBilanChargees = false
+    /// La dernière lecture du journal ou de la prise de sang a échoué (réseau).
+    /// Le hash calculé ainsi est faux : on ne régénère pas un bilan déjà là
+    /// sur cette base, sinon le serveur garde ce hash faux et la prochaine
+    /// ouverture normale régénère encore (incident du 7 oct. 2026).
+    private var donneesDuBilanIncompletes = false
     /// Le récap animé attend le bilan pour se jouer.
     ///
     /// Armé UNIQUEMENT à la fin du questionnaire, jamais au lancement : sinon
@@ -327,27 +335,19 @@ final class DashboardViewModel: ObservableObject {
         // Le journal des repas corrige les apports (étape 3) : lu AVANT le hash
         // du bilan, qui en dépend. Un échec laisse le seul questionnaire parler.
         if hasCompletedQuestionnaire {
-            await chargerJournal(userId: userId)
-            await chargerPriseDeSang(userId: userId)
+            await chargerDonneesDuBilan(userId: userId)
         }
 
-        // Hydrate le bilan v2 depuis le CACHE DB si le profil n'a pas changé
-        // (hash identique) — AVANT de débloquer le routing et de lancer
-        // l'analyse. Sinon `analysisV2` reste nil pendant le round-trip de
-        // `fetchBilanV2`, et la gate de chargement plein écran (AnalysisGateView,
-        // condition `analysisV2 == nil && isLoadingAnalysisV2`) CLIGNOTE à chaque
-        // ouverture. En posant le bilan caché ici, la gate ne s'affiche plus que
-        // pour un tout premier bilan (aucun cache) ou un profil modifié (hash
-        // différent). Lecture DB pure — aucun appel IA. `triggerAnalysis()`
-        // rafraîchira ensuite en arrière-plan sans re-vider `analysisV2`.
+        // Pose le DERNIER bilan connu, MÊME si son hash n'est plus le bon —
+        // AVANT de débloquer le routing et de lancer l'analyse. Le hash dépend
+        // des repas des 14 derniers jours : noter un repas suffisait à le
+        // changer, et l'app rouvrait alors sur l'écran « 2 à 3 minutes »
+        // (incident du 7 oct. 2026). Désormais la gate plein écran ne s'ouvre
+        // que pour un tout premier bilan ; un bilan périmé reste affiché et
+        // `triggerAnalysis()` le remplace en arrière-plan (« Mise à jour de
+        // l'analyse… »). Lecture DB pure — aucun appel IA.
         if hasCompletedQuestionnaire, analysisV2 == nil {
-            let hash = hashDuBilan
-            // `(try? …) ?? nil` aplatit le double-optionnel (la fonction rend déjà
-            // `AIAnalysisV2?`) — même motif que dans AIAnalysisService.fetchBilanV2.
-            if let cached = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil,
-               cached.meta?.profileHash == hash {
-                analysisV2 = cached
-            }
+            await poserDernierBilanConnu(userId: userId)
         }
 
         #if DEBUG
@@ -448,12 +448,46 @@ final class DashboardViewModel: ObservableObject {
 
     /// Lit la prise de sang la plus récente. Un échec laisse le calcul sans
     /// elle, sans message : comme le journal, elle corrige, elle ne bloque pas.
-    func chargerPriseDeSang(userId: String) async {
-        guard let derniere = try? await PriseDeSangService.shared.derniere(userId: userId) else { return }
+    /// Rend `false` si la lecture a échoué (réseau), `true` sinon — y compris
+    /// quand il n'y a simplement aucune prise de sang.
+    @discardableResult
+    func chargerPriseDeSang(userId: String) async -> Bool {
+        let derniere: PriseDeSang?
+        do {
+            derniere = try await PriseDeSangService.shared.derniere(userId: userId)
+        } catch {
+            return false
+        }
+        guard let derniere else { return true }
         priseDeSang = derniere
         // Le rappel des 6 mois se planifie sans le bilan en main (retour au
         // premier plan, onglet Progrès) : la date lui est laissée ici.
         RappelsPersonnalises.memoriserPriseDeSang(derniere.date)
+        return true
+    }
+
+    /// Lit tout ce qui entre dans le hash du bilan, en plus du profil : le
+    /// journal des repas et la prise de sang. Retient si une lecture a échoué.
+    func chargerDonneesDuBilan(userId: String) async {
+        let journalLu = await chargerJournal(userId: userId)
+        let sangLu = await chargerPriseDeSang(userId: userId)
+        donneesDuBilanChargees = true
+        donneesDuBilanIncompletes = !(journalLu && sangLu)
+    }
+
+    /// Pose le dernier bilan enregistré, quel que soit son hash : mieux vaut
+    /// un bilan d'hier à l'écran que trois minutes d'attente. Le hash ne sert
+    /// qu'à décider s'il faut le refaire, en arrière-plan.
+    /// Jamais juste après le questionnaire : le récap animé attend le NOUVEAU
+    /// bilan, il ne doit pas se jouer sur l'ancien.
+    private func poserDernierBilanConnu(userId: String) async {
+        // `(try? …) ?? nil` aplatit le double-optionnel (la fonction rend déjà
+        // `AIAnalysisV2?`) — même motif que dans AIAnalysisService.fetchBilanV2.
+        guard analysisV2 == nil, !recapArme,
+              let cached = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil,
+              cached.isValidV2
+        else { return }
+        analysisV2 = cached
     }
 
     /// La prise de sang a changé (import, suppression) : le rappel des 6 mois
@@ -508,13 +542,15 @@ final class DashboardViewModel: ObservableObject {
     /// Lit les repas notés des 14 derniers jours (aujourd'hui compris) et en
     /// tire les observations. Un échec réseau laisse le calcul au seul
     /// questionnaire, sans message : le journal corrige, il ne bloque jamais.
-    func chargerJournal(userId: String) async {
+    /// Rend `false` si la lecture a échoué.
+    @discardableResult
+    func chargerJournal(userId: String) async -> Bool {
         let calendrier = Calendar.current
         let aujourdhui = calendrier.startOfDay(for: Date())
         guard let debut = calendrier.date(byAdding: .day, value: -(JournalApports.fenetreJours - 1), to: aujourdhui),
               let demain = calendrier.date(byAdding: .day, value: 1, to: aujourdhui),
               let repas = try? await MealJournalService.shared.loadRange(userId: userId, from: debut, to: demain)
-        else { return }
+        else { return false }
         // Même mesure que le Journal : la composition exacte des aliments
         // quand la base la connaît, ce que le repas avait enregistré sinon.
         let compositions = await CompositionsStore.shared.completer(pour: repas)
@@ -522,6 +558,7 @@ final class DashboardViewModel: ObservableObject {
             repas: MesuresRepas.repasPrecises(repas, compositions: compositions),
             profil: profile
         )
+        return true
     }
 
     /// Un repas vient d'être noté, modifié ou retiré : les chiffres se refont
@@ -690,6 +727,23 @@ final class DashboardViewModel: ObservableObject {
         errorMessageV2 = nil
         defer { isLoadingAnalysisV2 = false }
 
+        // Le hash dépend du journal et de la prise de sang : sans eux (bilan
+        // lancé à la fin du questionnaire, onglet Plan ouvert avant la fin du
+        // chargement, lecture ratée), il serait faux. On les lit d'abord.
+        if !donneesDuBilanChargees || donneesDuBilanIncompletes {
+            await chargerDonneesDuBilan(userId: userId)
+        }
+        // Un bilan est déjà là : on l'affiche le temps qu'il se refasse, sans
+        // jamais rouvrir la gate plein écran.
+        await poserDernierBilanConnu(userId: userId)
+        // Lecture du journal ou de la prise de sang ratée : le hash est faux.
+        // On garde le bilan affiché plutôt que d'en payer un nouveau, que le
+        // serveur enregistrerait sous ce hash faux.
+        if !forceRefresh, donneesDuBilanIncompletes, analysisV2 != nil {
+            AppLogger.analysis.info("Bilan v2 : journal ou prise de sang illisible, bilan affiché conservé")
+            return
+        }
+
         // Entrées déterministes — mêmes sources locales que le flux v7
         // (HealthCalculator / RedFlagDetector, mirrors de health.js).
         let localScores = registre.mapValues(\.score)
@@ -698,14 +752,18 @@ final class DashboardViewModel: ObservableObject {
         let profileHash = hashDuBilan
 
         do {
-            analysisV2 = try await aiAnalysisService.fetchBilanV2(
-                userId: userId,
-                profileHash: profileHash,
-                scores: localScores,
-                healthScore: localHealthScore,
-                redFlags: localFlags,
-                forceRefresh: forceRefresh
-            )
+            // Protégé : quitter l'app pendant la génération lui laisse ~30 s
+            // de plus pour aboutir.
+            analysisV2 = try await TacheProtegee.executer("Bilan") {
+                try await aiAnalysisService.fetchBilanV2(
+                    userId: userId,
+                    profileHash: profileHash,
+                    scores: localScores,
+                    healthScore: localHealthScore,
+                    redFlags: localFlags,
+                    forceRefresh: forceRefresh
+                )
+            }
         } catch {
             AppLogger.analysis.report(error, context: "Dashboard bilan v2")
             // Surface une erreur exploitable par la gate onboarding UNIQUEMENT
