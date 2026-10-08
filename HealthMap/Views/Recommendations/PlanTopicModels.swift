@@ -150,7 +150,7 @@ func planTopicsFromApports(_ nutrients: [EnrichedNutrient],
     }
     func faible(_ n: EnrichedNutrient) -> Bool {
         guard let statut = statuts[n.id] else { return n.score < 70 }
-        return statut.estUneAlerte
+        return statut.estASuivre
     }
     var seen = Set<String>()
     let sorted = nutrients
@@ -217,11 +217,11 @@ private func planApportTopic(_ n: EnrichedNutrient, statut: StatutApport? = nil,
         }
     }
 
-    // « Par les compléments » : seulement pour un apport en alerte ; « Prioritaire »
-    // = « à renforcer ». Sans statut : score < 45. Le détail timing vit sur
-    // l'onglet dédié.
+    // « Par les compléments » : seulement pour un apport « à renforcer »,
+    // comme l'onglet Compléments (`SupplementEngine`). Sans statut : score < 45
+    // pour « Prioritaire ». Le détail timing vit sur l'onglet dédié.
     let strong = statut.map { $0 == .aRenforcer } ?? (n.score < 45)
-    let complements = statut.map({ $0.estUneAlerte }) ?? true ? [PlanSupplementSolution(
+    let complements = statut.map({ $0 == .aRenforcer }) ?? true ? [PlanSupplementSolution(
         name: def.label,
         note: n.solution?.quand?.isEmpty == false ? n.solution!.quand! : "À envisager si l'alimentation ne suffit pas",
         tag: strong ? "Prioritaire" : "Si besoin",

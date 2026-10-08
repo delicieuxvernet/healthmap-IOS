@@ -116,7 +116,7 @@ struct PlanNoeudSheet: View {
         case .symptome: return "Symptôme suivi"
         case .apport:
             guard let statut = topic.statut else { return "Apport à renforcer" }
-            return statut.estUneAlerte ? "Apport \(statut.libelleCourt.lowercased())" : "Apport"
+            return statut.estASuivre ? "Apport \(statut.libelleCourt.lowercased())" : "Apport"
         }
     }
 

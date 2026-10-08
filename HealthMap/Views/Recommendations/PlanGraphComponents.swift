@@ -97,7 +97,7 @@ enum PlanGraphTeintes {
         case .objectif: return anneau == 0 ? "Ton objectif" : "Objectif"
         case .symptome: return "Symptôme suivi"
         case .apport:
-            if let statut { return statut.estUneAlerte ? "Apport \(statut.libelleCourt.lowercased())" : "Apport" }
+            if let statut { return statut.estASuivre ? "Apport \(statut.libelleCourt.lowercased())" : "Apport" }
             return (score ?? 100) < 70 ? "Apport à renforcer" : "Apport"
         case .habitude: return "Habitude"
         }

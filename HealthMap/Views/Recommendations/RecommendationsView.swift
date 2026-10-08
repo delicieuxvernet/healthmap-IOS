@@ -154,7 +154,7 @@ struct RecommendationsContentView: View {
     private var aTravailler: [EnrichedNutrient] {
         let statuts = dashboardVM.statuts
         guard !statuts.isEmpty else { return vm.topDeficiencies }
-        return Array(dashboardVM.deficiencies.filter { statuts[$0.id]?.estUneAlerte == true }.prefix(3))
+        return Array(dashboardVM.deficiencies.filter { statuts[$0.id]?.estASuivre == true }.prefix(3))
     }
 
     // MARK: - Construction des topics (symptômes + objectifs)

@@ -51,6 +51,10 @@ extension StatutApport {
     /// Une alerte que la validation permet d'affirmer.
     var estUneAlerte: Bool { self == .aRenforcer || self == .auDessusDeLaLimite }
 
+    /// « À renforcer » ou « à surveiller » : l'apport semble sous sa référence
+    /// et l'estimation permet de le dire (pas « à affiner »).
+    var estASuivre: Bool { self == .aRenforcer || self == .aSurveiller }
+
     /// L'apport semble sous sa référence, avec ou sans certitude.
     var estSousLaReference: Bool { self == .aSurveiller || self == .aRenforcer || self == .peuPrecise }
 }

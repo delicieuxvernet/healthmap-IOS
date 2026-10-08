@@ -172,8 +172,8 @@ final class PlanSolutionsTests: XCTestCase {
     }
 
     /// Apports estimés : le statut ordonne (« à renforcer », puis « à
-    /// surveiller »), seuls ceux en alerte proposent un complément, et
-    /// « à affiner » ne cite pas de chiffre.
+    /// surveiller »), seul « à renforcer » propose un complément (comme
+    /// l'onglet Compléments), et « à affiner » ne cite pas de chiffre.
     func testApportTopicsFollowTheEstimatorStatus() {
         let nutrients = [
             Self.makeNutrient(id: "vitD", score: 20),
@@ -190,7 +190,7 @@ final class PlanSolutionsTests: XCTestCase {
         XCTAssertEqual(topics[0].kicker, "APPORT À RENFORCER")
         XCTAssertEqual(topics[0].complements.first?.tag, "Prioritaire")
         XCTAssertEqual(topics[1].kicker, "APPORT À SURVEILLER")
-        XCTAssertEqual(topics[1].complements.first?.tag, "Si besoin")
+        XCTAssertTrue(topics[1].complements.isEmpty)
         XCTAssertEqual(topics[2].kicker, "APPORT À AFFINER")
         XCTAssertTrue(topics[2].complements.isEmpty)
         XCTAssertFalse(topics[2].radialCause.contains("20"), topics[2].radialCause)
