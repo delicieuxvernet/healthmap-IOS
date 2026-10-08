@@ -1085,7 +1085,10 @@ struct JournalView: View {
             scores: dashboardVM.profile.completed ? dashboardVM.nutrientScores : [:],
             couvertureJournal: dashboardVM.observationsJournal?.couverture ?? [:],
             joursJournal: dashboardVM.observationsJournal?.jours ?? [:],
-            symptomes: dashboardVM.profile.symptoms
+            symptomes: dashboardVM.profile.symptoms,
+            estimations: dashboardVM.profile.completed ? (dashboardVM.estimation?.apports ?? [:]) : [:],
+            statuts: dashboardVM.profile.completed ? dashboardVM.statuts : [:],
+            profil: ProfilEstimation(profile: dashboardVM.profile)
         )
     }
 

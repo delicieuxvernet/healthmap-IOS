@@ -500,7 +500,7 @@ struct ApportV2DetailSheet: View {
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Ton chiffre passera de l'estimation à la mesure.")
+                Text("Ton statut pourra alors être affirmé.")
                     .font(.dsLegende)
                     .tracking(DSTracking.legende)
                     .foregroundStyle(Color.dsSecondaire)

@@ -24,7 +24,7 @@ final class LectureEstimationTests: XCTestCase {
                        "Ton apport en magnésium semble proche de la référence.")
         let phrase = LectureEstimation.verdict(nom: "Magnésium", estimation: mg)
         XCTAssertEqual(mg.statut, .peuPrecise, "neuf aliments cochés : rien d'affirmé")
-        XCTAssertTrue(phrase.contains("sans certitude"), phrase)
+        XCTAssertTrue(phrase.contains("reste à préciser"), phrase)
         for statut in [StatutApport.couvert, .aSurveiller, .aRenforcer, .peuPrecise, .couvertParComplement] {
             let texte = LectureEstimation.verdict(nom: "Magnésium", estimation: mg, statut: statut)
             XCTAssertFalse(texte.lowercased().contains("taux"), texte)
