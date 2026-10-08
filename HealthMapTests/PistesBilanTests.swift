@@ -210,13 +210,15 @@ final class PistesBilanTests: XCTestCase {
     func testLesBesoinsAffichesSontCeuxDeLaPersonne() {
         XCTAssertEqual(
             PistesBilan.carte(pour: .reperes, profil: femme35())?.texte,
-            "Fer 16 mg, magnésium 300 mg, calcium 950 mg par jour."
+            // Règles non renseignées : la référence d'une femme réglée, 11 mg (v10).
+            "Fer 11 mg, magnésium 300 mg, calcium 950 mg par jour."
         )
         let jeuneHomme = profil { $0.age = "20"; $0.height = "180"; $0.weight = "75" }
         let carte = PistesBilan.carte(pour: .reperes, profil: jeuneHomme)
         XCTAssertEqual(carte?.genre, .besoins)
         XCTAssertNil(carte?.nutriment)
-        XCTAssertEqual(carte?.texte, "Fer 11 mg, magnésium 350 mg, calcium 1000 mg par jour.")
+        // Référence ANSES 2021 du référentiel de l'estimateur : 380 mg pour un homme.
+        XCTAssertEqual(carte?.texte, "Fer 11 mg, magnésium 380 mg, calcium 1000 mg par jour.")
     }
 
     // MARK: « Jamais »

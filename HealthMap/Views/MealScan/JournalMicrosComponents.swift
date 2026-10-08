@@ -79,8 +79,10 @@ private extension LigneMicro {
         }
     }
 
-    /// Bas : sous le seuil de la règle (60 % du besoin).
+    /// Bas : une alerte que l'estimateur permet d'affirmer ; sans
+    /// estimation, sous le seuil de la règle (60 % du besoin).
     var estBas: Bool {
+        if let statutApport { return statutApport.estUneAlerte && sens == .besoin }
         guard sens == .besoin, let niveau else { return false }
         return niveau < MicrosDuJour.seuilBas
     }
@@ -724,8 +726,21 @@ struct MicroDuJourSheet: View {
         let fond: Color
     }
 
-    /// Mêmes seuils que `Color.dsStatut` : 60 couvert, 30 à renforcer.
+    /// Le statut de l'estimateur quand il existe ; sinon les seuils de
+    /// `Color.dsStatut` : 60 couvert, 30 à renforcer.
     private var etiquette: Etiquette? {
+        if let statut = ligne.statutApport {
+            switch statut {
+            case .couvert, .couvertParComplement, .sousLaLimite:
+                return Etiquette(texte: statut.libelleCourt, encre: Color.teinteKiwiTexte, fond: Color.teinteKiwi.opacity(0.14))
+            case .aSurveiller:
+                return Etiquette(texte: statut.libelleCourt, encre: Color.dsARenforcerTexte, fond: Color.dsARenforcer.opacity(0.14))
+            case .aRenforcer, .auDessusDeLaLimite:
+                return Etiquette(texte: statut.libelleCourt, encre: Color.dsACombler, fond: Color.dsACombler.opacity(0.12))
+            case .peuPrecise:
+                return Etiquette(texte: statut.libelleCourt, encre: Color.dsSecondaire, fond: Color.dsSecondaire.opacity(0.12))
+            }
+        }
         guard ligne.sens == .besoin, let niveau = ligne.niveau else { return nil }
         if niveau >= MicrosDuJour.seuilBas {
             return Etiquette(texte: "Couvert", encre: Color.teinteKiwiTexte, fond: Color.teinteKiwi.opacity(0.14))
@@ -749,6 +764,9 @@ struct MicroDuJourSheet: View {
         }
         guard ligne.niveau != nil else {
             return "Pas encore de chiffre : il faut une journée de repas assez notée."
+        }
+        if ligne.statutApport != nil {
+            return "Part de la référence ANSES couverte, estimée : pas un résultat d'analyse."
         }
         return ligne.partDuQuestionnaire
             ? "D'après ton questionnaire, puis tes repas notés."

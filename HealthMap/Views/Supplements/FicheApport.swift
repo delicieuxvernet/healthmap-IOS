@@ -90,6 +90,20 @@ struct FicheApportContexte: Identifiable {
         return "couvre le besoin"
     }
 
+    /// Le mot d'après le détail : le STATUT d'un apport estimé (audit de
+    /// fiabilité, 8 oct. 2026), l'échelle du score sinon.
+    static func statutMot(detail: DetailApport) -> String {
+        guard let statut = detail.estimation?.statut else { return statutMot(forScore: detail.score) }
+        switch statut {
+        case .couvert, .sousLaLimite: return "couvre le besoin"
+        case .couvertParComplement: return "couvert par ton complément"
+        case .aSurveiller: return "à surveiller"
+        case .aRenforcer: return "à renforcer"
+        case .peuPrecise: return "à affiner"
+        case .auDessusDeLaLimite: return "au-dessus de la limite"
+        }
+    }
+
     /// « à combler · 3 causes nommées »
     static func sousTitre(statutMot: String, causes: Int) -> String {
         switch causes {
@@ -176,6 +190,18 @@ struct FicheTexteCarte: View {
     }
 }
 
+/// La fiche d'un apport, celle du Bilan (`ApportV2DetailSheet`) : statut,
+/// quantité et sources de l'estimateur. Remplace l'ancienne fiche nutriment,
+/// qui citait encore le score du calcul en points (audit des écrans, 8 oct. 2026).
+struct FicheApportDuBilan: View {
+    @EnvironmentObject private var dashboardVM: DashboardViewModel
+    let nutriment: EnrichedNutrient
+
+    var body: some View {
+        ApportV2DetailSheet(apport: .pourLaFiche(nutriment, bilan: dashboardVM.analysisV2?.bilan))
+    }
+}
+
 struct FicheApportSheet: View {
 
     let contexte: FicheApportContexte
@@ -233,7 +259,13 @@ struct FicheApportSheet: View {
                     bloc("Ce que ça fait") { texteCarte(role) }
                 }
 
-                if !detail.contributions.isEmpty {
+                // Apport estimé : pas de « point de départ » ni de points à
+                // regagner ; ses sources, en part de la référence.
+                if detail.estimation != nil {
+                    if !detail.appuis.isEmpty {
+                        bloc("D'où vient ton apport", note: "en part de la référence") { sourcesCarte }
+                    }
+                } else if !detail.contributions.isEmpty {
                     calculBloc
                 }
 
@@ -260,8 +292,7 @@ struct FicheApportSheet: View {
         .verreFeuille()
         .sheet(isPresented: $montreDetailAssiette) {
             if let nutrimentDetail {
-                // Premium : la fiche observe elle-même SubscriptionService.
-                NutrientDetailSheet(nutrient: nutrimentDetail)
+                FicheApportDuBilan(nutriment: nutrimentDetail)
             }
         }
         .sheet(item: $causeOuverte, onDismiss: { surligne = nil }) { cause in
@@ -549,6 +580,36 @@ struct FicheApportSheet: View {
         let cause = geste.cause.prefix(1).lowercased() + geste.cause.dropFirst()
         guard let regain = LectureApport.libelleRegain(geste.regain) else { return "répond à : \(cause)" }
         return "\(regain) · \(cause)"
+    }
+
+    // MARK: Les sources d'un apport estimé
+
+    private var sourcesCarte: some View {
+        let sources = detail.appuis
+        return VStack(spacing: 0) {
+            ForEach(Array(sources.enumerated()), id: \.element.id) { rang, source in
+                if rang > 0 { DSSeparator(retrait: 0) }
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(AnneauTeintes.source(rang: rang, couleur: contexte.couleur))
+                        .frame(width: 10, height: 10)
+                        .accessibilityHidden(true)
+                    Text(source.libelle)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsTexte)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("\(DS.entier(source.delta))\u{202F}%")
+                        .font(.dsValeurLigne)
+                        .foregroundStyle(Color.dsSecondaire)
+                }
+                .padding(.horizontal, DS.paddingCarte)
+                .padding(.vertical, 12)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .dsCard()
     }
 
     // MARK: Le détail du calcul (replié)

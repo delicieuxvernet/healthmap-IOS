@@ -53,8 +53,31 @@ struct ProgresToileApport: Identifiable, Equatable {
     let court: String
     /// 0 à 100.
     let pct: Int
+    /// Le statut de l'estimateur (audit de fiabilité, 8 oct. 2026) : c'est
+    /// lui qui décide de la couleur et du mot, jamais un seuil sur `pct`.
+    var statut: StatutApport? = nil
 
-    var aRenforcer: Bool { pct < ProgresToile.seuil }
+    /// Orange : une alerte, ou « à surveiller ». Sans statut, sous 60.
+    var aRenforcer: Bool {
+        guard let statut else { return pct < ProgresToile.seuil }
+        return statut == .aRenforcer || statut == .aSurveiller || statut == .auDessusDeLaLimite
+    }
+
+    /// Gris : l'estimation ne permet rien d'affirmer.
+    var estAAffiner: Bool { statut == .peuPrecise }
+
+    /// À son besoin : couvert (ou par un complément). Sans statut, 60 et plus.
+    var estCouvert: Bool {
+        guard let statut else { return pct >= ProgresToile.seuil }
+        return !statut.estSousLaReference
+    }
+
+    /// Le mot posé sous le chiffre.
+    var mot: String {
+        if estCouvert { return "à ton besoin" }
+        if estAAffiner { return "à affiner" }
+        return statut == .aSurveiller ? "à surveiller" : "à renforcer"
+    }
 }
 
 enum ProgresToile {
@@ -102,7 +125,7 @@ enum ProgresToile {
 
     /// Le nombre d'apports à leur besoin.
     static func couverts(_ apports: [ProgresToileApport]) -> Int {
-        apports.filter { !$0.aRenforcer }.count
+        apports.filter(\.estCouvert).count
     }
 
     /// La part du rayon « besoin » qu'occupe un score : proportionnelle, comme
@@ -230,7 +253,8 @@ enum ProgresToile {
 
             let rayonPoint: CGFloat = (choisi ? 7 : (apport.aRenforcer ? 5.5 : 4)) * e
             let disque = cercle(points[index], rayon: rayonPoint)
-            calque.fill(disque, with: .color(apport.aRenforcer ? Color.dsARenforcer : Color.teinteKiwi))
+            calque.fill(disque, with: .color(apport.aRenforcer ? Color.dsARenforcer
+                                              : (apport.estAAffiner ? Color.dsSecondaire : Color.teinteKiwi)))
             calque.stroke(disque, with: .color(Color.white), lineWidth: 2)
 
             let a = angle(index, sur: total)
@@ -330,7 +354,7 @@ struct ProgresToileDessin: View, Animatable {
     }
 
     private static func valeurVocale(_ apport: ProgresToileApport) -> String {
-        let statut = apport.aRenforcer ? "à renforcer" : "à ton besoin"
+        let statut = apport.mot
         return "\(apport.pct) pour cent de ton besoin, \(statut)"
     }
 
@@ -414,7 +438,7 @@ struct ProgresToileView: View {
                     .tracking(-1.4)
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
-                Text(choisi.aRenforcer ? "à renforcer" : "à ton besoin")
+                Text(choisi.mot)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(choisi.aRenforcer ? Color.dsARenforcerTexte : Color.dsSecondaire)
                     .padding(.top, 3)
@@ -485,10 +509,19 @@ struct ProgresMiniToile: View {
 struct ProgresToileLegende: View {
     let apports: [ProgresToileApport]
 
-    private var detailARenforcer: String {
-        let bas = apports.filter(\.aRenforcer)
-        if bas.count > 3 { return "\(bas.count) apports" }
-        return bas.map { ProgresToile.nomEnPhrase($0.nom) }.joined(separator: ", ")
+    private var detailARenforcer: String { detail(apports.filter(\.aRenforcer)) }
+    private var detailAAffiner: String { detail(apports.filter(\.estAAffiner)) }
+
+    private func detail(_ liste: [ProgresToileApport]) -> String {
+        if liste.count > 3 { return "\(liste.count) apports" }
+        return liste.map { ProgresToile.nomEnPhrase($0.nom) }.joined(separator: ", ")
+    }
+
+    /// « À renforcer » s'il y a une alerte sûre ; sinon « À surveiller ».
+    private var titreOrange: String {
+        let avecStatut = apports.contains { $0.statut != nil }
+        guard avecStatut else { return "À renforcer" }
+        return apports.contains { $0.statut == .aRenforcer } ? "À renforcer ou à surveiller" : "À surveiller"
     }
 
     private var detailCouverts: String {
@@ -500,8 +533,11 @@ struct ProgresToileLegende: View {
     var body: some View {
         let couverts = ProgresToile.couverts(apports)
         VStack(spacing: 6) {
-            if couverts < apports.count {
-                ligne(couleur: Color.dsARenforcer, titre: "À renforcer", detail: detailARenforcer)
+            if apports.contains(where: \.aRenforcer) {
+                ligne(couleur: Color.dsARenforcer, titre: titreOrange, detail: detailARenforcer)
+            }
+            if apports.contains(where: \.estAAffiner) {
+                ligne(couleur: Color.dsSecondaire, titre: "À affiner", detail: detailAAffiner)
             }
             if couverts > 0 {
                 ligne(couleur: Color.teinteKiwi, titre: "À ton besoin", detail: detailCouverts)

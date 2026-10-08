@@ -15,6 +15,11 @@ import Foundation
 //     grammes ; on garde les apports satisfaisants de l'IOM (2005), par sexe ;
 //   · fibres : 30 g, la recommandation de l'ANSES (l'EFSA dit 25 g).
 //
+// Depuis le 8 oct. 2026 (audit de fiabilité), le besoin vient d'abord du
+// référentiel de l'estimateur (`EstimateurApports.repere`) : la quantité
+// affichée « X sur Y » se compare au même repère que le statut. La table
+// ci-dessous ne sert que si le référentiel n'est pas lisible.
+//
 // `NutrientData.rda` reste la référence GÉNÉRIQUE : c'est celle qu'utilisent
 // l'analyse des repas et le code-barres pour calculer leurs `pctRDA`. Pour
 // ramener un pourcentage générique à cette personne : `facteur(_:profil:)`.
@@ -24,6 +29,14 @@ enum BesoinsDeReference {
     /// Le besoin quotidien de référence de cette personne, dans l'unité de
     /// `NutrientData` (UI, µg, mg ou g).
     static func besoin(_ id: NutrientID, profil p: UserProfile) -> Double {
+        if let repere = EstimateurApports.partage?.repere(id.rawValue, profil: ProfilEstimation(profile: p)), repere > 0 {
+            return repere * LectureEstimation.facteurAffichage(id.rawValue)
+        }
+        return besoinDeRepli(id, profil: p)
+    }
+
+    /// L'ancienne table (EFSA / ANSES 2021), si le référentiel manque.
+    static func besoinDeRepli(_ id: NutrientID, profil p: UserProfile) -> Double {
         let femme = p.gender == .femme
         let age = p.ageInt
         let enceinte = femme && p.pregnancyStatus == "pregnant"

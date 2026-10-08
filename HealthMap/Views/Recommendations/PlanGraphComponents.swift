@@ -92,11 +92,13 @@ enum PlanGraphTeintes {
         }
     }
 
-    static func libelle(_ genre: PlanGraph.Genre, anneau: Int, score: Int?) -> String {
+    static func libelle(_ genre: PlanGraph.Genre, anneau: Int, score: Int?, statut: StatutApport? = nil) -> String {
         switch genre {
         case .objectif: return anneau == 0 ? "Ton objectif" : "Objectif"
         case .symptome: return "Symptôme suivi"
-        case .apport: return (score ?? 100) < 70 ? "Apport à renforcer" : "Apport"
+        case .apport:
+            if let statut { return statut.estASuivre ? "Apport \(statut.libelleCourt.lowercased())" : "Apport" }
+            return (score ?? 100) < 70 ? "Apport à renforcer" : "Apport"
         case .habitude: return "Habitude"
         }
     }
@@ -492,7 +494,7 @@ private struct PlanGraphNoeudView: View {
         .onChange(of: choisi) { _, maintenant in
             if maintenant { rebonds += 1 }
         }
-        .accessibilityLabel("\(PlanGraphTeintes.libelle(noeud.genre, anneau: noeud.anneau, score: noeud.score)), \(noeud.nom)")
+        .accessibilityLabel("\(PlanGraphTeintes.libelle(noeud.genre, anneau: noeud.anneau, score: noeud.score, statut: noeud.statut)), \(noeud.nom)")
         .accessibilityAddTraits(choisi ? [.isButton, .isSelected] : .isButton)
     }
 }
@@ -613,7 +615,7 @@ struct PlanSelectionBandeau: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(PlanGraphTeintes.libelle(noeud.genre, anneau: noeud.anneau, score: noeud.score))
+                Text(PlanGraphTeintes.libelle(noeud.genre, anneau: noeud.anneau, score: noeud.score, statut: noeud.statut))
                     .font(.dsSousTitreFort)
                     .foregroundStyle(PlanGraphTeintes.encre(noeud.genre))
                 Text(noeud.nom)
@@ -815,7 +817,7 @@ struct PlanGraphScreen: View {
 
     private var graphe: PlanGraph {
         let connus = apports.map {
-            PlanGraph.Apport(id: Self.idApport($0), nom: $0.name, score: $0.evidence.first?.score ?? 50)
+            PlanGraph.Apport(id: Self.idApport($0), nom: $0.name, score: $0.evidence.first?.score ?? 50, statut: $0.statut)
         }
         let parNom = Dictionary(connus.map { (Self.cle($0.nom), $0.id) }, uniquingKeysWith: { premier, _ in premier })
 

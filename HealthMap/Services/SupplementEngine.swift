@@ -276,13 +276,20 @@ enum SupplementEngine {
     // ============================================================
 
     /// Main entry: selectProducts for nutrients with score < 60
-    static func selectProducts(scores: [String: Int], profile: UserProfile) -> [SupplementRecommendation] {
+    ///
+    /// Audit de fiabilité (8 oct. 2026) : quand les statuts estimés sont
+    /// fournis, un complément n'est proposé QUE pour un apport « à renforcer »,
+    /// c'est-à-dire là où la validation permet de l'affirmer. Sans statut
+    /// (ancien calcul), le seuil de 60 reste.
+    static func selectProducts(scores: [String: Int], profile: UserProfile,
+                               statuts: [String: StatutApport] = [:]) -> [SupplementRecommendation] {
         // Collect all nutrients with score < 60
         var concerns: [(id: NutrientID, score: Int)] = []
 
         for nutrient in NutrientID.allCases {
             let score = scores[nutrient.rawValue] ?? 100
-            if score < 60 {
+            let retenu = statuts.isEmpty ? score < 60 : statuts[nutrient.rawValue] == .aRenforcer
+            if retenu {
                 concerns.append((id: nutrient, score: score))
             }
         }
@@ -628,8 +635,9 @@ enum SupplementEngine {
     // ============================================================
 
     /// Generate complete supplement recommendations from scores + profile
-    static func generateRecommendations(scores: [String: Int], profile: UserProfile) -> SupplementEngineResult {
-        let recommendations = selectProducts(scores: scores, profile: profile)
+    static func generateRecommendations(scores: [String: Int], profile: UserProfile,
+                                        statuts: [String: StatutApport] = [:]) -> SupplementEngineResult {
+        let recommendations = selectProducts(scores: scores, profile: profile, statuts: statuts)
         let schedule = generateSchedule(from: recommendations)
         let supplementWarnings = detectInteractionWarnings(from: recommendations)
         let medicationWarnings = detectMedicationInteractions(

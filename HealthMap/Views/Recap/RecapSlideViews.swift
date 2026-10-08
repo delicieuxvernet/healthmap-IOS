@@ -181,13 +181,13 @@ struct RecapSlideView: View {
 
             HStack(alignment: .lastTextBaseline, spacing: 8) {
                 RecapCompteur(valeur: apports, taille: 72, couleur: .scoreLow)
-                Text("apports à renforcer")
+                Text("apports à surveiller")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color.dsTexte)
             }
             .recapApparition(1)
             .accessibilityElement()
-            .accessibilityLabel("\(apports) apports à renforcer")
+            .accessibilityLabel("\(apports) apports à surveiller")
 
             Text("On te les montre un par un, avec ce qui les explique.")
                 .font(.system(size: 16))
@@ -581,7 +581,7 @@ struct RecapCartePartage: View {
 
             HStack(spacing: Theme.spacingSM) {
                 chiffre(carte.besoinsNourris, "besoins nourris", .dsAccent)
-                chiffre(carte.apportsARenforcer, "à renforcer", .scoreLow)
+                chiffre(carte.apportsARenforcer, "à surveiller", .scoreLow)
             }
 
             Text("Estimation basée sur mes déclarations.\nNe remplace pas un avis médical.")

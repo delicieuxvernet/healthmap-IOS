@@ -18,6 +18,11 @@ import Foundation
 // puis, si des journées de repas sont notées : n/(n+k) × leur moyenne
 // + k/(n+k) × l'estimation, avec un k propre à chaque apport.
 //
+// Caddie insuffisant (moins de 15 aliments cochés, v6-v8 du référentiel) :
+// les aliments non cochés comptent pour leur moyenne française, avec un poids
+// dégressif (15 − cochés) / 15, et l'app n'affirme RIEN (ni alerte ni
+// « couvert ») tant que des journées notées ne le permettent pas.
+//
 // La quantité est comparée à la référence ANSES 2021 de la personne (sexe,
 // âge, grossesse, allaitement, règles, régime). Le statut ne vient JAMAIS d'un
 // seuil sur un score : une alerte « à renforcer » n'existe que pour les
@@ -120,6 +125,8 @@ struct ReferenceApport: Equatable {
 /// D'où vient la quantité estimée, dans son unité.
 struct DecompositionApport: Equatable {
     var courses: Double
+    /// Caddie insuffisant : les aliments non cochés, à leur moyenne française.
+    var caddieNonRenseigne: Double
     var cafeThe: Double
     var eau: Double
     var alcool: Double
@@ -143,11 +150,30 @@ struct EstimationApport: Equatable {
     let statutAlimentsSeuls: StatutApport
     let categorieAlerte: String
     let alerteOuverte: Bool
+    /// Journées de repas notés à partir desquelles l'alerte s'ouvre (nil :
+    /// jamais sur les repas seuls, une prise de sang est nécessaire).
+    let joursConseilles: Int?
     let joursJournalRetenus: Int
     let k: Double
     let confiance: ConfianceEstimation
     let decomposition: DecompositionApport
     let topCourses: [ContributionAliment]
+}
+
+extension EstimationApport {
+    /// La même estimation, avec le statut que l'app retient (une prise de
+    /// sang récente prime) : tous les écrans qui lisent le détail d'un apport
+    /// disent alors le même statut.
+    func avecStatut(_ autre: StatutApport) -> EstimationApport {
+        guard autre != statut else { return self }
+        return EstimationApport(
+            id: id, apportEstime: apportEstime, unite: unite, reference: reference,
+            probabiliteAdequation: probabiliteAdequation, statut: autre, statutAlimentsSeuls: statutAlimentsSeuls,
+            categorieAlerte: categorieAlerte, alerteOuverte: alerteOuverte, joursConseilles: joursConseilles,
+            joursJournalRetenus: joursJournalRetenus, k: k, confiance: confiance,
+            decomposition: decomposition, topCourses: topCourses
+        )
+    }
 }
 
 struct SignalApport: Equatable {
@@ -158,6 +184,13 @@ struct SignalApport: Equatable {
 struct ResultatEstimation: Equatable {
     let versionReferentiel: String
     let horsPerimetre: Bool
+    /// Aliments connus cochés dans le caddie.
+    let alimentsCoches: Int
+    /// Au moins `alimentsCochesMinimum` aliments : l'estimation peut affirmer.
+    let caddieSuffisant: Bool
+    let alimentsCochesMinimum: Int
+    /// Poids des aliments non cochés comptés à leur moyenne (0 si suffisant).
+    let poidsRemplissage: Double
     let alimentsInconnus: [String]
     let journeesRetenues: Int
     let apports: [String: EstimationApport]
@@ -255,7 +288,9 @@ final class EstimateurApports {
         return Contexte(
             sexe: sexe, age: age, classe: classe, kcal: kcal, femme: femme,
             enceinte: enceinte, allaitante: allaitante, projet: projet, menopause: menopause,
-            pertesElevees: !(regle == "light" || regle == "normal"),
+            // v10 : seules des règles déclarées abondantes comptent ; « na » ou
+            // vide -> situation « femme » (RNP 11).
+            pertesElevees: regle == "heavy" || regle == "very_heavy",
             vegetarien: vegetariens.contains(p.dietType) || vegans.contains(p.dietType),
             vegan: vegans.contains(p.dietType),
             regime: p.dietType, horsPerimetre: age < 18
@@ -389,17 +424,29 @@ final class EstimateurApports {
     }
 
     /// Probabilité que l'apport couvre le besoin (IOM 2000). Fer des femmes
-    /// réglées : besoin log-normal (médiane BNM, 95e centile RNP).
+    /// réglées (v10) : UNE loi log-normale quel que soit `periodFlow` (ANSES
+    /// 2021, rapport p. 135 : médiane 7, P95 16), × 1,8 si végétarienne.
     func probabilite(_ n: String, _ y: Double, _ r: ReferenceApport, _ c: Contexte) -> Double {
         let bnm = r.bnm ?? 0, rnp = r.rnp ?? 0
         if n == "iron" && c.femme && !(c.menopause || c.enceinte || c.allaitante) {
-            let s = log(rnp / bnm) / 1.645
-            return Self.phi((log(max(y, 1e-6)) - log(bnm)) / s)
+            let regle = dico(dico(racine["references_regles"])["iron"])
+            let loi = dico(regle["fer_femme_reglee"])
+            let f = c.vegetarien ? (nombre(regle["facteur_vegetarien"]) ?? 1) : 1
+            let mediane = (nombre(loi["mediane"]) ?? 7) * f
+            let p95 = (nombre(loi["p95"]) ?? 16) * f
+            let s = log(p95 / mediane) / 1.645
+            return Self.phi((log(max(y, 1e-6)) - log(mediane)) / s)
         }
         return Self.phi((y - bnm) / ((rnp - bnm) / 2))
     }
 
     static func phi(_ x: Double) -> Double { 0.5 * (1 + erf(x / 2.0.squareRoot())) }
+
+    /// Le repère de cette personne (RNP, apport satisfaisant ou limite), dans
+    /// l'unité du référentiel : celui auquel l'estimation est comparée.
+    func repere(_ n: String, profil p: ProfilEstimation) -> Double? {
+        reference(n, contexte(p)).valeurRepere
+    }
 
     // MARK: 5. Estimation complète
 
@@ -411,8 +458,30 @@ final class EstimateurApports {
         let jours = journees.suffix(fenetre)
         let seuilKcal = (nombre(journal["part_minimale_depense"]) ?? 0.6) * c.kcal
         let retenus = jours.filter { $0.kcal > 0 && $0.kcal >= seuilKcal }
-        let caddieVide = parAliment.isEmpty
         let kParDefaut = nombre(journal["k_par_defaut"]) ?? 4
+
+        // Règle A (v6) : caddie suffisant ? Sinon (v7-v8), les aliments non
+        // cochés comptent à leur moyenne française, poids dégressif.
+        let ouverture = dico(P["ouverture_alerte"])
+        let minimum = Int(nombre(ouverture["aliments_coches_minimum"]) ?? 15)
+        let nbCoches = parAliment.count
+        let caddieSuffisant = nbCoches >= minimum
+        var poidsRemplissage = 0.0
+        var nonRenseignes: [[String: Any]] = []
+        if !caddieSuffisant {
+            poidsRemplissage = Double(minimum - nbCoches) / Double(minimum)
+            let population = dico(racine["caddie_population"])
+            let table = dico(dico(population["valeurs"])["\(c.sexe)|\(c.classe)"])
+            let familles = dico(population["famille_regime"])
+            let retirees = dico(SP["regimes"])[c.regime] as? [String] ?? []
+            let coches = Set(parAliment.map(\.id))
+            for id in dico(racine["aliments"]).keys.sorted() {
+                if coches.contains(id) { continue }
+                if let famille = familles[id] as? String, retirees.contains(famille) { continue }
+                nonRenseignes.append(dico(table[id]))
+            }
+        }
+        let joursSiInsuffisant = dico(ouverture["jours_notes_si_caddie_insuffisant"])
 
         let carteComplements = dico(P["complements"])
         var couverts = Set<String>()
@@ -420,6 +489,7 @@ final class EstimateurApports {
 
         let alertes = dico(dico(racine["alertes"])["par_apport"])
         let statuts = dico(P["statuts"])
+        let sousASPeuPrecise = statuts["sous_AS_estimation_peu_precise"] as? [String] ?? []
         let couvertSiP = nombre(statuts["bnm_couvert_si_P_au_moins"]) ?? 0.8
         let basSiP = nombre(statuts["bnm_bas_si_P_inferieur_a"]) ?? 0.5
         let seuilsBas = dico(dico(racine["statuts"])["seuils_bas_AS"])
@@ -430,7 +500,8 @@ final class EstimateurApports {
         for n in ApportsSuivis.ids {
             let coursesN = parAliment.reduce(0.0) { $0 + ($1.apports[n] ?? 0) }
             let soc = socle(p, c, n)
-            let q = coursesN + soc.total
+            let cnr = poidsRemplissage * nonRenseignes.reduce(0.0) { $0 + (nombre($1[n]) ?? 0) }
+            let q = coursesN + cnr + soc.total
             let valeurs = retenus.compactMap { $0.apports[n] }
             let nj = valeurs.count
             let alerte = dico(alertes[n])
@@ -443,20 +514,42 @@ final class EstimateurApports {
             let wq = 1 - wj
 
             let r = reference(n, c)
-            let joursConseilles = nombre(journalAlerte["jours_notes_conseilles_avant_alerte"]).map { Int($0) }
-            let ouverte = categorie == "alerte possible" || (joursConseilles.map { nj >= $0 } ?? false)
+            let joursConseilles: Int?
+            let ouverte: Bool
+            if caddieSuffisant {
+                joursConseilles = nombre(journalAlerte["jours_notes_conseilles_avant_alerte"]).map { Int($0) }
+                ouverte = categorie == "alerte possible" || (joursConseilles.map { nj >= $0 } ?? false)
+            } else {
+                // nil = jamais sur les repas seuls : il faut compléter le caddie.
+                joursConseilles = nombre(joursSiInsuffisant[n]).map { Int($0) }
+                ouverte = joursConseilles.map { nj >= $0 } ?? false
+            }
             var pAdequation: Double?
-            let statut: StatutApport
+            var statut: StatutApport
             let regleAlerte = dico(alerte["regle"])
 
+            // v11 : seuils de « couvert » (et « sous la limite ») calibrés pour
+            // un faux rassurant ≤ 10 % ; le seuil standard revient après assez
+            // de jours notés. Clé présente à null = jamais ; absente = standard.
+            let cv = dico(dico(P["couvert"])[n])
+            func reglage(_ cle: String, standard defaut: Double) -> Double? {
+                guard let v = cv[cle] else { return defaut }
+                return v is NSNull ? nil : (nombre(v) ?? defaut)
+            }
+            let standard = reglage("jours_notes_pour_seuil_standard", standard: 0).map { Double(nj) >= $0 } ?? false
+
             if r.type == "LSS" {
-                if y > (r.limite ?? .infinity) { statut = ouverte ? .auDessusDeLaLimite : .peuPrecise }
-                else { statut = .sousLaLimite }
+                let limite = r.limite ?? .infinity
+                let marge = standard ? 1 : reglage("marge_LSS", standard: 1)
+                if y > limite { statut = ouverte ? .auDessusDeLaLimite : .peuPrecise }
+                else if let marge, y <= limite * marge { statut = .sousLaLimite }
+                else { statut = .peuPrecise }
             } else if r.type == "BNM" {
                 let pr = probabilite(n, y, r, c)
                 pAdequation = pr
                 let seuil = categorie == "alerte possible" ? (nombre(regleAlerte["valeur"]) ?? basSiP) : basSiP
-                if pr >= couvertSiP { statut = .couvert }
+                let pMin = standard ? couvertSiP : reglage("p_min", standard: couvertSiP)
+                if let pMin, pr >= pMin { statut = .couvert }
                 else if ouverte && pr < seuil { statut = .aRenforcer }
                 else if pr < basSiP { statut = .peuPrecise }
                 else { statut = .aSurveiller }
@@ -466,18 +559,22 @@ final class EstimateurApports {
                 let seuil = categorie == "alerte possible"
                     ? nombre(dico(regleAlerte["seuils_par_sexe"])[String(c.sexe)])
                     : bas
-                if y >= repere { statut = .couvert }
+                let marge = standard ? 1 : reglage("marge_AS", standard: 1)
+                if let marge, y >= repere * marge { statut = .couvert }
                 else if ouverte, let seuil, y < seuil { statut = .aRenforcer }
-                else if bas == nil || y < (bas ?? 0) { statut = .peuPrecise }
+                else if sousASPeuPrecise.contains(n) || bas == nil || y < (bas ?? 0) { statut = .peuPrecise }
                 else { statut = .aSurveiller }
             }
+            // v8 : rien d'affirmé sur un caddie insuffisant, sauf si le journal
+            // a rouvert l'apport.
+            if !caddieSuffisant && !ouverte { statut = .peuPrecise }
 
             var final = statut
             if couverts.contains(n) && statut != .auDessusDeLaLimite && statut != .sousLaLimite {
                 final = .couvertParComplement
             }
             let confiance: ConfianceEstimation =
-                (n == "vitK" || (caddieVide && nj == 0)) ? .faible : (ouverte ? .bonne : .moyenne)
+                (n == "vitK" || (!caddieSuffisant && !ouverte)) ? .faible : (ouverte ? .bonne : .moyenne)
 
             let top = parAliment
                 .compactMap { item -> ContributionAliment? in
@@ -494,13 +591,35 @@ final class EstimateurApports {
                 reference: r, probabiliteAdequation: pAdequation,
                 statut: final, statutAlimentsSeuls: statut,
                 categorieAlerte: categorie, alerteOuverte: ouverte,
+                joursConseilles: joursConseilles,
                 joursJournalRetenus: nj, k: k, confiance: confiance,
                 decomposition: DecompositionApport(
-                    courses: coursesN * wq, cafeThe: soc.cafeThe * wq, eau: soc.eau * wq, alcool: soc.alcool * wq,
+                    courses: coursesN * wq, caddieNonRenseigne: cnr * wq, cafeThe: soc.cafeThe * wq, eau: soc.eau * wq, alcool: soc.alcool * wq,
                     reste: (soc.total - soc.cafeThe - soc.eau - soc.alcool) * wq,
                     repasNotes: y - q * wq
                 ),
                 topCourses: Array(top)
+            )
+        }
+
+        // v10 : oméga-3 du bilan = le statut le plus défavorable de ALA et
+        // EPA+DHA (aliments seuls), sans alerte propre.
+        if let o3 = sortie["omega3"], let a3 = sortie["ala"], let e3 = sortie["epaDha"] {
+            let ordre = (dico(P["omega3_bilan"])["ordre_defavorable"] as? [String] ?? [])
+                .compactMap(StatutApport.init(rawValue:))
+            func rang(_ s: StatutApport) -> Int { ordre.firstIndex(of: s) ?? ordre.count }
+            let base = rang(e3.statutAlimentsSeuls) < rang(a3.statutAlimentsSeuls) ? e3.statutAlimentsSeuls : a3.statutAlimentsSeuls
+            let niveaux: [ConfianceEstimation] = [.faible, .moyenne, .bonne]
+            let confiance = (niveaux.firstIndex(of: e3.confiance) ?? 0) < (niveaux.firstIndex(of: a3.confiance) ?? 0)
+                ? e3.confiance : a3.confiance
+            sortie["omega3"] = EstimationApport(
+                id: o3.id, apportEstime: o3.apportEstime, unite: o3.unite, reference: o3.reference,
+                probabiliteAdequation: nil,
+                statut: couverts.contains("omega3") ? .couvertParComplement : base,
+                statutAlimentsSeuls: base,
+                categorieAlerte: o3.categorieAlerte, alerteOuverte: a3.alerteOuverte || e3.alerteOuverte,
+                joursConseilles: o3.joursConseilles, joursJournalRetenus: o3.joursJournalRetenus, k: o3.k,
+                confiance: confiance, decomposition: o3.decomposition, topCourses: o3.topCourses
             )
         }
 
@@ -522,6 +641,8 @@ final class EstimateurApports {
 
         return ResultatEstimation(
             versionReferentiel: version, horsPerimetre: c.horsPerimetre,
+            alimentsCoches: nbCoches, caddieSuffisant: caddieSuffisant,
+            alimentsCochesMinimum: minimum, poidsRemplissage: poidsRemplissage,
             alimentsInconnus: inconnus, journeesRetenues: retenus.count,
             apports: sortie,
             signaux: ids.map { SignalApport(id: $0, message: messages[$0] ?? "") }

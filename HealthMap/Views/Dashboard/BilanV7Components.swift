@@ -408,9 +408,11 @@ struct BilanV7ApportsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
+                // Les trois apports du bilan mêlent « à renforcer », « à
+                // surveiller » et parfois « à affiner » (8 oct. 2026).
                 BilanV7SectionLabel(
                     icon: "target",
-                    text: "Tes apports à renforcer",
+                    text: "Tes apports à suivre",
                     color: Color.dsARenforcerTexte,
                     teinte: Color.dsARenforcer
                 )

@@ -52,7 +52,7 @@ struct MethodeView: View {
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
 
-            Text("Transparence totale sur notre algorithme")
+            Text("Transparence totale sur notre calcul")
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
@@ -64,9 +64,11 @@ struct MethodeView: View {
     }
 
     // MARK: - 4 Steps (vertical timeline)
+    // Audit de fiabilité (8 oct. 2026) : les étapes décrivent l'estimateur
+    // (Ciqual × INCA 3 × ANSES 2021), plus l'ancien score en points.
     private var stepsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader(title: "Les 4 etapes", icon: "arrow.triangle.swap")
+            sectionHeader(title: "Les 4 étapes", icon: "arrow.triangle.swap")
 
             VStack(spacing: 0) {
                 stepCard(
@@ -78,23 +80,23 @@ struct MethodeView: View {
                 )
                 stepCard(
                     number: 2,
-                    title: "Calcul local",
+                    title: "Estimation de tes apports",
                     icon: "function",
-                    description: "Notre algorithme calcule tes scores NAR pour 10 nutriments essentiels, 100% deterministe.",
+                    description: "Pour 27 vitamines, minéraux et acides gras, on estime ce que tu manges : tes aliments cochés, à leur fréquence et en portions réelles, puis, pour le reste, ce que mange en moyenne une personne de ton âge et de ton sexe en France. Le calcul est toujours le même, sans IA.",
                     isLast: false
                 )
                 stepCard(
                     number: 3,
-                    title: "Analyse IA",
-                    icon: "brain",
-                    description: "L'IA analyse ton profil et génère des recommandations personnalisées (temperature=0).",
+                    title: "Comparaison aux références",
+                    icon: "scalemass.fill",
+                    description: "Chaque apport est comparé à la référence de l'ANSES pour ton sexe, ton âge et ta situation : grossesse, allaitement, règles, alimentation végétale.",
                     isLast: false
                 )
                 stepCard(
                     number: 4,
                     title: "Ton bilan",
                     icon: "chart.bar.fill",
-                    description: "Tu recois un score global, tes nutriments a renforcer, et un plan d'action concret.",
+                    description: "L'IA explique tes résultats et propose des gestes concrets ; elle ne calcule rien. Les repas que tu notes affinent l'estimation au fil des jours.",
                     isLast: true
                 )
             }
@@ -149,55 +151,50 @@ struct MethodeView: View {
         }
     }
 
-    // MARK: - 6 Coded Interactions
+    // MARK: - Les données du calcul
+    // Remplace « 6 interactions codées » : l'estimateur ne retire plus de
+    // points par interaction ; il part des données ci-dessous.
     private var interactionsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader(title: "6 Interactions codees", icon: "link")
+            sectionHeader(title: "Les données du calcul", icon: "books.vertical.fill")
 
             // Une seule carte de verre, des lignes séparées d'un filet.
             VStack(spacing: 0) {
                 interactionCard(
-                    symbole: "cup.and.saucer.fill",
+                    symbole: "fork.knife",
                     apport: "iron",
                     filet: false,
-                    title: "Cafeine + Fer",
-                    description: "Les tannins du café bloquent l'absorption du fer jusqu'à 60 %",
-                    source: "Morck et al., 1983"
+                    title: "Composition des aliments",
+                    description: "La teneur en vitamines et minéraux de chaque aliment.",
+                    source: "Table Ciqual 2020, ANSES"
                 )
                 interactionCard(
-                    symbole: "pills.fill",
-                    apport: "vitB12",
-                    title: "IPP + B12",
-                    description: "Les inhibiteurs de pompe a protons reduisent l'absorption de la B12",
-                    source: "Lam et al., JAMA 2013"
+                    symbole: "person.3.fill",
+                    apport: "calcium",
+                    title: "Portions et habitudes",
+                    description: "Les portions réelles et ce que mangent les Français, selon l'âge et le sexe.",
+                    source: "Étude INCA 3, ANSES 2017"
                 )
                 interactionCard(
-                    symbole: "pills.fill",
-                    apport: "vitB12",
-                    title: "Metformine + B12",
-                    description: "La metformine réduit l'absorption intestinale de la B12 de 30 %",
-                    source: "Aroda et al., JCEM 2016"
+                    symbole: "checkmark.seal.fill",
+                    apport: "vitD",
+                    title: "Besoins de référence",
+                    description: "La référence de chaque apport, selon ton profil.",
+                    source: "Références nutritionnelles, ANSES 2021"
                 )
                 interactionCard(
-                    symbole: "pills.fill",
-                    apport: "zinc",
-                    title: "Contraceptif + Zinc/Mag",
-                    description: "La pilule augmente l'excretion du zinc et magnesium",
-                    source: "Palmery et al., 2013"
+                    symbole: "drop.fill",
+                    apport: "omega3",
+                    title: "Acides gras",
+                    description: "Les repères pour les oméga-3 et les autres acides gras.",
+                    source: "Apports nutritionnels conseillés en acides gras, ANSES 2011"
                 )
                 interactionCard(
-                    symbole: "brain.head.profile",
+                    symbole: "checkmark.circle.fill",
                     apport: "magnesium",
-                    title: "Stress + Magnesium",
-                    description: "Le stress chronique augmente l'excretion urinaire du magnesium",
-                    source: "Pickering et al., 2020"
-                )
-                interactionCard(
-                    symbole: "frying.pan.fill",
-                    apport: "vitC",
-                    title: "Cuisson + VitC",
-                    description: "La cuisson a haute temperature detruit 50-80% de la vitamine C",
-                    source: "Lee & Kader, 2000"
+                    title: "Un calcul vérifié",
+                    description: "Le calcul est testé sur les relevés alimentaires réels d'INCA 3 : « à renforcer » n'est utilisé que pour les apports où il se trompe rarement.",
+                    source: "Validation Kiwio sur INCA 3"
                 )
             }
             .dsCard()
@@ -251,46 +248,31 @@ struct MethodeView: View {
         }
     }
 
-    // MARK: - Scoring NAR
+    // MARK: - Les statuts
     private var scoringSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader(title: "Scoring NAR", icon: "gauge.with.dots.needle.33percent")
+            sectionHeader(title: "Les statuts", icon: "gauge.with.dots.needle.33percent")
 
             VStack(alignment: .leading, spacing: Theme.spacingMD) {
-                // Starting score
                 HStack(alignment: .firstTextBaseline, spacing: Theme.spacingSM) {
-                    Image(systemName: "play.fill")
+                    Image(systemName: "percent")
                         .font(.system(size: 12))
                         .foregroundStyle(Verre.iconeNeutre)
                         .accessibilityHidden(true)
-                    Text("Chaque nutriment démarre à 70/100")
+                    Text("Le chiffre affiché est la part de la référence couverte par ton apport estimé.")
                         .font(.dsSousTitre)
                         .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsTexte)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                // Deductions
-                HStack(alignment: .firstTextBaseline, spacing: Theme.spacingSM) {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.dsARenforcer)
-                        .accessibilityHidden(true)
-                    Text("Des deductions sont appliquees selon ton alimentation, mode de vie et interactions")
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsTexte)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                // Score ranges
                 DSSeparator(retrait: 0)
 
-                VStack(spacing: Theme.spacingSM) {
-                    scoreRange(label: "Bon", range: ">= 75", color: .scoreExcellent)
-                    scoreRange(label: "Adequat", range: "60 - 74", color: .scoreGood)
-                    scoreRange(label: "Faible", range: "40 - 59", color: .scoreLow)
-                    scoreRange(label: "A renforcer", range: "< 40", color: .scoreDeficient)
+                VStack(alignment: .leading, spacing: Theme.spacingSM) {
+                    statutLigne(.couvert, detail: "Ton apport estimé atteint la référence.")
+                    statutLigne(.aSurveiller, detail: "Proche de la référence, sans certitude qu'il en manque.")
+                    statutLigne(.aRenforcer, detail: "Nettement sous la référence, sur un apport que le calcul estime de façon fiable.")
+                    statutLigne(.peuPrecise, detail: "On ne peut rien affirmer : coche plus d'aliments ou note quelques repas.")
                 }
             }
             .padding(Theme.cardPadding)
@@ -300,25 +282,26 @@ struct MethodeView: View {
         }
     }
 
-    private func scoreRange(label: String, range: String, color: Color) -> some View {
-        HStack {
+    private func statutLigne(_ statut: StatutApport, detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.spacingSM) {
             // Le repère de la maquette : un carré de 10 pt, rayon 2.
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(color)
+                .fill(statut.statutV2.color)
                 .frame(width: 10, height: 10)
                 .accessibilityHidden(true)
 
-            Text(label)
-                .font(.dsSousTitreFort)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsTexte)
-
-            Spacer()
-
-            Text(range)
-                .font(.dsValeurLigne)
-                .foregroundStyle(Color.dsSecondaire)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(statut.libelleCourt)
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                Text(detail)
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Limitations
@@ -333,7 +316,7 @@ struct MethodeView: View {
                 )
                 limitationRow(
                     icon: "chart.bar.xaxis",
-                    text: "Les scores sont bases sur des estimations, pas des analyses sanguines"
+                    text: "Les statuts sont des estimations, pas des analyses sanguines. Une prise de sang récente prime sur l'estimation."
                 )
                 limitationRow(
                     icon: "person.badge.shield.checkmark",

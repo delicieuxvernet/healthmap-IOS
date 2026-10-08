@@ -80,6 +80,9 @@ final class EstimateurApportsTests: XCTestCase {
             if r.journeesRetenues != (attendu["journees_retenues"] as? NSNumber)?.intValue { ecarts.append("\(nom) journees_retenues") }
             if r.alimentsInconnus != (attendu["aliments_inconnus"] as? [String] ?? []) { ecarts.append("\(nom) aliments_inconnus") }
             if Set(r.signaux.map(\.id)) != Set(attendu["signaux"] as? [String] ?? []) { ecarts.append("\(nom) signaux") }
+            if r.alimentsCoches != (attendu["aliments_coches"] as? NSNumber)?.intValue { ecarts.append("\(nom) aliments cochés") }
+            if r.caddieSuffisant != (attendu["caddie_suffisant"] as? Bool) { ecarts.append("\(nom) caddie suffisant") }
+            if !proche(r.poidsRemplissage, nombre(attendu["poids_remplissage"]) ?? .nan, tolerance) { ecarts.append("\(nom) poids du remplissage") }
 
             for (n, x) in attendu["apports"] as? [String: [String: Any]] ?? [:] {
                 guard let a = r.apports[n] else { ecarts.append("\(nom).\(n) absent"); continue }
@@ -111,7 +114,7 @@ final class EstimateurApportsTests: XCTestCase {
 
                 let d = a.decomposition
                 let attenduD = (x["decomposition"] as? [Any] ?? []).map { nombre($0) ?? .nan }
-                for (i, valeur) in [d.courses, d.cafeThe, d.eau, d.alcool, d.reste, d.repasNotes].enumerated()
+                for (i, valeur) in [d.courses, d.caddieNonRenseigne, d.cafeThe, d.eau, d.alcool, d.reste, d.repasNotes].enumerated()
                 where i < attenduD.count && !proche(valeur, attenduD[i], tolerance) {
                     ecarts.append("\(ou) décomposition[\(i)] \(valeur) ≠ \(attenduD[i])")
                 }
@@ -123,18 +126,37 @@ final class EstimateurApportsTests: XCTestCase {
     // MARK: - Les cas qui ont motivé l'audit, lisibles
 
     /// Le testeur du 7 oct. 2026 : « magnésium bas » alors que sa prise de
-    /// sang était normale. Avec de vraies quantités, son magnésium est proche
-    /// de la référence et l'app n'alerte pas.
+    /// sang était normale. Neuf aliments cochés : le caddie ne suffit pas,
+    /// l'app n'affirme rien (ni alerte ni « couvert ») et compte les aliments
+    /// non cochés à leur moyenne française, poids dégressif.
     func testLeCasDeLAuditNAlertePlusSurLeMagnesium() throws {
         var p = ProfilEstimation(gender: "homme", age: "28", weight: "75", height: "178", strengthTraining: "moderate",
                                  caffeineIntake: "moderate", waterIntake: "1.75", alcohol: "rarely", mealsPerDay: "3")
         p.groceries = Dictionary(uniqueKeysWithValues: ["baguette", "pates", "steak_hache", "escalopes_poulet",
                                                         "yaourt_nature", "pommes", "oeufs", "tomates", "courgettes"].map { ($0, 3) })
-        let mg = try XCTUnwrap(try estimateur.estimer(p).apports["magnesium"])
-        XCTAssertEqual(mg.apportEstime, 332, accuracy: 1)
-        XCTAssertEqual(mg.statut, .aSurveiller)
-        XCTAssertNotEqual(mg.statut, .aRenforcer)
+        let r = try estimateur.estimer(p)
+        XCTAssertEqual(r.alimentsCoches, 9)
+        XCTAssertFalse(r.caddieSuffisant)
+        XCTAssertEqual(r.poidsRemplissage, 6.0 / 15, accuracy: 1e-9)
+        let mg = try XCTUnwrap(r.apports["magnesium"])
+        XCTAssertEqual(mg.apportEstime, 385, accuracy: 1)  // référentiel 2026-10-08.12
+        XCTAssertEqual(mg.statut, .peuPrecise)
+        XCTAssertEqual(mg.confiance, .faible)
         XCTAssertGreaterThan(mg.decomposition.cafeThe, 100, "le café APPORTE du magnésium (Ciqual), il n'en retire pas")
+        for (id, e) in r.apports {
+            XCTAssertNotEqual(e.statut, .aRenforcer, "caddie insuffisant sans journal : aucune alerte (\(id))")
+            XCTAssertNotEqual(e.statut, .couvert, "caddie insuffisant sans journal : rien d'affirmé (\(id))")
+        }
+    }
+
+    /// Règle B : la vitamine D n'est jamais « à surveiller » — 100 % des
+    /// adultes INCA 3 sont sous l'AS par l'alimentation.
+    func testLaVitamineDNEstJamaisASurveiller() throws {
+        let e = try estimateur
+        var p = ProfilEstimation(gender: "femme", age: "40", weight: "62", height: "166")
+        p.groceries = Dictionary(uniqueKeysWithValues: GroceryCatalog.allItems.prefix(30).map { ($0.id, 3) })
+        let vitD = try XCTUnwrap(e.estimer(p).apports["vitD"])
+        XCTAssertNotEqual(vitD.statut, .aSurveiller)
     }
 
     /// Le café est une source, pas une pénalité.

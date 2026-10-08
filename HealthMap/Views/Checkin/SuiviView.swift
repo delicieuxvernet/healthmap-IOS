@@ -409,7 +409,7 @@ struct SuiviView: View {
     /// premier jour, on nomme le sujet sans dire sa tendance.
     private func titreEquilibre(_ d: Donnees) -> String {
         guard !d.verrouille, dureeDuSuivi != nil,
-              let depart = dashboardVM.profile.baselineNutrientScores else {
+              let depart = dashboardVM.baselineApports else {
             return "Ton équilibre du jour"
         }
         let couverts = ProgresToile.couverts(d.apports)
@@ -1005,21 +1005,22 @@ struct SuiviView: View {
                 id: id,
                 nom: definition.label,
                 court: ProgresToile.libelleCourt(id, defaut: definition.label),
-                pct: score
+                pct: score,
+                statut: dashboardVM.statuts[id]
             )
         }
     }
 
     /// Ids des apports à renforcer (score < 60) — priorisent la couverture.
     private var weakNutrientIds: [String] {
-        dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id)
+        dashboardVM.apportsEnAlerte
     }
 
     private func couvertureDepuisLeDepart(_ scores: [String: Int]) -> [SuiviEngineV4.NutrientCoverage7d] {
         // Socle « départ » = baseline persistée (scores figés au 1er bilan).
         // Tant qu'elle n'est pas capturée, on passe [:] : avant = après, aucun
         // écart affiché (évite un socle transitoire faux).
-        let baseline = dashboardVM.profile.baselineNutrientScores ?? [:]
+        let baseline = dashboardVM.baselineApports ?? [:]
         let mesures = SuiviEngineV4.nutrientCoverage(fortnight: journal.fortnight,
                                                      focusIds: weakNutrientIds,
                                                      baseline: baseline)

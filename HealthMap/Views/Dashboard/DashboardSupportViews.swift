@@ -145,8 +145,7 @@ struct AllNutrientsSheet: View {
         .verreFeuille()
         .onAppear { arrive = true }
         .sheet(item: $selectedNutrient) { nutrient in
-            // Premium : la fiche observe elle-même SubscriptionService.
-            NutrientDetailSheet(nutrient: nutrient)
+            FicheApportDuBilan(nutriment: nutrient)
                 .healthMapSheet(.large)
         }
     }

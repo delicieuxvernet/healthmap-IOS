@@ -64,7 +64,9 @@ private enum ApportsOutilsW {
 
     /// « Vitamine D, 58 sur 100 » : ce que VoiceOver lit d'un anneau ou d'une barre.
     static func lu(_ apport: ApportW) -> String {
-        "\(apport.nom), \(apport.score) sur 100"
+        apport.alerte == nil
+            ? "\(apport.nom), \(apport.score) sur 100"
+            : "\(apport.nom), \(apport.score) pour cent de la référence"
     }
 
     static func lus(_ apports: [ApportW]) -> String {
@@ -162,7 +164,12 @@ private struct ApportsPetitContenuW: View {
     /// Sous 70, le Journal le dit « un peu juste » ou « bas » : il est à
     /// renforcer. Au-dessus, il est seulement le plus bas des trois.
     /// « Le plus bas » serait faux : on ne compare que les apports du bilan.
-    private var titre: String { principal.score < 70 ? "À renforcer" : "Tes apports" }
+    /// Depuis le 8 oct. 2026 : « À renforcer » seulement sur une alerte que
+    /// l'estimateur affirme, jamais sur un chiffre bas.
+    private var titre: String {
+        if let alerte = principal.alerte { return alerte ? "À renforcer" : "Tes apports" }
+        return principal.score < 70 ? "À renforcer" : "Tes apports"
+    }
 
     /// « Sardines ce soir ? » : le premier aliment de la fiche, au repas qui
     /// vient (mêmes plages que le Journal). Rien sans aliment.
@@ -194,7 +201,7 @@ private struct ApportsPetitContenuW: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                         .contentTransition(.numericText())
-                    Text("sur 100")
+                    Text(principal.alerte == nil ? "sur 100" : "% de la réf.")
                         .font(.texteW(12))
                         .foregroundStyle(TeinteW.encre(0.8))
                         .lineLimit(1)

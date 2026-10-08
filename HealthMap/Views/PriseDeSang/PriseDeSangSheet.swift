@@ -571,7 +571,7 @@ struct PriseDeSangSheet: View {
                 .font(.dsSousTitre)
                 .foregroundStyle(Color.dsTexte)
             Spacer(minLength: 8)
-            Text("\(effet.avant)")
+            Text(effet.texteAvant)
                 .font(.dsValeurLigne)
                 .foregroundStyle(Color.dsTertiaire)
                 .strikethrough()
@@ -579,14 +579,14 @@ struct PriseDeSangSheet: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color.dsTertiaire)
                 .accessibilityHidden(true)
-            Text("\(effet.apres)")
+            Text(effet.texteApres)
                 .font(.dsValeurLigneForte)
-                .foregroundStyle(Color.dsStatut(effet.apres))
+                .foregroundStyle(effet.statutApres.map { $0.statutV2.inkColor } ?? Color.dsStatut(effet.apres))
         }
         .padding(.horizontal, DS.paddingCarte)
         .frame(minHeight: DS.cibleTactile)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(nom) : \(effet.avant) avant, \(effet.apres) avec ta prise de sang")
+        .accessibilityLabel("\(nom) : \(effet.texteAvant) avant, \(effet.texteApres) avec ta prise de sang")
     }
 
     private func supprimer() {
@@ -687,7 +687,7 @@ struct PriseDeSangCarte: View {
     /// « Fer 62 → 41 ».
     static func pastille(_ effet: PriseDeSangApports.Effet) -> String {
         let nom = NutrientData.definition(for: effet.id)?.label ?? effet.id
-        return "\(nom) \(effet.avant) → \(effet.apres)"
+        return "\(nom) \(effet.texteAvant) → \(effet.texteApres)"
     }
 
     private var lectureVoiceOver: String {
@@ -695,7 +695,7 @@ struct PriseDeSangCarte: View {
         if !premium { phrases.append("Réservée à Kiwio Premium") }
         phrases += effets.map { effet in
             let nom = NutrientData.definition(for: effet.id)?.label ?? effet.id
-            return "\(nom) : \(effet.avant) avant, \(effet.apres) avec ta prise de sang"
+            return "\(nom) : \(effet.texteAvant) avant, \(effet.texteApres) avec ta prise de sang"
         }
         phrases.append(Self.avis)
         return phrases.joined(separator: ". ")

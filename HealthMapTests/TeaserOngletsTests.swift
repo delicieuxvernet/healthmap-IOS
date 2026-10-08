@@ -166,12 +166,12 @@ private final class MockTeaserAIAnalysisService: AIAnalysisServiceProtocol {
     private(set) var fullAnalysisCallCount = 0
     private(set) var bilanV2CallCount = 0
 
-    func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis? {
+    func fetchFullAnalysis(userId: String, profile: UserProfile, scores: [String: Int]?) async throws -> MergedAnalysis? {
         fullAnalysisCallCount += 1
         return nil
     }
 
-    func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2 {
+    func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], statuts: [String: String], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2 {
         bilanV2CallCount += 1
         return AIAnalysisV2(contract: "v2")
     }

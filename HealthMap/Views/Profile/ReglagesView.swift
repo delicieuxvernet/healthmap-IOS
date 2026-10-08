@@ -514,9 +514,12 @@ struct ReglagesView: View {
         let userId = session.user.id.uuidString
 
         do {
+            let estime = dashboardVM.estimation != nil
             let (data, filename) = try await DataExportService.shared.generateExport(
                 userId: userId,
-                authEmail: authViewModel.userEmail
+                authEmail: authViewModel.userEmail,
+                scores: estime ? dashboardVM.registre.mapValues(\.score) : nil,
+                statuts: estime ? dashboardVM.statuts.mapValues(\.libelleCourt) : nil
             )
             DataExportService.shared.presentShareSheet(data: data, filename: filename)
         } catch {

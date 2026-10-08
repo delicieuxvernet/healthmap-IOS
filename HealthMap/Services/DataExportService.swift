@@ -86,7 +86,12 @@ final class DataExportService {
     // MARK: - Generate Export
 
     /// Collects all user data and returns a JSON `Data` blob ready for sharing.
-    func generateExport(userId: String, authEmail: String?) async throws -> (data: Data, filename: String) {
+    /// `scores` / `statuts` : les apports estimés que l'app affiche (audit de
+    /// fiabilité, 8 oct. 2026) — l'export dit ce que la personne voit. `nil` :
+    /// l'ancien calcul du seul questionnaire.
+    func generateExport(userId: String, authEmail: String?,
+                        scores: [String: Int]? = nil,
+                        statuts: [String: String]? = nil) async throws -> (data: Data, filename: String) {
         // 1. Profile from Supabase
         let profileRow = try? await DatabaseService.shared.loadProfile(userId: userId)
 
@@ -97,7 +102,8 @@ final class DataExportService {
         let aiRaw = try? await DatabaseService.shared.loadAIAnalysis(userId: userId)
         let aiExport: AIAnalysisExport?
         if let aiRaw {
-            let localScores = questionnaire.map { HealthCalculator.analyzeNutrientScores(profile: $0) } ?? [:]
+            let localScores = scores.flatMap { $0.isEmpty ? nil : $0 }
+                ?? questionnaire.map { HealthCalculator.analyzeNutrientScores(profile: $0) } ?? [:]
 
             aiExport = AIAnalysisExport(
                 healthScore: questionnaire.map { HealthCalculator.calculateHealthScore(profile: $0) },
@@ -107,7 +113,8 @@ final class DataExportService {
                     NutrientExport(
                         name: def.label,
                         score: localScores[def.id.rawValue] ?? 50,
-                        status: NutrientStatus(score: localScores[def.id.rawValue] ?? 50).rawValue,
+                        status: statuts?[def.id.rawValue]
+                            ?? NutrientStatus(score: localScores[def.id.rawValue] ?? 50).rawValue,
                         verdict: aiRaw.nutrientRisks?.first(where: { $0.id == def.id.rawValue })?.verdict
                     )
                 },

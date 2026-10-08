@@ -113,6 +113,24 @@ final class PlanGraphTests: XCTestCase {
         XCTAssertEqual(g.noeuds.filter { $0.genre == .habitude }.map(\.nom), ["Lourde", "Moyenne"])
     }
 
+    // MARK: Les statuts de l'estimateur (8 oct. 2026)
+
+    func testLeStatutOrdonneLesApportsEtNommeLeNoeud() {
+        let estimes = [
+            PlanGraph.Apport(id: "iron", nom: "Fer", score: 30, statut: .peuPrecise),
+            PlanGraph.Apport(id: "magnesium", nom: "Magnésium", score: 80, statut: .aRenforcer),
+        ]
+        let g = PlanGraph.construire(
+            objectifs: [Sujet(id: "obj", nom: "Perte de poids")],
+            symptomes: [Sujet(id: "fatigue", nom: "Fatigue", apports: ["iron", "magnesium"])],
+            apports: estimes, registre: [:]
+        )
+        XCTAssertEqual(g.noeuds.filter { $0.genre == .apport }.map(\.id), ["magnesium", "iron"])
+        XCTAssertEqual(g.resume(de: "iron"), "À affiner · touche 1 symptôme")
+        XCTAssertEqual(PlanGraphTeintes.libelle(.apport, anneau: 2, score: 80, statut: .aRenforcer), "Apport à renforcer")
+        XCTAssertEqual(PlanGraphTeintes.libelle(.apport, anneau: 2, score: 30, statut: .peuPrecise), "Apport")
+    }
+
     // MARK: Le bandeau
 
     func testLeResumeDitUnEtatJamaisUnGeste() {

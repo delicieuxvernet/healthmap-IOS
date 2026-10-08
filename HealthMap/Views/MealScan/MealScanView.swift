@@ -229,7 +229,7 @@ struct JournalView: View {
               let gratification = GratificationRepas.calculer(
                 nouveau: nouveau,
                 repasDuJour: journal.dayMeals,
-                apportsARenforcer: dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id),
+                apportsARenforcer: dashboardVM.apportsEnAlerte,
                 quinzaine: journal.fortnight
               ) else { return }
 
@@ -250,7 +250,7 @@ struct JournalView: View {
         GratificationRepas.calculer(
             nouveau: repas,
             repasDuJour: journal.dayMeals,
-            apportsARenforcer: dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id),
+            apportsARenforcer: dashboardVM.apportsEnAlerte,
             quinzaine: journal.fortnight
         )
     }
@@ -435,7 +435,7 @@ struct JournalView: View {
                         cibleProteines: dashboardVM.physicalMetrics.macros?.protein,
                         cibleGlucides: dashboardVM.physicalMetrics.macros?.carbs,
                         cibleLipides: dashboardVM.physicalMetrics.macros?.fat,
-                        apportsARenforcer: dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id)
+                        apportsARenforcer: dashboardVM.apportsEnAlerte
                     )
                 }
                 // Résultat du scan en bottom-sheet (contenu immersif inchangé).
@@ -1085,7 +1085,10 @@ struct JournalView: View {
             scores: dashboardVM.profile.completed ? dashboardVM.nutrientScores : [:],
             couvertureJournal: dashboardVM.observationsJournal?.couverture ?? [:],
             joursJournal: dashboardVM.observationsJournal?.jours ?? [:],
-            symptomes: dashboardVM.profile.symptoms
+            symptomes: dashboardVM.profile.symptoms,
+            estimations: dashboardVM.profile.completed ? (dashboardVM.estimation?.apports ?? [:]) : [:],
+            statuts: dashboardVM.profile.completed ? dashboardVM.statuts : [:],
+            profil: ProfilEstimation(profile: dashboardVM.profile)
         )
     }
 
@@ -1160,7 +1163,7 @@ struct JournalView: View {
         }
 
         DSSectionHeader(
-            titre: "Apports à renforcer",
+            titre: "Apports à suivre",
             lien: dashboardVM.bilanAffichage == .bilan ? "Tout afficher" : nil,
             action: { showBilanComplet = true }
         )
@@ -1616,7 +1619,11 @@ struct JournalView: View {
             DSCapsuleButton(titre: "Analyser ce repas") {
                 // Le scan suit le jour affiché, comme la recherche et la dictée.
                 viewModel.jourDeSaisie = journal.selectedDay
-                Task { await viewModel.analyzePhoto() }
+                // Les apports estimés, comme partout ailleurs dans l'app.
+                let estimes = dashboardVM.estimation != nil
+                let scores = estimes ? dashboardVM.registre.mapValues(\.score) : nil
+                let alertes = estimes ? dashboardVM.apportsEnAlerte : nil
+                Task { await viewModel.analyzePhoto(scores: scores, alertes: alertes) }
             }
         }
     }

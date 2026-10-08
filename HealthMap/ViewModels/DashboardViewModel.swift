@@ -10,8 +10,14 @@ final class DashboardViewModel: ObservableObject {
     /// Bilan v2 (contrat v2) — nourrit le NOUVEL écran Bilan (v6). Le flux v7
     /// (`aiAnalysis`) continue de nourrir Plan/Compléments jusqu'à la vague V4.
     @Published var analysisV2: AIAnalysisV2? {
-        didSet { if analysisV2 != nil { marquerBilanRecu() } }
+        didSet {
+            if analysisV2 != nil { marquerBilanRecu() }
+            // Un bilan arrive (réseau, cache, test) : ses trois apports prennent
+            // aussitôt le statut et le chiffre du calcul local.
+            if !alignementEnCours { alignerBilan() }
+        }
     }
+    private var alignementEnCours = false
     /// Ce compte a déjà reçu un bilan, une fois, un jour. Règle d'Arthur du 8
     /// octobre 2026 : l'écran plein « 2 à 3 minutes » (`AnalysisGateView`)
     /// n'arrive qu'UNE seule fois, à la fin du tout premier questionnaire.
@@ -30,6 +36,13 @@ final class DashboardViewModel: ObservableObject {
     /// Ce que les repas notés des 14 derniers jours ont montré (étape 3 de
     /// l'audit de personnalisation) ; nil tant qu'ils n'en disent pas assez.
     @Published private(set) var observationsJournal: ObservationsJournal?
+    /// Les journées de repas notés des 14 derniers jours, au format de
+    /// `EstimateurApports` (audit de fiabilité du 8 oct. 2026).
+    @Published private(set) var journeesNotees: [JourneeNotee] = []
+    /// Les 27 apports estimés en vraies quantités (Ciqual × INCA 3 × ANSES
+    /// 2021), journal compris. nil sans questionnaire complet ou si le
+    /// référentiel n'est pas lisible (on retombe alors sur l'ancien registre).
+    @Published private(set) var estimation: ResultatEstimation?
     /// La prise de sang la plus récente (Premium, 30 sept. 2026) ; nil sans
     /// import. Elle corrige les apports APRÈS le journal (`PriseDeSangApports`).
     @Published private(set) var priseDeSang: PriseDeSang?
@@ -199,13 +212,23 @@ final class DashboardViewModel: ObservableObject {
     }
 
     var deficiencies: [EnrichedNutrient] {
-        // Seuil aligné sur l'échelle unique HealthScale (loi 3) :
-        // « Solide » commence à 70 — en dessous, le nutriment est à surveiller.
-        nutrients.filter { $0.score < 70 }.sorted { $0.score < $1.score }
+        // Apports estimés (audit de fiabilité, 8 oct. 2026) : le STATUT dit ce
+        // qui est sous la référence, les alertes sûres d'abord. Sans statut,
+        // l'échelle HealthScale : « Solide » commence à 70.
+        let statuts = self.statuts
+        guard !statuts.isEmpty else {
+            return nutrients.filter { $0.score < 70 }.sorted { $0.score < $1.score }
+        }
+        func rang(_ s: StatutApport?) -> Int { s == .aRenforcer ? 0 : (s == .aSurveiller ? 1 : 2) }
+        return nutrients
+            .filter { statuts[$0.id]?.estSousLaReference == true }
+            .sorted { (rang(statuts[$0.id]), $0.score) < (rang(statuts[$1.id]), $1.score) }
     }
 
     var goodNutrients: Int {
-        nutrients.filter { $0.score >= 70 }.count
+        let statuts = self.statuts
+        guard !statuts.isEmpty else { return nutrients.filter { $0.score >= 70 }.count }
+        return nutrients.filter { statuts[$0.id].map { !$0.estSousLaReference } ?? ($0.score >= 70) }.count
     }
 
     var interactionsCount: Int {
@@ -430,11 +453,14 @@ final class DashboardViewModel: ObservableObject {
         guard profile.completed else {
             healthScore = 0
             nutrientScores = [:]
+            estimation = nil
             return
         }
 
         healthScore = HealthCalculator.calculateHealthScore(profile: profile)
+        estimation = EstimateurApports.partage?.estimer(ProfilEstimation(profile: profile), journees: journeesNotees)
         nutrientScores = registre.mapValues(\.score)
+        alignerBilan()
 
         captureBaselineIfNeeded()
     }
@@ -446,18 +472,114 @@ final class DashboardViewModel: ObservableObject {
     /// rappelant `HealthCalculator.registreApports` : sinon la fiche et le
     /// tableau de bord ne diraient pas le même chiffre.
     var registre: [String: DetailApport] {
-        PriseDeSangApports.appliquer(registreSansPriseDeSang, priseDeSang: priseDeSang)
+        // Apport estimé : la prise de sang ne déplace plus le chiffre (une
+        // quantité estimée reste une quantité) ; elle ne change que le statut,
+        // porté par `statuts` et par le détail (audit des écrans, 8 oct. 2026).
+        if estimation != nil, profile.completed { return registreSansPriseDeSang }
+        return PriseDeSangApports.appliquer(registreSansPriseDeSang, priseDeSang: priseDeSang)
     }
 
-    /// Questionnaire + journal, sans la prise de sang.
+    /// Questionnaire + journal, sans la prise de sang. Depuis l'audit de
+    /// fiabilité (8 oct. 2026), c'est l'estimation en vraies quantités : ses
+    /// sources tiennent lieu de contributions, le chiffre est la part de la
+    /// référence couverte. L'ancien registre en points ne sert plus que de
+    /// repli si le référentiel est illisible.
     private var registreSansPriseDeSang: [String: DetailApport] {
-        JournalApports.appliquer(HealthCalculator.registreApports(profile: profile), observations: observationsJournal)
+        guard let estimation, profile.completed else {
+            return JournalApports.appliquer(HealthCalculator.registreApports(profile: profile), observations: observationsJournal)
+        }
+        let profil = ProfilEstimation(profile: profile)
+        let statuts = self.statuts
+        var sortie: [String: DetailApport] = [:]
+        for nutriment in NutrientID.allCases {
+            let id = nutriment.rawValue
+            guard let e = estimation.apports[id] else { continue }
+            sortie[id] = LectureEstimation.detail(id, e.avecStatut(statuts[id] ?? e.statut), profil: profil)
+        }
+        return sortie
+    }
+
+    /// Le statut de chaque apport estimé : ce que l'app peut affirmer. Une
+    /// prise de sang récente prime sur l'estimation, sauf pour le calcium et
+    /// le magnésium, que le corps tient serrés dans le sang.
+    var statuts: [String: StatutApport] {
+        guard let estimation else { return [:] }
+        var sortie = estimation.apports.mapValues(\.statut)
+        guard let priseDeSang, PriseDeSangApports.fraicheur(priseDeSang) > 0 else { return sortie }
+        for (id, statut) in sortie where statut != .couvertParComplement {
+            guard let m = PriseDeSangApports.marqueur(pour: id, dans: priseDeSang) else { continue }
+            let regule = PriseDeSangApports.marqueursRegules.contains(m.code)
+            switch m.position {
+            case .sousRepere: sortie[id] = .aRenforcer
+            case .basDuRepere where !regule: sortie[id] = .aSurveiller
+            case .dansRepere where !regule, .auDessus where !regule: sortie[id] = .couvert
+            default: break
+            }
+        }
+        return sortie
+    }
+
+    /// Les apports dont l'app peut AFFIRMER qu'ils sont à renforcer (statut
+    /// « à renforcer » de l'estimateur, ou prise de sang sous le repère).
+    /// Sans estimation, l'ancien seuil (sous 60). Ordre du catalogue.
+    /// « Ton apport en magnésium semble bas. » : la phrase de l'estimateur,
+    /// par apport, avec le statut retenu (prise de sang comprise). Elle prime
+    /// sur le verdict rédigé par l'analyse, écrit sur d'autres chiffres.
+    var verdictsEstimes: [String: String] {
+        guard let estimation else { return [:] }
+        let statuts = self.statuts
+        var sortie: [String: String] = [:]
+        for definition in NutrientData.all {
+            let id = definition.id.rawValue
+            guard let e = estimation.apports[id] else { continue }
+            sortie[id] = LectureEstimation.verdict(nom: definition.label, estimation: e, statut: statuts[id])
+        }
+        return sortie
+    }
+
+    var apportsEnAlerte: [String] {
+        let statuts = self.statuts
+        guard !statuts.isEmpty else { return nutrients.filter { $0.score < 60 }.map(\.id) }
+        return NutrientID.allCases.map(\.rawValue).filter { statuts[$0]?.estUneAlerte == true }
+    }
+
+    /// Les trois apports du bilan rédigé portent le statut et le chiffre du
+    /// calcul local : un seul chiffre, un seul statut partout.
+    private func alignerBilan() {
+        guard var bilan = analysisV2, var apports = bilan.bilan?.apports, !apports.isEmpty else { return }
+        let statuts = self.statuts
+        guard !statuts.isEmpty else { return }
+        for index in apports.indices {
+            guard let id = apports[index].id else { continue }
+            if let statut = statuts[id] { apports[index].statut = statut.statutV2 }
+            if let score = nutrientScores[id] { apports[index].pctBesoin = score }
+        }
+        bilan.bilan?.apports = apports
+        alignementEnCours = true
+        analysisV2 = bilan
+        alignementEnCours = false
     }
 
     /// Le hash du bilan : le profil, la version du calcul, ce que le journal
     /// puis la prise de sang changent aux scores (par paliers de 5 points), et
     /// la date de la prise de sang — le bilan la cite.
     var hashDuBilan: String {
+        // Le calcul estimé : le bilan se refait quand un statut change, ou
+        // quand le journal déplace un chiffre d'un palier de 10.
+        if let estimation, profile.completed {
+            let statuts = self.statuts
+            let signature = NutrientID.allCases.compactMap { nutriment -> String? in
+                let id = nutriment.rawValue
+                guard let e = estimation.apports[id] else { return nil }
+                let palier = Int((Double(LectureEstimation.couverture(e)) / Double(JournalApports.palierDuBilan)).rounded()) * JournalApports.palierDuBilan
+                return "\(id)=\((statuts[id] ?? e.statut).rawValue)/\(palier)"
+            }.joined(separator: ",")
+            return AIAnalysisService.hashProfile(
+                profile,
+                journal: estimation.journeesRetenues > 0 ? signature : "",
+                sang: PriseDeSangApports.signatureDuBilan(priseDeSang, scores: signature)
+            )
+        }
         let questionnaire = HealthCalculator.registreApports(profile: profile)
         let avecJournal = JournalApports.appliquer(questionnaire, observations: observationsJournal)
         let signature = JournalApports.signature(avant: questionnaire, apres: avecJournal)
@@ -544,6 +666,16 @@ final class DashboardViewModel: ObservableObject {
     /// canon. Vide avant le questionnaire (aucun score à corriger).
     func effetsPriseDeSang() -> [PriseDeSangApports.Effet] {
         guard profile.completed, priseDeSang != nil else { return [] }
+        // Apport estimé : ce que la prise de sang change, c'est le statut.
+        if let estimation {
+            let statuts = self.statuts
+            return NutrientData.all.compactMap { def in
+                let id = def.id.rawValue
+                guard let e = estimation.apports[id], let apres = statuts[id], apres != e.statut else { return nil }
+                let pct = LectureEstimation.couverture(e)
+                return PriseDeSangApports.Effet(id: id, avant: pct, apres: pct, statutAvant: e.statut, statutApres: apres)
+            }
+        }
         let sans = registreSansPriseDeSang
         let avec = registre
         return NutrientData.all.compactMap { def in
@@ -596,6 +728,7 @@ final class DashboardViewModel: ObservableObject {
         // Même mesure que le Journal : la composition exacte des aliments
         // quand la base la connaît, ce que le repas avait enregistré sinon.
         let compositions = await CompositionsStore.shared.completer(pour: repas)
+        journeesNotees = LectureEstimation.journees(MesuresRepas.journees(repas: repas, compositions: compositions))
         observationsJournal = JournalApports.observations(
             repas: MesuresRepas.repasPrecises(repas, compositions: compositions),
             profil: profile
@@ -621,6 +754,11 @@ final class DashboardViewModel: ObservableObject {
         observationsJournal = observations
     }
 
+    /// Tests : pose des journées notées sans passer par le réseau.
+    func poserJourneesNotees(_ journees: [JourneeNotee]) {
+        journeesNotees = journees
+    }
+
     /// Tests : pose une prise de sang sans réseau ni bilan.
     func poserPriseDeSangPourTest(_ prise: PriseDeSang?) {
         priseDeSang = prise
@@ -636,9 +774,11 @@ final class DashboardViewModel: ObservableObject {
     /// baseline dès le premier affichage. Non bloquant : un échec d'écriture
     /// n'est que loggué (l'utilisateur retentera au prochain chargement).
     private func captureBaselineIfNeeded() {
-        guard profile.baselineNutrientScores == nil, !nutrientScores.isEmpty else { return }
+        // Un départ d'un autre calcul ne se compare pas : il est recapturé.
+        guard baselineApports == nil, !nutrientScores.isEmpty else { return }
 
-        let baseline = nutrientScores
+        var baseline = nutrientScores
+        baseline[CalculApports.cleDuDepart] = CalculApports.empreinte
         // Copie en mémoire immédiate (la barre l'utilise tout de suite).
         profile.baselineNutrientScores = baseline
 
@@ -653,7 +793,23 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
+    /// Les scores de départ de Progrès, seulement s'ils viennent du calcul
+    /// actuel ; sans la clé de datation.
+    var baselineApports: [String: Int]? {
+        guard let depart = profile.baselineNutrientScores,
+              depart[CalculApports.cleDuDepart] == CalculApports.empreinte else { return nil }
+        return depart.filter { $0.key != CalculApports.cleDuDepart }
+    }
+
     // MARK: - Trigger AI Analysis
+
+    /// Les scores que l'analyse rédigée explique : ceux du registre (apports
+    /// estimés) quand l'estimateur répond ; sinon `nil`, l'ancien calcul.
+    private var scoresPourLAnalyse: [String: Int]? {
+        guard estimation != nil else { return nil }
+        let scores = registre.mapValues(\.score)
+        return scores.isEmpty ? nil : scores
+    }
 
     func triggerAnalysis() async {
         // Même logique que computeLocalScores : l'analyse doit pouvoir démarrer
@@ -684,7 +840,8 @@ final class DashboardViewModel: ObservableObject {
         do {
             let merged = try await aiAnalysisService.fetchFullAnalysis(
                 userId: userId,
-                profile: profile
+                profile: profile,
+                scores: scoresPourLAnalyse
             )
 
             self.aiAnalysis = merged
@@ -730,7 +887,7 @@ final class DashboardViewModel: ObservableObject {
                     if cachedResponse != nil {
                         // The service will find the cached row and skip the edge call
                         // since the profile hash hasn't changed.
-                        let retried = try await aiAnalysisService.fetchFullAnalysis(userId: userId, profile: profile)
+                        let retried = try await aiAnalysisService.fetchFullAnalysis(userId: userId, profile: profile, scores: scoresPourLAnalyse)
                         if let retried {
                             self.aiAnalysis = retried
                             self.healthScore = retried.healthScore
@@ -801,6 +958,7 @@ final class DashboardViewModel: ObservableObject {
                     userId: userId,
                     profileHash: profileHash,
                     scores: localScores,
+                    statuts: statuts.mapValues(\.codeServeur),
                     healthScore: localHealthScore,
                     redFlags: localFlags,
                     forceRefresh: forceRefresh
