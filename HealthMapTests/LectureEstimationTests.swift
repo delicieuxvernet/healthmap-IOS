@@ -20,17 +20,23 @@ final class LectureEstimationTests: XCTestCase {
 
     func testLeVerdictParleDUnApportJamaisDUnTaux() throws {
         let mg = try XCTUnwrap(try estimation(casDeLAudit).apports["magnesium"])
+        XCTAssertEqual(LectureEstimation.verdict(nom: "Magnésium", estimation: mg, statut: .aSurveiller),
+                       "Ton apport en magnésium semble proche de la référence.")
         let phrase = LectureEstimation.verdict(nom: "Magnésium", estimation: mg)
-        XCTAssertEqual(phrase, "Ton apport en magnésium semble proche de la référence.")
-        XCTAssertFalse(phrase.contains("bas"))
-        XCTAssertFalse(phrase.lowercased().contains("taux"))
+        XCTAssertEqual(mg.statut, .peuPrecise, "neuf aliments cochés : rien d'affirmé")
+        XCTAssertTrue(phrase.contains("sans certitude"), phrase)
+        for statut in [StatutApport.couvert, .aSurveiller, .aRenforcer, .peuPrecise, .couvertParComplement] {
+            let texte = LectureEstimation.verdict(nom: "Magnésium", estimation: mg, statut: statut)
+            XCTAssertFalse(texte.lowercased().contains("taux"), texte)
+            XCTAssertTrue(texte.contains("apport"), texte)
+        }
     }
 
     func testLaQuantiteEstUneVraieQuantite() throws {
         let mg = try XCTUnwrap(try estimation(casDeLAudit).apports["magnesium"])
         let texte = LectureEstimation.quantite("magnesium", mg)
-        XCTAssertTrue(texte.hasPrefix("≈ 332"), texte)
-        XCTAssertTrue(texte.contains("380"), "référence ANSES 2021 d'un homme : \(texte)")
+        XCTAssertTrue(texte.hasPrefix("≈ 379"), texte)
+        XCTAssertTrue(texte.contains("sur 380"), "référence ANSES 2021 d'un homme : \(texte)")
     }
 
     func testLesSourcesSommentALaQuantite() throws {
@@ -55,7 +61,16 @@ final class LectureEstimationTests: XCTestCase {
         XCTAssertEqual(d.score, LectureEstimation.couverture(mg))
         XCTAssertEqual(d.parts.reduce(0) { $0 + $1.valeur }, 100)
         XCTAssertEqual(LectureApport.verdict(id: "magnesium", nom: "Magnésium", detail: d),
-                       "Ton apport en magnésium semble proche de la référence.")
+                       LectureEstimation.verdict(nom: "Magnésium", estimation: mg))
+        XCTAssertTrue(LectureEstimation.sources("magnesium", mg, profil: casDeLAudit).contains { $0.id == "non_coches" },
+                      "caddie insuffisant : les aliments non cochés sont une source nommée")
+    }
+
+    func testUnCaddieInsuffisantInviteACocher() throws {
+        let r = try estimation(casDeLAudit)
+        let caddie = try XCTUnwrap(LectureEstimation.alimentsACocher(r))
+        XCTAssertEqual(caddie.coches, 9)
+        XCTAssertEqual(caddie.minimum, 15)
     }
 
     func testLeStatutDecideDesCouleursPasLeChiffre() {

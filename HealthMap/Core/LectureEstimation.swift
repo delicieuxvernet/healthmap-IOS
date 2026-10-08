@@ -145,6 +145,13 @@ enum LectureEstimation {
         return (e.joursJournalRetenus, conseillees)
     }
 
+    /// Caddie insuffisant : combien d'aliments il reste à cocher pour que
+    /// l'app puisse affirmer quelque chose. nil quand il suffit.
+    static func alimentsACocher(_ r: ResultatEstimation) -> (coches: Int, minimum: Int)? {
+        guard !r.caddieSuffisant else { return nil }
+        return (r.alimentsCoches, r.alimentsCochesMinimum)
+    }
+
     /// Calcium et magnésium : le corps tient leur taux sanguin serré.
     static let marqueursRegules: Set<String> = PriseDeSangApports.marqueursRegules
 
@@ -193,6 +200,8 @@ enum LectureEstimation {
                    detail: libelleCafe(profil.caffeineIntake) ?? "moyenne des Français", valeur: d.cafeThe * f, section: .modeDeVie),
             Source(id: "courses", libelle: "Tes courses",
                    detail: courses.isEmpty ? nil : courses.joined(separator: ", "), valeur: d.courses * f, section: .nutrition),
+            Source(id: "non_coches", libelle: "Les aliments que tu n'as pas cochés",
+                   detail: "moyenne des Français", valeur: d.caddieNonRenseigne * f, section: .profil),
             Source(id: "eau", libelle: "Ton eau",
                    detail: libelleEau(profil.waterIntake) ?? "moyenne des Français", valeur: d.eau * f, section: .modeDeVie),
             Source(id: "alcool", libelle: "Tes boissons alcoolisées",

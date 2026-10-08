@@ -227,6 +227,12 @@ struct ApportV2DetailSheet: View {
                         FicheBloc(titre: "Pour une estimation fiable", rang: 1) {
                             fiabiliteCarte(notees: restant.notees, conseillees: restant.conseillees)
                         }
+                    } else if !estimation.alerteOuverte,
+                              let resultat = dashboardVM.estimation,
+                              let caddie = LectureEstimation.alimentsACocher(resultat) {
+                        FicheBloc(titre: "Pour une estimation fiable", rang: 1) {
+                            caddieCarte(coches: caddie.coches, minimum: caddie.minimum)
+                        }
                     }
 
                     if let id = apport.id, let note = LectureEstimation.notePriseDeSang(id) {
@@ -495,6 +501,35 @@ struct ApportV2DetailSheet: View {
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Ton chiffre passera de l'estimation à la mesure.")
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(DS.paddingCarte)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .accessibilityElement(children: .combine)
+    }
+
+    private func caddieCarte(coches: Int, minimum: Int) -> some View {
+        let restants = max(0, minimum - coches)
+        return HStack(alignment: .center, spacing: 12) {
+            Text("\(coches)/\(minimum)")
+                .font(.dsSousTitre.weight(.bold).monospacedDigit())
+                .foregroundStyle(Color.teinteKiwiTexte)
+                .frame(width: 44, height: 44)
+                .background(Color.teinteKiwiPale, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(restants == 1 ? "Coche encore 1 aliment dans tes courses" : "Coche encore \(restants) aliments dans tes courses")
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Avec si peu d'aliments, ton chiffre reste une moyenne : on ne t'affirme rien.")
                     .font(.dsLegende)
                     .tracking(DSTracking.legende)
                     .foregroundStyle(Color.dsSecondaire)
