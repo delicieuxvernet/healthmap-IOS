@@ -10,11 +10,24 @@ final class DashboardViewModel: ObservableObject {
     /// Bilan v2 (contrat v2) — nourrit le NOUVEL écran Bilan (v6). Le flux v7
     /// (`aiAnalysis`) continue de nourrir Plan/Compléments jusqu'à la vague V4.
     @Published var analysisV2: AIAnalysisV2? {
-        // Un bilan arrive (réseau, cache, test) : ses trois apports prennent
-        // aussitôt le statut et le chiffre du calcul local.
-        didSet { if !alignementEnCours { alignerBilan() } }
+        didSet {
+            if analysisV2 != nil { marquerBilanRecu() }
+            // Un bilan arrive (réseau, cache, test) : ses trois apports prennent
+            // aussitôt le statut et le chiffre du calcul local.
+            if !alignementEnCours { alignerBilan() }
+        }
     }
     private var alignementEnCours = false
+    /// Ce compte a déjà reçu un bilan, une fois, un jour. Règle d'Arthur du 8
+    /// octobre 2026 : l'écran plein « 2 à 3 minutes » (`AnalysisGateView`)
+    /// n'arrive qu'UNE seule fois, à la fin du tout premier questionnaire.
+    /// Ensuite, quoi qu'il arrive (lecture réseau ratée au lancement, bilan
+    /// d'un ancien format, questionnaire refait, génération en échec), l'app
+    /// reste ouverte et le bilan se refait derrière. Retenu sur l'appareil
+    /// par compte, et reposé dès qu'un bilan est lu en base.
+    @Published private(set) var bilanDejaRecu = false
+    /// Le compte dont `bilanDejaRecu` parle.
+    private var userIdCourant: String?
     @Published var isLoadingProfile = false
     @Published var isLoadingAnalysis = false
     @Published var isLoadingAnalysisV2 = false
@@ -330,6 +343,10 @@ final class DashboardViewModel: ObservableObject {
         }
 
         let userId = session.user.id.uuidString
+        if userIdCourant != userId {
+            userIdCourant = userId
+            bilanDejaRecu = UserDefaults.standard.bool(forKey: Self.cleBilanRecu(userId))
+        }
         isLoadingProfile = true
         errorMessage = nil
 
@@ -587,11 +604,25 @@ final class DashboardViewModel: ObservableObject {
     private func poserDernierBilanConnu(userId: String) async {
         // `(try? …) ?? nil` aplatit le double-optionnel (la fonction rend déjà
         // `AIAnalysisV2?`) — même motif que dans AIAnalysisService.fetchBilanV2.
-        guard analysisV2 == nil, !recapArme,
-              let cached = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil,
-              cached.isValidV2
+        guard analysisV2 == nil,
+              let cached = (try? await databaseService.loadAIAnalysisV2(userId: userId)) ?? nil
         else { return }
+        // Un bilan existe en base, même d'un ancien format : le compte en a
+        // déjà reçu un, l'écran plein ne reviendra pas.
+        marquerBilanRecu()
+        guard !recapArme, cached.isValidV2 else { return }
         analysisV2 = cached
+    }
+
+    private static func cleBilanRecu(_ userId: String) -> String {
+        "kiwio.bilanDejaRecu.\(userId)"
+    }
+
+    /// Retient, pour ce compte et pour toujours, qu'un bilan est arrivé.
+    private func marquerBilanRecu() {
+        bilanDejaRecu = true
+        guard let userIdCourant else { return }
+        UserDefaults.standard.set(true, forKey: Self.cleBilanRecu(userIdCourant))
     }
 
     /// La prise de sang a changé (import, suppression) : le rappel des 6 mois

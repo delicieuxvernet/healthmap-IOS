@@ -753,9 +753,13 @@ struct MainTabView: View {
         // `gateContournee` : la seule porte de sortie. Sans elle, un échec du
         // bilan enfermait l'utilisateur dans l'app — écran plein, aucun bouton
         // de fermeture, aucun onglet accessible.
+        // `bilanDejaRecu` (8 oct. 2026) : UNE seule fois par compte, au tout
+        // premier bilan. Ensuite l'app ne se bloque plus jamais : le bilan se
+        // refait derrière, la carte du Journal dit qu'il arrive.
         .fullScreenCover(isPresented: Binding(
             get: {
                 !dashboardVM.gateContournee
+                    && !dashboardVM.bilanDejaRecu
                     && dashboardVM.analysisV2 == nil
                     && (dashboardVM.isLoadingAnalysisV2 || dashboardVM.errorMessageV2 != nil)
             },
