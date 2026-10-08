@@ -815,20 +815,13 @@ extension ApportV2 {
 
 /// Le rôle physiologique, en trois mots : la ligne secondaire sous le titre
 /// de la fiche. Catalogue côté client, jamais l'IA.
+/// « Ce que ça fait » : les allégations autorisées (Règlement UE 432/2012)
+/// du catalogue `Micronutriments`, les mêmes que le Journal. Audit du 8 oct.
+/// 2026 : les mots-clés d'avant (« sommeil », « humeur », « inflammation »,
+/// « glycémie ») n'étaient pas autorisés. Les fibres n'ont pas d'allégation
+/// générale (seulement par aliment : son de blé, avoine…) : pas de bloc.
 enum ApportRole {
     static func role(for id: String) -> String? {
-        switch id {
-        case "vitD": return "Os, immunité, humeur"
-        case "vitB12": return "Nerfs, globules rouges, énergie"
-        case "iron": return "Transport de l'oxygène, énergie"
-        case "magnesium": return "Muscles, nerfs, sommeil"
-        case "omega3": return "Cœur, cerveau, inflammation"
-        case "vitC": return "Immunité, absorption du fer"
-        case "calcium": return "Os, dents, contraction musculaire"
-        case "zinc": return "Immunité, peau, cicatrisation"
-        case "iodine": return "Thyroïde, métabolisme"
-        case "fiber": return "Digestion, satiété, glycémie"
-        default: return nil
-        }
+        Micronutriments.tous.first { $0.id == id }?.role
     }
 }
