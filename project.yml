@@ -67,7 +67,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: D87R3L7B75
         CURRENT_PROJECT_VERSION: 1
-        MARKETING_VERSION: "1.0.5"
+        MARKETING_VERSION: "1.0.6"
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
@@ -145,7 +145,7 @@ targets:
         CURRENT_PROJECT_VERSION: 1
         # À bumper EN MÊME TEMPS que celle de l'app (`WidgetsPartageTests`
         # échoue si les deux divergent).
-        MARKETING_VERSION: "1.0.5"
+        MARKETING_VERSION: "1.0.6"
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
         APPLICATION_EXTENSION_API_ONLY: YES

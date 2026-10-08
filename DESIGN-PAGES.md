@@ -170,17 +170,25 @@
 >      « Terminer »** (toucher la bulle termine aussi). Quand le doigt tient encore le bouton, ces
 >      deux boutons deviennent « Glisse pour annuler » et « Relâche pour terminer », et la bulle
 >      suit le doigt à l'horizontale en s'estompant vers l'annulation ;
->   3. **le calcul, sous la bulle** : elle se contracte à 66 pt, trois points tournent autour
->      d'elle (un tour en 1,2 s), les couches accélèrent, « Kiwio calcule tes apports… ». La
->      transcription PUIS l'analyse se font là, avant que la feuille ne monte
->      (`VoiceMealSheet.preparer` : mêmes appels, même ordre, mêmes données envoyées). Dès que la
->      transcription existe, la carte la relit **mot à mot, du flou au net** (`MotsQuiArrivent`).
+>   3. **la transcription, sous la bulle** : elle se contracte à 66 pt, trois points tournent
+>      autour d'elle (un tour en 1,2 s), les couches accélèrent, « Kiwio relit ta dictée… ». SEULE
+>      la transcription se fait là, sur l'appareil, gratuite (`VoiceMealSheet.transcrire`). Dès
+>      qu'elle existe, la carte la relit **mot à mot, du flou au net** (`MotsQuiArrivent`).
 >      ⚠️ Les mots n'arrivent PAS pendant qu'on parle : la capture enregistre d'abord et transcrit
 >      ensuite (voir `SpeechCaptureService`), décision conservée. Un « Annuler » réapparaît après
->      4 s de calcul : la scène couvre tout l'écran, il faut une sortie ;
->   4. **les résultats** : la bulle s'efface et **une feuille de verre DÉTACHÉE des bords** monte
->      (marges de 8, rayon 44, posée en bas à la taille de ce qu'elle montre ; elle défile si le
->      contenu dépasse) ; le voile reste jusqu'à ce qu'elle redescende. « Ton déjeuner » en 24/700
+>      4 s : la scène couvre tout l'écran, il faut une sortie ;
+>   3'. **la relecture, AVANT tout appel serveur** (retour d'Arthur, 7 octobre 2026 : une dictée
+>      ratée partait quand même à `parse-meal-voice`, payant, et ne se corrigeait qu'après) : la
+>      bulle s'efface et la feuille de verre (ci-dessous) monte sur « Dictée terminée », « Vérifie
+>      ce que j'ai compris… », **le texte transcrit dans un champ modifiable** (crayon en coin),
+>      puis le pied commun à « Écrire » (variante B, 7 octobre 2026) : « C'est bien ça ? Rien ne
+>      part avant ton feu vert. », **« Effacer »** (verre clair) et **« Lancer l'analyse »** (le seul
+>      geste qui appelle le serveur), et dessous **« Recommencer la
+>      dictée »** (la feuille redescend et la bulle se rouvre d'elle-même, mains libres). Après un
+>      échec d'analyse, « Corriger le texte » ramène ce champ au lieu d'imposer de tout redire ;
+>   4. **les résultats** : après « Lancer l'analyse », le pépin tourne dans **une feuille de verre
+>      DÉTACHÉE des bords** (marges de 8, rayon 44, posée en bas à la taille de ce qu'elle montre ;
+>      elle défile si le contenu dépasse) ; le voile reste jusqu'à ce qu'elle redescende. « Ton déjeuner » en 24/700
 >      (« Ton repas » tant que le repas n'est pas choisi) et « 3 aliments reconnus », les lignes en
 >      cascade (pastille de 40, nom, quantité, kcal ; UNE seule déployée à la fois pour régler sa
 >      quantité), le total qui compte, **les étiquettes de ce que le repas apporte** (« Protéines
@@ -205,12 +213,17 @@
 >   `kiwiCompteur`) et `kiwiVif` pour l'appui (0,96) ; rien ne dépasse 1,22 (`KiwiEchelle.plafond`).
 >   **Réduire les animations** : la bulle est posée d'emblée à sa place, liquide figé, ni onde ni
 >   trajet ; la capsule arrive dépliée ; tout se fait en fondu.
->   « Écrire » ouvre la même feuille détachée sur un champ, sans la bulle. Les autres ajouts
+>   « Écrire » ouvre la même feuille détachée sur un champ, sans la bulle, avec le même pied que la
+>   relecture : « C'est bien ça ? Rien ne part avant ton feu vert. », « Effacer » et « Lancer
+>   l'analyse ». Les autres ajouts
 >   (photo, recherche, code-barres) gardent la gratification décrite plus bas.
 > - **Micronutriments** (1er octobre 2026, verre le 2 ; `JournalMicrosComponents.swift`, calcul
->   `Core/MicrosDuJour.swift`) — sous la saisie. **Réservé au Premium** : en gratuit, la carte
->   reste devinable derrière le flou, et une porte « Débloque tes micronutriments » la suit (zone
->   `journal_micros`). La carte porte son en-tête (feuille verte, « Micronutriments », « touche
+>   `Core/MicrosDuJour.swift`) — sous la saisie. **Réservé au Premium** : en gratuit (variante B,
+>   7 octobre 2026), la carte n'est PAS floutée : « N micronutriments calculés sur tes repas »,
+>   les filtres, toute la liste dans l'ordre du catalogue, noms nets, et sur chaque ligne une
+>   pastille « 🔒 Débloquer avec Premium » à la place de la jauge et du chiffre ; ni priorités, ni
+>   repère « bas », ni phrase sur la personne (rien ne se devine). Le bouton d'essai (StoreKit)
+>   clôt la carte ; toucher une ligne ou ce bouton ouvre l'abonnement (zone `journal_micros`). La carte porte son en-tête (feuille verte, « Micronutriments », « touche
 >   pour le détail ») ; **les trois apports qui comptent le plus pour la personne**, puis tous les
 >   autres derrière « Voir les N micronutriments ». Une ligne = le nom, un point et une jauge à la
 >   TEINTE de l'apport, le pourcentage, un chevron ; un apport bas porte un petit signe rouge ou
@@ -444,21 +457,42 @@
 >   `PremiumGating.swift`). **Contenu verrouillé, partout** : un seul traitement, flou 8 et opacité
 >   0,5, sans voile blanc ; portes (`UnlockDoor`), jauges de quota et écrin Premium en verre.
 >
-> - **Widgets, écran verrouillé, activité en direct** (1er oct. 2026, maquette montrée dans le chat,
->   `Partage/VuesWidgets.swift` + `KiwioWidgets/`) : quatre widgets et une carte d'écran verrouillé
->   qui reprennent le Journal, jamais un design à part. **Ma journée** (petit : le chiffre des kcal
->   restantes + jauge ; moyen : le chiffre, la série, les quatre repas Matin · Midi · Soir · Encas avec
->   les symboles de la grille du Journal, un « + » vert sur chacun ; rectangulaire d'écran
->   verrouillé ; hors le vert Kiwio, les widgets gardent les teintes du système, qui suivent le mode
->   clair ou sombre, là où l'app est passée à la palette du verre : même famille de couleur, pas la
->   même valeur). **Ajout rapide** (petit et rond : le micro ; moyen : quatre tuiles, Dicter en vert,
->   Photo, l'eau, le rituel). **Eau** (les litres comme sur la carte Eau, « + 25 cl »). **Rituel du
->   jour** (matin · midi · soir à cocher, **jamais de dose**). **Activité en direct « Ta journée »** :
->   les quatre repas, puis Dicter · eau · rituel. Règle de geste : l'eau et le rituel se cochent sur
->   place ; Dicter, Photo et un repas ouvrent l'app au bon endroit (un widget ne peut pas enregistrer
->   la voix). Le vert reste réservé à ce qui se touche. Un widget suit le mode clair ou sombre du
->   téléphone (l'app, elle, reste claire). Réglages → Widgets et écran verrouillé : l'interrupteur
->   « Ma journée en direct », les aperçus (les vraies vues), le mode d'emploi en trois lignes.
+> - **Widgets, écran verrouillé, activité en direct** (refonte « en verre » du 3 oct. 2026, maquette
+>   Claude Design « Kiwio - Widgets », W1 à W7 ; briques dans `Partage/VuesWidgets.swift`, vues dans
+>   `Partage/Widgets*.swift`, configurations dans `KiwioWidgets/`) : six widgets, des accessoires
+>   d'écran verrouillé et une carte en direct, qui disent ce que dit le Journal, jamais autre chose.
+>   **Le verre** : texte blanc, plaques blanches translucides, bouton vert (dégradé `#96E26C` →
+>   `#5DA838`) pour ce qui se touche, pastille pâle pour ce qui est fait. Un widget ne voit pas le fond
+>   d'écran : en couleurs pleines, `FondVerreW` peint la base verte de la maquette puis le verre ; en
+>   Teinté et Transparent (iOS 18, iOS 26), iOS pose son propre verre et les illustrations 3D gardent
+>   leurs couleurs. Le verre est le même en mode clair et sombre. Teintes des apports et des repas :
+>   celles de la maquette, faites pour le verre et distinctes de la palette de l'app (vitamine D
+>   `#FFB547`, magnésium `#AFAEFF`, fer `#F0B27A`, les sept autres dérivées ; repas matin `#FFB547` ·
+>   midi `#8FDB62` · soir `#AFAEFF` · encas `#FF8FB1`). **Tes apports** (petit : l'apport le plus bas
+>   en anneau, son score, un aliment pour le prochain repas ; moyen : le verdict, les trois anneaux,
+>   « Voir le calcul » ; grand : l'apport en grand, sa cause, « Ce qui la remonte » en pastilles, les
+>   autres en barres ; rond, rectangulaire et en ligne sur l'écran verrouillé) : un seul chiffre par
+>   apport, celui du registre, et les mots de la fiche (`LectureApport`), jamais recalculés.
+>   **Conseil du jour** (petit, moyen, rectangulaire) : un geste par jour pour l'apport à renforcer,
+>   tiré des gestes de la fiche, qui change à minuit sans ouvrir l'app ; « C'est fait » se coche et se
+>   décoche sur place ; le geste est réservé au Premium, comme « Ce que tu peux faire » dans la fiche ;
+>   **jamais de dose**. **Ajout rapide** (petit : le micro et la question du repas de l'heure, « Ton
+>   midi ? » ; moyen : Dicter en grand, puis Photo, l'eau, le rituel, Chercher ; rond : le micro).
+>   **Eau** (le verre qui se remplit vraiment, les litres, « + 25 cl » jusqu'à l'objectif ; rond : les
+>   verres en anneau, un toucher ajoute un verre). **Rituel du jour** (petit : le prochain moment à
+>   prendre ; moyen : matin · midi · soir ; **jamais de dose**). **Ma journée** (même rôle, habillé
+>   comme la carte en direct : les kcal, la barre des repas, les quatre repas qui ouvrent leur fiche).
+>   **Activité en direct « Ta journée »** : la journée en une barre (chaque repas sa couleur), les kcal
+>   restantes, la série, puis Dicter · eau · prise du moment ; Dynamic Island compacte (le signe, les
+>   kcal), minimale (l'anneau du jour) et étendue (l'anneau, le prochain repas, Dicter et l'eau) ; un
+>   jour périmé dit « Nouvelle journée » au lieu des chiffres de la veille. Règle de geste : l'eau, le
+>   rituel et le conseil se cochent sur place ; Dicter, Photo, Chercher, un repas et un apport ouvrent
+>   l'app au bon endroit (« Voir le calcul » et « Pourquoi ? » : la fiche de l'apport, servie par le
+>   Journal). Accessoires d'écran verrouillé : monochromes, comme iOS les dessine. Réglages → Widgets
+>   et écran verrouillé : l'interrupteur « Ma journée en direct », l'écran verrouillé en miniature sur
+>   le fond d'écran de la maquette (accessoires et carte en direct), les widgets d'accueil à leur
+>   taille d'iPhone 16 (les vraies vues, nourries par la journée en cours, sinon par un exemple), le
+>   mode d'emploi en trois lignes.
 >
 > - **Prise de sang** (Premium, 30 sept. 2026 — maquette validée le 6 juil., `Views/PriseDeSang/PriseDeSangSheet.swift`) :
 >   une carte du Journal (`PriseDeSangCarte`, sous « Poids et eau » ; la puce « Analyses » y mène —
@@ -781,6 +815,27 @@ lisent ces colonnes) ; les clés annexes de l'Edge (`ciqual_code`, `confidence`,
 > valeurs (`QuestionnaireSection`), même `profile.groceries[id] = portions par semaine`. La
 > refonte ne change que l'ordre, le regroupement et les mots. `ParcoursBilanTests` et
 > `LibellesBilanTests` le vérifient.
+
+**Questionnaire ludique (3 octobre 2026, maquette avant / après validée par Arthur : « c'est top »)**
+— retour : « trop de freins, trop générique, pas assez ludique », surtout les aliments. Ce qui
+change, présentation seule (`Views/Questionnaire/BilanLudique.swift`) :
+- **le kiwi parle** : `KiwiMascotte` (animée) en haut de chaque écran, sa bulle (`BilanKiwi`) dit
+  pourquoi on demande, puis la piste que les réponses font apparaître (elle remplace la carte de
+  piste du bas) ; elle fête aussi la fin d'une étape et l'écran de fin ;
+- **une question à la fois** (`BilanQuestions`) : sur un écran à thème, la réponse donnée se range
+  en pastille (touchable pour corriger) et la suivante arrive seule après 0,55 s (1,1 s pour un
+  curseur) ; le bouton du bas ne sert qu'en fin d'écran ;
+- **un chemin à quatre stations** (`BilanChemin`) remplace la barre à quatre segments dans
+  l'en-tête (le Journal garde ses segments) ;
+- **grandes cartes** (`BilanCartes`) ; les bascules oui / non deviennent deux cartes (mêmes
+  valeurs `yes` / `no`) ; le stress et le réveil font vivre un visage (`BilanVisage`) ;
+- **aliments, « remplis ta journée »** : frise des quatre repas avec le nombre d'aliments cochés,
+  ciel qui passe du matin au soir (aube, ciel, kiwi, orchidée via `EcranBilan.teinteVerre`),
+  assiette en dix parts (`BilanAssiette`, même mesure que les dix jauges d'avant) avec une bulle
+  qui dit ce que l'aliment apporte, et les trois mots qui s'ouvrent **sous la rangée** de
+  l'aliment touché (`BilanGrilleAliments`, `BilanTiroirNiveau`) au lieu d'une barre flottante qui
+  cachait la grille ; boutons « Repas suivant : Midi » … « J'ai fini ma journée » ;
+- **fin d'étape** : les pistes arrivent face cachée (`BilanCartePisteCachee`), on les retourne.
 
 Code : `Views/Questionnaire/Bilan*.swift` (vue), `Core/ParcoursBilan.swift` (ordre, écrans
 visibles, ce qu'il faut avoir répondu), `Core/PistesBilan.swift` (ce que les réponses apprennent),

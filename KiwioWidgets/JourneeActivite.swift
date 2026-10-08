@@ -4,97 +4,94 @@ import WidgetKit
 
 // MARK: - L'activité en direct « Ta journée »
 //
-// La carte posée sur l'écran verrouillé (et dans la Dynamic Island) : les
-// quatre repas, dicter, l'eau, le rituel. L'app la démarre et la met à jour
-// (`ActiviteJournee`) ; ici on ne fait que la dessiner.
+// La carte posée sur l'écran verrouillé et la Dynamic Island (maquette W7) :
+// la journée en une barre, les kcal restantes, la série ; dicter, un verre
+// d'eau, la prise du moment. L'app la démarre et la met à jour
+// (`ActiviteJournee`) ; ici on ne fait que la dessiner, avec les vues de
+// `Partage/WidgetsJournee.swift`.
+//
+// La carte est en verre sombre (`FondActiviteW`), l'île est noire : texte
+// blanc partout, et les boutons du système (fermer l'activité) aussi.
 //
 // Une activité ne se réveille pas toute seule à minuit : passé la fin du jour,
-// iOS la marque périmée, et la carte invite à rouvrir l'app au lieu de montrer
-// les chiffres de la veille comme s'ils étaient ceux du jour.
+// iOS la marque périmée, et la carte comme l'île invitent à rouvrir l'app au
+// lieu de montrer les chiffres de la veille comme s'ils étaient ceux du jour.
+//
+// `Date()` : une activité n'a pas de frise, elle se redessine à chaque mise à
+// jour de l'app. « Prochain : ton dîner » suit donc l'heure de la dernière
+// mise à jour, comme le reste de la carte.
 
 struct JourneeActivite: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: JourneeAttributes.self) { contexte in
             Group {
                 if contexte.isStale {
-                    ActivitePerimee()
+                    VueActivitePerimee()
                 } else {
-                    VueActiviteJournee(etat: contexte.state.etat)
+                    VueActiviteJournee(etat: contexte.state.etat, maintenant: Date())
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
+            .activityBackgroundTint(FondActiviteW.teinte)
+            .activitySystemActionForegroundColor(Color.white)
             .widgetURL(LienKiwio.journal.url)
         } dynamicIsland: { contexte in
             let etat = contexte.state.etat
-            let calories = FormatW.ligneCalories(etat)
+            let perimee = contexte.isStale
             return DynamicIsland {
+                // L'en-tête de la maquette, de part et d'autre de la caméra.
                 DynamicIslandExpandedRegion(.leading) {
-                    MarqueW()
+                    JourneeIleEnTete()
                         .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    SerieW(serie: etat.serie)
-                        .padding(.trailing, 4)
-                }
-                DynamicIslandExpandedRegion(.center) {
-                    Text("\(calories.nombre) \(calories.legende)")
-                        .font(.system(size: 14, weight: .semibold).monospacedDigit())
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                DynamicIslandExpandedRegion(.bottom) {
-                    HStack(spacing: 8) {
-                        Link(destination: LienKiwio.dicter.url) {
-                            PastilleActiviteW(symbole: "mic.fill", titre: "Dicter", pleine: true)
-                        }
-                        if let eau = etat.eau {
-                            Button(intent: AjouterVerreEnDirectIntent()) {
-                                PastilleActiviteW(symbole: "drop.fill",
-                                                  titre: "\(eau.verres) / \(eau.objectif)",
-                                                  teinte: TeinteW.eau,
-                                                  accessoire: eau.atteint ? "checkmark.circle.fill" : "plus")
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        if let moment = etat.prochainMoment {
-                            Button(intent: CocherRituelEnDirectIntent()) {
-                                PastilleActiviteW(symbole: "pills", titre: moment.libelle,
-                                                  teinte: TeinteW.moment(moment), accessoire: "circle")
-                            }
-                            .buttonStyle(.plain)
-                        }
+                    // La série d'hier ne se montre pas sur une journée périmée.
+                    if !perimee {
+                        SerieW(serie: etat.serie)
+                            .padding(.trailing, 4)
                     }
                 }
+                DynamicIslandExpandedRegion(.bottom) {
+                    Group {
+                        if perimee {
+                            VueActivitePerimee(avecSigne: false)
+                        } else {
+                            VueIleEtendue(etat: etat, maintenant: Date())
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
             } compactLeading: {
-                Image(systemName: "fork.knife")
-                    .foregroundStyle(TeinteW.vert)
+                VueIleCompacteGauche()
             } compactTrailing: {
-                Text(calories.nombre)
-                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                // Périmée : le signe seul, pas un chiffre de la veille.
+                if !perimee {
+                    VueIleCompacteDroite(etat: etat)
+                }
             } minimal: {
-                Image(systemName: "fork.knife")
-                    .foregroundStyle(TeinteW.vert)
+                if perimee {
+                    SigneW(taille: 20)
+                } else {
+                    VueIleMinimale(etat: etat)
+                }
             }
             .widgetURL(LienKiwio.journal.url)
         }
     }
 }
 
-/// Le jour a changé sans que l'app ait été rouverte.
-private struct ActivitePerimee: View {
+/// Île étendue, à gauche de la caméra : le signe et « Ta journée ».
+private struct JourneeIleEnTete: View {
     var body: some View {
-        HStack(spacing: 12) {
-            KiwiSigne(taille: 30)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Nouvelle journée")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.primary)
-                Text("Ouvre Kiwio pour la commencer.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.secondary)
-            }
-            Spacer(minLength: 0)
+        HStack(spacing: 6) {
+            SigneW(taille: 18)
+            Text("Ta journée")
+                .font(.texteW(14, .bold))
+                .foregroundStyle(TeinteW.encre())
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
+        .accessibilityElement(children: .combine)
     }
 }

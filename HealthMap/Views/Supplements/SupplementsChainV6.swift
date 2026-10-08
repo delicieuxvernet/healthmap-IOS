@@ -249,13 +249,17 @@ private struct RituelCreneau: View {
     }
 
     /// La case : un cercle vide, puis un rond vert où la coche se trace.
+    /// Le rond se remplit en 0,25 s (la tuile, elle, en 0,3 s) ; le contour
+    /// gris disparaît d'un coup, sans fondu, comme dans la maquette.
     private var coche: some View {
         ZStack {
             Circle()
                 .fill(complet ? Color.teinteKiwi : Color.clear)
+                .animation(reduceMotion ? nil : Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.25), value: complet)
             Circle()
                 .strokeBorder(Color(uiColor: .systemGray3), lineWidth: 2)
                 .opacity(complet ? 0 : 1)
+                .animation(nil, value: complet)
             CocheDuRituel()
                 .trim(from: 0, to: complet ? 1 : 0)
                 .stroke(Color.white, style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
@@ -293,7 +297,11 @@ private struct CocheDuRituel: Shape {
 struct LigneAssiette: Identifiable {
     /// Identifiant de l'apport servi (c'est sa fiche que la ligne ouvre).
     let id: String
+    /// Repli quand l'aliment n'a pas d'illustration : le symbole de l'apport.
     let symbole: String
+    /// L'illustration de l'aliment en titre (asset `fluent_…` présent dans le
+    /// bundle), la même que dans « Où le trouver ». `nil` → `symbole`.
+    var iconeAliment: String? = nil
     /// Teinte de l'apport : pastille et icône.
     let teinte: Color
     /// Sa version foncée, pour le nom de l'apport posé sur le verre.
@@ -342,11 +350,7 @@ struct ComplementsAssietteCarte: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(ligne.teinte.opacity(0.12))
                 .frame(width: 40, height: 40)
-                .overlay(
-                    Image(systemName: ligne.symbole)
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(ligne.teinte)
-                )
+                .overlay { iconeVue(ligne) }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(ligne.titre)
@@ -373,6 +377,19 @@ struct ComplementsAssietteCarte: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, minHeight: DS.cibleTactile, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    /// Chaque ligne porte l'icône de SON aliment ; sans illustration connue,
+    /// celle de l'apport qu'il sert, à sa teinte.
+    @ViewBuilder
+    private func iconeVue(_ ligne: LigneAssiette) -> some View {
+        if let icone = ligne.iconeAliment {
+            Fluent3DIcon(name: icone, size: 24)
+        } else {
+            Image(systemName: ligne.symbole)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(ligne.teinte)
+        }
     }
 }
 

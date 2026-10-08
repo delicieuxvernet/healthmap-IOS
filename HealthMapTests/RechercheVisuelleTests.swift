@@ -139,7 +139,7 @@ final class RechercheVisuelleTests: XCTestCase {
             Ligne(nom: "Pâtes sèches", source: "ciqual", score: 2.40),
             Ligne(nom: "Coquillettes", source: "off", score: 2.59),
         ])
-        XCTAssertEqual(resultat.map(\.titre), ["Aliments", "Produits de marque"])
+        XCTAssertEqual(resultat.map(\.titre), ["Aliments", "Marques"])
         XCTAssertEqual(resultat[0].lignes.map(\.nom), ["Pâtes fraîches", "Pâtes sèches"])
         XCTAssertEqual(resultat[1].lignes.map(\.nom), ["Spaghetti n°5", "Coquillettes"])
     }
@@ -150,17 +150,58 @@ final class RechercheVisuelleTests: XCTestCase {
             Ligne(nom: "Nutella", source: "off", score: 2.80),
             Ligne(nom: "Pâte à tartiner chocolat et noisette", source: "ciqual", score: 1.90),
         ])
-        XCTAssertEqual(resultat.map(\.titre), ["Produits de marque", "Aliments"])
+        XCTAssertEqual(resultat.map(\.titre), ["Marques", "Aliments"])
     }
 
     func testUneSeuleSourceUneSeuleSectionEtRienPourRien() {
         XCTAssertEqual(sections([Ligne(nom: "Kiwi", source: "ciqual", score: 3)]).map(\.titre), ["Aliments"])
-        XCTAssertEqual(sections([Ligne(nom: "Coca", source: "off", score: 3)]).map(\.titre), ["Produits de marque"])
+        XCTAssertEqual(sections([Ligne(nom: "Coca", source: "off", score: 3)]).map(\.titre), ["Marques"])
         XCTAssertTrue(sections([]).isEmpty)
         // Repli sur l'ancienne RPC (pas de score) : l'ordre par défaut tient.
         XCTAssertEqual(sections([Ligne(nom: "Coca", source: "off", score: nil),
                                  Ligne(nom: "Kiwi", source: "ciqual", score: nil)]).map(\.titre),
-                       ["Aliments", "Produits de marque"])
+                       ["Aliments", "Marques"])
+    }
+
+    // MARK: Les marques devant pour ce qui s'achète de marque (7 oct. 2026)
+
+    private struct LigneFamille {
+        let nom: String
+        let source: String
+        let score: Double?
+        let sousGroupe: String?
+    }
+
+    private func sectionsParFamille(_ lignes: [LigneFamille]) -> [String] {
+        RechercheVisuelle.sections(lignes, source: \.source, score: \.score, sousGroupe: { $0.sousGroupe }).map(\.titre)
+    }
+
+    /// « céréales » : Chocapic et Trésor avant les génériques, même moins bien notés.
+    func testUneFamilleDeMarqueMetLesMarquesDevant() {
+        XCTAssertEqual(sectionsParFamille([
+            LigneFamille(nom: "Céréales pour petit déjeuner", source: "ciqual", score: 3.9, sousGroupe: "céréales de petit-déjeuner"),
+            LigneFamille(nom: "Chocapic", source: "off", score: 3.2, sousGroupe: nil),
+        ]), ["Marques", "Aliments"])
+        XCTAssertEqual(sectionsParFamille([
+            LigneFamille(nom: "Yaourt nature", source: "ciqual", score: 3.85, sousGroupe: "produits laitiers frais et assimilés"),
+            LigneFamille(nom: "Skyr", source: "off", score: 3.1, sousGroupe: nil),
+        ]), ["Marques", "Aliments"])
+    }
+
+    /// « pomme » : le fruit reste devant, même si une compote de marque score plus haut.
+    func testUnAlimentBrutGardeLesGeneriquesDevant() {
+        XCTAssertEqual(sectionsParFamille([
+            LigneFamille(nom: "Pomme crue", source: "ciqual", score: 3.85, sousGroupe: "fruits"),
+            LigneFamille(nom: "Pomme noisette", source: "off", score: 4.25, sousGroupe: nil),
+        ]), ["Aliments", "Marques"])
+    }
+
+    /// « bjorg » : la marque cherchée par son nom dépasse nettement les génériques.
+    func testUneMarqueChercheeParSonNomPasseDevant() {
+        XCTAssertEqual(sectionsParFamille([
+            LigneFamille(nom: "Boisson à base d'avoine", source: "ciqual", score: 2.0, sousGroupe: "laits"),
+            LigneFamille(nom: "Bjorg avoine", source: "off", score: 3.9, sousGroupe: nil),
+        ]), ["Marques", "Aliments"])
     }
 
     // MARK: Le contrat de décodage

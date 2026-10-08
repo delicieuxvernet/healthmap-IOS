@@ -65,7 +65,10 @@ enum ActiviteJournee {
         let calendrier = Calendar.current
         let finDuJour = calendrier.date(byAdding: .day, value: 1, to: calendrier.startOfDay(for: maintenant))
             ?? maintenant.addingTimeInterval(86_400)
-        let contenu = ActivityContent(state: JourneeAttributes.ContentState(etat: etat), staleDate: finDuJour)
+        // L'état allégé : ni apports ni conseils, que la carte n'affiche pas et
+        // qu'ActivityKit compterait dans ses 4 Ko.
+        let contenu = ActivityContent(state: JourneeAttributes.ContentState(etat: etat.pourActivite),
+                                      staleDate: finDuJour)
 
         var vivante: Activity<JourneeAttributes>?
         for activite in Activity<JourneeAttributes>.activities {

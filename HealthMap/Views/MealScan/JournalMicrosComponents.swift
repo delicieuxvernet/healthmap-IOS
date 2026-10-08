@@ -14,7 +14,10 @@ import SwiftUI
 // dans le détail.
 //
 // Toute cette partie est réservée au Premium (décision d'Arthur du même
-// jour) : la porte se pose dans `MealScanView.microsSection`.
+// jour) : la porte se pose dans `MealScanView.microsSection`. Depuis le 7
+// octobre 2026, la carte gratuite n'est plus floutée : `verrouille` montre la
+// liste, noms nets, avec « Débloquer avec Premium » sur chaque ligne et aucun
+// chiffre de la personne.
 //
 // Un seul chiffre par apport : la part du besoin couverte. C'est le même que
 // dans Progrès et dans la fiche de l'apport.
@@ -155,6 +158,18 @@ struct JournalMicrosAlerte: View {
 struct JournalMicrosCard: View {
     let tableau: TableauMicros
     let onLigne: (LigneMicro) -> Void
+    /// Compte gratuit (variante B validée par Arthur le 7 octobre 2026) : la
+    /// liste entière se lit, noms nets, pour montrer tout ce que Premium
+    /// apporte ; mais aucune donnée de la personne ne transparaît. Pas de
+    /// chiffre ni de jauge (pas même floutée : sa longueur se devinerait),
+    /// pas de priorités ni de repère « bas » (leur ordre trahirait les
+    /// apports les plus faibles), pas de phrase sur ce qui est bas. Chaque
+    /// ligne porte « Débloquer avec Premium ».
+    var verrouille = false
+    /// Libellé du bouton d'essai, lu depuis StoreKit (`PremiumOffre`).
+    var titrePorte = ""
+    /// Ligne ou bouton touché en gratuit : la page d'abonnement.
+    var onDebloquer: () -> Void = {}
 
     @State private var deplie = false
     @State private var famille: FamilleMicro?
@@ -183,33 +198,111 @@ struct JournalMicrosCard: View {
         tableau.toutes.filter { $0.sens != .rapport }.count
     }
 
-    private var titreDesPriorites: String {
-        tableau.priorites.count > 1
-            ? "Tes \(tableau.priorites.count) priorités, en part de ton besoin couverte"
-            : "Ta priorité, en part de ton besoin couverte"
+    /// Le nombre du bouton « Voir les … » : en gratuit, celui de la famille
+    /// filtrée, puisque les filtres sont visibles avant le dépli.
+    private var nombreAffiche: Int {
+        verrouille ? listeVerrouillee.filter { $0.sens != .rapport }.count : nombreDeMicros
     }
+
+    /// La phrase de tête nomme les priorités qui sont basses, comme la
+    /// maquette (« Ta vitamine C et ton fer sont bas. »). Le chiffre est celui
+    /// du registre, pas celui de la seule journée : la phrase ne dit donc pas
+    /// « aujourd'hui ». Aucune priorité basse : la phrase neutre d'avant.
+    private var titreDesPriorites: String {
+        let basses = tableau.priorites.filter(\.estBas)
+        guard let premiere = basses.first else {
+            return tableau.priorites.count > 1
+                ? "Tes \(tableau.priorites.count) priorités, en part de ton besoin couverte"
+                : "Ta priorité, en part de ton besoin couverte"
+        }
+        let noms = basses.map(Self.possessif)
+        let sujet: String
+        if noms.count > 1, let dernier = noms.last {
+            sujet = noms.dropLast().joined(separator: ", ") + " et " + dernier
+        } else {
+            sujet = Self.possessif(premiere)
+        }
+        let pluriel = basses.count > 1 || NomNutriment.estPluriel(id: premiere.id)
+        // L'adjectif s'accorde : le masculin l'emporte dès qu'un apport
+        // masculin est dans la liste (« ta vitamine C et ton fer sont bas »).
+        let feminin = basses.allSatisfy(Self.estFeminin)
+        let verbe = pluriel ? "sont" : "est"
+        let adjectif = feminin ? (pluriel ? "basses" : "basse") : "bas"
+        return NomNutriment.majusculeInitiale(sujet) + " \(verbe) \(adjectif)."
+    }
+
+    /// « ta vitamine C », « ton fer » : le possessif des notifications. Les
+    /// vitamines hors bilan (B9, A, E…) n'y sont pas : sans ce cas, elles
+    /// deviendraient « ton apport en vitamine B9 ».
+    private static func possessif(_ ligne: LigneMicro) -> String {
+        if NutrientID(rawValue: ligne.id) == nil, ligne.nom.hasPrefix("Vitamine ") {
+            return "ta " + NomNutriment.minusculeInitiale(ligne.nom)
+        }
+        return NomNutriment.possessif(id: ligne.id, nom: ligne.nom)
+    }
+
+    /// « ta vitamine D », « tes fibres » : féminin. « ton fer », « tes
+    /// oméga-3 », « ton apport en … » : masculin.
+    private static func estFeminin(_ ligne: LigneMicro) -> Bool {
+        if ligne.id == "fiber" { return true }
+        return possessif(ligne).hasPrefix("ta ")
+    }
+
+    /// Gratuit : tout le catalogue, dans son ordre, filtré par famille.
+    private var listeVerrouillee: [LigneMicro] {
+        tableau.toutes.filter { famille == nil || $0.famille == famille }
+    }
+
+    /// Gratuit : les six premières lignes, puis « Voir les … ».
+    private static let lignesAvantDepli = 6
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             enTete
 
-            if !tableau.priorites.isEmpty {
-                priorites
-                DSSeparator()
-            }
-            boutonToutVoir
-
-            if deplie {
-                DSSeparator()
-                filtres
-                ForEach(autres) { ligne in
-                    LigneMicroVue(ligne: ligne, enAvant: false) { onLigne(ligne) }
+            if verrouille {
+                corpsVerrouille
+            } else {
+                if !tableau.priorites.isEmpty {
+                    priorites
+                    DSSeparator()
                 }
-                legende
+                boutonToutVoir
+
+                if deplie {
+                    DSSeparator()
+                    filtres
+                    ForEach(autres) { ligne in
+                        LigneMicroVue(ligne: ligne, enAvant: false) { onLigne(ligne) }
+                    }
+                    legende
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
+    }
+
+    /// Gratuit : filtres, lignes verrouillées, « Voir les … », puis l'essai.
+    @ViewBuilder
+    private var corpsVerrouille: some View {
+        let liste = listeVerrouillee
+        filtres
+        ForEach(deplie ? liste : Array(liste.prefix(Self.lignesAvantDepli))) { ligne in
+            LigneMicroVue(ligne: ligne, enAvant: false, verrouille: true) { onDebloquer() }
+        }
+        if liste.count > Self.lignesAvantDepli {
+            DSSeparator()
+            boutonToutVoir
+        }
+        DSCapsuleButton(titre: titrePorte) {
+            HapticService.shared.tap()
+            onDebloquer()
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.top, 8)
+        .padding(.bottom, DS.paddingCarte)
+        .accessibilityIdentifier("journal.micros.debloquer")
     }
 
     /// L'en-tête de la carte : la catégorie (feuille dans la teinte, libellé
@@ -227,7 +320,7 @@ struct JournalMicrosCard: View {
                         .foregroundStyle(Color.teinteKiwiTexte)
                 }
                 Spacer(minLength: 8)
-                if !tableau.priorites.isEmpty {
+                if !verrouille, !tableau.priorites.isEmpty {
                     Text("touche pour le détail")
                         .font(.system(.caption, design: .default))
                         .foregroundStyle(Color.dsSecondaire)
@@ -235,7 +328,21 @@ struct JournalMicrosCard: View {
                 }
             }
 
-            if tableau.priorites.isEmpty {
+            if verrouille {
+                // Rien sur la personne : ce que la liste contient, et à quoi
+                // elle s'ouvre.
+                Text("\(nombreDeMicros) micronutriments calculés sur tes repas")
+                    .font(.dsHeadline)
+                    .tracking(DSTracking.corps)
+                    .lineSpacing(2)
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Vitamines, minéraux et acides gras. Tes chiffres s'ouvrent avec Premium.")
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if tableau.priorites.isEmpty {
                 Text("Tes micronutriments se calculent à partir de tes repas notés. Une journée assez notée suffit pour un premier chiffre.")
                     .font(.dsSousTitre)
                     .tracking(DSTracking.sousTitre)
@@ -246,13 +353,15 @@ struct JournalMicrosCard: View {
                 Text(titreDesPriorites)
                     .font(.dsHeadline)
                     .tracking(DSTracking.corps)
+                    // Interligne 1,3 de la maquette : 2 pt de plus que SF 17.
+                    .lineSpacing(2)
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.horizontal, DS.paddingCarte)
         .padding(.top, 14)
-        .padding(.bottom, tableau.priorites.isEmpty ? 12 : 6)
+        .padding(.bottom, verrouille ? 2 : (tableau.priorites.isEmpty ? 12 : 6))
     }
 
     /// Les priorités, séparées d'un filet sur toute la largeur de la carte.
@@ -273,7 +382,7 @@ struct JournalMicrosCard: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(deplie ? "Masquer le détail" : "Voir les \(nombreDeMicros) micronutriments")
+                Text(deplie ? "Masquer le détail" : "Voir les \(nombreAffiche) micronutriments")
                     .font(.dsSousTitreMoyen)
                     .tracking(DSTracking.sousTitre)
                 Image(systemName: deplie ? "chevron.up" : "chevron.down")
@@ -357,11 +466,51 @@ struct JournalMicrosCard: View {
 
 // MARK: - Une ligne
 
+/// L'appui d'une ligne de la carte : un fond gris qui s'allume en 0,15 s,
+/// sans changement d'échelle (maquette : `background:#F2F2F7`). Le gris
+/// système 6 vaut #F2F2F7 en clair et suit le mode sombre.
+private struct LigneMicroPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(Color(uiColor: .systemGray6).opacity(configuration.isPressed ? 1 : 0))
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+/// La jauge de 80 × 6 pt d'une ligne. Contrairement à `DSGauge`, elle ne se
+/// remplit pas à l'apparition : seul un changement de valeur la fait glisser.
+private struct JaugeMicro: View {
+    let niveau: Int
+    let teinte: Color
+
+    private static let hauteur: CGFloat = 6
+
+    private var part: CGFloat { CGFloat(min(100, max(0, niveau))) / 100 }
+
+    var body: some View {
+        GeometryReader { g in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.dsRemplissage)
+                Capsule()
+                    .fill(teinte)
+                    .frame(width: max(Self.hauteur, g.size.width * part))
+            }
+        }
+        .frame(width: 80, height: Self.hauteur)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct LigneMicroVue: View {
     let ligne: LigneMicro
     /// Priorité : nom en gras.
     let enAvant: Bool
+    /// Compte gratuit : « Débloquer avec Premium » à la place de la jauge et
+    /// du chiffre, sans repère de statut ni chevron. Rien de la ligne n'est lu.
+    var verrouille = false
     let action: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Ce qui s'affiche à droite quand l'apport n'a pas de chiffre.
     private var sansChiffre: String {
@@ -376,6 +525,7 @@ private struct LigneMicroVue: View {
     }
 
     private var libelleVocal: String {
+        if verrouille { return "\(ligne.nom), réservé à Kiwio Premium" }
         var morceaux: [String] = [ligne.nom]
         if let niveau = ligne.niveau {
             morceaux.append("\(niveau) pour cent de ton besoin")
@@ -400,38 +550,70 @@ private struct LigneMicroVue: View {
                         .foregroundStyle(Color.dsTexte)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    if ligne.statut != .normal {
+                    if !verrouille, ligne.statut != .normal {
                         RepereDeStatut(couleur: ligne.statut.couleurDeRepere)
                     }
                 }
                 Spacer(minLength: 8)
-                valeur
-                // Le chevron : la ligne entière ouvre le détail, il le dit.
-                DSChevron()
+                if verrouille {
+                    pastillePremium
+                } else {
+                    valeur
+                    // Le chevron : la ligne entière ouvre le détail, il le dit.
+                    DSChevron()
+                }
             }
             .padding(.horizontal, DS.paddingCarte)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.dsPress)
+        // Pleine largeur : la ligne ne rétrécit pas, elle se grise (maquette).
+        .buttonStyle(LigneMicroPressStyle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(libelleVocal)
-        .accessibilityHint("Ouvre les informations sur cet apport")
+        .accessibilityHint(verrouille ? "Ouvre l'abonnement Premium" : "Ouvre les informations sur cet apport")
+    }
+
+    /// « Débloquer avec Premium », dans le vert kiwi de la carte.
+    private var pastillePremium: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .accessibilityHidden(true)
+            Text("Débloquer avec Premium")
+                .font(.dsLegendeMoyenne)
+                .tracking(DSTracking.legende)
+                .lineLimit(1)
+        }
+        .foregroundStyle(Color.teinteKiwiTexte)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Capsule(style: .continuous).fill(Color.dsVoile))
+        .fixedSize()
+    }
+
+    /// Après un repas, la jauge et le chiffre glissent ENSEMBLE vers leur
+    /// nouvelle valeur : 1,1 s après 0,25 s, la courbe du compteur (maquette,
+    /// `tween('mt', 1100, 250)`). Rien à l'apparition : la maquette pose les
+    /// jauges pleines d'emblée.
+    private var glisse: Animation? {
+        reduceMotion ? nil : Animation.timingCurve(0.215, 0.61, 0.355, 1, duration: 1.1).delay(0.25)
     }
 
     /// La jauge de 80 pt et le pourcentage, ou ce qui en tient lieu.
     @ViewBuilder
     private var valeur: some View {
         if let niveau = ligne.niveau {
-            DSGauge(fraction: Double(niveau) / 100, couleur: ligne.teinte, hauteur: 6)
-                .frame(width: 80)
-            Text(DS.pourcent(niveau))
+            JaugeMicro(niveau: niveau, teinte: ligne.teinte)
+                .animation(glisse, value: niveau)
+            // Le pourcentage compte, image par image, avec la jauge.
+            ChiffreQuiCompte(valeur: Double(niveau), format: { DS.pourcent($0) })
                 .font(.dsValeurLigneForte)
                 .foregroundStyle(Color.dsTexte)
                 .lineLimit(1)
                 .frame(minWidth: 44, alignment: .trailing)
-                .contentTransition(.numericText())
+                .animation(glisse, value: niveau)
         } else {
             Text(sansChiffre)
                 .font(.dsLegende)
@@ -466,15 +648,26 @@ private struct FaitMicroVue: View {
 // MARK: - Le détail d'un micronutriment
 
 /// Une section du détail : titre de section (22 / 700), note dessous, contenu.
-/// Les sections arrivent l'une après l'autre, de haut en bas.
+/// Les deux premières (« Pourquoi… », « Quoi ajouter… ») sont posées d'emblée,
+/// comme dans la maquette : seules leurs lignes et leurs pastilles entrent en
+/// cascade. Les suivantes, que la maquette ne montre pas, arrivent l'une après
+/// l'autre, de haut en bas.
 private struct MicroSection<Contenu: View>: View {
     let titre: String
     var note: String? = nil
-    /// Position dans la page : décale son entrée.
+    /// Position dans la page : décale son entrée, à partir du rang 3.
     var rang: Int = 1
     @ViewBuilder var contenu: () -> Contenu
 
     var body: some View {
+        if rang >= 3 {
+            corps.kiwiEntrance(rang)
+        } else {
+            corps
+        }
+    }
+
+    private var corps: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(titre)
@@ -495,18 +688,12 @@ private struct MicroSection<Contenu: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 24)
-        .kiwiEntrance(rang)
     }
 }
 
-/// La page d'un micronutriment. Elle est POUSSÉE dans la pile du Journal
-/// (`MealScanView.pageMicro`), barre native masquée : c'est donc ELLE qui
-/// dessine son retour (« ‹ Journal », en vert comme tout ce qui se touche) et
-/// son fond de verre. Les deux vont ensemble : retirer ce retour sans rendre
-/// la barre native laisserait la page sans sortie visible.
-///
-/// Le nom du type date de l'époque où c'était une feuille ; il reste, avec son
-/// `init`, pour ses appelants.
+/// La page d'un micronutriment, présentée en FEUILLE de verre
+/// (`MealScanView.pageMicro`) : on la referme en la balayant vers le bas, ou
+/// par sa croix. Le fond est celui de la feuille (`.verreFeuille()`).
 struct MicroDuJourSheet: View {
     let ligne: LigneMicro
     /// L'apport du bilan qui porte ce micro : ouvre la fiche de ses causes.
@@ -611,7 +798,6 @@ struct MicroDuJourSheet: View {
             .containerRelativeFrame(.horizontal, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        .background { VerrePageFond() }
         .onAppear { arriver() }
         .onChange(of: ligne.niveau) { _, nouveau in
             compter(jusqua: nouveau)
@@ -640,30 +826,15 @@ struct MicroDuJourSheet: View {
 
     // MARK: Retour
 
-    /// « ‹ Journal » : la rangée de 44 pt qui ouvre la page, sous la barre
-    /// d'état. Elle dépile la page (ou referme la feuille, si c'en est une).
-    ///
-    /// La maquette décale cette rangée de 6 pt vers la gauche parce que son
-    /// icône flotte dans une boîte de 24. Le symbole système n'a pas cette
-    /// marge : sans décalage, le chevron tombe à l'aplomb du titre.
+    /// La page s'ouvre en feuille (on la balaie vers le bas pour la fermer) :
+    /// en tête, la croix de verre des autres feuilles, à droite.
     private var retour: some View {
-        Button {
-            dismiss()
-        } label: {
-            HStack(spacing: 2) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 20, weight: .medium))
-                    .accessibilityHidden(true)
-                Text("Journal")
-                    .font(.dsCorps)
-                    .tracking(DSTracking.corps)
-            }
-            .foregroundStyle(Color.dsAccent)
-            .frame(minHeight: DS.cibleTactile)
-            .contentShape(Rectangle())
+        HStack {
+            Spacer(minLength: 0)
+            DSCloseButton { dismiss() }
         }
-        .buttonStyle(.dsPress)
-        .accessibilityLabel("Retour au Journal")
+        .padding(.top, 8)
+        .padding(.trailing, -6)
     }
 
     // MARK: Le chiffre
@@ -714,14 +885,20 @@ struct MicroDuJourSheet: View {
     private var chiffre: some View {
         if ligne.sens == .besoin {
             ZStack {
-                if let niveau = ligne.niveau {
-                    DSRing(
-                        fraction: Double(niveau) / 100,
-                        couleur: ligne.teinte,
-                        taille: Self.axeAnneau,
-                        epaisseur: Self.traitAnneau,
-                        delai: 0.25
-                    )
+                if ligne.niveau != nil {
+                    // L'anneau suit le MÊME état que le chiffre (`compte`, déjà
+                    // animé par le compteur) : les deux partent et arrivent
+                    // ensemble, comme dans la maquette.
+                    ZStack {
+                        Circle()
+                            .stroke(Verre.pisteAnneau, lineWidth: Self.traitAnneau)
+                        Circle()
+                            .trim(from: 0, to: CGFloat(min(100, max(0, compte)) / 100))
+                            .stroke(ligne.teinte, style: StrokeStyle(lineWidth: Self.traitAnneau, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    }
+                    .frame(width: Self.axeAnneau, height: Self.axeAnneau)
+                    .accessibilityHidden(true)
                     VStack(spacing: 0) {
                         ChiffreQuiCompte(valeur: compte, format: { DS.pourcent($0) })
                             .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())

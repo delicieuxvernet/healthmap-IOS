@@ -38,8 +38,11 @@ enum PlanGraphTeintes {
     static let levier = Color(hex: "C7C7CC")
     static let levierFonce = Color(hex: "8E8E93")
 
-    /// Un lien au repos : `rgba(60,60,67,.16)`.
-    static let lienFroid = Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.16)
+    /// Un lien au repos. La maquette dit `rgba(60,60,67,.16)`, mais sur le fond
+    /// de verre les tiges disparaissaient : on ne voyait plus qu'elles TIENNENT
+    /// les bulles (retour d'Arthur sur le build 714, « comme le graphe
+    /// d'Obsidian »). Elles restent grises et fines, mais lisibles.
+    static let lienFroid = Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.34)
     /// Le nom du centre, ou d'un nœud relié au nœud choisi : `rgba(60,60,67,.75)`.
     static let nomVoisin = Verre.iconeNeutre
     /// Le nom d'un nœud hors du voisinage : `rgba(60,60,67,.35)`.
@@ -240,12 +243,11 @@ struct PlanGraphView: View {
                                     .onEnded { _ in physique.lacher() },
                                 including: exemple || reduceMotion ? .subviews : .all
                             )
-                            // Éclosion : 0,3 → 1 sur un ressort vif, l'objectif
-                            // d'abord (il est le premier du graphe), puis un
-                            // nœud tous les 0,09 s.
-                            .verreSurgir(entre,
-                                         delai: Self.retardDesNoeuds + Double(rang) * Self.pasDesNoeuds,
-                                         depart: 0.3)
+                            // Éclosion : 0,3 → 1 en 0,6 s sur la courbe qui
+                            // dépasse de la maquette, l'objectif d'abord (il est
+                            // le premier du graphe), puis un nœud tous les 0,09 s.
+                            .modifier(PlanEclosion(visible: entre,
+                                                   delai: Self.retardDesNoeuds + Double(rang) * Self.pasDesNoeuds))
                             .position(point)
                         }
                     }
@@ -327,7 +329,7 @@ struct PlanGraphView: View {
             // Un trait épais reste un lien fort : la force module l'épaisseur
             // autour des valeurs de la maquette (1,5 pt au repos, 3 pt allumé).
             let force = CGFloat(min(max(lien.force, 1), 3))
-            let froide: CGFloat = 1.5 + (force - 2) * 0.4
+            let froide: CGFloat = 1.6 + (force - 2) * 0.4
             let chaude: CGFloat = 3 + (force - 2) * 0.6
             let style = StrokeStyle(lineWidth: froide + (chaude - froide) * chaleur, lineCap: .round)
             if chaleur < 1 {
@@ -347,6 +349,37 @@ struct PlanGraphView: View {
             dessin.fill(Path(ellipseIn: CGRect(x: centre.x - 3.5, y: centre.y - 3.5, width: 7, height: 7)),
                         with: .color(PlanGraphTeintes.objectif.opacity(Double(chaleur))))
         }
+    }
+}
+
+// MARK: - L'éclosion d'un nœud à l'arrivée
+
+/// Un nœud qui éclot : 0,3 → 1 en 0,6 s sur `cubic-bezier(.3, 1.6, .5, 1)`
+/// (la courbe qui dépasse, propre au Plan), fondu de 0,3 s, après `delai`.
+/// Il disparaît sans animation : la toile est remise à blanc avant de
+/// rejouer l'entrée. Sous « Réduire les animations », le fondu seul.
+private struct PlanEclosion: ViewModifier {
+    let visible: Bool
+    let delai: Double
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var courbeDeLEchelle: Animation? {
+        guard visible, !reduceMotion else { return nil }
+        return Animation.timingCurve(0.3, 1.6, 0.5, 1, duration: 0.6).delay(delai)
+    }
+
+    private var courbeDuFondu: Animation? {
+        guard visible else { return nil }
+        return Animation.easeOut(duration: 0.3).delay(reduceMotion ? 0 : delai)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect((visible || reduceMotion) ? 1 : 0.3)
+            .animation(courbeDeLEchelle, value: visible)
+            .opacity(visible ? 1 : 0)
+            .animation(courbeDuFondu, value: visible)
     }
 }
 
@@ -416,7 +449,8 @@ private struct PlanGraphNoeudView: View {
                     .fill(PlanGraphTeintes.halo(noeud.genre))
                     .frame(width: diametreDuHalo, height: diametreDuHalo)
                     .scaleEffect((choisi || reduceMotion) ? 1 : 0.5)
-                    .animation(reduceMotion ? nil : Animation.kiwiRebond, value: choisi)
+                    // La courbe de la maquette : 0,5 s qui dépasse, puis se pose.
+                    .animation(reduceMotion ? nil : Animation.timingCurve(0.3, 1.6, 0.5, 1, duration: 0.5), value: choisi)
                     .opacity(choisi ? 1 : 0)
                     .animation(Animation.easeOut(duration: 0.3), value: choisi)
                 Circle()
@@ -447,7 +481,7 @@ private struct PlanGraphNoeudView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
-                    .frame(width: 108)
+                    .frame(width: 120)
                     .fixedSize()
                     .offset(y: decalageDuNom)
                     .animation(Animation.easeOut(duration: 0.3), value: choisi)
@@ -545,7 +579,7 @@ struct PlanSelectionBandeau: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 if avecDetail {
-                    porteDuDetail
+                    PlanPorteDuDetail()
                 }
             }
             .padding(.horizontal, DS.paddingCarte)
@@ -557,7 +591,9 @@ struct PlanSelectionBandeau: View {
             // ligne de plus, la carte grandit avec son contenu, sans à-coup.
             .animation(courbeDeLEchange, value: noeud.id)
         }
-        .buttonStyle(.dsPress)
+        // Toute la carte se touche, mais la plaque ne bouge pas : seule la
+        // porte « détail » s'enfonce (voir `PlanPorteDuDetail`).
+        .buttonStyle(PlanCarteStyle())
         .disabled(!avecDetail)
         .accessibilityHint(avecDetail ? "Ouvre le détail" : "")
     }
@@ -589,7 +625,6 @@ struct PlanSelectionBandeau: View {
                 if !resume.isEmpty {
                     Text(resume)
                         .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsSecondaire)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -597,9 +632,38 @@ struct PlanSelectionBandeau: View {
             }
         }
     }
+}
 
-    /// Le rond vert de 40 en verre teinté, et son mot.
-    private var porteDuDetail: some View {
+/// La carte appuyée, transmise à son contenu : c'est la porte « détail » qui
+/// réagit, pas la plaque.
+private struct PlanCarteAppuyeeCle: EnvironmentKey {
+    static let defaultValue = false
+}
+
+private extension EnvironmentValues {
+    var planCarteAppuyee: Bool {
+        get { self[PlanCarteAppuyeeCle.self] }
+        set { self[PlanCarteAppuyeeCle.self] = newValue }
+    }
+}
+
+/// Le style de la carte du bas : aucun effet sur la plaque (ni échelle, ni
+/// voile), l'état d'appui descend jusqu'à la porte « détail ».
+private struct PlanCarteStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .environment(\.planCarteAppuyee, configuration.isPressed)
+    }
+}
+
+/// Le rond vert de 40 en verre teinté, et son mot. À l'appui, il s'enfonce à
+/// 0,92 sur la courbe de la maquette (`cubic-bezier(.3, 1.5, .5, 1)`, 0,2 s) ;
+/// sous « Réduire les animations », il ne bouge pas (comme `DSPressStyle`).
+private struct PlanPorteDuDetail: View {
+    @Environment(\.planCarteAppuyee) private var appuyee
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
         VStack(spacing: 4) {
             Image(systemName: "arrow.right")
                 .font(.system(size: 20, weight: .medium))
@@ -610,6 +674,8 @@ struct PlanSelectionBandeau: View {
                 .font(.system(.footnote, design: .default).weight(.semibold))
                 .foregroundStyle(Color.dsAccent)
         }
+        .scaleEffect((appuyee && !reduceMotion) ? 0.92 : 1)
+        .animation(reduceMotion ? nil : Animation.timingCurve(0.3, 1.5, 0.5, 1, duration: 0.2), value: appuyee)
         .accessibilityHidden(true)
     }
 }
@@ -808,7 +874,7 @@ struct PlanGraphScreen: View {
         let noeudChoisi = choisi(dans: graphe)
 
         return VStack(spacing: 0) {
-            // Le titre « Plan » est porté par la barre de navigation.
+            // Le titre « Plan » est posé au-dessus, par `RecommendationsView`.
             Text(topics.isEmpty && apports.isEmpty
                  ? "Ton plan s'écrit au fil de tes bilans"
                  : "Ce qui relie tes symptômes à tes apports")

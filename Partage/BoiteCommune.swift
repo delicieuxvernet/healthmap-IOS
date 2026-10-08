@@ -10,9 +10,12 @@ import Security
 // Deux objets, un seul auteur chacun :
 //
 //   • `InstantaneJour`  : écrit par l'APP. La journée telle que l'app la
-//     connaît : calories par créneau, objectif, série, eau, rituel.
+//     connaît : calories par créneau, objectif, série, eau, rituel, et
+//     depuis les widgets en verre (3 oct. 2026) les apports du registre et
+//     les gestes du conseil du jour.
 //   • `ActionsEnAttente`: écrit par les WIDGETS. Ce qu'on y a touché depuis la
-//     dernière ouverture de l'app : des verres d'eau, des prises cochées.
+//     dernière ouverture de l'app : des verres d'eau, des prises cochées, le
+//     conseil du jour fait.
 //
 // Ce qu'un widget AFFICHE est toujours `instantané + attente`
 // (`InstantaneJour.affiche`), une fonction pure : un verre ajouté se voit
@@ -65,6 +68,28 @@ struct InstantaneJour: Codable, Hashable {
     var eau: Eau?
     var rituel: [Prise]
 
+    // Champs ajoutés avec les widgets en verre (3 oct. 2026). Tous OPTIONNELS :
+    // le `Decodable` généré ignore les valeurs par défaut, et un instantané
+    // écrit par la version précédente (trousseau, activité en direct) doit
+    // encore se lire.
+
+    /// « Tes apports » : les chiffres et les mots du Journal. `nil` tant qu'il
+    /// n'y a pas de bilan : le widget invite, il n'invente rien.
+    var apports: LectureApportsW? = nil
+    /// Les gestes candidats au conseil du jour, dans l'ordre de l'app. Le
+    /// widget choisit celui du jour lui-même (`conseilDuJour`) : à minuit, le
+    /// conseil change sans attendre que l'app soit ouverte.
+    var conseils: [ConseilW]? = nil
+    /// Id du conseil coché « C'est fait » ce jour-là.
+    var conseilFait: String? = nil
+    /// Id du conseil que l'app a retenu pour ce jour-là. Un repas noté peut
+    /// changer la liste des candidats en cours de journée : le conseil du
+    /// jour, lui, ne change pas sous les yeux de la personne (ni sa coche).
+    var conseilChoisi: String? = nil
+    /// Abonnement actif : le geste du conseil est réservé au Premium, comme
+    /// « Ce que tu peux faire » dans la fiche d'un apport.
+    var premium: Bool? = nil
+
     static func vide(jour: String, connecte: Bool = false) -> InstantaneJour {
         InstantaneJour(jour: jour, connecte: connecte, bilanFait: false, kcalObjectif: nil,
                        kcalParCreneau: [:], serie: 0, eau: nil, rituel: [])
@@ -89,6 +114,50 @@ struct InstantaneJour: Codable, Hashable {
         MomentRituel.allCases.first { moment in prises(du: moment).contains { !$0.fait } }
     }
 
+    /// Le moment que le petit widget Rituel montre en grand : le prochain à
+    /// cocher, sinon (rituel complet) le dernier qui avait quelque chose à
+    /// prendre, pour qu'on puisse le décocher. `nil` sans rituel.
+    var momentEnAvant: MomentRituel? {
+        prochainMoment ?? MomentRituel.allCases.last { !prises(du: $0).isEmpty }
+    }
+
+    /// Le repas à proposer maintenant : celui de l'heure (mêmes plages que le
+    /// Journal), ou, s'il est déjà noté, le suivant de la journée. L'encas ne
+    /// se propose que pendant sa plage.
+    func repasAVenir(_ maintenant: Date, calendrier: Calendar = .current) -> CreneauWidget {
+        let courant = CreneauWidget.deLHeure(calendrier.component(.hour, from: maintenant))
+        guard kcal(courant) > 0 else { return courant }
+        switch courant {
+        case .breakfast: return kcal(.lunch) > 0 ? .dinner : .lunch
+        case .lunch, .snack, .dinner: return .dinner
+        }
+    }
+
+    /// Le conseil du jour : un geste par jour, tiré des candidats que l'app a
+    /// écrits, choisi par le rang du jour. Demain, un autre.
+    var conseilDuJour: ConseilW? {
+        guard let conseils, !conseils.isEmpty else { return nil }
+        if let choisi = conseilChoisi, let retenu = conseils.first(where: { $0.id == choisi }) {
+            return retenu
+        }
+        return conseils[BoiteCommune.rangDuJour(jour) % conseils.count]
+    }
+
+    /// Le conseil du jour est coché.
+    var conseilDuJourFait: Bool {
+        guard let conseil = conseilDuJour else { return false }
+        return conseilFait == conseil.id
+    }
+
+    /// L'activité en direct n'a besoin ni des apports ni des conseils, et
+    /// ActivityKit plafonne attributs + état à 4 Ko : on les lui retire.
+    var pourActivite: InstantaneJour {
+        var leger = self
+        leger.apports = nil
+        leger.conseils = nil
+        return leger
+    }
+
     // MARK: Ce qu'on affiche
 
     /// L'instantané ramené au jour demandé, puis complété par ce que les
@@ -111,6 +180,11 @@ struct InstantaneJour: Codable, Hashable {
                 neuve.fait = false
                 return neuve
             }
+            // Le conseil coché hier ne l'est pas aujourd'hui (et ce n'est
+            // d'ailleurs plus le même conseil). Les apports, eux, ne bougent
+            // pas à minuit : ce sont ceux du registre.
+            etat.conseilFait = nil
+            etat.conseilChoisi = nil
         }
         guard let attente, attente.jour == jourDemande else { return etat }
         if let eau = etat.eau, attente.verres != 0 {
@@ -121,8 +195,81 @@ struct InstantaneJour: Codable, Hashable {
             guard let index = etat.rituel.firstIndex(where: { $0.id == id }) else { continue }
             etat.rituel[index].fait.toggle()
         }
+        // Coché puis décoché depuis le widget : l'ordre compte, comme pour les prises.
+        for id in attente.conseilsBascules ?? [] {
+            etat.conseilFait = etat.conseilFait == id ? nil : id
+        }
         return etat
     }
+}
+
+// MARK: - Tes apports, conseil du jour (écrits par l'app)
+
+/// Un apport tel que le Journal l'affiche : le score du registre, le même
+/// chiffre partout.
+struct ApportW: Codable, Hashable, Identifiable {
+    /// Id de nutriment (`NutrientID.rawValue`, ex. « vitD »).
+    var id: String
+    /// « Vitamine D »
+    var nom: String
+    /// « Vit. D », « Mg », « Fer » : sous un anneau, sur l'écran verrouillé.
+    var court: String
+    /// 0...100
+    var score: Int
+}
+
+/// Un aliment qui fait monter l'apport, avec son illustration (`fluent_…`).
+struct AlimentW: Codable, Hashable {
+    var nom: String
+    /// Nom d'un imageset présent dans les DEUX catalogues (app et extension).
+    var illustration: String
+}
+
+/// Ce que dit « Tes apports ». Tous les mots sont écrits par l'app, avec ceux
+/// de la fiche d'un apport (`LectureApport`) : le widget ne fait qu'assembler.
+struct LectureApportsW: Codable, Hashable {
+    /// Les apports à montrer, l'apport le plus bas en PREMIER (trois au plus :
+    /// ceux du bilan, comme les anneaux du Journal).
+    var apports: [ApportW]
+    /// « Ta vitamine D est un peu juste. »
+    var verdict: String
+    /// « Magnésium et fer sont couverts. » ; `nil` quand il n'y a qu'un apport.
+    var autres: String?
+    /// Le mot du statut, pour « 58 · un peu juste » : « bas », « basse »,
+    /// « un peu juste », « couvert », « couverte »…
+    var statut: String
+    /// « Première cause : tes repas notés ces 14 derniers jours. » Seulement
+    /// une cause qu'on peut montrer hors de l'app (assiette, journal, soleil,
+    /// sommeil) : jamais un traitement, l'âge, une grossesse ou le tabac.
+    var cause: String?
+    /// « Ce qui la remonte » (accordé à l'apport).
+    var titreAliments: String
+    /// Trois aliments au plus, sans filtre inventé : ceux du bilan (déjà
+    /// écartés des allergies), sinon ceux de la fiche.
+    var aliments: [AlimentW]
+
+    /// L'apport le plus bas, celui qu'on montre en grand.
+    var principal: ApportW? { apports.first }
+    /// Les autres, en anneaux ou en barres.
+    var secondaires: [ApportW] { Array(apports.dropFirst()) }
+}
+
+/// Un geste candidat au conseil du jour. Mêmes gestes que « Ce que tu peux
+/// faire » dans la fiche d'un apport.
+struct ConseilW: Codable, Hashable, Identifiable {
+    /// Stable d'un jour à l'autre : apport + facteur.
+    var id: String
+    /// Le geste, tel que la fiche l'écrit (format moyen).
+    var texte: String
+    /// Sa version courte (petit format, écran verrouillé).
+    var court: String
+    /// L'apport qu'il fait monter : id, nom, nom court.
+    var apport: String
+    var apportNom: String
+    var apportCourt: String
+    /// Points que le calcul rendrait sans ce facteur (« jusqu'à + N ») ; 0 =
+    /// aucun chiffre annoncé.
+    var points: Int
 }
 
 /// Ce que les widgets ont touché depuis la dernière ouverture de l'app.
@@ -135,8 +282,14 @@ struct ActionsEnAttente: Codable, Equatable {
     var prisesBasculees: [String] = []
     /// Écran demandé par un contrôle (`LienKiwio.code`), consommé à l'ouverture.
     var route: String?
+    /// Ids des conseils basculés « C'est fait », dans l'ordre (même sémantique
+    /// que `prisesBasculees`). Optionnel : une attente écrite par la version
+    /// précédente doit encore se lire.
+    var conseilsBascules: [String]? = nil
 
-    var estVide: Bool { verres == 0 && prisesBasculees.isEmpty && route == nil }
+    var estVide: Bool {
+        verres == 0 && prisesBasculees.isEmpty && route == nil && (conseilsBascules ?? []).isEmpty
+    }
 
     /// Retire ce que l'app vient d'appliquer. Ce qui est arrivé ENTRE la
     /// lecture et l'écriture (un doigt sur le widget pendant la synchro) reste.
@@ -146,6 +299,8 @@ struct ActionsEnAttente: Codable, Equatable {
         reste.verres -= appliquees.verres
         reste.prisesBasculees = Array(prisesBasculees.dropFirst(appliquees.prisesBasculees.count))
         if reste.route == appliquees.route { reste.route = nil }
+        let conseils = Array((conseilsBascules ?? []).dropFirst((appliquees.conseilsBascules ?? []).count))
+        reste.conseilsBascules = conseils.isEmpty ? nil : conseils
         return reste
     }
 }
@@ -176,6 +331,62 @@ enum CreneauWidget: String, CaseIterable, Identifiable {
         case .snack: return "birthday.cake"
         }
     }
+
+    /// Créneau de l'heure : mêmes plages que `MealSlot.from(date:)` (un test
+    /// tient la parité).
+    static func deLHeure(_ heure: Int) -> CreneauWidget {
+        switch heure {
+        case 5..<11: return .breakfast
+        case 11..<15: return .lunch
+        case 15..<18: return .snack
+        default: return .dinner
+        }
+    }
+
+    /// Heures où la proposition de repas change : la frise des widgets s'y
+    /// redessine sans que l'app soit ouverte.
+    static let heuresDeBascule = [5, 11, 15, 18]
+
+    /// « Ton midi ? » : la question du petit widget Ajout rapide (espace
+    /// fine insécable : le « ? » ne part jamais seul à la ligne).
+    var question: String {
+        switch self {
+        case .breakfast: return "Ton petit-déj\u{202F}?"
+        case .lunch: return "Ton midi\u{202F}?"
+        case .snack: return "Ton encas\u{202F}?"
+        case .dinner: return "Ton soir\u{202F}?"
+        }
+    }
+
+    /// « Dicter ton midi » : la grande tuile de l'Ajout rapide.
+    var aDicter: String {
+        switch self {
+        case .breakfast: return "Dicter ton petit-déj"
+        case .lunch: return "Dicter ton midi"
+        case .snack: return "Dicter ton encas"
+        case .dinner: return "Dicter ton soir"
+        }
+    }
+
+    /// « ton dîner » : « Prochain : ton dîner » dans la Dynamic Island.
+    var prochain: String {
+        switch self {
+        case .breakfast: return "ton petit-déjeuner"
+        case .lunch: return "ton déjeuner"
+        case .snack: return "ton encas"
+        case .dinner: return "ton dîner"
+        }
+    }
+
+    /// « ce soir » : « Sardines ce soir ? » (même tournure que les rappels).
+    var quand: String {
+        switch self {
+        case .breakfast: return "ce matin"
+        case .lunch: return "ce midi"
+        case .snack: return "en encas"
+        case .dinner: return "ce soir"
+        }
+    }
 }
 
 /// Les trois moments du rituel de compléments.
@@ -198,6 +409,14 @@ enum MomentRituel: String, CaseIterable, Identifiable {
         case .matin: return "sunrise"
         case .midi: return "sun.max"
         case .soir: return "moon"
+        }
+    }
+
+    /// Illustration 3D du moment (maquette des widgets : soleil, soleil, lune).
+    var illustration: String {
+        switch self {
+        case .matin, .midi: return "fluent_sun"
+        case .soir: return "fluent_moon"
         }
     }
 }
@@ -352,6 +571,28 @@ enum BoiteCommune {
         basculerMoment(moment)
     }
 
+    /// « C'est fait » sur le conseil du jour ; le retoucher le décoche.
+    static func basculerConseil() {
+        guard let conseil = etatAffiche()?.conseilDuJour else { return }
+        modifierAttente { attente in
+            attente.conseilsBascules = (attente.conseilsBascules ?? []) + [conseil.id]
+        }
+    }
+
+    /// Rang du jour « yyyy-MM-dd » : nombre de jours depuis le 1er janvier 2001,
+    /// en calendrier grégorien fixe. Le même dans l'app et dans le widget, quel
+    /// que soit le fuseau : c'est lui qui fait tourner le conseil du jour.
+    static func rangDuJour(_ jour: String) -> Int {
+        let morceaux = jour.split(separator: "-").compactMap { Int($0) }
+        guard morceaux.count == 3 else { return 0 }
+        var calendrier = Calendar(identifier: .gregorian)
+        calendrier.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let date = calendrier.date(from: DateComponents(year: morceaux[0], month: morceaux[1], day: morceaux[2]))
+        let reference = calendrier.date(from: DateComponents(year: 2001, month: 1, day: 1))
+        guard let date, let reference else { return 0 }
+        return max(0, calendrier.dateComponents([.day], from: reference, to: date).day ?? 0)
+    }
+
     /// Un contrôle (Centre de contrôle, bouton Action) demande un écran :
     /// l'app le lit à son ouverture.
     static func demanderRoute(_ lien: LienKiwio) {
@@ -384,6 +625,31 @@ extension InstantaneJour {
             Prise(id: "iron", nom: "Fer", moment: "matin", fait: true),
             Prise(id: "vitD", nom: "Vitamine D", moment: "midi", fait: true),
             Prise(id: "magnesium", nom: "Magnésium", moment: "soir", fait: false),
-        ]
+        ],
+        apports: LectureApportsW(
+            apports: [
+                ApportW(id: "vitD", nom: "Vitamine D", court: "Vit. D", score: 58),
+                ApportW(id: "magnesium", nom: "Magnésium", court: "Mg", score: 74),
+                ApportW(id: "iron", nom: "Fer", court: "Fer", score: 79),
+            ],
+            verdict: "Ta vitamine D est un peu juste.",
+            autres: "Magnésium et fer sont couverts.",
+            statut: "un peu juste",
+            cause: "Première cause : tes repas notés ces 14 derniers jours.",
+            titreAliments: "Ce qui la remonte",
+            aliments: [
+                AlimentW(nom: "Sardines", illustration: "fluent_fish"),
+                AlimentW(nom: "Œufs", illustration: "fluent_egg"),
+                AlimentW(nom: "Lait enrichi", illustration: "fluent_milk"),
+            ]
+        ),
+        conseils: [
+            ConseilW(id: "vitD-soleil",
+                     texte: "Un quart d'heure dehors, bras découverts, en milieu de journée quand c'est possible.",
+                     court: "15 min dehors, bras découverts",
+                     apport: "vitD", apportNom: "Vitamine D", apportCourt: "Vit. D", points: 5),
+        ],
+        conseilFait: nil,
+        premium: true
     )
 }

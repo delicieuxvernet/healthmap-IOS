@@ -831,6 +831,35 @@ final class MealJournalService {
         }
     }
 
+    /// La recherche de la feuille d'ajout (7 oct. 2026) : `search_foods_rapide`
+    /// rend les mêmes colonnes que `search_foods_visuel`, mais un mot en cours
+    /// de frappe compte (« céré »), les marques connues passent devant et les
+    /// aliments infantiles ne sortent plus en tête. Si elle ne répond pas, on
+    /// retombe sur `searchFoodsVisuel`.
+    func searchFoodsRapide(query: String, aliments: Int = 12, produits: Int = 12) async throws -> [FoodHit] {
+        struct Params: Encodable {
+            let q: String
+            let maxAliments: Int
+            let maxProduits: Int
+            enum CodingKeys: String, CodingKey {
+                case q
+                case maxAliments = "max_aliments"
+                case maxProduits = "max_produits"
+            }
+        }
+        do {
+            return try await client
+                .rpc("search_foods_rapide",
+                     params: Params(q: query, maxAliments: aliments, maxProduits: produits))
+                .execute()
+                .value
+        } catch {
+            if Task.isCancelled || error is CancellationError { throw error }
+            AppLogger.database.warning("search_foods_rapide failed, repli: \(error.localizedDescription, privacy: .public)")
+            return try await searchFoodsVisuel(query: query, aliments: aliments, produits: produits)
+        }
+    }
+
     /// Fiche 100 g d'un aliment (`get_food`), pour la fiche portion.
     func foodDetail(id: String) async throws -> FoodDetail {
         struct Params: Encodable {

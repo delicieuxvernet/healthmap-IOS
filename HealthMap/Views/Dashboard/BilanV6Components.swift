@@ -127,14 +127,10 @@ struct ApportV2DetailSheet: View {
         apport.id.map { Color.nutrientColor(for: $0) } ?? couleurStatut
     }
 
-    /// « 5,9 sur 11 mg par jour » : part couverte × besoin de CETTE personne
-    /// (sexe, âge, grossesse, règles : `BesoinsDeReference`). nil si le
-    /// nutriment n'est pas au catalogue (on n'invente pas d'unité).
+    /// « 5,9 sur 11 mg par jour » (`QuantiteApport`, partagé avec la fiche
+    /// des Compléments).
     private var quantite: String? {
-        guard let definition else { return nil }
-        let besoin = BesoinsDeReference.besoin(definition.id, profil: dashboardVM.profile)
-        let absolu = besoin * Double(pct) / 100
-        return "\(DS.decimal(absolu)) sur \(DS.decimal(besoin))\(DS.fine)\(definition.unit) par jour"
+        apport.id.flatMap { QuantiteApport.libelle(id: $0, score: pct, profil: dashboardVM.profile) }
     }
 
     /// Le registre donne le score ET ses causes nommées. Quand il se tait
@@ -574,6 +570,21 @@ struct ApportV2DetailSheet: View {
             quoi = "Les aliments qui couvrent ce besoin."
         }
         return quoi + " Les causes, elles, restent toujours gratuites."
+    }
+}
+
+// MARK: - La quantité d'un apport, en clair
+
+/// « 5,9 sur 11 mg par jour » : part couverte × besoin de CETTE personne
+/// (sexe, âge, grossesse, règles : `BesoinsDeReference`). Une seule formule
+/// pour la fiche du Bilan et celle des Compléments. `nil` si le nutriment
+/// n'est pas au catalogue (on n'invente pas d'unité).
+enum QuantiteApport {
+    static func libelle(id: String, score: Int, profil: UserProfile) -> String? {
+        guard let definition = NutrientData.definition(for: id) else { return nil }
+        let besoin = BesoinsDeReference.besoin(definition.id, profil: profil)
+        let absolu = besoin * Double(score) / 100
+        return "\(DS.decimal(absolu)) sur \(DS.decimal(besoin))\(DS.fine)\(definition.unit) par jour"
     }
 }
 

@@ -82,8 +82,18 @@ extension EcranBilan {
 
     /// La teinte du fond : celle de son étape, kiwi sinon (accueil, fin,
     /// écrans d'affinage).
+    ///
+    /// Les repas font passer le ciel du matin au soir (questionnaire ludique,
+    /// 3 octobre 2026) : aube au petit déj, ciel à midi, kiwi au goûter,
+    /// orchidée le soir. Les halos fondent de l'un à l'autre (`VerreFond`).
     var teinteVerre: VerreTeinte {
-        etape?.teinteVerre ?? .kiwi
+        guard let repas else { return etape?.teinteVerre ?? .kiwi }
+        switch repas {
+        case .petitDej: return .aube
+        case .midi: return .ciel
+        case .gouter: return .kiwi
+        case .soir: return .orchidee
+        }
     }
 }
 
@@ -171,6 +181,13 @@ enum BilanTypo {
     static let molette: Font = .system(.title, design: .rounded).weight(.bold).monospacedDigit()
     /// Les valeurs voisines d'une molette.
     static let moletteVoisine: Font = .system(.subheadline, design: .rounded).weight(.semibold).monospacedDigit()
+
+    /// La question montrée, une à la fois (questionnaire ludique).
+    static let question: Font = .system(.title2, design: .rounded).weight(.bold)
+    /// L'image d'une grande carte de réponse.
+    static let grandEmoji: Font = .system(size: 34)
+    /// Le mot d'une grande carte de réponse.
+    static let carte: Font = .system(.subheadline, design: .default).weight(.semibold)
 
     /// Rayon d'une réponse en verre clair (tuile, ligne, champ).
     static let rayon: CGFloat = 22

@@ -39,6 +39,23 @@ final class MealJournalViewModel: ObservableObject {
 
     private let service = MealJournalService.shared
 
+    /// La quinzaine a-t-elle été chargée au moins une fois ? Tant que non, les
+    /// bornes ci-dessus valent « aujourd'hui » sans que rien ne soit en main.
+    private var quinzaineChargee = false
+
+    /// Quinzaine + archives, chaque repas UNE SEULE fois. Une archive partie
+    /// avant le premier `load()` (brief « Ajouter mes repas d'hier » au
+    /// démarrage, chevrons après un chargement raté) recouvrait la quinzaine :
+    /// toute la journée s'affichait en double (retour d'Arthur du 7 oct. 2026).
+    /// La quinzaine, plus fraîche, l'emporte.
+    nonisolated static func fusion(_ quinzaine: [MealJournalService.MealRecord],
+                       _ archives: [MealJournalService.MealRecord]) -> [MealJournalService.MealRecord] {
+        var vus = Set(quinzaine.map(\.id))
+        return quinzaine + archives.filter { vus.insert($0.id).inserted }
+    }
+
+    private var repasCharges: [MealJournalService.MealRecord] { Self.fusion(fortnight, archives) }
+
     // MARK: - Mémoïsation du jour affiché
     //
     // `dayMeals` était une propriété calculée : elle reconcaténait
@@ -74,7 +91,7 @@ final class MealJournalViewModel: ObservableObject {
     ) -> TableauMicros {
         if let connu = cacheMicros, connu.contexte == contexte { return connu.tableau }
         let tableau = MicrosDuJour.tableau(
-            repas: fortnight + archives,
+            repas: repasCharges,
             jourAffiche: selectedDay,
             compositions: compositions,
             contexte: contexte,
@@ -86,7 +103,7 @@ final class MealJournalViewModel: ObservableObject {
 
     /// Demande à la base la composition des aliments qu'on ne connaît pas encore.
     private func chargerCompositions() async {
-        let connues = await CompositionsStore.shared.completer(pour: fortnight + archives)
+        let connues = await CompositionsStore.shared.completer(pour: repasCharges)
         if connues != compositions { compositions = connues }
     }
 
@@ -152,7 +169,12 @@ final class MealJournalViewModel: ObservableObject {
             // pendant le vol a pu en faire démarrer une plus fraîche.
             defer { if Self.volEnCours?.tache == tache { Self.volEnCours = nil } }
             let all = try await tache.value
+            // Les archives qui recouvrent la fenêtre rechargée sont périmées
+            // (repas supprimés ou modifiés depuis) : la quinzaine fait foi.
+            let ids = Set(all.map(\.id))
+            archives.removeAll { ids.contains($0.id) || ($0.consumedAt >= from && $0.consumedAt < to) }
             fortnight = all
+            quinzaineChargee = true
             // Le brief du jour se calcule sur cette même quinzaine : on la garde
             // sur le téléphone pour qu'il s'affiche demain matin SANS attendre
             // le réseau (retour d'Arthur du 19 sept. : « il arrive au bout
@@ -327,7 +349,7 @@ final class MealJournalViewModel: ObservableObject {
     /// demande par le calendrier.
     var dayMeals: [MealJournalService.MealRecord] {
         if let cacheDayMeals { return cacheDayMeals }
-        let jour = (fortnight + archives)
+        let jour = repasCharges
             .filter { cal.isDate($0.consumedAt, inSameDayAs: selectedDay) }
             .sorted { $0.consumedAt < $1.consumedAt }
         cacheDayMeals = jour
@@ -444,6 +466,12 @@ final class MealJournalViewModel: ObservableObject {
     func chargerArchiveSiBesoin(pour date: Date) async {
         let cal = Calendar.current
         let jour = cal.startOfDay(for: date)
+        // Bornes encore fictives : la quinzaine d'abord (elle couvre déjà le
+        // jour affiché), l'archive ensuite seulement si elle manque.
+        if !quinzaineChargee {
+            await load()
+            guard quinzaineChargee else { return }
+        }
         let versLePasse = jour < jourLePlusAncienCharge
         let versLeFutur = jour >= jourLePlusRecentCharge
         guard versLePasse || versLeFutur else { return }
@@ -462,7 +490,7 @@ final class MealJournalViewModel: ObservableObject {
         defer { chargeLArchive = false }
         do {
             let horsFenetre = try await service.loadRange(userId: userId, from: from, to: to)
-            let dejaLa = Set((fortnight + archives).map(\.id))
+            let dejaLa = Set(repasCharges.map(\.id))
             archives.append(contentsOf: horsFenetre.filter { !dejaLa.contains($0.id) })
             await chargerCompositions()
             if versLePasse {

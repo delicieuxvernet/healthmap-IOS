@@ -30,8 +30,6 @@ struct JournalPoidsCard: View {
     let onActuel: (Double) -> Void
     let onSouhaite: (Double) -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 0) {
@@ -56,26 +54,108 @@ struct JournalPoidsCard: View {
     }
 
     /// L'encart d'objectif : ce que l'écart entre les deux poids donne en
-    /// calories, puis ce qu'il change. Les calories roulent avec le poids.
+    /// calories, puis ce qu'il change. Le NOMBRE de calories roule avec le
+    /// poids, seul (maquette : « Objectif : » et « kcal par jour » restent).
     private var encartObjectif: some View {
         VStack(alignment: .leading, spacing: 3) {
             if let calories {
-                Text("Objectif : \(DS.entier(calories)) kcal par jour")
+                ligneObjectif(calories)
                     .font(.dsSousTitreFort)
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
-                    .contentTransition(.numericText(value: Double(calories)))
             }
             Text(phrase)
                 .font(.dsLegende)
+                // Interligne 1,35 de la maquette : 2 pt de plus que SF 13.
+                .lineSpacing(2)
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.teinteKiwi.opacity(0.1)))
-        .animation(reduceMotion ? Animation.easeOut(duration: 0.2) : Animation.kiwiVif, value: calories)
         .accessibilityElement(children: .combine)
+    }
+
+    /// Sur une ligne, le nombre est isolé pour rouler. Aux grandes tailles de
+    /// texte, la ligne ne tient plus : la phrase d'un bloc reprend la main et
+    /// passe à la ligne normalement (sans rouler).
+    private func ligneObjectif(_ calories: Int) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text("Objectif : ")
+                Text(DS.entier(calories))
+                    .monospacedDigit()
+                    .roulement(calories, depart: 15)
+                Text(" kcal par jour")
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Objectif : \(DS.entier(calories)) kcal par jour")
+            Text("Objectif : \(DS.entier(calories)) kcal par jour")
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+// MARK: - Un chiffre qui roule
+
+private enum Roulements {
+    /// La courbe de la maquette pour un chiffre qui change
+    /// (`cubic-bezier(.3,1.3,.5,1)`) : il dépasse à peine sa place, puis s'y pose.
+    static var courbe: UnitCurve {
+        UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.3, y: 1.3), endControlPoint: UnitPoint(x: 0.5, y: 1))
+    }
+    static let duree: TimeInterval = 0.38
+}
+
+private struct EtatDuRoulement {
+    /// Décalage vertical, en points.
+    var y: CGFloat = 0
+    var opacite: Double = 1
+}
+
+/// Le `roll()` de la maquette : quand `declencheur` change, la NOUVELLE valeur
+/// repart de `depart` points plus bas (80 % de la fenêtre de la maquette :
+/// 24 pt pour le poids, 16 pour les litres, 15 pour l'objectif), transparente,
+/// et remonte à sa place en 0,38 s, rognée à sa propre hauteur. L'ancienne
+/// valeur ne glisse pas : elle est remplacée d'un coup. Toujours vers le haut,
+/// que le chiffre monte ou descende. Rien sous « Réduire les animations ».
+private struct Roulement<Declencheur: Equatable>: ViewModifier {
+    let declencheur: Declencheur
+    let depart: CGFloat
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            content
+                // Le texte change sans fondu : c'est le roulement qui l'amène.
+                .transaction { $0.animation = nil }
+                .keyframeAnimator(initialValue: EtatDuRoulement(), trigger: declencheur) { vue, etat in
+                    vue
+                        .offset(y: etat.y)
+                        .opacity(etat.opacite)
+                } keyframes: { _ in
+                    KeyframeTrack(\.y) {
+                        MoveKeyframe(depart)
+                        LinearKeyframe(0, duration: Roulements.duree, timingCurve: Roulements.courbe)
+                    }
+                    KeyframeTrack(\.opacite) {
+                        MoveKeyframe(0)
+                        LinearKeyframe(1, duration: Roulements.duree, timingCurve: Roulements.courbe)
+                    }
+                }
+                .clipped()
+        }
+    }
+}
+
+private extension View {
+    /// Le chiffre roule vers le haut quand `declencheur` change.
+    func roulement<Declencheur: Equatable>(_ declencheur: Declencheur, depart: CGFloat) -> some View {
+        modifier(Roulement(declencheur: declencheur, depart: depart))
     }
 }
 
@@ -87,30 +167,27 @@ private struct ColonnePoids: View {
     let enAttente: Bool
     let onChange: (Double) -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         VStack(spacing: 6) {
             Text(titre)
                 .font(.dsLegende)
                 .foregroundStyle(Color.dsSecondaire)
 
-            // Le chiffre roule vers le haut quand le poids monte, vers le bas
-            // quand il descend. Un ressort court : l'appui maintenu enchaîne
-            // les pas, le chiffre doit suivre sans traîner.
+            // Tout le bloc « 70,0 kg » roule vers le haut à chaque pas, comme
+            // le `roll()` de la maquette : 0,38 s, assez court pour suivre
+            // l'appui maintenu qui enchaîne les pas.
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(ObjectifPoids.affichage(kilos))
                     .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
                     .tracking(DSTracking.valeur24)
                     .foregroundStyle(enAttente ? Color.dsTertiaire : Color.dsTexte)
-                    .contentTransition(.numericText(value: kilos))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text("kg")
                     .font(.dsSousTitre)
                     .foregroundStyle(Color.dsSecondaire)
             }
-            .animation(reduceMotion ? nil : Animation.kiwiVif, value: kilos)
+            .roulement(kilos, depart: 24)
 
             HStack(spacing: 14) {
                 bouton(symbole: "minus", pas: -ObjectifPoids.pas)
@@ -144,7 +221,7 @@ private struct ColonnePoids: View {
                 .verreClair(Circle())
                 .contentShape(Circle())
         }
-        .buttonStyle(.dsPress)
+        .buttonStyle(PasPressStyle())
         .buttonRepeatBehavior(.enabled)
     }
 
@@ -153,6 +230,28 @@ private struct ColonnePoids: View {
         guard nouveau != kilos || enAttente else { return }
         HapticService.shared.selection()
         onChange(nouveau)
+    }
+}
+
+/// L'appui d'un « − » ou d'un « + » : un rond se creuse plus qu'une puce
+/// (0,9 et non 0,96), en 0,2 s, avec le léger dépassement de la maquette
+/// (`cubic-bezier(.3,1.5,.5,1)`). Sans assombrir.
+private struct PasPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.9 : 1))
+            .animation(Animation.timingCurve(0.3, 1.5, 0.5, 1, duration: 0.2), value: configuration.isPressed)
+    }
+}
+
+/// Un gobelet n'a pas d'état d'appui dans la maquette : c'est l'eau qui
+/// monte qui répond. Ce style rend le libellé tel quel (`.plain` pourrait
+/// l'estomper sous le doigt).
+private struct GobeletPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
     }
 }
 
@@ -231,16 +330,17 @@ struct JournalEauCard: View {
                 .tracking(DSTracking.corps)
                 .foregroundStyle(Color.teinteEauTexte)
             Spacer(minLength: 8)
-            Text("\(litres(bus)) L")
+            // « 0,75 L » roule vers le haut à chaque gobelet (maquette).
+            Text("\(Self.litres(bus)) L")
                 .font(.dsValeurLigneForte)
                 .foregroundStyle(Color.dsTexte)
-                .contentTransition(.numericText(value: Double(bus)))
-            Text("sur \(litres(SuiviEau.gobeletsParJour)) L")
+                .roulement(bus, depart: 16)
+            Text("sur \(Self.litres(SuiviEau.gobeletsParJour)) L")
                 .font(.dsValeurLigne)
                 .foregroundStyle(Color.dsSecondaire)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Eau : \(litres(bus)) litre sur \(litres(SuiviEau.gobeletsParJour)).")
+        .accessibilityLabel("Eau : \(Self.litres(bus)) litre sur \(Self.litres(SuiviEau.gobeletsParJour)).")
     }
 
     private func gobelet(_ rang: Int) -> some View {
@@ -251,7 +351,7 @@ struct JournalEauCard: View {
                 .frame(maxWidth: .infinity, minHeight: 56)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.dsPress)
+        .buttonStyle(GobeletPressStyle())
         .accessibilityLabel("Gobelet \(rang + 1) sur \(SuiviEau.gobeletsParJour)")
         .accessibilityValue(rang < bus ? "bu" : "vide")
         .verreEnvol(envols[rang], texte: texteEnvol, couleur: Color.teinteEauTexte)
@@ -276,8 +376,13 @@ struct JournalEauCard: View {
         onToucher(rang)
     }
 
-    private func litres(_ gobelets: Int) -> String {
-        DS.decimal(SuiviEau.litres(gobelets), decimales: 2)
+    /// « 0,25 », « 0,5 », « 0,75 », « 1 », « 2 » : comme la maquette, sans
+    /// zéro de fin (`DS.decimal` à deux décimales écrirait « 0,50 »). La puce
+    /// « Eau » du Journal l'emprunte.
+    static func litres(_ gobelets: Int) -> String {
+        let valeur = SuiviEau.litres(gobelets)
+        let dixiemes = valeur * 10
+        return DS.decimal(valeur, decimales: dixiemes.rounded() == dixiemes ? 1 : 2)
     }
 }
 

@@ -32,6 +32,31 @@ private enum AncreJournal: Hashable {
     case poids
     case eau
     case sang
+
+    /// La maquette pose la cible (le titre « Poids et eau », la carte de
+    /// l'eau, celle de la prise de sang) à 64 pt du haut du téléphone, soit
+    /// environ 5 pt sous le bord de la zone sûre, où `scrollTo(_, anchor:
+    /// .top)` aligne l'ancre.
+    static let ecartSousLeBord: CGFloat = 5
+}
+
+private extension View {
+    /// Le repère que vise une puce : un point sans taille, posé `retrait` sous
+    /// le haut de la vue, DANS sa marge du haut. La marge elle-même (30 pt
+    /// avant un titre de section, 12 entre deux cartes) passe ainsi au-dessus
+    /// du bord, comme dans la maquette qui vise le haut de l'élément, marge
+    /// non comprise. L'`id` se pose avant le décalage : c'est le point qui est
+    /// visé, pas sa marge.
+    func repereDeDefilement(_ ancre: AncreJournal, retrait: CGFloat) -> some View {
+        overlay(alignment: .top) {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .id(ancre)
+                .padding(.top, max(0, retrait))
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
 }
 
 struct JournalView: View {
@@ -45,11 +70,11 @@ struct JournalView: View {
     @State private var showCaptureChoice = false
     @State private var showCamera = false
     @State private var showPhotoLibrary = false
-    /// Fiche 100 g de l'aliment tapé dans la recherche (fetch `get_food`).
-    @State private var selectedSearchDetail: MealJournalService.FoodDetail?
-    @State private var isAddingFood = false
     @State private var addFoodConfirmation: String?
     @State private var showPaywall = false
+    /// Carte des micronutriments touchée en gratuit : l'abonnement, avec sa
+    /// zone de suivi (`journal_micros`).
+    @State private var porteMicros = false
     @State private var selectedFood: MealScanViewModel.DetectedFood?
     @State private var impactDetail: MealScanViewModel.MicroNutrient?
     /// Repas ouvert depuis la mosaïque (« Midi » → la fiche du déjeuner).
@@ -93,11 +118,14 @@ struct JournalView: View {
         nonmutating set { dicteeBox.geste.glissement = newValue }
     }
     @State private var demarrageDictee: Task<Void, Never>?
-    /// Fin d'écoute : la transcription puis l'analyse tournent ici, sous la
-    /// bulle contractée. La feuille ne monte qu'avec leur résultat.
+    /// Fin d'écoute : la transcription tourne ici, sous la bulle contractée.
+    /// La feuille ne monte qu'avec son texte, à relire avant toute analyse.
     @State private var calculDictee: Task<Void, Never>?
-    /// Ce que le calcul a donné : la feuille de dictée s'ouvre dessus.
+    /// Ce que la transcription a donné : la feuille de dictée s'ouvre dessus.
     @State private var departDictee: VoiceMealSheet.Depart?
+    /// « Recommencer la dictée » depuis la feuille : la bulle se rouvre dès
+    /// que la feuille est redescendue.
+    @State private var redicterApresFeuille = false
     /// Le repas que la feuille de dictée vient d'enregistrer. La page ne bouge
     /// qu'à la fermeture de la feuille : c'est là que la pastille confirme et
     /// que la carte des calories compte jusqu'à sa nouvelle valeur.
@@ -141,11 +169,13 @@ struct JournalView: View {
     @State private var showActivite = false
     /// Fiche apport ouverte depuis « Apports à renforcer ».
     @State private var selectedApport: ApportV2?
-    /// Micronutriment touché dans la carte du Journal. Il reste en place
-    /// pendant que sa page se referme : c'est `microPoussee` qui la pousse.
+    /// Micronutriment touché dans la carte du Journal : sa présence OUVRE sa
+    /// page. `.sheet(isPresented:)` lisait une capture encore vide au premier
+    /// toucher → feuille blanche, il fallait la rouvrir (retour d'Arthur du
+    /// 7 oct. 2026). Même correctif que le Bilan en juin : `.sheet(item:)`.
     @State private var selectedMicro: LigneMicro?
-    /// La page d'un micronutriment est poussée dans la pile du Journal.
-    @State private var microPoussee = false
+    /// La page d'un micronutriment est ouverte.
+    private var microPoussee: Bool { selectedMicro != nil }
     /// Bilan complet (ex-onglet), présenté par « Tout afficher ».
     @State private var showBilanComplet = false
     /// Prise de sang (Premium) : import + « Tes repères ».
@@ -234,6 +264,12 @@ struct JournalView: View {
         // doit pas resservir à la prochaine.
         EcouteCentre.partage.fermer()
         departDictee = nil
+        if redicterApresFeuille {
+            redicterApresFeuille = false
+            // Mains libres : aucun doigt ne tient le bouton.
+            demarrerDictee(verrouillee: true)
+            return
+        }
         guard let ajout = ajoutVocal else { return }
         ajoutVocal = nil
         // Pendant le tutoriel, c'est lui qui parle : pas de pastille par-dessus.
@@ -250,17 +286,14 @@ struct JournalView: View {
     }
 
     /// Un repas vient d'entrer dans la journée affichée : la carte Énergie le
-    /// dit sous son chiffre (« Déjeuner ajouté · 3 aliments »), puis rend la
-    /// place à l'objectif. Seulement aujourd'hui, comme la maquette.
+    /// dit sous son chiffre (« Déjeuner ajouté · 3 aliments ») tant qu'on
+    /// reste sur ce jour, comme la maquette ; le changement de jour rend la
+    /// place à l'objectif. Seulement aujourd'hui.
     private func signalerAjout(_ creneau: MealJournalService.MealSlot, aliments: Int) {
         guard isTodaySelected else { return }
-        ajoutRecent = creneau.phraseAjout(aliments: aliments)
         effacementAjout?.cancel()
-        effacementAjout = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(8))
-            guard !Task.isCancelled else { return }
-            ajoutRecent = nil
-        }
+        effacementAjout = nil
+        ajoutRecent = creneau.phraseAjout(aliments: aliments)
     }
 
     /// Rejoue l'entrée de la page : tout se range d'un coup, puis les repas
@@ -317,10 +350,11 @@ struct JournalView: View {
                 // déclaré : c'est le nom de l'écran dans la pile.
                 .navigationTitle("Journal")
                 .toolbar(.hidden, for: .navigationBar)
-                // La page d'un micronutriment entre par la droite, dans la
-                // pile du Journal : la barre d'onglets reste là.
-                .navigationDestination(isPresented: $microPoussee) {
-                    pageMicro
+                // La page d'un micronutriment s'ouvre en FEUILLE de verre :
+                // on la referme en la balayant vers le bas (demande d'Arthur
+                // du 3 oct. 2026, plutôt que le retour « ‹ Journal »).
+                .sheet(item: $selectedMicro) { ligne in
+                    pageMicro(ligne)
                 }
                 // Le Bilan complet garde sa propre pile de navigation : on le
                 // présente en feuille, jamais poussé (pile dans la pile).
@@ -354,9 +388,10 @@ struct JournalView: View {
                             cibleGlucides: mesures.macros?.carbs,
                             cibleLipides: mesures.macros?.fat,
                             gratification: { gratificationDe($0) },
-                            // Déjà transcrite et chiffrée sous la bulle : la
-                            // feuille monte directement sur son résultat.
+                            // Déjà transcrite sous la bulle : la feuille monte
+                            // sur le texte, à relire avant l'analyse.
                             depart: departDictee,
+                            onRedicter: { redicterApresFeuille = true },
                             speech: speech
                         ) { ajout in
                             ajoutVocal = ajout
@@ -483,26 +518,18 @@ struct JournalView: View {
         }
     }
 
-    // MARK: - Sheet recherche d'aliment (logique de recherche inchangée)
+    // MARK: - Sheet recherche d'aliment
+    //
+    // La même feuille que « Ajouter » d'un repas (`FoodSearchSheet`) : récents,
+    // favoris, « Tes aliments » et la recherche rapide. Le créneau se déduit
+    // de l'heure, comme avant.
     private var searchSheet: some View {
-        NavigationStack {
-            ScrollView {
-                searchTab
-                    .padding(.vertical, Theme.spacingMD)
-            }
-            .navigationTitle("Rechercher")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { showSearch = false }
-                        .foregroundStyle(Color.dsTexte)
-                        .accessibilityLabel("Fermer")
-                }
-            }
+        let slot = MealJournalService.MealSlot.from(date: Date())
+        return FoodSearchSheet(slot: slot, recents: AlimentsHabituels.recents(journal.fortnight)) { detail, grammes in
+            await journal.addFood(detail: detail, grams: grammes, slot: slot)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .verreFeuille()
     }
 
     // MARK: - Scaffold
@@ -561,7 +588,7 @@ struct JournalView: View {
         // La page d'un micronutriment est poussée : elle se referme d'abord,
         // le geste demandé se sert sur le Journal une fois revenu.
         guard !microPoussee else {
-            microPoussee = false
+            selectedMicro = nil
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(500))
                 servirLienWidget(lien)
@@ -582,13 +609,23 @@ struct JournalView: View {
         case .dicter:
             demarrerDictee(verrouillee: true)
         case .photo:
+            // « Photo » d'un widget : l'appareil déjà prêt (maquette des
+            // widgets), sans passer par le choix appareil / galerie.
             if CameraPicker.isAvailable {
-                showCaptureChoice = true
+                showCamera = true
             } else {
                 showPhotoLibrary = true
             }
         case .rechercher:
             showSearch = true
+        case .apport(let id):
+            // « Voir le calcul », « Pourquoi ? » : la même fiche que depuis la
+            // carte « Apports à renforcer », porte Premium comprise. Un apport
+            // que le Journal ne connaît plus (bilan refait depuis) : on reste
+            // sur le Journal plutôt que d'ouvrir une fiche vide.
+            if let nutriment = dashboardVM.nutrients.first(where: { $0.id == id }) {
+                selectedApport = ApportV2.pourLaFiche(nutriment, bilan: dashboardVM.analysisV2?.bilan)
+            }
         case .journal, .complements:
             break
         }
@@ -778,7 +815,7 @@ struct JournalView: View {
         } label: {
             VerrePuce(
                 libelle: "Eau",
-                valeur: "\(DS.decimal(SuiviEau.litres(gobeletsEau), decimales: 2)) L"
+                valeur: "\(JournalEauCard.litres(gobeletsEau)) L"
             ) {
                 JournalPuceEau(fraction: Double(gobeletsEau) / Double(max(1, SuiviEau.gobeletsParJour)))
             }
@@ -797,7 +834,15 @@ struct JournalView: View {
                 libelle: "Poids",
                 valeur: "\(ObjectifPoids.affichage(profil.weightDouble)) kg"
             ) {
-                VerrePastilleIcone(symbole: "scalemass")
+                // La balance est en gris secondaire (60 %), pas dans l'encre
+                // neutre à 75 % de `VerrePastilleIcone` : seule exception de
+                // la maquette.
+                Image(systemName: "scalemass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.dsSecondaire)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Verre.remplissage))
+                    .accessibilityHidden(true)
             }
             .contentShape(Capsule(style: .continuous))
         }
@@ -854,7 +899,7 @@ struct JournalView: View {
             // Le titre et le jour affiché, tout en haut : le jour commande la
             // page entière (jauges, apports, repas) ET la date des ajouts.
             enTete
-                .padding(.top, 14)
+                .padding(.top, DS.hautTitreOnglet)
 
             puces
 
@@ -929,8 +974,8 @@ struct JournalView: View {
                     showPriseDeSang = true
                 }
                 .padding(.top, DS.interCarte)
-                // La puce « Analyses » mène ici.
-                .id(AncreJournal.sang)
+                // La puce « Analyses » mène ici : la carte, marge non comprise.
+                .repereDeDefilement(.sang, retrait: DS.interCarte - AncreJournal.ecartSousLeBord)
 
                 apportsSection
 
@@ -953,7 +998,7 @@ struct JournalView: View {
             } else if microPoussee {
                 // On quitte l'onglet : la page d'un micronutriment se referme
                 // (maquette), le Journal se retrouve sur sa racine au retour.
-                microPoussee = false
+                selectedMicro = nil
             }
         }
         .onChange(of: journal.selectedDay) { _, _ in
@@ -1056,21 +1101,24 @@ struct JournalView: View {
     @ViewBuilder
     private var microsSection: some View {
         if dashboardVM.premiumVisible {
-            // Porte Premium (décision d'Arthur du 1er octobre 2026) : la carte
-            // reste devinable derrière le voile, rien ne s'ouvre, et la page
-            // d'un micronutriment n'est donc pas atteignable. Même geste que
-            // dans Progrès (`GatedOverlay` + `UnlockDoor`).
-            GatedOverlay(intensity: .locked) {
-                JournalMicrosCard(tableau: tableauMicros) { _ in }
-            }
-            .padding(.top, DS.interCarte)
-            UnlockDoor(
-                icon: "chart.bar.xaxis",
-                title: "Débloque tes micronutriments",
-                subtitle: "Vitamines, minéraux et acides gras, calculés sur tes repas",
-                zone: "journal_micros"
+            // Porte Premium (décision d'Arthur du 1er octobre 2026) : en
+            // gratuit, la page d'un micronutriment n'est pas atteignable. Depuis le 7
+            // octobre (variante B), la carte n'est plus floutée : la liste se
+            // lit, noms nets, et chaque ligne dit « Débloquer avec Premium » ;
+            // aucun chiffre de la personne n'est affiché.
+            JournalMicrosCard(
+                tableau: tableauMicros,
+                onLigne: { _ in porteMicros = true },
+                verrouille: true,
+                titrePorte: PremiumOffre.titreEssai(offerings: subscriptionService.offerings,
+                                                    produits: subscriptionService.directProducts),
+                onDebloquer: { porteMicros = true }
             )
             .padding(.top, DS.interCarte)
+            .sheet(isPresented: $porteMicros) {
+                PaywallView(source: "journal_micros")
+                    .healthMapFullSheet()
+            }
         } else {
             JournalMicrosCard(tableau: tableauMicros) { ligne in
                 HapticService.shared.tap()
@@ -1083,37 +1131,17 @@ struct JournalView: View {
     /// Un micronutriment vient d'être touché : sa page entre par la droite.
     private func ouvrirMicro(_ ligne: LigneMicro) {
         selectedMicro = ligne
-        microPoussee = true
     }
 
-    /// La page d'un micronutriment, POUSSÉE dans la pile du Journal (elle
-    /// était une feuille) : elle entre par la droite et la barre d'onglets
-    /// reste là. La vue vit dans `JournalMicrosComponents.swift` : elle
-    /// dessine son propre retour (« ‹ Journal », qui dépile la page) et son
-    /// fond de verre. La barre native est donc masquée ici aussi, sinon le
-    /// retour serait écrit deux fois.
-    @ViewBuilder
-    private var pageMicro: some View {
-        if let ligne = selectedMicro {
-            MicroDuJourSheet(ligne: ligne, apportDuBilan: apportDuBilan(pour: ligne))
-                .environmentObject(dashboardVM)
-                .kiwiTabBarBottomInset()
-                .toolbar(.hidden, for: .navigationBar)
-                .simultaneousGesture(retourParLeBord)
-        }
-    }
-
-    /// Barre masquée, le glissé de retour du système ne répond plus : on
-    /// garde le geste. Un glissé parti du bord gauche, franchement vers la
-    /// droite, referme la page.
-    private var retourParLeBord: some Gesture {
-        DragGesture(minimumDistance: 20)
-            .onEnded { geste in
-                guard geste.startLocation.x < 28,
-                      geste.translation.width > 70,
-                      abs(geste.translation.height) < 60 else { return }
-                microPoussee = false
-            }
+    /// La page d'un micronutriment, en feuille de verre pleine hauteur : on
+    /// la referme en la balayant vers le bas, ou par sa croix. La vue vit
+    /// dans `JournalMicrosComponents.swift`.
+    private func pageMicro(_ ligne: LigneMicro) -> some View {
+        MicroDuJourSheet(ligne: ligne, apportDuBilan: apportDuBilan(pour: ligne))
+            .environmentObject(dashboardVM)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .verreFeuille()
     }
 
     /// La fiche des causes n'existe que pour les apports du bilan.
@@ -1191,8 +1219,9 @@ struct JournalView: View {
         let cibles = mesures
 
         DSSectionHeader(titre: "Poids et eau")
-            // La puce « Poids » mène ici : le titre, puis la carte.
-            .id(AncreJournal.poids)
+            // La puce « Poids » mène ici : le titre, puis la carte. Le repère
+            // est dans la marge de 30 pt du titre, pas au-dessus d'elle.
+            .repereDeDefilement(.poids, retrait: DS.avantSection - AncreJournal.ecartSousLeBord)
 
         JournalPoidsCard(
             actuel: profil.weightDouble,
@@ -1212,8 +1241,8 @@ struct JournalView: View {
             .onReceive(NotificationCenter.default.publisher(for: .healthmapEauChange)) { _ in
                 relireEau()
             }
-            // La puce « Eau » mène ici.
-            .id(AncreJournal.eau)
+            // La puce « Eau » mène ici : la carte, marge non comprise.
+            .repereDeDefilement(.eau, retrait: DS.interCarte - AncreJournal.ecartSousLeBord)
     }
 
     private func relireEau() {
@@ -1497,8 +1526,9 @@ struct JournalView: View {
 
     /// Clôt la dictée : trop courte, la bulle retourne dans son bouton sans
     /// faire attendre ; sinon elle se contracte et tourne, le temps de
-    /// transcrire puis de chiffrer ce qui vient d'être dit, et la feuille
-    /// monte avec le résultat.
+    /// transcrire ce qui vient d'être dit, et la feuille monte avec le texte.
+    /// L'analyse (payante) n'est lancée que depuis la feuille, une fois le
+    /// texte relu.
     private func terminerDictee() {
         demarrageDictee?.cancel()
         demarrageDictee = nil
@@ -1515,13 +1545,13 @@ struct JournalView: View {
         }
         HapticService.shared.lightTap()
         EcouteCentre.partage.contracter()
-        // Le calcul se fait ICI, sous la bulle : on referme le micro, on
-        // transcrit l'enregistrement entier, la carte le relit, puis le
-        // serveur chiffre. La feuille ne monte qu'avec le résultat (ou
-        // l'échec, qu'elle sait rejouer).
+        // La transcription se fait ICI, sous la bulle : on referme le micro,
+        // on transcrit l'enregistrement entier (sur l'appareil) et la carte le
+        // relit. La feuille monte avec ce texte (ou l'échec) : rien n'est
+        // encore parti au serveur.
         calculDictee?.cancel()
         calculDictee = Task { @MainActor in
-            let depart = await VoiceMealSheet.preparer(speech: speech) { texte in
+            let depart = await VoiceMealSheet.transcrire(speech: speech) { texte in
                 EcouteCentre.partage.transcrire(texte)
             }
             // Abandonné entre-temps (« Annuler » sous la bulle) : rien ne monte.
@@ -2131,164 +2161,10 @@ struct JournalView: View {
         .padding(.horizontal, Theme.spacingLG)
     }
 
-    // MARK: - Search Tab
-    //
-    // Même habillage que `FoodSearchSheet` (JournalEditorComponents.swift) :
-    // champ et exemples en verre clair, confirmation en capsule de verre vert
-    // pâle, UNE carte de verre par section de résultats, lignes séparées d'un
-    // filet. La logique ne bouge pas : toucher une ligne ouvre la fiche
-    // portion ; il n'y a pas d'ajout rapide ici, donc pas de « + ».
-    private var searchTab: some View {
-        VStack(spacing: Theme.spacingMD) {
-            champRecherche
+    // MARK: - Ajout depuis le code-barres
 
-            if viewModel.searchQuery.isEmpty {
-                exemplesRecherche
-            }
-
-            if let confirmation = addFoodConfirmation {
-                confirmationRecherche(confirmation)
-            }
-
-            if viewModel.isSearching {
-                ProgressView()
-                    .tint(Color.dsAccent)
-                    .padding()
-            } else {
-                // La même ligne à vignette que la recherche du journal
-                // (`FoodHitContenu`), rangée dans les deux mêmes sections.
-                ForEach(RechercheVisuelle.sections(viewModel.searchResults, source: \.source, score: \.score)) { section in
-                    VStack(spacing: 8) {
-                        RechercheSectionTitre(titre: section.titre)
-                        carteResultats(section.lignes)
-                    }
-                }
-                if viewModel.searchResults.contains(where: { $0.source == "off" }) {
-                    RechercheCreditPhotos()
-                }
-            }
-        }
-        .padding(.horizontal, DS.marge)
-        // Fiche portion unifiée (quantité libre) — l'ajout passe par le VM
-        // journal (ligne riche éditable), créneau déduit de l'heure.
-        .sheet(item: $selectedSearchDetail) { detail in
-            ajoutPortionSheet(detail)
-        }
-    }
-
-    /// Le champ, en capsule de verre clair de 48 pt.
-    private var champRecherche: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(Verre.iconeNeutre)
-                .accessibilityHidden(true)
-            TextField("Rechercher un aliment…", text: $viewModel.searchQuery)
-                .font(Theme.bodyFont)
-                .accessibilityIdentifier("recherche.champ")
-                .autocorrectionDisabled()
-                .onChange(of: viewModel.searchQuery) { _, _ in
-                    Task { await viewModel.searchFoods() }
-                }
-            if !viewModel.searchQuery.isEmpty {
-                Button {
-                    viewModel.searchQuery = ""
-                    viewModel.searchResults = []
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Color.dsTertiaire)
-                        .frame(width: DS.cibleTactile, height: DS.cibleTactile)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.dsPress)
-                // Nommé : sans libellé, la croix se lirait comme un second
-                // « Fermer » à côté de celui de la barre.
-                .accessibilityLabel("Effacer la recherche")
-            }
-        }
-        .padding(.leading, 16)
-        .padding(.trailing, viewModel.searchQuery.isEmpty ? 16 : 2)
-        .frame(minHeight: 48)
-        .verreClair()
-    }
-
-    private var exemplesRecherche: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingSM) {
-            Text("Essaie par exemple :")
-                .font(.dsSousTitreFort)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .padding(.horizontal, 2)
-            HStack(spacing: 8) {
-                quickSearchButton("Épinards", index: 0)
-                quickSearchButton("Saumon", index: 1)
-                quickSearchButton("Lentilles", index: 2)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// « Yaourt ajouté · 96 kcal » : une capsule de verre vert pâle, la coche
-    /// dans sa pastille.
-    private func confirmationRecherche(_ texte: String) -> some View {
-        HStack(spacing: 8) {
-            VerrePastilleIcone(symbole: "checkmark", teinte: Color.teinteKiwi, taille: 30, tailleIcone: 14)
-            Text(texte)
-                .font(.dsLegende.weight(.semibold))
-                .foregroundStyle(Color.dsTexte)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            Spacer(minLength: 0)
-        }
-        .padding(.leading, 8)
-        .padding(.trailing, 16)
-        .frame(minHeight: 46)
-        .verre(.clairActif, forme: Capsule(style: .continuous))
-        .accessibilityElement(children: .combine)
-        .transition(.opacity)
-    }
-
-    /// Les lignes d'une section, dans une carte de verre, séparées d'un filet
-    /// aligné sur le texte (12 + vignette 48 + 12).
-    private func carteResultats(_ lignes: [MealJournalService.FoodHit]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(lignes.enumerated()), id: \.element.id) { index, hit in
-                if index > 0 {
-                    DSSeparator(retrait: 72)
-                }
-                ligneResultat(hit)
-                    .kiwiEntrance(index)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .dsCard()
-    }
-
-    /// Une ligne de résultat : toute la ligne ouvre la fiche portion.
-    private func ligneResultat(_ hit: MealJournalService.FoodHit) -> some View {
-        Button {
-            openSearchDetail(hit)
-        } label: {
-            HStack(spacing: 8) {
-                FoodHitContenu(hit: hit)
-                if isAddingFood {
-                    ProgressView().tint(Color.dsAccent).scaleEffect(0.8)
-                } else {
-                    DSChevron()
-                }
-            }
-            .padding(.leading, 12)
-            .padding(.trailing, 14)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.dsPress)
-        .disabled(isAddingFood)
-    }
-
-    /// Fiche portion d'ajout — partagée par la recherche texte et le scan de
-    /// code-barres : un seul chemin d'ajout, donc un seul comportement à tester.
+    /// Fiche portion d'ajout du scan de code-barres. La recherche par nom passe
+    /// par `FoodSearchSheet`, qui ajoute par le même `journal.addFood`.
     private func ajoutPortionSheet(_ detail: MealJournalService.FoodDetail) -> some View {
         PortionSheet(mode: .add(detail: detail,
                                 slot: MealJournalService.MealSlot.from(date: Date())),
@@ -2323,41 +2199,6 @@ struct JournalView: View {
             AppLogger.analysis.report(error, context: "MealScan code-barres")
             barcodeIntrouvable = "Aucun produit ne correspond au code \(code). Essaie la recherche par nom."
         }
-    }
-
-    private func openSearchDetail(_ hit: MealJournalService.FoodHit) {
-        guard !isAddingFood else { return }
-        HapticService.shared.selection()
-        isAddingFood = true
-        Task {
-            defer { isAddingFood = false }
-            do {
-                selectedSearchDetail = try await MealJournalService.shared.foodDetail(id: hit.id)
-            } catch {
-                AppLogger.analysis.report(error, context: "MealScan get_food")
-            }
-        }
-    }
-
-    /// Puce de verre clair (36 pt, 15 / 500), comme les aliments suggérés de
-    /// la maquette ; la cible tactile déborde pour atteindre 44 pt.
-    private func quickSearchButton(_ text: String, index: Int) -> some View {
-        Button {
-            viewModel.searchQuery = text
-            Task { await viewModel.searchFoods() }
-        } label: {
-            Text(text)
-                .font(.dsSousTitreMoyen)
-                .foregroundStyle(Color.dsTexte)
-                .lineLimit(1)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 36)
-                .verreClair()
-                .frame(minHeight: DS.cibleTactile)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.dsPress)
-        .kiwiEntrance(index)
     }
 }
 

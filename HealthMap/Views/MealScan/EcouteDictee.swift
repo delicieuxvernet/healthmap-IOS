@@ -24,8 +24,9 @@ import UIKit
 // terminer.
 //
 // « Terminer » : la bulle se contracte à 66 pt, trois points tournent autour
-// d'elle, les couches accélèrent. La transcription puis l'analyse se font là,
-// sous elle. Quand le résultat est prêt elle s'efface, la feuille monte, et le
+// d'elle, les couches accélèrent. La transcription se fait là, sous elle (sur
+// l'appareil). Quand le texte est prêt elle s'efface, la feuille monte sur sa
+// relecture — l'analyse, payante, n'est lancée que depuis la feuille — et le
 // voile reste jusqu'à ce que la feuille redescende.
 //
 // La scène vit à la RACINE : elle passe par-dessus la barre d'onglets, et le
@@ -82,7 +83,7 @@ enum EcouteGeometrie {
     static let ecartControles: CGFloat = 28
     /// Place gardée sous la bulle pour la consigne et ses deux boutons.
     static let hauteurControles: CGFloat = 96
-    /// Entre le bas de la bulle contractée et « Kiwio calcule tes apports… ».
+    /// Entre le bas de la bulle contractée et « Kiwio relit ta dictée… ».
     static let ecartCalcul: CGFloat = 23
     /// Les trois points tournent à cette distance du bord de la bulle.
     static let ecartPoints: CGFloat = 16
@@ -335,11 +336,11 @@ final class EcouteCentre: ObservableObject {
         case repos
         /// La bulle est là, on écoute.
         case ecoute
-        /// Fin d'écoute : la bulle se contracte et tourne. On transcrit, puis
-        /// on chiffre.
+        /// Fin d'écoute : la bulle se contracte et tourne, le temps de
+        /// transcrire. Rien ne part encore au serveur.
         case calcul
-        /// Le résultat est prêt : la bulle s'efface, la feuille monte. Le
-        /// voile reste jusqu'à ce qu'elle redescende.
+        /// Le texte est prêt : la bulle s'efface, la feuille monte pour le
+        /// relire. Le voile reste jusqu'à ce qu'elle redescende.
         case resultat
         /// Dictée jetée ou trop courte : la bulle retourne dans son bouton.
         case retour
@@ -391,11 +392,12 @@ final class EcouteCentre: ObservableObject {
     }
 
     /// Fin d'écoute réussie : la bulle se contracte et tourne, le temps de
-    /// transcrire puis de chiffrer. Elle a quitté le bouton, qui revient.
+    /// transcrire. Le bouton reste caché, sous le voile puis
+    /// sous la feuille : il ne revient qu'au repos (`vider()`), comme dans la
+    /// maquette.
     func contracter() {
         guard phase == .ecoute else { return }
         phase = .calcul
-        boutonCache = false
     }
 
     /// La transcription existe : la carte la relit mot à mot.
@@ -404,7 +406,7 @@ final class EcouteCentre: ObservableObject {
         transcription = texte
     }
 
-    /// Le résultat est prêt : la bulle s'efface, la feuille prend le relais.
+    /// Le texte est prêt : la bulle s'efface, la feuille prend le relais.
     func livrer() {
         guard phase == .calcul else { return }
         phase = .resultat
@@ -617,7 +619,7 @@ private struct EcouteScene: View {
         .task(id: centre.phase) {
             abandonPossible = false
             guard centre.phase == .calcul else { return }
-            UIAccessibility.post(notification: .announcement, argument: "Kiwio calcule tes apports")
+            UIAccessibility.post(notification: .announcement, argument: "Kiwio relit ta dictée")
             try? await Task.sleep(for: Self.delaiAbandon)
             guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.3)) { abandonPossible = true }
@@ -667,9 +669,10 @@ private struct EcouteScene: View {
         .allowsHitTesting(controlesVisibles)
     }
 
+    /// La vibration vient de `annulerDictee()` (un avertissement) : en jouer
+    /// une ici en ferait deux pour un seul geste.
     private var boutonAnnuler: some View {
         Button {
-            HapticService.shared.tap()
             centre.toucherAnnuler()
         } label: {
             Text("Annuler")
@@ -749,17 +752,17 @@ private struct EcouteScene: View {
     private var consigneCalcul: some View {
         let actif = centre.phase == .calcul
         return VStack(spacing: 18) {
-            Text("Kiwio calcule tes apports…")
+            Text("Kiwio relit ta dictée…")
                 .font(.dsSousTitreFort)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.white)
                 .shadow(color: Color.black.opacity(0.25), radius: 4, x: 0, y: 1)
 
-            // Le calcul passe par le réseau : s'il dure, on ne garde personne
-            // devant un écran sans sortie.
+            // La transcription peut durer (longue dictée, modèle absent de
+            // l'appareil) : on ne garde personne devant un écran sans sortie.
             if abandonPossible && actif {
+                // Vibration : celle de `abandonnerCalcul()`, une seule.
                 Button {
-                    HapticService.shared.tap()
                     centre.toucherAbandonner()
                 } label: {
                     Text("Annuler")
