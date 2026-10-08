@@ -1005,7 +1005,8 @@ struct SuiviView: View {
                 id: id,
                 nom: definition.label,
                 court: ProgresToile.libelleCourt(id, defaut: definition.label),
-                pct: score
+                pct: score,
+                statut: dashboardVM.statuts[id]
             )
         }
     }
