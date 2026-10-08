@@ -39,6 +39,20 @@ final class VoiceMealQuantiteDiteTests: XCTestCase {
         XCTAssertTrue(unite.tailles.isEmpty)
     }
 
+    /// « Deux noix » : la pièce dite, avec le poids du serveur, et la poignée
+    /// proposée à côté — plus « 2 poignées · 10 g » (7 oct. 2026).
+    func testDeuxNoixSontDeuxPiecesEtLaPoigneeResteProposee() throws {
+        let noix = try item("""
+        {"index":0,"foodId":"ciqual:15005","nom":"Noix, séchée, cerneaux","g":10,"besoin_quantite":false,
+         "confiance":0.9,"kcal":70,"portions":[{"label":"1 poignée","grammes":30}],"statut":"compris",
+         "quantite_dite":{"valeur":2,"unite":"piece","singulier":"pièce","pluriel":"pièces","poids_unite_g":5}}
+        """)
+        let unite = try XCTUnwrap(VoiceMealSheet.unite(pour: noix))
+        XCTAssertEqual(unite.libelle(nombre: 2), "2 pièces")
+        XCTAssertEqual(unite.grammes, 5)
+        XCTAssertEqual(VoiceMealSheet.unitesProposees(pour: noix).map(\.singulier), ["pièce", "poignée"])
+    }
+
     func testAncienneReponseSansChampsDitsResteDecodable() throws {
         let ancien = try item("""
         {"index":0,"foodId":"ciqual:9104","nom":"Riz blanc, cuit","g":null,

@@ -79,16 +79,19 @@ struct PortionSheet: View {
     /// add : l'étoile des favoris dans l'en-tête (nil = pas d'étoile).
     var favori: Binding<Bool>? = nil
 
-    @State private var grams: Int
+    /// Grammes retenus, au dixième : une amande pèse 1,2 g, et deux doivent
+    /// rester deux (arrondis à l'entier, 2,4 g redevenaient « 1,5 pièce »).
+    @State private var grams: Double
     @State private var isWorking = false
-    /// Unité de saisie (« œuf », « tranche »…) pour les aliments que personne
-    /// ne pèse ; nil = grammes. Voir `UnitPortionCatalog`. Les grammes restent
-    /// la valeur persistée : l'unité n'est qu'une façon de les choisir.
-    private let unite: UnitPortionCatalog.Unite?
+    /// Unités proposées en pastilles pour l'aliment (« pièce », « poignée »…,
+    /// la première d'office) ; vide = grammes seulement. Voir
+    /// `UnitPortionCatalog`. Les grammes restent la valeur persistée : l'unité
+    /// n'est qu'une façon de les choisir.
+    private let unites: [UnitPortionCatalog.Unite]
+    /// Unité retenue ; nil = saisie en grammes (pastille « g »).
+    @State private var unite: UnitPortionCatalog.Unite?
     /// Index de la taille retenue (petit / moyen / gros) dans `unite.tailles`.
     @State private var taille: Int?
-    /// L'utilisateur a demandé à saisir en grammes malgré l'unité.
-    @State private var enGrammes = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -105,25 +108,29 @@ struct PortionSheet: View {
         self.onSave = onSave
         self.onDelete = onDelete
         self.favori = favori
-        let unite: UnitPortionCatalog.Unite?
+        let unites: [UnitPortionCatalog.Unite]
         switch mode {
         case .add(let detail, _):
-            unite = UnitPortionCatalog.unite(pourNom: detail.name,
-                                             portions: detail.portions.map { (label: $0.label, grammes: $0.grammes) })
+            unites = UnitPortionCatalog.unites(pourNom: detail.name,
+                                               portions: detail.portions.map { (label: $0.label, grammes: $0.grammes) })
         case .edit(let row):
-            unite = UnitPortionCatalog.unite(pourNom: row.name)
+            // Une ligne du journal ne garde pas les portions de sa fiche :
+            // le nom suffit au catalogue.
+            unites = UnitPortionCatalog.unites(pourNom: row.name)
         case .info:
-            unite = nil
+            unites = []
         }
-        self.unite = unite
+        let unite = unites.first
+        self.unites = unites
+        _unite = State(initialValue: unite)
         _taille = State(initialValue: unite?.tailleParDefaut)
         switch mode {
         case .add:
             // Un aliment à l'unité démarre à UNE unité (« 1 œuf » = 50 g),
             // pas à 100 g : c'est la quantité que la personne a en tête.
-            _grams = State(initialValue: Int((grammesProposes ?? unite?.grammes ?? 100).rounded()))
+            _grams = State(initialValue: Self.auDixieme(grammesProposes ?? unite?.grammes ?? 100))
         case .edit(let row):
-            _grams = State(initialValue: Int((row.grams ?? 100).rounded()))
+            _grams = State(initialValue: Self.auDixieme(row.grams ?? 100))
         case .info:
             _grams = State(initialValue: 0)
         }
@@ -236,9 +243,15 @@ struct PortionSheet: View {
     // MARK: - Contrôles quantité (presets + stepper + saisie libre)
 
     private var editorControls: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 12) {
+            // Sous le nom, les unités de l'aliment, « g » en dernier. Changer
+            // d'unité garde le nombre et recalcule les grammes.
+            if !unites.isEmpty {
+                PastillesUnites(unites: unites, active: unite) { choisirUnite($0) }
+            }
+
             VStack(spacing: 12) {
-                if let unite, !enGrammes {
+                if let unite {
                     controlesUnite(unite)
                 } else {
                     controlesGrammes
@@ -255,24 +268,33 @@ struct PortionSheet: View {
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity)
             .dsCard()
-
-            // Unités ↔ grammes : les grammes retenus ne bougent pas, seule la
-            // façon de les choisir change.
-            if let unite {
-                Button {
-                    HapticService.shared.selection()
-                    enGrammes.toggle()
-                } label: {
-                    Text(enGrammes ? unite.lienCompter : "Saisir en grammes")
-                        .font(.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsAccent)
-                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.dsPress)
-            }
         }
+    }
+
+    /// Une pastille d'unité touchée (`nil` = « g »). D'une unité à l'autre, le
+    /// nombre reste et les grammes suivent (« 2 pièces » → « 2 poignées ») ;
+    /// depuis les grammes, on retombe sur le nombre entier d'unités le plus
+    /// proche. Sur « g », les grammes retenus ne bougent pas.
+    private func choisirUnite(_ nouvelle: UnitPortionCatalog.Unite?) {
+        guard let nouvelle else {
+            unite = nil
+            return
+        }
+        let tailleNouvelle = nouvelle.tailleParDefaut
+        let n: Double
+        if let actuelle = unite {
+            n = max(1, UnitPortionCatalog.nombre(grammes: grams, poidsUnite: actuelle.poids(taille: taille)))
+        } else {
+            n = max(1, UnitPortionCatalog.nombre(grammes: grams, poidsUnite: nouvelle.poids(taille: tailleNouvelle)).rounded())
+        }
+        unite = nouvelle
+        taille = tailleNouvelle
+        grams = min(1500, max(1, Self.auDixieme(n * nouvelle.poids(taille: tailleNouvelle))))
+    }
+
+    /// Grammes au dixième (« 2,4 g » pour deux amandes).
+    private static func auDixieme(_ grammes: Double) -> Double {
+        (grammes * 10).rounded() / 10
     }
 
     /// Ce que la quantité retenue apporte : les calories en grand (elles
@@ -313,7 +335,7 @@ struct PortionSheet: View {
                         pill(t.libelle, sous: "\(Int(t.grammes)) g", choisie: taille == index) {
                             let n = max(1, nombre(unite).rounded())
                             taille = index
-                            grams = min(1500, max(1, Int((n * t.grammes).rounded())))
+                            grams = min(1500, max(1, Self.auDixieme(n * t.grammes)))
                         }
                     }
                 }
@@ -329,7 +351,7 @@ struct PortionSheet: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .contentTransition(.numericText())
-                    Text("\(grams) g")
+                    Text("\(UnitPortionCatalog.formater(grams)) g")
                         .font(.dsLegende.monospacedDigit())
                         .foregroundStyle(Color.dsSecondaire)
                         .contentTransition(.numericText())
@@ -347,7 +369,7 @@ struct PortionSheet: View {
         Button {
             HapticService.shared.selection()
             let n = UnitPortionCatalog.nombreSuivant(nombre(unite), delta: delta)
-            grams = min(1500, max(1, Int((n * unite.poids(taille: taille)).rounded())))
+            grams = min(1500, max(1, Self.auDixieme(n * unite.poids(taille: taille))))
         } label: {
             stepLabel(symbol)
         }
@@ -393,7 +415,7 @@ struct PortionSheet: View {
     }
 
     private func presetPill(_ label: String, _ value: Int) -> some View {
-        pill(label, sous: "\(value) g", choisie: grams == value) { grams = value }
+        pill(label, sous: "\(value) g", choisie: grams == Double(value)) { grams = Double(value) }
     }
 
     /// Puce de choix (portion ou taille) : libellé + grammes, en verre clair.
@@ -429,7 +451,7 @@ struct PortionSheet: View {
     private func stepButton(_ symbol: String, delta: Int) -> some View {
         Button {
             HapticService.shared.selection()
-            grams = min(1500, max(1, grams + delta))
+            grams = min(1500, max(1, (grams + Double(delta)).rounded()))
         } label: {
             stepLabel(symbol)
         }
@@ -449,8 +471,8 @@ struct PortionSheet: View {
 
     private var gramsBinding: Binding<String> {
         Binding(
-            get: { grams > 0 ? String(grams) : "" },
-            set: { grams = min(1500, max(0, Int($0.filter(\.isNumber)) ?? 0)) }
+            get: { grams > 0 ? String(Int(grams.rounded())) : "" },
+            set: { grams = Double(min(1500, max(0, Int($0.filter(\.isNumber)) ?? 0))) }
         )
     }
 
@@ -646,6 +668,56 @@ struct PortionSheet: View {
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel(title)
+    }
+}
+
+// MARK: - Pastilles d'unités (« pièce · 5 g », « poignée · 30 g », « g »)
+
+/// Les unités d'un aliment en pastilles de verre, « g » toujours en dernier.
+/// La pastille retenue passe au verre vert pâle, comme les choix de portion.
+/// Toucher une pastille change d'unité ; l'appelant recalcule les grammes.
+/// Partagée par la fiche portion et la ligne d'aliment de la dictée.
+struct PastillesUnites: View {
+    let unites: [UnitPortionCatalog.Unite]
+    /// Unité retenue ; nil = saisie en grammes (« g » allumée).
+    let active: UnitPortionCatalog.Unite?
+    let onChoisir: (UnitPortionCatalog.Unite?) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Array(unites.enumerated()), id: \.offset) { _, u in
+                    let poids = UnitPortionCatalog.formater(u.grammes)
+                    pastille("\(u.singulier) · \(poids) g",
+                             vocal: "\(u.singulier), \(poids) grammes",
+                             retenue: active == u) { onChoisir(u) }
+                }
+                pastille("g", vocal: "En grammes", retenue: active == nil) { onChoisir(nil) }
+            }
+        }
+        // L'ombre des pastilles de verre déborde de la rangée.
+        .scrollClipDisabled()
+    }
+
+    private func pastille(_ titre: String, vocal: String, retenue: Bool,
+                          action: @escaping () -> Void) -> some View {
+        let forme = Capsule(style: .continuous)
+        return Button {
+            HapticService.shared.selection()
+            action()
+        } label: {
+            Text(titre)
+                .font(.system(.footnote, design: .default).weight(.semibold).monospacedDigit())
+                .foregroundStyle(retenue ? Color.teinteKiwiTexte : Color.dsTexte)
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .frame(minWidth: DS.cibleTactile, minHeight: DS.cibleTactile)
+                .verre(retenue ? VerreMatiere.clairActif : VerreMatiere.clair, forme: forme)
+                .contentShape(forme)
+        }
+        .buttonStyle(.dsPress)
+        .accessibilityLabel(vocal)
+        .accessibilityAddTraits(retenue ? .isSelected : [])
     }
 }
 
