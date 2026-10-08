@@ -47,8 +47,12 @@ enum AnneauTeintes {
         case .innomme: return piste
         // Les sources d'un apport estimé : la couleur de l'apport, de plus en
         // plus claire de la plus grosse à la plus petite.
-        case .source(let rang): return couleur.opacity(max(0.35, 1 - 0.2 * Double(rang)))
+        case .source(let rang): return source(rang: rang, couleur: couleur)
         }
+    }
+
+    static func source(rang: Int, couleur: Color) -> Color {
+        couleur.opacity(max(0.35, 1 - 0.2 * Double(rang)))
     }
 }
 

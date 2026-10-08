@@ -259,7 +259,13 @@ struct FicheApportSheet: View {
                     bloc("Ce que ça fait") { texteCarte(role) }
                 }
 
-                if !detail.contributions.isEmpty {
+                // Apport estimé : pas de « point de départ » ni de points à
+                // regagner ; ses sources, en part de la référence.
+                if detail.estimation != nil {
+                    if !detail.appuis.isEmpty {
+                        bloc("D'où vient ton apport", note: "en part de la référence") { sourcesCarte }
+                    }
+                } else if !detail.contributions.isEmpty {
                     calculBloc
                 }
 
@@ -574,6 +580,36 @@ struct FicheApportSheet: View {
         let cause = geste.cause.prefix(1).lowercased() + geste.cause.dropFirst()
         guard let regain = LectureApport.libelleRegain(geste.regain) else { return "répond à : \(cause)" }
         return "\(regain) · \(cause)"
+    }
+
+    // MARK: Les sources d'un apport estimé
+
+    private var sourcesCarte: some View {
+        let sources = detail.appuis
+        return VStack(spacing: 0) {
+            ForEach(Array(sources.enumerated()), id: \.element.id) { rang, source in
+                if rang > 0 { DSSeparator(retrait: 0) }
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(AnneauTeintes.source(rang: rang, couleur: contexte.couleur))
+                        .frame(width: 10, height: 10)
+                        .accessibilityHidden(true)
+                    Text(source.libelle)
+                        .font(.dsSousTitre)
+                        .tracking(DSTracking.sousTitre)
+                        .foregroundStyle(Color.dsTexte)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("\(DS.entier(source.delta))\u{202F}%")
+                        .font(.dsValeurLigne)
+                        .foregroundStyle(Color.dsSecondaire)
+                }
+                .padding(.horizontal, DS.paddingCarte)
+                .padding(.vertical, 12)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .dsCard()
     }
 
     // MARK: Le détail du calcul (replié)
