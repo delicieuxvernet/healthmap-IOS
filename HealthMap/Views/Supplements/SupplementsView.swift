@@ -144,7 +144,12 @@ struct SupplementsView: View {
     /// score, pas de tuile — on n'affiche pas un zéro inventé.
     private var tuiles: [Tuile] {
         let registre = dashboardVM.registre
+        let statuts = dashboardVM.statuts
         return chains.compactMap { chain -> Tuile? in
+            // « Recommandés pour toi » : seulement un apport à renforcer ou à
+            // surveiller (8 oct. 2026) — jamais un apport couvert ni « à
+            // affiner », que le rituel du jour ne recommande pas non plus.
+            if let statut = statuts[chain.id], !statut.estASuivre { return nil }
             if let detail = registre[chain.id] {
                 return Tuile(chain: chain, detail: detail)
             }
@@ -831,7 +836,9 @@ struct SupplementsView: View {
 
     @ViewBuilder
     private var aiFallbackSection: some View {
-        if let schedule = aiSchedule {
+        // Apports estimés : le planning rédigé par l'ancienne analyse ne
+        // suit pas les statuts ; rien à ajouter plutôt qu'une contradiction.
+        if dashboardVM.statuts.isEmpty, let schedule = aiSchedule {
             let blocks: [(String, String, [SupplementEntry])] = [
                 ("Matin", "sunrise.fill", schedule.morning ?? []),
                 ("Midi", "sun.max.fill", schedule.afternoon ?? []),
