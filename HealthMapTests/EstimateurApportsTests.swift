@@ -139,7 +139,7 @@ final class EstimateurApportsTests: XCTestCase {
         XCTAssertFalse(r.caddieSuffisant)
         XCTAssertEqual(r.poidsRemplissage, 6.0 / 15, accuracy: 1e-9)
         let mg = try XCTUnwrap(r.apports["magnesium"])
-        XCTAssertEqual(mg.apportEstime, 379, accuracy: 1)
+        XCTAssertEqual(mg.apportEstime, 385, accuracy: 1)  // référentiel 2026-10-08.12
         XCTAssertEqual(mg.statut, .peuPrecise)
         XCTAssertEqual(mg.confiance, .faible)
         XCTAssertGreaterThan(mg.decomposition.cafeThe, 100, "le café APPORTE du magnésium (Ciqual), il n'en retire pas")

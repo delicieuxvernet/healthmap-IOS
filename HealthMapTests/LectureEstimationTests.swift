@@ -35,7 +35,7 @@ final class LectureEstimationTests: XCTestCase {
     func testLaQuantiteEstUneVraieQuantite() throws {
         let mg = try XCTUnwrap(try estimation(casDeLAudit).apports["magnesium"])
         let texte = LectureEstimation.quantite("magnesium", mg)
-        XCTAssertTrue(texte.hasPrefix("≈ 379"), texte)
+        XCTAssertTrue(texte.hasPrefix("≈ 385"), texte)
         XCTAssertTrue(texte.contains("sur 380"), "référence ANSES 2021 d'un homme : \(texte)")
     }
 
