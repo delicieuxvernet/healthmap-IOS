@@ -129,9 +129,21 @@ final class DashboardViewModel: ObservableObject {
     /// locaux quand elle est disponible ; sinon on affiche les scores LOCAUX
     /// seuls (HealthCalculator) — le bilan ne doit JAMAIS être vide ou à 0
     /// quand le questionnaire est complété (incident TestFlight 28).
+    ///
+    /// Un seul chiffre par apport : le v7 est calculé sur le questionnaire
+    /// seul ; ses textes restent, mais le score et le statut sont ceux du
+    /// registre (journal et prise de sang compris), comme la fiche et la toile.
+    /// Audit de fiabilité du 8 oct. 2026 : le Plan et le PDF lisaient un autre
+    /// chiffre que la fiche.
     var nutrients: [EnrichedNutrient] {
-        if let merged = aiAnalysis { return merged.nutrients }
-        return localNutrients
+        guard let merged = aiAnalysis else { return localNutrients }
+        return merged.nutrients.map { nutriment in
+            guard let score = nutrientScores[nutriment.id] else { return nutriment }
+            var aligne = nutriment
+            aligne.score = score
+            aligne.status = NutrientStatus(score: score).rawValue
+            return aligne
+        }
     }
 
     /// Nutriments construits uniquement à partir des scores locaux
