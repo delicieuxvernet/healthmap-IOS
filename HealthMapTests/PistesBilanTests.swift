@@ -129,7 +129,7 @@ final class PistesBilanTests: XCTestCase {
 
     /// Le café APPORTE du magnésium (Ciqual) : c'est un bon point, plus un frein.
     /// Un homme qui en boit beaucoup (INCA 3 : 146 mg par jour par le café et
-    /// le thé ; chez les femmes, la classe « beaucoup » est surtout du thé).
+    /// le thé ; chez les femmes, la classe « beaucoup » d'INCA 3 en donne moins, peu d'effectif).
     func testLeCafeEstUnBonPointPourLeMagnesium() {
         let p = profil { $0.gender = .homme; $0.age = "35"; $0.height = "178"; $0.weight = "75"; $0.caffeineIntake = "heavy" }
         let carte = PistesBilan.carte(pour: .boire, profil: p)
