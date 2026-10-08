@@ -32,6 +32,8 @@ enum ScientificSources {
                         "https://www.who.int/health-topics/nutrition"),
         SourceReference("Ciqual (ANSES)", "Table de composition des aliments",
                         "https://ciqual.anses.fr/"),
+        SourceReference("INCA 3 (ANSES)", "Consommations alimentaires des Français",
+                        "https://www.data.gouv.fr/datasets/donnees-de-consommations-et-habitudes-alimentaires-de-letude-inca-3"),
     ]
 }
 
