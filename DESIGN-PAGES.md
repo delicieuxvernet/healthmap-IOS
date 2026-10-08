@@ -286,6 +286,23 @@
 >   maquette) ; les cartes « À quoi c'est relié » arrivent de gauche à droite ; la carte de
 >   gratification REDESCEND avant que « Modifier » n'ouvre la fiche du repas ; la carte du Plan
 >   suit la sélection en fondu flouté.
+> - **Brief du jour : la priorité** (`Views/Brief/BriefPrioriteEcran.swift`, modèle
+>   `BriefDuJourBuilder.priorite`, table `Core/AlimentsDeReference.swift` ; maquette « A — une
+>   priorité, un geste » validée le 8 oct. 2026). Remplace l'écran des trois jauges « Ce qui a
+>   manqué hier » et, quand hier est noté, l'écran « Aujourd'hui, mise sur ». Retour d'Arthur sur
+>   la version à deux sphères : « mal pensé niveau ergonomie et trajet du regard ». **Une seule
+>   colonne centrée, cinq arrêts, de haut en bas** : « Récap d'hier » + le titre (« Ta vitamine D a
+>   manqué ») · la sphère de verre (`SphereDeVerre`, liquide à la teinte de l'apport) et, collé
+>   dessous, le chiffre héros « 22 % de ton besoin couvert hier » · la carte « Aujourd'hui,
+>   ajoute » (illustration 3D, aliment, « 1 boîte · +30 % de ton besoin », « Sinon : … ») · la
+>   ligne « Aussi à remonter : ton fer 38 % » (seulement si un 2ᵉ apport est sous 70 %) · le
+>   bouton « C'est parti » sous le pouce. Le même aliment est posé sur la sphère, à la ligne
+>   pointillée qu'il atteindrait (plafonnée à 100 %). **Aucun chiffre inventé** : la table ne porte
+>   que le code Ciqual et la portion ; l'apport se calcule depuis la composition de la base, avec
+>   la référence des repas notés (`canonRDA`). Parmi les idées du bilan, l'aliment proposé est
+>   celui qui apporte le plus ; sous 5 points, ou sans composition sur le téléphone, la première
+>   idée s'affiche sans portion, sans chiffre ni ligne pointillée. Tout au-dessus de 70 % hier, ou
+>   hier trop peu noté : l'écran « Aujourd'hui, mise sur » reste.
 > - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) — **réordonnée le 21 sept.
 >   2026** (retour d'Arthur : « on ne sait pas où regarder en premier »), la même d'où qu'on vienne
 >   (Journal, Bilan, Progrès). Elle répond dans l'ordre des questions, et tout ce qui s'y calcule

@@ -27,14 +27,27 @@ final class CompositionsStore {
     /// ces repas. Un échec réseau rend ce qu'on a déjà : les repas concernés
     /// gardent alors ce qu'ils avaient enregistré.
     func completer(pour repas: [MealJournalService.MealRecord]) async -> Compositions {
+        await completer(identifiants: MesuresRepas.identifiants(repas))
+    }
+
+    /// Les compositions connues après avoir demandé celles qui manquaient
+    /// parmi ces aliments (`ciqual:…` ou `off:…`).
+    func completer(identifiants: Set<String>) async -> Compositions {
         lireLeDisque()
         if let tacheEnCours = enVol { await tacheEnCours.value }
-        let manquants = MesuresRepas.identifiants(repas).subtracting(connues.keys)
+        let manquants = identifiants.subtracting(connues.keys)
         guard !manquants.isEmpty else { return connues }
         let tache = Task { await self.telecharger(Array(manquants)) }
         enVol = tache
         await tache.value
         enVol = nil
+        return connues
+    }
+
+    /// Ce que le téléphone sait déjà, sans réseau. Le brief du matin s'affiche
+    /// à l'instant : il lit ici la composition des aliments qu'il propose.
+    func connuesSansReseau() -> Compositions {
+        lireLeDisque()
         return connues
     }
 
