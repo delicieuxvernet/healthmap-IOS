@@ -75,33 +75,37 @@ final class PistesBilanTests: XCTestCase {
         XCTAssertEqual(sansSoleil.groceries, rempli.groceries)
     }
 
-    // MARK: La doctrine : un fait, jamais un symptôme
+    // MARK: La doctrine : un fait estimé, jamais un symptôme ni une habitude sans preuve
 
     func testUnSymptomeNeFaitJamaisUnePiste() {
         let p = femme35 { $0.symptoms = ["fatigue_chronic", "hair_loss", "brittle_nails", "tingling"]; $0.goals = ["energie"] }
         XCTAssertNil(PistesBilan.carte(pour: .motif, profil: p))
         XCTAssertTrue(PistesBilan.faits(de: .motif, profil: p).isEmpty)
-
-        let sansSymptomes = femme35()
-        XCTAssertEqual(PistesBilan.lecture(profil: p), PistesBilan.lecture(profil: sansSymptomes))
+        XCTAssertEqual(PistesBilan.lecture(profil: p), PistesBilan.lecture(profil: femme35()))
     }
 
-    /// Être une femme de moins de 50 ans pèse sur le fer dans le registre,
-    /// mais ce n'est pas une piste : c'est un besoin.
-    func testLeSexeEtLAgeSeulsNeFontPasUnePiste() {
-        let lecture = PistesBilan.lecture(profil: femme35())
-        XCTAssertTrue(lecture.pistes.isEmpty)
-        XCTAssertEqual(lecture.etats[.iron], .enAttente)
+    /// Audit de fiabilité (8 oct. 2026) : aucune preuve solide ne relie le
+    /// stress, les écrans ou le sommeil à un apport. Ils ne font plus de piste.
+    func testLeStressLesEcransEtLeSommeilNeFontPlusDePiste() {
+        let p = femme35 { $0.stressLevel = "explode"; $0.wakeFeeling = "terrible"; $0.screenBeforeBed = "very_long"; $0.sleepHours = "4" }
+        XCTAssertTrue(PistesBilan.faits(de: .ressenti, profil: p).isEmpty)
+        XCTAssertTrue(PistesBilan.faits(de: .nuits, profil: p).isEmpty)
+        XCTAssertNil(PistesBilan.carte(pour: .ressenti, profil: p))
+        XCTAssertNil(PistesBilan.carte(pour: .nuits, profil: p))
+        XCTAssertEqual(PistesBilan.lecture(profil: p), PistesBilan.lecture(profil: femme35()))
+    }
 
+    func testLeSportNeFaitPlusDePiste() {
+        let p = femme35 { $0.strengthTraining = "intense" }
+        XCTAssertTrue(PistesBilan.faits(de: .bouger, profil: p).isEmpty)
+        XCTAssertNil(PistesBilan.carte(pour: .bouger, profil: p))
+    }
+
+    /// Le sexe et l'âge règlent les besoins ; seuls, ils n'annoncent rien.
+    func testLeSexeEtLAgeSeulsNeFontPasUnePiste() {
+        XCTAssertTrue(PistesBilan.lecture(profil: femme35()).pistes.isEmpty)
         let senior = profil { $0.age = "74"; $0.height = "170"; $0.weight = "70" }
         XCTAssertTrue(PistesBilan.lecture(profil: senior).pistes.isEmpty)
-    }
-
-    func testUnFaitVecuAjouteAuBesoinFaitUnePiste() {
-        let p = femme35 { $0.caffeineIntake = "heavy"; $0.caffeineTiming = "with_meals" }
-        let lecture = PistesBilan.lecture(profil: p)
-        XCTAssertEqual(lecture.etats[.iron], .aSurveiller)
-        XCTAssertTrue(lecture.pistes.contains(.iron))
     }
 
     func testSansRienDeDeclareToutEstEnAttente() {
@@ -112,180 +116,62 @@ final class PistesBilanTests: XCTestCase {
         }
     }
 
-    // MARK: Les cartes
-
-    func testPeuDeSoleilFaitUnePisteSurLaVitamineD() {
-        let p = femme35 { $0.sunExposure = "very_little"; $0.skinType = "fair"; $0.indoorWork = "yes" }
-        let carte = PistesBilan.carte(pour: .soleil, profil: p)
-        XCTAssertEqual(carte?.genre, .piste)
-        XCTAssertEqual(carte?.nutriment, .vitD)
-        XCTAssertEqual(carte?.surtitre, "Piste repérée")
-        XCTAssertEqual(carte?.titre, "Vitamine D : à surveiller")
-        XCTAssertEqual(carte?.raisons, ["Très peu de soleil", "Peau claire"])
+    /// Une alimentation végétarienne retire la viande et le poisson du reste
+    /// de l'assiette : la B12 devient une piste, l'assiette dira si elle compense.
+    func testUnRegimeVegetarienFaitUnePisteSurLaB12() {
+        let p = femme35 { $0.dietType = "vegetarien" }
+        let lecture = PistesBilan.lecture(profil: p)
+        XCTAssertEqual(lecture.etats[.vitB12], .aSurveiller)
+        let carte = PistesBilan.carte(pour: .regime, profil: p)
+        XCTAssertEqual(carte?.raisons, ["Alimentation végétarienne"])
         XCTAssertEqual(carte?.texte, "Ton assiette dira si elle compense.")
     }
 
-    func testUnFaitQuiPeseSansSuffireEstNote() {
-        let p = femme35 { $0.sunExposure = "plenty"; $0.skinType = "dark" }
-        let carte = PistesBilan.carte(pour: .soleil, profil: p)
-        XCTAssertEqual(carte?.genre, .note)
-        XCTAssertEqual(carte?.surtitre, "C'est noté")
-        XCTAssertEqual(carte?.titre, "Vitamine D : ça compte")
-        XCTAssertEqual(carte?.raisons, ["Peau foncée"])
+    /// Une femme de 35 ans qui a coché douze aliments, une fois par semaine
+    /// chacun : ses apports restent sous la référence, le plafond de 100 %
+    /// n'écrase pas l'effet d'une réponse (un caddie vide vaut la moyenne
+    /// française, déjà au plafond pour le magnésium).
+    private func femmeAuCaddieLeger(_ regler: (inout UserProfile) -> Void = { _ in }) -> UserProfile {
+        femme35 {
+            $0.groceries = Dictionary(uniqueKeysWithValues: [
+                "baguette", "pates", "steak_hache", "escalopes_poulet", "yaourt_nature", "pommes",
+                "oeufs", "tomates", "courgettes", "carottes", "beurre", "lait",
+            ].map { ($0, 1) })
+            regler(&$0)
+        }
     }
 
-    func testDuSoleilRegulierEstUnBonPoint() {
-        let p = femme35 { $0.sunExposure = "moderate"; $0.skinType = "very_fair" }
-        let carte = PistesBilan.carte(pour: .soleil, profil: p)
+    /// Le café APPORTE du magnésium (Ciqual) : c'est un bon point, plus un frein.
+    /// Référentiel 2026-10-08.12 : « modérément » = 72 % → 86 % de la référence.
+    func testLeCafeEstUnBonPointPourLeMagnesium() {
+        let p = femmeAuCaddieLeger { $0.caffeineIntake = "moderate" }
+        let carte = PistesBilan.carte(pour: .boire, profil: p)
         XCTAssertEqual(carte?.genre, .bonPoint)
-        XCTAssertEqual(carte?.titre, "Soleil régulier : un bon point pour ta vitamine D")
-        XCTAssertEqual(PistesBilan.lecture(profil: p).etats[.vitD], .bienParti)
-    }
-
-    func testRienADireNAfficheRien() {
-        XCTAssertNil(PistesBilan.carte(pour: .soleil, profil: profil()))
-        XCTAssertNil(PistesBilan.carte(pour: .ventre, profil: femme35 { $0.bloating = "no"; $0.antibiotics = "no" }))
-        XCTAssertNil(PistesBilan.carte(pour: .ressenti, profil: femme35 { $0.stressLevel = "relaxed"; $0.wakeFeeling = "good" }))
-        XCTAssertNil(PistesBilan.carte(pour: .accueil, profil: profilRempli()))
-        XCTAssertNil(PistesBilan.carte(pour: .provisoire, profil: profilRempli()))
-        XCTAssertNil(PistesBilan.carte(pour: .midi, profil: profilRempli()))
-    }
-
-    func testLeSportAugmenteLesBesoins() {
-        let p = femme35 { $0.strengthTraining = "regular"; $0.weightTrend = "stable" }
-        let carte = PistesBilan.carte(pour: .bouger, profil: p)
         XCTAssertEqual(carte?.nutriment, .magnesium)
-        XCTAssertEqual(carte?.titre, "Sport régulier : besoins un peu plus hauts")
-        XCTAssertEqual(carte?.raisons, ["Sport régulier"])
-
-        XCTAssertNil(PistesBilan.carte(pour: .bouger, profil: femme35 { $0.strengthTraining = "light" }))
+        XCTAssertEqual(carte?.titre, "Ton café, ton thé et ton eau : un bon point pour ton magnésium")
     }
 
-    func testLaCarteNommeLApportLePlusTouche() {
-        // Tabac : vitamine C −25, oméga-3 −8, calcium −5.
-        let fumeur = profil { $0.smoking = .yes; $0.alcohol = "none" }
-        XCTAssertEqual(PistesBilan.carte(pour: .alcoolTabac, profil: fumeur)?.nutriment, .vitC)
-        XCTAssertEqual(PistesBilan.carte(pour: .alcoolTabac, profil: fumeur)?.raisons, ["Tabac"])
-
-        // Alcool régulier sans tabac : vitamine B12 −15.
-        let alcool = profil { $0.alcohol = "regular" }
-        XCTAssertEqual(PistesBilan.carte(pour: .alcoolTabac, profil: alcool)?.nutriment, .vitB12)
-
-        // Végétalien : vitamine B12 −30.
-        let vegan = profil { $0.dietType = "vegan" }
-        let carte = PistesBilan.carte(pour: .regime, profil: vegan)
-        XCTAssertEqual(carte?.nutriment, .vitB12)
-        XCTAssertEqual(carte?.genre, .piste)
-        XCTAssertEqual(carte?.raisons, ["Alimentation végétalienne"])
-    }
-
-    /// Les faits d'un écran ne débordent pas sur le suivant.
     func testUnEcranNeReprendPasLesFaitsDUnAutre() {
-        let p = femme35 {
-            $0.sunExposure = "none"; $0.skinType = "fair"
-            $0.stressLevel = "explode"; $0.wakeFeeling = "bad"
-        }
-        XCTAssertEqual(Set(PistesBilan.faits(de: .soleil, profil: p).map(\.nutriment)), [.vitD])
-        let ressenti = PistesBilan.faits(de: .ressenti, profil: p)
-        XCTAssertFalse(ressenti.contains { $0.nutriment == .vitD })
-        XCTAssertTrue(ressenti.contains { $0.nutriment == .magnesium && $0.delta == -20 })
-        XCTAssertTrue(PistesBilan.faits(de: .reperes, profil: p).contains { $0.libelle == "Femme de moins de 50 ans" })
-    }
-
-    func testLesFaitsDUnEcranSontCeuxDuRegistre() {
-        let p = femme35 { $0.caffeineIntake = "heavy"; $0.caffeineTiming = "both"; $0.waterIntake = "0.75" }
-        let registre = HealthCalculator.registreApports(profile: p)
-        for fait in PistesBilan.faits(de: .boire, profil: p) {
-            let lignes = registre[fait.nutriment.rawValue]?.contributions ?? []
-            XCTAssertTrue(
-                lignes.contains { $0.libelle == fait.libelle && $0.delta == fait.delta },
-                "\(fait.libelle) (\(fait.delta)) n'est pas dans le registre"
-            )
-        }
+        let p = femmeAuCaddieLeger { $0.caffeineIntake = "moderate" }
+        XCTAssertTrue(PistesBilan.faits(de: .alcoolTabac, profil: p).isEmpty)
         XCTAssertFalse(PistesBilan.faits(de: .boire, profil: p).isEmpty)
     }
 
-    // MARK: Les besoins
+    func testUnComplementDeclareEstCompte() {
+        let p = femme35 { $0.supplementsCurrent = ["magnesium"] }
+        let carte = PistesBilan.carte(pour: .complements, profil: p)
+        XCTAssertEqual(carte?.genre, .bonPoint)
+        XCTAssertEqual(carte?.nutriment, .magnesium)
+        XCTAssertNil(PistesBilan.carte(pour: .complements, profil: femme35()))
+    }
 
-    func testLesBesoinsAffichesSontCeuxDeLaPersonne() {
-        XCTAssertEqual(
-            PistesBilan.carte(pour: .reperes, profil: femme35())?.texte,
-            "Fer 16 mg, magnésium 300 mg, calcium 950 mg par jour."
-        )
-        let jeuneHomme = profil { $0.age = "20"; $0.height = "180"; $0.weight = "75" }
-        let carte = PistesBilan.carte(pour: .reperes, profil: jeuneHomme)
+    /// Les besoins affichés sont les références ANSES 2021 de la personne.
+    func testLesBesoinsAffichesSontCeuxDeLANSES() {
+        let homme = profil { $0.gender = .homme; $0.age = "30"; $0.height = "178"; $0.weight = "75" }
+        let carte = PistesBilan.carte(pour: .reperes, profil: homme)
         XCTAssertEqual(carte?.genre, .besoins)
-        XCTAssertNil(carte?.nutriment)
-        XCTAssertEqual(carte?.texte, "Fer 11 mg, magnésium 350 mg, calcium 1000 mg par jour.")
-    }
-
-    // MARK: « Jamais »
-
-    func testCeQuOnNeMangeJamaisEstNommeAlimentParAliment() {
-        let p = profil { $0.allergies = ["fish_shellfish", "peanut"] }
-        let faits = PistesBilan.faits(de: .jamais, profil: p)
-        XCTAssertEqual(Set(faits.map(\.libelle)), ["Jamais de poisson ni de crustacés"])
-        XCTAssertEqual(faits.first { $0.nutriment == .omega3 }?.delta, -20)
-        XCTAssertEqual(faits.first { $0.nutriment == .vitD }?.delta, -8)
-        XCTAssertEqual(faits.first { $0.nutriment == .iodine }?.delta, -10)
-
-        let carte = PistesBilan.carte(pour: .jamais, profil: p)
-        XCTAssertEqual(carte?.nutriment, .omega3)
-        XCTAssertEqual(carte?.genre, .piste)
-        XCTAssertEqual(carte?.texte, "Ton bilan en tient compte.")
-    }
-
-    /// Les poids viennent du bloc partagé du moteur, pas d'une copie.
-    func testLesPoidsDesEvictionsSontCeuxDuMoteur() {
-        for eviction in PistesBilan.libellesJamais.keys {
-            let p = profil { $0.allergies = [eviction] }
-            var ardoise: [String: Int] = [:]
-            for id in NutrientID.allCases { ardoise[id.rawValue] = 0 }
-            NutrientEngine.applyMedicalHistoryPenalties(&ardoise, profile: p)
-
-            let faits = PistesBilan.faits(de: .jamais, profil: p)
-            for id in NutrientID.allCases {
-                let attendu = ardoise[id.rawValue] ?? 0
-                let lu = faits.first { $0.nutriment == id }?.delta ?? 0
-                XCTAssertEqual(lu, attendu, "\(eviction) / \(id.rawValue)")
-            }
-            XCTAssertFalse(faits.isEmpty, "\(eviction) a un libellé mais ne pèse sur rien")
-        }
-    }
-
-    func testUneEvictionSansEffetNeDitRien() {
-        XCTAssertNil(PistesBilan.carte(pour: .jamais, profil: profil { $0.allergies = ["soy", "sesame", "sulfites"] }))
-        XCTAssertNil(PistesBilan.carte(pour: .jamais, profil: profil { $0.allergies = ["none"] }))
-    }
-
-    func testLeSansGlutenNeRetireLIodeQuUneFois() {
-        let sansRegime = PistesBilan.faits(de: .jamais, profil: profil { $0.allergies = ["wheat_gluten"] })
-        XCTAssertEqual(sansRegime.first { $0.nutriment == .iodine }?.delta, -5)
-
-        let avecRegime = PistesBilan.faits(de: .jamais, profil: profil {
-            $0.allergies = ["wheat_gluten"]; $0.dietType = "sans_gluten"
-        })
-        XCTAssertNil(avecRegime.first { $0.nutriment == .iodine })
-    }
-
-    // MARK: L'ordre des pistes
-
-    func testLesPistesVontDeLaPlusToucheeALaMoinsTouchee() {
-        let p = femme35 {
-            $0.sunExposure = "very_little"      // vitamine D −20
-            $0.smoking = .yes                   // vitamine C −25
-            $0.dietType = "vegan"               // vitamine B12 −30
-        }
-        let pistes = PistesBilan.lecture(profil: p).pistes
-        XCTAssertEqual(Array(pistes.prefix(3)), [.vitB12, .iron, .vitC])
-        XCTAssertTrue(pistes.contains(.vitD))
-    }
-
-    func testLAssietteNeChangePasLesPistes() {
-        var p = femme35 { $0.sunExposure = "very_little"; $0.smoking = .yes }
-        let avant = PistesBilan.lecture(profil: p)
-        p.groceries = ["saumon": 10, "oranges": 10, "lentilles": 10]
-        XCTAssertEqual(PistesBilan.lecture(profil: p), avant)
+        XCTAssertTrue(carte?.texte?.contains("magnésium 380 mg") == true, carte?.texte ?? "")
+        XCTAssertTrue(carte?.texte?.contains("Fer 11 mg") == true, carte?.texte ?? "")
     }
 
     // MARK: L'assiette
@@ -299,17 +185,17 @@ final class PistesBilanTests: XCTestCase {
     func testUnAlimentRempliLesJaugesDeCeQuIlApporte() {
         let p = profil { $0.groceries = ["saumon": NiveauConsommation.beaucoup.portions] }
         let jauges = PistesBilan.jauges(profil: p)
-        XCTAssertEqual(jauges[.omega3], 1)
-        XCTAssertEqual(jauges[.vitD], 1)
-        XCTAssertEqual(jauges[.vitB12], 1)
-        XCTAssertEqual(jauges[.fiber], 0)
+        XCTAssertGreaterThan(jauges[.omega3] ?? 0, 0.1)
+        XCTAssertGreaterThan(jauges[.vitB12] ?? 0, 0.1)
+        XCTAssertEqual(jauges[.fiber] ?? -1, 0, accuracy: 0.001)
     }
 
     func testUneJaugeNeDepasseJamaisUn() {
         var caddie: [String: Int] = [:]
         for aliment in GroceryCatalog.allItems { caddie[aliment.id] = 10 }
         for (_, valeur) in PistesBilan.jauges(profil: profil { $0.groceries = caddie }) {
-            XCTAssertEqual(valeur, 1)
+            XCTAssertLessThanOrEqual(valeur, 1)
+            XCTAssertGreaterThanOrEqual(valeur, 0)
         }
     }
 
@@ -328,18 +214,24 @@ final class PistesBilanTests: XCTestCase {
 
     // MARK: L'écran de fin
 
-    func testLaSyntheseCompteLesVraisScores() {
-        var p = femme35 { $0.sunExposure = "very_little"; $0.smoking = .yes; $0.dietType = "vegetarien" }
+    /// La synthèse compte les statuts de l'estimateur : « à renforcer » et
+    /// « à surveiller », jamais une estimation « à affiner ».
+    func testLaSyntheseCompteLesVraisStatuts() throws {
+        var p = femme35 { $0.dietType = "vegetarien" }
         p.groceries = ["lentilles": 10, "oeufs": 3, "yaourt_nature": 10, "oranges": 3, "pain_complet": 10]
 
         let synthese = PistesBilan.synthese(profil: p)
-        let scores = HealthCalculator.registreApports(profile: p).mapValues(\.score)
-        XCTAssertEqual(synthese.aSurveiller, scores.values.filter { $0 < 60 }.count)
+        let r = try XCTUnwrap(EstimateurApports.partage).estimer(ProfilEstimation(profile: p))
+        let attendus = NutrientID.allCases.filter {
+            let s = r.apports[$0.rawValue]?.statut
+            return s == .aRenforcer || s == .aSurveiller
+        }
+        XCTAssertEqual(synthese.aSurveiller, attendus.count)
         XCTAssertTrue(synthese.assietteConnue)
         XCTAssertLessThanOrEqual(synthese.lignes.count, 3)
         XCTAssertGreaterThan(synthese.bienServis, 0)
         for ligne in synthese.lignes where ligne.aSurveiller {
-            XCTAssertLessThan(scores[ligne.nutriment.rawValue] ?? 100, 60, ligne.nutriment.rawValue)
+            XCTAssertTrue(attendus.contains(ligne.nutriment), ligne.nutriment.rawValue)
         }
     }
 

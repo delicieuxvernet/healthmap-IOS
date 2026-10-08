@@ -357,9 +357,7 @@ struct DashboardView: View {
     }
 
     private var weakNutrientIds: [String] {
-        viewModel.nutrientScores
-            .filter { $0.value < 60 }
-            .map(\.key)
+        viewModel.apportsEnAlerte
             .sorted()
     }
 

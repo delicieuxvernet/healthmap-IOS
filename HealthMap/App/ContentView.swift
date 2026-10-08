@@ -753,9 +753,13 @@ struct MainTabView: View {
         // `gateContournee` : la seule porte de sortie. Sans elle, un échec du
         // bilan enfermait l'utilisateur dans l'app — écran plein, aucun bouton
         // de fermeture, aucun onglet accessible.
+        // `bilanDejaRecu` (8 oct. 2026) : UNE seule fois par compte, au tout
+        // premier bilan. Ensuite l'app ne se bloque plus jamais : le bilan se
+        // refait derrière, la carte du Journal dit qu'il arrive.
         .fullScreenCover(isPresented: Binding(
             get: {
                 !dashboardVM.gateContournee
+                    && !dashboardVM.bilanDejaRecu
                     && dashboardVM.analysisV2 == nil
                     && (dashboardVM.isLoadingAnalysisV2 || dashboardVM.errorMessageV2 != nil)
             },
@@ -804,6 +808,10 @@ struct MainTabView: View {
         BriefDuJourStore.memoriserPrenom(dashboardVM.firstName)
         proposerBrief()
         replanifierRappels()
+        // Les aliments que le brief peut proposer : leur composition est gardée
+        // sur le téléphone (une seule demande, puis plus rien), pour que le
+        // brief suivant chiffre « +30 % de ton besoin » sans réseau.
+        Task { _ = await CompositionsStore.shared.completer(identifiants: AlimentsDeReference.identifiants) }
         // Les widgets et l'activité en direct : on applique ce qui a été
         // touché pendant que l'app dormait, puis on réécrit la journée.
         Task { await SynchroWidgets.synchroniser(dashboardVM) }
@@ -974,7 +982,10 @@ struct MainTabView: View {
             == UNAuthorizationStatus.notDetermined.rawValue
         let slides = BriefDuJourBuilder.slides(
             brief: brief,
-            proposerInvitation: jamaisDemande && BriefDuJourStore.invitationAProposer()
+            proposerInvitation: jamaisDemande && BriefDuJourStore.invitationAProposer(),
+            // La composition des aliments proposés, déjà sur le téléphone : la
+            // priorité du jour se chiffre sans attendre la base.
+            compositions: CompositionsStore.shared.connuesSansReseau()
         )
         guard slides.count >= 2 else { return }
         BriefDuJourStore.marquerVu()

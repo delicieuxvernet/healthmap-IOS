@@ -157,31 +157,80 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertFalse(vm.nutrientScores.isEmpty, "Nutrient scores should be populated")
     }
 
-    /// Étape 3 de l'audit (22 sept. 2026) : le journal des repas corrige les
-    /// scores du tableau de bord, le registre que lisent les écrans, et le hash
-    /// du bilan, d'un seul geste.
-    func testLeJournalCorrigeLeTableauDeBordLeRegistreEtLeHash() {
+    /// Audit de fiabilité (8 oct. 2026) : les journées notées entrent dans
+    /// l'estimation en vraies quantités, et de là dans le chiffre du tableau
+    /// de bord, le registre que lisent les écrans, et le hash du bilan.
+    func testLesJourneesNoteesCorrigentLEstimationLeRegistreEtLeHash() throws {
         let vm = makeVM(profile: makeProfileThomas())
         vm.computeLocalScores()
         let hashSansJournal = vm.hashDuBilan
+        let ferAvant = try XCTUnwrap(vm.estimation?.apports["iron"]?.apportEstime)
 
-        // Un journal qui ne montre rien sur les dix apports : au moins l'un
-        // d'eux n'est pas déjà au plafond, donc un chiffre bouge forcément.
-        let observations = ObservationsJournal(
-            joursRetenus: 5,
-            couverture: Dictionary(uniqueKeysWithValues: NutrientID.allCases.map { ($0.rawValue, 0) })
-        )
-        vm.poserObservationsJournal(observations)
+        // Trois journées pleines, très riches : l'estimation doit monter.
+        let riche = JourneeNotee(kcal: 4000, apports: ["iron": 40, "vitC": 400, "magnesium": 900, "calcium": 2500])
+        vm.poserJourneesNotees([riche, riche, riche])
         vm.computeLocalScores()
 
-        let attendu = JournalApports.appliquer(HealthCalculator.registreApports(profile: vm.profile), observations: observations)
-        XCTAssertEqual(vm.nutrientScores["iron"], attendu["iron"]?.score)
-        XCTAssertEqual(vm.registre["iron"], attendu["iron"])
-        XCTAssertTrue(vm.registre["vitC"]?.contributions.contains { $0.section == .journal } == true)
+        let fer = try XCTUnwrap(vm.estimation?.apports["iron"])
+        XCTAssertEqual(fer.joursJournalRetenus, 3)
+        XCTAssertGreaterThan(fer.apportEstime, ferAvant)
+        XCTAssertEqual(vm.nutrientScores["iron"], vm.registre["iron"]?.score)
+        XCTAssertTrue(vm.registre["vitC"]?.contributions.contains { $0.section == .journal } == true,
+                      "les repas notés sont une source nommée")
         XCTAssertNotEqual(vm.hashDuBilan, hashSansJournal, "le bilan doit suivre ce que le journal change")
 
-        vm.poserObservationsJournal(nil)
+        vm.poserJourneesNotees([])
+        vm.computeLocalScores()
         XCTAssertEqual(vm.hashDuBilan, hashSansJournal)
+    }
+
+    /// Le registre lu par les écrans vient de l'estimation : ses
+    /// contributions sont des sources, et le statut ne se déduit pas du chiffre.
+    func testLeRegistreVientDeLEstimation() throws {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.computeLocalScores()
+        let mg = try XCTUnwrap(vm.registre["magnesium"])
+        XCTAssertEqual(mg.depart, 0)
+        XCTAssertNotNil(mg.estimation)
+        XCTAssertTrue(mg.freins.isEmpty, "plus aucun point retiré : des sources, pas des pénalités")
+        XCTAssertEqual(vm.statuts["magnesium"], mg.estimation?.statut)
+        XCTAssertEqual(mg.parts.reduce(0) { $0 + $1.valeur }, 100, "l'anneau ferme toujours à 100")
+    }
+
+    /// Audit des écrans (8 oct. 2026) : une prise de sang ne déplace plus le
+    /// chiffre d'un apport estimé ; elle change son statut, partout.
+    func testUnePriseDeSangChangeLeStatutPasLeChiffre() throws {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.computeLocalScores()
+        let avant = try XCTUnwrap(vm.nutrientScores["iron"])
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "yyyy-MM-dd"
+        let ferritine = MarqueurSanguin(code: "ferritine", nutriment: "iron", libelle: "Ferritine", valeur: 9, unite: "µg/L",
+                                        borneBasse: 15, borneHaute: 150, position: .sousRepere)
+        vm.poserPriseDeSangPourTest(PriseDeSang(id: "test", takenAt: f.string(from: Date()), dateLue: true, markers: [ferritine]))
+        vm.computeLocalScores()
+
+        XCTAssertEqual(vm.nutrientScores["iron"], avant, "le chiffre reste la quantité estimée")
+        XCTAssertEqual(vm.statuts["iron"], .aRenforcer)
+        XCTAssertEqual(vm.registre["iron"]?.estimation?.statut, .aRenforcer, "le détail dit le même statut")
+        XCTAssertTrue(vm.apportsEnAlerte.contains("iron"))
+        let effet = try XCTUnwrap(vm.effetsPriseDeSang().first { $0.id == "iron" })
+        XCTAssertEqual(effet.statutApres, .aRenforcer)
+        XCTAssertEqual(effet.texteApres, "À renforcer")
+    }
+
+    /// Le bilan rédigé porte le statut et le chiffre du calcul local.
+    func testLeBilanRedigePrendLeStatutLocal() throws {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.computeLocalScores()
+        var bilan = AIAnalysisV2(contract: "v2")
+        bilan.bilan = BilanV2(apports: [ApportV2(id: "magnesium", nom: "Magnésium", statut: .aCombler, pctBesoin: 3)])
+        vm.analysisV2 = bilan
+
+        let mg = try XCTUnwrap(vm.analysisV2?.bilan?.apports?.first)
+        let statut = try XCTUnwrap(vm.statuts["magnesium"])
+        XCTAssertEqual(mg.statut, statut.statutV2)
+        XCTAssertEqual(mg.pctBesoin, vm.nutrientScores["magnesium"])
     }
 
     /// An incomplete questionnaire should reset scores to zero.
@@ -245,6 +294,40 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertEqual(vm.overallScore, 8, "Should use AI overall score when available")
     }
 
+    /// Audit de fiabilité du 8 oct. 2026 : le v7 garde ses textes, mais le
+    /// chiffre et le statut de chaque apport sont ceux du registre (un seul
+    /// chiffre partout, Plan et PDF compris).
+    func testLesNutrimentsDuV7PortentLeChiffreDuRegistre() throws {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.computeLocalScores()
+        let duRegistre = try XCTUnwrap(vm.nutrientScores["iron"])
+        let autre = duRegistre >= 50 ? 5 : 95
+
+        let merged = MergedAnalysis(
+            healthScore: vm.healthScore,
+            scores: ["iron": autre],
+            nutrients: [EnrichedNutrient(id: "iron", label: "Fer", emoji: "", color: "", score: autre,
+                                         status: NutrientStatus(score: autre).rawValue, confidence: nil,
+                                         verdict: "Texte du v7")],
+            redFlags: [],
+            summary: nil,
+            bilanDetail: nil,
+            interactions: [],
+            pepites: [],
+            priorityActions: [],
+            positiveFindings: [],
+            supplementsSchedule: nil,
+            bloodTests: nil,
+            meta: nil
+        )
+        vm.aiAnalysis = merged
+
+        let fer = try XCTUnwrap(vm.nutrients.first { $0.id == "iron" })
+        XCTAssertEqual(fer.score, duRegistre)
+        XCTAssertEqual(fer.status, NutrientStatus(score: duRegistre).rawValue)
+        XCTAssertEqual(fer.verdict, "Texte du v7", "les textes du v7 restent")
+    }
+
     /// Without AI analysis, overallScore should fall back to local healthScore / 10.
     func testOverallScore_withoutAI_fallsBackToLocal() {
         let vm = makeVM(profile: makeProfileThomas())
@@ -275,7 +358,9 @@ final class DashboardViewModelTests: XCTestCase {
     /// Nutrients below 60 should appear in the deficiencies list.
     func testDeficiencies_filtersBelowThreshold() {
         let vm = makeVM(profile: makeProfileThomas())
-        vm.computeLocalScores()
+        // Pas de registre local ici : on teste le filtre seul. Avec un
+        // registre, ses chiffres remplaceraient ceux injectés (un seul
+        // chiffre par apport, cf. testLesNutrimentsDuV7PortentLeChiffreDuRegistre).
 
         // Inject an AI analysis with a mix of scores
         let nutrients = [
@@ -519,11 +604,11 @@ private final class MockAIAnalysisService: AIAnalysisServiceProtocol {
     private(set) var fullAnalysisCallCount = 0
     private(set) var bilanV2CallCount = 0
 
-    func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis? {
+    func fetchFullAnalysis(userId: String, profile: UserProfile, scores: [String: Int]?) async throws -> MergedAnalysis? {
         fullAnalysisCallCount += 1
         return nil
     }
-    func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2 {
+    func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], statuts: [String: String], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2 {
         bilanV2CallCount += 1
         return AIAnalysisV2(contract: "v2")
     }

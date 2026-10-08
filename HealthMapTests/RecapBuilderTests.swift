@@ -223,12 +223,14 @@ final class RecapBuilderTests: XCTestCase {
 
     // MARK: - Mot d'état
 
-    func testStatusWordFollowsTheServerNotTheLocalScale() {
-        // Le serveur dit « couvre » : le récap ne doit pas contredire le Bilan.
+    func testStatusWordFollowsTheStatusNotTheScale() {
+        // Le statut fait foi, jamais le pourcentage : le récap ne contredit pas
+        // la fiche. Audit de fiabilité du 8 oct. 2026 : orange = à surveiller,
+        // rouge = à renforcer (alerte sûre), gris = estimation à affiner.
         XCTAssertEqual(RecapBuilder.mot(statut: .couvre, pourcent: 40), "Couvre ton besoin")
-        XCTAssertEqual(RecapBuilder.mot(statut: .aCombler, pourcent: 90), "À combler")
-        // Statut absent : on retombe sur l'échelle locale (loi 4).
-        XCTAssertEqual(RecapBuilder.mot(statut: .neutre, pourcent: 30), HealthScale.nutrientLabel(for: 30))
+        XCTAssertEqual(RecapBuilder.mot(statut: .aRenforcer, pourcent: 90), "À surveiller")
+        XCTAssertEqual(RecapBuilder.mot(statut: .aCombler, pourcent: 90), "À renforcer")
+        XCTAssertEqual(RecapBuilder.mot(statut: .neutre, pourcent: 30), "À affiner")
     }
 
     // MARK: - Rythme

@@ -32,6 +32,14 @@ struct ContexteMicros: Equatable {
     let joursJournal: [String: Int]
     /// Symptômes déclarés au questionnaire.
     let symptomes: [String]
+    /// Les apports estimés en vraies quantités (`EstimateurApports`, audit de
+    /// fiabilité du 8 oct. 2026) : quand un micro y est, son chiffre est la
+    /// part de la référence couverte et son statut celui de l'estimateur.
+    var estimations: [String: EstimationApport] = [:]
+    /// Le statut retenu par l'app (une prise de sang récente prime).
+    var statuts: [String: StatutApport] = [:]
+    /// Les réponses lues par l'estimateur, pour nommer les sources.
+    var profil: ProfilEstimation? = nil
 }
 
 struct FaitMicro: Equatable, Identifiable {
@@ -97,6 +105,9 @@ struct LigneMicro: Equatable, Identifiable {
     let contributeurs: [ContributeurMicro]
     let role: String
     let sources: [String]
+    /// Le statut de l'estimateur, quand il couvre ce micro : c'est lui, jamais
+    /// un seuil sur le chiffre, qui décide des mots et des alertes.
+    var statutApport: StatutApport? = nil
 }
 
 struct TableauMicros: Equatable {
@@ -171,11 +182,17 @@ enum MicrosDuJour {
             }
             let mesuresQuinzaine = quinzaine.compactMap { couverture(le: $0) }
 
-            // Le chiffre : le registre quand il existe, sinon les repas seuls.
+            // Le chiffre : l'estimation quand elle couvre ce micro, sinon le
+            // registre, sinon les repas seuls.
             var niveau: Int?
             var partDuQuestionnaire = false
+            let estimation = micro.sens == .besoin ? contexte.estimations[micro.id] : nil
+            let statutApport = estimation.map { contexte.statuts[micro.id] ?? $0.statut }
             if micro.sens == .besoin {
-                if micro.apport != nil, let score = contexte.scores[micro.id] {
+                if let estimation {
+                    niveau = LectureEstimation.couverture(estimation)
+                    partDuQuestionnaire = true
+                } else if micro.apport != nil, let score = contexte.scores[micro.id] {
                     niveau = max(0, min(100, score))
                     partDuQuestionnaire = true
                 } else if mesuresQuinzaine.count >= joursMinimum {
@@ -184,10 +201,22 @@ enum MicrosDuJour {
                 }
             }
 
-            let etat = Self.statut(sens: micro.sens, semaine: jours)
+            // Les repas seuls ne font plus d'alerte que l'estimateur ne
+            // confirme pas : une journée ou trois sous 60 % ne suffisent pas à
+            // affirmer un manque (vitamine D, B12…).
+            var etat = Self.statut(sens: micro.sens, semaine: jours)
+            if let statutApport, !(statutApport.estUneAlerte && etat.estUneAlerte) {
+                etat = .normal
+            }
             let quantiteDuJour = journees[jour]?.quantites[micro.id]
 
-            let raisons = Self.faits(
+            let raisons = estimation.map {
+                Self.faitsEstimes(micro: micro, estimation: $0, statut: statutApport ?? $0.statut,
+                                  profil: contexte.profil, symptomes: contexte.symptomes,
+                                  quantiteDuJour: quantiteDuJour, besoin: besoin,
+                                  jourEstAujourdhui: jour == aujourdhui,
+                                  mois: calendar.component(.month, from: maintenant))
+            } ?? Self.faits(
                 micro: micro,
                 niveau: niveau,
                 partDuQuestionnaire: partDuQuestionnaire,
@@ -218,7 +247,8 @@ enum MicrosDuJour {
                 faits: raisons,
                 contributeurs: contributeurs(micro.id, jours: semaine, journees: journees),
                 role: micro.role,
-                sources: micro.sources
+                sources: micro.sources,
+                statutApport: statutApport
             ))
         }
 
@@ -388,6 +418,15 @@ enum MicrosDuJour {
             guard ligne.sens == .besoin, let niveau = ligne.niveau,
                   Micronutriments.parId[ligne.id]?.detailDe == nil else { continue }
             var poids = 100 - niveau
+            // Le statut d'abord : une alerte sûre, puis « à surveiller », puis
+            // « à affiner » ; un apport couvert ne passe jamais devant.
+            switch ligne.statutApport {
+            case .aRenforcer?, .auDessusDeLaLimite?: poids += 300
+            case .aSurveiller?: poids += 200
+            case .peuPrecise?: poids += 100
+            case .couvert?, .couvertParComplement?, .sousLaLimite?: poids -= 100
+            case nil: break
+            }
             if case .basProlonge = ligne.statut { poids += 40 }
             poids += bonusSymptome(ligne.id, niveau: niveau, symptomes: symptomes)
             candidats.append(Candidat(rang: rang, poids: poids, ligne: ligne))
@@ -416,6 +455,55 @@ enum MicrosDuJour {
     }
 
     // MARK: Les faits
+
+    /// Les faits d'un micro estimé : d'où vient le chiffre (ses sources),
+    /// ce qu'il faut pour l'affirmer, et la journée affichée. Plus de
+    /// « points » : des quantités.
+    static func faitsEstimes(
+        micro: MicroDefinition,
+        estimation e: EstimationApport,
+        statut: StatutApport,
+        profil: ProfilEstimation?,
+        symptomes: [String],
+        quantiteDuJour: Double?,
+        besoin: Double,
+        jourEstAujourdhui: Bool,
+        mois: Int
+    ) -> [FaitMicro] {
+        var faits: [FaitMicro] = [FaitMicro(genre: .questionnaire, texte: LectureEstimation.provenance(e))]
+        let unite = LectureEstimation.uniteAffichage(micro.id, estimation: e)
+        if let premiere = LectureEstimation.sources(micro.id, e, profil: profil ?? ProfilEstimation()).first {
+            let valeur = DS.decimal(LectureEstimation.arrondiLisible(premiere.valeur))
+            faits.append(FaitMicro(
+                genre: premiere.section == .journal ? .repas : .questionnaire,
+                texte: "Ta plus grosse source : \(LectureEstimation.enMinuscule(premiere.libelle)), \(valeur)\(DS.fine)\(unite) par jour."
+            ))
+        }
+        if let restant = LectureEstimation.journeesAvantFiabilite(e) {
+            let n = restant.conseillees - restant.notees
+            faits.append(FaitMicro(genre: .repas, texte: n > 1
+                ? "Encore \(n) journées notées pour pouvoir l'affirmer."
+                : "Encore 1 journée notée pour pouvoir l'affirmer."))
+        }
+        if statut.estSousLaReference, let lien = liensSolides(micro.id, symptomes: symptomes).first {
+            faits.append(FaitMicro(genre: .symptome, texte: "Tu as signalé \(lien.formulation)."))
+        } else if micro.id == "vitD", [10, 11, 12, 1, 2, 3].contains(mois) {
+            faits.append(FaitMicro(
+                genre: .saison,
+                texte: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes."
+            ))
+        }
+        let moment = jourEstAujourdhui ? "Aujourd'hui" : "Ce jour-là"
+        if let quantiteDuJour, besoin > 0 {
+            faits.append(FaitMicro(
+                genre: .jour,
+                texte: "\(moment) : \(quantite(quantiteDuJour)) noté\(DS.fine)\(micro.unite)."
+            ))
+        } else {
+            faits.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+        }
+        return faits
+    }
 
     private static func points(_ delta: Int) -> String {
         let signe = delta >= 0 ? "+" : "\u{2212}"

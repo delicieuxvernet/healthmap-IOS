@@ -631,7 +631,7 @@ struct QuotaWall: View {
                 title: "Une de tes habitudes quotidiennes bloque l'absorption de ton fer.",
                 promises: [
                     PremiumTeasePromise(id: "mecanisme", emoji: "🔍", label: "Le mécanisme", blurred: "Les tanins captent le fer"),
-                    PremiumTeasePromise(id: "solution", emoji: "💡", label: "Ta solution", blurred: "Décale ton café à 1 h après le repas."),
+                    PremiumTeasePromise(id: "solution", emoji: "💡", label: "Ta solution", blurred: "Prends ton café 1 h avant le repas."),
                     PremiumTeasePromise(id: "effet", emoji: "📈", label: "L'effet", blurred: "Jusqu'à 60 % d'absorption en plus"),
                 ],
                 zone: "point_attention"

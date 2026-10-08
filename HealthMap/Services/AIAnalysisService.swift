@@ -21,11 +21,14 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
 
     // MARK: - Fetch Full Analysis
     /// Main entry point — checks cache, calls Edge Function if needed, validates, merges
-    func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis? {
+    func fetchFullAnalysis(userId: String, profile: UserProfile, scores: [String: Int]? = nil) async throws -> MergedAnalysis? {
         guard profile.completed else { return nil }
 
-        // 1. Compute local scores (ALWAYS deterministic)
-        let localScores = HealthCalculator.analyzeNutrientScores(profile: profile)
+        // 1. Compute local scores (ALWAYS deterministic). Audit de fiabilité
+        // (8 oct. 2026) : quand l'app a des apports estimés, ce sont EUX que
+        // l'analyse explique — jamais l'ancien calcul en points.
+        let localScores = scores.flatMap { $0.isEmpty ? nil : $0 }
+            ?? HealthCalculator.analyzeNutrientScores(profile: profile)
         let healthScore = HealthCalculator.calculateHealthScore(profile: profile)
         let redFlags = RedFlagDetector.detect(profile: profile)
 
@@ -204,6 +207,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         userId: String,
         profileHash: String,
         scores: [String: Int],
+        statuts: [String: String] = [:],
         healthScore: Int,
         redFlags: [RedFlag],
         forceRefresh: Bool = false
@@ -232,6 +236,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         let requestBody = BilanV2Request(
             tache: "bilan",
             scores: scores,
+            statuts: statuts,
             healthScore: healthScore,
             redFlags: redFlags.map { EdgeFlagDTO(id: $0.id.rawValue, urgency: $0.urgency.rawValue, message: $0.message) },
             profileHash: profileHash,
@@ -544,6 +549,10 @@ private struct EdgeFlagDTO: Encodable {
 private struct BilanV2Request: Encodable {
     let tache: String
     let scores: [String: Int]
+    /// Statut de chaque apport estimé (audit de fiabilité, 8 oct. 2026) : le
+    /// serveur choisit les trois apports du bilan d'après eux, plus d'après
+    /// les chiffres les plus bas. Vide pour l'ancien calcul.
+    let statuts: [String: String]
     let healthScore: Int
     let redFlags: [EdgeFlagDTO]
     let profileHash: String

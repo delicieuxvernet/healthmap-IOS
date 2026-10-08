@@ -100,10 +100,12 @@ final class PriseDeSangService {
     func analyser(_ fichier: Fichier) async throws -> PriseDeSang {
         guard fichier.donnees.count <= Fichier.octetsMax else { throw Erreur.tropLourd }
         do {
-            let reponse: Reponse = try await client.functions.invoke(
-                "analyze-blood-report",
-                options: .init(body: Body(fichier: fichier.donnees.base64EncodedString(), typeMime: fichier.typeMime))
-            )
+            let reponse: Reponse = try await TacheProtegee.executer("Prise de sang") {
+                try await client.functions.invoke(
+                    "analyze-blood-report",
+                    options: .init(body: Body(fichier: fichier.donnees.base64EncodedString(), typeMime: fichier.typeMime))
+                )
+            }
             return reponse.report
         } catch let error as FunctionsError {
             if case .httpError(let code, let data) = error {

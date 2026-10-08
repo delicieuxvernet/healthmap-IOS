@@ -54,6 +54,48 @@ enum LectureApport {
         mot(score, accord(id))
     }
 
+    /// Le mot d'un STATUT d'apport estimé (audit de fiabilité, 8 oct. 2026),
+    /// accordé : il ne se déduit plus d'un seuil sur le chiffre.
+    static func mot(_ statut: StatutApport, id: String) -> String {
+        let a = accord(id)
+        switch statut {
+        case .couvert, .couvertParComplement:
+            switch a {
+            case .masculin: return "couvert"
+            case .feminin: return "couverte"
+            case .masculinPluriel: return "couverts"
+            case .femininPluriel: return "couvertes"
+            }
+        case .aSurveiller:
+            return (a == .masculin || a == .feminin) ? "un peu juste" : "un peu justes"
+        case .aRenforcer:
+            switch a {
+            case .masculin, .masculinPluriel: return "bas"
+            case .feminin: return "basse"
+            case .femininPluriel: return "basses"
+            }
+        case .peuPrecise: return "à affiner"
+        case .auDessusDeLaLimite: return "au-dessus de la limite"
+        case .sousLaLimite: return "sous la limite"
+        }
+    }
+
+    /// Le mot du statut d'un apport, d'après son détail : le statut estimé
+    /// quand il existe, l'échelle du score sinon.
+    static func motStatut(id: String, detail: DetailApport) -> String {
+        if let statut = detail.estimation?.statut { return mot(statut, id: id) }
+        return motStatut(id: id, score: detail.score)
+    }
+
+    /// Le constat d'après le détail : « Ton apport en magnésium semble proche
+    /// de la référence. » pour un apport estimé.
+    static func constat(id: String, nom: String, detail: DetailApport) -> String {
+        if let estimation = detail.estimation {
+            return LectureEstimation.verdict(nom: nom, estimation: estimation)
+        }
+        return constat(id: id, nom: nom, score: detail.score)
+    }
+
     /// « Ta vitamine D est un peu juste. » : le constat seul, sans sa cause.
     static func constat(id: String, nom: String, score: Int) -> String {
         let sujet = NomNutriment.majusculeInitiale(NomApport.possessif(NomApport.avecArticle(id: id, repli: nom)))
@@ -63,6 +105,11 @@ enum LectureApport {
     /// « Ton fer est bas. Première cause : règles abondantes. » — la phrase à
     /// lire en premier. Sans cause nommée, elle s'arrête au constat.
     static func verdict(id: String, nom: String, detail: DetailApport) -> String {
+        // Apport estimé : la phrase de l'estimation, sans « première cause » —
+        // ses contributions sont des sources, pas des freins.
+        if let estimation = detail.estimation {
+            return LectureEstimation.verdict(nom: nom, estimation: estimation)
+        }
         let phrase = constat(id: id, nom: nom, score: detail.score)
         guard detail.score < 70 else { return phrase }
         // Une prise de sang n'est pas une cause : elle confirme le constat, et

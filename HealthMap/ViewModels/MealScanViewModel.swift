@@ -423,7 +423,10 @@ final class MealScanViewModel: ObservableObject {
 
     // MARK: - Analyze Photo
 
-    func analyzePhoto() async {
+    /// `scores` / `alertes` : les apports estimés que l'app affiche (audit de
+    /// fiabilité, 8 oct. 2026) — le scan personnalise sur EUX. `nil` :
+    /// l'ancien calcul du seul questionnaire, seuil 60.
+    func analyzePhoto(scores: [String: Int]? = nil, alertes: [String]? = nil) async {
         guard let imageData = selectedImage else { return }
 
         isAnalyzing = true
@@ -456,8 +459,12 @@ final class MealScanViewModel: ObservableObject {
 
             // 3. Scores NAR locaux (déterministes) : le serveur personnalise
             // tout le scan avec. Les deficiencies en sont dérivées (< 60).
-            let userScores = await resolveUserScores()
-            let userDeficiencies = userScores.filter { $0.value < 60 }.map { $0.key }
+            let estimes = scores.flatMap { $0.isEmpty ? nil : $0 }
+            let userScores: [String: Int]
+            if let estimes { userScores = estimes } else { userScores = await resolveUserScores() }
+            let userDeficiencies = estimes != nil && alertes != nil
+                ? (alertes ?? [])
+                : userScores.filter { $0.value < 60 }.map { $0.key }
 
             // 4. Call Edge Function with 130s timeout
             let requestBody = MealAnalyzeRequest(
@@ -469,27 +476,32 @@ final class MealScanViewModel: ObservableObject {
                 consumedAt: consumedAtÀEnvoyer
             )
 
-            let response: EdgeMealResponse = try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
-                group.addTask { [client] in
-                    try await client.functions.invoke(
-                        "analyze-meal-photo",
-                        options: .init(body: requestBody)
-                    )
-                }
+            // Protégée : verrouiller le téléphone pendant l'analyse ne coupe
+            // plus l'envoi (le serveur enregistre le repas lui-même ; une
+            // réponse perdue faisait croire à un échec, puis à un doublon).
+            let response: EdgeMealResponse = try await TacheProtegee.executer("Photo du repas") {
+                try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
+                    group.addTask { [client] in
+                        try await client.functions.invoke(
+                            "analyze-meal-photo",
+                            options: .init(body: requestBody)
+                        )
+                    }
 
-                // Timeout task
-                group.addTask {
-                    try await Task.sleep(nanoseconds: 130_000_000_000) // 130 seconds
-                    throw MealScanError.timeout
-                }
+                    // Timeout task
+                    group.addTask {
+                        try await Task.sleep(nanoseconds: 130_000_000_000) // 130 seconds
+                        throw MealScanError.timeout
+                    }
 
-                // Return whichever finishes first; cancel the other
-                guard let result = try await group.next() else {
+                    // Return whichever finishes first; cancel the other
+                    guard let result = try await group.next() else {
+                        group.cancelAll()
+                        throw MealScanError.timeout
+                    }
                     group.cancelAll()
-                    throw MealScanError.timeout
+                    return result
                 }
-                group.cancelAll()
-                return result
             }
 
             // 5. Check for Edge Function error in response body

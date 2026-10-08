@@ -36,6 +36,8 @@ struct PlanGraph: Equatable {
         var angle: Double
         /// Score 0-100 d'un apport ; `nil` pour les autres genres.
         var score: Int? = nil
+        /// Statut de l'estimateur d'un apport (8 oct. 2026) ; `nil` sinon.
+        var statut: StatutApport? = nil
         /// Points que cette habitude retire, tous apports confondus (négatif).
         var points: Int? = nil
     }
@@ -85,7 +87,7 @@ struct PlanGraph: Equatable {
         let apports = proches.filter { $0.genre == .apport }
         switch noeud.genre {
         case .apport:
-            let etat = noeud.score.map { "À \($0) %" }
+            let etat = noeud.statut == .peuPrecise ? "À affiner" : noeud.score.map { "À \($0) %" }
             let touche = symptomes > 0 ? "touche \(Self.compte(symptomes, "symptôme"))" : nil
             return [etat, touche].compactMap { $0 }.joined(separator: " · ")
         case .symptome:
@@ -121,6 +123,16 @@ extension PlanGraph {
         let id: String
         let nom: String
         let score: Int
+        var statut: StatutApport? = nil
+
+        /// « à renforcer », puis « à surveiller », puis le reste.
+        var rang: Int {
+            switch statut {
+            case .aRenforcer?: return 0
+            case .aSurveiller?: return 1
+            default: return 2
+            }
+        }
     }
 
     /// Une habitude déclarée et ce qu'elle retire, apport par apport.
@@ -182,13 +194,15 @@ extension PlanGraph {
         }
         var classes: [Apport] = cites.compactMap { parId[$0] }
         classes.sort { a, b in
+            if a.rang != b.rang { return a.rang < b.rang }
             if a.score != b.score { return a.score < b.score }
             return a.id < b.id
         }
         let retenus: [Apport] = Array(classes.prefix(apportsAffiches))
 
         for apport in retenus {
-            noeuds.append(Noeud(id: apport.id, genre: .apport, nom: apport.nom, anneau: 2, angle: 0, score: apport.score))
+            noeuds.append(Noeud(id: apport.id, genre: .apport, nom: apport.nom, anneau: 2, angle: 0,
+                                score: apport.score, statut: apport.statut))
             let poids = force(pourScore: apport.score)
             for element in anneau1 where element.sujet.apports.contains(apport.id) {
                 liens.append(Lien(de: element.sujet.id, vers: apport.id, force: poids))

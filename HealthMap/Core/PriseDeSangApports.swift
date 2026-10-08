@@ -206,6 +206,14 @@ enum PriseDeSangApports {
         let id: String
         let avant: Int
         let apres: Int
+        /// Apport estimé (8 oct. 2026) : la prise de sang ne déplace plus le
+        /// chiffre, elle change le STATUT ; l'effet se lit alors en mots.
+        var statutAvant: StatutApport? = nil
+        var statutApres: StatutApport? = nil
+
+        /// « 62 » ou « À affiner ».
+        var texteAvant: String { statutAvant?.libelleCourt ?? "\(avant)" }
+        var texteApres: String { statutApres?.libelleCourt ?? "\(apres)" }
     }
 
     /// Le marqueur qui parle pour un apport (le premier relié, le serveur les
@@ -231,9 +239,7 @@ enum PriseDeSangApports {
                   let vers = cible(m.position, code: m.code) else { continue }
             let delta = correction(score: detail.score, cible: vers, fraicheur: poids)
             guard abs(delta) >= effetMinimum else { continue }
-            let contributions = detail.contributions + [ContributionApport(libelle: texte, delta: delta, section: .priseDeSang)]
-            let brut = DetailApport.pointDeDepart + contributions.reduce(0) { $0 + $1.delta }
-            sortie[id] = DetailApport(contributions: contributions, score: max(0, min(100, brut)))
+            sortie[id] = detail.ajoutant(ContributionApport(libelle: texte, delta: delta, section: .priseDeSang))
         }
         return sortie
     }

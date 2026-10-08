@@ -114,7 +114,9 @@ struct PlanNoeudSheet: View {
         switch topic.kind {
         case .objectif: return "Ton objectif"
         case .symptome: return "Symptôme suivi"
-        case .apport: return "Apport à renforcer"
+        case .apport:
+            guard let statut = topic.statut else { return "Apport à renforcer" }
+            return statut.estASuivre ? "Apport \(statut.libelleCourt.lowercased())" : "Apport"
         }
     }
 
@@ -658,7 +660,7 @@ extension PlanTopic {
     private var scoreEvidence: String {
         evidence
             .prefix(2)
-            .map { "\($0.label) à \($0.score)\u{202F}%" }
+            .map { $0.statut == .peuPrecise ? "\($0.label) : à affiner" : "\($0.label) à \($0.score)\u{202F}%" }
             .joined(separator: " · ")
     }
 

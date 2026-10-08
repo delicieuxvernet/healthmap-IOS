@@ -109,9 +109,11 @@ final class CalculEtape2Tests: XCTestCase {
         XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: femme), 11)
         femme.periodFlow = "very_heavy"
         XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: femme), 16)
-        // Jamais posée (« na » par défaut) : on ne présume pas des règles légères.
+        // Jamais posée (« na » par défaut) : la référence d'une femme réglée,
+        // 11 mg (référentiel v10, relecture externe du 8 oct. 2026).
         femme.periodFlow = "na"
-        XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: femme), 16)
+        XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: femme), 11)
+        XCTAssertEqual(BesoinsDeReference.besoinDeRepli(.iron, profil: femme), 16)
         var apres50 = adulte(femme: true, age: "58")
         apres50.periodFlow = "na"
         XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: apres50), 11)
@@ -127,7 +129,9 @@ final class CalculEtape2Tests: XCTestCase {
         XCTAssertEqual(BesoinsDeReference.besoin(.iodine, profil: p), 200)
         XCTAssertEqual(BesoinsDeReference.besoin(.vitB12, profil: p), 4.5)
         p.pregnancyStatus = "breastfeeding"
-        XCTAssertEqual(BesoinsDeReference.besoin(.vitC, profil: p), 155)
+        // ANSES 2021, référentiel de l'estimateur : 170 mg en allaitant.
+        XCTAssertEqual(BesoinsDeReference.besoin(.vitC, profil: p), 170)
+        XCTAssertEqual(BesoinsDeReference.besoinDeRepli(.vitC, profil: p), 155)
         // Un homme n'est jamais « enceinte », même si la réponse traîne.
         var homme = adulte()
         homme.pregnancyStatus = "pregnant"

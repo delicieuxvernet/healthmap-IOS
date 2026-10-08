@@ -44,7 +44,9 @@ enum RedFlagDetector {
         if profile.pregnancyStatus == "trying_to_conceive" && !hasSupplement("folate") {
             flags.append(RedFlag(
                 id: .tryingConceiveNoFolate, urgency: .soon,
-                message: "Projet de grossesse sans folate. L'idéal est de commencer 3 mois avant, entre 400 et 600 µg par jour."
+                // Aucune dose dans Kiwio (doctrine du 20 sept. 2026) : la posologie
+                // appartient au médecin ou au pharmacien.
+                message: "Projet de grossesse sans folate. L'idéal est de commencer avant la conception : parles-en à ton médecin ou à ton pharmacien."
             ))
         }
 
@@ -52,7 +54,7 @@ enum RedFlagDetector {
         if profile.periodFlow == "very_heavy" && !hasSupplement("iron") {
             flags.append(RedFlag(
                 id: .heavyPeriodsNoIron, urgency: .soon,
-                message: "Règles abondantes et pas de fer en soutien, tes réserves s'épuisent vite. Une prise de sang (ferritine) te donnera une réponse claire."
+                message: "Règles abondantes et pas de fer en soutien. Une prise de sang (ferritine) te donnera une réponse claire."
             ))
         }
 
@@ -142,7 +144,7 @@ enum RedFlagDetector {
             (profile.periodFlow == "heavy" || profile.periodFlow == "very_heavy" || ["vegan", "vegetarien"].contains(diet)) {
             flags.append(RedFlag(
                 id: .hairLossIronRisk, urgency: .soon,
-                message: "Tes cheveux tombent et plusieurs signaux pointent le fer. Fais doser ta ferritine, on vise plus de 50 µg/L pour les cheveux."
+                message: "Tes cheveux tombent et plusieurs signaux pointent le fer. Fais doser ta ferritine : ton médecin saura la lire."
             ))
         }
 

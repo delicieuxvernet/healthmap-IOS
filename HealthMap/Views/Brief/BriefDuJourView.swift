@@ -35,6 +35,14 @@ struct BriefDuJourView: View {
 
     private var estDernier: Bool { index >= slides.count - 1 }
 
+    /// La priorité du jour garde son bouton HORS du défilement : sur un
+    /// iPhone de 6,1", sphère, carte et ligne du fer poussaient « C'est
+    /// parti » de 35 pt sous le bord. Le contenu peut glisser, pas le bouton.
+    private var boutonEpingle: Bool {
+        guard estDernier, case .priorite? = slideCourant else { return false }
+        return true
+    }
+
     /// Typée `AnyTransition` (comme dans le récap) : en ternaire, `.opacity`
     /// est ambigu depuis iOS 17 (`AnyTransition` ou `Transition`).
     private var transitionEcran: AnyTransition {
@@ -79,6 +87,11 @@ struct BriefDuJourView: View {
                                 terminer(raison: "glisser")
                             }
                         )
+                    }
+
+                    if boutonEpingle {
+                        boutonFin
+                            .padding(.horizontal, Theme.spacingLG)
                     }
 
                     Text("Calculé sur les repas que tu as notés.")
@@ -166,10 +179,10 @@ struct BriefDuJourView: View {
             ecranHier(couverts: couverts, avantHier: avantHier)
         case .rienHier(let repas):
             ecranRienHier(repas: repas)
-        case .manques(let manques):
-            ecranManques(manques)
         case .effort(let effort):
             ecranEffort(effort)
+        case .priorite(let priorite):
+            ecranPriorite(priorite)
         case .cible(let cible):
             ecranCible(cible)
         case .invitation(let cible):
@@ -249,29 +262,11 @@ struct BriefDuJourView: View {
         }
     }
 
-    private func ecranManques(_ manques: [BriefDuJour.Manque]) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Ce qui a manqué hier")
-            ForEach(manques, id: \.id) { manque in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(manque.nom)
-                        .font(.dsHeadline)
-                        .foregroundStyle(Color.dsTexte)
-                    RecapJaugeApport(
-                        pourcent: manque.pourcent,
-                        couleur: NutrientData.definition(for: manque.id)?.color ?? .dsAccent
-                    )
-                }
-                .padding(.bottom, Theme.spacingSM)
-            }
-            if let plusBas = manques.first, plusBas.pourcent < 100 {
-                Text("Il t'a manqué \(100 - plusBas.pourcent) % \(NomNutriment.complement(id: plusBas.id, nom: plusBas.nom)) : c'est ta priorité du jour.")
-                    .font(.dsSousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if estDernier { boutonFin }
-        }
+    /// Ce qui a manqué hier et l'aliment qui le remonte : une colonne, un
+    /// chiffre héros (`BriefPrioriteContenu`). Son bouton est épinglé sous le
+    /// défilement (`boutonEpingle`).
+    private func ecranPriorite(_ priorite: PrioriteDuJour) -> some View {
+        BriefPrioriteContenu(priorite: priorite)
     }
 
     private func ecranEffort(_ effort: BriefDuJour.Effort) -> some View {
