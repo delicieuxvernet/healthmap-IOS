@@ -548,7 +548,11 @@ private struct LigneMicroVue: View {
                         .font(enAvant ? Font.dsSousTitreFort : Font.dsSousTitre)
                         .tracking(DSTracking.sousTitre)
                         .foregroundStyle(Color.dsTexte)
-                        .lineLimit(1)
+                        // En gratuit, la pastille prend la place du chiffre :
+                        // un nom long (« Oméga-3 EPA + DHA », le rapport
+                        // oméga) passe sur deux lignes au lieu d'être coupé
+                        // (captures du 8 octobre 2026).
+                        .lineLimit(verrouille ? 2 : 1)
                         .minimumScaleFactor(0.8)
                     if !verrouille, ligne.statut != .normal {
                         RepereDeStatut(couleur: ligne.statut.couleurDeRepere)

@@ -606,7 +606,8 @@ struct VoiceMealSheet: View {
             grams: grams[item.index],
             unite: enGrammes.contains(item.index) ? nil : unites[item.index],
             taille: tailles[item.index],
-            peutBasculer: unites[item.index] != nil,
+            // Calculées pour la seule ligne ouverte : c'est la seule qui les montre.
+            unitesProposees: deployee == item.index ? Self.unitesProposees(pour: item) : [],
             deployee: deployee == item.index,
             aVerifier: aVerifier(item),
             remplacementEnCours: remplacementEnCours == item.index,
@@ -620,7 +621,7 @@ struct VoiceMealSheet: View {
             onAjuster: { ajuster($0, pour: item.index) },
             onTaille: { choisirTaille($0, pour: item.index) },
             onCompter: { compter($0, pour: item.index) },
-            onBasculerUnite: { basculerUnite(item.index) },
+            onChoisirUnite: { choisirUnite($0, pour: item.index) },
             onRemove: {
                 removed.insert(item.index)
                 if deployee == item.index { deployee = prochainManquant() }
@@ -1027,7 +1028,9 @@ struct VoiceMealSheet: View {
         let poids = unite.poids(taille: tailles[index])
         let actuel = UnitPortionCatalog.nombre(grammes: grams[index] ?? 0, poidsUnite: poids)
         let nombre = UnitPortionCatalog.nombreSuivant(actuel, delta: delta)
-        grams[index] = min(2000, (nombre * poids).rounded())
+        // Au dixième de gramme : une amande pèse 1,2 g, deux doivent rester
+        // deux (arrondies à l'entier, 2,4 g redevenaient « 1,5 pièce »).
+        grams[index] = min(2000, (nombre * poids * 10).rounded() / 10)
     }
 
     // MARK: Aliment retenu
@@ -1090,31 +1093,48 @@ struct VoiceMealSheet: View {
         }
     }
 
-    /// Unité de saisie d'un aliment : d'abord la quantité TELLE QU'ELLE A ÉTÉ
-    /// DITE (compte + poids d'une unité fournis par le serveur), sinon le
-    /// catalogue. Pour une pièce, le catalogue donne le mot (« carré »,
-    /// « œuf ») mais le poids reste celui du serveur, sans tailles : le compte
-    /// dit × poids d'unité doit retomber exactement sur les grammes comptés.
+    /// Unité de saisie proposée d'office : la première de `unitesProposees(pour:)`.
     static func unite(pour item: VoiceMealService.Item) -> UnitPortionCatalog.Unite? {
-        let portions = item.portions.map { (label: $0.label, grammes: $0.grammes) }
-        let catalogue = UnitPortionCatalog.unite(pourNom: item.nom, portions: portions)
-        guard let dite = item.quantiteDite, dite.poidsUniteG > 0 else { return catalogue }
-        if dite.unite == "piece" {
-            return UnitPortionCatalog.Unite(singulier: catalogue?.singulier ?? dite.singulier,
-                                            pluriel: catalogue?.pluriel ?? dite.pluriel,
-                                            grammes: dite.poidsUniteG,
-                                            tailles: [])
-        }
-        return UnitPortionCatalog.Unite(singulier: dite.singulier,
-                                        pluriel: dite.pluriel,
-                                        grammes: dite.poidsUniteG,
-                                        tailles: [])
+        unitesProposees(pour: item).first
     }
 
-    /// Unités ↔ grammes pour un aliment : les grammes retenus ne bougent pas,
-    /// seule la façon de les choisir change.
-    private func basculerUnite(_ index: Int) {
-        if enGrammes.contains(index) { enGrammes.remove(index) } else { enGrammes.insert(index) }
+    /// Unités proposées en pastilles pour un aliment : d'abord celle de la
+    /// quantité TELLE QU'ELLE A ÉTÉ DITE (code + poids d'une unité fournis par
+    /// le serveur), puis les autres unités du catalogue. Voir
+    /// `UnitPortionCatalog.unites(dites:…)`.
+    static func unitesProposees(pour item: VoiceMealService.Item) -> [UnitPortionCatalog.Unite] {
+        let portions = item.portions.map { (label: $0.label, grammes: $0.grammes) }
+        let catalogue = UnitPortionCatalog.unites(pourNom: item.nom, portions: portions)
+        guard let dite = item.quantiteDite else { return catalogue }
+        return UnitPortionCatalog.unites(dites: dite.unite,
+                                         singulier: dite.singulier,
+                                         pluriel: dite.pluriel,
+                                         poidsUnite: dite.poidsUniteG,
+                                         parmi: catalogue)
+    }
+
+    /// Une pastille d'unité touchée (`nil` = « g »). D'une unité à l'autre, le
+    /// nombre reste et les grammes suivent (« 2 pièces » → « 2 poignées ») ;
+    /// depuis les grammes, on retombe sur le nombre entier d'unités le plus
+    /// proche. Sur « g », les grammes retenus ne bougent pas.
+    private func choisirUnite(_ nouvelle: UnitPortionCatalog.Unite?, pour index: Int) {
+        guard let nouvelle else {
+            enGrammes.insert(index)
+            return
+        }
+        let taille = nouvelle.tailleParDefaut
+        if let g = grams[index], g > 0 {
+            let nombre: Double
+            if !enGrammes.contains(index), let actuelle = unites[index] {
+                nombre = max(1, UnitPortionCatalog.nombre(grammes: g, poidsUnite: actuelle.poids(taille: tailles[index])))
+            } else {
+                nombre = max(1, UnitPortionCatalog.nombre(grammes: g, poidsUnite: nouvelle.poids(taille: taille)).rounded())
+            }
+            grams[index] = min(2000, (nombre * nouvelle.poids(taille: taille) * 10).rounded() / 10)
+        }
+        unites[index] = nouvelle
+        tailles[index] = taille
+        enGrammes.remove(index)
     }
 
     /// Prochaine question ouverte : un aliment à vérifier d'abord, sinon une
@@ -1467,8 +1487,9 @@ private struct VoiceItemRow: View {
     let unite: UnitPortionCatalog.Unite?
     /// Index de la taille retenue dans `unite.tailles`.
     let taille: Int?
-    /// Vrai quand l'aliment a une unité : le lien unités ↔ grammes s'affiche.
-    let peutBasculer: Bool
+    /// Unités proposées en pastilles (la première d'office), « g » en dernier ;
+    /// vide = on saisit en grammes, sans pastilles.
+    let unitesProposees: [UnitPortionCatalog.Unite]
     let deployee: Bool
     /// Incertain et pas encore tranché : ne compte pas tant que la personne
     /// n'a pas choisi.
@@ -1486,7 +1507,8 @@ private struct VoiceItemRow: View {
     let onAjuster: (Double) -> Void
     let onTaille: (Int) -> Void
     let onCompter: (Int) -> Void
-    let onBasculerUnite: () -> Void
+    /// Pastille d'unité touchée ; `nil` = « g ».
+    let onChoisirUnite: (UnitPortionCatalog.Unite?) -> Void
     let onRemove: () -> Void
 
     private var manque: Bool { (grams ?? 0) <= 0 }
@@ -1504,13 +1526,6 @@ private struct VoiceItemRow: View {
     private var resume: String {
         if let unite { return "\(unite.libelle(nombre: nombre)), \(Int(grams ?? 0)) grammes, \(kcalAffichees) kilocalories" }
         return "\(Int(grams ?? 0)) grammes, \(kcalAffichees) kilocalories"
-    }
-
-    /// Unité connue pour cet aliment, même quand on saisit en grammes (lien
-    /// « Compter en œufs »).
-    private var uniteConnue: UnitPortionCatalog.Unite? {
-        unite ?? UnitPortionCatalog.unite(pourNom: item.nom,
-                                          portions: item.portions.map { (label: $0.label, grammes: $0.grammes) })
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -1532,7 +1547,8 @@ private struct VoiceItemRow: View {
     private var quantite: String {
         let grammes = "\(Int(grams ?? 0)) g"
         guard let unite else { return grammes }
-        return "\(unite.libelle(nombre: nombre)) · \(grammes)"
+        // Au dixième : « 2 pièces · 2,4 g » pour deux amandes.
+        return "\(unite.libelle(nombre: nombre)) · \(UnitPortionCatalog.formater(grams ?? 0)) g"
     }
 
     var body: some View {
@@ -1620,20 +1636,18 @@ private struct VoiceItemRow: View {
                             .foregroundStyle(Color.dsTexte)
                     }
 
+                    // Les unités de l'aliment, « g » en dernier : toucher
+                    // une pastille change d'unité, les grammes suivent.
+                    if !unitesProposees.isEmpty {
+                        PastillesUnites(unites: unitesProposees,
+                                        active: unite,
+                                        onChoisir: onChoisirUnite)
+                    }
+
                     if let unite {
                         controlesUnite(unite)
                     } else {
                         controlesGrammes
-                    }
-
-                    if peutBasculer {
-                        Button(action: onBasculerUnite) {
-                            Text(unite == nil ? (uniteConnue?.lienCompter ?? "Compter en unités") : "Saisir en grammes")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color.dsAccent)
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
                     }
 
                     Button(action: onRemove) {
@@ -1762,7 +1776,7 @@ private struct VoiceItemRow: View {
                         .foregroundStyle(manque ? Color.dsTertiaire : Color.dsAccent)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    Text("\(Int(grams ?? 0)) g · \(kcalAffichees) kcal")
+                    Text("\(UnitPortionCatalog.formater(grams ?? 0)) g · \(kcalAffichees) kcal")
                         .font(.kiwioMono(12, .regular))
                         .foregroundStyle(Color.dsSecondaire)
                 }
