@@ -605,10 +605,23 @@ final class ScreenshotsUITests: XCTestCase {
             app.buttons["J'ai déjà un compte"].tap()
             sleep(1)
             snap("09-connexion")
-            app.swipeDown(velocity: .fast)
-            sleep(1)
+            // La feuille reste ouverte : on s'y connecte (même saisie que
+            // `connecterSiBesoin`, sans photographier les champs remplis).
+            let email = app.textFields["auth.email"]
+            if email.waitForExistence(timeout: 10) {
+                email.tap()
+                email.typeText(app.launchEnvironment["SCREENSHOT_EMAIL"] ?? "")
+                let password = app.secureTextFields["auth.password"].exists
+                    ? app.secureTextFields["auth.password"] : app.textFields["auth.password"]
+                password.tap()
+                password.typeText(app.launchEnvironment["SCREENSHOT_PASSWORD"] ?? "")
+                sleep(1)
+                let connexion = app.buttons["Se connecter"].firstMatch
+                if connexion.waitForExistence(timeout: 5) { connexion.tap() }
+            }
+        } else {
+            connecterSiBesoin()
         }
-        connecterSiBesoin()
         XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120))
         attendreChargement()
         snap("10-journal-avant-bilan")
