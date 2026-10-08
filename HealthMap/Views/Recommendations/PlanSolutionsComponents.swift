@@ -658,7 +658,7 @@ extension PlanTopic {
     private var scoreEvidence: String {
         evidence
             .prefix(2)
-            .map { "\($0.label) à \($0.score)\u{202F}%" }
+            .map { $0.statut == .peuPrecise ? "\($0.label) : à affiner" : "\($0.label) à \($0.score)\u{202F}%" }
             .joined(separator: " · ")
     }
 

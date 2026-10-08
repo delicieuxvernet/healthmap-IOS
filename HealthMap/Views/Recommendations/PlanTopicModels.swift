@@ -17,6 +17,8 @@ import SwiftUI
 struct PlanEvidence: Hashable {
     let label: String
     let score: Int
+    /// Le statut de l'estimateur : « à affiner » ne cite pas de chiffre.
+    var statut: StatutApport? = nil
 }
 
 struct PlanTopic: Identifiable {
@@ -49,12 +51,20 @@ struct PlanTopic: Identifiable {
     /// Couleur canonique du nutriment (palette nutriments) — décor du cerclage
     /// et du fond d'icône en vue « Apports ». `nil` hors de cette vue.
     var apportColor: Color? = nil
+    /// Statut de l'apport (vue « Apports ») : il nomme le nœud.
+    var statut: StatutApport? = nil
 
     var kicker: String {
         switch kind {
         case .symptome: return "SYMPTÔME"
         case .objectif: return "OBJECTIF"
-        case .apport: return "APPORT À RENFORCER"
+        case .apport:
+            switch statut {
+            case .aSurveiller?: return "APPORT À SURVEILLER"
+            case .peuPrecise?: return "APPORT À AFFINER"
+            case .couvert?, .couvertParComplement?, .sousLaLimite?: return "APPORT COUVERT"
+            default: return "APPORT À RENFORCER"
+            }
         }
     }
     /// Accent des TEXTES : bleu pour un symptôme, vert encre pour un objectif
@@ -123,28 +133,43 @@ struct PlanSupplementSolution: Identifiable {
 /// Bilan, cf. DashboardViewModel.deficiencies) d'abord, plafonnés à 6 ; s'ils
 /// sont moins de 3, on complète avec les apports suivants par ordre de score
 /// croissant. Le graphe (`PlanGraph.construire`) borne ensuite ce qu'il affiche.
-func planTopicsFromApports(_ nutrients: [EnrichedNutrient]) -> [PlanTopic] {
-    // Tri croissant : le plus faible d'abord. Ids canoniques uniquement — un id
-    // inconnu ne peut pas produire de nœud (pas de libellé/emoji défendables).
+func planTopicsFromApports(_ nutrients: [EnrichedNutrient],
+                           statuts: [String: StatutApport] = [:]) -> [PlanTopic] {
+    // Apports estimés (audit de fiabilité, 8 oct. 2026) : le STATUT ordonne —
+    // « à renforcer », puis « à surveiller », puis le reste ; le score ne
+    // départage qu'à statut égal. Sans statut : le plus faible d'abord, faible
+    // sous 70. Ids canoniques uniquement — un id inconnu ne peut pas produire
+    // de nœud (pas de libellé/emoji défendables).
+    func rang(_ n: EnrichedNutrient) -> Int {
+        switch statuts[n.id] {
+        case .aRenforcer?: return 0
+        case .aSurveiller?: return 1
+        default: return 2
+        }
+    }
+    func faible(_ n: EnrichedNutrient) -> Bool {
+        guard let statut = statuts[n.id] else { return n.score < 70 }
+        return statut.estUneAlerte
+    }
     var seen = Set<String>()
     let sorted = nutrients
         .filter { NutrientData.validIDs.contains($0.id) && seen.insert($0.id).inserted }
-        .sorted { $0.score < $1.score }
+        .sorted { (rang($0), $0.score) < (rang($1), $1.score) }
     guard !sorted.isEmpty else { return [] }
 
-    let weakCount = sorted.filter { $0.score < 70 }.count
+    let weakCount = sorted.filter(faible).count
     let count = Swift.min(Swift.max(weakCount, 3), 6)
-    // `weak` est un préfixe de `sorted` (tri croissant) : prendre les `count`
+    // Les apports faibles sont en tête de `sorted` : prendre les `count`
     // premiers = tous les apports faibles (max 6), complétés au besoin par les
-    // suivants les moins bien couverts.
-    return sorted.prefix(count).compactMap(planApportTopic)
+    // suivants.
+    return sorted.prefix(count).compactMap { planApportTopic($0, statut: statuts[$0.id]) }
 }
 
 /// Un nœud « apport » : mêmes composants et même pop-up que la vue objectifs,
 /// alimentés par les données déjà disponibles pour CE nutriment (sources
 /// d'aliments du catalogue, hack/synergie/solution de l'analyse quand ils
 /// existent — jamais de dosage inventé).
-private func planApportTopic(_ n: EnrichedNutrient) -> PlanTopic? {
+private func planApportTopic(_ n: EnrichedNutrient, statut: StatutApport? = nil) -> PlanTopic? {
     guard let def = NutrientData.definition(for: n.id) else { return nil }
 
     // Explication de l'analyse quand elle existe (une phrase suffira à la
@@ -190,15 +215,16 @@ private func planApportTopic(_ n: EnrichedNutrient) -> PlanTopic? {
         }
     }
 
-    // « Par les compléments » : même règle de priorité que la vue objectifs
-    // (score < 45 → prioritaire). Le détail timing/dose vit sur l'onglet dédié.
-    let strong = n.score < 45
-    let complements = [PlanSupplementSolution(
+    // « Par les compléments » : seulement pour un apport en alerte ; « Prioritaire »
+    // = « à renforcer ». Sans statut : score < 45. Le détail timing vit sur
+    // l'onglet dédié.
+    let strong = statut.map { $0 == .aRenforcer } ?? (n.score < 45)
+    let complements = statut.map({ $0.estUneAlerte }) ?? true ? [PlanSupplementSolution(
         name: def.label,
         note: n.solution?.quand?.isEmpty == false ? n.solution!.quand! : "À envisager si l'alimentation ne suffit pas",
         tag: strong ? "Prioritaire" : "Si besoin",
         strong: strong
-    )]
+    )] : []
 
     return PlanTopic(
         id: "app_\(n.id)",
@@ -210,10 +236,11 @@ private func planApportTopic(_ n: EnrichedNutrient) -> PlanTopic? {
         habitudes: habitudes,
         complements: complements,
         // La vraie valeur du bilan, citée telle quelle par la pop-up.
-        evidence: [PlanEvidence(label: def.label, score: n.score)],
+        evidence: [PlanEvidence(label: def.label, score: n.score, statut: statut)],
         delai: n.solution?.delai,
         emojiBadge: def.emoji,
-        apportColor: Color.nutrientColor(for: n.id)
+        apportColor: Color.nutrientColor(for: n.id),
+        statut: statut
     )
 }
 

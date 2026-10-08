@@ -133,7 +133,7 @@ struct RecommendationsV2ContentView: View {
     var body: some View {
         PlanGraphScreen(
             topics: topics,
-            apports: planTopicsFromApports(dashboardVM.nutrients),
+            apports: planTopicsFromApports(dashboardVM.nutrients, statuts: dashboardVM.statuts),
             causes: PlanGraphScreen.causes(depuis: dashboardVM.analysisV2),
             registre: dashboardVM.registre
         )

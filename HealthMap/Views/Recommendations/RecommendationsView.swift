@@ -146,7 +146,15 @@ struct RecommendationsContentView: View {
     /// les nutriments du bilan via le VM du Dashboard (analyse si disponible,
     /// sinon scores locaux) — labels/emojis/couleurs canoniques garantis.
     private var apportTopics: [PlanTopic] {
-        planTopicsFromApports(dashboardVM.nutrients)
+        planTopicsFromApports(dashboardVM.nutrients, statuts: dashboardVM.statuts)
+    }
+
+    /// Les apports à travailler : ceux en alerte (« à renforcer » puis « à
+    /// surveiller »), trois au plus. Sans statut, l'ancien tri de l'analyse.
+    private var aTravailler: [EnrichedNutrient] {
+        let statuts = dashboardVM.statuts
+        guard !statuts.isEmpty else { return vm.topDeficiencies }
+        return Array(dashboardVM.deficiencies.filter { statuts[$0.id]?.estUneAlerte == true }.prefix(3))
     }
 
     // MARK: - Construction des topics (symptômes + objectifs)
@@ -158,7 +166,7 @@ struct RecommendationsContentView: View {
         // Pool d'apports à DISTRIBUER de façon distincte entre les cartes :
         // chaque carte consomme SES propres apports, plus aucun fond commun
         // partagé (corrige le doublon de solutions d'une carte à l'autre).
-        var pool = vm.topDeficiencies
+        var pool = aTravailler
 
         // Apports pertinents cités dans le texte IA ET réellement insuffisants.
         // `fallbackToDeficiencies` : pour un SYMPTÔME, à défaut de correspondance
@@ -224,7 +232,7 @@ struct RecommendationsContentView: View {
             habitudes: habits(for: focus, kind: kind, objectifName: name),
             complements: supplementSolutions(for: focus),
             // Les vraies valeurs du bilan, citées telles quelles par la pop-up.
-            evidence: focus.map { PlanEvidence(label: $0.label, score: $0.score) },
+            evidence: focus.map { PlanEvidence(label: $0.label, score: $0.score, statut: dashboardVM.statuts[$0.id]) },
             // Délai d'effet : celui de l'analyse, ou rien.
             delai: focus.compactMap { $0.solution?.delai }.first { !$0.isEmpty }
         )
@@ -434,7 +442,7 @@ struct RecommendationsContentView: View {
     // prioritaire). Le détail timing/dose vit sur l'onglet Compléments.
     private func supplementSolutions(for nutrients: [EnrichedNutrient]) -> [PlanSupplementSolution] {
         nutrients.prefix(3).map { n in
-            let strong = n.score < 45
+            let strong = dashboardVM.statuts[n.id].map { $0 == .aRenforcer } ?? (n.score < 45)
             return PlanSupplementSolution(
                 name: n.label,
                 note: n.solution?.quand?.isEmpty == false ? n.solution!.quand! : "À envisager si l'alimentation ne suffit pas",
@@ -464,7 +472,7 @@ struct RecommendationsContentView: View {
     /// Détecte les apports cités dans un texte libre (cause, levier…).
     private func nutrientsMentioned(in text: String) -> [EnrichedNutrient] {
         guard !text.isEmpty else { return [] }
-        return vm.topDeficiencies.filter { text.localizedCaseInsensitiveContains($0.label) }
+        return aTravailler.filter { text.localizedCaseInsensitiveContains($0.label) }
     }
 
     /// Rend une clé brute (« fatigue_persistante ») présentable.

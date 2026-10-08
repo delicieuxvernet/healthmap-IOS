@@ -171,6 +171,31 @@ final class PlanSolutionsTests: XCTestCase {
         XCTAssertEqual(topics.map(\.id), ["app_iron", "app_vitD", "app_zinc"])
     }
 
+    /// Apports estimés : le statut ordonne (« à renforcer », puis « à
+    /// surveiller »), seuls ceux en alerte proposent un complément, et
+    /// « à affiner » ne cite pas de chiffre.
+    func testApportTopicsFollowTheEstimatorStatus() {
+        let nutrients = [
+            Self.makeNutrient(id: "vitD", score: 20),
+            Self.makeNutrient(id: "magnesium", score: 70),
+            Self.makeNutrient(id: "iron", score: 55),
+            Self.makeNutrient(id: "zinc", score: 90),
+        ]
+        let statuts: [String: StatutApport] = [
+            "vitD": .peuPrecise, "magnesium": .aRenforcer, "iron": .aSurveiller, "zinc": .couvert,
+        ]
+        let topics = planTopicsFromApports(nutrients, statuts: statuts)
+
+        XCTAssertEqual(topics.map(\.id), ["app_magnesium", "app_iron", "app_vitD"])
+        XCTAssertEqual(topics[0].kicker, "APPORT À RENFORCER")
+        XCTAssertEqual(topics[0].complements.first?.tag, "Prioritaire")
+        XCTAssertEqual(topics[1].kicker, "APPORT À SURVEILLER")
+        XCTAssertEqual(topics[1].complements.first?.tag, "Si besoin")
+        XCTAssertEqual(topics[2].kicker, "APPORT À AFFINER")
+        XCTAssertTrue(topics[2].complements.isEmpty)
+        XCTAssertFalse(topics[2].radialCause.contains("20"), topics[2].radialCause)
+    }
+
     /// Le hack et la synergie de l'analyse alimentent le levier « habitudes »
     /// de la pop-up quand ils existent.
     func testApportTopicsFeedHabitsFromHackAndSynergie() {
