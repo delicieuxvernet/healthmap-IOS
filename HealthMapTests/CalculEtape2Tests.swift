@@ -109,9 +109,11 @@ final class CalculEtape2Tests: XCTestCase {
         XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: femme), 11)
         femme.periodFlow = "very_heavy"
         XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: femme), 16)
-        // Jamais posée (« na » par défaut) : on ne présume pas des règles légères.
+        // Jamais posée (« na » par défaut) : la référence d'une femme réglée,
+        // 11 mg (référentiel v10, relecture externe du 8 oct. 2026).
         femme.periodFlow = "na"
-        XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: femme), 16)
+        XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: femme), 11)
+        XCTAssertEqual(BesoinsDeReference.besoinDeRepli(.iron, profil: femme), 16)
         var apres50 = adulte(femme: true, age: "58")
         apres50.periodFlow = "na"
         XCTAssertEqual(BesoinsDeReference.besoin(.iron, profil: apres50), 11)

@@ -288,7 +288,9 @@ final class EstimateurApports {
         return Contexte(
             sexe: sexe, age: age, classe: classe, kcal: kcal, femme: femme,
             enceinte: enceinte, allaitante: allaitante, projet: projet, menopause: menopause,
-            pertesElevees: !(regle == "light" || regle == "normal"),
+            // v10 : seules des règles déclarées abondantes comptent ; « na » ou
+            // vide -> situation « femme » (RNP 11).
+            pertesElevees: regle == "heavy" || regle == "very_heavy",
             vegetarien: vegetariens.contains(p.dietType) || vegans.contains(p.dietType),
             vegan: vegans.contains(p.dietType),
             regime: p.dietType, horsPerimetre: age < 18
@@ -422,12 +424,18 @@ final class EstimateurApports {
     }
 
     /// Probabilité que l'apport couvre le besoin (IOM 2000). Fer des femmes
-    /// réglées : besoin log-normal (médiane BNM, 95e centile RNP).
+    /// réglées (v10) : UNE loi log-normale quel que soit `periodFlow` (ANSES
+    /// 2021, rapport p. 135 : médiane 7, P95 16), × 1,8 si végétarienne.
     func probabilite(_ n: String, _ y: Double, _ r: ReferenceApport, _ c: Contexte) -> Double {
         let bnm = r.bnm ?? 0, rnp = r.rnp ?? 0
         if n == "iron" && c.femme && !(c.menopause || c.enceinte || c.allaitante) {
-            let s = log(rnp / bnm) / 1.645
-            return Self.phi((log(max(y, 1e-6)) - log(bnm)) / s)
+            let regle = dico(dico(racine["references_regles"])["iron"])
+            let loi = dico(regle["fer_femme_reglee"])
+            let f = c.vegetarien ? (nombre(regle["facteur_vegetarien"]) ?? 1) : 1
+            let mediane = (nombre(loi["mediane"]) ?? 7) * f
+            let p95 = (nombre(loi["p95"]) ?? 16) * f
+            let s = log(p95 / mediane) / 1.645
+            return Self.phi((log(max(y, 1e-6)) - log(mediane)) / s)
         }
         return Self.phi((y - bnm) / ((rnp - bnm) / 2))
     }
@@ -520,14 +528,28 @@ final class EstimateurApports {
             var statut: StatutApport
             let regleAlerte = dico(alerte["regle"])
 
+            // v11 : seuils de « couvert » (et « sous la limite ») calibrés pour
+            // un faux rassurant ≤ 10 % ; le seuil standard revient après assez
+            // de jours notés. Clé présente à null = jamais ; absente = standard.
+            let cv = dico(dico(P["couvert"])[n])
+            func reglage(_ cle: String, standard defaut: Double) -> Double? {
+                guard let v = cv[cle] else { return defaut }
+                return v is NSNull ? nil : (nombre(v) ?? defaut)
+            }
+            let standard = reglage("jours_notes_pour_seuil_standard", standard: 0).map { Double(nj) >= $0 } ?? false
+
             if r.type == "LSS" {
-                if y > (r.limite ?? .infinity) { statut = ouverte ? .auDessusDeLaLimite : .peuPrecise }
-                else { statut = .sousLaLimite }
+                let limite = r.limite ?? .infinity
+                let marge = standard ? 1 : reglage("marge_LSS", standard: 1)
+                if y > limite { statut = ouverte ? .auDessusDeLaLimite : .peuPrecise }
+                else if let marge, y <= limite * marge { statut = .sousLaLimite }
+                else { statut = .peuPrecise }
             } else if r.type == "BNM" {
                 let pr = probabilite(n, y, r, c)
                 pAdequation = pr
                 let seuil = categorie == "alerte possible" ? (nombre(regleAlerte["valeur"]) ?? basSiP) : basSiP
-                if pr >= couvertSiP { statut = .couvert }
+                let pMin = standard ? couvertSiP : reglage("p_min", standard: couvertSiP)
+                if let pMin, pr >= pMin { statut = .couvert }
                 else if ouverte && pr < seuil { statut = .aRenforcer }
                 else if pr < basSiP { statut = .peuPrecise }
                 else { statut = .aSurveiller }
@@ -537,7 +559,8 @@ final class EstimateurApports {
                 let seuil = categorie == "alerte possible"
                     ? nombre(dico(regleAlerte["seuils_par_sexe"])[String(c.sexe)])
                     : bas
-                if y >= repere { statut = .couvert }
+                let marge = standard ? 1 : reglage("marge_AS", standard: 1)
+                if let marge, y >= repere * marge { statut = .couvert }
                 else if ouverte, let seuil, y < seuil { statut = .aRenforcer }
                 else if sousASPeuPrecise.contains(n) || bas == nil || y < (bas ?? 0) { statut = .peuPrecise }
                 else { statut = .aSurveiller }
@@ -576,6 +599,27 @@ final class EstimateurApports {
                     repasNotes: y - q * wq
                 ),
                 topCourses: Array(top)
+            )
+        }
+
+        // v10 : oméga-3 du bilan = le statut le plus défavorable de ALA et
+        // EPA+DHA (aliments seuls), sans alerte propre.
+        if let o3 = sortie["omega3"], let a3 = sortie["ala"], let e3 = sortie["epaDha"] {
+            let ordre = (dico(P["omega3_bilan"])["ordre_defavorable"] as? [String] ?? [])
+                .compactMap(StatutApport.init(rawValue:))
+            func rang(_ s: StatutApport) -> Int { ordre.firstIndex(of: s) ?? ordre.count }
+            let base = rang(e3.statutAlimentsSeuls) < rang(a3.statutAlimentsSeuls) ? e3.statutAlimentsSeuls : a3.statutAlimentsSeuls
+            let niveaux: [ConfianceEstimation] = [.faible, .moyenne, .bonne]
+            let confiance = (niveaux.firstIndex(of: e3.confiance) ?? 0) < (niveaux.firstIndex(of: a3.confiance) ?? 0)
+                ? e3.confiance : a3.confiance
+            sortie["omega3"] = EstimationApport(
+                id: o3.id, apportEstime: o3.apportEstime, unite: o3.unite, reference: o3.reference,
+                probabiliteAdequation: nil,
+                statut: couverts.contains("omega3") ? .couvertParComplement : base,
+                statutAlimentsSeuls: base,
+                categorieAlerte: o3.categorieAlerte, alerteOuverte: a3.alerteOuverte || e3.alerteOuverte,
+                joursConseilles: o3.joursConseilles, joursJournalRetenus: o3.joursJournalRetenus, k: o3.k,
+                confiance: confiance, decomposition: o3.decomposition, topCourses: o3.topCourses
             )
         }
 

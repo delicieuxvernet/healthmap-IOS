@@ -204,7 +204,7 @@ enum CalculApports {
     /// 2026-10-08 : audit de fiabilité, les apports viennent de
     /// `EstimateurApports` (Ciqual × INCA 3 × ANSES 2021) et leur statut
     /// ne se déduit plus d'un seuil sur le score.
-    static let version = "2026-10-08"
+    static let version = "2026-10-08.12"
 
     /// La clé qui date les scores de départ de Progrès
     /// (`profiles.baseline_nutrient_scores`) : des scores d'un autre calcul ne
