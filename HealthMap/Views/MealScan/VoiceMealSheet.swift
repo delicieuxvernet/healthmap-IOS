@@ -14,10 +14,17 @@ import SwiftUI
 ///                  geste : une dictée ratée se corrige AVANT l'appel
 ///                  (retour d'Arthur, 7 octobre 2026).
 ///   2. analyse   — le texte relu ou écrit part au serveur.
-///   3. résultat  — « Ton déjeuner », lignes posées en cascade, UNE seule
-///                 déployée à la fois, total qui compte, étiquettes de ce que
-///                 le repas apporte, action bloquée tant qu'il manque une
-///                 quantité.
+///   3. résultat  — « Ton déjeuner » en UN SEUL écran, ajouté en un toucher
+///                 (maquette « un toucher » validée par Arthur le 8 octobre
+///                 2026 : « trop de freins, trop de clics »). Tout arrive déjà
+///                 compté : une quantité non dite prend la portion standard,
+///                 un aliment incertain la proposition la plus probable, un
+///                 repas non dit celui de l'heure (le titre se touche pour le
+///                 changer). Seuls ces doutes se montrent — point ambré,
+///                 « Portion estimée » / « Type estimé », et leurs choix juste
+///                 dessous, la réponse probable déjà cochée : un toucher
+///                 corrige, sinon rien à faire. Toucher une ligne ouvre son
+///                 réglage fin (règle graduée en grammes).
 /// À l'ajout, la feuille redescend aussitôt : c'est la capsule du haut de
 /// l'écran (`PastilleConfirmation`) qui confirme.
 ///
@@ -101,19 +108,28 @@ struct VoiceMealSheet: View {
     @State private var unites: [Int: UnitPortionCatalog.Unite] = [:]
     @State private var tailles: [Int: Int] = [:]
     @State private var enGrammes: Set<Int> = []
-    /// Index de la seule ligne déployée. Le design impose « une seule question
-    /// ouverte à la fois » : deux lignes ouvertes, et on ne sait plus à laquelle
-    /// répondre.
+    /// Quantités non dites, pré-remplies avec la portion standard et pas
+    /// encore touchées : la ligne dit « Portion estimée ».
+    @State private var estimees: Set<Int> = []
+    /// Lignes dont les choix (portions, aliments) restent posés sous la ligne
+    /// repliée. Un doute tranché les replie, après un court instant pour que
+    /// la coche se voie.
+    @State private var choixQuantiteVisibles: Set<Int> = []
+    @State private var choixAlimentVisibles: Set<Int> = []
+    /// Index de la seule ligne déployée (réglage fin). Une seule à la fois :
+    /// deux règles ouvertes, et on ne sait plus laquelle on tient.
     @State private var deployee: Int?
     @State private var quotedTranscript = ""
-    /// Repas choisi. `nil` tant que le vocal ne l'a pas dit ET que la personne
-    /// ne l'a pas choisi : on ne le devine plus en silence d'après l'heure
-    /// (retour d'Arthur, 30 sept. 2026 — « il faut que je puisse choisir »).
+    /// Repas retenu : celui du vocal, sinon celui de l'heure. Plus jamais
+    /// deviné EN SILENCE (retour d'Arthur, 30 sept. 2026 — « il faut que je
+    /// puisse choisir ») : il est le titre de la feuille, et le titre se
+    /// touche pour en changer (8 oct. 2026 : plus d'action bloquée pour lui).
     @State private var slot: MealJournalService.MealSlot?
-    /// Vrai quand le repas vient du vocal (« ce midi ») : on le dit sous le choix.
+    /// Vrai quand le repas vient du vocal (« ce midi »).
     @State private var slotDit = false
     /// Aliments « à vérifier » que la personne a tranchés (gardés ou remplacés).
-    /// Tant qu'un aliment à vérifier n'est pas tranché, il ne compte pas.
+    /// Non tranché, un aliment à vérifier compte avec la proposition la plus
+    /// probable, et sa ligne dit « Type estimé ».
     @State private var confirmes: Set<Int> = []
     /// Aliment pour lequel la recherche de remplacement est ouverte.
     @State private var remplacementPour: RemplacementCible?
@@ -517,7 +533,6 @@ struct VoiceMealSheet: View {
             avertissements
             totalLigne
             etiquettesApports
-            choixRepas
             ctaBlock
         }
         .padding(.horizontal, Self.margeInterieure)
@@ -538,41 +553,80 @@ struct VoiceMealSheet: View {
         }
     }
 
-    private var compteAliments: String {
-        let nombre = visibleItems.count
-        if nombre == 0 { return "Aucun aliment" }
-        return nombre > 1 ? "\(nombre) aliments reconnus" : "1 aliment reconnu"
-    }
-
+    /// Le titre EST le choix du repas : « Ton dîner ⌄ », l'illustration du
+    /// repas (la même que la capsule de confirmation) et un menu pour en
+    /// changer. Plus de rangée de quatre tuiles : la dernière décision ne
+    /// prend plus la place de la première.
     private var enTeteResultats: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(titreRepas)
-                .font(.system(size: 24, weight: .bold))
-                .tracking(-0.6)
-                .foregroundStyle(Color.dsTexte)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Spacer(minLength: 8)
-            Text(compteAliments)
-                .font(.dsSousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .lineLimit(1)
+        Menu {
+            ForEach(MealJournalService.MealSlot.ordreJournal, id: \.self) { s in
+                Button {
+                    HapticService.shared.selection()
+                    slot = s
+                    slotDit = false
+                } label: {
+                    Label(s.titreJournal, systemImage: slot == s ? "checkmark" : s.symboleJournal)
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                if let slot {
+                    Fluent3DIcon(name: Fluent3D.asset(pour: slot), size: 28)
+                }
+                Text(titreRepas)
+                    .font(.system(size: 28, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.dsSecondaire)
+                    .frame(width: 28, height: 28)
+                    .verreClair(Circle())
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: DS.cibleTactile)
+            .contentShape(Rectangle())
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityLabel(titreRepas)
+        .accessibilityValue(slotDit ? "dit dans ta dictée" : "d'après l'heure")
+        .accessibilityHint("Touche pour changer de repas")
         .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("dictee.resultat.repas")
     }
 
-    /// Ce qui a été dit, avec les aliments reconnus en vert.
-    @ViewBuilder
+    /// Ce qui a été dit, les aliments reconnus en vert, et de quoi recommencer
+    /// (la dictée, ou le texte écrit) sans descendre en bas de la feuille.
     private var citation: some View {
-        if !quotedTranscript.isEmpty {
-            Text(transcriptSurligne)
-                .font(.dsLegende)
-                .foregroundStyle(Color.dsSecondaire)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 6)
-                .accessibilityLabel(quotedTranscript)
+        HStack(alignment: .center, spacing: 8) {
+            if !quotedTranscript.isEmpty {
+                Image(systemName: saisieAuClavier ? "pencil" : "mic.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.dsSecondaire)
+                    .accessibilityHidden(true)
+                Text(transcriptSurligne)
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(quotedTranscript)
+            }
+            Spacer(minLength: 0)
+            Button {
+                recommencerDictee()
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.dsSecondaire)
+                    .frame(width: 32, height: 32)
+                    .verreClair(Circle())
+                    .frame(width: DS.cibleTactile, height: DS.cibleTactile)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityLabel(saisieAuClavier ? "Réécrire mon repas" : "Recommencer la dictée")
+            .accessibilityIdentifier("dictee.resultat.redicter")
         }
     }
 
@@ -583,6 +637,7 @@ struct VoiceMealSheet: View {
             guard let dit = item.libelle, dit.count >= 2,
                   let plage = texte.range(of: dit, options: [.caseInsensitive, .diacriticInsensitive]) else { continue }
             texte[plage].swiftUI.foregroundColor = Color.teinteKiwiTexte
+            texte[plage].swiftUI.font = Font.dsLegende.weight(.semibold)
         }
         return texte
     }
@@ -595,37 +650,41 @@ struct VoiceMealSheet: View {
                 ligne(item, rang: rang)
             }
         }
-        .padding(.top, 8)
+        .padding(.top, 4)
     }
 
     /// Une ligne d'aliment. Elle remonte en cascade : 0,15 s, puis 0,09 s
     /// d'écart, plafonné pour qu'une longue dictée n'attende pas.
     private func ligne(_ item: VoiceMealService.Item, rang: Int) -> some View {
-        VoiceItemRow(
+        let index = item.index
+        let ouverte = deployee == index
+        let alimentEnChoix = ouverte ? !(item.alternatives ?? []).isEmpty : choixAlimentVisibles.contains(index)
+        let quantiteEnChoix = ouverte || choixQuantiteVisibles.contains(index)
+        return VoiceItemRow(
             item: item,
-            grams: grams[item.index],
-            unite: enGrammes.contains(item.index) ? nil : unites[item.index],
-            taille: tailles[item.index],
-            // Calculées pour la seule ligne ouverte : c'est la seule qui les montre.
-            unitesProposees: deployee == item.index ? Self.unitesProposees(pour: item) : [],
-            deployee: deployee == item.index,
-            aVerifier: aVerifier(item),
-            remplacementEnCours: remplacementEnCours == item.index,
+            grams: grams[index],
+            unite: enGrammes.contains(index) ? nil : unites[index],
+            taille: tailles[index],
+            // Calculés pour les seules lignes qui les montrent.
+            choixQuantite: quantiteEnChoix
+                ? Self.choixQuantite(pour: item, unite: unites[index], taille: tailles[index])
+                : [],
+            unitesProposees: ouverte ? Self.unitesProposees(pour: item) : [],
+            deployee: ouverte,
+            montrerChoixAliment: alimentEnChoix,
+            typeEstime: typeEstime(item),
+            quantiteEstimee: estimees.contains(index),
+            remplacementEnCours: remplacementEnCours == index,
             posee: poses,
             teinte: Self.teinte(pour: item),
-            onGarder: { garder(item.index) },
-            onRemplacer: { id in Task { await remplacer(item.index, par: id) } },
-            onChercher: { remplacementPour = RemplacementCible(index: item.index) },
-            onTap: { basculer(item.index) },
-            onPick: { choisir($0, pour: item.index) },
-            onAjuster: { ajuster($0, pour: item.index) },
-            onTaille: { choisirTaille($0, pour: item.index) },
-            onCompter: { compter($0, pour: item.index) },
-            onChoisirUnite: { choisirUnite($0, pour: item.index) },
-            onRemove: {
-                removed.insert(item.index)
-                if deployee == item.index { deployee = prochainManquant() }
-            }
+            onTap: { basculer(index) },
+            onGarder: { garder(index) },
+            onRemplacer: { id in Task { await remplacer(index, par: id) } },
+            onChercher: { remplacementPour = RemplacementCible(index: index) },
+            onChoix: { choisirQuantite($0, pour: index) },
+            onGrammes: { regler($0, pour: index) },
+            onChoisirUnite: { choisirUnite($0, pour: index) },
+            onRemove: { retirer(index) }
         )
         .verreCascade(poses, delai: 0.15 + Double(min(rang, 8)) * 0.09, decalage: 14)
     }
@@ -740,109 +799,31 @@ struct VoiceMealSheet: View {
         }
     }
 
-    // MARK: Le repas
-
-    /// Choix du repas, en FIN de feuille, juste avant d'ajouter : c'est la
-    /// dernière décision, pas la première. Pré-choisi seulement si le vocal
-    /// l'a dit.
-    private var choixRepas: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("C'est pour quel repas ?")
-                .font(.dsSousTitreFort)
-                .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.dsTexte)
-            if slotDit {
-                Text("Tu l'as dit dans ton vocal.")
-                    .font(.dsLegende)
-                    .foregroundStyle(Color.dsSecondaire)
-            }
-            HStack(spacing: 7) {
-                ForEach(MealJournalService.MealSlot.ordreJournal, id: \.self) { s in
-                    let choisi = slot == s
-                    Button {
-                        HapticService.shared.tap()
-                        slot = s
-                        slotDit = false
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: s.symboleJournal)
-                                .font(.system(size: 15, weight: .semibold))
-                                .accessibilityHidden(true)
-                            Text(s.titreJournal)
-                                .font(.system(size: 12, weight: .semibold))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .background(choisi ? Color.dsAccent : Verre.tuileInactive,
-                                in: RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
-                    .foregroundStyle(choisi ? Color.white : Color.dsTexte)
-                    .accessibilityLabel(s.titreJournal)
-                    .accessibilityAddTraits(choisi ? .isSelected : [])
-                }
-            }
-        }
-        .padding(.top, 14)
-        .accessibilityElement(children: .contain)
-    }
-
     // MARK: L'action
 
+    /// L'action est TOUJOURS là, au même endroit : « Ajouter au dîner ». Plus
+    /// rien ne la bloque (8 oct. 2026) — une quantité non dite a sa portion
+    /// standard, un aliment incertain sa proposition la plus probable, le
+    /// repas celui de l'heure — et chaque estimation se lit sur sa ligne.
     @ViewBuilder
     private var ctaBlock: some View {
-        Group {
-            if visibleItems.isEmpty {
-                Text("Plus aucun aliment. Recommence la dictée.")
-                    .font(.dsLegende)
-                    .foregroundStyle(Color.dsTertiaire)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
-            } else if let douteux = aVerifierNames.first {
-                // Un aliment incertain ne compte pas tant qu'il n'est pas tranché :
-                // un total incomplet et signalé vaut mieux qu'un total faux.
-                consigne("Vérifie l'aliment : « \(douteux) »")
-            } else if let manquant = missingNames.first {
-                // Bloquant tant qu'une quantité manque : on n'invente pas un grammage.
-                // Un féculent varie du simple au triple selon la portion.
-                consigne("Précise la quantité : \(manquant)")
-            } else if let slot {
-                boutonAjouter(slot)
-            } else {
-                consigne("Choisis le repas juste au-dessus")
-            }
-        }
-        .padding(.top, 16)
-
-        if !visibleItems.isEmpty {
-            Button {
-                modifierLesQuantites()
-            } label: {
-                Text("Modifier les quantités")
+        if visibleItems.isEmpty {
+            VStack(spacing: 12) {
+                Text("Plus aucun aliment.")
                     .font(.dsSousTitre)
-                    .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsAccent)
-                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                    .contentShape(Rectangle())
+                    .foregroundStyle(Color.dsSecondaire)
+                // La feuille n'écoute plus (2 août 2026) : recommencer =
+                // fermer, et le Journal rouvre la bulle.
+                DSCapsuleButton(titre: saisieAuClavier ? "Réécrire mon repas" : "Recommencer la dictée") {
+                    recommencerDictee()
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityHint("Ouvre le réglage du premier aliment")
+            .frame(maxWidth: .infinity)
+            .padding(.top, 16)
+        } else {
+            boutonAjouter(slot ?? MealJournalService.MealSlot.from(date: Date()))
+                .padding(.top, 16)
         }
-
-        // La feuille n'écoute plus (2 août 2026) : recommencer = fermer, et
-        // le Journal rouvre la bulle.
-        Button {
-            recommencerDictee()
-        } label: {
-            Text("Recommencer la dictée")
-                .font(.dsLegendeMoyenne)
-                .foregroundStyle(Color.dsSecondaire)
-                .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     /// « Ajouter au déjeuner » : l'action principale, en verre vert, traversée
@@ -870,37 +851,6 @@ struct VoiceMealSheet: View {
         .buttonStyle(.dsPress)
         .disabled(isSaving || nombre == 0)
         .accessibilityLabel("\(titre), \(nombre) aliment\(nombre > 1 ? "s" : ""), \(totaux.kcal) kilocalories")
-    }
-
-    /// « Modifier les quantités » : ouvre le réglage du premier aliment, ou
-    /// referme celui qui est ouvert. Chaque ligne s'ouvre aussi d'un toucher.
-    private func modifierLesQuantites() {
-        HapticService.shared.selection()
-        withAnimation(.snappy(duration: 0.22)) {
-            deployee = (deployee == nil) ? visibleItems.first?.index : nil
-        }
-    }
-
-    /// Ce qui manque avant de pouvoir ajouter. Rendue en gris sur gris, cette
-    /// instruction se lisait comme un bouton désactivé — donc comme un
-    /// cul-de-sac. C'est une consigne : elle prend l'ambre de la question et un
-    /// corps de conclusion.
-    private func consigne(_ texte: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "questionmark.circle.fill")
-                .font(.system(size: 15, weight: .semibold))
-                .accessibilityHidden(true)
-            Text(texte)
-                .font(Theme.insightFont)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(Kiwio.ambre)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, minHeight: Verre.hauteurAction, alignment: .leading)
-        .background(Kiwio.ambreFond, in: RoundedRectangle(cornerRadius: Verre.rayonTuile, style: .continuous))
-        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Erreur
@@ -988,55 +938,62 @@ struct VoiceMealSheet: View {
 
     // MARK: - Interaction
 
+    /// Toucher une ligne ouvre (ou referme) son réglage fin.
     private func basculer(_ index: Int) {
-        withAnimation(.snappy(duration: 0.22)) {
+        HapticService.shared.selection()
+        withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
             deployee = (deployee == index) ? nil : index
         }
     }
 
-    /// Une portion choisie ferme la question et ouvre la suivante : le design
-    /// impose une seule question ouverte, autant enchaîner tout seul.
-    private func choisir(_ g: Double, pour index: Int) {
-        grams[index] = g
-        withAnimation(.snappy(duration: 0.22)) {
-            deployee = prochainManquant()
+    /// Une pastille de portion touchée : la quantité est tranchée.
+    private func choisirQuantite(_ choix: ChoixQuantite, pour index: Int) {
+        HapticService.shared.selection()
+        if let taille = choix.taille { tailles[index] = taille }
+        if choix.parUnite { enGrammes.remove(index) }
+        grams[index] = choix.grammes
+        quantiteTranchee(index)
+    }
+
+    /// La règle graduée : des grammes au gramme près (au pas de la règle).
+    private func regler(_ g: Double, pour index: Int) {
+        grams[index] = max(0.1, min(2000, g))
+        quantiteTranchee(index)
+    }
+
+    private func quantiteTranchee(_ index: Int) {
+        guard estimees.contains(index) else { return }
+        estimees.remove(index)
+        replierLesChoix(index)
+    }
+
+    /// Un doute tranché : ses choix restent un instant, le temps que la coche
+    /// se voie, puis la ligne se replie d'elle-même.
+    private func replierLesChoix(_ index: Int) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(650))
+            withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
+                if !estimees.contains(index) { choixQuantiteVisibles.remove(index) }
+                if let item = items.first(where: { $0.index == index }), !typeEstime(item) {
+                    choixAlimentVisibles.remove(index)
+                }
+            }
         }
     }
 
-    private func ajuster(_ delta: Double, pour index: Int) {
-        let actuel = grams[index] ?? 0
-        grams[index] = max(5, min(2000, actuel + delta))
-    }
-
-    // MARK: Unités
-
-    /// Taille choisie (petit / moyen / gros) : on garde le nombre d'unités
-    /// déjà retenu (au moins 1) et on recalcule les grammes. Comme une portion
-    /// tapée, une taille choisie referme la question et ouvre la suivante.
-    private func choisirTaille(_ taille: Int, pour index: Int) {
-        guard let unite = unites[index] else { return }
-        let actuel = UnitPortionCatalog.nombre(grammes: grams[index] ?? 0,
-                                               poidsUnite: unite.poids(taille: tailles[index]))
-        let nombre = max(1, actuel.rounded())
-        tailles[index] = taille
-        choisir(min(2000, nombre * unite.poids(taille: taille)), pour: index)
-    }
-
-    /// « + » / « − » une unité. Depuis « quantité ? », le premier « + » pose 1.
-    private func compter(_ delta: Int, pour index: Int) {
-        guard let unite = unites[index] else { return }
-        let poids = unite.poids(taille: tailles[index])
-        let actuel = UnitPortionCatalog.nombre(grammes: grams[index] ?? 0, poidsUnite: poids)
-        let nombre = UnitPortionCatalog.nombreSuivant(actuel, delta: delta)
-        // Au dixième de gramme : une amande pèse 1,2 g, deux doivent rester
-        // deux (arrondies à l'entier, 2,4 g redevenaient « 1,5 pièce »).
-        grams[index] = min(2000, (nombre * poids * 10).rounded() / 10)
+    private func retirer(_ index: Int) {
+        HapticService.shared.tap()
+        withAnimation(reduceMotion ? nil : Animation.kiwiFluide) {
+            removed.insert(index)
+            if deployee == index { deployee = nil }
+        }
     }
 
     // MARK: Aliment retenu
 
-    /// À vérifier et pas encore tranché : ne compte pas, bloque l'ajout.
-    private func aVerifier(_ item: VoiceMealService.Item) -> Bool {
+    /// À vérifier et pas encore tranché : il compte avec la proposition la
+    /// plus probable, et sa ligne le dit (« Type estimé »).
+    private func typeEstime(_ item: VoiceMealService.Item) -> Bool {
         item.aVerifier && !confirmes.contains(item.index)
     }
 
@@ -1048,9 +1005,9 @@ struct VoiceMealSheet: View {
 
     /// « C'est bien ça » : l'aliment proposé est gardé tel quel.
     private func garder(_ index: Int) {
-        HapticService.shared.tap()
+        HapticService.shared.selection()
         confirmes.insert(index)
-        withAnimation(.snappy(duration: 0.22)) { deployee = prochainManquant() }
+        replierLesChoix(index)
     }
 
     /// Remplace l'aliment retenu par un autre de la base (alternative proposée
@@ -1079,15 +1036,16 @@ struct VoiceMealSheet: View {
             confirmes.insert(index)
             // L'unité suit l'aliment, sauf si elle vient de la quantité dite
             // (« 2 c. à soupe » reste 2 c. à soupe, quel que soit l'aliment).
-            if let unite = Self.unite(pour: item) {
-                unites[index] = unite
-                tailles[index] = unite.tailleParDefaut
-            } else {
-                unites[index] = nil
-                tailles[index] = nil
+            let unite = Self.unite(pour: item)
+            unites[index] = unite
+            tailles[index] = unite?.tailleParDefaut
+            // Une portion encore estimée suit le nouvel aliment : la portion
+            // standard d'un fromage n'est pas celle d'une salade.
+            if estimees.contains(index) {
+                grams[index] = Self.portionEstimee(pour: item, unite: unite)
             }
             HapticService.shared.primary()
-            withAnimation(.snappy(duration: 0.22)) { deployee = prochainManquant() }
+            replierLesChoix(index)
         } catch {
             AppLogger.analysis.error("get_food(\(foodId, privacy: .public)) indisponible pour un remplacement")
         }
@@ -1111,6 +1069,91 @@ struct VoiceMealSheet: View {
                                          pluriel: dite.pluriel,
                                          poidsUnite: dite.poidsUniteG,
                                          parmi: catalogue)
+    }
+
+    // MARK: Portions estimées et pastilles de portion
+
+    /// Une pastille de portion sous une ligne : « Moyenne · 200 g », « 2 œufs
+    /// · 100 g », ou une portion de la base.
+    struct ChoixQuantite: Identifiable, Equatable {
+        let id: Int
+        let libelle: String
+        let detail: String
+        let grammes: Double
+        /// Taille de l'unité que ce choix impose (pastilles de taille).
+        let taille: Int?
+        /// Le choix s'exprime dans l'unité de l'aliment (il la rétablit si la
+        /// personne était passée aux grammes).
+        let parUnite: Bool
+        /// Pastilles de taille : la même assiette, l'aliment plus ou moins
+        /// gros dedans (0 → 1). `nil` : pas d'assiette dessinée.
+        let echelle: Double?
+    }
+
+    /// Portion retenue d'office quand la quantité n'a pas été dite : une unité
+    /// de taille moyenne (« 1 assiette moyenne »), sinon la portion du milieu
+    /// de la base, sinon 100 g. Elle est affichée « estimée » et se corrige
+    /// d'un toucher.
+    static func portionEstimee(pour item: VoiceMealService.Item,
+                               unite: UnitPortionCatalog.Unite?) -> Double {
+        if let unite {
+            let poids = unite.poids(taille: unite.tailleParDefaut)
+            if poids > 0 { return poids }
+        }
+        let portions = item.portions.filter { $0.grammes > 0 }
+        if !portions.isEmpty { return portions[portions.count / 2].grammes }
+        return portionParDefautG
+    }
+
+    /// Dernier recours, sans unité ni portion connue : 100 g, la référence
+    /// de toutes les valeurs nutritionnelles.
+    static let portionParDefautG: Double = 100
+
+    /// Les pastilles de portion d'un aliment :
+    ///   · un contenant ou une pièce qui a des tailles (« assiette », « bol »,
+    ///     « tasse ») → ses trois tailles, une unité chacune ;
+    ///   · ce qui se compte (« œuf », « tranche », « c. à soupe ») → 1, 2, 3 ;
+    ///   · sans unité → jusqu'à trois portions de la base.
+    /// Vide : la ligne ne propose que la règle graduée.
+    static func choixQuantite(pour item: VoiceMealService.Item,
+                              unite: UnitPortionCatalog.Unite?,
+                              taille: Int?) -> [ChoixQuantite] {
+        if let unite {
+            if unite.code != "piece", unite.tailles.count >= 2 {
+                let tailles = Array(unite.tailles.prefix(3))
+                return tailles.enumerated().map { rang, t in
+                    ChoixQuantite(id: rang,
+                                  libelle: t.libelle,
+                                  detail: "\(UnitPortionCatalog.formater(t.grammes)) g",
+                                  grammes: t.grammes,
+                                  taille: rang,
+                                  parUnite: true,
+                                  echelle: tailles.count > 1 ? Double(rang) / Double(tailles.count - 1) : 0.5)
+                }
+            }
+            let poids = unite.poids(taille: taille ?? unite.tailleParDefaut)
+            guard poids > 0 else { return [] }
+            return (1...3).map { nombre in
+                // Au dixième : deux amandes pèsent 2,4 g, pas 2 g.
+                let g = (Double(nombre) * poids * 10).rounded() / 10
+                return ChoixQuantite(id: nombre,
+                                     libelle: unite.libelle(nombre: Double(nombre)),
+                                     detail: "\(UnitPortionCatalog.formater(g)) g",
+                                     grammes: g,
+                                     taille: nil,
+                                     parUnite: true,
+                                     echelle: nil)
+            }
+        }
+        return item.portions.filter { $0.grammes > 0 }.prefix(3).enumerated().map { rang, p in
+            ChoixQuantite(id: rang,
+                          libelle: p.label,
+                          detail: "\(UnitPortionCatalog.formater(p.grammes)) g",
+                          grammes: p.grammes,
+                          taille: nil,
+                          parUnite: false,
+                          echelle: nil)
+        }
     }
 
     /// Une pastille d'unité touchée (`nil` = « g »). D'une unité à l'autre, le
@@ -1137,12 +1180,6 @@ struct VoiceMealSheet: View {
         enGrammes.remove(index)
     }
 
-    /// Prochaine question ouverte : un aliment à vérifier d'abord, sinon une
-    /// quantité manquante.
-    private func prochainManquant() -> Int? {
-        visibleItems.first { aVerifier($0) || (grams[$0.index] ?? 0) <= 0 }?.index
-    }
-
     // MARK: - Données dérivées
 
     private var visibleItems: [VoiceMealService.Item] {
@@ -1150,18 +1187,12 @@ struct VoiceMealSheet: View {
     }
     /// Enregistrable = on a un grammage ET de quoi le chiffrer : soit un aliment
     /// de la base, soit l'estimation du serveur. Un aliment absent de la base
-    /// n'est plus jeté — le jeter faussait le total de la journée.
+    /// n'est plus jeté — le jeter faussait le total de la journée. Un aliment
+    /// « à vérifier » non tranché compte avec la proposition la plus probable.
     private var savableItems: [VoiceMealService.Item] {
         visibleItems.filter {
-            !aVerifier($0) && (grams[$0.index] ?? 0) > 0 && ($0.foodId != nil || $0.per100 != nil)
+            (grams[$0.index] ?? 0) > 0 && ($0.foodId != nil || $0.per100 != nil)
         }
-    }
-    private var missingNames: [String] {
-        visibleItems.filter { (grams[$0.index] ?? 0) <= 0 }.map(\.nom)
-    }
-    /// Ce que la personne a dit, pour chaque aliment encore à vérifier.
-    private var aVerifierNames: [String] {
-        visibleItems.filter { aVerifier($0) }.map { $0.libelle ?? $0.nom }
     }
     /// Vraiment inexploitables : ni fiche, ni estimation. Devenu rare.
     private var ignoredNames: [String] {
@@ -1176,7 +1207,7 @@ struct VoiceMealSheet: View {
     /// Total recalculé à chaque interaction, à partir des valeurs pour 100 g.
     private var totaux: (kcal: Int, proteines: Double, glucides: Double, lipides: Double, fibres: Double) {
         var k = 0.0, p = 0.0, g = 0.0, l = 0.0, fi = 0.0
-        for item in visibleItems where !aVerifier(item) {
+        for item in visibleItems {
             guard let poids = grams[item.index], poids > 0, let cent = item.per100 else { continue }
             let f = poids / 100
             k += cent.kcal * f
@@ -1260,21 +1291,38 @@ struct VoiceMealSheet: View {
         quotedTranscript = analysis.transcript
         items = analysis.aliments
         removed = []
-        grams = Dictionary(uniqueKeysWithValues: analysis.aliments.compactMap { item in
-            item.grammes.map { (item.index, $0) }
-        })
         unites = Dictionary(uniqueKeysWithValues: analysis.aliments.compactMap { item in
             Self.unite(pour: item).map { (item.index, $0) }
         })
         tailles = unites.compactMapValues { $0.tailleParDefaut }
+        // Une quantité non dite prend la portion standard, marquée « estimée »
+        // sur sa ligne : on ne bloque plus l'ajout pour elle (8 oct. 2026).
+        var retenus: [Int: Double] = [:]
+        var estimeesAuDepart: Set<Int> = []
+        for item in analysis.aliments {
+            if let g = item.grammes, g > 0 {
+                retenus[item.index] = g
+            } else {
+                retenus[item.index] = Self.portionEstimee(pour: item, unite: unites[item.index])
+                estimeesAuDepart.insert(item.index)
+            }
+        }
+        grams = retenus
+        estimees = estimeesAuDepart
+        choixQuantiteVisibles = estimeesAuDepart
+        choixAlimentVisibles = Set(analysis.aliments
+            .filter { $0.aVerifier && !($0.alternatives ?? []).isEmpty }
+            .map(\.index))
         enGrammes = []
         confirmes = []
-        slot = VoiceMealService.slotDit(analysis.repas)
-        slotDit = slot != nil
+        // Le repas du vocal, sinon celui de l'heure — affiché en titre, il se
+        // change d'un toucher.
+        let dit = VoiceMealService.slotDit(analysis.repas)
+        slot = dit ?? MealJournalService.MealSlot.from(date: Date())
+        slotDit = dit != nil
         alimentsIgnoresServeur = analysis.alimentsIgnores ?? 0
         phase = .results
-        // On ouvre d'emblée la première question à laquelle il faut répondre.
-        deployee = prochainManquant()
+        deployee = nil
         lancerRevelation()
     }
 
@@ -1474,193 +1522,113 @@ extension VoiceMealSheet {
 
 // MARK: - Ligne d'aliment
 
-/// Ligne compacte qui se déploie au tap.
+/// Une ligne d'aliment (maquette « un toucher », 8 octobre 2026).
 ///
-/// Repliée, elle tient sur une ligne : pastille, nom, quantité dessous, kcal à
-/// droite, puis un filet. Déployée, elle porte la question de quantité, les
-/// portions concrètes et l'ajustement fin. C'est le point clé du design : une
-/// liste lisible d'un coup d'œil, et une seule chose à décider à la fois.
+/// Repliée : vignette 3D, nom, quantité — ou, en ambre, ce qui a été estimé —
+/// et kcal. Un doute pose ses choix juste dessous, la réponse probable déjà
+/// cochée : un toucher corrige, sinon il n'y a rien à faire. Toucher la ligne
+/// ouvre son réglage fin : unités, grammes et kcal en grand, règle graduée,
+/// « Changer d'aliment », « Retirer ».
 private struct VoiceItemRow: View {
     let item: VoiceMealService.Item
     let grams: Double?
-    /// Unité de saisie (« œuf », « tranche »…) ; nil = on saisit en grammes.
+    /// Unité de saisie (« œuf », « assiette »…) ; nil = on saisit en grammes.
     let unite: UnitPortionCatalog.Unite?
     /// Index de la taille retenue dans `unite.tailles`.
     let taille: Int?
-    /// Unités proposées en pastilles (la première d'office), « g » en dernier ;
-    /// vide = on saisit en grammes, sans pastilles.
+    /// Pastilles de portion à poser sous la ligne ; vide = aucune.
+    let choixQuantite: [VoiceMealSheet.ChoixQuantite]
+    /// Unités proposées (ligne ouverte seulement), « g » en dernier.
     let unitesProposees: [UnitPortionCatalog.Unite]
     let deployee: Bool
-    /// Incertain et pas encore tranché : ne compte pas tant que la personne
-    /// n'a pas choisi.
-    let aVerifier: Bool
+    /// L'aliment retenu et ses autres possibles sont posés sous la ligne.
+    let montrerChoixAliment: Bool
+    /// « À vérifier » pas encore tranché : compte avec l'aliment retenu.
+    let typeEstime: Bool
+    /// Quantité non dite : la portion standard, pas encore touchée.
+    let quantiteEstimee: Bool
     let remplacementEnCours: Bool
     /// La ligne est posée : ses kcal comptent jusqu'à leur valeur.
     let posee: Bool
-    /// Teinte de la pastille (`nil` : neutre).
+    /// Teinte du symbole de repli, quand l'aliment n'a pas d'illustration 3D.
     let teinte: Color?
+    let onTap: () -> Void
     let onGarder: () -> Void
     let onRemplacer: (String) -> Void
     let onChercher: () -> Void
-    let onTap: () -> Void
-    let onPick: (Double) -> Void
-    let onAjuster: (Double) -> Void
-    let onTaille: (Int) -> Void
-    let onCompter: (Int) -> Void
+    let onChoix: (VoiceMealSheet.ChoixQuantite) -> Void
+    let onGrammes: (Double) -> Void
     /// Pastille d'unité touchée ; `nil` = « g ».
     let onChoisirUnite: (UnitPortionCatalog.Unite?) -> Void
     let onRemove: () -> Void
 
-    private var manque: Bool { (grams ?? 0) <= 0 }
-    /// Quelque chose attend la personne sur cette ligne (aliment ou quantité).
-    private var alerte: Bool { manque || aVerifier }
-    private var dit: String { item.libelle ?? item.nom }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Pas de la règle, figé à l'ouverture : il ne doit pas changer sous le
+    /// doigt (1 g pour les petites quantités, 5 g au-delà).
+    @State private var pasFige: Double?
 
-    /// Nombre d'unités retenu (0 tant que la quantité manque).
+    private var g: Double { grams ?? 0 }
+
+    private var illustration: String? { MealScanFluent.asset(forFoodName: item.nom) }
+
+    private var pas: Double { pasFige ?? (g < 40 ? 1 : 5) }
+
+    /// Nombre d'unités retenu.
     private var nombre: Double {
         guard let unite else { return 0 }
-        return UnitPortionCatalog.nombre(grammes: grams ?? 0, poidsUnite: unite.poids(taille: taille))
+        return UnitPortionCatalog.nombre(grammes: g, poidsUnite: unite.poids(taille: taille))
     }
 
-    /// Lu par VoiceOver : « 2 œufs, 100 grammes, 150 kilocalories ».
-    private var resume: String {
-        if let unite { return "\(unite.libelle(nombre: nombre)), \(Int(grams ?? 0)) grammes, \(kcalAffichees) kilocalories" }
-        return "\(Int(grams ?? 0)) grammes, \(kcalAffichees) kilocalories"
-    }
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// Fond de la pastille : l'ambre d'une question, sinon la teinte de
-    /// l'aliment à 12 %, sinon le gris neutre du verre.
-    private var fondPastille: Color {
-        if alerte { return Kiwio.ambreFond }
-        if let teinte { return teinte.opacity(0.12) }
-        return Verre.remplissage
-    }
-
-    private var encrePastille: Color {
-        if alerte { return Kiwio.ambre }
-        return teinte ?? Verre.iconeNeutre
-    }
-
-    /// « 2 œufs · 100 g », ou « 150 g » : la quantité retenue.
+    /// « 1 assiette moyenne · 200 g », « 2 œufs · 100 g », « 150 g ».
     private var quantite: String {
-        let grammes = "\(Int(grams ?? 0)) g"
+        let grammes = "\(UnitPortionCatalog.formater(g)) g"
         guard let unite else { return grammes }
-        // Au dixième : « 2 pièces · 2,4 g » pour deux amandes.
-        return "\(unite.libelle(nombre: nombre)) · \(UnitPortionCatalog.formater(grams ?? 0)) g"
+        var compte = unite.libelle(nombre: nombre)
+        // La taille ne s'accorde qu'au singulier : « 1 assiette moyenne ».
+        if nombre <= 1, unite.tailles.count > 1, let taille, unite.tailles.indices.contains(taille) {
+            compte += " \(unite.tailles[taille].libelle.lowercased())"
+        }
+        return "\(compte) · \(grammes)"
+    }
+
+    /// Ce que la ligne a estimé à la place de la personne ; `nil` = rien.
+    private var estimation: String? {
+        switch (typeEstime, quantiteEstimee) {
+        case (true, true): return "Type et portion estimés"
+        case (true, false): return "Type estimé · \(quantite)"
+        case (false, true): return "Portion estimée"
+        case (false, false): return nil
+        }
+    }
+
+    /// kcal pour la quantité retenue, depuis les valeurs pour 100 g.
+    private var kcal: Int {
+        guard g > 0 else { return 0 }
+        if let cent = item.per100 { return Int((cent.kcal * g / 100).rounded()) }
+        guard let kcal = item.kcal, let base = item.grammes, base > 0 else { return 0 }
+        return Int((Double(kcal) * g / base).rounded())
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button(action: onTap) {
-                HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(fondPastille)
-                        Image(systemName: alerte ? "questionmark" : "fork.knife")
-                            .font(.system(size: 21, weight: .medium))
-                            .foregroundStyle(encrePastille)
-                    }
-                    .frame(width: 40, height: 40)
-                    .accessibilityHidden(true)
+            entete
 
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(aVerifier ? dit : item.nom)
-                            .font(.dsSousTitreFort)
-                            .tracking(DSTracking.sousTitre)
-                            .foregroundStyle(Color.dsTexte)
-                            .lineLimit(1)
-                        if aVerifier {
-                            Text("à vérifier")
-                                .font(Theme.insightFont)
-                                .foregroundStyle(Kiwio.ambre)
-                        } else if manque {
-                            // C'est la question qui bloque l'enregistrement :
-                            // elle ne peut pas être le plus petit texte de la
-                            // ligne.
-                            Text("quantité ?")
-                                .font(Theme.insightFont)
-                                .foregroundStyle(Kiwio.ambre)
-                        } else {
-                            // Chiffres en chasse fixe : la ligne ne saute pas
-                            // quand la valeur change sous les yeux.
-                            Text(quantite)
-                                .font(Font.dsLegende.monospacedDigit())
-                                .foregroundStyle(Color.dsSecondaire)
-                                .lineLimit(1)
-                        }
-                        if item.parDefaut && !aVerifier {
-                            // Dit vaguement : on a pris la référence la plus
-                            // consommée. On le montre, pour que ça se corrige.
-                            Text("Tu as dit « \(dit) » : le plus courant")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.dsSecondaire)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    Spacer(minLength: 8)
-
-                    if !alerte {
-                        // Les kcal comptent jusqu'à leur valeur quand la ligne
-                        // se pose, puis suivent la quantité corrigée.
-                        ChiffreQuiCompte(valeur: Double(posee ? kcalAffichees : 0),
-                                         format: { "\(DS.entier($0)) kcal" })
-                            .font(.dsValeurLigneForte)
-                            .foregroundStyle(Color.dsTexte)
-                            .lineLimit(1)
-                            .animation(reduceMotion ? nil : Animation.kiwiCompteur.delay(0.35), value: posee)
-                            .animation(reduceMotion ? nil : Animation.kiwiVif, value: kcalAffichees)
-                    }
-                }
-                .padding(.vertical, 10)
-                .frame(minHeight: DS.cibleTactile)
-                .contentShape(Rectangle())
+            if montrerChoixAliment {
+                choixAliment
+                    .padding(.bottom, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(aVerifier
-                                ? "\(dit), aliment à vérifier"
-                                : manque
-                                ? "\(item.nom), quantité à préciser"
-                                : "\(item.nom), \(resume)")
-            .accessibilityHint("Toucher pour ajuster")
+
+            if !choixQuantite.isEmpty {
+                pastillesQuantite
+                    .padding(.bottom, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             if deployee {
-                VStack(alignment: .leading, spacing: 12) {
-                    choixAliment
-
-                    if manque {
-                        Text(unite?.question ?? "Quelle quantité as-tu mangée ?")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.dsTexte)
-                    }
-
-                    // Les unités de l'aliment, « g » en dernier : toucher
-                    // une pastille change d'unité, les grammes suivent.
-                    if !unitesProposees.isEmpty {
-                        PastillesUnites(unites: unitesProposees,
-                                        active: unite,
-                                        onChoisir: onChoisirUnite)
-                    }
-
-                    if let unite {
-                        controlesUnite(unite)
-                    } else {
-                        controlesGrammes
-                    }
-
-                    Button(action: onRemove) {
-                        Label("Retirer cet aliment", systemImage: "xmark")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.dsSecondaire)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 2)
-                .padding(.bottom, 8)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                reglage
+                    .padding(.bottom, 4)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             Rectangle()
@@ -1670,203 +1638,389 @@ private struct VoiceItemRow: View {
         }
     }
 
-    // MARK: Aliment retenu
+    // MARK: L'en-tête
 
-    /// À vérifier : « c'est lequel ? » + l'aliment proposé et ses alternatives.
-    /// Par défaut : les autres formes courantes, pour corriger d'un geste.
-    /// Toujours : chercher un autre aliment, sans refaire la dictée.
-    @ViewBuilder
-    private var choixAliment: some View {
-        let alternatives = item.alternatives ?? []
-        if aVerifier || (item.parDefaut && !alternatives.isEmpty) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(aVerifier
-                     ? "Tu as dit « \(dit) » : c'est lequel ?"
-                     : "Tu as dit « \(dit) ». J'ai pris le plus courant, ou :")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.dsTexte)
-                    .fixedSize(horizontal: false, vertical: true)
-                if aVerifier {
-                    choixLigne(item.nom, choisi: false, action: onGarder)
+    private var entete: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                vignette
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.nom)
+                        .font(.dsHeadline)
+                        .foregroundStyle(Color.dsTexte)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let estimation {
+                        HStack(spacing: 6) {
+                            PointEstimation()
+                            Text(estimation)
+                                .font(Font.dsLegende.monospacedDigit())
+                                .foregroundStyle(Kiwio.ambre)
+                                .lineLimit(1)
+                        }
+                    } else {
+                        // Chiffres en chasse fixe : la ligne ne saute pas
+                        // quand la valeur change sous les yeux.
+                        Text(quantite)
+                            .font(Font.dsLegende.monospacedDigit())
+                            .foregroundStyle(Color.dsSecondaire)
+                            .lineLimit(1)
+                    }
                 }
-                ForEach(alternatives, id: \.self) { alt in
-                    choixLigne(alt.marque.map { "\(alt.nom) · \($0)" } ?? alt.nom, choisi: false) {
+
+                Spacer(minLength: 8)
+
+                // Les kcal comptent jusqu'à leur valeur quand la ligne se
+                // pose, puis suivent la quantité corrigée.
+                ChiffreQuiCompte(valeur: Double(posee ? kcal : 0),
+                                 format: { "\(DS.entier($0)) kcal" })
+                    .font(Font.dsHeadline.monospacedDigit())
+                    .foregroundStyle(Color.dsTexte)
+                    .lineLimit(1)
+                    .animation(reduceMotion ? nil : Animation.kiwiCompteur.delay(0.35), value: posee)
+                    .animation(reduceMotion ? nil : Animation.kiwiVif, value: kcal)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.dsTertiaire)
+                    .rotationEffect(.degrees(deployee ? 180 : 0))
+                    .accessibilityHidden(true)
+            }
+            .padding(.vertical, 12)
+            .frame(minHeight: DS.cibleTactile)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(item.nom), \(estimation ?? quantite), \(kcal) kilocalories")
+        .accessibilityHint(deployee ? "Touche pour refermer le réglage" : "Touche pour régler la quantité")
+    }
+
+    /// Vignette de verre : l'illustration 3D de l'aliment, sinon un couvert
+    /// dans la teinte de sa famille.
+    private var vignette: some View {
+        ZStack {
+            if let illustration {
+                Fluent3DIcon(name: illustration, size: 30)
+            } else {
+                Image(systemName: "fork.knife")
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(teinte ?? Verre.iconeNeutre)
+            }
+        }
+        .frame(width: 48, height: 48)
+        .verre(.carte, forme: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityHidden(true)
+    }
+
+    // MARK: L'aliment retenu
+
+    /// Les autres aliments plausibles, sans celui qui est retenu.
+    private var autresAliments: [VoiceMealService.Alternative] {
+        (item.alternatives ?? []).filter { $0.foodId != item.foodId }
+    }
+
+    private func nomAliment(_ nom: String, _ marque: String?) -> String {
+        marque.map { "\(nom) · \($0)" } ?? nom
+    }
+
+    /// L'aliment retenu, coché, puis ses autres possibles : un toucher garde
+    /// ou remplace, sans refaire la dictée.
+    private var choixAliment: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                pastilleAliment(nomAliment(item.nom, item.marque), retenue: true, action: onGarder)
+                ForEach(autresAliments, id: \.self) { alt in
+                    pastilleAliment(nomAliment(alt.nom, alt.marque), retenue: false) {
                         onRemplacer(alt.foodId)
                     }
                 }
-            }
-        }
-        Button(action: onChercher) {
-            HStack(spacing: 6) {
                 if remplacementEnCours {
-                    ProgressView().scaleEffect(0.7)
-                } else {
-                    Image(systemName: "magnifyingglass")
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.leading, 4)
+                }
+            }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 2)
+        }
+        .scrollClipDisabled()
+        .disabled(remplacementEnCours)
+    }
+
+    private func pastilleAliment(_ titre: String, retenue: Bool,
+                                 action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(titre)
+                    .font(Font.dsLegende.weight(.semibold))
+                    .lineLimit(1)
+                if retenue {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
                         .accessibilityHidden(true)
                 }
-                Text(aVerifier ? "Chercher un autre aliment" : "Ce n'est pas ça ? Changer d'aliment")
             }
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Color.dsAccent)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .foregroundStyle(retenue ? Color.teinteKiwiTexte : Color.dsTexte)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: 240, minHeight: 40)
+            .background {
+                VerrePlaque(forme: Capsule(style: .continuous),
+                            matiere: retenue ? VerreMatiere.clairActif : VerreMatiere.clair)
+            }
+            .overlay {
+                if retenue {
+                    Capsule(style: .continuous)
+                        .strokeBorder(Color.teinteKiwi, lineWidth: 1.5)
+                }
+            }
+            .contentShape(Capsule(style: .continuous))
         }
-        .buttonStyle(.plain)
-        .disabled(remplacementEnCours)
+        .buttonStyle(.dsPress)
+        .accessibilityAddTraits(retenue ? .isSelected : [])
     }
 
-    private func choixLigne(_ titre: String, choisi: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(titre)
-                    .font(.system(size: 14, weight: .medium))
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.dsTertiaire)
-                    .accessibilityHidden(true)
-            }
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(Color.dsRemplissage, in: RoundedRectangle(cornerRadius: 10))
-            .foregroundStyle(Color.dsTexte)
-        }
-        .buttonStyle(.plain)
-        .disabled(remplacementEnCours)
-    }
+    // MARK: La portion
 
-    // MARK: Saisie en unités
-
-    /// Tailles (petit / moyen / gros) si l'unité en a, puis « − 2 œufs + » avec
-    /// les grammes et les kcal dessous : on compte, l'app pèse.
-    private func controlesUnite(_ unite: UnitPortionCatalog.Unite) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if !unite.tailles.isEmpty {
-                HStack(spacing: 7) {
-                    ForEach(Array(unite.tailles.enumerated()), id: \.offset) { index, t in
-                        let choisie = !manque && taille == index
-                        Button { onTaille(index) } label: {
-                            VStack(spacing: 2) {
-                                Text(t.libelle)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .lineLimit(1)
-                                Text("\(Int(t.grammes)) g")
-                                    .font(.kiwioMono(11, .bold))
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 44)
+    /// Trois pastilles de portion, la retenue cochée de vert.
+    private var pastillesQuantite: some View {
+        HStack(spacing: 8) {
+            ForEach(choixQuantite) { choix in
+                let retenue = abs(g - choix.grammes) < 0.05
+                Button {
+                    onChoix(choix)
+                } label: {
+                    HStack(spacing: 8) {
+                        if let echelle = choix.echelle {
+                            AssietteMiniature(illustration: illustration, teinte: teinte, echelle: echelle)
                         }
-                        .buttonStyle(.plain)
-                        .background(choisie ? Color.dsAccent : Color.dsRemplissage,
-                                    in: RoundedRectangle(cornerRadius: 10))
-                        .foregroundStyle(choisie ? .white : Color.dsTexte)
-                        .accessibilityLabel("\(t.libelle), \(Int(t.grammes)) grammes")
-                        .accessibilityAddTraits(choisie ? .isSelected : [])
-                    }
-                }
-            }
-
-            HStack(spacing: 14) {
-                BoutonPas(symbole: "minus", actif: nombre > 1,
-                          libelle: "Retirer une unité") { onCompter(-1) }
-
-                VStack(spacing: 0) {
-                    Text(unite.libelle(nombre: nombre))
-                        .font(.kiwioMono(20, .bold))
-                        .foregroundStyle(manque ? Color.dsTertiaire : Color.dsAccent)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text("\(UnitPortionCatalog.formater(grams ?? 0)) g · \(kcalAffichees) kcal")
-                        .font(.kiwioMono(12, .regular))
-                        .foregroundStyle(Color.dsSecondaire)
-                }
-                .frame(maxWidth: .infinity)
-
-                BoutonPas(symbole: "plus", actif: true,
-                          libelle: "Ajouter une unité") { onCompter(1) }
-            }
-        }
-    }
-
-    // MARK: Saisie en grammes
-
-    @ViewBuilder
-    private var controlesGrammes: some View {
-        if !item.portions.isEmpty {
-            HStack(spacing: 7) {
-                ForEach(item.portions, id: \.self) { p in
-                    Button { onPick(p.grammes) } label: {
-                        VStack(spacing: 2) {
-                            Text(p.label)
-                                .font(.system(size: 11, weight: .medium))
+                        VStack(alignment: choix.echelle == nil ? .center : .leading, spacing: 0) {
+                            Text(choix.libelle)
+                                .font(Font.dsLegende.weight(.semibold))
+                                .foregroundStyle(Color.dsTexte)
                                 .lineLimit(1)
-                            Text("\(Int(p.grammes)) g")
-                                .font(.kiwioMono(11, .bold))
+                                .minimumScaleFactor(0.8)
+                            Text(choix.detail)
+                                .font(Font.dsLegende.monospacedDigit())
+                                .foregroundStyle(Color.dsSecondaire)
+                                .lineLimit(1)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .buttonStyle(.plain)
-                    .background(
-                        grams == p.grammes ? Color.dsAccent : Color.dsRemplissage,
-                        in: RoundedRectangle(cornerRadius: 10)
-                    )
-                    .foregroundStyle(grams == p.grammes ? .white : Color.dsTexte)
+                    .padding(.horizontal, 8)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background {
+                        VerrePlaque(forme: RoundedRectangle(cornerRadius: 18, style: .continuous),
+                                    matiere: retenue ? VerreMatiere.clairActif : VerreMatiere.carte)
+                    }
+                    .overlay {
+                        if retenue {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .strokeBorder(Color.teinteKiwi, lineWidth: 2)
+                        }
+                    }
+                    .scaleEffect(retenue ? 1.03 : 1)
+                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
+                .buttonStyle(.dsPress)
+                .accessibilityLabel("\(choix.libelle), \(choix.detail)")
+                .accessibilityAddTraits(retenue ? .isSelected : [])
             }
         }
+        .animation(reduceMotion ? nil : Animation.kiwiRebond, value: g)
+    }
 
-        // Ajustement fin par pas de 5 g : les portions proposées
-        // couvrent le cas courant, ce curseur couvre le reste sans
-        // obliger à taper un nombre au clavier.
-        HStack(spacing: 14) {
-            BoutonPas(symbole: "minus", actif: (grams ?? 0) > 5) { onAjuster(-5) }
+    // MARK: Le réglage fin
 
-            VStack(spacing: 0) {
-                Text("\(Int(grams ?? 0)) g")
-                    .font(.kiwioMono(20, .bold))
-                    .foregroundStyle(manque ? Color.dsTertiaire : Color.dsAccent)
-                Text("\(kcalAffichees) kcal")
-                    .font(.kiwioMono(12, .regular))
+    private var reglage: some View {
+        VStack(spacing: 8) {
+            // Les unités de l'aliment, « g » en dernier.
+            if unitesProposees.count > 1 {
+                PastillesUnites(unites: unitesProposees, active: unite, onChoisir: onChoisirUnite)
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(UnitPortionCatalog.formater(g))
+                    .font(.system(.title, design: .rounded).weight(.bold).monospacedDigit())
+                    .foregroundStyle(Color.dsTexte)
+                    .contentTransition(.numericText())
+                Text("g")
+                    .font(.dsHeadline)
+                    .foregroundStyle(Color.dsSecondaire)
+                Text("·")
+                    .font(.dsHeadline)
+                    .foregroundStyle(Color.dsTertiaire)
+                    .padding(.horizontal, 4)
+                Text("\(kcal)")
+                    .font(Font.dsHeadline.monospacedDigit())
+                    .foregroundStyle(Color.dsTexte)
+                    .contentTransition(.numericText())
+                Text("kcal")
+                    .font(.dsHeadline)
                     .foregroundStyle(Color.dsSecondaire)
             }
             .frame(maxWidth: .infinity)
+            .animation(reduceMotion ? nil : Animation.kiwiVif, value: g)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(UnitPortionCatalog.formater(g)) grammes, \(kcal) kilocalories")
 
-            BoutonPas(symbole: "plus", actif: true) { onAjuster(5) }
+            RegleGrammes(grammes: g,
+                         pas: pas,
+                         maximum: 2000,
+                         reperes: choixQuantite.map(\.grammes),
+                         onChange: onGrammes)
+
+            HStack(spacing: 24) {
+                Button(action: onChercher) {
+                    Label("Changer d'aliment", systemImage: "arrow.left.arrow.right")
+                        .frame(minHeight: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                }
+                Button(action: onRemove) {
+                    Label("Retirer", systemImage: "trash")
+                        .frame(minHeight: DS.cibleTactile)
+                        .contentShape(Rectangle())
+                }
+            }
+            .font(.dsLegende)
+            .foregroundStyle(Color.dsSecondaire)
+            .buttonStyle(.plain)
+            .disabled(remplacementEnCours)
         }
-    }
-
-    /// kcal pour la quantité retenue, calculées depuis les valeurs pour 100 g.
-    ///
-    /// Anciennement dérivées du ratio `kcal / grammes` renvoyé par le serveur —
-    /// ce qui donnait 0 dès que la quantité n'avait pas été dictée, puisque le
-    /// serveur ne renvoie alors ni l'un ni l'autre. Le total du repas était donc
-    /// faux exactement dans le cas où l'utilisateur venait de répondre.
-    private var kcalAffichees: Int {
-        guard let g = grams, g > 0 else { return 0 }
-        if let cent = item.per100 { return Int((cent.kcal * g / 100).rounded()) }
-        guard let kcal = item.kcal, let base = item.grammes, base > 0 else { return 0 }
-        return Int((Double(kcal) * g / base).rounded())
+        .onAppear {
+            if pasFige == nil { pasFige = g < 40 ? 1 : 5 }
+        }
     }
 }
 
-private struct BoutonPas: View {
-    let symbole: String
-    let actif: Bool
-    var libelle: String? = nil
-    let action: () -> Void
+/// Le point ambré d'une estimation, cerné d'un halo qui respire.
+private struct PointEstimation: View {
+    var body: some View {
+        Circle()
+            .fill(Color.teinteVitamineD)
+            .frame(width: 6, height: 6)
+            .background {
+                VerreHaloQuiRespire(couleur: Color.teinteVitamineD.opacity(0.7))
+                    .frame(width: 12, height: 12)
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+/// Une petite assiette, l'aliment plus ou moins gros dedans : la portion se
+/// voit avant de se lire.
+private struct AssietteMiniature: View {
+    let illustration: String?
+    let teinte: Color?
+    /// 0 → 1 : de la petite à la grande portion.
+    let echelle: Double
+
+    private var cote: CGFloat { 16 + CGFloat(echelle) * 12 }
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: symbole)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(actif ? Color.dsTexte : Color.dsTertiaire)
-                .frame(width: 44, height: 44)
-                .verreClair(Circle())
-                .contentShape(Circle())
+        ZStack {
+            Circle()
+                .fill(Color.white)
+            Circle()
+                .strokeBorder(Color(white: 0.92), lineWidth: 2)
+                .padding(3)
+            if let illustration {
+                Fluent3DIcon(name: illustration, size: cote)
+            } else {
+                Image(systemName: "fork.knife")
+                    .font(.system(size: cote * 0.6, weight: .medium))
+                    .foregroundStyle(teinte ?? Verre.iconeNeutre)
+            }
         }
-        .buttonStyle(.dsPress)
-        .disabled(!actif)
-        .accessibilityLabel(libelle ?? (symbole == "plus" ? "Ajouter 5 grammes" : "Retirer 5 grammes"))
+        .frame(width: 32, height: 32)
+        .overlay(Circle().strokeBorder(Color.black.opacity(0.06), lineWidth: 0.5))
+        .shadow(color: Verre.encreOmbre.opacity(0.18), radius: 3, y: 2)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Règle graduée en grammes (maquette du 8 octobre 2026) : on la fait glisser
+/// sous le curseur vert. Un trait par pas, un grand tous les dix, une valeur
+/// tous les vingt ; les portions proposées y sont marquées d'un point vert.
+/// Chaque pas franchi donne un tic haptique. VoiceOver la règle d'un pas en
+/// balayant vers le haut ou le bas.
+private struct RegleGrammes: View {
+    let grammes: Double
+    let pas: Double
+    let maximum: Double
+    let reperes: [Double]
+    let onChange: (Double) -> Void
+
+    /// Grammes au début du glissé en cours.
+    @State private var depart: Double?
+    /// Points entre deux traits.
+    private static let ecart: CGFloat = 10
+
+    var body: some View {
+        Canvas { contexte, taille in
+            let milieu = taille.width / 2
+            let demi = Int((milieu / Self.ecart).rounded(.up)) + 1
+            let centre = Int((grammes / pas).rounded())
+            let encre = Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255)
+            for k in max(0, centre - demi)...(centre + demi) {
+                let valeur = Double(k) * pas
+                if valeur > maximum { break }
+                let x = milieu + CGFloat((valeur - grammes) / pas) * Self.ecart
+                let grand = k % 10 == 0
+                let trait = CGRect(x: x - 1, y: 10, width: 2, height: grand ? 18 : 10)
+                contexte.fill(Path(roundedRect: trait, cornerRadius: 1),
+                              with: .color(encre.opacity(grand ? 0.38 : 0.2)))
+                if k % 20 == 0 {
+                    contexte.draw(Text(UnitPortionCatalog.formater(valeur))
+                                    .font(Font.caption2.monospacedDigit())
+                                    .foregroundStyle(Color.dsTertiaire),
+                                  at: CGPoint(x: x, y: 42))
+                }
+                if reperes.contains(where: { abs($0 - valeur) < pas / 2 }) {
+                    contexte.fill(Path(ellipseIn: CGRect(x: x - 2, y: 2, width: 4, height: 4)),
+                                  with: .color(Color.teinteKiwi))
+                }
+            }
+        }
+        .mask {
+            LinearGradient(stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .black, location: 0.22),
+                .init(color: .black, location: 0.78),
+                .init(color: .clear, location: 1),
+            ], startPoint: .leading, endPoint: .trailing)
+        }
+        .overlay(alignment: .top) {
+            Capsule(style: .continuous)
+                .fill(Color.teinteKiwi)
+                .frame(width: 4, height: 30)
+                .padding(.top, 4)
+        }
+        .frame(height: 52)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 2)
+                .onChanged { geste in
+                    let origine = depart ?? grammes
+                    if depart == nil { depart = grammes }
+                    let brut = origine - Double(geste.translation.width / Self.ecart) * pas
+                    let valeur = min(maximum, max(pas, (brut / pas).rounded() * pas))
+                    guard abs(valeur - grammes) >= pas / 2 else { return }
+                    HapticService.shared.selection()
+                    onChange(valeur)
+                }
+                .onEnded { _ in depart = nil }
+        )
+        .accessibilityElement()
+        .accessibilityLabel("Quantité en grammes")
+        .accessibilityValue("\(UnitPortionCatalog.formater(grammes)) grammes")
+        .accessibilityAdjustableAction { sens in
+            switch sens {
+            case .increment: onChange(min(maximum, grammes + pas))
+            case .decrement: onChange(max(pas, grammes - pas))
+            @unknown default: break
+            }
+        }
     }
 }
 

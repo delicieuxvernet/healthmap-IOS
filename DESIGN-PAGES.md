@@ -188,14 +188,35 @@
 >      échec d'analyse, « Corriger le texte » ramène ce champ au lieu d'imposer de tout redire ;
 >   4. **les résultats** : après « Lancer l'analyse », le pépin tourne dans **une feuille de verre
 >      DÉTACHÉE des bords** (marges de 8, rayon 44, posée en bas à la taille de ce qu'elle montre ;
->      elle défile si le contenu dépasse) ; le voile reste jusqu'à ce qu'elle redescende. « Ton déjeuner » en 24/700
->      (« Ton repas » tant que le repas n'est pas choisi) et « 3 aliments reconnus », les lignes en
->      cascade (pastille de 40, nom, quantité, kcal ; UNE seule déployée à la fois pour régler sa
->      quantité), le total qui compte, **les étiquettes de ce que le repas apporte** (« Protéines
->      +42 g », glucides, lipides, fibres : des grammes, jamais un objectif inventé), « Ajouter au
->      déjeuner » en verre vert de 54 pt avec son reflet, puis « Modifier les quantités ». Gardés
->      alors que la maquette ne les montre pas : la citation de la dictée, les avertissements, le
->      choix du repas, l'action bloquée tant qu'il manque une quantité, « Recommencer la dictée » ;
+>      elle défile si le contenu dépasse) ; le voile reste jusqu'à ce qu'elle redescende.
+>      **UN seul écran, ajouté en UN toucher** (maquette « un toucher » validée par Arthur le
+>      8 octobre 2026 : « trop de freins, trop de clics », la feuille précédente posait la même
+>      question trois fois et bloquait l'action) :
+>      - **le titre est le choix du repas** : l'illustration 3D du repas (celle de la capsule de
+>        confirmation), « Ton dîner » en 28/700, un chevron dans un rond de verre ; le toucher
+>        ouvre le menu des quatre repas. Le repas du vocal, sinon celui de l'heure
+>        (`MealSlot.from(date:)`) : affiché, jamais deviné en silence. Plus de rangée de tuiles ;
+>      - dessous, **la citation** (aliments reconnus en vert gras) et un rond de verre ↺ pour
+>        recommencer la dictée ;
+>      - **les lignes** en cascade : vignette de verre de 48 avec l'illustration 3D de l'aliment
+>        (`MealScanFluent`, sinon un couvert teinté), nom sur deux lignes, quantité (« 1 assiette
+>        moyenne · 200 g »), kcal, chevron. **Tout arrive déjà compté** ; seuls les doutes se
+>        montrent, d'un point ambré qui respire et d'un mot : « Portion estimée » (quantité non
+>        dite → portion standard : une unité de taille moyenne, sinon la portion du milieu de la
+>        base, sinon 100 g), « Type estimé » (aliment `a_verifier` → la proposition la plus
+>        probable compte). Leurs choix sont posés juste dessous, la réponse probable cochée de
+>        vert : trois pastilles de portion (tailles dans une mini-assiette où l'aliment grossit,
+>        ou 1 / 2 / 3 pour ce qui se compte) ou les aliments possibles en capsules. Un toucher
+>        corrige et la ligne se replie seule (0,65 s, le temps de voir la coche) ;
+>      - **toucher une ligne ouvre son réglage fin** (une seule à la fois) : unités, grammes et
+>        kcal en grand, **règle graduée** à faire glisser sous un curseur vert (pas de 5 g, 1 g sous
+>        40 g, tic haptique à chaque pas, portions proposées marquées d'un point vert),
+>        « Changer d'aliment » et « Retirer » ;
+>      - le total qui compte, **les étiquettes de ce que le repas apporte** (« Protéines +42 g »,
+>        glucides, lipides, fibres : des grammes, jamais un objectif inventé), puis « Ajouter au
+>        dîner » en verre vert de 54 pt avec son reflet, **jamais bloqué**. Retirés : « 3 aliments
+>        reconnus », « C'est pour quel repas ? » et ses tuiles, la consigne ambrée, « Modifier les
+>        quantités », le lien « Recommencer la dictée » du bas. Gardés : les avertissements ;
 >   5. **la confirmation sort de l'île** : à l'ajout (vibration de succès), la feuille redescend
 >      AUSSITÔT. Une capsule noire part de la place de la Dynamic Island (126 × 37), se déplie
 >      sous elle (350 × 68), sa pastille verte rebondit : « Ajouté au déjeuner », ce que le repas
