@@ -205,6 +205,14 @@ enum CalculApports {
     /// `EstimateurApports` (Ciqual × INCA 3 × ANSES 2021) et leur statut
     /// ne se déduit plus d'un seuil sur le score.
     static let version = "2026-10-08"
+
+    /// La clé qui date les scores de départ de Progrès
+    /// (`profiles.baseline_nutrient_scores`) : des scores d'un autre calcul ne
+    /// se comparent pas (audit des écrans, 8 oct. 2026 : « vitamine D en
+    /// baisse, de 55 à 15 % » entre l'ancien score en points et la nouvelle
+    /// couverture).
+    static let cleDuDepart = "_calcul"
+    static var empreinte: Int { Int(version.filter(\.isNumber)) ?? 0 }
 }
 
 // MARK: - Le registre

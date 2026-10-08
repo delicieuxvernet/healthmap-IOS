@@ -759,9 +759,11 @@ final class DashboardViewModel: ObservableObject {
     /// baseline dès le premier affichage. Non bloquant : un échec d'écriture
     /// n'est que loggué (l'utilisateur retentera au prochain chargement).
     private func captureBaselineIfNeeded() {
-        guard profile.baselineNutrientScores == nil, !nutrientScores.isEmpty else { return }
+        // Un départ d'un autre calcul ne se compare pas : il est recapturé.
+        guard baselineApports == nil, !nutrientScores.isEmpty else { return }
 
-        let baseline = nutrientScores
+        var baseline = nutrientScores
+        baseline[CalculApports.cleDuDepart] = CalculApports.empreinte
         // Copie en mémoire immédiate (la barre l'utilise tout de suite).
         profile.baselineNutrientScores = baseline
 
@@ -774,6 +776,14 @@ final class DashboardViewModel: ObservableObject {
                 AppLogger.database.report(error, context: "Capture baseline nutrient scores")
             }
         }
+    }
+
+    /// Les scores de départ de Progrès, seulement s'ils viennent du calcul
+    /// actuel ; sans la clé de datation.
+    var baselineApports: [String: Int]? {
+        guard let depart = profile.baselineNutrientScores,
+              depart[CalculApports.cleDuDepart] == CalculApports.empreinte else { return nil }
+        return depart.filter { $0.key != CalculApports.cleDuDepart }
     }
 
     // MARK: - Trigger AI Analysis
