@@ -342,15 +342,16 @@ final class QuestionnaireParcoursTests: XCTestCase {
 
     // MARK: Les pistes
 
+    /// Les pistes viennent de l'estimateur des apports (8 oct. 2026) : le
+    /// soleil n'y entre pas (la vitamine D se lit dans l'assiette), une
+    /// alimentation végétarienne, si (vitamine B12).
     func testUnePisteApparaitQuandOnRepond() {
-        allerJusqua(.soleil, femme: true)
-        XCTAssertTrue(vm.lectureBilan.pistes.isEmpty)
-        XCTAssertNil(vm.carteDeLEcran)
+        allerJusqua(.regime, femme: true)
+        XCTAssertFalse(vm.lectureBilan.pistes.contains(.vitB12))
 
-        repondre("sunExposure", "very_little"); repondre("skinType", "fair")
-        XCTAssertEqual(vm.lectureBilan.pistes, [.vitD])
-        XCTAssertEqual(vm.carteDeLEcran?.genre, .piste)
-        XCTAssertEqual(vm.carteDeLEcran?.nutriment, .vitD)
+        repondre("dietType", "vegetarien")
+        XCTAssertTrue(vm.lectureBilan.pistes.contains(.vitB12))
+        XCTAssertNotNil(vm.carteDeLEcran)
     }
 
     // MARK: Le Journal
