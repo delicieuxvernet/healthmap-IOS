@@ -188,7 +188,9 @@ enum AttentionMechanismCatalog {
                 habit: .init(icon: "cup.and.saucer.fill", line1: "Café pendant", line2: "le repas"),
                 mechanism: .init(icon: "magnet", line1: "Les tanins", line2: "captent le fer"),
                 impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "Jusqu'à −60 %", line2: "d'absorption"),
-                solution: "Décale ton café à 1 h après le repas : ton fer passe, ton café reste.",
+                // Morck et al. (1983) : pris 1 h APRÈS le repas, le café freine
+                // le fer autant qu'au repas ; 1 h avant, il ne le gêne pas.
+                solution: "Prends ton café au moins 1 h avant le repas plutôt qu'à table ou juste après : ton fer passe, ton café reste.",
                 nutrientId: "iron"
             )
         ),
@@ -204,18 +206,9 @@ enum AttentionMechanismCatalog {
                 nutrientId: "iron"
             )
         ),
-        // Écrans / stress / sommeil court → magnésium (croisement health.js).
-        Entry(
-            required: [["\\bmagnes"], ["\\becran", "\\bstress", "\\bsommeil", "\\bsoir", "\\bcoucher", "\\bdormir", "\\bnuit"]],
-            mechanism: AttentionMechanism(
-                teasing: "Ton rythme du soir puise dans tes réserves de magnésium.",
-                habit: .init(icon: "iphone", line1: "Écrans et stress", line2: "le soir"),
-                mechanism: .init(icon: "bolt.fill", line1: "Ton corps brûle", line2: "son magnésium"),
-                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "Réserves qui", line2: "s'épuisent"),
-                solution: "Coupe les écrans 30 min avant de dormir : ton magnésium travaille pour ta nuit, pas contre ton stress.",
-                nutrientId: "magnesium"
-            )
-        ),
+        // (8 oct. 2026) Plus d'entrée « écrans et stress épuisent ton
+        // magnésium » : aucune source ne le chiffre pour une personne, et
+        // l'estimateur des apports ne s'en sert pas. Repli générique.
         // Cuisson longue à l'eau → vitamine C (croisement health.js).
         Entry(
             required: [["vitamine c\\b"], ["\\bcuisson", "\\bbouill", "\\bcuire", "\\bcuit"]],
