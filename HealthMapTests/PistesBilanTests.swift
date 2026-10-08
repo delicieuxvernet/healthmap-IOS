@@ -128,8 +128,10 @@ final class PistesBilanTests: XCTestCase {
     }
 
     /// Le café APPORTE du magnésium (Ciqual) : c'est un bon point, plus un frein.
+    /// Un homme qui en boit beaucoup (INCA 3 : 146 mg par jour par le café et
+    /// le thé ; chez les femmes, la classe « beaucoup » est surtout du thé).
     func testLeCafeEstUnBonPointPourLeMagnesium() {
-        let p = femme35 { $0.caffeineIntake = "heavy" }
+        let p = profil { $0.gender = .homme; $0.age = "35"; $0.height = "178"; $0.weight = "75"; $0.caffeineIntake = "heavy" }
         let carte = PistesBilan.carte(pour: .boire, profil: p)
         XCTAssertEqual(carte?.genre, .bonPoint)
         XCTAssertEqual(carte?.nutriment, .magnesium)
@@ -137,7 +139,7 @@ final class PistesBilanTests: XCTestCase {
     }
 
     func testUnEcranNeReprendPasLesFaitsDUnAutre() {
-        let p = femme35 { $0.caffeineIntake = "heavy" }
+        let p = profil { $0.gender = .homme; $0.age = "35"; $0.height = "178"; $0.weight = "75"; $0.caffeineIntake = "heavy" }
         XCTAssertTrue(PistesBilan.faits(de: .alcoolTabac, profil: p).isEmpty)
         XCTAssertFalse(PistesBilan.faits(de: .boire, profil: p).isEmpty)
     }
