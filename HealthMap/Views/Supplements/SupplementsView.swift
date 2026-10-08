@@ -734,6 +734,8 @@ struct SupplementsView: View {
     /// rien de solide ne se dit.
     private func eclairage(for id: String) -> String? {
         guard let nutriment = NutrientID(rawValue: id) else { return nil }
+        // Seulement pour un apport à renforcer ou à surveiller (statut estimé).
+        if let statut = dashboardVM.statuts[id], !statut.estASuivre { return nil }
         return SymptomesApports.explication(pour: nutriment, symptomes: dashboardVM.profile.symptoms)
     }
 

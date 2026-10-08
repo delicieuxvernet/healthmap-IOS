@@ -166,6 +166,9 @@ struct ApportV2DetailSheet: View {
     /// déterministe, jamais le texte libre du bilan.
     private var eclairage: String? {
         guard let nutriment = apport.id.flatMap({ NutrientID(rawValue: $0) }) else { return nil }
+        // « Un apport bas peut expliquer… » : seulement pour un apport à
+        // renforcer ou à surveiller, jamais couvert ni « à affiner ».
+        if let statut = statutLocal, !statut.estASuivre { return nil }
         return SymptomesApports.explication(pour: nutriment, symptomes: dashboardVM.profile.symptoms)
     }
 
