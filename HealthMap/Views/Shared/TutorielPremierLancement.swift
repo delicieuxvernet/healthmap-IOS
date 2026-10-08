@@ -552,8 +552,9 @@ struct TutorielOverlayPrincipal: View {
 
 // MARK: - Bulle de la feuille de dictée (étape 4, sans voile)
 
-/// La liste reste entièrement manipulable : la seule question posée (la
-/// quantité manquante) est déjà mise en avant par la feuille elle-même.
+/// La liste reste entièrement manipulable : tout y est déjà compté, et les
+/// seules estimations (portion non dite, aliment incertain) sont mises en
+/// avant par la feuille elle-même, leur choix juste dessous.
 struct TutorielBulleVerifier: View {
     @ObservedObject var service: TutorielService
 
@@ -561,8 +562,8 @@ struct TutorielBulleVerifier: View {
         if service.etape == .verifier {
             TutorielBulle(
                 etape: .verifier,
-                titre: "On ne te demande que ce qui manque",
-                texte: Text("Ce qui est reconnu affiche sa quantité et ses calories. S'il manque une quantité, la ligne te la demande : un appui suffit."),
+                titre: "Tout est déjà compté",
+                texte: Text("Un point orange signale ce que Kiwio a estimé à ta place : un appui sur le bon choix suffit pour corriger. Sinon, ajoute directement."),
                 onPasser: { service.passer() }
             )
             .padding(.horizontal, 20)
