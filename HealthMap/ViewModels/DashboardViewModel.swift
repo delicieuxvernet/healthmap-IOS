@@ -472,7 +472,11 @@ final class DashboardViewModel: ObservableObject {
     /// rappelant `HealthCalculator.registreApports` : sinon la fiche et le
     /// tableau de bord ne diraient pas le même chiffre.
     var registre: [String: DetailApport] {
-        PriseDeSangApports.appliquer(registreSansPriseDeSang, priseDeSang: priseDeSang)
+        // Apport estimé : la prise de sang ne déplace plus le chiffre (une
+        // quantité estimée reste une quantité) ; elle ne change que le statut,
+        // porté par `statuts` et par le détail (audit des écrans, 8 oct. 2026).
+        if estimation != nil, profile.completed { return registreSansPriseDeSang }
+        return PriseDeSangApports.appliquer(registreSansPriseDeSang, priseDeSang: priseDeSang)
     }
 
     /// Questionnaire + journal, sans la prise de sang. Depuis l'audit de
@@ -485,11 +489,12 @@ final class DashboardViewModel: ObservableObject {
             return JournalApports.appliquer(HealthCalculator.registreApports(profile: profile), observations: observationsJournal)
         }
         let profil = ProfilEstimation(profile: profile)
+        let statuts = self.statuts
         var sortie: [String: DetailApport] = [:]
         for nutriment in NutrientID.allCases {
             let id = nutriment.rawValue
             guard let e = estimation.apports[id] else { continue }
-            sortie[id] = LectureEstimation.detail(id, e, profil: profil)
+            sortie[id] = LectureEstimation.detail(id, e.avecStatut(statuts[id] ?? e.statut), profil: profil)
         }
         return sortie
     }
@@ -646,6 +651,16 @@ final class DashboardViewModel: ObservableObject {
     /// canon. Vide avant le questionnaire (aucun score à corriger).
     func effetsPriseDeSang() -> [PriseDeSangApports.Effet] {
         guard profile.completed, priseDeSang != nil else { return [] }
+        // Apport estimé : ce que la prise de sang change, c'est le statut.
+        if let estimation {
+            let statuts = self.statuts
+            return NutrientData.all.compactMap { def in
+                let id = def.id.rawValue
+                guard let e = estimation.apports[id], let apres = statuts[id], apres != e.statut else { return nil }
+                let pct = LectureEstimation.couverture(e)
+                return PriseDeSangApports.Effet(id: id, avant: pct, apres: pct, statutAvant: e.statut, statutApres: apres)
+            }
+        }
         let sans = registreSansPriseDeSang
         let avec = registre
         return NutrientData.all.compactMap { def in

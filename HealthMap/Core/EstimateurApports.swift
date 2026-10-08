@@ -160,6 +160,22 @@ struct EstimationApport: Equatable {
     let topCourses: [ContributionAliment]
 }
 
+extension EstimationApport {
+    /// La même estimation, avec le statut que l'app retient (une prise de
+    /// sang récente prime) : tous les écrans qui lisent le détail d'un apport
+    /// disent alors le même statut.
+    func avecStatut(_ autre: StatutApport) -> EstimationApport {
+        guard autre != statut else { return self }
+        return EstimationApport(
+            id: id, apportEstime: apportEstime, unite: unite, reference: reference,
+            probabiliteAdequation: probabiliteAdequation, statut: autre, statutAlimentsSeuls: statutAlimentsSeuls,
+            categorieAlerte: categorieAlerte, alerteOuverte: alerteOuverte, joursConseilles: joursConseilles,
+            joursJournalRetenus: joursJournalRetenus, k: k, confiance: confiance,
+            decomposition: decomposition, topCourses: topCourses
+        )
+    }
+}
+
 struct SignalApport: Equatable {
     let id: String
     let message: String

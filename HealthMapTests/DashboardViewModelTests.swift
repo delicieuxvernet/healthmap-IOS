@@ -197,6 +197,28 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertEqual(mg.parts.reduce(0) { $0 + $1.valeur }, 100, "l'anneau ferme toujours à 100")
     }
 
+    /// Audit des écrans (8 oct. 2026) : une prise de sang ne déplace plus le
+    /// chiffre d'un apport estimé ; elle change son statut, partout.
+    func testUnePriseDeSangChangeLeStatutPasLeChiffre() throws {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.computeLocalScores()
+        let avant = try XCTUnwrap(vm.nutrientScores["iron"])
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "yyyy-MM-dd"
+        let ferritine = MarqueurSanguin(code: "ferritine", nutriment: "iron", libelle: "Ferritine", valeur: 9, unite: "µg/L",
+                                        borneBasse: 15, borneHaute: 150, position: .sousRepere)
+        vm.poserPriseDeSangPourTest(PriseDeSang(id: "test", takenAt: f.string(from: Date()), dateLue: true, markers: [ferritine]))
+        vm.computeLocalScores()
+
+        XCTAssertEqual(vm.nutrientScores["iron"], avant, "le chiffre reste la quantité estimée")
+        XCTAssertEqual(vm.statuts["iron"], .aRenforcer)
+        XCTAssertEqual(vm.registre["iron"]?.estimation?.statut, .aRenforcer, "le détail dit le même statut")
+        XCTAssertTrue(vm.apportsEnAlerte.contains("iron"))
+        let effet = try XCTUnwrap(vm.effetsPriseDeSang().first { $0.id == "iron" })
+        XCTAssertEqual(effet.statutApres, .aRenforcer)
+        XCTAssertEqual(effet.texteApres, "À renforcer")
+    }
+
     /// Le bilan rédigé porte le statut et le chiffre du calcul local.
     func testLeBilanRedigePrendLeStatutLocal() throws {
         let vm = makeVM(profile: makeProfileThomas())

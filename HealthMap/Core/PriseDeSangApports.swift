@@ -206,6 +206,14 @@ enum PriseDeSangApports {
         let id: String
         let avant: Int
         let apres: Int
+        /// Apport estimé (8 oct. 2026) : la prise de sang ne déplace plus le
+        /// chiffre, elle change le STATUT ; l'effet se lit alors en mots.
+        var statutAvant: StatutApport? = nil
+        var statutApres: StatutApport? = nil
+
+        /// « 62 » ou « À affiner ».
+        var texteAvant: String { statutAvant?.libelleCourt ?? "\(avant)" }
+        var texteApres: String { statutApres?.libelleCourt ?? "\(apres)" }
     }
 
     /// Le marqueur qui parle pour un apport (le premier relié, le serveur les
