@@ -8,13 +8,15 @@ import Foundation
 //
 // TROIS RÈGLES, à ne pas assouplir :
 //
-//   1. Une piste vient d'un FAIT du registre (`HealthCalculator.registreApports`),
-//      jamais d'un symptôme. C'est la doctrine de `SymptomesApports` : le score
-//      décide, le symptôme explique, après. Cocher « fatigue » n'affiche rien.
+//   1. Une piste vient de l'ESTIMATION des apports (`EstimateurApports`,
+//      Ciqual × INCA 3 × ANSES 2021, audit de fiabilité du 8 oct. 2026),
+//      jamais d'un symptôme ni d'une habitude sans effet démontré : le stress,
+//      les écrans, le sommeil ou le sport ne font plus de piste.
 //
 //   2. Aucune table n'est recopiée. Ce qu'un écran a appris se lit par
-//      DIFFÉRENCE : le registre du profil, moins le registre du même profil
-//      privé des réponses de cet écran. Si le moteur change, les pistes suivent.
+//      DIFFÉRENCE : la part de la référence couverte pour le profil, moins
+//      celle du même profil privé des réponses de cet écran. Si l'estimateur
+//      change, les pistes suivent.
 //
 //   3. Un fait qui ne dépend pas de la vie de la personne (son sexe, son âge)
 //      ne fait pas une piste à lui seul : il règle ses besoins
@@ -121,12 +123,11 @@ struct SyntheseBilan: Equatable {
 
 enum PistesBilan {
 
-    /// En dessous de ce total de points, le mode de vie fait une piste.
+    /// En dessous de cet écart de couverture (en points de la référence), les
+    /// habitudes déclarées font une piste.
     static let seuilPiste = -15
-    /// À partir de ce total, sans rien qui pèse, l'apport est « bien parti ».
+    /// À partir de cet écart, l'apport est « bien parti ».
     static let seuilBienParti = 5
-    /// Le seuil de l'app : sous 60, un apport est à renforcer.
-    static let seuilScore = 60
 
     // MARK: Le profil sans les réponses d'un écran
 
@@ -203,63 +204,69 @@ enum PistesBilan {
         "periodFlow", "pregnancyStatus",
     ]
 
-    // MARK: Ce qu'un écran a appris
+    // MARK: L'estimation
 
-    /// Les faits que les réponses de cet écran ont fait entrer dans le
-    /// registre : ses lignes, moins celles qui y seraient sans cet écran.
-    static func faits(de ecran: EcranBilan, profil: UserProfile) -> [FaitBilan] {
-        if ecran == .jamais { return faitsJamais(profil) }
-        guard !ecran.questions.isEmpty, ecran.repas == nil else { return [] }
+    /// Sous ce nombre de points de couverture, une différence ne fait pas un fait.
+    static let seuilFait = 3
+    /// Part de la référence que les courses doivent couvrir pour qu'un apport
+    /// soit « bien servi par ton assiette ».
+    static let partBienServi = 30
 
-        let avec = HealthCalculator.registreApports(profile: profil)
-        let sans = HealthCalculator.registreApports(profile: sansReponses(de: ecran, profil))
+    private static func estimer(_ profil: UserProfile) -> ResultatEstimation? {
+        EstimateurApports.partage?.estimer(ProfilEstimation(profile: profil))
+    }
 
-        var sortie: [FaitBilan] = []
+    /// La part de la référence couverte, apport par apport (0-100).
+    private static func couvertures(_ r: ResultatEstimation?) -> [NutrientID: Int] {
+        var sortie: [NutrientID: Int] = [:]
         for id in NutrientID.allCases {
-            var dejaLa = sans[id.rawValue]?.contributions ?? []
-            for ligne in avec[id.rawValue]?.contributions ?? [] {
-                if let index = dejaLa.firstIndex(of: ligne) {
-                    dejaLa.remove(at: index)
-                } else {
-                    sortie.append(FaitBilan(nutriment: id, libelle: ligne.libelle, delta: ligne.delta))
-                }
-            }
+            guard let e = r?.apports[id.rawValue] else { continue }
+            sortie[id] = LectureEstimation.couverture(e)
         }
         return sortie
     }
 
-    /// Le libellé d'un aliment que la personne ne mange jamais. Seuls ceux qui
-    /// pèsent sur un apport en ont un : les autres ne font pas de fait.
-    static let libellesJamais: [String: String] = [
-        "nuts": "Jamais de fruits à coque",
-        "fish_shellfish": "Jamais de poisson ni de crustacés",
-        "milk": "Jamais de lait de vache",
-        "egg": "Jamais d'œuf",
-        "wheat_gluten": "Jamais de blé ni de gluten",
-    ]
+    /// Ce que l'écran a déclaré, en mots de la personne.
+    static func libelle(de ecran: EcranBilan, profil: UserProfile) -> String {
+        switch ecran {
+        case .boire: return "Ton café, ton thé et ton eau"
+        case .alcoolTabac: return "Tes boissons alcoolisées"
+        case .aTable: return "Tes repas de la journée"
+        case .complements: return "Tes compléments"
+        case .regime:
+            switch profil.dietType {
+            case "vegetarien", "vegetarian": return "Alimentation végétarienne"
+            case "vegan": return "Alimentation végane"
+            default: return "Ton alimentation"
+            }
+        case .cycle:
+            switch profil.pregnancyStatus {
+            case "pregnant": return "Grossesse"
+            case "breastfeeding": return "Allaitement"
+            case "trying_to_conceive": return "Projet de grossesse"
+            default: return ["heavy", "very_heavy"].contains(profil.periodFlow) ? "Règles abondantes" : "Ton cycle"
+            }
+        default: return "Tes réponses"
+        }
+    }
 
-    /// Les évictions pèsent dans le registre sous une seule ligne (« antécédents,
-    /// opérations et allergies »). Ici on les nomme une par une, en exécutant
-    /// le bloc partagé du moteur sur une ardoise à zéro : aucun poids recopié.
-    static func faitsJamais(_ profil: UserProfile) -> [FaitBilan] {
+    // MARK: Ce qu'un écran a appris
+
+    /// Ce que les réponses de cet écran changent à la part de la référence
+    /// couverte : l'estimation du profil, moins celle du profil sans elles.
+    static func faits(de ecran: EcranBilan, profil: UserProfile) -> [FaitBilan] {
+        // Repères et activité physique ne règlent que la dépense, donc les
+        // références qui en dépendent (acides gras) : ce n'est pas une piste.
+        guard !ecran.questions.isEmpty, ecran.repas == nil, ecran != .reperes, ecran != .bouger else { return [] }
+        let avec = couvertures(estimer(profil))
+        let sans = couvertures(estimer(sansReponses(de: ecran, profil)))
+        let texte = libelle(de: ecran, profil: profil)
         var sortie: [FaitBilan] = []
-        for eviction in profil.allergies {
-            guard let libelle = libellesJamais[eviction] else { continue }
-            var seule = UserProfile.empty
-            seule.allergies = [eviction]
-            // Le régime « sans gluten » retire déjà l'iode : le moteur ne le
-            // compte qu'une fois, il lui faut donc le régime déclaré.
-            seule.dietType = profil.dietType
-
-            var ardoise: [String: Int] = [:]
-            for id in NutrientID.allCases { ardoise[id.rawValue] = 0 }
-            NutrientEngine.applyMedicalHistoryPenalties(&ardoise, profile: seule)
-
-            for id in NutrientID.allCases {
-                let delta = ardoise[id.rawValue] ?? 0
-                if delta != 0 {
-                    sortie.append(FaitBilan(nutriment: id, libelle: libelle, delta: delta))
-                }
+        for id in NutrientID.allCases {
+            guard let a = avec[id], let b = sans[id] else { continue }
+            let delta = a - b
+            if abs(delta) >= seuilFait {
+                sortie.append(FaitBilan(nutriment: id, libelle: texte, delta: delta))
             }
         }
         return sortie
@@ -267,33 +274,33 @@ enum PistesBilan {
 
     // MARK: L'état de chaque apport
 
-    /// Ce que le mode de vie dit de chaque apport, assiette mise à part.
+    /// Les écrans dont les réponses changent l'estimation avant l'assiette.
+    static let ecransQuiComptent: [EcranBilan] = [.boire, .alcoolTabac, .regime, .aTable, .cycle]
+
+    /// Ce que les habitudes déclarées disent de chaque apport, assiette mise à
+    /// part : l'estimation sans les courses, comparée à celle d'une personne
+    /// du même sexe et du même âge qui n'aurait rien déclaré.
     static func lecture(profil: UserProfile) -> LectureBilan {
-        // Sans les courses : le registre ne garde que ce que la personne a
-        // déclaré de sa vie et de ses habitudes.
         var horsAssiette = profil
         horsAssiette.groceries = [:]
+        var typique = horsAssiette
+        for ecran in ecransQuiComptent { typique = sansReponses(de: ecran, typique) }
 
-        let registre = HealthCalculator.registreApports(profile: horsAssiette)
-        let sansReperes = HealthCalculator.registreApports(
-            profile: sansReponses(de: .reperes, horsAssiette)
-        )
+        let declare = couvertures(estimer(horsAssiette))
+        let reference = couvertures(estimer(typique))
 
         var etats: [NutrientID: EtatApport] = [:]
         var sommes: [NutrientID: Int] = [:]
         for id in NutrientID.allCases {
-            guard let detail = registre[id.rawValue] else {
+            guard let a = declare[id], let b = reference[id] else {
                 etats[id] = .enAttente
                 continue
             }
-            let somme = detail.brut - detail.depart
+            let somme = a - b
             sommes[id] = somme
-            // Un frein qui tient encore une fois le sexe, l'âge et le poids
-            // retirés : c'est un frein vécu.
-            let freinVecu = !(sansReperes[id.rawValue]?.freins.isEmpty ?? true)
-            if somme <= seuilPiste && freinVecu {
+            if somme <= seuilPiste {
                 etats[id] = .aSurveiller
-            } else if somme >= seuilBienParti && detail.freins.isEmpty {
+            } else if somme >= seuilBienParti {
                 etats[id] = .bienParti
             } else {
                 etats[id] = .enAttente
@@ -320,6 +327,7 @@ enum PistesBilan {
     /// rien à dire. Rien n'est jamais inventé pour remplir la place.
     static func carte(pour ecran: EcranBilan, profil: UserProfile) -> CartePiste? {
         if ecran == .reperes { return carteDesBesoins(profil) }
+        if ecran == .complements { return carteDesComplements(profil) }
 
         let appris = faits(de: ecran, profil: profil)
         let freins = appris.filter { $0.delta < 0 }
@@ -328,23 +336,13 @@ enum PistesBilan {
             let estPiste = lecture(profil: profil).etats[cible] == .aSurveiller
             let nom = NutrientData.definition(for: cible).label
             let raisons = freins.filter { $0.nutriment == cible }.map(\.libelle)
-
-            var titre = estPiste ? "\(nom) : à surveiller" : "\(nom) : ça compte"
-            var texte = ecran.estApresLesRepas
-                ? "Ton bilan en tient compte."
-                : "Ton assiette dira si elle compense."
-            // Le sport ne retire rien : il augmente ce dont le corps a besoin.
-            if ecran == .bouger && profil.isActive {
-                titre = "Sport régulier : besoins un peu plus hauts"
-                texte = "Magnésium, fer et zinc partent plus vite. Ton assiette dira si elle suit."
-            }
             return CartePiste(
                 genre: estPiste ? .piste : .note,
                 nutriment: cible,
                 surtitre: estPiste ? "Piste repérée" : "C'est noté",
-                titre: titre,
+                titre: estPiste ? "\(nom) : à surveiller" : "\(nom) : ça compte",
                 raisons: raisons,
-                texte: texte
+                texte: ecran.estApresLesRepas ? "Ton bilan en tient compte." : "Ton assiette dira si elle compense."
             )
         }
 
@@ -353,15 +351,26 @@ enum PistesBilan {
             .filter { $0.delta >= seuilBienParti }
             .sorted { a, b in a.delta != b.delta ? a.delta > b.delta : rang(a.nutriment) < rang(b.nutriment) }
         guard let appui = appuis.first else { return nil }
-
-        let titre = appui.libelle.hasPrefix("Tu prends déjà")
-            ? "\(appui.libelle) : c'est compté"
-            : "\(appui.libelle) : un bon point pour \(possessif(appui.nutriment))"
         return CartePiste(
             genre: .bonPoint,
             nutriment: appui.nutriment,
             surtitre: "Bon point",
-            titre: titre,
+            titre: "\(appui.libelle) : un bon point pour \(possessif(appui.nutriment))",
+            raisons: [],
+            texte: nil
+        )
+    }
+
+    /// Un complément déclaré couvre son apport : on le dit, sans dose.
+    static func carteDesComplements(_ profil: UserProfile) -> CartePiste? {
+        guard let r = estimer(profil),
+              let couvert = NutrientID.allCases.first(where: { r.apports[$0.rawValue]?.statut == .couvertParComplement })
+        else { return nil }
+        return CartePiste(
+            genre: .bonPoint,
+            nutriment: couvert,
+            surtitre: "Bon point",
+            titre: "Tes compléments : c'est compté",
             raisons: [],
             texte: nil
         )
@@ -379,11 +388,13 @@ enum PistesBilan {
         }
     }
 
-    /// « Tes besoins sont calculés » : les vrais chiffres de cette personne,
-    /// ceux de `BesoinsDeReference`.
+    /// « Tes besoins sont calculés » : les références ANSES 2021 de cette
+    /// personne, celles de l'estimateur.
     static func carteDesBesoins(_ profil: UserProfile) -> CartePiste {
+        let r = estimer(profil)
         func besoin(_ id: NutrientID) -> Int {
-            Int(BesoinsDeReference.besoin(id, profil: profil).rounded())
+            if let repere = r?.apports[id.rawValue]?.reference.valeurRepere { return Int(repere.rounded()) }
+            return Int(BesoinsDeReference.besoin(id, profil: profil).rounded())
         }
         return CartePiste(
             genre: .besoins,
@@ -397,13 +408,20 @@ enum PistesBilan {
 
     // MARK: L'assiette
 
+    /// La part de la référence que les courses couvrent, de 0 à 1.
+    private static func partDesCourses(_ e: EstimationApport) -> Double {
+        guard e.reference.type != "LSS", let repere = e.reference.valeurRepere, repere > 0 else { return 0 }
+        return e.decomposition.courses / repere
+    }
+
     /// Remplissage de la jauge de chaque apport pendant qu'on coche ses
-    /// aliments, de 0 à 1 : la part de la cible de la semaine déjà atteinte.
+    /// aliments, de 0 à 1 : la part de la référence que les courses couvrent.
     static func jauges(profil: UserProfile) -> [NutrientID: Double] {
+        let r = estimer(profil)
         var sortie: [NutrientID: Double] = [:]
-        for apport in GroceryNutrient.allCases {
-            guard let id = NutrientID(rawValue: apport.rawValue) else { continue }
-            sortie[id] = NutrientEngine.couvertureDesCourses(profil, apport)
+        for id in NutrientID.allCases {
+            guard let e = r?.apports[id.rawValue] else { continue }
+            sortie[id] = min(1, max(0, partDesCourses(e)))
         }
         return sortie
     }
@@ -417,38 +435,38 @@ enum PistesBilan {
 
     // MARK: L'écran de fin
 
-    /// Le bilan en une phrase et trois lignes, sur les VRAIS scores : ceux que
-    /// la personne retrouvera dans son bilan une minute plus tard.
+    /// Le bilan en une phrase et trois lignes, sur les VRAIS statuts : ceux
+    /// que la personne retrouvera dans son bilan une minute plus tard. Une
+    /// estimation « à affiner » n'est pas comptée : on ne l'affirme pas.
     static func synthese(profil: UserProfile) -> SyntheseBilan {
-        let registre = HealthCalculator.registreApports(profile: profil)
+        let r = estimer(profil)
         let assietteConnue = !profil.groceries.isEmpty
 
-        // Les apports sous le seuil, du plus bas au plus haut.
-        var bas: [NutrientID] = []
-        var scores: [NutrientID: Int] = [:]
-        for id in NutrientID.allCases {
-            guard let detail = registre[id.rawValue] else { continue }
-            scores[id] = detail.score
-            if detail.score < seuilScore { bas.append(id) }
+        func priorite(_ s: StatutApport?) -> Int { s == .aRenforcer ? 0 : 1 }
+        var bas: [NutrientID] = NutrientID.allCases.filter {
+            let s = r?.apports[$0.rawValue]?.statut
+            return s == .aRenforcer || s == .aSurveiller
         }
+        let couverture = couvertures(r)
         bas.sort { a, b in
-            let sa = scores[a] ?? 0
-            let sb = scores[b] ?? 0
+            let pa = priorite(r?.apports[a.rawValue]?.statut), pb = priorite(r?.apports[b.rawValue]?.statut)
+            if pa != pb { return pa < pb }
+            let sa = couverture[a] ?? 0, sb = couverture[b] ?? 0
             return sa != sb ? sa < sb : rang(a) < rang(b)
         }
 
         var bienServis: [NutrientID] = []
         if assietteConnue {
-            for apport in GroceryNutrient.allCases {
-                guard NutrientEngine.foodDeltaBrut(profil, apport) >= seuilBienParti,
-                      let id = NutrientID(rawValue: apport.rawValue) else { continue }
+            for id in NutrientID.allCases {
+                guard let e = r?.apports[id.rawValue], partDesCourses(e) * 100 >= Double(partBienServi) else { continue }
                 bienServis.append(id)
             }
         }
 
         var lignes: [SyntheseBilan.Ligne] = []
         for id in bas.prefix(3) {
-            lignes.append(SyntheseBilan.Ligne(nutriment: id, mention: "à surveiller", aSurveiller: true))
+            let mention = r?.apports[id.rawValue]?.statut == .aRenforcer ? "à renforcer" : "à surveiller"
+            lignes.append(SyntheseBilan.Ligne(nutriment: id, mention: mention, aSurveiller: true))
         }
         // S'il reste de la place : les pistes que l'assiette a rattrapées.
         for piste in lecture(profil: profil).pistes {
