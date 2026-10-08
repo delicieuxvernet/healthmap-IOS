@@ -166,10 +166,10 @@ struct BriefDuJourView: View {
             ecranHier(couverts: couverts, avantHier: avantHier)
         case .rienHier(let repas):
             ecranRienHier(repas: repas)
-        case .manques(let manques):
-            ecranManques(manques)
         case .effort(let effort):
             ecranEffort(effort)
+        case .priorite(let priorite):
+            ecranPriorite(priorite)
         case .cible(let cible):
             ecranCible(cible)
         case .invitation(let cible):
@@ -249,27 +249,11 @@ struct BriefDuJourView: View {
         }
     }
 
-    private func ecranManques(_ manques: [BriefDuJour.Manque]) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Ce qui a manqué hier")
-            ForEach(manques, id: \.id) { manque in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(manque.nom)
-                        .font(.dsHeadline)
-                        .foregroundStyle(Color.dsTexte)
-                    RecapJaugeApport(
-                        pourcent: manque.pourcent,
-                        couleur: NutrientData.definition(for: manque.id)?.color ?? .dsAccent
-                    )
-                }
-                .padding(.bottom, Theme.spacingSM)
-            }
-            if let plusBas = manques.first, plusBas.pourcent < 100 {
-                Text("Il t'a manqué \(100 - plusBas.pourcent) % \(NomNutriment.complement(id: plusBas.id, nom: plusBas.nom)) : c'est ta priorité du jour.")
-                    .font(.dsSousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+    /// Ce qui a manqué hier et l'aliment qui le remonte : une colonne, un
+    /// chiffre héros, le bouton sous le pouce (`BriefPrioriteContenu`).
+    private func ecranPriorite(_ priorite: PrioriteDuJour) -> some View {
+        VStack(spacing: Theme.spacingLG) {
+            BriefPrioriteContenu(priorite: priorite)
             if estDernier { boutonFin }
         }
     }

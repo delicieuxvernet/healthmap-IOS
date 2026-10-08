@@ -158,10 +158,114 @@ final class BriefDuJourTests: XCTestCase {
             maintenant: date(heure: 8)
         )
         let slides = BriefDuJourBuilder.slides(brief: brief, proposerInvitation: true)
-        XCTAssertEqual(slides.first?.id, "intro")
-        XCTAssertEqual(slides.last?.id, "invitation")
-        XCTAssertTrue(slides.map(\.id).contains("hier"))
-        XCTAssertTrue(slides.map(\.id).contains("manques"))
+        // La priorité du jour ferme le brief, juste avant l'invitation.
+        XCTAssertEqual(slides.map(\.id), ["intro", "hier", "priorite", "invitation"])
+    }
+
+    // MARK: - Priorité du jour (maquette « A », 8 oct. 2026)
+
+    private let vitD = CibleNutritionnelle(
+        id: "vitD", nom: "Vitamine D", aliments: ["Œufs", "Saumon vapeur", "Sardines en boîte"], conseil: nil
+    )
+
+    /// Compositions Ciqual pour 100 g (valeurs de la base au 8 oct. 2026).
+    private let compositions: Compositions = [
+        "ciqual:22010": CompositionAliment(estime: false, apports: ["vitD": 44.8, "iron": 1.72]),
+        "ciqual:26038": CompositionAliment(estime: false, apports: ["vitD": 348]),
+        "ciqual:26034": CompositionAliment(estime: false, apports: ["vitD": 302.4, "iron": 1.97]),
+        "ciqual:8704": CompositionAliment(estime: false, apports: ["iron": 22.8]),
+    ]
+
+    /// Hier (9 sept.) noté en deux repas.
+    private func briefAvecHier(
+        cibles: [CibleNutritionnelle],
+        micros: [(String, Int)]
+    ) -> BriefDuJour {
+        BriefDuJourBuilder.construire(
+            prenom: "Léa",
+            cibles: cibles,
+            repas: [
+                repas(jour: 9, micros: micros),
+                repas(jour: 9, heure: 20, slot: .dinner, micros: []),
+            ],
+            maintenant: date(heure: 8)
+        )
+    }
+
+    func testPriorite_proposeLAlimentQuiApporteLePlus_etProjette() throws {
+        let fer = CibleNutritionnelle(id: "iron", nom: "Fer", aliments: ["Lentilles"], conseil: nil)
+        let brief = briefAvecHier(cibles: [vitD, fer], micros: [("vitD", 22), ("iron", 38)])
+        let priorite = try XCTUnwrap(BriefDuJourBuilder.priorite(brief: brief, compositions: compositions))
+
+        XCTAssertEqual(priorite.id, "vitD")
+        XCTAssertEqual(priorite.pourcentHier, 22)
+        XCTAssertEqual(priorite.titre, "Ta vitamine D a manqué")
+        // Œufs : 2 œufs = 45 UI, 4 points, sous le seuil. Saumon : 1 pavé de
+        // 130 g = 452 UI sur 1 000, 45 points. Sardines : 30 points.
+        XCTAssertEqual(priorite.remede?.nom, "Saumon")
+        XCTAssertEqual(priorite.remede?.portion, "1 pavé")
+        XCTAssertEqual(priorite.remede?.apport, 45)
+        XCTAssertEqual(priorite.remede?.illustration, "fluent_fish")
+        XCTAssertEqual(priorite.projection, 67)
+        // Les autres idées restent telles que le bilan les écrit.
+        XCTAssertEqual(priorite.autresAliments, ["Œufs", "Sardines en boîte"])
+        // Le fer, resté sous le repère, descend d'un cran.
+        XCTAssertEqual(priorite.aussiBas?.id, "iron")
+        XCTAssertEqual(priorite.aussiBas?.pourcent, 38)
+    }
+
+    func testPriorite_sansComposition_premiereIdeeSansChiffre() throws {
+        let brief = briefAvecHier(cibles: [vitD], micros: [("vitD", 22)])
+        let priorite = try XCTUnwrap(BriefDuJourBuilder.priorite(brief: brief, compositions: [:]))
+
+        XCTAssertEqual(priorite.remede?.nom, "Œufs")
+        XCTAssertNil(priorite.remede?.portion, "pas de portion sans chiffre")
+        XCTAssertNil(priorite.remede?.apport)
+        XCTAssertNil(priorite.projection, "pas de ligne pointillée sans mesure")
+        XCTAssertEqual(priorite.autresAliments, ["Saumon vapeur", "Sardines en boîte"])
+        XCTAssertNil(BriefPrioriteContenu.ligneApport(try XCTUnwrap(priorite.remede)))
+    }
+
+    func testPriorite_projectionPlafonneeA100() throws {
+        let fer = CibleNutritionnelle(id: "iron", nom: "Fer", aliments: ["Boudin noir"], conseil: nil)
+        let brief = briefAvecHier(cibles: [fer], micros: [("iron", 40)])
+        let priorite = try XCTUnwrap(BriefDuJourBuilder.priorite(brief: brief, compositions: compositions))
+
+        // 120 g × 22,8 mg = 27,4 mg pour une référence de 18 mg.
+        XCTAssertEqual(priorite.remede?.apport, 152)
+        XCTAssertEqual(priorite.projection, 100)
+        XCTAssertEqual(priorite.titre, "Ton fer a manqué")
+        XCTAssertEqual(BriefPrioriteContenu.ligneApport(try XCTUnwrap(priorite.remede)),
+                       "1 portion · tout ton besoin du jour")
+    }
+
+    func testPriorite_ligneApport_portionEtPourcentage() {
+        let remede = PrioriteDuJour.Remede(nom: "Sardines", portion: "1 boîte", apport: 30, illustration: nil)
+        XCTAssertEqual(BriefPrioriteContenu.ligneApport(remede), "1 boîte · +\(DS.pourcent(30)) de ton besoin")
+    }
+
+    func testPriorite_toutAuDessusDuRepere_retombeSurLaCible() {
+        let brief = briefAvecHier(cibles: [vitD], micros: [("vitD", 85)])
+        XCTAssertNil(BriefDuJourBuilder.priorite(brief: brief, compositions: compositions))
+
+        let slides = BriefDuJourBuilder.slides(brief: brief, proposerInvitation: false, compositions: compositions)
+        XCTAssertEqual(slides.map(\.id), ["intro", "hier", "cible"])
+    }
+
+    func testPriorite_deuxiemeApportAuDessusDuRepere_nEstPasCite() throws {
+        let fer = CibleNutritionnelle(id: "iron", nom: "Fer", aliments: [], conseil: nil)
+        let brief = briefAvecHier(cibles: [vitD, fer], micros: [("vitD", 22), ("iron", 75)])
+        let priorite = try XCTUnwrap(BriefDuJourBuilder.priorite(brief: brief, compositions: compositions))
+        XCTAssertNil(priorite.aussiBas)
+    }
+
+    func testPriorite_titreAccorde() {
+        func titre(_ id: String, _ nom: String) -> String {
+            PrioriteDuJour(id: id, nom: nom, pourcentHier: 20, remede: nil, autresAliments: [], aussiBas: nil).titre
+        }
+        XCTAssertEqual(titre("vitD", "Vitamine D"), "Ta vitamine D a manqué")
+        XCTAssertEqual(titre("omega3", "Oméga-3"), "Tes oméga-3 ont manqué")
+        XCTAssertEqual(titre("magnesium", "Magnésium"), "Ton magnésium a manqué")
     }
 
     func testComparaison_jamaisCulpabilisante() {
