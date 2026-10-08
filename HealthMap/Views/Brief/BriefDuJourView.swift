@@ -35,6 +35,14 @@ struct BriefDuJourView: View {
 
     private var estDernier: Bool { index >= slides.count - 1 }
 
+    /// La priorité du jour garde son bouton HORS du défilement : sur un
+    /// iPhone de 6,1", sphère, carte et ligne du fer poussaient « C'est
+    /// parti » de 35 pt sous le bord. Le contenu peut glisser, pas le bouton.
+    private var boutonEpingle: Bool {
+        guard estDernier, case .priorite? = slideCourant else { return false }
+        return true
+    }
+
     /// Typée `AnyTransition` (comme dans le récap) : en ternaire, `.opacity`
     /// est ambigu depuis iOS 17 (`AnyTransition` ou `Transition`).
     private var transitionEcran: AnyTransition {
@@ -79,6 +87,11 @@ struct BriefDuJourView: View {
                                 terminer(raison: "glisser")
                             }
                         )
+                    }
+
+                    if boutonEpingle {
+                        boutonFin
+                            .padding(.horizontal, Theme.spacingLG)
                     }
 
                     Text("Calculé sur les repas que tu as notés.")
@@ -250,12 +263,10 @@ struct BriefDuJourView: View {
     }
 
     /// Ce qui a manqué hier et l'aliment qui le remonte : une colonne, un
-    /// chiffre héros, le bouton sous le pouce (`BriefPrioriteContenu`).
+    /// chiffre héros (`BriefPrioriteContenu`). Son bouton est épinglé sous le
+    /// défilement (`boutonEpingle`).
     private func ecranPriorite(_ priorite: PrioriteDuJour) -> some View {
-        VStack(spacing: Theme.spacingLG) {
-            BriefPrioriteContenu(priorite: priorite)
-            if estDernier { boutonFin }
-        }
+        BriefPrioriteContenu(priorite: priorite)
     }
 
     private func ecranEffort(_ effort: BriefDuJour.Effort) -> some View {

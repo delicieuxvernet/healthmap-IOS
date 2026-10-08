@@ -296,7 +296,8 @@
 >   dessous, le chiffre héros « 22 % de ton besoin couvert hier » · la carte « Aujourd'hui,
 >   ajoute » (illustration 3D, aliment, « 1 boîte · +30 % de ton besoin », « Sinon : … ») · la
 >   ligne « Aussi à remonter : ton fer 38 % » (seulement si un 2ᵉ apport est sous 70 %) · le
->   bouton « C'est parti » sous le pouce. Le même aliment est posé sur la sphère, à la ligne
+>   bouton « C'est parti », épinglé sous le défilement (sphère de 176 pt : tout tient sans défiler sur
+>   un iPhone de 6,1"). Le même aliment est posé sur la sphère, à la ligne
 >   pointillée qu'il atteindrait (plafonnée à 100 %). **Aucun chiffre inventé** : la table ne porte
 >   que le code Ciqual et la portion ; l'apport se calcule depuis la composition de la base, avec
 >   la référence des repas notés (`canonRDA`). Parmi les idées du bilan, l'aliment proposé est
