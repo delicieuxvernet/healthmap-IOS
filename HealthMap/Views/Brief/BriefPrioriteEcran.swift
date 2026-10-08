@@ -12,7 +12,7 @@ import SwiftUI
 //      apporte. Le même aliment est posé sur la sphère, à la ligne pointillée
 //      qu'il atteindrait ;
 //   4. le deuxième apport resté bas, sur une ligne ;
-//   5. le bouton, sous le pouce (posé par `BriefDuJourView`).
+//   5. le bouton, sous le pouce, épinglé hors du défilement (`BriefDuJourView`).
 // Un seul chiffre héros. Un aliment que la base ne chiffre pas s'affiche sans
 // portion ni ligne pointillée : on ne montre que ce qui est mesuré.
 
@@ -23,7 +23,9 @@ struct BriefPrioriteContenu: View {
     @State private var chiffre: Double = 0
     @State private var projectionVisible = false
 
-    private static let diametre: CGFloat = 200
+    /// 176 pt : sphère, carte et ligne du fer tiennent sans défiler sur un
+    /// iPhone de 6,1" (le bouton est épinglé sous le contenu).
+    private static let diametre: CGFloat = 176
 
     private var teinte: Color { Color.nutrientColor(for: priorite.id) }
     private var teinteTexte: Color { Color.teinteApportTexte(for: priorite.id) }
@@ -44,16 +46,16 @@ struct BriefPrioriteContenu: View {
                 .accessibilityAddTraits(.isHeader)
 
             heros
-                .padding(.top, 22)
+                .padding(.top, 18)
 
             if let remede = priorite.remede {
                 carteRemede(remede)
-                    .padding(.top, 22)
+                    .padding(.top, 18)
             }
 
             if let aussiBas = priorite.aussiBas {
                 ligneAussiBas(aussiBas)
-                    .padding(.top, 14)
+                    .padding(.top, 12)
             }
         }
         .frame(maxWidth: .infinity)
