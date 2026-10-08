@@ -617,6 +617,86 @@ final class ScreenshotsUITests: XCTestCase {
         sleep(1)
     }
 
+    // MARK: - 6. Micronutriments en gratuit + « Écrire » (7 octobre 2026)
+    //
+    // Le compte d'audit est gratuit avec un bilan fait : la carte des
+    // micronutriments s'affiche verrouillée (noms nets, « Débloquer avec
+    // Premium » sur chaque ligne). Puis « Écrire » : un texte tapé, puis
+    // « Effacer ». ⚠️ Ne touche JAMAIS « Lancer l'analyse » ni « Ajouter » :
+    // rien n'est envoyé ni enregistré.
+
+    func test06_MicrosGratuitEtEcrire() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
+        attendreChargement()
+        sleep(3)
+
+        // Descendre jusqu'à la carte (son bouton d'essai en bas).
+        let essai = app.buttons["journal.micros.debloquer"]
+        for _ in 0..<10 where !(essai.exists && essai.isHittable) {
+            app.swipeUp(velocity: .slow)
+            sleep(1)
+        }
+        let voirLes = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Voir les")).firstMatch
+        // Le haut de la carte : on remonte d'un cran pour voir l'en-tête.
+        app.swipeDown(velocity: .slow)
+        sleep(1)
+        snap("01-micros-gratuit-haut")
+        app.swipeUp(velocity: .slow)
+        sleep(1)
+        snap("02-micros-gratuit-bas")
+
+        if voirLes.waitForExistence(timeout: 3) {
+            taper(voirLes)
+            sleep(2)
+            snap("03-micros-deplie")
+            app.swipeUp(velocity: .slow)
+            sleep(1)
+            snap("04-micros-deplie-suite")
+        }
+        let mineraux = app.buttons["Minéraux"].firstMatch
+        if mineraux.exists {
+            for _ in 0..<4 where !mineraux.isHittable { app.swipeDown(velocity: .slow); sleep(1) }
+            taper(mineraux)
+            sleep(1)
+            snap("05-micros-filtre-mineraux")
+        }
+
+        // « Écrire » : remonter en haut du Journal, ouvrir la saisie.
+        for _ in 0..<8 { app.swipeDown(velocity: .fast) }
+        sleep(1)
+        if app.buttons["journal.autres"].waitForExistence(timeout: 5) {
+            if !app.buttons["Écrire"].exists { taper(app.buttons["journal.autres"]) }
+            let ecrire = app.buttons["Écrire"].firstMatch
+            if ecrire.waitForExistence(timeout: 5) {
+                taper(ecrire)
+                sleep(2)
+                snap("06-ecrire-vide")
+                let champ = app.textFields["journal.texte"].exists ? app.textFields["journal.texte"] : app.textViews["journal.texte"]
+                if champ.waitForExistence(timeout: 5) {
+                    fermerTutorielClavier()
+                    champ.typeText("150 g de pâtes, du poulet et une cuillère d'huile d'olive")
+                    sleep(1)
+                    snap("07-ecrire-texte")
+                    let effacer = app.buttons["journal.texte.effacer"]
+                    if effacer.waitForExistence(timeout: 3) {
+                        taper(effacer)
+                        sleep(1)
+                        snap("08-ecrire-efface")
+                    }
+                }
+                fermerFeuille()
+            }
+        }
+    }
+
     /// Laisse le temps au Journal de charger ses données (journal, bilan).
     private func attendreChargement() {
         autoriserSante()
