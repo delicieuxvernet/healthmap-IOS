@@ -709,21 +709,33 @@ final class ScreenshotsUITests: XCTestCase {
         snap("27-bilan-provisoire")
         guard bilanSuite("Passer à table") else { return quitterLeBilan() }
 
-        // Les repas : on choisit chaque moment par son onglet (l'écran peut
-        // avancer seul d'un repas), on remplit, on photographie.
-        let repas: [(onglet: String, nom: String, choix: [[String]])] = [
-            ("Petit déj", "petit-dej", [["Pain complet", "Tartines", "Pain"], ["Œufs", "Oeufs", "Yaourt nature"], ["Kiwis", "Banane"]]),
-            ("Midi", "midi", [["Poulet"], ["Riz blanc", "Pâtes"], ["Carottes", "Salade verte"]]),
-            ("Goûter", "gouter", [["Amandes", "Banane", "Pomme"]]),
-            ("Soir", "soir", [["Saumon", "Thon en boîte"], ["Pommes de terre", "Riz blanc"], ["Salade verte", "Tomates"]]),
-        ]
-        for (i, moment) in repas.enumerated() {
-            let onglet = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", moment.onglet)).firstMatch
-            if onglet.waitForExistence(timeout: 3) { taper(onglet); sleep(1) }
-            for groupe in moment.choix { bilanToucherPremier(groupe) }
-            snap(String(format: "%02d-bilan-repas-%@", 28 + i, moment.nom))
+        // Les repas : l'écran ouvre sur le prochain moment à remplir. On y
+        // choisit ce qui est proposé, on photographie, puis le bouton du bas
+        // (« Repas suivant : … ») jusqu'à « J'ai fini ma journée ».
+        let choix = [["Poulet", "Saumon", "Pain complet"],
+                     ["Riz blanc", "Pommes de terre", "Bananes"],
+                     ["Carottes", "Salade verte", "Amandes"]]
+        var fini = false
+        for etape in 0..<5 {
+            for groupe in choix { bilanToucherPremier(groupe) }
+            snap(String(format: "%02d-bilan-repas-%d", 28 + etape, etape + 1))
+            let finJournee = app.buttons["J'ai fini ma journée"].firstMatch
+            if finJournee.exists && finJournee.isEnabled {
+                taper(finJournee)
+                sleep(1)
+                fini = true
+                break
+            }
+            let suivant = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Repas suivant")).firstMatch
+            guard suivant.waitForExistence(timeout: 3) else { break }
+            taper(suivant)
+            sleep(1)
         }
-        guard bilanSuite("J'ai fini ma journée") else { return quitterLeBilan() }
+        guard fini else {
+            snap("79-bilan-bloque")
+            XCTFail("« J'ai fini ma journée » jamais atteint.")
+            return quitterLeBilan()
+        }
 
         bilanToucherPremier(["Je mange de tout"])
         snap("34-bilan-jamais")
