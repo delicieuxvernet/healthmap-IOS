@@ -119,7 +119,7 @@ enum ResumeWidgets {
         }
         let b = secondaires[1]
         let motB = mot(b, registre: registre)
-        guard bande(a, registre: registre) == bande(b, registre: registre), motA == motB else {
+        guard bande(a, registre: registre) == bande(b, registre: registre), (motA == "à affiner") == (motB == "à affiner") else {
             return "\(sujetA) \(verbeA) \(motA), \(NomApport.avecArticle(id: b.id, repli: b.nom)) \(motB)."
         }
         // Accord du pluriel : féminin seulement si les deux le sont.
