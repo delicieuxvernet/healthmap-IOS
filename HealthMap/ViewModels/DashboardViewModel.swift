@@ -514,6 +514,15 @@ final class DashboardViewModel: ObservableObject {
         return sortie
     }
 
+    /// Les apports dont l'app peut AFFIRMER qu'ils sont à renforcer (statut
+    /// « à renforcer » de l'estimateur, ou prise de sang sous le repère).
+    /// Sans estimation, l'ancien seuil (sous 60). Ordre du catalogue.
+    var apportsEnAlerte: [String] {
+        let statuts = self.statuts
+        guard !statuts.isEmpty else { return nutrients.filter { $0.score < 60 }.map(\.id) }
+        return NutrientID.allCases.map(\.rawValue).filter { statuts[$0]?.estUneAlerte == true }
+    }
+
     /// Les trois apports du bilan rédigé portent le statut et le chiffre du
     /// calcul local : un seul chiffre, un seul statut partout.
     private func alignerBilan() {

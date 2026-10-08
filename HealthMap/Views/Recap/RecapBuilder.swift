@@ -85,7 +85,10 @@ enum RecapBuilder {
         }
 
         // ⑤ La tension : combien, sans dire lesquels.
-        let aRenforcer = apports.filter { $0.statut != .couvre }
+        // Sous la référence et affirmable : alerte (`aCombler`) ou « à
+        // surveiller » (`aRenforcer`) ; une estimation « à affiner » (`neutre`)
+        // n'est pas comptée (audit de fiabilité, 8 oct. 2026).
+        let aRenforcer = apports.filter { $0.statut == .aCombler || $0.statut == .aRenforcer }
         let ordonnes = trier(aRenforcer.isEmpty ? apports : aRenforcer)
         if ordonnes.count > 1 {
             slides.append(.compte(apports: ordonnes.count))

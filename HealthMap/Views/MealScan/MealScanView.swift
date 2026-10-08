@@ -229,7 +229,7 @@ struct JournalView: View {
               let gratification = GratificationRepas.calculer(
                 nouveau: nouveau,
                 repasDuJour: journal.dayMeals,
-                apportsARenforcer: dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id),
+                apportsARenforcer: dashboardVM.apportsEnAlerte,
                 quinzaine: journal.fortnight
               ) else { return }
 
@@ -250,7 +250,7 @@ struct JournalView: View {
         GratificationRepas.calculer(
             nouveau: repas,
             repasDuJour: journal.dayMeals,
-            apportsARenforcer: dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id),
+            apportsARenforcer: dashboardVM.apportsEnAlerte,
             quinzaine: journal.fortnight
         )
     }
@@ -435,7 +435,7 @@ struct JournalView: View {
                         cibleProteines: dashboardVM.physicalMetrics.macros?.protein,
                         cibleGlucides: dashboardVM.physicalMetrics.macros?.carbs,
                         cibleLipides: dashboardVM.physicalMetrics.macros?.fat,
-                        apportsARenforcer: dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id)
+                        apportsARenforcer: dashboardVM.apportsEnAlerte
                     )
                 }
                 // Résultat du scan en bottom-sheet (contenu immersif inchangé).

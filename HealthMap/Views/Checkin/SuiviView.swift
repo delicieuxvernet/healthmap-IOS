@@ -1013,7 +1013,7 @@ struct SuiviView: View {
 
     /// Ids des apports à renforcer (score < 60) — priorisent la couverture.
     private var weakNutrientIds: [String] {
-        dashboardVM.nutrients.filter { $0.score < 60 }.map(\.id)
+        dashboardVM.apportsEnAlerte
     }
 
     private func couvertureDepuisLeDepart(_ scores: [String: Int]) -> [SuiviEngineV4.NutrientCoverage7d] {
