@@ -90,6 +90,20 @@ struct FicheApportContexte: Identifiable {
         return "couvre le besoin"
     }
 
+    /// Le mot d'après le détail : le STATUT d'un apport estimé (audit de
+    /// fiabilité, 8 oct. 2026), l'échelle du score sinon.
+    static func statutMot(detail: DetailApport) -> String {
+        guard let statut = detail.estimation?.statut else { return statutMot(forScore: detail.score) }
+        switch statut {
+        case .couvert, .sousLaLimite: return "couvre le besoin"
+        case .couvertParComplement: return "couvert par ton complément"
+        case .aSurveiller: return "à surveiller"
+        case .aRenforcer: return "à renforcer"
+        case .peuPrecise: return "à affiner"
+        case .auDessusDeLaLimite: return "au-dessus de la limite"
+        }
+    }
+
     /// « à combler · 3 causes nommées »
     static func sousTitre(statutMot: String, causes: Int) -> String {
         switch causes {

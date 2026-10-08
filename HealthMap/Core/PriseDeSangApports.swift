@@ -231,9 +231,7 @@ enum PriseDeSangApports {
                   let vers = cible(m.position, code: m.code) else { continue }
             let delta = correction(score: detail.score, cible: vers, fraicheur: poids)
             guard abs(delta) >= effetMinimum else { continue }
-            let contributions = detail.contributions + [ContributionApport(libelle: texte, delta: delta, section: .priseDeSang)]
-            let brut = DetailApport.pointDeDepart + contributions.reduce(0) { $0 + $1.delta }
-            sortie[id] = DetailApport(contributions: contributions, score: max(0, min(100, brut)))
+            sortie[id] = detail.ajoutant(ContributionApport(libelle: texte, delta: delta, section: .priseDeSang))
         }
         return sortie
     }

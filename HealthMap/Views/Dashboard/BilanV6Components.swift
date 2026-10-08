@@ -15,13 +15,16 @@ import UIKit
 
 // MARK: - Libellé d'un statut (badge de la fiche apport)
 extension StatutV2 {
-    /// Libellé court affiché dans les badges / pastilles.
+    /// Libellé court affiché dans les badges / pastilles. Audit de fiabilité
+    /// du 8 oct. 2026 : les statuts viennent du calcul local
+    /// (`StatutApport.statutV2`) — orange = « à surveiller », rouge = une
+    /// alerte que la validation permet d'affirmer, gris = à affiner.
     var displayLabel: String {
         switch self {
         case .couvre:      return "Couvert"
-        case .aRenforcer:  return "À renforcer"
-        case .aCombler:    return "À combler"
-        case .neutre:      return "À suivre"
+        case .aRenforcer:  return "À surveiller"
+        case .aCombler:    return "À renforcer"
+        case .neutre:      return "À affiner"
         }
     }
 }
@@ -104,7 +107,15 @@ struct ApportV2DetailSheet: View {
         }
         return min(100, max(0, apport.pctBesoin ?? 0))
     }
-    private var statut: StatutV2 { apport.statut }
+    /// L'apport estimé en vraies quantités (audit de fiabilité, 8 oct. 2026).
+    private var estimation: EstimationApport? {
+        apport.id.flatMap { dashboardVM.estimation?.apports[$0] }
+    }
+    /// Le statut que l'app retient : l'estimation, ou la prise de sang récente.
+    private var statutLocal: StatutApport? {
+        apport.id.flatMap { dashboardVM.statuts[$0] }
+    }
+    private var statut: StatutV2 { statutLocal?.statutV2 ?? apport.statut }
     private var definition: NutrientDefinition? {
         apport.id.flatMap { NutrientData.definition(for: $0) }
     }
@@ -130,7 +141,14 @@ struct ApportV2DetailSheet: View {
     /// « 5,9 sur 11 mg par jour » (`QuantiteApport`, partagé avec la fiche
     /// des Compléments).
     private var quantite: String? {
-        apport.id.flatMap { QuantiteApport.libelle(id: $0, score: pct, profil: dashboardVM.profile) }
+        if let id = apport.id, let estimation { return LectureEstimation.quantite(id, estimation) }
+        return apport.id.flatMap { QuantiteApport.libelle(id: $0, score: pct, profil: dashboardVM.profile) }
+    }
+
+    /// D'où vient l'apport estimé, de la plus grosse source à la plus petite.
+    private var sourcesEstimees: [LectureEstimation.Source] {
+        guard let id = apport.id, let estimation else { return [] }
+        return LectureEstimation.sources(id, estimation, profil: ProfilEstimation(profile: dashboardVM.profile))
     }
 
     /// Le registre donne le score ET ses causes nommées. Quand il se tait
@@ -149,6 +167,21 @@ struct ApportV2DetailSheet: View {
     private var eclairage: String? {
         guard let nutriment = apport.id.flatMap({ NutrientID(rawValue: $0) }) else { return nil }
         return SymptomesApports.explication(pour: nutriment, symptomes: dashboardVM.profile.symptoms)
+    }
+
+    private var quantiteAuCentre: Double? {
+        guard let id = apport.id, let estimation else { return nil }
+        return LectureEstimation.quantiteAffichee(id, estimation)
+    }
+
+    private var uniteAuCentre: String? {
+        guard let id = apport.id, let estimation else { return nil }
+        return "\(LectureEstimation.uniteAffichage(id, estimation: estimation)) / jour"
+    }
+
+    private var uniteAffichee: String {
+        guard let id = apport.id, let estimation else { return "" }
+        return LectureEstimation.uniteAffichage(id, estimation: estimation)
     }
 
     private var hasTip: Bool {
@@ -173,7 +206,35 @@ struct ApportV2DetailSheet: View {
                 verdictCarte(detail)
                     .kiwiEntrance(0)
 
-                if !causes.isEmpty {
+                if let estimation {
+                    Text(LectureEstimation.provenance(estimation))
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 6)
+                        .padding(.top, 10)
+                        .kiwiEntrance(1)
+
+                    let sources = sourcesEstimees
+                    if !sources.isEmpty {
+                        FicheBloc(titre: "D'où vient cet apport", rang: 1) {
+                            sourcesCarte(sources)
+                        }
+                    }
+
+                    if let restant = LectureEstimation.journeesAvantFiabilite(estimation) {
+                        FicheBloc(titre: "Pour une estimation fiable", rang: 1) {
+                            fiabiliteCarte(notees: restant.notees, conseillees: restant.conseillees)
+                        }
+                    }
+
+                    if let id = apport.id, let note = LectureEstimation.notePriseDeSang(id) {
+                        FicheBloc(titre: "Et ta prise de sang ?", rang: 2) {
+                            FicheTexteCarte(texte: note)
+                        }
+                    }
+                } else if !causes.isEmpty {
                     FicheBloc(titre: "Ce qui pèse le plus", note: "touche pour comprendre", rang: 1) {
                         causesCarte(causes)
                     }
@@ -243,14 +304,17 @@ struct ApportV2DetailSheet: View {
     private func verdictCarte(_ detail: DetailApport) -> some View {
         HStack(alignment: .center, spacing: 14) {
             AnneauDeCause(parts: detail.parts, score: detail.score, couleur: couleurApport,
-                          taille: .heros, surligne: surligne)
+                          taille: .heros, surligne: surligne,
+                          quantite: quantiteAuCentre,
+                          uniteQuantite: uniteAuCentre)
             VStack(alignment: .leading, spacing: 4) {
                 Text(nom)
                     .font(.dsSection)
                     .tracking(DSTracking.section)
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(LectureApport.verdict(id: apport.id ?? "", nom: nom, detail: detail))
+                Text(estimation.map { LectureEstimation.verdict(nom: nom, estimation: $0, statut: statutLocal) }
+                     ?? LectureApport.verdict(id: apport.id ?? "", nom: nom, detail: detail))
                     .font(.dsSousTitre)
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
@@ -262,6 +326,15 @@ struct ApportV2DetailSheet: View {
                         .tracking(DSTracking.legende)
                         .foregroundStyle(Color.dsSecondaire)
                         .padding(.top, 1)
+                }
+                if let statutLocal {
+                    Text(statutLocal.libelleCourt)
+                        .font(.dsLegende.weight(.semibold))
+                        .foregroundStyle(statut.inkColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(statut.color.opacity(0.16), in: Capsule())
+                        .padding(.top, 4)
                 }
             }
             Spacer(minLength: 0)
@@ -342,6 +415,97 @@ struct ApportV2DetailSheet: View {
             }
         }
         .dsCard()
+    }
+
+    // MARK: 2 bis · D'où vient l'apport (estimation, 8 oct. 2026)
+
+    private func sourcesCarte(_ sources: [LectureEstimation.Source]) -> some View {
+        let plusGrosse = max(sources.map(\.valeur).max() ?? 1, 0.0001)
+        return VStack(spacing: 0) {
+            ForEach(Array(sources.enumerated()), id: \.element.id) { rang, source in
+                if rang > 0 {
+                    DSSeparator(retrait: 0)
+                        .verreCascade(rempli, delai: 0.2 + Double(rang) * 0.07, decalage: 0)
+                }
+                ligneSource(source, rang: rang, plusGrosse: plusGrosse)
+            }
+        }
+        .dsCard()
+    }
+
+    private func ligneSource(_ source: LectureEstimation.Source, rang: Int, plusGrosse: Double) -> some View {
+        let teinte = couleurApport.opacity(max(0.35, 1 - 0.2 * Double(rang)))
+        let part = source.valeur / plusGrosse
+        return HStack(alignment: .center, spacing: 12) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(teinte)
+                .frame(width: 10, height: 10)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(source.libelle)
+                    .font(.dsSousTitre)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail = source.detail {
+                    Text(detail)
+                        .font(.dsLegende)
+                        .tracking(DSTracking.legende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Verre.remplissage)
+                        Capsule().fill(teinte)
+                            .frame(width: max(5, geo.size.width * (rempli ? part : 0)))
+                    }
+                }
+                .frame(height: 5)
+                .animation(
+                    reduceMotion ? nil : Animation.timingCurve(0.3, 1.1, 0.4, 1, duration: 0.8).delay(0.35 + Double(rang) * 0.08),
+                    value: rempli
+                )
+                .accessibilityHidden(true)
+            }
+            Text("\(DS.decimal(LectureEstimation.arrondiLisible(source.valeur)))\(DS.fine)\(uniteAffichee)")
+                .font(.dsSousTitreFort.monospacedDigit())
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsTexte)
+        }
+        .padding(.horizontal, DS.paddingCarte)
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+        .verreCascade(rempli, delai: 0.2 + Double(rang) * 0.07, decalage: 10)
+    }
+
+    private func fiabiliteCarte(notees: Int, conseillees: Int) -> some View {
+        let restantes = max(0, conseillees - notees)
+        return HStack(alignment: .center, spacing: 12) {
+            Text("\(notees)/\(conseillees)")
+                .font(.dsSousTitre.weight(.bold).monospacedDigit())
+                .foregroundStyle(Color.teinteKiwiTexte)
+                .frame(width: 44, height: 44)
+                .background(Color.teinteKiwiPale, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(restantes == 1 ? "Note encore 1 journée de repas" : "Note encore \(restantes) journées de repas")
+                    .font(.dsSousTitreFort)
+                    .tracking(DSTracking.sousTitre)
+                    .foregroundStyle(Color.dsTexte)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Ton chiffre passera de l'estimation à la mesure.")
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(DS.paddingCarte)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dsCard()
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: 3 · Ce que tu peux faire (premium)
@@ -466,7 +630,10 @@ struct ApportV2DetailSheet: View {
         let role = apport.id.flatMap { ApportRole.role(for: $0) }
         let why = apport.why.flatMap { $0.isEmpty ? nil : $0 }
         let signes = eclairage.flatMap { $0.isEmpty ? nil : $0 }
-        let aDuContenu = role != nil || why != nil || signes != nil || !detail.contributions.isEmpty
+        // Le détail du calcul en points n'existe plus pour un apport estimé :
+        // ses sources sont déjà affichées plus haut.
+        let calcul = estimation == nil && !detail.contributions.isEmpty
+        let aDuContenu = role != nil || why != nil || signes != nil || calcul
 
         return Group {
             if aDuContenu {
@@ -484,7 +651,7 @@ struct ApportV2DetailSheet: View {
                                     .tracking(DSTracking.sousTitre)
                                     .foregroundStyle(Color.dsTexte)
                                 Text(resumeDuReplie(role: role != nil, signes: signes != nil,
-                                                    calcul: !detail.contributions.isEmpty))
+                                                    calcul: calcul))
                                     .font(.dsLegende)
                                     .tracking(DSTracking.legende)
                                     .foregroundStyle(Color.dsSecondaire)
@@ -518,7 +685,7 @@ struct ApportV2DetailSheet: View {
                             if let why {
                                 FicheBloc(titre: "Ce que dit ton bilan", rang: 0) { FicheTexteCarte(texte: why) }
                             }
-                            if !detail.contributions.isEmpty {
+                            if calcul {
                                 FicheBloc(titre: "Le détail du calcul", note: "touche une ligne", rang: 0) {
                                     CascadeApport(detail: detail, couleur: couleurApport,
                                                   apportAvecArticle: avecArticle, surligne: $surligne)

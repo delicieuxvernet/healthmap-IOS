@@ -76,7 +76,8 @@ struct SupplementsView: View {
     private var engineResult: SupplementEngineResult? {
         let scores = dashboardVM.nutrientScores
         guard !scores.isEmpty else { return nil }
-        return SupplementEngine.generateRecommendations(scores: scores, profile: dashboardVM.profile)
+        return SupplementEngine.generateRecommendations(scores: scores, profile: dashboardVM.profile,
+                                                        statuts: dashboardVM.statuts)
     }
 
     private var aiSchedule: SupplementsSchedule? {
@@ -528,7 +529,7 @@ struct SupplementsView: View {
             parts: item.detail.parts,
             score: item.detail.score,
             enLigne: enLigne,
-            statutMot: FicheApportContexte.statutMot(forScore: item.detail.score),
+            statutMot: FicheApportContexte.statutMot(detail: item.detail),
             cadence: cadenceAnneaux
         ) { ouvrir(item) }
     }
@@ -569,6 +570,12 @@ struct SupplementsView: View {
     /// `TuileApport.statutMot`). En voie assiette, l'apport que l'aliment sert.
     private func statutLigne(_ item: Tuile, complet: Bool) -> String {
         guard voie == .complements else { return "pour \(item.chain.avecArticle)" }
+        // Apport estimé : ses contributions sont des sources, pas des causes.
+        if item.detail.estimation != nil {
+            let n = item.detail.appuis.count
+            let sources = n == 1 ? "1 source" : "\(n) sources"
+            return complet ? "\(FicheApportContexte.statutMot(detail: item.detail)) · \(sources)" : sources
+        }
         let causes = item.detail.freins.count
         guard complet else {
             switch causes {
@@ -577,7 +584,7 @@ struct SupplementsView: View {
             default: return "\(causes) causes"
             }
         }
-        let mot = FicheApportContexte.statutMot(forScore: item.detail.score)
+        let mot = FicheApportContexte.statutMot(detail: item.detail)
         switch causes {
         case 0: return "\(mot) · sans cause nommée"
         case 1: return "\(mot) · 1 cause nommée"
@@ -688,7 +695,7 @@ struct SupplementsView: View {
             apportAvecArticle: chain.avecArticle,
             symbole: symbole(item),
             couleur: chain.tint,
-            statutMot: FicheApportContexte.statutMot(forScore: item.detail.score),
+            statutMot: FicheApportContexte.statutMot(detail: item.detail),
             detail: item.detail,
             eclairage: eclairage(for: chain.id),
             role: ApportRole.role(for: chain.id),

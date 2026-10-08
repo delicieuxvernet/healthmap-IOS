@@ -157,31 +157,58 @@ final class DashboardViewModelTests: XCTestCase {
         XCTAssertFalse(vm.nutrientScores.isEmpty, "Nutrient scores should be populated")
     }
 
-    /// Étape 3 de l'audit (22 sept. 2026) : le journal des repas corrige les
-    /// scores du tableau de bord, le registre que lisent les écrans, et le hash
-    /// du bilan, d'un seul geste.
-    func testLeJournalCorrigeLeTableauDeBordLeRegistreEtLeHash() {
+    /// Audit de fiabilité (8 oct. 2026) : les journées notées entrent dans
+    /// l'estimation en vraies quantités, et de là dans le chiffre du tableau
+    /// de bord, le registre que lisent les écrans, et le hash du bilan.
+    func testLesJourneesNoteesCorrigentLEstimationLeRegistreEtLeHash() throws {
         let vm = makeVM(profile: makeProfileThomas())
         vm.computeLocalScores()
         let hashSansJournal = vm.hashDuBilan
+        let ferAvant = try XCTUnwrap(vm.estimation?.apports["iron"]?.apportEstime)
 
-        // Un journal qui ne montre rien sur les dix apports : au moins l'un
-        // d'eux n'est pas déjà au plafond, donc un chiffre bouge forcément.
-        let observations = ObservationsJournal(
-            joursRetenus: 5,
-            couverture: Dictionary(uniqueKeysWithValues: NutrientID.allCases.map { ($0.rawValue, 0) })
-        )
-        vm.poserObservationsJournal(observations)
+        // Trois journées pleines, très riches : l'estimation doit monter.
+        let riche = JourneeNotee(kcal: 4000, apports: ["iron": 40, "vitC": 400, "magnesium": 900, "calcium": 2500])
+        vm.poserJourneesNotees([riche, riche, riche])
         vm.computeLocalScores()
 
-        let attendu = JournalApports.appliquer(HealthCalculator.registreApports(profile: vm.profile), observations: observations)
-        XCTAssertEqual(vm.nutrientScores["iron"], attendu["iron"]?.score)
-        XCTAssertEqual(vm.registre["iron"], attendu["iron"])
-        XCTAssertTrue(vm.registre["vitC"]?.contributions.contains { $0.section == .journal } == true)
+        let fer = try XCTUnwrap(vm.estimation?.apports["iron"])
+        XCTAssertEqual(fer.joursJournalRetenus, 3)
+        XCTAssertGreaterThan(fer.apportEstime, ferAvant)
+        XCTAssertEqual(vm.nutrientScores["iron"], vm.registre["iron"]?.score)
+        XCTAssertTrue(vm.registre["vitC"]?.contributions.contains { $0.section == .journal } == true,
+                      "les repas notés sont une source nommée")
         XCTAssertNotEqual(vm.hashDuBilan, hashSansJournal, "le bilan doit suivre ce que le journal change")
 
-        vm.poserObservationsJournal(nil)
+        vm.poserJourneesNotees([])
+        vm.computeLocalScores()
         XCTAssertEqual(vm.hashDuBilan, hashSansJournal)
+    }
+
+    /// Le registre lu par les écrans vient de l'estimation : ses
+    /// contributions sont des sources, et le statut ne se déduit pas du chiffre.
+    func testLeRegistreVientDeLEstimation() throws {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.computeLocalScores()
+        let mg = try XCTUnwrap(vm.registre["magnesium"])
+        XCTAssertEqual(mg.depart, 0)
+        XCTAssertNotNil(mg.estimation)
+        XCTAssertTrue(mg.freins.isEmpty, "plus aucun point retiré : des sources, pas des pénalités")
+        XCTAssertEqual(vm.statuts["magnesium"], mg.estimation?.statut)
+        XCTAssertEqual(mg.parts.reduce(0) { $0 + $1.valeur }, 100, "l'anneau ferme toujours à 100")
+    }
+
+    /// Le bilan rédigé porte le statut et le chiffre du calcul local.
+    func testLeBilanRedigePrendLeStatutLocal() throws {
+        let vm = makeVM(profile: makeProfileThomas())
+        vm.computeLocalScores()
+        var bilan = AIAnalysisV2(contract: "v2")
+        bilan.bilan = BilanV2(apports: [ApportV2(id: "magnesium", nom: "Magnésium", statut: .aCombler, pctBesoin: 3)])
+        vm.analysisV2 = bilan
+
+        let mg = try XCTUnwrap(vm.analysisV2?.bilan?.apports?.first)
+        let statut = try XCTUnwrap(vm.statuts["magnesium"])
+        XCTAssertEqual(mg.statut, statut.statutV2)
+        XCTAssertEqual(mg.pctBesoin, vm.nutrientScores["magnesium"])
     }
 
     /// An incomplete questionnaire should reset scores to zero.

@@ -45,6 +45,9 @@ enum AnneauTeintes {
         case .couvert: return couleur
         case .cause(let rang): return cause(rang: rang)
         case .innomme: return piste
+        // Les sources d'un apport estimé : la couleur de l'apport, de plus en
+        // plus claire de la plus grosse à la plus petite.
+        case .source(let rang): return couleur.opacity(max(0.35, 1 - 0.2 * Double(rang)))
         }
     }
 }
@@ -124,6 +127,10 @@ struct AnneauDeCause: View {
     /// Part mise en avant depuis la cascade (`PartAnneau.id`), s'il y en a une.
     var surligne: String? = nil
     var cadence: Cadence = .standard
+    /// Apport estimé : la quantité au centre (« 332 ») et son unité dessous
+    /// (« mg / jour »), à la place du chiffre sur 100.
+    var quantite: Double? = nil
+    var uniteQuantite: String? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var deploye = false
@@ -175,6 +182,17 @@ struct AnneauDeCause: View {
     }
 
     private var resume: String {
+        if let quantite {
+            var phrases = ["\(DS.entier(Int(quantite.rounded()))) \(uniteQuantite ?? "")."]
+            let sources = parts.filter {
+                if case .source = $0.genre { return $0.valeur > 0 }
+                return false
+            }
+            if !sources.isEmpty {
+                phrases.append("D'où ça vient : " + sources.map(\.libelle).joined(separator: ", ") + ".")
+            }
+            return phrases.joined(separator: " ")
+        }
         var phrases = ["Score \(score) sur 100."]
         let freins = parts.filter {
             if case .cause = $0.genre { return $0.valeur > 0 }
@@ -201,12 +219,30 @@ struct AnneauDeCause: View {
                 arcVue(arc, rang: rang, dessine: dessine, inset: inset)
             }
 
-            // Le score nu, sans « % » : c'est un score sur 100, pas un taux mesuré.
-            ChiffreQuiCompte(valeur: dessine ? Double(score) : 0)
-                .font(.system(size: taille.police, weight: .bold, design: taille.dessin).monospacedDigit())
-                .tracking(taille.tracking)
-                .foregroundStyle(Color.dsTexte)
-                .animation(reduceMotion ? nil : animationDuCompteur, value: deploye)
+            if let quantite {
+                VStack(spacing: 0) {
+                    ChiffreQuiCompte(valeur: dessine ? quantite.rounded() : 0)
+                        .font(.system(size: taille.police * 0.82, weight: .bold, design: taille.dessin).monospacedDigit())
+                        .tracking(taille.tracking)
+                        .foregroundStyle(Color.dsTexte)
+                        .animation(reduceMotion ? nil : animationDuCompteur, value: deploye)
+                    if let uniteQuantite {
+                        Text(uniteQuantite)
+                            .font(.dsLegende)
+                            .foregroundStyle(Color.dsSecondaire)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                }
+                .padding(.horizontal, taille.trait)
+            } else {
+                // Le score nu, sans « % » : c'est un score sur 100, pas un taux mesuré.
+                ChiffreQuiCompte(valeur: dessine ? Double(score) : 0)
+                    .font(.system(size: taille.police, weight: .bold, design: taille.dessin).monospacedDigit())
+                    .tracking(taille.tracking)
+                    .foregroundStyle(Color.dsTexte)
+                    .animation(reduceMotion ? nil : animationDuCompteur, value: deploye)
+            }
         }
         .frame(width: taille.points, height: taille.points)
         .animation(reduceMotion ? nil : DS.ressortAppui, value: surligne)

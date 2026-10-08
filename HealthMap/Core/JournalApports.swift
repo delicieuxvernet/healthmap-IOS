@@ -146,9 +146,7 @@ enum JournalApports {
             guard let couverture = observations.couverture[id] else { continue }
             let delta = correction(score: detail.score, couverture: couverture, jours: observations.joursPour(id))
             guard abs(delta) >= effetMinimum else { continue }
-            let contributions = detail.contributions + [ContributionApport(libelle: libelle, delta: delta, section: .journal)]
-            let brut = DetailApport.pointDeDepart + contributions.reduce(0) { $0 + $1.delta }
-            sortie[id] = DetailApport(contributions: contributions, score: max(0, min(100, brut)))
+            sortie[id] = detail.ajoutant(ContributionApport(libelle: libelle, delta: delta, section: .journal))
         }
         return sortie
     }

@@ -72,6 +72,10 @@ struct PartAnneau: Equatable, Identifiable {
         /// Frein nommé, `rang` 0 = le plus lourd.
         case cause(rang: Int)
         case innomme
+        /// Une source de l'apport estimé (courses, café, eau, reste de
+        /// l'alimentation…), `rang` 0 = la plus grosse. Audit du 8 oct. 2026 :
+        /// l'anneau montre d'où vient l'apport, plus des points retirés.
+        case source(rang: Int)
     }
 
     let id: String
@@ -95,8 +99,28 @@ struct DetailApport: Equatable {
     let contributions: [ContributionApport]
     /// Score final borné 0-100 — identique à `analyzeNutrientScores`.
     let score: Int
+    /// Point de départ de la cascade : 70 pour l'ancien registre en points,
+    /// 0 pour un apport ESTIMÉ (`EstimateurApports`), dont les contributions
+    /// sont ses sources, en part de la référence.
+    let depart: Int
+    /// L'estimation en vraies quantités, quand le détail en vient.
+    let estimation: EstimationApport?
 
-    var depart: Int { Self.pointDeDepart }
+    init(contributions: [ContributionApport], score: Int,
+         depart: Int = DetailApport.pointDeDepart, estimation: EstimationApport? = nil) {
+        self.contributions = contributions
+        self.score = score
+        self.depart = depart
+        self.estimation = estimation
+    }
+
+    /// Le même détail, une contribution de plus (journal, prise de sang).
+    func ajoutant(_ contribution: ContributionApport) -> DetailApport {
+        let contributions = self.contributions + [contribution]
+        let brut = depart + contributions.reduce(0) { $0 + $1.delta }
+        return DetailApport(contributions: contributions, score: max(0, min(100, brut)),
+                            depart: depart, estimation: estimation)
+    }
 
     /// Total avant bornage : `depart` + tous les deltas.
     var brut: Int { depart + contributions.reduce(0) { $0 + $1.delta } }
@@ -128,6 +152,23 @@ struct DetailApport: Equatable {
     /// prend ce qui reste. Une part peut valoir 0 (l'anneau ne la dessine pas),
     /// jamais moins.
     var parts: [PartAnneau] {
+        // Apport estimé : l'anneau se remplit de ses sources, de la plus grosse
+        // à la plus petite, jusqu'au chiffre ; le reste est la piste.
+        if estimation != nil {
+            var sortie: [PartAnneau] = []
+            var utilise = 0
+            for (rang, source) in appuis.enumerated() {
+                let valeur = min(source.delta, max(0, score - utilise))
+                sortie.append(PartAnneau(id: source.id, libelle: source.libelle, valeur: valeur, genre: .source(rang: rang)))
+                utilise += valeur
+            }
+            if utilise < score {
+                sortie.append(PartAnneau(id: Self.idCouvert, libelle: "Couvert", valeur: score - utilise, genre: .couvert))
+                utilise = score
+            }
+            sortie.append(PartAnneau(id: Self.idInnomme, libelle: "Reste à couvrir", valeur: max(0, 100 - utilise), genre: .innomme))
+            return sortie
+        }
         var sortie = [PartAnneau(id: Self.idCouvert, libelle: "Couvert", valeur: score, genre: .couvert)]
         var utilise = score
         for (rang, frein) in freins.enumerated() {
@@ -160,7 +201,10 @@ enum CalculApports {
     /// pourcentages enregistrés avec le repas.
     /// 2026-10-01.2 : le journal réagit plus vite (une journée suffit, la
     /// journée en cours compte, son poids grandit avec les journées notées).
-    static let version = "2026-10-01.2"
+    /// 2026-10-08 : audit de fiabilité, les apports viennent de
+    /// `EstimateurApports` (Ciqual × INCA 3 × ANSES 2021) et leur statut
+    /// ne se déduit plus d'un seuil sur le score.
+    static let version = "2026-10-08"
 }
 
 // MARK: - Le registre

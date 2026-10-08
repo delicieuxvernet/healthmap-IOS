@@ -143,6 +143,9 @@ struct EstimationApport: Equatable {
     let statutAlimentsSeuls: StatutApport
     let categorieAlerte: String
     let alerteOuverte: Bool
+    /// Journées de repas notés à partir desquelles l'alerte s'ouvre (nil :
+    /// jamais sur les repas seuls, une prise de sang est nécessaire).
+    let joursConseilles: Int?
     let joursJournalRetenus: Int
     let k: Double
     let confiance: ConfianceEstimation
@@ -494,6 +497,7 @@ final class EstimateurApports {
                 reference: r, probabiliteAdequation: pAdequation,
                 statut: final, statutAlimentsSeuls: statut,
                 categorieAlerte: categorie, alerteOuverte: ouverte,
+                joursConseilles: joursConseilles,
                 joursJournalRetenus: nj, k: k, confiance: confiance,
                 decomposition: DecompositionApport(
                     courses: coursesN * wq, cafeThe: soc.cafeThe * wq, eau: soc.eau * wq, alcool: soc.alcool * wq,

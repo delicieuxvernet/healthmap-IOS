@@ -63,6 +63,29 @@ enum ResumeWidgets {
         score < 40 ? 0 : (score < 70 ? 1 : 2)
     }
 
+    /// La bande d'un apport estimé vient de son STATUT, jamais du chiffre
+    /// (audit de fiabilité, 8 oct. 2026) : la vitamine D d'une alimentation
+    /// ordinaire couvre peu la référence sans être une alerte.
+    private static func bande(_ apport: ApportW, registre: [String: DetailApport]) -> Int {
+        guard let statut = registre[apport.id]?.estimation?.statut else { return bande(apport.score) }
+        switch statut {
+        case .aRenforcer, .auDessusDeLaLimite: return 0
+        case .aSurveiller, .peuPrecise: return 1
+        case .couvert, .couvertParComplement, .sousLaLimite: return 2
+        }
+    }
+
+    private static func mot(_ apport: ApportW, registre: [String: DetailApport]) -> String {
+        guard let detail = registre[apport.id] else { return LectureApport.motStatut(id: apport.id, score: apport.score) }
+        return LectureApport.motStatut(id: apport.id, detail: detail)
+    }
+
+    /// Sous la référence ou sans détail estimé : sous 70.
+    private static func appelleUnConseil(_ detail: DetailApport) -> Bool {
+        if let statut = detail.estimation?.statut { return statut.estSousLaReference }
+        return detail.score < 70
+    }
+
     // MARK: Tes apports
 
     /// Les apports à montrer, le plus bas d'abord : ceux du bilan (les anneaux
@@ -84,27 +107,28 @@ enum ResumeWidgets {
     /// « Magnésium et fer sont couverts. » (l'énumération de la maquette, sans
     /// article), « Le fer est un peu juste aussi. », « Le magnésium est
     /// couvert, le fer un peu juste. » ; `nil` sans voisin.
-    static func autres(principal: ApportW, secondaires: [ApportW]) -> String? {
+    static func autres(principal: ApportW, secondaires: [ApportW], registre: [String: DetailApport] = [:]) -> String? {
         guard let a = secondaires.first else { return nil }
-        let aussi = { (apport: ApportW) in bande(apport.score) == bande(principal.score) ? " aussi" : "" }
+        let aussi = { (apport: ApportW) in bande(apport, registre: registre) == bande(principal, registre: registre) ? " aussi" : "" }
         let sujetA = NomNutriment.majusculeInitiale(NomApport.avecArticle(id: a.id, repli: a.nom))
         let verbeA = estPluriel(a.id) ? "sont" : "est"
-        let motA = LectureApport.motStatut(id: a.id, score: a.score)
+        let motA = mot(a, registre: registre)
 
         guard secondaires.count >= 2 else {
             return "\(sujetA) \(verbeA) \(motA)\(aussi(a))."
         }
         let b = secondaires[1]
-        let motB = LectureApport.motStatut(id: b.id, score: b.score)
-        guard bande(a.score) == bande(b.score) else {
+        let motB = mot(b, registre: registre)
+        guard bande(a, registre: registre) == bande(b, registre: registre), motA == motB else {
             return "\(sujetA) \(verbeA) \(motA), \(NomApport.avecArticle(id: b.id, repli: b.nom)) \(motB)."
         }
         // Accord du pluriel : féminin seulement si les deux le sont.
         let feminin = estFeminin(a.id) && estFeminin(b.id)
         let motPluriel: String
-        switch bande(a.score) {
-        case 0: motPluriel = feminin ? "basses" : "bas"
-        case 1: motPluriel = "un peu justes"
+        switch (bande(a, registre: registre), motA) {
+        case (0, _): motPluriel = feminin ? "basses" : "bas"
+        case (1, "à affiner"): motPluriel = "à affiner"
+        case (1, _): motPluriel = "un peu justes"
         default: motPluriel = feminin ? "couvertes" : "couverts"
         }
         let enumeration = NomNutriment.majusculeInitiale(nomSansArticle(a.id))
@@ -157,9 +181,9 @@ enum ResumeWidgets {
         guard let principal = liste.first, let detail = registre[principal.id] else { return nil }
         return LectureApportsW(
             apports: liste,
-            verdict: LectureApport.constat(id: principal.id, nom: principal.nom, score: principal.score),
-            autres: autres(principal: principal, secondaires: Array(liste.dropFirst())),
-            statut: LectureApport.motStatut(id: principal.id, score: principal.score),
+            verdict: LectureApport.constat(id: principal.id, nom: principal.nom, detail: detail),
+            autres: autres(principal: principal, secondaires: Array(liste.dropFirst()), registre: registre),
+            statut: LectureApport.motStatut(id: principal.id, detail: detail),
             cause: cause(detail),
             titreAliments: titreAliments(principal.id),
             aliments: aliments(principal.id, duBilan: alimentsDuBilan[principal.id])
@@ -174,13 +198,18 @@ enum ResumeWidgets {
     /// Rien au-dessus de 70 : un apport couvert n'appelle pas de conseil.
     static func conseils(registre: [String: DetailApport]) -> [ConseilW] {
         let ids = registre
-            .filter { $0.value.score < 70 }
+            .filter { appelleUnConseil($0.value) }
             .sorted { ($0.value.score, $0.key) < ($1.value.score, $1.key) }
             .map(\.key)
         var sortie: [ConseilW] = []
         var textes = Set<String>()
         for id in ids {
             guard let detail = registre[id] else { continue }
+            // Apport estimé : plus de freins en points, donc plus de geste
+            // tiré d'une pénalité. Un conseil d'aliment devra venir des
+            // aliments du bilan (allergies écartées par le serveur), pas d'un
+            // catalogue générique : rien plutôt qu'un conseil non vérifié.
+            if detail.estimation != nil { continue }
             for frein in detail.freins {
                 guard let geste = CauseApport.gesteHorsApp(pour: frein),
                       textes.insert(geste.texte).inserted else { continue }

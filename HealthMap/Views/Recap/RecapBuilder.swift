@@ -148,9 +148,9 @@ enum RecapBuilder {
     static func mot(statut: StatutV2, pourcent: Int) -> String {
         switch statut {
         case .couvre: return "Couvre ton besoin"
-        case .aRenforcer: return "À renforcer"
-        case .aCombler: return "À combler"
-        case .neutre: return HealthScale.nutrientLabel(for: pourcent)
+        case .aRenforcer: return "À surveiller"
+        case .aCombler: return "À renforcer"
+        case .neutre: return "À affiner"
         }
     }
 
