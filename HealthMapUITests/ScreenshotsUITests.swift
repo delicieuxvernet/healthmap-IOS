@@ -709,34 +709,29 @@ final class ScreenshotsUITests: XCTestCase {
         snap("27-bilan-provisoire")
         guard bilanSuite("Passer à table") else { return quitterLeBilan() }
 
-        bilanToucherPremier(["Pain complet", "Pain"])
-        bilanToucherPremier(["Œufs", "Oeufs", "Yaourt"])
-        bilanToucherPremier(["Kiwis", "Banane"])
-        snap("28-bilan-repas-petit-dej")
-        guard bilanSuite("Repas suivant : Midi") else { return quitterLeBilan() }
-
-        bilanToucherPremier(["Poulet", "Viande blanche", "Lentilles"])
-        bilanToucherPremier(["Riz", "Pâtes"])
-        bilanToucherPremier(["Brocoli", "Haricots verts", "Légumes"])
-        snap("29-bilan-repas-midi")
-        guard bilanSuite("Repas suivant : Goûter") else { return quitterLeBilan() }
-
-        bilanToucherPremier(["Amandes", "Fruit"])
-        snap("30-bilan-repas-gouter")
-        guard bilanSuite("Repas suivant : Soir") else { return quitterLeBilan() }
-
-        bilanToucherPremier(["Saumon", "Poisson", "Épinards"])
-        bilanToucherPremier(["Pommes de terre", "Riz"])
-        snap("31-bilan-repas-soir")
+        // Les repas : on choisit chaque moment par son onglet (l'écran peut
+        // avancer seul d'un repas), on remplit, on photographie.
+        let repas: [(onglet: String, nom: String, choix: [[String]])] = [
+            ("Petit déj", "petit-dej", [["Pain complet", "Tartines", "Pain"], ["Œufs", "Oeufs", "Yaourt nature"], ["Kiwis", "Banane"]]),
+            ("Midi", "midi", [["Poulet"], ["Riz blanc", "Pâtes"], ["Carottes", "Salade verte"]]),
+            ("Goûter", "gouter", [["Amandes", "Banane", "Pomme"]]),
+            ("Soir", "soir", [["Saumon", "Thon en boîte"], ["Pommes de terre", "Riz blanc"], ["Salade verte", "Tomates"]]),
+        ]
+        for (i, moment) in repas.enumerated() {
+            let onglet = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", moment.onglet)).firstMatch
+            if onglet.waitForExistence(timeout: 3) { taper(onglet); sleep(1) }
+            for groupe in moment.choix { bilanToucherPremier(groupe) }
+            snap(String(format: "%02d-bilan-repas-%@", 28 + i, moment.nom))
+        }
         guard bilanSuite("J'ai fini ma journée") else { return quitterLeBilan() }
 
         bilanToucherPremier(["Je mange de tout"])
-        snap("32-bilan-jamais")
+        snap("34-bilan-jamais")
         guard bilanSuite("Terminer") else { return quitterLeBilan() }
 
         // Fin : on photographie, on n'envoie pas.
         sleep(2)
-        snap("33-bilan-fin")
+        snap("35-bilan-fin")
         quitterLeBilan()
     }
 
