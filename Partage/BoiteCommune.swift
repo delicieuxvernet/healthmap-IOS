@@ -214,8 +214,12 @@ struct ApportW: Codable, Hashable, Identifiable {
     var nom: String
     /// « Vit. D », « Mg », « Fer » : sous un anneau, sur l'écran verrouillé.
     var court: String
-    /// 0...100
+    /// 0...100. Depuis l'audit de fiabilité (8 oct. 2026) : la part de la
+    /// référence ANSES couverte, quand `alerte` est renseigné.
     var score: Int
+    /// L'estimateur affirme-t-il une alerte ? nil pour un instantané d'avant
+    /// le 8 oct. 2026 (le widget retombe alors sur l'ancien seuil).
+    var alerte: Bool? = nil
 }
 
 /// Un aliment qui fait monter l'apport, avec son illustration (`fluent_…`).

@@ -97,10 +97,24 @@ enum ResumeWidgets {
         if ids.isEmpty {
             ids = registre.keys.sorted { (registre[$0]?.score ?? 0, $0) < (registre[$1]?.score ?? 0, $1) }
         }
+        // Apport estimé : le statut d'abord (alerte, à surveiller, à affiner),
+        // puis le chiffre ; jamais le seul chiffre (vitamine D toujours basse).
+        func rang(_ id: String) -> Int {
+            switch registre[id]?.estimation?.statut {
+            case .aRenforcer?, .auDessusDeLaLimite?: return 0
+            case .aSurveiller?: return 1
+            case .peuPrecise?: return 2
+            case nil: return 1
+            default: return 3
+            }
+        }
         return Array(ids.prefix(apportsAffiches))
-            .compactMap { id in registre[id].map { ApportW(id: id, nom: nom(id), court: nomCourt(id), score: $0.score) } }
+            .compactMap { id in registre[id].map {
+                ApportW(id: id, nom: nom(id), court: nomCourt(id), score: $0.score,
+                        alerte: $0.estimation?.statut.estUneAlerte)
+            } }
             .enumerated()
-            .sorted { ($0.element.score, $0.offset) < ($1.element.score, $1.offset) }
+            .sorted { (rang($0.element.id), $0.element.score, $0.offset) < (rang($1.element.id), $1.element.score, $1.offset) }
             .map(\.element)
     }
 
