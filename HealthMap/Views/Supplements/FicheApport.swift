@@ -190,6 +190,18 @@ struct FicheTexteCarte: View {
     }
 }
 
+/// La fiche d'un apport, celle du Bilan (`ApportV2DetailSheet`) : statut,
+/// quantité et sources de l'estimateur. Remplace l'ancienne fiche nutriment,
+/// qui citait encore le score du calcul en points (audit des écrans, 8 oct. 2026).
+struct FicheApportDuBilan: View {
+    @EnvironmentObject private var dashboardVM: DashboardViewModel
+    let nutriment: EnrichedNutrient
+
+    var body: some View {
+        ApportV2DetailSheet(apport: .pourLaFiche(nutriment, bilan: dashboardVM.analysisV2?.bilan))
+    }
+}
+
 struct FicheApportSheet: View {
 
     let contexte: FicheApportContexte
@@ -274,8 +286,7 @@ struct FicheApportSheet: View {
         .verreFeuille()
         .sheet(isPresented: $montreDetailAssiette) {
             if let nutrimentDetail {
-                // Premium : la fiche observe elle-même SubscriptionService.
-                NutrientDetailSheet(nutrient: nutrimentDetail)
+                FicheApportDuBilan(nutriment: nutrimentDetail)
             }
         }
         .sheet(item: $causeOuverte, onDismiss: { surligne = nil }) { cause in
