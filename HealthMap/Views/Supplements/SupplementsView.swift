@@ -682,7 +682,7 @@ struct SupplementsView: View {
                 note = forme.isEmpty ? nil : forme
             } else {
                 specs = []
-                note = "Ton écart est petit : l'alimentation le comble seule, sans gélule."
+                note = Self.noteSansComplement(statut: dashboardVM.statuts[chain.id])
             }
             precautions = chain.rec.map {
                 SupplementsV4.precautions(for: $0, warnings: engineResult?.warnings ?? [])
@@ -725,6 +725,21 @@ struct SupplementsView: View {
     private func quantite(_ id: String, score: Int) -> String? {
         if let e = dashboardVM.estimation?.apports[id] { return LectureEstimation.quantite(id, e) }
         return QuantiteApport.libelle(id: id, score: score, profil: dashboardVM.profile)
+    }
+
+    /// Pourquoi aucun complément n'est proposé, selon le statut estimé : le
+    /// chiffre ne dit pas « petit écart » (une vitamine D à 13 % le disait).
+    static func noteSansComplement(statut: StatutApport?) -> String {
+        switch statut {
+        case .peuPrecise?:
+            return "Ton apport reste à préciser : pas de complément à envisager pour l'instant. Coche plus d'aliments ou note quelques repas."
+        case .aSurveiller?:
+            return "Ton apport semble un peu juste : l'assiette suffit pour le renforcer, sans gélule."
+        case .couvert?, .couvertParComplement?, .sousLaLimite?:
+            return "Ton apport couvre ta référence : pas besoin de complément."
+        default:
+            return "Ton écart est petit : l'alimentation le comble seule, sans gélule."
+        }
     }
 
     /// Un texte du bilan, nettoyé ; `nil` s'il est vide.
