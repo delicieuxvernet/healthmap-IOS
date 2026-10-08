@@ -1619,7 +1619,11 @@ struct JournalView: View {
             DSCapsuleButton(titre: "Analyser ce repas") {
                 // Le scan suit le jour affiché, comme la recherche et la dictée.
                 viewModel.jourDeSaisie = journal.selectedDay
-                Task { await viewModel.analyzePhoto() }
+                // Les apports estimés, comme partout ailleurs dans l'app.
+                let estimes = dashboardVM.estimation != nil
+                let scores = estimes ? dashboardVM.registre.mapValues(\.score) : nil
+                let alertes = estimes ? dashboardVM.apportsEnAlerte : nil
+                Task { await viewModel.analyzePhoto(scores: scores, alertes: alertes) }
             }
         }
     }
