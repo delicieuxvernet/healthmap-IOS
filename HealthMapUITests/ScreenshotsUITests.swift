@@ -579,8 +579,8 @@ final class ScreenshotsUITests: XCTestCase {
         // Onboarding
         if app.buttons["Passer"].waitForExistence(timeout: 15) {
             snap("01-onboarding-garde")
-            // Les pages de l'onboarding portent toutes « Passer » : on avance
-            // tant qu'il est là (6 pages au plus), puis on le touche.
+            // On avance tant que « Passer » est là ; la dernière page (sans
+            // « Passer ») est photographiée, on ne la valide pas.
             for page in 2...7 {
                 let suivant = ["C'est parti", "Continuer", "Suivant"]
                     .map { app.buttons[$0].firstMatch }
@@ -590,13 +590,14 @@ final class ScreenshotsUITests: XCTestCase {
                 sleep(1)
                 snap(String(format: "%02d-onboarding-page", page))
             }
-            // La dernière page n'a plus « Passer » : elle se termine par « Commencer ».
-            for fin in ["Commencer", "Passer"] where app.buttons[fin].firstMatch.exists {
-                taper(app.buttons[fin].firstMatch)
-                sleep(1)
-                break
-            }
         }
+        // L'argument `-hasSeenOnboarding NO` l'emporte sur ce que l'app
+        // enregistre : « Commencer » ne fermerait jamais l'onboarding. On
+        // relance l'app, onboarding vu, pour la suite du parcours.
+        app.terminate()
+        app.launchArguments = app.launchArguments.map { $0 == "NO" ? "YES" : $0 }
+        app.launch()
+        fermerAlerteApple()
 
         // Page de garde, puis l'écran de connexion vide (jamais rempli à l'image).
         if app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 30) {
