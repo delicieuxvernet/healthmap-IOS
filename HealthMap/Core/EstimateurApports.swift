@@ -434,6 +434,12 @@ final class EstimateurApports {
 
     static func phi(_ x: Double) -> Double { 0.5 * (1 + erf(x / 2.0.squareRoot())) }
 
+    /// Le repère de cette personne (RNP, apport satisfaisant ou limite), dans
+    /// l'unité du référentiel : celui auquel l'estimation est comparée.
+    func repere(_ n: String, profil p: ProfilEstimation) -> Double? {
+        reference(n, contexte(p)).valeurRepere
+    }
+
     // MARK: 5. Estimation complète
 
     func estimer(_ p: ProfilEstimation, journees: [JourneeNotee] = []) -> ResultatEstimation {

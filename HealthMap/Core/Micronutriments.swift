@@ -236,7 +236,8 @@ enum BesoinsMicros {
             if enceinte { return 1.8 }
             return femme ? 1.6 : 1.7
         case "vitB9":
-            if enceinte { return 600 }
+            // Projet de grossesse : 600 µg, comme le référentiel (ANSES 2021).
+            if enceinte || (femme && p.pregnancyStatus == "trying_to_conceive") { return 600 }
             if allaite { return 500 }
             return 330
         case "potassium":

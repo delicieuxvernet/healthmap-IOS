@@ -707,14 +707,19 @@ struct SupplementsView: View {
             ctaAlternative: cta,
             // La quantité dit l'APPORT : sous le nom d'un aliment (voie
             // assiette), elle se lirait comme celle de l'aliment.
-            quantite: enAssiette ? nil : QuantiteApport.libelle(
-                id: chain.id, score: item.detail.score, profil: dashboardVM.profile
-            ),
+            quantite: enAssiette ? nil : quantite(chain.id, score: item.detail.score),
             // Voie assiette : le conseil du bilan est déjà la note de « Comment
             // l'intégrer », on ne le redit pas dans les gestes.
             conseil: enAssiette ? nil : texteOuNil(chain.apport?.tipBold),
             conseilSuite: enAssiette ? nil : texteOuNil(chain.apport?.tipRest)
         )
+    }
+
+    /// « ≈ 332 sur 380 mg par jour » : l'apport estimé quand il existe, comme
+    /// sur la fiche du Bilan.
+    private func quantite(_ id: String, score: Int) -> String? {
+        if let e = dashboardVM.estimation?.apports[id] { return LectureEstimation.quantite(id, e) }
+        return QuantiteApport.libelle(id: id, score: score, profil: dashboardVM.profile)
     }
 
     /// Un texte du bilan, nettoyé ; `nil` s'il est vide.

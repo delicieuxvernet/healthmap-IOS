@@ -127,7 +127,9 @@ final class CalculEtape2Tests: XCTestCase {
         XCTAssertEqual(BesoinsDeReference.besoin(.iodine, profil: p), 200)
         XCTAssertEqual(BesoinsDeReference.besoin(.vitB12, profil: p), 4.5)
         p.pregnancyStatus = "breastfeeding"
-        XCTAssertEqual(BesoinsDeReference.besoin(.vitC, profil: p), 155)
+        // ANSES 2021, référentiel de l'estimateur : 170 mg en allaitant.
+        XCTAssertEqual(BesoinsDeReference.besoin(.vitC, profil: p), 170)
+        XCTAssertEqual(BesoinsDeReference.besoinDeRepli(.vitC, profil: p), 155)
         // Un homme n'est jamais « enceinte », même si la réponse traîne.
         var homme = adulte()
         homme.pregnancyStatus = "pregnant"
