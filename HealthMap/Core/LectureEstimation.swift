@@ -36,6 +36,18 @@ extension StatutApport {
         }
     }
 
+    /// Ce que reçoit `generate-analysis` pour choisir les trois apports du
+    /// bilan : les alertes sûres d'abord, puis « à surveiller », puis « à
+    /// affiner », puis le reste.
+    var codeServeur: String {
+        switch self {
+        case .couvert, .couvertParComplement, .sousLaLimite: return "couvert"
+        case .aSurveiller: return "a_surveiller"
+        case .aRenforcer, .auDessusDeLaLimite: return "a_renforcer"
+        case .peuPrecise: return "a_affiner"
+        }
+    }
+
     /// Une alerte que la validation permet d'affirmer.
     var estUneAlerte: Bool { self == .aRenforcer || self == .auDessusDeLaLimite }
 

@@ -204,6 +204,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         userId: String,
         profileHash: String,
         scores: [String: Int],
+        statuts: [String: String] = [:],
         healthScore: Int,
         redFlags: [RedFlag],
         forceRefresh: Bool = false
@@ -232,6 +233,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         let requestBody = BilanV2Request(
             tache: "bilan",
             scores: scores,
+            statuts: statuts,
             healthScore: healthScore,
             redFlags: redFlags.map { EdgeFlagDTO(id: $0.id.rawValue, urgency: $0.urgency.rawValue, message: $0.message) },
             profileHash: profileHash,
@@ -544,6 +546,10 @@ private struct EdgeFlagDTO: Encodable {
 private struct BilanV2Request: Encodable {
     let tache: String
     let scores: [String: Int]
+    /// Statut de chaque apport estimé (audit de fiabilité, 8 oct. 2026) : le
+    /// serveur choisit les trois apports du bilan d'après eux, plus d'après
+    /// les chiffres les plus bas. Vide pour l'ancien calcul.
+    let statuts: [String: String]
     let healthScore: Int
     let redFlags: [EdgeFlagDTO]
     let profileHash: String

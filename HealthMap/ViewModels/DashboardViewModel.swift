@@ -869,6 +869,7 @@ final class DashboardViewModel: ObservableObject {
                     userId: userId,
                     profileHash: profileHash,
                     scores: localScores,
+                    statuts: statuts.mapValues(\.codeServeur),
                     healthScore: localHealthScore,
                     redFlags: localFlags,
                     forceRefresh: forceRefresh

@@ -171,7 +171,7 @@ private final class MockTeaserAIAnalysisService: AIAnalysisServiceProtocol {
         return nil
     }
 
-    func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2 {
+    func fetchBilanV2(userId: String, profileHash: String, scores: [String: Int], statuts: [String: String], healthScore: Int, redFlags: [RedFlag], forceRefresh: Bool) async throws -> AIAnalysisV2 {
         bilanV2CallCount += 1
         return AIAnalysisV2(contract: "v2")
     }
