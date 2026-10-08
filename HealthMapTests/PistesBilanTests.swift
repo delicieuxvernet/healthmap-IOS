@@ -127,11 +127,24 @@ final class PistesBilanTests: XCTestCase {
         XCTAssertEqual(carte?.texte, "Ton assiette dira si elle compense.")
     }
 
+    /// Une femme de 35 ans qui a coché douze aliments, une fois par semaine
+    /// chacun : ses apports restent sous la référence, le plafond de 100 %
+    /// n'écrase pas l'effet d'une réponse (un caddie vide vaut la moyenne
+    /// française, déjà au plafond pour le magnésium).
+    private func femmeAuCaddieLeger(_ regler: (inout UserProfile) -> Void = { _ in }) -> UserProfile {
+        femme35 {
+            $0.groceries = Dictionary(uniqueKeysWithValues: [
+                "baguette", "pates", "steak_hache", "escalopes_poulet", "yaourt_nature", "pommes",
+                "oeufs", "tomates", "courgettes", "carottes", "beurre", "lait",
+            ].map { ($0, 1) })
+            regler(&$0)
+        }
+    }
+
     /// Le café APPORTE du magnésium (Ciqual) : c'est un bon point, plus un frein.
-    /// Un homme qui en boit beaucoup (INCA 3 : 146 mg par jour par le café et
-    /// le thé ; chez les femmes, la classe « beaucoup » d'INCA 3 en donne moins, peu d'effectif).
+    /// Référentiel 2026-10-08.12 : « modérément » = 72 % → 86 % de la référence.
     func testLeCafeEstUnBonPointPourLeMagnesium() {
-        let p = profil { $0.gender = .homme; $0.age = "35"; $0.height = "178"; $0.weight = "75"; $0.caffeineIntake = "heavy" }
+        let p = femmeAuCaddieLeger { $0.caffeineIntake = "moderate" }
         let carte = PistesBilan.carte(pour: .boire, profil: p)
         XCTAssertEqual(carte?.genre, .bonPoint)
         XCTAssertEqual(carte?.nutriment, .magnesium)
@@ -139,7 +152,7 @@ final class PistesBilanTests: XCTestCase {
     }
 
     func testUnEcranNeReprendPasLesFaitsDUnAutre() {
-        let p = profil { $0.gender = .homme; $0.age = "35"; $0.height = "178"; $0.weight = "75"; $0.caffeineIntake = "heavy" }
+        let p = femmeAuCaddieLeger { $0.caffeineIntake = "moderate" }
         XCTAssertTrue(PistesBilan.faits(de: .alcoolTabac, profil: p).isEmpty)
         XCTAssertFalse(PistesBilan.faits(de: .boire, profil: p).isEmpty)
     }
