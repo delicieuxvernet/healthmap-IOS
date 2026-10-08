@@ -590,7 +590,12 @@ final class ScreenshotsUITests: XCTestCase {
                 sleep(1)
                 snap(String(format: "%02d-onboarding-page", page))
             }
-            if app.buttons["Passer"].firstMatch.exists { app.buttons["Passer"].firstMatch.tap() }
+            // La dernière page n'a plus « Passer » : elle se termine par « Commencer ».
+            for fin in ["Commencer", "Passer"] where app.buttons[fin].firstMatch.exists {
+                taper(app.buttons[fin].firstMatch)
+                sleep(1)
+                break
+            }
         }
 
         // Page de garde, puis l'écran de connexion vide (jamais rempli à l'image).
