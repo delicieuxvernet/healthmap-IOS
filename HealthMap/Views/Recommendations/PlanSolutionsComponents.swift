@@ -114,7 +114,9 @@ struct PlanNoeudSheet: View {
         switch topic.kind {
         case .objectif: return "Ton objectif"
         case .symptome: return "Symptôme suivi"
-        case .apport: return "Apport à renforcer"
+        case .apport:
+            guard let statut = topic.statut else { return "Apport à renforcer" }
+            return statut.estUneAlerte ? "Apport \(statut.libelleCourt.lowercased())" : "Apport"
         }
     }
 

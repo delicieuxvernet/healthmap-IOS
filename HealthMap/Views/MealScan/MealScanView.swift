@@ -1163,7 +1163,7 @@ struct JournalView: View {
         }
 
         DSSectionHeader(
-            titre: "Apports à renforcer",
+            titre: "Apports à suivre",
             lien: dashboardVM.bilanAffichage == .bilan ? "Tout afficher" : nil,
             action: { showBilanComplet = true }
         )
