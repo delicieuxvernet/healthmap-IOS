@@ -522,6 +522,21 @@ final class DashboardViewModel: ObservableObject {
     /// Les apports dont l'app peut AFFIRMER qu'ils sont à renforcer (statut
     /// « à renforcer » de l'estimateur, ou prise de sang sous le repère).
     /// Sans estimation, l'ancien seuil (sous 60). Ordre du catalogue.
+    /// « Ton apport en magnésium semble bas. » : la phrase de l'estimateur,
+    /// par apport, avec le statut retenu (prise de sang comprise). Elle prime
+    /// sur le verdict rédigé par l'analyse, écrit sur d'autres chiffres.
+    var verdictsEstimes: [String: String] {
+        guard let estimation else { return [:] }
+        let statuts = self.statuts
+        var sortie: [String: String] = [:]
+        for definition in NutrientData.all {
+            let id = definition.id.rawValue
+            guard let e = estimation.apports[id] else { continue }
+            sortie[id] = LectureEstimation.verdict(nom: definition.label, estimation: e, statut: statuts[id])
+        }
+        return sortie
+    }
+
     var apportsEnAlerte: [String] {
         let statuts = self.statuts
         guard !statuts.isEmpty else { return nutrients.filter { $0.score < 60 }.map(\.id) }
@@ -788,6 +803,14 @@ final class DashboardViewModel: ObservableObject {
 
     // MARK: - Trigger AI Analysis
 
+    /// Les scores que l'analyse rédigée explique : ceux du registre (apports
+    /// estimés) quand l'estimateur répond ; sinon `nil`, l'ancien calcul.
+    private var scoresPourLAnalyse: [String: Int]? {
+        guard estimation != nil else { return nil }
+        let scores = registre.mapValues(\.score)
+        return scores.isEmpty ? nil : scores
+    }
+
     func triggerAnalysis() async {
         // Même logique que computeLocalScores : l'analyse doit pouvoir démarrer
         // pendant la célébration post-questionnaire, avant le flip du flag UI.
@@ -817,7 +840,8 @@ final class DashboardViewModel: ObservableObject {
         do {
             let merged = try await aiAnalysisService.fetchFullAnalysis(
                 userId: userId,
-                profile: profile
+                profile: profile,
+                scores: scoresPourLAnalyse
             )
 
             self.aiAnalysis = merged
@@ -863,7 +887,7 @@ final class DashboardViewModel: ObservableObject {
                     if cachedResponse != nil {
                         // The service will find the cached row and skip the edge call
                         // since the profile hash hasn't changed.
-                        let retried = try await aiAnalysisService.fetchFullAnalysis(userId: userId, profile: profile)
+                        let retried = try await aiAnalysisService.fetchFullAnalysis(userId: userId, profile: profile, scores: scoresPourLAnalyse)
                         if let retried {
                             self.aiAnalysis = retried
                             self.healthScore = retried.healthScore

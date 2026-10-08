@@ -146,7 +146,7 @@ struct RecommendationsContentView: View {
     /// les nutriments du bilan via le VM du Dashboard (analyse si disponible,
     /// sinon scores locaux) — labels/emojis/couleurs canoniques garantis.
     private var apportTopics: [PlanTopic] {
-        planTopicsFromApports(dashboardVM.nutrients, statuts: dashboardVM.statuts)
+        planTopicsFromApports(dashboardVM.nutrients, statuts: dashboardVM.statuts, verdicts: dashboardVM.verdictsEstimes)
     }
 
     /// Les apports à travailler : ceux en alerte (« à renforcer » puis « à

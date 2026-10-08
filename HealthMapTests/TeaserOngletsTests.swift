@@ -166,7 +166,7 @@ private final class MockTeaserAIAnalysisService: AIAnalysisServiceProtocol {
     private(set) var fullAnalysisCallCount = 0
     private(set) var bilanV2CallCount = 0
 
-    func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis? {
+    func fetchFullAnalysis(userId: String, profile: UserProfile, scores: [String: Int]?) async throws -> MergedAnalysis? {
         fullAnalysisCallCount += 1
         return nil
     }

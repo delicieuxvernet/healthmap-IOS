@@ -134,7 +134,8 @@ struct PlanSupplementSolution: Identifiable {
 /// sont moins de 3, on complète avec les apports suivants par ordre de score
 /// croissant. Le graphe (`PlanGraph.construire`) borne ensuite ce qu'il affiche.
 func planTopicsFromApports(_ nutrients: [EnrichedNutrient],
-                           statuts: [String: StatutApport] = [:]) -> [PlanTopic] {
+                           statuts: [String: StatutApport] = [:],
+                           verdicts: [String: String] = [:]) -> [PlanTopic] {
     // Apports estimés (audit de fiabilité, 8 oct. 2026) : le STATUT ordonne —
     // « à renforcer », puis « à surveiller », puis le reste ; le score ne
     // départage qu'à statut égal. Sans statut : le plus faible d'abord, faible
@@ -162,19 +163,20 @@ func planTopicsFromApports(_ nutrients: [EnrichedNutrient],
     // Les apports faibles sont en tête de `sorted` : prendre les `count`
     // premiers = tous les apports faibles (max 6), complétés au besoin par les
     // suivants.
-    return sorted.prefix(count).compactMap { planApportTopic($0, statut: statuts[$0.id]) }
+    return sorted.prefix(count).compactMap { planApportTopic($0, statut: statuts[$0.id], verdict: verdicts[$0.id]) }
 }
 
 /// Un nœud « apport » : mêmes composants et même pop-up que la vue objectifs,
 /// alimentés par les données déjà disponibles pour CE nutriment (sources
 /// d'aliments du catalogue, hack/synergie/solution de l'analyse quand ils
 /// existent — jamais de dosage inventé).
-private func planApportTopic(_ n: EnrichedNutrient, statut: StatutApport? = nil) -> PlanTopic? {
+private func planApportTopic(_ n: EnrichedNutrient, statut: StatutApport? = nil, verdict: String? = nil) -> PlanTopic? {
     guard let def = NutrientData.definition(for: n.id) else { return nil }
 
-    // Explication de l'analyse quand elle existe (une phrase suffira à la
-    // pop-up) ; sinon rien — la cause citera déjà le score réel.
-    let intro = [n.pourquoiCeScore, n.verdict, n.mecanisme]
+    // Le verdict de l'estimateur d'abord ; à défaut, l'explication de
+    // l'analyse (une phrase suffira à la pop-up) ; sinon rien — la cause
+    // citera déjà le score réel.
+    let intro = [verdict, n.pourquoiCeScore, n.verdict, n.mecanisme]
         .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
         .first { !$0.isEmpty } ?? ""
 

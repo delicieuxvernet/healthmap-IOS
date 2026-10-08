@@ -21,11 +21,14 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
 
     // MARK: - Fetch Full Analysis
     /// Main entry point — checks cache, calls Edge Function if needed, validates, merges
-    func fetchFullAnalysis(userId: String, profile: UserProfile) async throws -> MergedAnalysis? {
+    func fetchFullAnalysis(userId: String, profile: UserProfile, scores: [String: Int]? = nil) async throws -> MergedAnalysis? {
         guard profile.completed else { return nil }
 
-        // 1. Compute local scores (ALWAYS deterministic)
-        let localScores = HealthCalculator.analyzeNutrientScores(profile: profile)
+        // 1. Compute local scores (ALWAYS deterministic). Audit de fiabilité
+        // (8 oct. 2026) : quand l'app a des apports estimés, ce sont EUX que
+        // l'analyse explique — jamais l'ancien calcul en points.
+        let localScores = scores.flatMap { $0.isEmpty ? nil : $0 }
+            ?? HealthCalculator.analyzeNutrientScores(profile: profile)
         let healthScore = HealthCalculator.calculateHealthScore(profile: profile)
         let redFlags = RedFlagDetector.detect(profile: profile)
 
