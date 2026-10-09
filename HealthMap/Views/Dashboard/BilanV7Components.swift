@@ -666,7 +666,7 @@ struct BilanV7SymptomesCard: View {
                                 // la ligne : le nom du symptôme devient son
                                 // kicker teinté, le verdict prend le dessus.
                                 Text(row.nom)
-                                    .font(Theme.subLabelFont)
+                                    .dsPolice(11.5, .bold)
                                     .foregroundStyle(encre)
                                     .multilineTextAlignment(.leading)
                                 HStack(spacing: 5) {
@@ -1150,7 +1150,7 @@ struct BilanV7SourcesFooter: View {
                     .font(.system(size: 13, weight: .semibold))
                     .accessibilityHidden(true)
                 Text("Sources scientifiques")
-                    .font(Theme.subLabelFont)
+                    .dsPolice(11.5, .bold)
             }
             .foregroundStyle(BilanV7.soft)
 
@@ -1158,7 +1158,7 @@ struct BilanV7SourcesFooter: View {
                 ForEach(ScientificSources.all) { source in
                     Link(destination: source.url) {
                         Text("\(source.name) — \(source.subtitle)")
-                            .font(Theme.chromeFont)
+                            .dsPolice(10.5, .medium)
                             .foregroundStyle(BilanV7.sourcesInk)
                             .underline()
                             .multilineTextAlignment(.leading)
@@ -1166,7 +1166,7 @@ struct BilanV7SourcesFooter: View {
                     }
                 }
                 Text("Kiwio ne remplace pas un avis médical.")
-                    .font(Theme.chromeFont)
+                    .dsPolice(10.5, .medium)
                     .foregroundStyle(BilanV7.sourcesInk)
                     .padding(.top, 2)
             }

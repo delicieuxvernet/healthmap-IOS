@@ -1853,7 +1853,7 @@ struct JournalView: View {
                     // Seul chiffre-héros de l'écran qui n'était ni arrondi ni à
                     // chasse fixe : il l'est comme tous les autres désormais.
                     Text("\(score)")
-                        .dsPolice(26, .bold, chiffres: true)
+                        .font(.system(size: 26, weight: .bold, design: .default).monospacedDigit())
                         .foregroundStyle(Color.dsTexte)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
