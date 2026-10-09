@@ -296,9 +296,7 @@ final class DashboardViewModel: ObservableObject {
             relaisAbonnement = abonnement.$isPremium
                 .removeDuplicates()
                 .dropFirst()
-                .sink { [weak self] _ in
-                    Task { @MainActor in self?.objectWillChange.send() }
-                }
+                .sink { [weak self] _ in self?.objectWillChange.send() }
         }
 
         initTask = Task {
