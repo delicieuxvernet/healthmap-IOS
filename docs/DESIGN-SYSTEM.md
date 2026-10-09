@@ -141,8 +141,9 @@ Trois règles portent 80 % de l'écart perçu :
 | Cartes | `.dsCard()` : verre dépoli, rayon 24 continu, liseré blanc intérieur, ombre douce découpée |
 | Listes | `DSGroupedList` + `DSRow` + `DSSeparator(retrait: 49 avec icône / 16 sans)` |
 | Jauges | `DSGauge` (4 pt, animée 1 s easeOut, cascade 50 ms) · `DSRing` (92 pt, trait 9) |
-| Boutons | `DSCapsuleButton` (50 pt, capsule, verre vert ; `hauteur:` 54 et `brillance:` pour l'action d'une feuille) · `DSLinkRow` (lien vert de fin de carte) · `DSCloseButton` (rond de verre de 36) · `.dsPress` (0,96 + assombrissement, ressort `kiwiVif`) |
+| Boutons | `DSCapsuleButton` (50 pt, capsule, verre vert ; `hauteur:` 54 et `brillance:` pour l'action d'une feuille) · `DSLinkRow` (lien vert de fin de carte) · `DSCloseButton` (rond de verre de 36) · `.dsPress` (0,96 + assombrissement, ressort `kiwiVif`) ; `.healthMapPressed` en est un alias |
 | Mouvement | `KiwiMotion.swift` : `kiwiVif` · `kiwiGlisse` · `kiwiFluide` · `kiwiRebond` · `kiwiCompteur`, échelles `KiwiEchelle` (rien au-dessus de 1,22), `ChiffreQuiCompte`, `.kiwiImpulsion(_:)`, `.kiwiRecompense(_:)` |
+| Gestes | `KiwiGestes.swift` : `CompteurAjouts` (recherche) · `.kiwiSecousse(_:)` + `Butee` (la quantité fait non de la tête, une fois par appui). Un « − / + » de quantité = `Button` + `.buttonRepeatBehavior(.enabled)` (maintien accéléré système). La coche d'un ajout rapide = `verrePop` + `verreGerbe` |
 | Formats | `DS.entier(1021)` → `1 021` · `DS.pourcent(42)` → `42 %` · `DS.decimal(5.9)` → `5,9` (espace fine U+202F) |
 | Navigation | `KiwiFloatingTabBar` (capsule de verre de 62, pastille qui glisse, 5 onglets) · titre d'onglet : dessiné dans la page pour Journal et Progrès (`DSLargeTitle`) et Compléments (17/600), grand titre natif `.large` pour Plan et Réglages (voir « Règles d'écran ») |
 

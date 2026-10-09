@@ -92,6 +92,9 @@ struct PortionSheet: View {
     @State private var unite: UnitPortionCatalog.Unite?
     /// Index de la taille retenue (petit / moyen / gros) dans `unite.tailles`.
     @State private var taille: Int?
+    /// Un « − » ou un « + » a buté : la quantité fait alors non de la tête
+    /// (`kiwiSecousse`), une fois par appui.
+    @State private var butee = Butee()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -357,6 +360,7 @@ struct PortionSheet: View {
                         .contentTransition(.numericText())
                 }
                 .frame(minWidth: 120, minHeight: 44)
+                .kiwiSecousse(butee.secousses)
                 .accessibilityElement(children: .combine)
                 .animation(reduceMotion ? nil : Animation.kiwiVif, value: grams)
                 stepUnite("plus", unite: unite, delta: 1)
@@ -366,16 +370,36 @@ struct PortionSheet: View {
     }
 
     private func stepUnite(_ symbol: String, unite: UnitPortionCatalog.Unite, delta: Int) -> some View {
-        Button {
-            HapticService.shared.selection()
+        boutonPas(symbol, enButee: delta < 0 && nombre(unite) <= 1) {
             let n = UnitPortionCatalog.nombreSuivant(nombre(unite), delta: delta)
-            grams = min(1500, max(1, Self.auDixieme(n * unite.poids(taille: taille))))
-        } label: {
+            allerA(Self.auDixieme(n * unite.poids(taille: taille)))
+        }
+        .accessibilityLabel(delta > 0 ? "Ajouter une unité" : "Retirer une unité")
+    }
+
+    /// Un « − » ou un « + ». Maintenu, il répète son pas de plus en plus vite
+    /// (comportement système, le même que le poids du Journal). À la butée il
+    /// s'estompe mais reste touchable : c'est la quantité qui répond « non ».
+    private func boutonPas(_ symbol: String, enButee: Bool,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             stepLabel(symbol)
+                .opacity(enButee ? 0.4 : 1)
         }
         .buttonStyle(.dsPress)
-        .disabled(delta < 0 && nombre(unite) <= 1)
-        .accessibilityLabel(delta > 0 ? "Ajouter une unité" : "Retirer une unité")
+        .buttonRepeatBehavior(.enabled)
+    }
+
+    /// Pose une nouvelle quantité, bornée de 1 à 1 500 g. À la butée, rien ne
+    /// change et la quantité fait non de la tête.
+    private func allerA(_ cible: Double) {
+        let bornee = min(1500, max(1, cible))
+        guard bornee != grams else {
+            butee.toucher()
+            return
+        }
+        HapticService.shared.selection()
+        grams = bornee
     }
 
     // MARK: Saisie en grammes (presets + stepper + saisie libre)
@@ -408,6 +432,7 @@ struct PortionSheet: View {
                         .font(.dsSousTitre)
                         .foregroundStyle(Color.dsSecondaire)
                 }
+                .kiwiSecousse(butee.secousses)
                 stepButton("plus", delta: 10)
             }
             .frame(maxWidth: .infinity)
@@ -449,13 +474,9 @@ struct PortionSheet: View {
     }
 
     private func stepButton(_ symbol: String, delta: Int) -> some View {
-        Button {
-            HapticService.shared.selection()
-            grams = min(1500, max(1, (grams + Double(delta)).rounded()))
-        } label: {
-            stepLabel(symbol)
+        boutonPas(symbol, enButee: delta < 0 ? grams <= 1 : grams >= 1500) {
+            allerA((grams + Double(delta)).rounded())
         }
-        .buttonStyle(.dsPress)
         .accessibilityLabel(delta > 0 ? "Plus 10 grammes" : "Moins 10 grammes")
     }
 
@@ -837,6 +858,14 @@ struct FoodSearchSheet: View {
     @State private var ficheOuverte: FicheAjout?
     @State private var loadingHitId: String?
     @State private var confirmation: String?
+    /// Lignes dont le « + » montre encore sa coche (elle redevient « + » au
+    /// bout d'un instant : on peut ajouter deux fois le même aliment).
+    @State private var ajoutes: Set<String> = []
+    /// Nombre d'ajouts réussis par ligne : chaque nouveau fait rebondir le
+    /// rond (`verrePop`) et partir sa gerbe (`verreGerbe`).
+    @State private var salves: [String: Int] = [:]
+    /// Aliments ajoutés depuis l'ouverture de la recherche.
+    @State private var nombreAjouts = 0
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -869,6 +898,11 @@ struct FoodSearchSheet: View {
             .navigationTitle("Ajouter : \(slot.label)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if nombreAjouts > 0 {
+                        CompteurAjouts(nombre: nombreAjouts)
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
                         .foregroundStyle(Color.dsTexte)
@@ -1071,6 +1105,7 @@ struct FoodSearchSheet: View {
     /// la maquette ; la cible tactile déborde pour atteindre 44 pt.
     private func exampleChip(_ text: String, index: Int) -> some View {
         Button {
+            HapticService.shared.selection()
             vm.query = text
             vm.search()
         } label: {
@@ -1155,6 +1190,8 @@ struct FoodSearchSheet: View {
             .buttonStyle(.dsPress)
 
             // Ajout direct : un rond de verre vert, la seule action de la ligne.
+            // Réussi, il devient une coche qui rebondit et part en gerbe,
+            // comme la prise d'un complément.
             Button {
                 ajouter()
             } label: {
@@ -1162,13 +1199,18 @@ struct FoodSearchSheet: View {
                     if loadingHitId == hit.id {
                         ProgressView().tint(.white).scaleEffect(0.7)
                     } else {
-                        Image(systemName: "plus")
+                        Image(systemName: ajoutes.contains(hit.id) ? "checkmark" : "plus")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
                     }
                 }
                 .frame(width: 32, height: 32)
                 .verre(Self.matierePlus, forme: Circle())
+                .verrePop(salves[hit.id] ?? 0, creux: 0.75, crete: KiwiEchelle.coche, duree: 0.45)
+                .verreGerbe(salves[hit.id] ?? 0,
+                            couleurs: [Color.teinteKiwi, Color.teinteKiwiClair],
+                            nombre: 10,
+                            distance: 24)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
             }
@@ -1179,6 +1221,13 @@ struct FoodSearchSheet: View {
         .padding(.leading, 12)
         .padding(.trailing, 6)
         .padding(.vertical, 10)
+        // La ligne s'éclaire le temps de la coche, puis s'éteint.
+        .background(
+            Color.dsAccent
+                .opacity(ajoutes.contains(hit.id) ? 0.10 : 0)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.6),
+                           value: ajoutes.contains(hit.id))
+        )
         .contextMenu {
             Button {
                 basculerFavori(hit)
@@ -1189,6 +1238,16 @@ struct FoodSearchSheet: View {
                     Label("Ajouter aux favoris", systemImage: "star")
                 }
             }
+        }
+    }
+
+    /// La coche tient un instant, puis le « + » revient.
+    private func marquerAjoute(_ id: String) {
+        salves[id, default: 0] += 1
+        ajoutes.insert(id)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1400))
+            ajoutes.remove(id)
         }
     }
 
@@ -1284,6 +1343,7 @@ struct FoodSearchSheet: View {
                     ?? 100
                 if await onAdd(detail, grams) {
                     HapticService.shared.success()
+                    marquerAjoute(id)
                     habituels.apresAjout(detail, grammes: grams)
                     showConfirmation(for: detail, grams: grams)
                 }
@@ -1295,6 +1355,7 @@ struct FoodSearchSheet: View {
 
     private func showConfirmation(for detail: MealJournalService.FoodDetail, grams: Double) {
         let kcal = Int(((detail.kcal100g ?? 0) * grams / 100).rounded())
+        nombreAjouts += 1
         withAnimation(animationConfirmation) { confirmation = "\(detail.name) ajouté · \(kcal) kcal" }
         Task {
             try? await Task.sleep(nanoseconds: 2_200_000_000)
