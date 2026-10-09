@@ -428,18 +428,18 @@ struct ProgresToileView: View {
         if let choisi {
             VStack(spacing: 0) {
                 Text(choisi.nom)
-                    .dsPolice(12, .semibold)
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.dsTexte)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
                 Text(DS.pourcent(choisi.pct))
-                    .dsPolice(30, .bold, design: .rounded, chiffres: true)
+                    .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
                     .tracking(-1.4)
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                 Text(choisi.mot)
-                    .dsPolice(12, .semibold)
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(choisi.aRenforcer ? Color.dsARenforcerTexte : Color.dsSecondaire)
                     .padding(.top, 3)
             }
@@ -462,12 +462,12 @@ struct ProgresToileView: View {
                         .tracking(-1.4)
                         .foregroundStyle(Color.dsTexte)
                     Text("/\(apports.count)")
-                        .dsPolice(17, .semibold)
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.dsSecondaire)
                 }
                 .lineLimit(1)
                 Text("à ton besoin")
-                    .dsPolice(12, .semibold)
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.dsSecondaire)
                     .padding(.top, 3)
             }

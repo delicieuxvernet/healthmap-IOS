@@ -83,11 +83,12 @@ struct KiwiFloatingTabBar: View {
         .verre(.barre, forme: Capsule(style: .continuous))
         .padding(.horizontal, Self.margeLaterale)
         .padding(.bottom, Self.margeBas)
-        // La capsule garde sa hauteur : ses libellés suivent Dynamic Type
-        // jusqu'à xxLarge (au-delà, « Compléments » ne tient plus dans son
-        // cinquième de barre, captures AX3 du 9 oct.), puis la loupe de grand
-        // contenu prend le relais (appui long sur un onglet).
-        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+        // Comme la barre d'onglets d'iOS, la capsule garde la taille par
+        // défaut : dès xxLarge, « Compléments » ne tient plus dans son
+        // cinquième de barre (captures AX3 du 9 oct. 2026). Aux tailles
+        // d'accessibilité, la loupe de grand contenu prend le relais (appui
+        // long sur un onglet).
+        .dynamicTypeSize(...DynamicTypeSize.large)
         .accessibilityElement(children: .contain)
         .onChange(of: selected) { _, nouvel in
             // Le changement peut venir d'ailleurs que d'un toucher (lien
@@ -119,8 +120,9 @@ struct KiwiFloatingTabBar: View {
                     .scaleEffect(rebond == item.tab ? KiwiEchelle.iconeOnglet : 1)
                     .animation(reduceMotion ? nil : Animation.kiwiRebond, value: rebond)
                 Text(item.label)
-                    // 10 pt à la taille par défaut, puis Dynamic Type
-                    // (plafonné à la barre, voir `body`).
+                    // 10 pt, comme la barre d'onglets d'iOS : la taille est
+                    // bornée par la barre (voir `body`), les grandes tailles
+                    // passent par la loupe de grand contenu.
                     .dsPolice(10, actif ? .semibold : .medium)
                     .lineLimit(1)
                     // « Compléments » actif (semibold) dépassait son cinquième
