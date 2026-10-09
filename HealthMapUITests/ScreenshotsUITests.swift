@@ -526,15 +526,18 @@ final class ScreenshotsUITests: XCTestCase {
             sleep(1)
         }
 
-        // Paywall, depuis la carte Premium des Réglages.
-        app.buttons["tab.reglages"].tap()
-        sleep(1)
-        // La carte s'annonce « Essayer 7 jours gratuits » ou « Découvrir
-        // Kiwio Premium » selon l'éligibilité à l'essai.
-        let essai = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@",
-                                                     "Essayer", "Découvrir Kiwio Premium")).firstMatch
-        if essai.waitForExistence(timeout: 4) {
-            taper(essai)
+        // Paywall, depuis le bouton de la carte des micronutriments du
+        // Journal (identifiant stable, à toutes les tailles de texte).
+        fermerTutorielSiOuvert()
+        app.buttons["tab.journal"].tap()
+        sleep(2)
+        let debloquer = app.buttons["journal.micros.debloquer"].firstMatch
+        for _ in 0..<6 where !(debloquer.exists && debloquer.isHittable) {
+            app.swipeUp()
+            sleep(1)
+        }
+        if debloquer.waitForExistence(timeout: 4) {
+            debloquer.tap()
             sleep(3)
             snap("30-paywall-haut")
             app.swipeUp()
@@ -543,10 +546,12 @@ final class ScreenshotsUITests: XCTestCase {
             fermerFeuille()
             sleep(1)
         }
-        // Une page poussée par erreur masquerait la ligne du Récap.
-        if app.navigationBars.buttons.element(boundBy: 0).exists { retour() }
+        fermerTutorielSiOuvert()
 
         // Récap animé, rejoué depuis les Réglages.
+        app.buttons["tab.reglages"].tap()
+        sleep(1)
+        if app.navigationBars.buttons.element(boundBy: 0).exists { retour() }
         let rejouer = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "bilan animé")).firstMatch
         for _ in 0..<5 where !(rejouer.exists && rejouer.isHittable) {
             app.swipeUp()
@@ -567,6 +572,16 @@ final class ScreenshotsUITests: XCTestCase {
     }
 
     // MARK: - Outils
+
+    /// Le tutoriel du premier repas peut s'ouvrir en cours de parcours : on
+    /// le referme (« Plus tard ») sans rien commencer.
+    private func fermerTutorielSiOuvert() {
+        let plusTard = app.buttons["Plus tard"]
+        if plusTard.waitForExistence(timeout: 2) {
+            plusTard.tap()
+            sleep(1)
+        }
+    }
 
     /// Se connecte si la page de garde est affichée (session absente).
     ///
