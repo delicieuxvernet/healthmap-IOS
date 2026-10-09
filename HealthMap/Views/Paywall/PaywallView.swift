@@ -711,20 +711,11 @@ struct PaywallView: View {
     }
 
     /// « 7 jours » / « 1 mois »… lu depuis l'offre d'introduction StoreKit.
-    /// Nil si le produit n'a pas d'essai gratuit — on ne promet jamais un
-    /// essai qui n'existe pas côté App Store.
+    /// Nil si le produit n'a pas d'essai gratuit, OU si Apple dit que cette
+    /// personne l'a déjà eu (App Store 3.1.2) : on ne promet jamais un essai
+    /// qu'Apple ne donnera pas. Le bouton dit alors « Continuer », et le prix.
     private func trialLabel(for plan: PlanOption?) -> String? {
-        guard let discount = plan?.introductoryDiscount,
-              discount.paymentMode == .freeTrial else {
-            return nil
-        }
-        let period = discount.subscriptionPeriod
-        switch period.unit {
-        case .day: return "\(period.value) jours"
-        case .week: return "\(period.value * 7) jours"
-        case .month: return period.value == 1 ? "1 mois" : "\(period.value) mois"
-        case .year: return period.value == 1 ? "1 an" : "\(period.value) ans"
-        }
+        OffrePremium.essaiGratuit(SubscriptionService.essaiGratuit(de: plan?.product))
     }
 
     /// Équivalent mensuel d'une formule, quelle que soit sa durée : c'est la

@@ -910,16 +910,11 @@ enum PremiumOffre {
         return all.first { $0.periodUnit == .year } ?? all.first
     }
 
-    /// « 7 jours » / « 1 mois », lu depuis l'offre d'introduction StoreKit.
+    /// « 7 jours » / « 1 mois », lu depuis l'offre d'introduction StoreKit,
+    /// et SEULEMENT si Apple dit que la personne y a encore droit (App Store
+    /// 3.1.2) : quelqu'un qui a déjà eu son essai voit le prix, pas l'essai.
     static func essai(_ plan: PlanOption?) -> String? {
-        guard let discount = plan?.introductoryDiscount, discount.paymentMode == .freeTrial else { return nil }
-        let period = discount.subscriptionPeriod
-        switch period.unit {
-        case .day: return "\(period.value) jours"
-        case .week: return "\(period.value * 7) jours"
-        case .month: return period.value == 1 ? "1 mois" : "\(period.value) mois"
-        case .year: return period.value == 1 ? "1 an" : "\(period.value) ans"
-        }
+        OffrePremium.essaiGratuit(SubscriptionService.essaiGratuit(de: plan?.product))
     }
 
     /// L'essai de la formule mise en avant (« 7 jours »), ou `nil` : pays ou

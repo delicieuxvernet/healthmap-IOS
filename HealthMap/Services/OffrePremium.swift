@@ -50,7 +50,8 @@ struct OffrePremium: Equatable {
             auTarifCourt = (hebdo.priceFormatter ?? annuel.priceFormatter)?.string(from: unAn as NSDecimalNumber)
         }
 
-        let essai = essaiGratuit(annuel.introductoryDiscount)
+        // L'essai ne s'annonce qu'à qui y a droit (App Store 3.1.2).
+        let essai = essaiGratuit(SubscriptionService.essaiGratuit(de: annuel))
         guard pourcent != nil || essai != nil else { return nil }
 
         return OffrePremium(
