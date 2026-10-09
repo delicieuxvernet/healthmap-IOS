@@ -190,6 +190,12 @@ final class SubscriptionService: ObservableObject {
     /// pas de `deinit` à écrire (et pas d'isolation à contourner).
     private var veilleTransactions: Task<Void, Never>?
 
+    /// Veille sur la boutique App Store (pays du compte Apple). Les prix sont
+    /// ceux d'UNE boutique : si elle change pendant que l'app tourne, les
+    /// formules en mémoire affichaient encore l'ancienne devise (« $US » en
+    /// France, 9 octobre 2026). On relit alors les formules.
+    private var veilleBoutique: Task<Void, Never>?
+
     private init() {
         // Filet hors-ligne (V10 #4) : au cold start, l'état premium repart du
         // dernier état CONNU via `isPremiumWithGrace` (cache persisté, grâce
@@ -207,6 +213,13 @@ final class SubscriptionService: ObservableObject {
             for await _ in StoreKit.Transaction.updates {
                 if Task.isCancelled { return }
                 await self?.rafraichirFiletStoreKit()
+            }
+        }
+        // `StoreKit.` : RevenueCat déclare aussi un type `Storefront`.
+        veilleBoutique = Task { [weak self] in
+            for await _ in StoreKit.Storefront.updates {
+                if Task.isCancelled { return }
+                await self?.loadOfferings()
             }
         }
     }
