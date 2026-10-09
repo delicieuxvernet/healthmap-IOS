@@ -166,6 +166,16 @@ enum RappelsPersonnalises {
     /// En dessous, « ta semaine en chiffres » n'aurait rien à chiffrer.
     static let repasMinimumSemaine = 3
 
+    /// La fréquence RÉELLE, dite avant l'accord aux notifications (audit de
+    /// conformité du 9 octobre 2026 : l'invitation annonçait « quelques
+    /// signes » pour jusqu'à six rappels par jour). Les deux journées pleines
+    /// en portent six au plus, les suivantes trois, quatre le dimanche (« ta
+    /// semaine en chiffres »). `RappelsFrequenceTests` vérifie que
+    /// `planifier` ne dépasse jamais ce qui est écrit ici.
+    static let maxParJourPlein = 6
+    static let maxParJourAllege = 4
+    static let frequenceAnnoncee = "Jusqu'à 6 rappels par jour les deux premiers jours, puis 3 ou 4 : le matin, avant les repas et le soir. Un repas noté annule son rappel. Tu les coupes quand tu veux dans Réglages."
+
     enum Moment {
         static let brief = (heure: 8, minute: 30)
         static let declic = (heure: 10, minute: 0)

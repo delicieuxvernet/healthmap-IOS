@@ -382,12 +382,15 @@ struct InvitationNotificationsContenu: View {
         }
     }
 
+    /// La raison, puis la vraie fréquence (`RappelsPersonnalises.frequenceAnnoncee`) :
+    /// on dit combien de rappels avant de demander l'accord.
     static func explication(cible: CibleNutritionnelle?) -> String {
+        let frequence = RappelsPersonnalises.frequenceAnnoncee
         guard let cible else {
-            return "Quelques signes dans la journée, avant de passer à table, chacun avec un chiffre tiré de tes repas notés."
+            return "Chaque rappel part d'un chiffre tiré de tes repas notés. \(frequence)"
         }
         let verbe = NomNutriment.accord(id: cible.id, singulier: "est", pluriel: "sont")
-        return "\(NomNutriment.majusculeInitiale(cible.avecPossessif)) \(verbe) ton apport le plus bas. Kiwio te fait signe dans la journée, avec tes chiffres : où tu en es, et quoi mettre dans l'assiette."
+        return "\(NomNutriment.majusculeInitiale(cible.avecPossessif)) \(verbe) ton apport le plus bas. Kiwio te dit où tu en es, et quoi mettre dans l'assiette. \(frequence)"
     }
 
     static func exemple(cible: CibleNutritionnelle?) -> String {

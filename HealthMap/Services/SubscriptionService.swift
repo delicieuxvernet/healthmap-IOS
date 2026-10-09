@@ -82,6 +82,28 @@ struct PremiumSnapshot: Equatable {
     }
 }
 
+// MARK: - Droit à l'essai gratuit, lisible de partout
+/// Le droit à l'essai que Apple a donné, par identifiant de produit. Gardé
+/// sous verrou : les fonctions pures qui écrivent les libellés d'offre le
+/// lisent sans passer par l'acteur principal. Écrit par
+/// `SubscriptionService.rafraichirDroitALEssai` seulement.
+final class DroitEssaiGratuit: @unchecked Sendable {
+    private let verrou = NSLock()
+    private var autorises: [String: Bool] = [:]
+
+    func autorise(_ identifiant: String) -> Bool {
+        verrou.lock()
+        defer { verrou.unlock() }
+        return autorises[identifiant] == true
+    }
+
+    func remplacer(par nouveaux: [String: Bool]) {
+        verrou.lock()
+        autorises = nouveaux
+        verrou.unlock()
+    }
+}
+
 // MARK: - Subscription Service (RevenueCat)
 @MainActor
 final class SubscriptionService: ObservableObject {
@@ -145,6 +167,18 @@ final class SubscriptionService: ObservableObject {
     /// exactement ce qu'Apple vend, et l'inverse (verrouiller un payeur) coûte
     /// infiniment plus cher.
     @Published private(set) var abonnementStoreKitActif = false
+
+    /// Droit à l'essai gratuit, par identifiant de produit, tel qu'Apple le
+    /// donne pour CET identifiant Apple (App Store 3.1.2, audit du 9 octobre
+    /// 2026). Un essai déjà consommé ne se représente pas : Apple facturerait
+    /// tout de suite quelqu'un à qui l'écran promettait « 7 jours gratuits ».
+    /// Vide tant qu'Apple n'a pas répondu : on n'affiche alors AUCUN essai.
+    /// Publié pour que les écrans se redessinent à la réponse ; la valeur se
+    /// LIT dans `droitEssai`, accessible aux fonctions pures (`PremiumOffre`).
+    @Published private(set) var essaiAutorise: [String: Bool] = [:]
+
+    /// Copie de `essaiAutorise` lisible hors de l'acteur principal.
+    nonisolated static let droitEssai = DroitEssaiGratuit()
 
     /// Fin de la période payée d'après StoreKit — persistée dans le filet
     /// hors-ligne quand RevenueCat ne sait rien en dire.
@@ -395,6 +429,9 @@ final class SubscriptionService: ObservableObject {
             AppLogger.subscription.report(error, context: "loadOfferings")
         }
 
+        // Le droit à l'essai, avant que les écrans ne lisent les formules.
+        await rafraichirDroitALEssai()
+
         // L'offering « current » couvre-t-elle bien les 2 formules ? Sinon on
         // complète depuis StoreKit : le paywall doit TOUJOURS pouvoir afficher
         // les abonnements actifs sur App Store Connect, quelle que soit la
@@ -413,6 +450,35 @@ final class SubscriptionService: ObservableObject {
                 "Repli StoreKit : \(fetched.count, privacy: .public) produit(s) chargé(s) hors offering"
             )
         }
+    }
+
+    // MARK: - Droit à l'essai gratuit
+
+    /// Demande à Apple, formule par formule, si cet identifiant Apple peut
+    /// encore profiter de l'essai. Appelé à chaque chargement des formules :
+    /// l'éligibilité est celle de l'identifiant Apple, pas du compte Kiwio.
+    func rafraichirDroitALEssai() async {
+        let statuts = await Purchases.shared.checkTrialOrIntroDiscountEligibility(
+            productIdentifiers: Self.subscriptionProductIds
+        )
+        let autorises = statuts.mapValues { $0.status.isEligible }
+        Self.droitEssai.remplacer(par: autorises)
+        essaiAutorise = autorises
+    }
+
+    /// L'essai gratuit d'un produit, SEULEMENT si Apple dit que la personne y
+    /// a droit. `nil` sinon : on affiche alors « Continuer » et le prix réel.
+    nonisolated static func essaiGratuit(de produit: StoreProduct?) -> StoreProductDiscount? {
+        guard let produit else { return nil }
+        return essaiGratuit(de: produit.introductoryDiscount,
+                            autorise: droitEssai.autorise(produit.productIdentifier))
+    }
+
+    /// La règle seule, sans état : une remise d'essai gratuit ne s'affiche que
+    /// si Apple a confirmé le droit. Un statut inconnu vaut un refus.
+    nonisolated static func essaiGratuit(de remise: StoreProductDiscount?, autorise: Bool) -> StoreProductDiscount? {
+        guard autorise, let remise, remise.paymentMode == .freeTrial else { return nil }
+        return remise
     }
 
     // MARK: - Purchase

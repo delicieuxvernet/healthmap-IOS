@@ -82,14 +82,18 @@ enum RaisonNutriment {
     static let parNutriment: [String: String] = [
         "vitD": "La vitamine D se fabrique au soleil, rare en hiver.",
         "vitB12": "La B12 ne vient que des produits animaux ou enrichis.",
-        "iron": "Le fer, c'est ton énergie de la journée.",
+        // Mots exacts du règlement (UE) 432/2012 : une allégation de santé ne
+        // se reformule pas (audit de conformité du 9 octobre 2026).
+        "iron": "Le fer contribue à réduire la fatigue.",
         "magnesium": "Le magnésium part vite quand la semaine est chargée.",
         "omega3": "Les oméga-3 viennent surtout des poissons gras.",
         "vitC": "La vitamine C ne se stocke pas, elle se refait chaque jour.",
         "calcium": "Le calcium se joue sur la régularité, pas sur un à-coup.",
         "zinc": "Le zinc se trouve côté viandes, graines et légumineuses.",
         "iodine": "L'iode vient de la mer, et du sel iodé.",
-        "fiber": "Les fibres nourrissent ton microbiote, et elles calent.",
+        // Le règlement n'autorise aucune allégation pour « les fibres » en
+        // général (seulement pour certaines, nommées) : on dit d'où elles viennent.
+        "fiber": "Les fibres se trouvent surtout dans les végétaux.",
     ]
 
     static func pour(_ id: String) -> String? { parNutriment[id] }

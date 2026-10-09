@@ -637,7 +637,7 @@ struct EditProfileView: View {
         case .profil:
             return [
                 EditableField(id: "firstName", label: "Prénom", emoji: "👤", kind: .text(placeholder: "Ton prénom")),
-                EditableField(id: "age", label: "Âge", emoji: "🎂", kind: .number(unit: "ans", min: 10, max: 110)),
+                EditableField(id: "age", label: "Âge", emoji: "🎂", kind: .number(unit: "ans", min: AgeMinimum.ans, max: 110)),
                 EditableField(id: "gender", label: "Genre", emoji: "⚧", kind: .pickerSingle(options: options("gender"))),
                 EditableField(id: "height", label: "Taille", emoji: "📏", kind: .number(unit: "cm", min: 120, max: 230)),
                 EditableField(id: "weight", label: "Poids", emoji: "⚖️", kind: .number(unit: "kg", min: 30, max: 250)),
