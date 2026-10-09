@@ -126,7 +126,8 @@ final class BriefDuJourTests: XCTestCase {
         XCTAssertEqual(brief.repasHier, 2)
         // vitD 70, vitC 90, calcium 80 → 3 besoins couverts (fer à 58).
         XCTAssertEqual(brief.besoinsCouvertsHier, 3)
-        XCTAssertEqual(brief.manquesHier.map(\.id), ["iron", "vitD", "vitC"])
+        // Le calcium, hors bilan mais renseigné par les repas, compte aussi.
+        XCTAssertEqual(brief.manquesHier.map(\.id), ["iron", "vitD", "calcium"])
         XCTAssertEqual(brief.manquesHier.first?.pourcent, 58)
         XCTAssertEqual(brief.cible?.id, "iron")
     }
@@ -143,11 +144,55 @@ final class BriefDuJourTests: XCTestCase {
         // Sans données d'hier : la priorité du bilan (à combler d'abord).
         XCTAssertEqual(brief.cible?.id, "iron")
 
+        // Rien à dire de ce qui a manqué : un seul écran, qui propose
+        // d'ajouter les repas d'hier.
         let slides = BriefDuJourBuilder.slides(brief: brief, proposerInvitation: false)
-        XCTAssertEqual(slides.map(\.id), ["intro", "rien-hier", "cible"])
+        XCTAssertEqual(slides.map(\.id), ["rien-hier"])
     }
 
-    func testSlides_ordre_et_invitationEnDernier() {
+    /// Retour d'Arthur du 9 oct. 2026 : le brief du matin (bilan gardé la
+    /// veille, vitamine D parmi les cibles) disait « vitamine D, 11 % » ; rejoué
+    /// depuis les Réglages une fois le nouveau bilan arrivé (vitamine D « à
+    /// affiner », plus une cible), il disait « calcium, 48 % ». L'apport le
+    /// plus bas d'hier ne dépend plus que des repas.
+    func testConstruire_lePlusBasDHier_neDependPasDesCiblesDuBilan() {
+        let calcium = CibleNutritionnelle(id: "calcium", nom: "Calcium", aliments: ["Emmental"], conseil: nil)
+        let meals = [
+            repas(jour: 9, micros: [("vitD", 6), ("calcium", 30), ("iron", 90)]),
+            repas(jour: 9, heure: 20, slot: .dinner, micros: [("vitD", 5), ("calcium", 18)]),
+        ]
+        let avant = BriefDuJourBuilder.construire(prenom: nil, cibles: [vitD, calcium], repas: meals, maintenant: date(heure: 8))
+        let apres = BriefDuJourBuilder.construire(prenom: nil, cibles: [calcium], repas: meals, maintenant: date(heure: 8))
+
+        XCTAssertEqual(avant.manquesHier, apres.manquesHier)
+        XCTAssertEqual(apres.manquesHier.map(\.id), ["vitD", "calcium", "iron"])
+        XCTAssertEqual(apres.manquesHier.first?.pourcent, 11)
+        // Hors bilan : libellé canonique et idées de repas écrites à la main.
+        XCTAssertEqual(apres.cible?.id, "vitD")
+        XCTAssertEqual(apres.cible?.nom, "Vitamine D")
+        XCTAssertEqual(apres.cible?.alimentsAffichables, ["Saumon", "Sardines", "Jaune d'œuf"])
+        XCTAssertEqual(
+            BriefDuJourBuilder.priorite(brief: apres, compositions: [:])?.id,
+            BriefDuJourBuilder.priorite(brief: avant, compositions: [:])?.id
+        )
+    }
+
+    func testConstruire_unApportQuAucunRepasNeRenseigne_nEstPasUnZero() {
+        let brief = BriefDuJourBuilder.construire(
+            prenom: nil,
+            cibles: [vitD],
+            repas: [
+                repas(jour: 9, micros: [("vitD", 40)]),
+                repas(jour: 9, heure: 20, slot: .dinner, micros: [("vitD", 10)]),
+            ],
+            maintenant: date(heure: 8)
+        )
+        // L'iode, le zinc… ne sont renseignés par aucun repas : ils n'ont pas
+        // « manqué » à 0 %.
+        XCTAssertEqual(brief.manquesHier.map(\.id), ["vitD"])
+    }
+
+    func testSlides_directementCeQuiAManque_puisInvitation() {
         let brief = BriefDuJourBuilder.construire(
             prenom: "Léa",
             apports: [apport("iron", .aCombler)],
@@ -157,9 +202,11 @@ final class BriefDuJourTests: XCTestCase {
             ],
             maintenant: date(heure: 8)
         )
+        // Ni « Bonjour », ni « 7 / 10 besoins couverts » : le brief ouvre
+        // directement sur ce qui a manqué hier.
+        XCTAssertEqual(BriefDuJourBuilder.slides(brief: brief, proposerInvitation: false).map(\.id), ["priorite"])
         let slides = BriefDuJourBuilder.slides(brief: brief, proposerInvitation: true)
-        // La priorité du jour ferme le brief, juste avant l'invitation.
-        XCTAssertEqual(slides.map(\.id), ["intro", "hier", "priorite", "invitation"])
+        XCTAssertEqual(slides.map(\.id), ["priorite", "invitation"])
     }
 
     // MARK: - Priorité du jour (maquette « A », 8 oct. 2026)
@@ -249,7 +296,7 @@ final class BriefDuJourTests: XCTestCase {
         XCTAssertNil(BriefDuJourBuilder.priorite(brief: brief, compositions: compositions))
 
         let slides = BriefDuJourBuilder.slides(brief: brief, proposerInvitation: false, compositions: compositions)
-        XCTAssertEqual(slides.map(\.id), ["intro", "hier", "cible"])
+        XCTAssertEqual(slides.map(\.id), ["cible"])
     }
 
     func testPriorite_deuxiemeApportAuDessusDuRepere_nEstPasCite() throws {
@@ -266,15 +313,6 @@ final class BriefDuJourTests: XCTestCase {
         XCTAssertEqual(titre("vitD", "Vitamine D"), "Ta vitamine D a manqué")
         XCTAssertEqual(titre("omega3", "Oméga-3"), "Tes oméga-3 ont manqué")
         XCTAssertEqual(titre("magnesium", "Magnésium"), "Ton magnésium a manqué")
-    }
-
-    func testComparaison_jamaisCulpabilisante() {
-        XCTAssertEqual(BriefDuJourView.comparaison(couverts: 6, avantHier: 5), "Un de plus qu'avant-hier.")
-        XCTAssertEqual(BriefDuJourView.comparaison(couverts: 6, avantHier: 3), "3 de plus qu'avant-hier.")
-        XCTAssertEqual(BriefDuJourView.comparaison(couverts: 4, avantHier: 4), "Autant qu'avant-hier.")
-        XCTAssertEqual(BriefDuJourView.comparaison(couverts: 3, avantHier: 5),
-                       "2 de moins qu'avant-hier : aujourd'hui, on remonte.")
-        XCTAssertNil(BriefDuJourView.comparaison(couverts: 3, avantHier: nil))
     }
 
     // MARK: - Mémoire du brief
