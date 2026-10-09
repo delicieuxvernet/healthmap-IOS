@@ -168,7 +168,7 @@ struct NumericInputView: View {
         HStack(spacing: Theme.spacingSM) {
             TextField(placeholder, text: $text)
                 .keyboardType(.decimalPad)
-                .font(.system(size: 28, weight: .semibold, design: .default))
+                .dsPolice(28, .semibold)
                 .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
                 .focused($isFocused)
@@ -176,7 +176,7 @@ struct NumericInputView: View {
 
             if let suffix {
                 Text(suffix)
-                    .font(.system(size: 18, weight: .medium))
+                    .dsPolice(18, .medium)
                     .foregroundStyle(Color.dsSecondaire)
             }
         }
@@ -240,7 +240,7 @@ struct WheelInputView: View {
         Picker(question.text, selection: $tick) {
             ForEach(0..<count, id: \.self) { t in
                 Text(label(t))
-                    .font(.system(size: 22, weight: .medium, design: .default))
+                    .font(.system(size: 22, weight: .medium))
                     .tag(t)
             }
         }
@@ -277,7 +277,7 @@ struct TextInputView: View {
 
     var body: some View {
         TextField(placeholder, text: $text)
-            .font(.system(size: 24, weight: .semibold, design: .default))
+            .dsPolice(24, .semibold)
             .foregroundStyle(Color.dsTexte)
             .multilineTextAlignment(.center)
             .autocorrectionDisabled()

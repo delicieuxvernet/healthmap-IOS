@@ -207,7 +207,7 @@ struct BilanRepasView: View {
                 } label: {
                     VStack(spacing: 1) {
                         Text(autre.emoji)
-                            .font(.system(size: 15))
+                            .dsPolice(15)
                             .accessibilityHidden(true)
                         HStack(spacing: 3) {
                             Text(autre.onglet)

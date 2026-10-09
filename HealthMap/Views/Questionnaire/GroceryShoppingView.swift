@@ -19,6 +19,8 @@ struct GroceryShoppingView: View {
     /// Famille de quantités affichée (pagination : un écran par famille).
     @State private var familyIndex = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Aux tailles d'accessibilité, le nom d'un aliment revient à la ligne.
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     init(initial: [String: Int], onDone: @escaping ([String: Int]) -> Void, onCancel: @escaping () -> Void) {
         self.onDone = onDone
@@ -121,10 +123,12 @@ struct GroceryShoppingView: View {
                 }
                 Button { next() } label: {
                     Text(last ? "Terminer mes courses" : "Continuer")
-                        .font(.system(size: 17, weight: .semibold))
+                        .dsPolice(17, .semibold)
                         .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
-                        .frame(height: Verre.hauteurAction)
+                        .frame(minHeight: Verre.hauteurAction)
                         .verrePrincipal()
                         .contentShape(Capsule())
                 }
@@ -144,7 +148,7 @@ struct GroceryShoppingView: View {
             VStack(spacing: 4) {
                 Text(item.emoji).font(.system(size: 26))
                 Text(item.name)
-                    .font(.system(size: 11, weight: .semibold))
+                    .dsPolice(11, .semibold)
                     .foregroundStyle(Color.dsTexte)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -227,7 +231,7 @@ struct GroceryShoppingView: View {
             if families.isEmpty {
                 Spacer()
                 VStack(spacing: Theme.spacingSM) {
-                    Text("🛒").font(.system(size: 34))
+                    Text("🛒").dsPolice(34)
                     Text("Ton caddie est vide. Reviens cocher des aliments.")
                         .font(Theme.captionFont)
                         .foregroundStyle(Color.dsSecondaire)
@@ -258,10 +262,12 @@ struct GroceryShoppingView: View {
                     }
                 } label: {
                     Text(isLast ? "Valider mon caddie" : "Suivant")
-                        .font(.system(size: 17, weight: .semibold))
+                        .dsPolice(17, .semibold)
                         .foregroundStyle(families.isEmpty ? Color.dsTertiaire : Color.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
-                        .frame(height: Verre.hauteurAction)
+                        .frame(minHeight: Verre.hauteurAction)
                         .verre(
                             families.isEmpty ? VerreMatiere.clair : VerreMatiere.principal,
                             forme: Capsule(style: .continuous)
@@ -338,7 +344,7 @@ struct GroceryShoppingView: View {
             .frame(height: 6)
             if covered < total {
                 Text("Complète les \(total) familles pour un bilan plus précis.")
-                    .font(.system(size: 11))
+                    .dsPolice(11)
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -353,7 +359,7 @@ struct GroceryShoppingView: View {
     private func familySection(_ family: QuantityFamily) -> some View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             HStack(spacing: 6) {
-                Text(family.emoji).font(.system(size: 15))
+                Text(family.emoji).dsPolice(15)
                 Text(family.label)
                     .font(Theme.captionBoldFont)
                     .foregroundStyle(Color.dsSecondaire)
@@ -369,9 +375,9 @@ struct GroceryShoppingView: View {
         let current = QuantityBracket.from(portions: selections[item.id] ?? 1)
         return VStack(alignment: .leading, spacing: 8) {
             Text("\(item.emoji) \(item.name)")
-                .font(.system(size: 14, weight: .semibold))
+                .dsPolice(14, .semibold)
                 .foregroundStyle(Color.dsTexte)
-                .lineLimit(1)
+                .lineLimit(tailleTexte.isAccessibilitySize ? nil : 1)
             HStack(spacing: 8) {
                 ForEach(QuantityBracket.allCases) { bracket in
                     bracketButton(item: item, bracket: bracket, selected: bracket == current)
@@ -388,11 +394,12 @@ struct GroceryShoppingView: View {
             selections[item.id] = bracket.medianPortionsPerWeek
         } label: {
             Text(bracket.label)
-                .font(.system(size: 15, weight: .semibold))
-                .monospacedDigit()
+                .dsPolice(15, .semibold, chiffres: true)
                 .foregroundStyle(selected ? Color.teinteKiwiTexte : Color.dsTexte)
+                .multilineTextAlignment(.center)
+                .padding(.vertical, 6)
                 .frame(maxWidth: .infinity)
-                .frame(height: 44)
+                .frame(minHeight: 44)
                 // Une tuile dans une carte de verre : creuse au repos, vert
                 // kiwi à 16 % et liseré une fois choisie.
                 .background(
@@ -458,7 +465,7 @@ struct GroceryQuestionControl: View {
                     Image(systemName: "checkmark.seal.fill").font(.system(size: 22)).foregroundStyle(Color.scoreExcellent)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Courses validées")
-                            .font(.system(size: 16, weight: .semibold))
+                            .dsPolice(16, .semibold)
                             .foregroundStyle(Color.dsTexte)
                         Text("\(count) aliment\(count > 1 ? "s" : "") dans ton caddie")
                             .font(Theme.captionFont)
@@ -475,7 +482,7 @@ struct GroceryQuestionControl: View {
                     HStack(spacing: Theme.spacingSM) {
                         Image(systemName: "cart.fill").font(.system(size: 18)).foregroundStyle(.white)
                         Text("Commencer mes courses")
-                            .font(.system(size: 16, weight: .semibold))
+                            .dsPolice(16, .semibold)
                             .foregroundStyle(.white)
                         Spacer()
                         Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.85))

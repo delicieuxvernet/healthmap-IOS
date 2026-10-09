@@ -23,6 +23,9 @@ struct ComparatifPremiumView: View {
     let onPlusTard: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Aux tailles d'accessibilité, un libellé de ligne prend autant de
+    /// lignes qu'il lui faut (« Vitamines et minéraux en… », AX3).
+    @Environment(\.dynamicTypeSize) private var tailleTexte
     /// Les kiwis se posent, une fois la carte montée.
     @State private var poses = false
 
@@ -62,7 +65,7 @@ struct ComparatifPremiumView: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Standard ou Premium ?")
-                        .font(.system(size: 22, weight: .bold))
+                        .dsPolice(22, .bold)
                         .tracking(-0.6)
                         .foregroundStyle(Color.dsTexte)
                         .accessibilityAddTraits(.isHeader)
@@ -144,6 +147,11 @@ struct ComparatifPremiumView: View {
             .padding(.bottom, 6)
         }
         .frame(height: 76)
+        // Les colonnes font 68 et 76 pt : « Standard » et « Premium » y
+        // tiennent à la taille d'iOS, pas au-delà (« St… / Pre… » en AX3).
+        // L'en-tête garde donc cette taille, comme une barre d'onglets ; chaque
+        // ligne dit les deux colonnes à VoiceOver.
+        .dynamicTypeSize(...DynamicTypeSize.large)
         .accessibilityHidden(true)
     }
 
@@ -152,8 +160,9 @@ struct ComparatifPremiumView: View {
             Text(ligne.libelle)
                 .font(.dsSousTitre)
                 .foregroundStyle(Color.dsTexte)
-                .lineLimit(2)
+                .lineLimit(tailleTexte.isAccessibilitySize ? nil : 2)
                 .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: tailleTexte.isAccessibilitySize)
                 .frame(maxWidth: .infinity, alignment: .leading)
             cellule(ligne.standard, rang: rang, premium: false)
                 .frame(width: Self.largeurStandard)

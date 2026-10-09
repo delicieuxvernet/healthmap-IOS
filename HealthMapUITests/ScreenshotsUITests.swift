@@ -75,10 +75,9 @@ final class ScreenshotsUITests: XCTestCase {
         // Journal : le premier onglet, une fois le profil chargé.
         XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
         attendreChargement()
-
-        // Deux aliments dans la journée (yaourt, banane) : les cartes calories
-        // et macros de la capture ne sont pas à zéro.
-        for aliment in ["Yaourt nature", "Banane"] { ajouterRapide(aliment) }
+        // Lecture seule : audit-b est le compte de démonstration d'App Review,
+        // le parcours n'ajoute plus rien à son journal (il y ajoutait un yaourt
+        // et une banane à chaque passage, jusqu'au 9 oct. 2026).
         sleep(2)
         app.swipeDown()
         sleep(1)
@@ -520,6 +519,17 @@ final class ScreenshotsUITests: XCTestCase {
             app.swipeUp()
             sleep(1)
             snap("31-paywall-bas")
+            // Les formules, derrière le comparatif : on les regarde, on
+            // n'achète rien (aucun bouton d'achat n'est touché).
+            let passer = app.buttons["Passer à Premium"].firstMatch
+            if passer.waitForExistence(timeout: 3) {
+                passer.tap()
+                sleep(3)
+                snap("32-paywall-formules")
+                app.swipeUp()
+                sleep(1)
+                snap("33-paywall-formules-bas")
+            }
             fermerFeuille()
             sleep(1)
         }
@@ -586,57 +596,6 @@ final class ScreenshotsUITests: XCTestCase {
         sleep(1)
         app.buttons["Se connecter"].firstMatch.tap()
     }
-
-    /// Ajoute un aliment à la journée par la recherche et le « + » rapide de
-    /// la première ligne de résultats (1 unité pour un aliment qui se compte,
-    /// 100 g sinon). Sans effet si la recherche ne répond pas.
-    private func ajouterRapide(_ aliment: String) {
-        guard app.buttons["journal.autres"].waitForExistence(timeout: 5) else { return }
-        if !app.buttons["Rechercher"].exists { taper(app.buttons["journal.autres"]) }
-        guard app.buttons["Rechercher"].waitForExistence(timeout: 5) else { return }
-        app.buttons["Rechercher"].tap()
-        let champ = app.textFields["recherche.champ"]
-        guard champ.waitForExistence(timeout: 8) else { fermerFeuille(); return }
-        champ.tap()
-        fermerTutorielClavier()
-        champ.clearAndType(aliment)
-        sleep(4)
-        // Première ligne de résultats → fiche portion → « Ajouter au … ».
-        let premier = app.buttons.matching(NSPredicate(
-            format: "label CONTAINS[c] %@ AND label CONTAINS %@ AND NOT (label BEGINSWITH %@)", aliment, "kcal", "Ajouter")).firstMatch
-        if premier.waitForExistence(timeout: 5) {
-            premier.tap()
-            // CTA de la fiche portion (« Ajouter le midi »…) par identifiant :
-            // « Ajouter une unité » (le + du compteur) et « Ajouter un repas »
-            // (le bouton flottant) commencent pareil.
-            let ajouter = app.buttons["portion.valider"]
-            if ajouter.waitForExistence(timeout: 6) {
-                ajouter.tap()
-                // L'ajout est réseau : la fiche ne se referme qu'une fois
-                // l'écriture faite. Fermer la recherche avant, c'est taper
-                // dans le vide sous la fiche encore ouverte.
-                _ = ajouter.waitForNonExistence(timeout: 20)
-                sleep(1)
-            } else {
-                app.swipeDown(velocity: .fast)
-            }
-        }
-        fermerFeuille()
-        sleep(1)
-        // La carte « Bien joué » monte une fois la recherche refermée : on la
-        // photographie (une fois), puis « Continuer ».
-        let continuer = app.buttons["Continuer"]
-        if continuer.waitForExistence(timeout: 8) {
-            if !gratificationPhotographiee {
-                snap("18-gratification")
-                gratificationPhotographiee = true
-            }
-            taper(continuer)
-            sleep(1)
-        }
-    }
-
-    private var gratificationPhotographiee = false
 
     // MARK: - 5. Le questionnaire en quatre étapes, écran par écran (hook DEBUG `-captureDecouverte`)
     //

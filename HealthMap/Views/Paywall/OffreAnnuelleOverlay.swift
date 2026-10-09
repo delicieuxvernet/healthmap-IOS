@@ -28,9 +28,6 @@ struct OffreAnnuelleOverlay: View {
     @State private var montee = false
     @State private var ferme = false
 
-    /// Titre de la feuille : 24 / 700, qui suit la taille de texte choisie.
-    @ScaledMetric(relativeTo: .title2) private var tailleTitre: CGFloat = 24
-
     var body: some View {
         ZStack(alignment: .bottom) {
             VerreVoile()
@@ -47,7 +44,21 @@ struct OffreAnnuelleOverlay: View {
         .accessibilityAddTraits(.isModal)
     }
 
+    /// La carte tient sans défiler à toutes les tailles de texte courantes ;
+    /// aux plus grandes, elle défile, et « Voir l'offre », « Plus tard » et
+    /// « Ne plus me proposer » restent atteignables.
     private var carte: some View {
+        ViewThatFits(in: .vertical) {
+            contenuCarte
+            ScrollView {
+                contenuCarte
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .background(alignment: .top) { fond }
+    }
+
+    private var contenuCarte: some View {
         VStack(alignment: .leading, spacing: 0) {
             Capsule()
                 .fill(Color.dsSecondaire.opacity(0.4))
@@ -69,7 +80,7 @@ struct OffreAnnuelleOverlay: View {
             .padding(.top, 8)
 
             Text(offre.titre)
-                .font(.system(size: tailleTitre, weight: .bold))
+                .dsPolice(24, .bold)
                 .tracking(-0.6)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
@@ -118,7 +129,6 @@ struct OffreAnnuelleOverlay: View {
         .padding(.horizontal, 24)
         .padding(.bottom, 18)
         .frame(maxWidth: .infinity)
-        .background(alignment: .top) { fond }
     }
 
     /// Le verre de la feuille, découpé aux coins de 38. Le fond du socle ne

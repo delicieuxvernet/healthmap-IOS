@@ -212,6 +212,7 @@ private struct BilanPrenom: View {
 
     @EnvironmentObject var viewModel: QuestionnaireViewModel
     @Environment(\.teinteBilan) private var teinte
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var saisie: Bool
 
     private var prenom: String { Prenom.affichable(viewModel.profile.firstName) }
@@ -252,7 +253,8 @@ private struct BilanPrenom: View {
                         .transition(.opacity)
                 }
             }
-            .animation(.kiwiSoft, value: prenom.isEmpty)
+            // Sous « Réduire les animations », la ligne apparaît sans fondu.
+            .animation(reduceMotion ? nil : .kiwiSoft, value: prenom.isEmpty)
         }
         .task {
             // Le clavier monte une fois l'écran en place, pas pendant qu'il glisse.

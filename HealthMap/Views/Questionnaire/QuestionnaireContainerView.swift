@@ -250,7 +250,7 @@ struct QuestionnaireContainerView: View {
                 Text("Question \(viewModel.currentQuestionNumberInSection)/\(viewModel.totalQuestionsInSection)")
                     .font(.dsLegende)
                     .monospacedDigit()
-                    .foregroundStyle(Color.dsTertiaire)
+                    .foregroundStyle(Color.dsSecondaire)
             }
             .padding(.horizontal, Theme.spacingMD)
         }
@@ -343,7 +343,7 @@ struct QuestionnaireContainerView: View {
             if let error = viewModel.errorMessage {
                 Text(error)
                     .font(.dsLegende)
-                    .foregroundStyle(Color.dsACombler)
+                    .foregroundStyle(Color.dsAComblerTexte)
             }
         }
         .padding(.horizontal, DS.marge)
@@ -950,7 +950,7 @@ private struct QuestionnaireGateView: View {
                             .foregroundStyle(Color.dsAccent)
                         Text("plus rapide, mais ton bilan sera moins fiable")
                             .font(.dsLegende)
-                            .foregroundStyle(Color.dsTertiaire)
+                            .foregroundStyle(Color.dsSecondaire)
                     }
                     .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
                     .contentShape(Rectangle())

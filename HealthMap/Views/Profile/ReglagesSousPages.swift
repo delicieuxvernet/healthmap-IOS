@@ -365,7 +365,7 @@ private struct MotDePasseSheet: View {
                             Text("Les deux mots de passe ne sont pas identiques.")
                         }
                         if let erreur {
-                            Text(erreur).foregroundStyle(Color.dsACombler)
+                            Text(erreur).foregroundStyle(Color.dsAComblerTexte)
                         }
                     }
                     .font(.dsLegende)

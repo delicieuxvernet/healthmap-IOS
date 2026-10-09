@@ -141,7 +141,7 @@ struct BilanChemin: View {
                     .foregroundStyle(Color.white)
             } else if ici {
                 Text(etape.emoji)
-                    .font(.system(size: 14))
+                    .dsPolice(14)
             }
         }
         .frame(width: taille, height: taille)

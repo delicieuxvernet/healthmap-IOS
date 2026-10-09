@@ -449,7 +449,7 @@ struct PriseDeSangSheet: View {
                 .dsCard()
                 Text("Ta prise de sang apparaît dans le détail du calcul de chaque apport. Au-delà de 6 mois elle compte moitié moins, au-delà d'un an plus du tout.")
                     .font(.dsLegende)
-                    .foregroundStyle(Color.dsTertiaire)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 4)
             }
@@ -468,7 +468,7 @@ struct PriseDeSangSheet: View {
                 .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
             }
             .buttonStyle(.dsPress)
-            .foregroundStyle(Color.dsACombler)
+            .foregroundStyle(Color.dsAComblerTexte)
             .disabled(suppressionEnCours)
         }
     }
@@ -538,7 +538,7 @@ struct PriseDeSangSheet: View {
             if m.nutriment == nil {
                 Text("Kiwio ne suit pas encore cet apport : cette valeur ne change pas ton bilan.")
                     .font(.dsLegende)
-                    .foregroundStyle(Color.dsTertiaire)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
             }
@@ -577,7 +577,7 @@ struct PriseDeSangSheet: View {
             Spacer(minLength: 8)
             Text(effet.texteAvant)
                 .font(.dsValeurLigne)
-                .foregroundStyle(Color.dsTertiaire)
+                .foregroundStyle(Color.dsSecondaire)
                 .strikethrough()
             Image(systemName: "arrow.right")
                 .font(.system(size: 11, weight: .semibold))
@@ -585,7 +585,7 @@ struct PriseDeSangSheet: View {
                 .accessibilityHidden(true)
             Text(effet.texteApres)
                 .font(.dsValeurLigneForte)
-                .foregroundStyle(effet.statutApres.map { $0.statutV2.inkColor } ?? Color.dsStatut(effet.apres))
+                .foregroundStyle(effet.statutApres.map { $0.statutV2.inkColor } ?? Color.dsStatutTexte(effet.apres))
         }
         .padding(.horizontal, DS.paddingCarte)
         .frame(minHeight: DS.cibleTactile)
@@ -642,7 +642,7 @@ private struct PriseDeSangChiffre: View {
 struct PriseDeSangPastilleBeta: View {
     var body: some View {
         Text("Nouveau · bêta")
-            .font(.system(size: 11, weight: .semibold))
+            .dsPolice(11, .semibold)
             .foregroundStyle(Color.teinteAmbreEncre)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)

@@ -143,7 +143,7 @@ struct FunFactLabel: View {
                 .accessibilityHidden(true)
 
             Text(fact)
-                .font(.system(size: 14, weight: .medium, design: .default))
+                .dsPolice(14, .medium)
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.leading)
         }

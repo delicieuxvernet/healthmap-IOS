@@ -98,6 +98,9 @@ private struct FeuillePremiumFond: View {
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Aux tailles d'accessibilité, le badge d'une formule passe sous son nom
+    /// (« 7 jours gratuits · -51 % » se tassait et se coupait en AX3).
+    @Environment(\.dynamicTypeSize) private var tailleTexte
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     let source: String
@@ -135,9 +138,6 @@ struct PaywallView: View {
     /// cascade (délais de la maquette : 0,05 · 0,12 · 0,22 + 0,06 par ligne ·
     /// 0,42).
     @State private var revele = false
-
-    /// Titre de la feuille : 24 / 700, qui suit la taille de texte choisie.
-    @ScaledMetric(relativeTo: .title2) private var tailleTitre: CGFloat = 24
 
     /// Marge latérale de la feuille (maquette : 24).
     private static let marge: CGFloat = 24
@@ -345,7 +345,7 @@ struct PaywallView: View {
             // « chaque jour » et non « sans limite » : le serveur plafonne les
             // scans photo à 30 par jour en Premium (`analyze-meal-photo`).
             Text("Ton bilan complet,\ntes solutions et tes scans,\nchaque jour.")
-                .font(.system(size: tailleTitre, weight: .bold))
+                .dsPolice(24, .bold)
                 .tracking(-0.6)
                 .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
@@ -478,7 +478,7 @@ struct PaywallView: View {
         } label: {
             HStack(spacing: Theme.spacingSM) {
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
+                    DSLigneOuColonne(alignementLigne: .center, espacement: 8) {
                         Text(title)
                             .font(.dsSousTitre)
                             .tracking(DSTracking.sousTitre)
@@ -487,9 +487,17 @@ struct PaywallView: View {
                             Text(badge)
                                 .font(.dsLegendeMoyenne)
                                 .foregroundStyle(isSelected ? Color.white : Color.dsSecondaire)
+                                .fixedSize(horizontal: false, vertical: tailleTexte.isAccessibilitySize)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
-                                .background(Capsule().fill(isSelected ? Color.dsAccent : Color.dsRemplissage))
+                                .background {
+                                    let teinte = isSelected ? Color.dsAccent : Color.dsRemplissage
+                                    if tailleTexte.isAccessibilitySize {
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous).fill(teinte)
+                                    } else {
+                                        Capsule().fill(teinte)
+                                    }
+                                }
                         }
                     }
                     Text(priceLabel(for: plan))
@@ -987,12 +995,12 @@ private struct PremiumPurchaseSuccessView: View {
 
                 VStack(spacing: Theme.spacingXS) {
                     Text(titre)
-                        .font(.system(size: 23, weight: .bold, design: .default))
+                        .dsPolice(23, .bold)
                         .foregroundStyle(Color.dsTexte)
                         .multilineTextAlignment(.center)
 
                     Text(sousTitre)
-                        .font(.system(size: 14, weight: .medium))
+                        .dsPolice(14, .medium)
                         .foregroundStyle(Color.dsSecondaire)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1001,7 +1009,7 @@ private struct PremiumPurchaseSuccessView: View {
                     // pas deviner, et celle qui évite le prélèvement surprise.
                     if let echeance {
                         Text(echeance)
-                            .font(.system(size: 12, weight: .semibold))
+                            .dsPolice(12, .semibold)
                             .foregroundStyle(Color.dsTexte)
                             .padding(.horizontal, Theme.spacingSM)
                             .padding(.vertical, 5)
@@ -1050,7 +1058,8 @@ private struct PremiumPurchaseSuccessView: View {
                 }
             }
         }
-        .dynamicTypeSize(.large ... .accessibility3)
+        // Plus de plancher ni de plafond : la feuille défile, elle peut
+        // grandir jusqu'à AX5 (audit d'accessibilité du 9 oct. 2026).
     }
 
     private func benefitRow(icon: String, title: String) -> some View {
@@ -1061,7 +1070,7 @@ private struct PremiumPurchaseSuccessView: View {
                 .frame(width: 28, height: 44)
                 .accessibilityHidden(true)
             Text(title)
-                .font(.system(size: 13.5, weight: .semibold))
+                .dsPolice(13.5, .semibold)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)

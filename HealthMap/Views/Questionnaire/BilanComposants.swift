@@ -473,7 +473,7 @@ struct BilanMolette: View {
                 Text("\(valeur)")
                     .font(BilanTypo.molette)
                     .contentTransition(.numericText())
-                    .foregroundStyle(touchee ? Color.dsTexte : Color.dsTertiaire)
+                    .foregroundStyle(touchee ? Color.dsTexte : Color.dsSecondaire)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 3)
                     .overlay(alignment: .top) { filet }
@@ -512,6 +512,9 @@ struct BilanMolette: View {
     }
 
     private func voisine(_ nombre: Int) -> some View {
+        // Les voisines restent pâles, comme celles d'un sélecteur d'iOS :
+        // elles situent la valeur, la valeur à confirmer est en gris lisible,
+        // la valeur confirmée en encre.
         Text(plage.contains(nombre) ? "\(nombre)" : " ")
             .font(BilanTypo.moletteVoisine)
             .foregroundStyle(Color.dsTertiaire)

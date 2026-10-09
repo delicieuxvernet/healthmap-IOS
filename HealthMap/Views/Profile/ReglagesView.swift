@@ -53,6 +53,9 @@ struct ReglagesView: View {
     /// onglets restent montés : c'est `estOngletActif` qui dit qu'on arrive.
     @State private var lignesVisibles = false
     @Environment(\.estOngletActif) private var estOngletActif
+    /// Aux tailles d'accessibilité, les trois liens sous la carte Premium
+    /// s'empilent : en tiers de largeur, ils se coupaient au milieu des mots.
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     /// La feuille Premium grandit depuis la carte touchée (iOS 18 et plus ;
     /// une feuille simple avant). La feuille reste présentée par la page, pas
@@ -280,7 +283,7 @@ struct ReglagesView: View {
                 .accessibilityHint("Ouvre la page de remboursement d'Apple dans Safari.")
             }
             Text("Géré par l'App Store. Modification, résiliation et remboursement passent par Apple.")
-                .font(.system(size: 12))
+                .dsPolice(12)
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 4)
@@ -497,7 +500,7 @@ struct ReglagesView: View {
     // MARK: - Restaurer · Conditions · Confidentialité
 
     private var liensLegaux: some View {
-        HStack(spacing: 14) {
+        DSLigneOuColonne(alignementLigne: .center, alignementColonne: .center, espacement: 14) {
             Button {
                 Task { await restauration.lancer(contexte: "reglages") }
             } label: {
@@ -512,7 +515,7 @@ struct ReglagesView: View {
             .disabled(restauration.enCours)
             .accessibilityHint("Restaure un abonnement Premium acheté avant avec ce même identifiant Apple.")
 
-            filetVertical
+            if !tailleTexte.isAccessibilitySize { filetVertical }
 
             // L'EULA d'Apple, qui régit l'abonnement ; les CGU de Kiwio sont
             // dans « Conditions d'utilisation », plus bas.
@@ -522,7 +525,7 @@ struct ReglagesView: View {
                     .contentShape(Rectangle())
             }
 
-            filetVertical
+            if !tailleTexte.isAccessibilitySize { filetVertical }
 
             Link(destination: ReglagesLiens.confidentialite) {
                 Text("Confidentialité")
@@ -530,7 +533,7 @@ struct ReglagesView: View {
                     .contentShape(Rectangle())
             }
         }
-        .font(.system(size: 12))
+        .dsPolice(12)
         .foregroundStyle(Color.dsSecondaire)
         .frame(maxWidth: .infinity)
     }
@@ -577,8 +580,8 @@ struct ReglagesView: View {
         VStack(spacing: 6) {
             KiwiPiedDePage(detail: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
             Text("Ne remplace pas un avis médical")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.dsTertiaire)
+                .dsPolice(12)
+                .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -706,6 +709,11 @@ struct ReglageLigne<Accessoire: View>: View {
     var filet = false
     @ViewBuilder var accessoire: () -> Accessoire
 
+    /// Aux tailles d'accessibilité, la valeur passe sous le libellé : à côté,
+    /// prioritaire, elle réduisait « Mes objectifs » à une lettre par ligne
+    /// (captures AX3 du 9 oct. 2026).
+    @Environment(\.dynamicTypeSize) private var tailleTexte
+
     private var fond: Color {
         switch sens {
         case .neutre: return Verre.remplissage
@@ -727,7 +735,7 @@ struct ReglageLigne<Accessoire: View>: View {
             Text(titre)
                 .font(grande ? Font.dsHeadline : Font.dsCorps)
                 .tracking(DSTracking.corps)
-                .foregroundStyle(sens == .destructif ? Color.dsACombler : Color.dsTexte)
+                .foregroundStyle(sens == .destructif ? Color.dsAComblerTexte : Color.dsTexte)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
             if let sousTitre {
@@ -751,15 +759,30 @@ struct ReglageLigne<Accessoire: View>: View {
             .frame(width: ReglageMetrique.pastille, height: ReglageMetrique.pastille)
             .accessibilityHidden(true)
 
-            HStack(alignment: .center, spacing: 8) {
-                libelles
-                Spacer(minLength: 8)
-                if let valeur {
-                    Text(valeur)
-                        .font(.dsValeurLigne)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .layoutPriority(1)
+            Group {
+                if tailleTexte.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 4) {
+                        libelles
+                        if let valeur {
+                            Text(valeur)
+                                .font(.dsValeurLigne)
+                                .tracking(DSTracking.sousTitre)
+                                .foregroundStyle(Color.dsSecondaire)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                } else {
+                    HStack(alignment: .center, spacing: 8) {
+                        libelles
+                        Spacer(minLength: 8)
+                        if let valeur {
+                            Text(valeur)
+                                .font(.dsValeurLigne)
+                                .tracking(DSTracking.sousTitre)
+                                .foregroundStyle(Color.dsSecondaire)
+                                .layoutPriority(1)
+                        }
+                    }
                 }
             }
             .padding(.vertical, 14)
