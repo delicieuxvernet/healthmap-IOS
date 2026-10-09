@@ -519,6 +519,17 @@ final class ScreenshotsUITests: XCTestCase {
             app.swipeUp()
             sleep(1)
             snap("31-paywall-bas")
+            // Les formules, derrière le comparatif : on les regarde, on
+            // n'achète rien (aucun bouton d'achat n'est touché).
+            let passer = app.buttons["Passer à Premium"].firstMatch
+            if passer.waitForExistence(timeout: 3) {
+                passer.tap()
+                sleep(3)
+                snap("32-paywall-formules")
+                app.swipeUp()
+                sleep(1)
+                snap("33-paywall-formules-bas")
+            }
             fermerFeuille()
             sleep(1)
         }
