@@ -20,6 +20,12 @@ enum AgeMinimum {
 
     static func estAtteint(_ age: Int) -> Bool { age >= ans }
 
+    /// Un âge déjà écrit (brouillon d'avant la mise à jour, profil) qui est
+    /// sous le minimum. Un âge vide ou illisible n'est pas jugé ici.
+    static func estSousLeMinimum(_ age: String) -> Bool {
+        Int(age).map { !estAtteint($0) } ?? false
+    }
+
     /// Ce que l'écran dit à quelqu'un de plus jeune.
     static let message = "Kiwio est réservé aux personnes de 16 ans et plus. Rien de ce que tu as répondu n'est gardé."
 }

@@ -1,4 +1,5 @@
 import XCTest
+import RevenueCat
 @testable import HealthMap
 
 // MARK: - Audit de conformité du 9 octobre 2026
@@ -19,6 +20,31 @@ final class ConformiteTests: XCTestCase {
         XCTAssertTrue(droit.autorise("healthmap_annual"))
         XCTAssertFalse(droit.autorise("healthmap_weekly"))
         XCTAssertFalse(droit.autorise("inconnu"))
+    }
+
+    func testSeulApple_eligible_ouvreLEssai() {
+        let droits = SubscriptionService.droits([
+            "eligible": .eligible,
+            "deja_eu": .ineligible,
+            // Ce que RevenueCat rend quand le réseau ou StoreKit échoue.
+            "echec_reseau": .unknown,
+            "sans_essai": .noIntroOfferExists,
+        ])
+        XCTAssertEqual(droits["eligible"], true)
+        XCTAssertEqual(droits["deja_eu"], false)
+        XCTAssertEqual(droits["echec_reseau"], false)
+        XCTAssertEqual(droits["sans_essai"], false)
+    }
+
+    func testSansEssai_lePaywallMontreLePrixReelEtResteAchetable() {
+        XCTAssertEqual(TexteAchat.titre(essai: nil), "Continuer")
+        let sans = TexteAchat.prix("30,00 €", periode: "an", essai: nil)
+        XCTAssertEqual(sans, "30,00 € / an.")
+        XCTAssertFalse(sans.lowercased().contains("gratuit"))
+        XCTAssertEqual(TexteAchat.titre(essai: "7 jours"), "Essayer 7 jours gratuits")
+        XCTAssertEqual(TexteAchat.prix("30,00 €", periode: "an", essai: "7 jours"), "Gratuit 7 jours, puis 30,00 € / an.")
+        // Sans droit, la carte des Réglages ne promet rien non plus.
+        XCTAssertEqual(PremiumOffre.titreEssai(offerings: nil, produits: []), "Découvrir Kiwio Premium")
     }
 
     func testSansRemise_pasDEssaiMemeAvecLeDroit() {
@@ -46,6 +72,49 @@ final class ConformiteTests: XCTestCase {
         vm.choisirAge(17)
         XCTAssertEqual(vm.profile.age, "17")
         XCTAssertFalse(vm.sousAgeMinimum)
+    }
+
+    /// Un compte existant dont le questionnaire porte un âge sous 16 ans :
+    /// rien ne plante, et le bilan ne part pas.
+    func testCompteExistantSousSeizeAns_rienNePlanteRienNePart() async {
+        let vm = QuestionnaireViewModel()
+        var profil = vm.profile
+        profil.age = "14"
+        vm.profile = profil
+        await vm.submitQuestionnaire()
+        XCTAssertEqual(vm.errorMessage, AgeMinimum.message)
+        XCTAssertFalse(vm.isSubmitting)
+        XCTAssertFalse(vm.profile.completed)
+        // Les calculs locaux tiennent aussi avec cet âge.
+        XCTAssertGreaterThanOrEqual(HealthCalculator.calculateHealthScore(profile: profil), 0)
+        XCTAssertFalse(HealthCalculator.analyzeNutrientScores(profile: profil).isEmpty)
+    }
+
+    /// Brouillon d'avant la mise à jour avec 15 ans : vu dès la reprise.
+    func testUnBrouillonRepriSousSeizeAns_estArreteALaReprise() {
+        XCTAssertTrue(AgeMinimum.estSousLeMinimum("15"))
+        XCTAssertFalse(AgeMinimum.estSousLeMinimum("16"))
+        XCTAssertFalse(AgeMinimum.estSousLeMinimum(""))
+        let vm = QuestionnaireViewModel()
+        var profil = vm.profile
+        profil.age = "15"
+        vm.profile = profil
+        vm.verifierAgeRepris()
+        XCTAssertTrue(vm.sousAgeMinimum)
+        XCTAssertEqual(vm.profile.age, "")
+    }
+
+    /// Le droit à l'essai n'attend jamais plus que son délai.
+    func testUneVerificationQuiTraine_nAttendPasPlusQueLeDelai() async {
+        let debut = Date()
+        let resultat: Bool? = await SubscriptionService.auPlus(.milliseconds(200)) {
+            try? await Task.sleep(for: .seconds(5))
+            return true
+        }
+        XCTAssertNil(resultat)
+        XCTAssertLessThan(Date().timeIntervalSince(debut), 2)
+        let rapide: Bool? = await SubscriptionService.auPlus(.seconds(2)) { true }
+        XCTAssertEqual(rapide, true)
     }
 
     // MARK: Relances

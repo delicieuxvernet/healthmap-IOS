@@ -103,7 +103,8 @@ final class PriseDeSangApportsTests: XCTestCase {
         let r = registre(["iron": 70, "fiber": 60])
         let p = prise("2026-09-12", [marqueur("folates", nil, .sousRepere)])
         XCTAssertEqual(PriseDeSangApports.appliquer(r, priseDeSang: p, maintenant: maintenant), r)
-        XCTAssertEqual(PriseDeSangApports.etat(p.markers[0]), .aOptimiser)
+        XCTAssertEqual(PriseDeSangApports.etat(p.markers[0]), .sousIntervalle)
+        XCTAssertTrue(PriseDeSangApports.rappelleLAssiette(p.markers[0]))
         XCTAssertFalse(PriseDeSangApports.aliments(pour: p.markers[0]).isEmpty)
     }
 
@@ -134,7 +135,8 @@ final class PriseDeSangApportsTests: XCTestCase {
         XCTAssertNil(p.markers[1].nutriment)
         XCTAssertEqual(p.markers[2].position, .sansRepere)
         XCTAssertNil(p.markers[2].borneBasse)
-        XCTAssertEqual(PriseDeSangApports.repereLisible(p.markers[0]), "repère 30–100")
+        // L'intervalle imprimé par le labo, cité comme tel (audit du 9 oct. 2026).
+        XCTAssertEqual(PriseDeSangApports.repereLisible(p.markers[0]), "intervalle du labo : 30–100")
         XCTAssertEqual(PriseDeSangApports.valeurLisible(4.1), "4,1")
     }
 

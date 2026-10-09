@@ -316,6 +316,17 @@ final class QuestionnaireViewModel: ObservableObject {
     // MARK: - Update Answers
 
     /// Update a single-value answer by question ID (maps to UserProfile property)
+    /// Un brouillon d'avant la mise à jour peut porter 14 ou 15 ans : on le
+    /// voit dès la reprise. L'âge est retiré, le brouillon effacé, et la
+    /// reprise retombe sur l'écran de l'âge (il n'est plus complet), où le
+    /// message s'affiche.
+    func verifierAgeRepris() {
+        guard AgeMinimum.estSousLeMinimum(profile.age) else { return }
+        sousAgeMinimum = true
+        profile.age = ""
+        Self.clearDraft()
+    }
+
     /// L'âge de la molette. Sous 16 ans, aucune collecte : l'âge n'est pas
     /// enregistré et le brouillon déjà écrit sur le téléphone est effacé.
     func choisirAge(_ ans: Int) {
@@ -890,7 +901,7 @@ final class QuestionnaireViewModel: ObservableObject {
         guard !isSubmitting else { return }
 
         // Moins de 16 ans : le bilan ne part jamais (`AgeMinimum`).
-        if sousAgeMinimum || Int(profile.age).map({ !AgeMinimum.estAtteint($0) }) == true {
+        if sousAgeMinimum || AgeMinimum.estSousLeMinimum(profile.age) {
             errorMessage = AgeMinimum.message
             return
         }
@@ -1090,6 +1101,9 @@ final class QuestionnaireViewModel: ObservableObject {
                     .map { $0.id }
             )
         }
+        // Âge sous le minimum dans le brouillon : vu AVANT de choisir l'écran
+        // de reprise, qui retombe alors sur celui de l'âge.
+        verifierAgeRepris()
         // Parcours en quatre étapes : on rouvre là où la personne s'est arrêtée,
         // sans jamais sauter un écran qu'elle n'a pas terminé.
         self.ecran = ParcoursBilan.ecranDeReprise(

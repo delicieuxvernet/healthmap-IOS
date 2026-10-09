@@ -16,8 +16,11 @@ import UniformTypeIdentifiers
 //   · « Tes repères » : compteurs, précision médicale (une seule, en haut comme
 //     la maquette), une carte par valeur, puis ce que ça change à ton bilan.
 //
-// Vocabulaire : « repère du laboratoire », « à optimiser », « dans les
-// repères ». Jamais de verdict ; le médecin est cité, pas remplacé.
+// Vocabulaire (audit de conformité du 9 oct. 2026, règlement 2017/745) :
+// « intervalle du labo », cité comme tel ; la position d'une valeur, jamais un
+// verdict, aucune couleur qui change avec elle. L'usage est nutritionnel : les
+// valeurs mesurées corrigent nos estimations d'apport. « Montre tes résultats à
+// ton médecin » est visible à chaque étape.
 //
 // Verre liquide (2 octobre 2026) : la feuille est en verre, les cartes aussi.
 // Le ton est celui de la carte du Journal : pastille rouge à 10 %, étiquette
@@ -157,7 +160,7 @@ struct PriseDeSangSheet: View {
     // MARK: Nouveau · en bêta
 
     private var avisMedical: LocalizedStringKey {
-        "Ce n'est pas un avis médical. Pour interpréter tes résultats, demande toujours à ton médecin."
+        "Ce n'est pas un avis médical. Montre toujours tes résultats à ton médecin."
     }
 
     /// Ce que Kiwio fait des analyses, et la limite de la lecture : montré
@@ -167,7 +170,7 @@ struct PriseDeSangSheet: View {
             Text("Nouveau · en bêta")
                 .font(.dsSousTitreFort)
                 .tracking(DSTracking.sousTitre)
-            Text("Kiwio lit tes analyses et regarde si tes vitamines et minéraux vont dans le même sens que ton profil. Tes apports, ton bilan et ton plan s'ajustent.")
+            Text("Kiwio lit les valeurs de tes analyses : pour les apports qu'elles mesurent, tes valeurs mesurées corrigent nos estimations. Ton bilan et ton plan s'ajustent.")
                 .font(.dsLegende)
                 .fixedSize(horizontal: false, vertical: true)
             Text("La lecture peut se tromper : compare avec ton compte rendu.")
@@ -330,12 +333,19 @@ struct PriseDeSangSheet: View {
                     .font(.dsHeadline)
                     .tracking(DSTracking.corps)
                     .foregroundStyle(Color.dsTexte)
-                Text("On repère les valeurs et on prépare tes repères nutrition. Quelques secondes.")
+                Text("On relève les valeurs pour corriger l'estimation de tes apports. Quelques secondes.")
                     .font(.dsSousTitre)
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
+                Text("Montre toujours tes résultats à ton médecin.")
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
             }
         }
         .padding(.vertical, 36)
@@ -384,15 +394,14 @@ struct PriseDeSangSheet: View {
             .padding(.top, 12)
 
             DSCapsuleButton(titre: "Réessayer") { etape = .depot }
+
+            carteMedecin(avisMedical)
         }
     }
 
     // MARK: Résultat — « Tes repères »
 
     private func resultat(_ prise: PriseDeSang) -> some View {
-        let etats = prise.markers.map(PriseDeSangApports.etat)
-        let aOptimiser = etats.filter { $0 == .aOptimiser }.count
-        let dansReperes = etats.filter { $0 == .dansLesReperes }.count
         let effets = dashboardVM.effetsPriseDeSang()
 
         return VStack(alignment: .leading, spacing: DS.interCarte) {
@@ -403,13 +412,15 @@ struct PriseDeSangSheet: View {
                 .foregroundStyle(Color.dsSecondaire)
                 .padding(.top, 8)
 
+            // Ce qui a été lu et ce que ça change aux apports : deux faits,
+            // une seule teinte neutre. Aucun décompte « bon / à revoir ».
             HStack(spacing: 10) {
-                compteur(aOptimiser, "à optimiser", fond: Color.teinteVitamineD.opacity(0.14), encre: Color.teinteAmbreEncre)
-                compteur(dansReperes, "dans les repères", fond: Color.teinteKiwi.opacity(0.14), encre: Color.teinteKiwiTexte)
+                compteur(prise.markers.count, prise.markers.count > 1 ? "valeurs lues" : "valeur lue")
+                compteur(effets.count, effets.count > 1 ? "apports corrigés" : "apport corrigé")
             }
             .kiwiEntrance(0)
 
-            carteMedecin("Repères **nutritionnels** : Kiwio compare tes valeurs aux repères imprimés par ton laboratoire, sans remplacer un avis médical. Montre ces résultats à ton médecin.")
+            carteMedecin("Usage **nutritionnel** : Kiwio situe tes valeurs dans les intervalles imprimés par ton laboratoire pour corriger l'estimation de tes apports. Ce n'est pas un avis médical : montre tes résultats à ton médecin.")
 
             HStack(alignment: .top, spacing: 8) {
                 PriseDeSangPastilleBeta()
@@ -461,22 +472,22 @@ struct PriseDeSangSheet: View {
         }
     }
 
-    /// Un compteur des repères : le chiffre compte jusqu'à sa valeur, en SF Pro
-    /// Rounded, sur une tuile à 14 % de sa teinte.
-    private func compteur(_ n: Int, _ libelle: String, fond: Color, encre: Color) -> some View {
+    /// Un compteur : le chiffre compte jusqu'à sa valeur, en SF Pro Rounded,
+    /// sur une tuile de verre neutre — la teinte ne dépend d'aucune valeur.
+    private func compteur(_ n: Int, _ libelle: String) -> some View {
         VStack(spacing: 2) {
             PriseDeSangChiffre(valeur: n)
                 .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
                 .tracking(DSTracking.valeur24)
-                .foregroundStyle(encre)
+                .foregroundStyle(Color.dsTexte)
             Text(libelle)
                 .font(.dsLegende)
                 .tracking(DSTracking.legende)
-                .foregroundStyle(encre)
+                .foregroundStyle(Color.dsSecondaire)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous).fill(fond))
+        .background(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous).fill(Verre.remplissage))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(n) \(libelle)")
     }
@@ -506,32 +517,21 @@ struct PriseDeSangSheet: View {
             }
             .padding(.top, 4)
 
-            switch etat {
-            case .aOptimiser where !aliments.isEmpty:
+            // Usage nutritionnel : où l'apport se trouve dans l'assiette quand
+            // la mesure tire son estimation vers le bas, et rien d'autre.
+            // Aucune phrase de Kiwio sur la valeur elle-même.
+            if PriseDeSangApports.rappelleLAssiette(m), !aliments.isEmpty {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "fork.knife")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Verre.iconeNeutre)
                         .accessibilityHidden(true)
-                    Text("**Côté assiette :** \(aliments.joined(separator: ", "))")
+                    Text("**Côté assiette**, on le trouve dans : \(aliments.joined(separator: ", "))")
                         .font(.dsLegende)
                         .foregroundStyle(Color.dsSecondaire)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.top, 9)
-            case .dansLesReperes:
-                Label("Continue comme ça", systemImage: "face.smiling")
-                    .font(.dsLegende)
-                    .foregroundStyle(Color.teinteKiwiTexte)
-                    .padding(.top, 9)
-            case .auDessus:
-                Text("Au-dessus du repère : rien à ajouter côté assiette. Parles-en à ton médecin.")
-                    .font(.dsLegende)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 9)
-            default:
-                EmptyView()
             }
 
             if m.nutriment == nil {
@@ -548,20 +548,23 @@ struct PriseDeSangSheet: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// La position dans l'intervalle du labo : une teinte neutre pour toutes,
+    /// une flèche qui dit seulement où la valeur se situe.
     private func pastille(_ etat: PriseDeSangApports.Etat) -> some View {
-        let (fond, encre, symbole): (Color, Color, String) = {
+        let symbole: String = {
             switch etat {
-            case .aOptimiser: return (Color.teinteVitamineD.opacity(0.14), Color.teinteAmbreEncre, "arrow.up.right")
-            case .dansLesReperes: return (Color.teinteKiwi.opacity(0.14), Color.teinteKiwiTexte, "checkmark")
-            case .auDessus, .sansRepere: return (Verre.remplissage, Color.dsSecondaire, "minus")
+            case .sousIntervalle: return "arrow.down"
+            case .dansIntervalle: return "arrow.left.and.right"
+            case .auDessus: return "arrow.up"
+            case .sansRepere: return "minus"
             }
         }()
         return Label(etat.libelle, systemImage: symbole)
             .font(.dsLegende.weight(.semibold))
-            .foregroundStyle(encre)
+            .foregroundStyle(Color.dsSecondaire)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Capsule().fill(fond))
+            .background(Capsule().fill(Verre.remplissage))
     }
 
     private func ligneEffet(_ effet: PriseDeSangApports.Effet) -> some View {
@@ -664,8 +667,8 @@ struct PriseDeSangCarte: View {
     var identifiant: String = "bilan.priseDeSang"
     let action: () -> Void
 
-    static let invitation = "Ajoute tes analyses : Kiwio vérifie tes apports avec ce qui a été mesuré."
-    static let avis = "Ne remplace pas un avis médical."
+    static let invitation = "Ajoute tes analyses : tes valeurs mesurées corrigent l'estimation de tes apports."
+    static let avis = "Ne remplace pas un avis médical : montre tes résultats à ton médecin."
 
     /// La ligne sous le titre : l'invitation, ou ce qui a été importé et ce
     /// que ça pèse encore (`PriseDeSangApports.fraicheur`).
@@ -674,8 +677,9 @@ struct PriseDeSangCarte: View {
         let quand = "\(prise.dateLue ? "Prélèvement du" : "Importée le") \(prise.dateCourte(maintenant: maintenant))"
         switch PriseDeSangApports.fraicheur(prise, maintenant: maintenant) {
         case 1:
-            let n = prise.markers.filter { PriseDeSangApports.etat($0) == .aOptimiser }.count
-            let valeurs = n == 0 ? "tout est dans les repères" : (n == 1 ? "1 valeur à optimiser" : "\(n) valeurs à optimiser")
+            // Ce qui a été lu, sans le juger.
+            let n = prise.markers.count
+            let valeurs = n == 1 ? "1 valeur lue" : "\(n) valeurs lues"
             return "\(quand) · \(valeurs)"
         case 0:
             return "\(quand) · plus d'un an : elle ne compte plus dans tes apports"

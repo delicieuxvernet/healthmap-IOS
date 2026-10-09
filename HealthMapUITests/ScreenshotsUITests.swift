@@ -314,6 +314,152 @@ final class ScreenshotsUITests: XCTestCase {
         }
     }
 
+    // MARK: - 7. Conformité (9 octobre 2026) : avant / après
+    //
+    // Les écrans touchés par le lot 1 de l'audit de conformité, photographiés
+    // de la même façon sur le code d'avant et sur celui d'après : prise de
+    // sang, fiche complément, Réglages (bas, licences, abonnement), paywall
+    // (deux ouvertures), molette d'âge réglée sous 16 ans.
+    // ⚠️ Rien n'est envoyé : ni achat, ni « Voir mon bilan » (audit-b est le
+    // compte de démonstration d'App Review). Les réponses du questionnaire
+    // restent dans le brouillon local du simulateur.
+
+    func test07_Conformite() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente")
+        attendreChargement()
+        // L'écran d'accord (après) : on le photographie s'il est là, sans y
+        // répondre, et le test s'arrête (rien ne doit s'écrire en base).
+        if app.staticTexts["Avant de commencer, j'ai besoin de ton accord."].waitForExistence(timeout: 3) {
+            snap("00-consentement")
+        }
+
+        // Prise de sang : la carte du Journal, puis sa feuille.
+        let sang = app.buttons["journal.priseDeSang"].firstMatch
+        var defilements = 0
+        while !(sang.exists && sang.isHittable) && defilements < 4 {
+            app.swipeUp()
+            sleep(1)
+            defilements += 1
+        }
+        if sang.waitForExistence(timeout: 5) {
+            snap("01-journal-carte-sang")
+            taper(sang)
+            sleep(2)
+            snap("02-sang-feuille")
+            app.swipeUp()
+            sleep(1)
+            snap("03-sang-feuille-bas")
+            fermerFeuille()
+        }
+
+        // Compléments : la fiche d'un apport (le « pourquoi cette forme »).
+        app.buttons["tab.complements"].tap()
+        sleep(3)
+        let tuile = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "sur 100")).firstMatch
+        if tuile.waitForExistence(timeout: 4) {
+            taper(tuile)
+            sleep(2)
+            snap("04-complements-fiche")
+            app.swipeUp()
+            sleep(1)
+            snap("05-complements-fiche-bas")
+            fermerFeuille()
+        }
+
+        // Réglages : le haut (carte Premium, essai), le bas (liens légaux),
+        // les licences, l'abonnement (remboursement).
+        app.buttons["tab.reglages"].tap()
+        sleep(2)
+        snap("06-reglages")
+        app.swipeUp()
+        sleep(1)
+        snap("07-reglages-bas")
+        let licences = app.buttons["reglages.licences"].firstMatch
+        if licences.waitForExistence(timeout: 3) {
+            taper(licences)
+            sleep(2)
+            snap("08-licences")
+            retour()
+        }
+        app.swipeDown()
+        sleep(1)
+        let abonnement = app.buttons["reglages.abonnement"].firstMatch
+        if abonnement.waitForExistence(timeout: 4) {
+            taper(abonnement)
+            sleep(2)
+            snap("09-abonnement")
+            retour()
+        }
+
+        // Paywall depuis la carte Premium, deux fois : le comparatif ne revient
+        // qu'une fois par semaine (après).
+        let carte = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@", "Essayer", "Découvrir Kiwio Premium")).firstMatch
+        if carte.waitForExistence(timeout: 5) {
+            taper(carte)
+            sleep(3)
+            snap("10-paywall-1re-ouverture")
+            let passer = app.buttons["Passer à Premium"].firstMatch
+            if passer.waitForExistence(timeout: 4) {
+                taper(passer)
+                sleep(2)
+            }
+            snap("11-paywall-formules")
+            app.swipeUp()
+            sleep(1)
+            snap("12-paywall-formules-bas")
+            fermerFeuille()
+            sleep(2)
+            if carte.waitForExistence(timeout: 5) {
+                taper(carte)
+                sleep(3)
+                snap("13-paywall-2e-ouverture")
+                fermerFeuille()
+            }
+        }
+
+        // La molette d'âge réglée sous 16 ans, dans le questionnaire d'un
+        // compte « sans bilan » (en mémoire seulement).
+        app.terminate()
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES", "-captureDecouverte", "YES"]
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120))
+        attendreChargement()
+        let porte = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "questionnaire")).firstMatch
+        guard porte.waitForExistence(timeout: 10) else { return }
+        taper(porte)
+        sleep(2)
+        guard bilanSuite("Commencer") else { return quitterLeBilan() }
+        bilanToucher("Fatigue")
+        guard bilanSuite() else { return quitterLeBilan() }
+        let prenom = app.textFields["Ton prénom"]
+        if prenom.waitForExistence(timeout: 2) {
+            prenom.tap()
+            prenom.typeText("Léa")
+            guard bilanSuite() else { return quitterLeBilan() }
+        }
+        bilanToucher("Femme")
+        let age = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Âge")).firstMatch
+        if age.waitForExistence(timeout: 3) {
+            let debut = age.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            debut.press(forDuration: 0.1, thenDragTo: debut.withOffset(CGVector(dx: 0, dy: 240)))
+            sleep(2)
+            snap("14-age-sous-16")
+        }
+        quitterLeBilan()
+    }
+
     // MARK: - Outils
 
     /// Se connecte si la page de garde est affichée (session absente).
