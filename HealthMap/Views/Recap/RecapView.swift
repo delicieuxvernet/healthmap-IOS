@@ -103,7 +103,9 @@ struct RecapView: View {
             Button("Aller à mon bilan") { terminer() }
             Button("Reprendre", role: .cancel) { progression.reprendre() }
         }
-        // Plus de borne Dynamic Type : le slide défile, il peut grandir.
+        // Plancher `.large` comme partout dans l'app, sans plafond : le slide
+        // défile, il peut grandir.
+        .dynamicTypeSize(DynamicTypeSize.large...)
     }
 
     // MARK: - Contenu
@@ -380,5 +382,6 @@ struct RecapListeView: View {
                 }
             }
         }
+        .dynamicTypeSize(DynamicTypeSize.large...)
     }
 }

@@ -108,13 +108,11 @@ enum RythmeOffre {
     static let vuesRapprochees = 3
     /// …puis deux semaines : qui a dit trois fois « plus tard » l'a dit.
     static let intervalleEspace: TimeInterval = 14 * 24 * 3_600
-    /// Et jamais plus de six cartes en tout (audit de conformité du 9 octobre
-    /// 2026) : une relance sans fin est une pression, pas une information.
-    /// « Ne plus me proposer » arrête tout, dès la première.
-    static let vuesMax = 6
+    // Pas de plafond au nombre de cartes (celui de six, ajouté le 9 oct. 2026,
+    // est retiré le 10 oct. à la demande d'Arthur) : « Ne plus me proposer »
+    // suffit à qui ne veut plus la voir.
 
     static func peutProposer(premierPassage: Date?, derniere: Date?, vues: Int, maintenant: Date) -> Bool {
-        guard vues < vuesMax else { return false }
         guard let premierPassage,
               maintenant.timeIntervalSince(premierPassage) >= anciennete else { return false }
         guard let derniere else { return true }

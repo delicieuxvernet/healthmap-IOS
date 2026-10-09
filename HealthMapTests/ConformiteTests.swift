@@ -119,21 +119,17 @@ final class ConformiteTests: XCTestCase {
 
     // MARK: Relances
 
-    func testLeComparatif_auPlusUneFoisParSemaine() {
+    /// La carte revient toutes les deux semaines, sans plafond de nombre
+    /// (rétabli le 10 oct. 2026) ; seul « Ne plus me proposer » l'arrête.
+    func testLaCarteDOffre_revientSansPlafond() {
         let maintenant = Date(timeIntervalSince1970: 1_800_000_000)
-        XCTAssertTrue(RythmeComparatif.peutMontrer(derniere: nil, maintenant: maintenant))
-        XCTAssertFalse(RythmeComparatif.peutMontrer(derniere: maintenant.addingTimeInterval(-3 * 86_400), maintenant: maintenant))
-        XCTAssertTrue(RythmeComparatif.peutMontrer(derniere: maintenant.addingTimeInterval(-7 * 86_400), maintenant: maintenant))
-    }
-
-    func testLaCarteDOffre_estPlafonnee() {
-        let maintenant = Date(timeIntervalSince1970: 1_800_000_000)
-        let premier = maintenant.addingTimeInterval(-120 * 86_400)
-        let derniere = maintenant.addingTimeInterval(-30 * 86_400)
-        XCTAssertTrue(RythmeOffre.peutProposer(premierPassage: premier, derniere: derniere,
-                                               vues: RythmeOffre.vuesMax - 1, maintenant: maintenant))
-        XCTAssertFalse(RythmeOffre.peutProposer(premierPassage: premier, derniere: derniere,
-                                                vues: RythmeOffre.vuesMax, maintenant: maintenant))
+        let premier = maintenant.addingTimeInterval(-400 * 86_400)
+        XCTAssertTrue(RythmeOffre.peutProposer(premierPassage: premier,
+                                               derniere: maintenant.addingTimeInterval(-15 * 86_400),
+                                               vues: 40, maintenant: maintenant))
+        XCTAssertFalse(RythmeOffre.peutProposer(premierPassage: premier,
+                                                derniere: maintenant.addingTimeInterval(-5 * 86_400),
+                                                vues: 40, maintenant: maintenant))
     }
 
     func testNePlusMeProposer_arreteLaCarte() async {
