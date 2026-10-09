@@ -8,9 +8,9 @@ enum PurchaseOutcome: Equatable {
     case activated
     /// Achat ABOUTI (transaction StoreKit confirmée) mais confirmation
     /// RevenueCat pas encore lisible (réseau, propagation). L'accès est
-    /// considéré actif d'après le résultat d'achat — l'UI dit au pire
-    /// « Achat confirmé — la synchronisation se termine… », JAMAIS un
-    /// échec (promesse V10 #3).
+    /// considéré actif d'après le résultat d'achat — l'UI montre la même
+    /// confirmation qu'un achat lu tout de suite, JAMAIS un échec (promesse
+    /// V10 #3).
     case activatedSyncPending
     /// Achat DIFFÉRÉ (Ask to Buy — approbation parentale — ou validation
     /// bancaire SCA) : la transaction attend une approbation externe.
@@ -282,6 +282,30 @@ final class SubscriptionService: ObservableObject {
         return ancienneFormule != nouvelleFormule
     }
 
+    /// Le serveur vient de répondre comme à un compte gratuit (prise de sang
+    /// refusée, quota du gratuit atteint) alors que l'app voit un abonné : son
+    /// `profiles.tier` n'a pas encore suivi l'achat (achat à l'instant,
+    /// webhook en retard, vérification post-achat tombée sur un réseau
+    /// coupé). On lui fait recouper l'abonnement MAINTENANT. Vrai si le
+    /// serveur reconnaît désormais l'abonné : l'appelant rejoue alors sa
+    /// requête, une seule fois.
+    func realignerLeServeur() async -> Bool {
+        guard isPremium else { return false }
+        let tier = await ReceiptValidationService.shared.verifyCurrentEntitlements(
+            userId: Purchases.shared.appUserID,
+            force: true
+        )
+        return Self.tierPayant(tier)
+    }
+
+    /// Le tier rendu par `verify-receipt` ouvre-t-il le Premium côté serveur ?
+    /// Même règle que les fonctions Edge (`tier !== "free"`) ; nil (serveur
+    /// injoignable) ne prouve rien.
+    nonisolated static func tierPayant(_ tier: String?) -> Bool {
+        guard let tier, !tier.isEmpty else { return false }
+        return tier != "free"
+    }
+
     /// Demande au serveur de recouper l'abonnement contre RevenueCat et
     /// d'aligner `profiles.tier`. Non bloquant, sans effet visible : c'est le
     /// serveur qui tranche (`verify-receipt` résout l'identité depuis le JWT).
@@ -448,6 +472,15 @@ final class SubscriptionService: ObservableObject {
     /// abouti — une relecture RevenueCat qui échoue (réseau) n'est pas un
     /// achat raté et ne doit JAMAIS s'afficher comme tel (promesse V10 #3).
     private func finish(result: PurchaseResultData) async -> PurchaseOutcome {
+        // Un achat fait DANS l'app ne passe pas par `Transaction.updates`
+        // (réservé aux achats faits ailleurs, aux renouvellements et aux
+        // approbations) : le filet StoreKit l'ignorait. Or le 9 octobre 2026,
+        // l'hebdo n'était toujours rattaché à aucun entitlement RevenueCat :
+        // sans cette relecture, son achat n'ouvrait l'accès qu'après deux
+        // relectures RevenueCat vaines (3 s), et par le chemin optimiste.
+        if !result.userCancelled {
+            await rafraichirFiletStoreKit()
+        }
         applyFresh(customerInfo: result.customerInfo)
 
         var outcome = PurchaseOutcome.resolve(

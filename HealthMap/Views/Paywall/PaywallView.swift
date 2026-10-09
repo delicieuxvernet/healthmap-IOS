@@ -843,8 +843,10 @@ struct PaywallView: View {
                 AnalyticsService.shared.track(.subscriptionStarted, properties: [
                     "package": plan.id,
                 ])
-                alertMessage = "Achat confirmé. La synchronisation se termine, tes avantages s’activent dans quelques instants."
-                showAlert = true
+                // La même confirmation qu'un achat lu tout de suite : l'accès
+                // est ouvert. Une alerte posée ici se heurtait à cette feuille,
+                // que l'ouverture de l'accès présente déjà (`onChange`).
+                showPurchaseSuccess = true
             case .cancelled:
                 AnalyticsService.shared.track(.paywallDismissed, properties: [
                     "source": source,

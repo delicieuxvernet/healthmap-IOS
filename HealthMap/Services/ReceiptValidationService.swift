@@ -76,10 +76,13 @@ final class ReceiptValidationService {
     ///   juste après un paiement, la vérification serveur doit partir MAINTENANT —
     ///   avant ce paramètre, une vérification périodique < 24 h rendait l'appel
     ///   post-achat silencieusement no-op (promesse V10 #2).
-    func verifyCurrentEntitlements(userId: String, force: Bool = false) async {
+    /// - Returns: le tier que le serveur retient après vérification, nil si
+    ///   rien n'a été vérifié (debounce, réseau, serveur).
+    @discardableResult
+    func verifyCurrentEntitlements(userId: String, force: Bool = false) async -> String? {
         // 24h debounce (sauf force)
         if !force, !Self.shouldVerify(lastVerification: lastVerification, now: Date()) {
-            return
+            return nil
         }
 
         var activeProductIds: [String] = []
@@ -107,9 +110,11 @@ final class ReceiptValidationService {
         // Timestamp écrit APRÈS succès seulement : un échec (réseau, serveur)
         // laisse la prochaine occasion re-tenter, au lieu d'armer 24 h de
         // silence sur une vérification qui n'a jamais eu lieu (V10 #2).
-        if await serverSideVerify(userId: userId, activeProductIds: activeProductIds) {
+        let tier = await serverSideVerify(userId: userId, activeProductIds: activeProductIds)
+        if tier != nil {
             lastVerification = Date()
         }
+        return tier
     }
 
     /// Décision de debounce, pure et testable : vérifier si jamais vérifié,
@@ -126,10 +131,9 @@ final class ReceiptValidationService {
     ///
     /// If the server detects a mismatch (client claims premium but server says
     /// free), it corrects `profiles.tier` and we refresh SubscriptionService.
-    /// - Returns: `true` si la vérification serveur a abouti (le debounce 24 h
-    ///   ne s'arme que dans ce cas), `false` sur échec réseau/serveur.
-    @discardableResult
-    private func serverSideVerify(userId: String, activeProductIds: [String]) async -> Bool {
+    /// - Returns: le tier retenu par le serveur si la vérification a abouti (le
+    ///   debounce 24 h ne s'arme que dans ce cas), nil sur échec réseau/serveur.
+    private func serverSideVerify(userId: String, activeProductIds: [String]) async -> String? {
         do {
             struct VerifyRequest: Encodable {
                 let userId: String
@@ -172,12 +176,12 @@ final class ReceiptValidationService {
                     "new_tier": response.tier,
                 ])
             }
-            return true
+            return response.tier
         } catch {
             // Non-fatal: server verification is defense-in-depth, not blocking.
             // RevenueCat remains the primary source of truth for entitlements.
             AppLogger.subscription.notice("Server-side receipt verification failed: \(error.localizedDescription, privacy: .public)")
-            return false
+            return nil
         }
     }
 

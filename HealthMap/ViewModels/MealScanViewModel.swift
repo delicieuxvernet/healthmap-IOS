@@ -476,33 +476,7 @@ final class MealScanViewModel: ObservableObject {
                 consumedAt: consumedAtÀEnvoyer
             )
 
-            // Protégée : verrouiller le téléphone pendant l'analyse ne coupe
-            // plus l'envoi (le serveur enregistre le repas lui-même ; une
-            // réponse perdue faisait croire à un échec, puis à un doublon).
-            let response: EdgeMealResponse = try await TacheProtegee.executer("Photo du repas") {
-                try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
-                    group.addTask { [client] in
-                        try await client.functions.invoke(
-                            "analyze-meal-photo",
-                            options: .init(body: requestBody)
-                        )
-                    }
-
-                    // Timeout task
-                    group.addTask {
-                        try await Task.sleep(nanoseconds: 130_000_000_000) // 130 seconds
-                        throw MealScanError.timeout
-                    }
-
-                    // Return whichever finishes first; cancel the other
-                    guard let result = try await group.next() else {
-                        group.cancelAll()
-                        throw MealScanError.timeout
-                    }
-                    group.cancelAll()
-                    return result
-                }
-            }
+            let response = try await envoyerEnAbonne(requestBody)
 
             // 5. Check for Edge Function error in response body
             if let errorMsg = response.error {
@@ -658,6 +632,50 @@ final class MealScanViewModel: ObservableObject {
         }
 
         isAnalyzing = false
+    }
+
+    /// Quota du jour atteint alors que l'app voit un abonné : c'est le quota
+    /// du GRATUIT (3) que le serveur applique encore, faute d'avoir suivi
+    /// l'achat. Une seconde chance une fois le serveur réaligné ; s'il répond
+    /// encore 429, c'est la vraie limite (30), et le message le dit.
+    private func envoyerEnAbonne(_ requestBody: MealAnalyzeRequest) async throws -> EdgeMealResponse {
+        do {
+            return try await envoyer(requestBody)
+        } catch let erreur as FunctionsError {
+            guard case .httpError(let code, _) = erreur, code == 429,
+                  await SubscriptionService.shared.realignerLeServeur() else { throw erreur }
+            return try await envoyer(requestBody)
+        }
+    }
+
+    /// Protégée : verrouiller le téléphone pendant l'analyse ne coupe plus
+    /// l'envoi (le serveur enregistre le repas lui-même ; une réponse perdue
+    /// faisait croire à un échec, puis à un doublon).
+    private func envoyer(_ requestBody: MealAnalyzeRequest) async throws -> EdgeMealResponse {
+        try await TacheProtegee.executer("Photo du repas") {
+            try await withThrowingTaskGroup(of: EdgeMealResponse.self) { group in
+                group.addTask { [client] in
+                    try await client.functions.invoke(
+                        "analyze-meal-photo",
+                        options: .init(body: requestBody)
+                    )
+                }
+
+                // Timeout task
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 130_000_000_000) // 130 seconds
+                    throw MealScanError.timeout
+                }
+
+                // Return whichever finishes first; cancel the other
+                guard let result = try await group.next() else {
+                    group.cancelAll()
+                    throw MealScanError.timeout
+                }
+                group.cancelAll()
+                return result
+            }
+        }
     }
 
     /// Décodage + réduction pour l'affichage. 1200 px de côté couvre le plus

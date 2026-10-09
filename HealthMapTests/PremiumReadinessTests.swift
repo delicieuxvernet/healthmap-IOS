@@ -274,4 +274,25 @@ final class PremiumReadinessTests: XCTestCase {
         XCTAssertEqual(SubscriptionService.expirationAPersister(entitlement: date, storeKit: nil), date)
         XCTAssertNil(SubscriptionService.expirationAPersister(entitlement: nil, storeKit: nil))
     }
+
+    // MARK: - Serveur en retard sur l'achat (audit paiement, 9 oct. 2026)
+    //
+    // Prise de sang, scans et dictées sont tranchés par `profiles.tier` côté
+    // serveur. Refusé comme un compte gratuit alors que l'app voit un abonné,
+    // le client fait recouper l'abonnement puis rejoue sa requête une fois :
+    // seulement si le serveur reconnaît bien un tier payant.
+
+    func testTierPayant_memeRegleQueLesFonctionsEdge() {
+        for tier in ["weekly", "monthly", "annual", "lifetime", "premium"] {
+            XCTAssertTrue(SubscriptionService.tierPayant(tier), tier)
+        }
+    }
+
+    func testTierPayant_rienNeSeRejoueSansPreuve() {
+        // « free » : le serveur ne voit toujours pas l'abonnement, rejouer
+        // reproduirait le même refus. nil : serveur injoignable.
+        XCTAssertFalse(SubscriptionService.tierPayant("free"))
+        XCTAssertFalse(SubscriptionService.tierPayant(""))
+        XCTAssertFalse(SubscriptionService.tierPayant(nil))
+    }
 }

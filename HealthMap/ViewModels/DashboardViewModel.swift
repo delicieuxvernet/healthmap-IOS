@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 @MainActor
@@ -113,6 +114,12 @@ final class DashboardViewModel: ObservableObject {
     /// n'est pas fait. Toutes les cartes / pills / portes paywall se
     /// conditionnent ici plutôt que sur `!isPremium` copié partout.
     var premiumVisible: Bool { bilanComplete && !subscriptionService.isPremium }
+
+    /// `premiumVisible` lit l'abonnement, que ce modèle ne publie pas : sans
+    /// ce relais, une vue qui ne regarde que `dashboardVM` (Progrès et ses
+    /// courbes) gardait ses verrous après un achat fait depuis un autre
+    /// onglet, jusqu'au prochain changement sans rapport.
+    private var relaisAbonnement: AnyCancellable?
 
     /// Lance (ou reprend) le bilan depuis n'importe quel onglet. Le draft du
     /// questionnaire est restauré par QuestionnaireViewModel — la reprise se
@@ -284,6 +291,15 @@ final class DashboardViewModel: ObservableObject {
         self.analyticsService = analytics
         self.aiAnalysisService = aiAnalysis
         self.gamificationService = gamification
+
+        if let abonnement = subscription as? SubscriptionService {
+            relaisAbonnement = abonnement.$isPremium
+                .removeDuplicates()
+                .dropFirst()
+                .sink { [weak self] _ in
+                    Task { @MainActor in self?.objectWillChange.send() }
+                }
+        }
 
         initTask = Task {
             await loadProfile()
