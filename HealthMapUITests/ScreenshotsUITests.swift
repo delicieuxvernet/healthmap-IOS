@@ -383,7 +383,10 @@ final class ScreenshotsUITests: XCTestCase {
         // Paywall, depuis la carte Premium des Réglages.
         app.buttons["tab.reglages"].tap()
         sleep(1)
-        let essai = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Premium")).firstMatch
+        // La carte s'annonce « Essayer 7 jours gratuits » ou « Découvrir
+        // Kiwio Premium » selon l'éligibilité à l'essai.
+        let essai = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label == %@",
+                                                     "Essayer", "Découvrir Kiwio Premium")).firstMatch
         if essai.waitForExistence(timeout: 4) {
             taper(essai)
             sleep(3)
@@ -394,6 +397,8 @@ final class ScreenshotsUITests: XCTestCase {
             fermerFeuille()
             sleep(1)
         }
+        // Une page poussée par erreur masquerait la ligne du Récap.
+        if app.navigationBars.buttons.element(boundBy: 0).exists { retour() }
 
         // Récap animé, rejoué depuis les Réglages.
         let rejouer = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "bilan animé")).firstMatch
