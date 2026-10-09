@@ -131,6 +131,22 @@ struct AbonnementReglagesView: View {
                             .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
                         }
 
+                        // Remboursement : toujours chez Apple, quel que soit
+                        // l'état (audit de conformité du 9 octobre 2026).
+                        Link(destination: ReglagesLiens.remboursement) {
+                            ReglageLigne(symbole: "arrow.uturn.backward",
+                                         titre: "Demander un remboursement",
+                                         sousTitre: "Via Apple, sur reportaproblem.apple.com",
+                                         filet: true) {
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.dsTertiaire)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .buttonStyle(.dsPress)
+                        .accessibilityHint("Ouvre la page de remboursement d'Apple dans Safari.")
+
                         // Restaurer : visible quel que soit l'état, un abonné qui
                         // réinstalle doit toujours pouvoir récupérer son accès.
                         Button {

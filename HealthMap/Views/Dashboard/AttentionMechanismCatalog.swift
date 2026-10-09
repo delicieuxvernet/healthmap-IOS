@@ -16,7 +16,8 @@ import Foundation
 // Chiffres du schéma : uniquement des ordres de grandeur établis, les mêmes
 // que le prompt serveur (IPP + B12 : Lam 2013 · metformine + B12 : de Jager
 // 2010 · tanins et fer non héminique : jusqu'à −60 %). Pas de source → pas de
-// chiffre (l'étape impact reste qualitative).
+// chiffre (l'étape impact reste qualitative). Depuis l'audit de conformité du
+// 9 octobre 2026, un chiffre d'absorption porte sa source À L'ÉCRAN (`source`).
 
 struct AttentionMechanism: Equatable {
     struct Step: Equatable {
@@ -37,6 +38,9 @@ struct AttentionMechanism: Equatable {
     let solution: String
     /// Id du catalogue `NutrientData` (chip colorée du header).
     let nutrientId: String
+    /// L'étude d'où vient le chiffre de l'étape « impact », affichée sous le
+    /// schéma. Un chiffre d'effet ne s'affiche jamais sans elle.
+    var source: String? = nil
 }
 
 enum AttentionMechanismCatalog {
@@ -168,7 +172,9 @@ enum AttentionMechanismCatalog {
                 nutrientId: "calcium"
             )
         ),
-        // IPP / antiacides → B12 (Lam 2013).
+        // IPP / antiacides → B12. Le chiffre est une absorption mesurée :
+        // B12 liée aux protéines, 3,2 % → 0,9 % sous oméprazole 20 mg
+        // (Marcuard et al., Annals of Internal Medicine, 1994).
         Entry(
             required: [["\\bipp\\b", "\\bomeprazole", "\\bpantoprazole", "\\besomeprazole", "\\bantiacide", "anti-acide", "protecteur gastrique"]],
             mechanism: AttentionMechanism(
@@ -177,10 +183,13 @@ enum AttentionMechanismCatalog {
                 mechanism: .init(icon: "drop.fill", line1: "Moins d'acidité pour", line2: "libérer la B12"),
                 impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "Jusqu'à −65 %", line2: "d'absorption"),
                 solution: "Mise sur des sources régulières de B12 (œufs, poisson, laitages) et parles-en à ton médecin au prochain rendez-vous.",
-                nutrientId: "vitB12"
+                nutrientId: "vitB12",
+                source: "Marcuard et al., Annals of Internal Medicine, 1994"
             )
         ),
-        // Café / thé pendant le repas → fer (tanins, jusqu'à −60 %).
+        // Café / thé pendant le repas → fer (tanins, jusqu'à −60 %) : thé au
+        // repas −62 %, café −35 % (Hallberg et Rossander, Human Nutrition:
+        // Applied Nutrition, 1982).
         Entry(
             required: [["\\bcafe", "\\bcafeine", "\\bthe\\b", "\\btanin", "\\btannin"], ["\\bfer\\b"]],
             mechanism: AttentionMechanism(
@@ -191,7 +200,8 @@ enum AttentionMechanismCatalog {
                 // Morck et al. (1983) : pris 1 h APRÈS le repas, le café freine
                 // le fer autant qu'au repas ; 1 h avant, il ne le gêne pas.
                 solution: "Prends ton café au moins 1 h avant le repas plutôt qu'à table ou juste après : ton fer passe, ton café reste.",
-                nutrientId: "iron"
+                nutrientId: "iron",
+                source: "Hallberg et Rossander, Human Nutrition: Applied Nutrition, 1982"
             )
         ),
         // Fer + calcium pris ensemble (liste fermée : 2 h d'écart).

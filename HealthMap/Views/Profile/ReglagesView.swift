@@ -119,6 +119,9 @@ struct ReglagesView: View {
                         applicationList
                             .padding(.top, 24)
 
+                        legalList
+                            .padding(.top, DS.interCarte)
+
                         // Restaurer un achat doit rester atteignable, toujours
                         // (App Review 3.1.1) : sous l'offre quand elle est là,
                         // ici sinon.
@@ -241,8 +244,42 @@ struct ReglagesView: View {
                 }
                 .buttonStyle(.dsPress)
                 .accessibilityHint("Ouvre la gestion de ton abonnement (modifier ou annuler) dans les réglages Apple.")
+
+                DSSeparator(retrait: ReglageMetrique.retraitMascotte)
+
+                // Le remboursement d'un abonnement App Store se demande à
+                // Apple, jamais à Kiwio : on le dit, et on y mène (audit de
+                // conformité du 9 octobre 2026).
+                Link(destination: ReglagesLiens.remboursement) {
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Demander un remboursement")
+                                .font(.dsCorps)
+                                .tracking(DSTracking.corps)
+                                .foregroundStyle(Color.dsTexte)
+                            Text("Via Apple, sur reportaproblem.apple.com")
+                                .font(.dsLegende)
+                                .tracking(DSTracking.legende)
+                                .foregroundStyle(Color.dsSecondaire)
+                        }
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.dsTertiaire)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.leading, ReglageMetrique.retraitMascotte)
+                    .padding(.trailing, DS.paddingCarte)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, minHeight: ReglageMetrique.hauteurLigne, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.dsPress)
+                .accessibilityHint("Ouvre la page de remboursement d'Apple dans Safari.")
             }
-            Text("Géré par l'App Store. Modification ou résiliation depuis les réglages Apple.")
+            Text("Géré par l'App Store. Modification, résiliation et remboursement passent par Apple.")
                 .font(.system(size: 12))
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
@@ -406,6 +443,57 @@ struct ReglagesView: View {
         }
     }
 
+    // MARK: - Informations légales (audit de conformité du 9 octobre 2026)
+
+    /// CGU, mentions légales et confidentialité, publiées sur healthmap.fr,
+    /// puis les licences des données et des logiciels.
+    private var legalList: some View {
+        DSGroupedList {
+            Link(destination: ReglagesLiens.cgu) {
+                ReglageLigne(symbole: "doc.text", titre: "Conditions d'utilisation", filet: true) {
+                    lienExterne
+                }
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityHint("Ouvre les conditions d'utilisation de Kiwio dans Safari.")
+            .verreCascade(lignesVisibles, delai: delai(10), decalage: 10)
+
+            Link(destination: ReglagesLiens.mentionsLegales) {
+                ReglageLigne(symbole: "building.columns", titre: "Mentions légales", filet: true) {
+                    lienExterne
+                }
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityHint("Ouvre les mentions légales de Kiwio dans Safari.")
+            .verreCascade(lignesVisibles, delai: delai(10), decalage: 10)
+
+            Link(destination: ReglagesLiens.confidentialite) {
+                ReglageLigne(symbole: "hand.raised", titre: "Politique de confidentialité", filet: true) {
+                    lienExterne
+                }
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityHint("Ouvre la politique de confidentialité dans Safari.")
+            .verreCascade(lignesVisibles, delai: delai(10), decalage: 10)
+
+            NavigationLink {
+                LicencesView()
+            } label: {
+                ReglageLigne(symbole: "text.book.closed", titre: "Licences")
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityIdentifier("reglages.licences")
+            .verreCascade(lignesVisibles, delai: delai(10), decalage: 10)
+        }
+    }
+
+    private var lienExterne: some View {
+        Image(systemName: "arrow.up.right")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Color.dsTertiaire)
+            .accessibilityHidden(true)
+    }
+
     // MARK: - Restaurer · Conditions · Confidentialité
 
     private var liensLegaux: some View {
@@ -426,15 +514,17 @@ struct ReglagesView: View {
 
             filetVertical
 
-            Link(destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!) {
-                Text("Conditions")
+            // L'EULA d'Apple, qui régit l'abonnement ; les CGU de Kiwio sont
+            // dans « Conditions d'utilisation », plus bas.
+            Link(destination: ReglagesLiens.eulaApple) {
+                Text("Conditions Apple")
                     .frame(minHeight: DS.cibleTactile)
                     .contentShape(Rectangle())
             }
 
             filetVertical
 
-            Link(destination: URL(string: "https://healthmap.fr/privacy")!) {
+            Link(destination: ReglagesLiens.confidentialite) {
                 Text("Confidentialité")
                     .frame(minHeight: DS.cibleTactile)
                     .contentShape(Rectangle())
@@ -525,6 +615,19 @@ struct ReglagesView: View {
             AppLogger.app.report(error, context: "ReglagesView data export")
         }
     }
+}
+
+// MARK: - Les adresses légales
+
+/// Les pages légales de Kiwio (publiées sur healthmap.fr le 9 octobre 2026)
+/// et les pages d'Apple. Un seul endroit pour les adresses.
+enum ReglagesLiens {
+    static let cgu = URL(string: "https://www.healthmap.fr/cgu.html")!
+    static let mentionsLegales = URL(string: "https://www.healthmap.fr/mentions-legales.html")!
+    static let confidentialite = URL(string: "https://healthmap.fr/privacy")!
+    static let eulaApple = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    /// Les abonnements App Store se remboursent chez Apple.
+    static let remboursement = URL(string: "https://reportaproblem.apple.com")!
 }
 
 // MARK: - Grammaire d'une ligne (pastille carrée, libellé, filet)
@@ -910,16 +1013,11 @@ enum PremiumOffre {
         return all.first { $0.periodUnit == .year } ?? all.first
     }
 
-    /// « 7 jours » / « 1 mois », lu depuis l'offre d'introduction StoreKit.
+    /// « 7 jours » / « 1 mois », lu depuis l'offre d'introduction StoreKit,
+    /// et SEULEMENT si Apple dit que la personne y a encore droit (App Store
+    /// 3.1.2) : quelqu'un qui a déjà eu son essai voit le prix, pas l'essai.
     static func essai(_ plan: PlanOption?) -> String? {
-        guard let discount = plan?.introductoryDiscount, discount.paymentMode == .freeTrial else { return nil }
-        let period = discount.subscriptionPeriod
-        switch period.unit {
-        case .day: return "\(period.value) jours"
-        case .week: return "\(period.value * 7) jours"
-        case .month: return period.value == 1 ? "1 mois" : "\(period.value) mois"
-        case .year: return period.value == 1 ? "1 an" : "\(period.value) ans"
-        }
+        OffrePremium.essaiGratuit(SubscriptionService.essaiGratuit(de: plan?.product))
     }
 
     /// L'essai de la formule mise en avant (« 7 jours »), ou `nil` : pays ou

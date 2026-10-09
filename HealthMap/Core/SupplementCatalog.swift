@@ -22,6 +22,11 @@ import Foundation
 // (ordre intentionnel), donc lister le meilleur en premier.
 //
 // Les prix étant volatils, toute réutilisation doit re-vérifier `verifiedAt`.
+//
+// `whyBrand` (audit de conformité du 9 octobre 2026) : composition et forme,
+// rien d'autre. Aucun bienfait, aucun effet sur le corps : une allégation de
+// santé sur un complément n'est permise que dans les mots exacts du règlement
+// (UE) 432/2012, et l'app n'en a pas besoin pour dire ce qu'il y a dedans.
 
 extension SupplementEngine {
 
@@ -49,7 +54,7 @@ extension SupplementEngine {
             contraindications: [.hypercalcemie],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Synergie D3 + K2 (brevet K2VITAL) : la K2 aide à orienter le calcium vers les os. D3 d'origine végétale (lichen)."
+            whyBrand: "Vitamine D3 d'origine végétale (lichen), associée à de la vitamine K2 MK-7 (K2VITAL)."
         ),
         SupplementProduct(
             id: "vitd3-gouttes-nutrico",
@@ -85,7 +90,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Forme concentrée : au-delà des petites quantités, la B12 passe surtout par diffusion passive, ce qui compte quand l'absorption est réduite (âge, metformine, IPP)."
+            whyBrand: "Méthylcobalamine en gélule concentrée, végane."
         ),
         SupplementProduct(
             id: "b12-3-formes-dynveo",
@@ -102,7 +107,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [],
             tier: .value,
-            whyBrand: "Trois formes actives en une gélule, sans additifs, à ~0,15 €/jour. Les essais qui ont montré que la voie orale vaut l'injection portaient sur ces formes."
+            whyBrand: "Trois formes de B12 en une gélule, sans additifs, à ~0,15 €/jour."
         ),
 
         // --- FER ---
@@ -123,7 +128,7 @@ extension SupplementEngine {
             contraindications: [.hemochromatose],
             antiInteractions: ["calcium", "zinc"],
             tier: .premium,
-            whyBrand: "Fer bisglycinate Ferrochel + souche lactique + vitamine C + folate 5-MTHF : douceur digestive et absorption soutenue."
+            whyBrand: "Fer bisglycinate Ferrochel, souche lactique, vitamine C et folate 5-MTHF, en une gélule."
         ),
         SupplementProduct(
             id: "fer-bisglycinate-aromazone",
@@ -169,7 +174,7 @@ extension SupplementEngine {
             contraindications: [.insuffisanceRenaleSevere],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Bisglycinate TRAACS pur, sans oxyde ajouté : la forme la mieux tolérée, sans effet laxatif. Fabriqué en France, sans excipient superflu."
+            whyBrand: "Bisglycinate TRAACS pur, sans oxyde ajouté. Fabriqué en France, sans excipient superflu."
         ),
 
         // --- OMEGA-3 ---
@@ -191,7 +196,7 @@ extension SupplementEngine {
             contraindications: [.allergiePoisson],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Ratio riche en DHA (objectif cognitif), forme triglycéride, capsules Licaps anti-oxydation."
+            whyBrand: "Riche en DHA, forme triglycéride, en capsules Licaps."
         ),
         SupplementProduct(
             id: "omega3-algue-dynveo",
@@ -208,7 +213,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Alternative végane (huile d'algue Schizochytrium) : DHA + EPA sans poisson, zéro contamination."
+            whyBrand: "Huile d'algue Schizochytrium, végane : DHA et EPA sans poisson."
         ),
 
         // --- VITAMINE C ---
@@ -227,7 +232,7 @@ extension SupplementEngine {
             contraindications: [.hemochromatose],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Forme liposomale : meilleure biodisponibilité et tolérance digestive que la vitamine C classique."
+            whyBrand: "Vitamine C sous forme liposomale."
         ),
         SupplementProduct(
             id: "vitc-qualic-nutripure",
@@ -268,7 +273,7 @@ extension SupplementEngine {
             contraindications: [.hypercalcemie],
             antiInteractions: ["iron", "zinc"],
             tier: .premium,
-            whyBrand: "Formule complète calcium + D3 + K2 végane en un produit, pour aider à fixer le calcium sur l'os."
+            whyBrand: "Calcium, vitamine D3 et vitamine K2, véganes, réunis en un produit."
         ),
         SupplementProduct(
             id: "calcium-lithothamne-nutrixeal",
@@ -285,7 +290,7 @@ extension SupplementEngine {
             contraindications: [.hypercalcemie],
             antiInteractions: ["iron", "zinc"],
             tier: .value,
-            whyBrand: "Calcium marin (lithothamne), algue rouge naturellement riche en calcium et oligo-éléments. 100% pur."
+            whyBrand: "Calcium marin issu du lithothamne, une algue rouge. 100 % pur."
         ),
 
         // --- ZINC ---
@@ -349,7 +354,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [antiInteractionMedicaments],
             tier: .premium,
-            whyBrand: "Trio de fibres solubles certifié Low-FODMAP, compatible intestins sensibles (SII)."
+            whyBrand: "Trois fibres solubles bio (acacia, guar, psyllium), certifiées Low-FODMAP."
         ),
         SupplementProduct(
             id: "psyllium-blond-aromazone",
@@ -368,7 +373,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [antiInteractionMedicaments],
             tier: .value,
-            whyBrand: "Psyllium blond bio pur : fibre soluble de référence pour le transit. Toujours avec un grand verre d'eau."
+            whyBrand: "Téguments de psyllium blond bio, purs. À prendre avec un grand verre d'eau."
         ),
     ]
 }

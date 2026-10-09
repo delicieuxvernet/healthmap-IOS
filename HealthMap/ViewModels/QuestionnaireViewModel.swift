@@ -36,6 +36,9 @@ final class QuestionnaireViewModel: ObservableObject {
     @Published private(set) var ecran: EcranBilan = .accueil
     @Published var isSubmitting = false
     @Published var errorMessage: String?
+    /// L'âge choisi est sous le minimum (`AgeMinimum`) : rien n'est gardé, ni
+    /// l'âge ni le brouillon, et l'écran ne laisse pas avancer.
+    @Published private(set) var sousAgeMinimum = false
 
     // MARK: - Draft persistence
     /// Local UserDefaults key used to survive an app kill mid-questionnaire.
@@ -313,6 +316,19 @@ final class QuestionnaireViewModel: ObservableObject {
     // MARK: - Update Answers
 
     /// Update a single-value answer by question ID (maps to UserProfile property)
+    /// L'âge de la molette. Sous 16 ans, aucune collecte : l'âge n'est pas
+    /// enregistré et le brouillon déjà écrit sur le téléphone est effacé.
+    func choisirAge(_ ans: Int) {
+        guard AgeMinimum.estAtteint(ans) else {
+            sousAgeMinimum = true
+            profile.age = ""
+            Self.clearDraft()
+            return
+        }
+        sousAgeMinimum = false
+        updateAnswer(questionId: "age", value: String(ans))
+    }
+
     func updateAnswer(questionId: String, value: Any) {
         switch questionId {
         // Section 1: Profil
@@ -873,6 +889,12 @@ final class QuestionnaireViewModel: ObservableObject {
         // Double-tap guard: prevent concurrent submissions
         guard !isSubmitting else { return }
 
+        // Moins de 16 ans : le bilan ne part jamais (`AgeMinimum`).
+        if sousAgeMinimum || Int(profile.age).map({ !AgeMinimum.estAtteint($0) }) == true {
+            errorMessage = AgeMinimum.message
+            return
+        }
+
         // Force a session refresh to prevent JWT expiry during the update.
         // Supabase Auth rafraîchit normalement tout seul ; on force ici un
         // refresh explicite juste avant l'écriture critique.
@@ -959,6 +981,8 @@ final class QuestionnaireViewModel: ObservableObject {
         // it to disk could persist inconsistent data (e.g. completed=true
         // from the submission copy leaking to the draft).
         guard !isSubmitting else { return }
+        // Moins de 16 ans : rien ne s'écrit sur le téléphone (`AgeMinimum`).
+        guard !sousAgeMinimum else { return }
 
         // Grab current userId synchronously from cached session if available.
         // Depuis Clerk : lookup sync dans le cache `ClerkProfileResolver`. nil
