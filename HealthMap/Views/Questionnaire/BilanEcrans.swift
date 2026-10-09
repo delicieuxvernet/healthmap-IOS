@@ -294,9 +294,13 @@ private struct BilanReperes: View {
                 BilanQuestion("mesures", titre: "Ton âge, ta taille, ton poids", resume: mesures) {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(alignment: .top, spacing: 8) {
-                            BilanMolette(titre: "Âge", unite: "ans", plage: 14...100, parDefaut: 30, texte: viewModel.profile.age) { valeur in
-                                viewModel.updateAnswer(questionId: "age", value: String(valeur))
-                                clinDOeil = FunFactCatalog.fact(for: "age", value: Double(valeur)) ?? clinDOeil
+                            // La molette descend sous 16 ans pour qu'on puisse
+                            // dire son vrai âge ; en dessous, rien n'est gardé.
+                            BilanMolette(titre: "Âge", unite: "ans", plage: AgeMinimum.plageMolette, parDefaut: 30, texte: viewModel.profile.age) { valeur in
+                                viewModel.choisirAge(valeur)
+                                clinDOeil = AgeMinimum.estAtteint(valeur)
+                                    ? (FunFactCatalog.fact(for: "age", value: Double(valeur)) ?? clinDOeil)
+                                    : ""
                             }
                             BilanMolette(titre: "Taille", unite: "cm", plage: 140...220, parDefaut: 170, texte: viewModel.profile.height) { valeur in
                                 viewModel.updateAnswer(questionId: "height", value: String(valeur))
@@ -307,12 +311,20 @@ private struct BilanReperes: View {
                             }
                         }
 
-                        Text(clinDOeil.isEmpty ? "Fais glisser chaque molette, ou touche-la si le chiffre est bon." : clinDOeil)
-                            .font(.dsLegende)
-                            .tracking(DSTracking.legende)
-                            .foregroundStyle(teinte.encre)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if viewModel.sousAgeMinimum {
+                            Label(AgeMinimum.message, systemImage: "hand.raised")
+                                .font(Font.dsLegende.weight(.semibold))
+                                .foregroundStyle(Color.dsTexte)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            Text(clinDOeil.isEmpty ? "Fais glisser chaque molette, ou touche-la si le chiffre est bon." : clinDOeil)
+                                .font(.dsLegende)
+                                .tracking(DSTracking.legende)
+                                .foregroundStyle(teinte.encre)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 },
             ])
