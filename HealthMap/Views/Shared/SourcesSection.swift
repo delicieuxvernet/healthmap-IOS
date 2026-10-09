@@ -44,12 +44,12 @@ struct SourcesSection: View {
             HStack(spacing: Theme.spacingSM) {
                 VerrePastilleIcone(symbole: "text.book.closed.fill", taille: 26, tailleIcone: 13)
                 Text("Sources scientifiques")
-                    .font(.system(size: 16, weight: .semibold))
+                    .dsPolice(16, .semibold)
                     .foregroundStyle(Color.dsTexte)
             }
 
             Text("Les repères et recommandations s'appuient sur les références nutritionnelles officielles\u{202F}:")
-                .font(.system(size: 12.5))
+                .dsPolice(12.5)
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -63,10 +63,10 @@ struct SourcesSection: View {
                         HStack(spacing: Theme.spacingSM) {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(source.name)
-                                    .font(.system(size: 13.5, weight: .semibold))
+                                    .dsPolice(13.5, .semibold)
                                     .foregroundStyle(Color.dsTexte)
                                 Text(source.subtitle)
-                                    .font(.system(size: 11.5))
+                                    .dsPolice(11.5)
                                     .foregroundStyle(Color.dsSecondaire)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
@@ -90,7 +90,7 @@ struct SourcesSection: View {
                     .foregroundStyle(Color.dsSecondaire)
                     .accessibilityHidden(true)
                 Text("Information nutritionnelle éducative. Ne remplace pas un avis médical. Consulte un professionnel de santé pour toute décision de santé.")
-                    .font(.system(size: 11.5))
+                    .dsPolice(11.5)
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }

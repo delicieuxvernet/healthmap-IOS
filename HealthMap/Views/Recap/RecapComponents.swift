@@ -36,8 +36,12 @@ struct RecapProgressBar: View {
                 .frame(height: 3)
             }
         }
+        // Un seul élément réglable, comme un indicateur de pages : balayer
+        // vers le haut ou le bas change de slide. Les actions nommées
+        // (suivant, précédent, pause) sont posées par `RecapView`.
         .accessibilityElement()
-        .accessibilityLabel("Étape \(min(index + 1, total)) sur \(total)")
+        .accessibilityLabel("Bilan animé")
+        .accessibilityValue("Étape \(min(index + 1, total)) sur \(total)")
     }
 
     private func remplissage(_ position: Int) -> Double {
@@ -61,7 +65,7 @@ struct RecapCompteur: View {
 
     var body: some View {
         Text("\(Int(affiche.rounded()))")
-            .font(.system(size: taille, weight: .bold, design: .default))
+            .dsPolice(taille, .bold)
             .monospacedDigit()
             .foregroundStyle(couleur)
             .contentTransition(.numericText())
@@ -116,15 +120,15 @@ struct RecapJaugeApport: View {
 
             HStack(spacing: 6) {
                 Text(masquee ? "•• %" : "\(pourcent) %")
-                    .font(.system(size: 13, weight: .semibold))
+                    .dsPolice(13, .semibold)
                     .monospacedDigit()
                     .foregroundStyle(Color.dsTexte)
                 Text("du besoin couvert")
-                    .font(.system(size: 12))
+                    .dsPolice(12)
                     .foregroundStyle(Color.dsSecondaire)
                 Spacer(minLength: 0)
                 Text("visé : 70 %")
-                    .font(.system(size: 11))
+                    .dsPolice(11)
                     .foregroundStyle(Color.dsSecondaire)
             }
         }

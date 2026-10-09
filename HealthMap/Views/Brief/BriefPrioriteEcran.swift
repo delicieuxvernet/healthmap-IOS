@@ -93,7 +93,7 @@ struct BriefPrioriteContenu: View {
                     .tracking(-1.5)
                     .foregroundStyle(Color.dsTexte)
                 Text("%")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .dsPolice(26, .bold, design: .rounded)
                     .foregroundStyle(Color.dsSecondaire)
             }
             .padding(.top, 14)

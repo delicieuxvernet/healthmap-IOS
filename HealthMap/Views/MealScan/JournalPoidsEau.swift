@@ -178,7 +178,7 @@ private struct ColonnePoids: View {
             // l'appui maintenu qui enchaîne les pas.
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(ObjectifPoids.affichage(kilos))
-                    .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
+                    .dsPolice(24, .bold, design: .rounded, chiffres: true)
                     .tracking(DSTracking.valeur24)
                     .foregroundStyle(enAttente ? Color.dsTertiaire : Color.dsTexte)
                     .lineLimit(1)

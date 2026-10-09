@@ -712,7 +712,7 @@ struct FoodDetailSheetV4: View {
     private func macroTile(_ label: String, _ value: String, _ unit: String, encre: Color) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 17, weight: .bold, design: .rounded).monospacedDigit())
+                .dsPolice(17, .bold, design: .rounded, chiffres: true)
                 .foregroundStyle(Color.dsTexte)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -1124,7 +1124,7 @@ struct BesoinsCourbeCard: View {
             // jours
             let labels = Self.dayLabels(count: n)
             for (i, lab) in labels.enumerated() {
-                ctx.draw(Text(lab).font(.system(size: 10, weight: .semibold, design: .default).monospacedDigit()).foregroundColor(Color.dsSecondaire),
+                ctx.draw(Text(lab).dsPolice(10, .semibold, chiffres: true).foregroundColor(Color.dsSecondaire),
                          at: CGPoint(x: px(i), y: h + 11))
             }
         }

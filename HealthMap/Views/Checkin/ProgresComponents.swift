@@ -263,12 +263,12 @@ enum ProgresToile {
             let lieu = point(centre: centre, rayon: rayonLibelles * e, angle: a)
             let fort = apport.aRenforcer || choisi
             let nom = Text(apport.court)
-                .font(.system(size: police, weight: fort ? Font.Weight.semibold : Font.Weight.medium))
+                .dsPolice(police, fort ? Font.Weight.semibold : Font.Weight.medium)
                 .foregroundColor(fort ? Color.dsTexte : encreLibelle)
             if apport.aRenforcer {
                 calque.draw(nom, at: CGPoint(x: lieu.x, y: lieu.y - 8 * e), anchor: ancre)
                 let chiffre = Text(DS.pourcent(Int(valeurs[index].rounded())))
-                    .font(.system(size: police, weight: Font.Weight.medium).monospacedDigit())
+                    .dsPolice(police, Font.Weight.medium, chiffres: true)
                     .foregroundColor(Color.dsARenforcerTexte)
                 calque.draw(chiffre, at: CGPoint(x: lieu.x, y: lieu.y + 8 * e), anchor: ancre)
             } else {
@@ -428,18 +428,18 @@ struct ProgresToileView: View {
         if let choisi {
             VStack(spacing: 0) {
                 Text(choisi.nom)
-                    .font(.system(size: 12, weight: .semibold))
+                    .dsPolice(12, .semibold)
                     .foregroundStyle(Color.dsTexte)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
                 Text(DS.pourcent(choisi.pct))
-                    .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
+                    .dsPolice(30, .bold, design: .rounded, chiffres: true)
                     .tracking(-1.4)
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                 Text(choisi.mot)
-                    .font(.system(size: 12, weight: .semibold))
+                    .dsPolice(12, .semibold)
                     .foregroundStyle(choisi.aRenforcer ? Color.dsARenforcerTexte : Color.dsSecondaire)
                     .padding(.top, 3)
             }
@@ -462,12 +462,12 @@ struct ProgresToileView: View {
                         .tracking(-1.4)
                         .foregroundStyle(Color.dsTexte)
                     Text("/\(apports.count)")
-                        .font(.system(size: 17, weight: .semibold))
+                        .dsPolice(17, .semibold)
                         .foregroundStyle(Color.dsSecondaire)
                 }
                 .lineLimit(1)
                 Text("à ton besoin")
-                    .font(.system(size: 12, weight: .semibold))
+                    .dsPolice(12, .semibold)
                     .foregroundStyle(Color.dsSecondaire)
                     .padding(.top, 3)
             }
@@ -639,7 +639,7 @@ struct ProgresBarChart: View {
                 HStack(spacing: 0) {
                     ForEach(points) { point in
                         Text(point.libelle)
-                            .font(.system(size: 12))
+                            .dsPolice(12)
                             .foregroundStyle(point.futur ? Color.dsTertiaire : Color.dsSecondaire)
                             .frame(width: colonne)
                     }

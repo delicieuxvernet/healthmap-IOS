@@ -129,7 +129,7 @@ struct BilanV7SectionLabel: View {
 struct BilanV7PremiumBadge: View {
     var body: some View {
         Text("Premium")
-            .font(.system(size: 11, weight: .semibold))
+            .dsPolice(11, .semibold)
             .foregroundStyle(Color.dsSecondaire)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -275,7 +275,7 @@ struct BilanV7Header: View {
                         Image(systemName: "sparkles")
                             .font(.system(size: 14, weight: .semibold))
                         Text("Premium")
-                            .font(.system(size: 12, weight: .bold))
+                            .dsPolice(12, .bold)
                     }
                     .foregroundStyle(Color.dsTexte)
                     .padding(.horizontal, 12)
@@ -718,7 +718,7 @@ struct BilanV7SymptomesCard: View {
                         .foregroundStyle(.white)
                     if solutionsCount > 0 {
                         Text("\(solutionsCount)")
-                            .font(.system(size: 12, weight: .bold, design: .default).monospacedDigit())
+                            .dsPolice(12, .bold, chiffres: true)
                             .foregroundStyle(.white)
                             .frame(minWidth: 22, minHeight: 22)
                             .background(Color.white.opacity(0.25), in: Capsule())

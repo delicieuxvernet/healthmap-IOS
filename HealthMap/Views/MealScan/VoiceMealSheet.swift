@@ -307,7 +307,7 @@ struct VoiceMealSheet: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Écris ton repas")
-                        .font(.system(size: 24, weight: .bold))
+                        .dsPolice(24, .bold)
                         .tracking(-0.6)
                         .foregroundStyle(Color.dsTexte)
                     Text("Comme tu le dirais : on identifie les aliments et les quantités.")
@@ -422,7 +422,7 @@ struct VoiceMealSheet: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Dictée terminée")
-                        .font(.system(size: 24, weight: .bold))
+                        .dsPolice(24, .bold)
                         .tracking(-0.6)
                         .foregroundStyle(Color.dsTexte)
                         .accessibilityAddTraits(.isHeader)
@@ -574,7 +574,7 @@ struct VoiceMealSheet: View {
                     Fluent3DIcon(name: Fluent3D.asset(pour: slot), size: 28)
                 }
                 Text(titreRepas)
-                    .font(.system(size: 28, weight: .bold))
+                    .dsPolice(28, .bold)
                     .tracking(-0.8)
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
@@ -733,7 +733,7 @@ struct VoiceMealSheet: View {
                 .font(.system(size: 13, weight: .semibold))
                 .accessibilityHidden(true)
             Text(texte)
-                .font(.system(size: 13, weight: .medium))
+                .dsPolice(13, .medium)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }

@@ -125,6 +125,7 @@ struct ForgotPasswordSheet: View {
 
     @EnvironmentObject var authVM: AuthViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var email = ""
     @State private var code = ""
     @State private var newPassword = ""
@@ -192,7 +193,7 @@ struct ForgotPasswordSheet: View {
                 HapticService.shared.primary()
                 let ok = await authVM.resetPassword(email: email)
                 if ok {
-                    withAnimation(.healthMapSpring) { step = .codeAndPassword }
+                    withAnimation(reduceMotion ? nil : .healthMapSpring) { step = .codeAndPassword }
                 } else {
                     HapticService.shared.warning()
                 }
@@ -203,7 +204,7 @@ struct ForgotPasswordSheet: View {
                     ProgressView().tint(.white)
                 } else {
                     Text("Envoyer le code")
-                        .font(.system(size: 17, weight: .semibold))
+                        .dsPolice(17, .semibold)
                 }
             }
             .authActionVerre()
@@ -265,7 +266,7 @@ struct ForgotPasswordSheet: View {
                 HapticService.shared.primary()
                 let ok = await authVM.completeResetPassword(code: code, newPassword: newPassword)
                 if ok {
-                    withAnimation(.healthMapSpring) { step = .success }
+                    withAnimation(reduceMotion ? nil : .healthMapSpring) { step = .success }
                 } else {
                     HapticService.shared.warning()
                 }
@@ -276,7 +277,7 @@ struct ForgotPasswordSheet: View {
                     ProgressView().tint(.white)
                 } else {
                     Text("Réinitialiser le mot de passe")
-                        .font(.system(size: 17, weight: .semibold))
+                        .dsPolice(17, .semibold)
                 }
             }
             .authActionVerre()
@@ -375,7 +376,7 @@ struct EmailCodeVerificationSheet: View {
                 TextField("Code à 6 chiffres", text: $code)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
-                    .font(.system(size: 24, weight: .semibold, design: .default).monospacedDigit())
+                    .dsPolice(24, .semibold, chiffres: true)
                     .multilineTextAlignment(.center)
                     .authChampVerre(hauteur: 60)
                     .focused($isCodeFocused)
@@ -408,7 +409,7 @@ struct EmailCodeVerificationSheet: View {
                             ProgressView().tint(.white)
                         } else {
                             Text("Valider")
-                                .font(.system(size: 17, weight: .semibold))
+                                .dsPolice(17, .semibold)
                         }
                     }
                     .authActionVerre()

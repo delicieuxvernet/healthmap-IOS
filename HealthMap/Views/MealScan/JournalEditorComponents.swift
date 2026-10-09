@@ -304,7 +304,7 @@ struct PortionSheet: View {
         return VStack(spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(DS.entier(valeurs.kcal))
-                    .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
+                    .dsPolice(28, .bold, design: .rounded, chiffres: true)
                     .tracking(-0.9)
                     .foregroundStyle(Color.dsTexte)
                     .contentTransition(.numericText())
@@ -345,7 +345,7 @@ struct PortionSheet: View {
                 stepUnite("minus", unite: unite, delta: -1)
                 VStack(spacing: 2) {
                     Text(unite.libelle(nombre: nombre(unite)))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .dsPolice(24, .bold, design: .rounded)
                         .tracking(-0.8)
                         .foregroundStyle(Color.dsTexte)
                         .lineLimit(1)

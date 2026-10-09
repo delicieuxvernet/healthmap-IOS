@@ -59,9 +59,9 @@ extension Color {
     })
     // Le gris d'habillage. En clair, #9CA3AF ne tient que 2,54:1 sur carte
     // blanche et 2,36:1 sur crème — or c'est la couleur de 17 des 22 usages de
-    // `Theme.chromeFont`, un corps de 10,5 pt VOLONTAIREMENT fixe (il ne suit
-    // pas Dynamic Type). Un texte qui ne grossit jamais ET qui passe sous
-    // 2,6:1 n'est rattrapé par rien. Il prend donc la valeur de
+    // `Theme.chromeFont`, un petit corps (11 pt depuis le 9 oct. 2026, 10,5
+    // figé avant). Un petit texte qui passe sous 2,6:1 n'est rattrapé par
+    // rien. Il prend donc la valeur de
     // `healthMapSecondary` : 4,83:1 sur blanc, 4,50:1 sur crème. Aucune teinte
     // inventée — il n'existe pas de gris plus clair qui tienne le seuil.
     // La variante sombre n'est pas concernée (l'app force `.light`).

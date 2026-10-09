@@ -83,6 +83,10 @@ struct KiwiFloatingTabBar: View {
         .verre(.barre, forme: Capsule(style: .continuous))
         .padding(.horizontal, Self.margeLaterale)
         .padding(.bottom, Self.margeBas)
+        // La capsule garde sa hauteur : ses libellés suivent Dynamic Type
+        // jusqu'à xxxLarge, au-delà c'est la loupe de grand contenu qui prend
+        // le relais (appui long sur un onglet).
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityElement(children: .contain)
         .onChange(of: selected) { _, nouvel in
             // Le changement peut venir d'ailleurs que d'un toucher (lien
@@ -114,7 +118,9 @@ struct KiwiFloatingTabBar: View {
                     .scaleEffect(rebond == item.tab ? KiwiEchelle.iconeOnglet : 1)
                     .animation(reduceMotion ? nil : Animation.kiwiRebond, value: rebond)
                 Text(item.label)
-                    .font(.dsOnglet(actif: actif))
+                    // 10 pt à la taille par défaut, puis Dynamic Type
+                    // (plafonné à la barre, voir `body`).
+                    .dsPolice(10, actif ? .semibold : .medium)
                     .lineLimit(1)
                     // « Compléments » actif (semibold) dépassait son cinquième
                     // de barre et s'affichait « Complém… » (audit captures).
@@ -131,6 +137,12 @@ struct KiwiFloatingTabBar: View {
         .accessibilityLabel(item.label)
         .accessibilityIdentifier("tab.\(String(describing: item.tab))")
         .accessibilityAddTraits(actif ? [.isButton, .isSelected] : .isButton)
+        // Aux tailles d'accessibilité, un appui long montre l'onglet en
+        // grand au centre de l'écran (loupe de grand contenu), comme la barre
+        // d'onglets d'iOS.
+        .accessibilityShowsLargeContentViewer {
+            Label(item.label, systemImage: item.icon)
+        }
     }
 }
 

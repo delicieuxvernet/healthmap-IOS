@@ -638,7 +638,7 @@ private struct PriseDeSangChiffre: View {
 struct PriseDeSangPastilleBeta: View {
     var body: some View {
         Text("Nouveau · bêta")
-            .font(.system(size: 11, weight: .semibold))
+            .dsPolice(11, .semibold)
             .foregroundStyle(Color.teinteAmbreEncre)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)

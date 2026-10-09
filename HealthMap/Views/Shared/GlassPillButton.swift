@@ -27,7 +27,7 @@ struct GlassPillButton: View {
                         .accessibilityHidden(true)
                 }
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .dsPolice(13, .semibold)
                     .foregroundStyle(Color.dsTexte)
             }
             .padding(.horizontal, Theme.spacingMD)

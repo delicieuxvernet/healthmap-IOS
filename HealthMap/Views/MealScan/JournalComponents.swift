@@ -831,10 +831,10 @@ struct JournalPopulationCard: View {
                     if index > 0 { DSSeparator() }
                     HStack(alignment: .center, spacing: 14) {
                         Text(ligne.fraction)
-                            .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                            .dsPolice(26, .bold, design: .rounded, chiffres: true)
                             .tracking(-0.9)
                             .foregroundStyle(Color.dsTexte)
-                            .frame(width: 74, alignment: .leading)
+                            .frame(minWidth: 74, alignment: .leading)
                         Text(ligne.texte)
                             .font(.dsSousTitre)
                             .tracking(DSTracking.sousTitre)
@@ -1331,7 +1331,7 @@ struct ActiviteSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(kcalActives.map { DS.entier($0) } ?? "\u{2014}")
-                    .font(.system(size: 48, weight: .bold, design: .rounded).monospacedDigit())
+                    .dsPolice(48, .bold, design: .rounded, chiffres: true)
                     .tracking(DSTracking.heros48)
                     .foregroundStyle(kcalActives == nil ? Color.dsTertiaire : Color.dsTexte)
                 Text("kcal dépensées aujourd'hui")

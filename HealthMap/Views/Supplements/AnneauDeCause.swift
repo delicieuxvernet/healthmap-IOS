@@ -242,7 +242,7 @@ struct AnneauDeCause: View {
             } else {
                 // Le score nu, sans « % » : c'est un score sur 100, pas un taux mesuré.
                 ChiffreQuiCompte(valeur: dessine ? Double(score) : 0)
-                    .font(.system(size: taille.police, weight: .bold, design: taille.dessin).monospacedDigit())
+                    .dsPolice(taille.police, .bold, design: taille.dessin, chiffres: true)
                     .tracking(taille.tracking)
                     .foregroundStyle(Color.dsTexte)
                     .animation(reduceMotion ? nil : animationDuCompteur, value: deploye)
@@ -384,13 +384,13 @@ struct TuileApportHero: View {
                         .frame(width: 10, height: 10)
                         .accessibilityHidden(true)
                     Text(ligne.libelle)
-                        .font(.system(size: tailleCause))
+                        .dsPolice(tailleCause)
                         .foregroundStyle(Color.dsTexte)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(PointsApport.signe(ligne.delta))
-                        .font(.system(size: tailleCause, weight: .semibold).monospacedDigit())
+                        .dsPolice(tailleCause, .semibold, chiffres: true)
                         .foregroundStyle(Color.dsTexte)
                 }
                 .verreCascade(visible, delai: 0.35 + Double(rang) * 0.07, decalage: 8)

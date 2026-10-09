@@ -72,8 +72,10 @@ enum Theme {
     static let sectionLabelFont: Font = .system(.footnote).weight(.bold)
 
     /// Sous-label discret : la précision qui accompagne un titre de section.
-    /// 11.5 / bold · encre pâle (`healthMapSecondary` ou `healthMapMuted`).
-    static let subLabelFont: Font = .system(size: 11.5, weight: .bold)
+    /// 12 / bold (`caption`) · encre pâle (`healthMapSecondary` ou
+    /// `healthMapMuted`). Ex-11,5 pt figé : il suit désormais Dynamic Type
+    /// (accessibilité, 9 oct. 2026).
+    static let subLabelFont: Font = .system(.caption).weight(.bold)
 
     /// Conclusion : ce que les données veulent dire, le pic de sa carte.
     /// 17 / semibold · encre la plus foncée · `conclusionTracking` · JAMAIS de
@@ -108,9 +110,10 @@ enum Theme {
     static let dataSecondaryFont: Font = .system(.caption).weight(.medium)
 
     /// Habillage : unité, date, mention, note de bas de carte.
-    /// 10.5 / medium · `healthMapMuted`. Jamais de fond coloré si la
-    /// donnée-héros du même bloc n'en porte pas.
-    static let chromeFont: Font = .system(size: 10.5, weight: .medium)
+    /// 11 / medium (`caption2`) · `healthMapMuted`. Jamais de fond coloré si
+    /// la donnée-héros du même bloc n'en porte pas. Ex-10,5 pt figé : il suit
+    /// désormais Dynamic Type (accessibilité, 9 oct. 2026).
+    static let chromeFont: Font = .system(.caption2).weight(.medium)
 
     /// CTA primaire : un seul par carte, 15 / semibold, blanc sur `kiwiGreen`,
     /// hauteur 48, sans ombre. Un CTA n'est jamais plus lourd que ce qu'il sert.

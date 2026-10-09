@@ -945,7 +945,7 @@ struct MicroDuJourSheet: View {
             .frame(width: Self.tailleAnneau, height: Self.tailleAnneau)
         } else if ligne.sens == .rapport, let valeur = ligne.rapport {
             Text(MicrosDuJour.texteDuRapport(valeur))
-                .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
+                .dsPolice(34, .bold, design: .rounded, chiffres: true)
                 .tracking(-1)
                 .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
@@ -1122,7 +1122,7 @@ private struct SemaineMicroGraphe: View {
                             }
                         }
                         Text(Self.initiale.string(from: jour.jour).uppercased())
-                            .font(.system(size: 12))
+                            .dsPolice(12)
                             .foregroundStyle(Color.dsSecondaire)
                     }
                     .frame(maxWidth: .infinity)
@@ -1142,7 +1142,7 @@ private struct SemaineMicroGraphe: View {
             .accessibilityHidden(true)
 
             Text(resume)
-                .font(.system(size: 12))
+                .dsPolice(12)
                 .foregroundStyle(Color.dsSecondaire)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

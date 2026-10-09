@@ -217,10 +217,8 @@ extension Font {
     static let dsLegende: Font = .system(.footnote, design: .default)
     /// Légende appuyée : 13 / 500.
     static let dsLegendeMoyenne: Font = .system(.footnote, design: .default).weight(.medium)
-    /// Libellé de tab bar : 10 / 500-600.
-    static func dsOnglet(actif: Bool) -> Font {
-        .system(size: 10, weight: actif ? .semibold : .medium)
-    }
+    // Libellé de tab bar : plus de jeton figé à 10 pt. La barre pose
+    // `.dsPolice(10, …)`, qui suit Dynamic Type (voir `KiwiFloatingTabBar`).
 
     // Chiffres : SF Pro à chasse tabulaire, jamais SF Mono.
 
@@ -238,6 +236,65 @@ extension Font {
     static let dsJour: Font = .system(.subheadline, design: .default).weight(.semibold).monospacedDigit()
     /// Petite valeur au centre d'un anneau : 17 / 700, tabulaire.
     static let dsValeurAnneau: Font = .system(.headline, design: .default).weight(.bold).monospacedDigit()
+}
+
+// MARK: - Taille de maquette qui suit Dynamic Type (accessibilité, 9 oct. 2026)
+//
+// Un texte en `.system(size: 15)` ne grossit jamais : la personne qui a
+// monté la taille du texte dans Réglages ne le voit pas bouger. `.dsPolice(15)`
+// garde EXACTEMENT 15 pt à la taille par défaut et suit ensuite la courbe du
+// style iOS le plus proche (`@ScaledMetric(relativeTo:)`). Aucun écran ne
+// change de rendu à la taille par défaut.
+
+/// Le style de texte iOS dont la courbe de grossissement s'applique à une
+/// taille de maquette : celui dont la taille par défaut est la plus proche.
+enum DSEchelle {
+    static func style(pour taille: CGFloat) -> Font.TextStyle {
+        switch taille {
+        case ..<11.5: return .caption2      // 11
+        case ..<12.5: return .caption       // 12
+        case ..<14: return .footnote        // 13
+        case ..<15.5: return .subheadline   // 15
+        case ..<16.5: return .callout       // 16
+        case ..<18.5: return .body          // 17
+        case ..<21: return .title3          // 20
+        case ..<25: return .title2          // 22
+        case ..<31: return .title           // 28
+        default: return .largeTitle         // 34
+        }
+    }
+}
+
+/// Police système à la taille de la maquette, qui grossit avec Dynamic Type.
+struct DSPoliceAjustee: ViewModifier {
+    @ScaledMetric private var taille: CGFloat
+    private let poids: Font.Weight
+    private let design: Font.Design
+    private let chiffres: Bool
+
+    init(taille: CGFloat, poids: Font.Weight, design: Font.Design, chiffres: Bool) {
+        _taille = ScaledMetric(wrappedValue: taille, relativeTo: DSEchelle.style(pour: taille))
+        self.poids = poids
+        self.design = design
+        self.chiffres = chiffres
+    }
+
+    func body(content: Content) -> some View {
+        let police = Font.system(size: taille, weight: poids, design: design)
+        return content.font(chiffres ? police.monospacedDigit() : police)
+    }
+}
+
+extension View {
+    /// `.font(.system(size: 15, weight: .semibold))` qui suit Dynamic Type :
+    /// 15 pt à la taille par défaut, puis la courbe du style le plus proche.
+    /// `chiffres` : chiffres à chasse fixe (`monospacedDigit`).
+    func dsPolice(_ taille: CGFloat,
+                  _ poids: Font.Weight = .regular,
+                  design: Font.Design = .default,
+                  chiffres: Bool = false) -> some View {
+        modifier(DSPoliceAjustee(taille: taille, poids: poids, design: design, chiffres: chiffres))
+    }
 }
 
 /// Tracking optique par taille : c'est ce qui fait qu'un texte « sonne » iOS.
