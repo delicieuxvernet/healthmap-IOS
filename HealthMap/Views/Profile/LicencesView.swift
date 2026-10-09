@@ -75,6 +75,8 @@ struct LicencesView: View {
                                 DSRow(titre: entree.nom, sousTitre: entree.detail) {
                                     lienExterne
                                 }
+                                // Un lien centre son texte : la ligne reste à gauche.
+                                .multilineTextAlignment(.leading)
                             }
                             .accessibilityHint("Ouvre le site dans Safari.")
                         }
