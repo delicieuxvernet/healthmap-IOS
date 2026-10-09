@@ -30,7 +30,7 @@ l'environnement (`\.verreTeinte`). Une page racine ne peint jamais d'aplat. Page
 | `carteFlottante` | la même + flou vivant (au-dessus d'un contenu) | `.verreCarteFlottante()` (rayon 28) |
 | `clair` | blanc 74 → 40 %, reflet haut et bas, capsule | `.verreClair()` · `.verreClair(Circle())` |
 | `clairActif` | vert pâle (bouton déplié, choix retenu) | `.verre(.clairActif, forme:)` |
-| `principal` | vert `#8AD262 → #5DA838 → #4C982B`, même reflet | `.verrePrincipal()` · `DSCapsuleButton` |
+| `principal` | vert profond `#4C9330 → #387A1C → #2C6416`, même reflet, libellé blanc ≥ 4,6:1 (9 oct. 2026) | `.verrePrincipal()` · `DSCapsuleButton` |
 | `principalBombe` | le bouton Dicter (éclat sur la moitié haute) | `.verre(.principalBombe, forme:)` |
 | `barre` · `pastille` | barre d'onglets et sa pastille qui glisse | `KiwiFloatingTabBar` |
 | `piste` · `curseur` | bascule à segments | `VerreBascule` |
@@ -42,7 +42,20 @@ Une carte posée sur le fond n'en porte pas. Sous « Réduire la transparence »
 un aplat opaque.
 
 **Couleurs.** Une teinte par catégorie, une version foncée pour le texte posé sur fond clair. Le vert
-kiwi reste réservé à ce qui se touche.
+reste réservé à ce qui se touche : en texte et en icône d'action, c'est `dsAccent` = vert forêt
+`#3B6D11` (la version texte du kiwi) ; le kiwi vif `#5DA838` habille (halos, mascotte, marque).
+
+**Accessibilité (WCAG AA, 9 oct. 2026, maquette validée par Arthur).**
+- Texte ≥ 4,5:1, objet graphique ≥ 3:1, mesurés sur les fonds réels (en-tête vert du Journal, fond de
+  Progrès, cartes de verre). `dsSecondaire` = `rgba(60,60,67,.80)` (5,0:1 au pire), `dsTertiaire` =
+  `.62`, réservé aux objets (chevrons, icônes passives) : un texte prend `dsSecondaire`.
+- Une teinte vive ne colore jamais un texte : `HealthScale.couleurTexte`, `Color.dsStatutTexte`,
+  `dsAComblerTexte`, `dsARenforcerTexte`. Jauge « couvert » : `dsCouvert` #4C982B.
+- « Augmenter le contraste » : gris `.94`, vert `#2F5A16`, bouton plus foncé, verre plus opaque.
+  « Réduire la transparence » : aplats opaques.
+- Taille du texte : `.dsPolice(taille, poids)` plutôt que `.font(.system(size:))` (même rendu par
+  défaut, puis Dynamic Type). Ce qui est côte à côte passe en colonne aux tailles d'accessibilité
+  avec `DSLigneOuColonne`. Restent fixes : icônes, chiffres logés dans une forme, textes de `Canvas`.
 
 | Catégorie | Teinte | Texte |
 |---|---|---|
