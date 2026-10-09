@@ -732,7 +732,7 @@ struct ReglageLigne<Accessoire: View>: View {
             Text(titre)
                 .font(grande ? Font.dsHeadline : Font.dsCorps)
                 .tracking(DSTracking.corps)
-                .foregroundStyle(sens == .destructif ? Color.dsACombler : Color.dsTexte)
+                .foregroundStyle(sens == .destructif ? Color.dsAComblerTexte : Color.dsTexte)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
             if let sousTitre {

@@ -512,9 +512,12 @@ struct BilanMolette: View {
     }
 
     private func voisine(_ nombre: Int) -> some View {
+        // Les voisines restent pâles, comme celles d'un sélecteur d'iOS :
+        // elles situent la valeur, la valeur à confirmer est en gris lisible,
+        // la valeur confirmée en encre.
         Text(plage.contains(nombre) ? "\(nombre)" : " ")
             .font(BilanTypo.moletteVoisine)
-            .foregroundStyle(Color.dsSecondaire)
+            .foregroundStyle(Color.dsTertiaire)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

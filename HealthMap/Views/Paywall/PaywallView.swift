@@ -136,9 +136,6 @@ struct PaywallView: View {
     /// 0,42).
     @State private var revele = false
 
-    /// Titre de la feuille : 24 / 700, qui suit la taille de texte choisie.
-    @ScaledMetric(relativeTo: .title2) private var tailleTitre: CGFloat = 24
-
     /// Marge latérale de la feuille (maquette : 24).
     private static let marge: CGFloat = 24
 
@@ -345,7 +342,7 @@ struct PaywallView: View {
             // « chaque jour » et non « sans limite » : le serveur plafonne les
             // scans photo à 30 par jour en Premium (`analyze-meal-photo`).
             Text("Ton bilan complet,\ntes solutions et tes scans,\nchaque jour.")
-                .dsPolice(tailleTitre, .bold)
+                .dsPolice(24, .bold)
                 .tracking(-0.6)
                 .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)

@@ -19,6 +19,8 @@ struct GroceryShoppingView: View {
     /// Famille de quantités affichée (pagination : un écran par famille).
     @State private var familyIndex = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Aux tailles d'accessibilité, le nom d'un aliment revient à la ligne.
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     init(initial: [String: Int], onDone: @escaping ([String: Int]) -> Void, onCancel: @escaping () -> Void) {
         self.onDone = onDone
@@ -123,8 +125,10 @@ struct GroceryShoppingView: View {
                     Text(last ? "Terminer mes courses" : "Continuer")
                         .dsPolice(17, .semibold)
                         .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
-                        .frame(height: Verre.hauteurAction)
+                        .frame(minHeight: Verre.hauteurAction)
                         .verrePrincipal()
                         .contentShape(Capsule())
                 }
@@ -260,8 +264,10 @@ struct GroceryShoppingView: View {
                     Text(isLast ? "Valider mon caddie" : "Suivant")
                         .dsPolice(17, .semibold)
                         .foregroundStyle(families.isEmpty ? Color.dsTertiaire : Color.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
-                        .frame(height: Verre.hauteurAction)
+                        .frame(minHeight: Verre.hauteurAction)
                         .verre(
                             families.isEmpty ? VerreMatiere.clair : VerreMatiere.principal,
                             forme: Capsule(style: .continuous)
@@ -371,7 +377,7 @@ struct GroceryShoppingView: View {
             Text("\(item.emoji) \(item.name)")
                 .dsPolice(14, .semibold)
                 .foregroundStyle(Color.dsTexte)
-                .lineLimit(1)
+                .lineLimit(tailleTexte.isAccessibilitySize ? nil : 1)
             HStack(spacing: 8) {
                 ForEach(QuantityBracket.allCases) { bracket in
                     bracketButton(item: item, bracket: bracket, selected: bracket == current)
@@ -388,11 +394,12 @@ struct GroceryShoppingView: View {
             selections[item.id] = bracket.medianPortionsPerWeek
         } label: {
             Text(bracket.label)
-                .dsPolice(15, .semibold)
-                .monospacedDigit()
+                .dsPolice(15, .semibold, chiffres: true)
                 .foregroundStyle(selected ? Color.teinteKiwiTexte : Color.dsTexte)
+                .multilineTextAlignment(.center)
+                .padding(.vertical, 6)
                 .frame(maxWidth: .infinity)
-                .frame(height: 44)
+                .frame(minHeight: 44)
                 // Une tuile dans une carte de verre : creuse au repos, vert
                 // kiwi à 16 % et liseré une fois choisie.
                 .background(

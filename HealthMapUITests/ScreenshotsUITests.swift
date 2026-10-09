@@ -586,12 +586,6 @@ final class ScreenshotsUITests: XCTestCase {
         app.buttons["Se connecter"].firstMatch.tap()
     }
 
-    /// Ajoute un aliment à la journée par la recherche et le « + » rapide de
-    /// la première ligne de résultats (1 unité pour un aliment qui se compte,
-    /// 100 g sinon). Sans effet si la recherche ne répond pas.
-
-    private var gratificationPhotographiee = false
-
     // MARK: - 5. Le questionnaire en quatre étapes, écran par écran (hook DEBUG `-captureDecouverte`)
     //
     // Parcourt le bilan du premier au dernier écran et photographie chacun.

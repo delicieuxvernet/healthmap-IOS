@@ -182,6 +182,8 @@ struct ContentView: View {
 private struct OfflineBanner: View {
     @State private var showReconnected = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Aux tailles d'accessibilité, le bandeau passe sur plusieurs lignes.
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     var body: some View {
         VStack(spacing: 6) {
@@ -195,8 +197,9 @@ private struct OfflineBanner: View {
                 Text("Hors ligne. Certaines données ne sont pas à jour")
                     .dsPolice(13, .medium)
                     .foregroundStyle(Color.dsTexte)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .lineLimit(tailleTexte.isAccessibilitySize ? nil : 1)
+                    .minimumScaleFactor(tailleTexte.isAccessibilitySize ? 1 : 0.85)
+                    .fixedSize(horizontal: false, vertical: tailleTexte.isAccessibilitySize)
             }
             .padding(.leading, 6)
             .padding(.trailing, 14)
