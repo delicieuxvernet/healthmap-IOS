@@ -563,7 +563,7 @@ struct PaywallView: View {
                 .multilineTextAlignment(.center)
 
             Button {
-                Task { await loadOfferingsWithTimeout(force: true) }
+                Task { await loadOfferingsWithTimeout() }
             } label: {
                 Text("Réessayer")
                     .font(.dsSousTitreFort)
@@ -764,24 +764,28 @@ struct PaywallView: View {
 
     /// Charge les offerings avec un timeout : au-delà de `offeringsTimeout`
     /// sans paquet exploitable, on bascule sur l'état d'échec (Réessayer).
-    /// `force: true` (bouton Réessayer) relance même si un cache vide existe.
-    private func loadOfferingsWithTimeout(force: Bool = false) async {
+    ///
+    /// Relu à CHAQUE ouverture, pas seulement quand rien n'est en mémoire
+    /// (9 octobre 2026) : les formules chargées au lancement restaient
+    /// affichées toute la session, et un prix lu chez Apple dans la mauvaise
+    /// boutique (« 24,99 $US / an ») restait à l'écran alors que la feuille de
+    /// paiement Apple, elle, demandait 30 €. Les formules déjà en mémoire
+    /// restent visibles le temps de la relecture.
+    private func loadOfferingsWithTimeout() async {
         offeringsFailed = false
 
-        if force || subscriptionService.offerings == nil {
-            // Chien de garde : si loadOfferings (réseau RevenueCat) traîne,
-            // on affiche l'échec sans attendre son retour. La tâche de chargement
-            // continue en arrière-plan — si elle aboutit finalement, onChange
-            // des offerings resélectionne un paquet et l'UI se rétablit seule.
-            let watchdog = Task {
-                try? await Task.sleep(for: Self.offeringsTimeout)
-                if !Task.isCancelled && annualPlan == nil && shortPlan == nil {
-                    offeringsFailed = true
-                }
+        // Chien de garde : si loadOfferings (réseau RevenueCat) traîne,
+        // on affiche l'échec sans attendre son retour. La tâche de chargement
+        // continue en arrière-plan — si elle aboutit finalement, onChange
+        // des offerings resélectionne un paquet et l'UI se rétablit seule.
+        let watchdog = Task {
+            try? await Task.sleep(for: Self.offeringsTimeout)
+            if !Task.isCancelled && annualPlan == nil && shortPlan == nil {
+                offeringsFailed = true
             }
-            await subscriptionService.loadOfferings()
-            watchdog.cancel()
         }
+        await subscriptionService.loadOfferings()
+        watchdog.cancel()
 
         if selectedPlan == nil {
             selectedPlan = annualPlan ?? shortPlan
