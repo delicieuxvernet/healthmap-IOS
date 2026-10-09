@@ -53,6 +53,9 @@ struct ReglagesView: View {
     /// onglets restent montés : c'est `estOngletActif` qui dit qu'on arrive.
     @State private var lignesVisibles = false
     @Environment(\.estOngletActif) private var estOngletActif
+    /// Aux tailles d'accessibilité, les trois liens sous la carte Premium
+    /// s'empilent : en tiers de largeur, ils se coupaient au milieu des mots.
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     /// La feuille Premium grandit depuis la carte touchée (iOS 18 et plus ;
     /// une feuille simple avant). La feuille reste présentée par la page, pas
@@ -497,7 +500,7 @@ struct ReglagesView: View {
     // MARK: - Restaurer · Conditions · Confidentialité
 
     private var liensLegaux: some View {
-        HStack(spacing: 14) {
+        DSLigneOuColonne(alignementLigne: .center, alignementColonne: .center, espacement: 14) {
             Button {
                 Task { await restauration.lancer(contexte: "reglages") }
             } label: {
@@ -512,7 +515,7 @@ struct ReglagesView: View {
             .disabled(restauration.enCours)
             .accessibilityHint("Restaure un abonnement Premium acheté avant avec ce même identifiant Apple.")
 
-            filetVertical
+            if !tailleTexte.isAccessibilitySize { filetVertical }
 
             // L'EULA d'Apple, qui régit l'abonnement ; les CGU de Kiwio sont
             // dans « Conditions d'utilisation », plus bas.
@@ -522,7 +525,7 @@ struct ReglagesView: View {
                     .contentShape(Rectangle())
             }
 
-            filetVertical
+            if !tailleTexte.isAccessibilitySize { filetVertical }
 
             Link(destination: ReglagesLiens.confidentialite) {
                 Text("Confidentialité")

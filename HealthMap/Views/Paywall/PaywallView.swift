@@ -98,6 +98,9 @@ private struct FeuillePremiumFond: View {
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Aux tailles d'accessibilité, le badge d'une formule passe sous son nom
+    /// (« 7 jours gratuits · -51 % » se tassait et se coupait en AX3).
+    @Environment(\.dynamicTypeSize) private var tailleTexte
     @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     let source: String
@@ -475,7 +478,7 @@ struct PaywallView: View {
         } label: {
             HStack(spacing: Theme.spacingSM) {
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
+                    DSLigneOuColonne(alignementLigne: .center, espacement: 8) {
                         Text(title)
                             .font(.dsSousTitre)
                             .tracking(DSTracking.sousTitre)
@@ -484,9 +487,17 @@ struct PaywallView: View {
                             Text(badge)
                                 .font(.dsLegendeMoyenne)
                                 .foregroundStyle(isSelected ? Color.white : Color.dsSecondaire)
+                                .fixedSize(horizontal: false, vertical: tailleTexte.isAccessibilitySize)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
-                                .background(Capsule().fill(isSelected ? Color.dsAccent : Color.dsRemplissage))
+                                .background {
+                                    let teinte = isSelected ? Color.dsAccent : Color.dsRemplissage
+                                    if tailleTexte.isAccessibilitySize {
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous).fill(teinte)
+                                    } else {
+                                        Capsule().fill(teinte)
+                                    }
+                                }
                         }
                     }
                     Text(priceLabel(for: plan))
