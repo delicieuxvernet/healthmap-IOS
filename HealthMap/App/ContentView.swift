@@ -56,9 +56,9 @@ struct ContentView: View {
                     .zIndex(1)
             }
 
-            // Global toast overlay — surfaces ToastService messages (nutrient
-            // facts, motivational tips) across all tabs. Zero-config for
-            // callers : just call `ToastService.shared.showActionToast()`.
+            // Global toast overlay — surfaces ToastService messages (short
+            // confirmations) across all tabs. Zero-config for callers : just
+            // call `ToastService.shared.confirmer(_:)`.
             ToastOverlayView()
                 .zIndex(2)
         }
