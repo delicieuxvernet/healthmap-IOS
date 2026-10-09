@@ -197,6 +197,70 @@ final class DataExportTests: XCTestCase {
         XCTAssertFalse(json.contains("\"user_id\""), "Export should not expose internal user_id field")
     }
 
+    // MARK: - Données du serveur (export-user-data)
+
+    private func exportMinimal(serveur: DataExportService.ServeurJSON?) -> DataExportService.UserDataExport {
+        let complet = DataExportService.serveurEstComplet(serveur)
+        return DataExportService.UserDataExport(
+            exportDate: "2026-10-09T10:00:00Z",
+            appVersion: "2.0 (1)",
+            profile: nil,
+            questionnaire: nil,
+            aiAnalysis: nil,
+            scoreHistory: [],
+            checkinHistory: [],
+            gamification: DataExportService.GamificationExport(
+                currentStreak: 0, bestStreak: 0, totalCheckins: 0,
+                badgesEarned: [], isZenMode: false
+            ),
+            serverData: serveur,
+            serverDataComplete: complet,
+            note: complet ? nil : DataExportService.notePartielle
+        )
+    }
+
+    private func serveur(_ json: String) throws -> DataExportService.ServeurJSON {
+        try JSONDecoder().decode(DataExportService.ServeurJSON.self, from: Data(json.utf8))
+    }
+
+    /// Repas, journal et prises de sang viennent du serveur : ils doivent se
+    /// retrouver dans le fichier, tels quels.
+    func testServerDataIsEmbeddedVerbatim() throws {
+        let reponse = try serveur("""
+        {"export_metadata":{"incomplete_sections":[]},
+         "meal_scans":[{"meal_type":"lunch"}],
+         "journal_entries":[{"nom":"Pomme"}],
+         "blood_reports":[{"taken_at":"2026-09-30"}],
+         "ai_analysis_v2":{"version":2}}
+        """)
+        let data = try JSONEncoder().encode(exportMinimal(serveur: reponse))
+        let racine = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let donnees = try XCTUnwrap(racine["serverData"] as? [String: Any])
+
+        XCTAssertEqual((donnees["journal_entries"] as? [[String: Any]])?.first?["nom"] as? String, "Pomme")
+        XCTAssertEqual((donnees["meal_scans"] as? [Any])?.count, 1)
+        XCTAssertEqual((donnees["blood_reports"] as? [Any])?.count, 1)
+        XCTAssertNotNil(donnees["ai_analysis_v2"])
+        XCTAssertEqual(racine["serverDataComplete"] as? Bool, true)
+        XCTAssertNil(racine["note"])
+    }
+
+    /// Une section que le serveur n'a pas pu lire rend l'export « partiel », et le fichier le dit.
+    func testIncompleteServerSectionMarksExportPartial() throws {
+        let reponse = try serveur(#"{"export_metadata":{"incomplete_sections":["journalEntries"]}}"#)
+        XCTAssertFalse(DataExportService.serveurEstComplet(reponse))
+        XCTAssertEqual(exportMinimal(serveur: reponse).note, DataExportService.notePartielle)
+    }
+
+    /// Serveur muet (hors ligne, panne) : le fichier part quand même, marqué partiel.
+    func testMissingServerDataMarksExportPartial() throws {
+        let export = exportMinimal(serveur: nil)
+        XCTAssertFalse(export.serverDataComplete)
+        XCTAssertEqual(export.note, DataExportService.notePartielle)
+        let json = String(data: try JSONEncoder().encode(export), encoding: .utf8)!
+        XCTAssertTrue(json.contains("\"serverDataComplete\":false"))
+    }
+
     // MARK: - Gamification Export
 
     func testGamificationExportFields() throws {
