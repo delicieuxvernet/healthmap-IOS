@@ -843,6 +843,44 @@ final class ScreenshotsUITests: XCTestCase {
         }
     }
 
+    // MARK: - 7. Réglages › Exporter mes données (audit de conformité, 9 oct. 2026)
+
+    /// Le fichier part dans la feuille de partage : son nom et son poids s'y
+    /// lisent, de quoi comparer avant / après. Lecture seule pour le compte :
+    /// l'export n'écrit qu'une trace dans le journal de sécurité (`audit_log`),
+    /// aucune donnée de la personne. Le bouton est cherché par son libellé
+    /// (pas d'identifiant d'accessibilité sur cette ligne).
+    func test07_ExporterMesDonnees() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
+        attendreChargement()
+
+        app.buttons["tab.reglages"].tap()
+        sleep(2)
+        let exporter = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Exporter mes données")).firstMatch
+        for _ in 0..<8 where !(exporter.exists && exporter.isHittable) {
+            app.swipeUp(velocity: .slow)
+            sleep(1)
+        }
+        snap("01-reglages-exporter")
+        guard exporter.exists else { return }
+        taper(exporter)
+
+        // L'export appelle le serveur avant d'ouvrir la feuille de partage.
+        let fichier = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "healthmap-export")).firstMatch
+        _ = fichier.waitForExistence(timeout: 45)
+        sleep(2)
+        snap("02-export-feuille-de-partage")
+        fermerFeuille()
+    }
+
     /// Laisse le temps au Journal de charger ses données (journal, bilan).
     private func attendreChargement() {
         autoriserSante()

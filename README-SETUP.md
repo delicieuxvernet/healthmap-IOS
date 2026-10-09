@@ -69,7 +69,8 @@ depuis le 20 avril 2026 (remplacement de Supabase Auth).
 Pour Supabase : sélectionner le produit `Supabase`. Il reste utilisé pour la DB et les
 Edge Functions — le JWT vient de Clerk (cf. `SupabaseService.configure()` qui branche
 un `accessToken` closure lisant `Clerk.shared.session?.getToken(.init(template: "supabase"))`).
-Pour RevenueCat : sélectionner `RevenueCat` **et** `RevenueCatUI`.
+Pour RevenueCat : sélectionner `RevenueCat` seulement (`RevenueCatUI` retiré le 9 oct. 2026 :
+le paywall est le nôtre, `PaywallView.swift`, le module n'était jamais importé).
 Pour Sentry : sélectionner `Sentry`. Le code est guardé par `#if canImport(Sentry)` donc il
 compile même sans la dépendance — elle active simplement le reporting.
 

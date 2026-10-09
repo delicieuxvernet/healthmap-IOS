@@ -19,10 +19,12 @@
         set to FALSE for the same reason. Product Interaction linkage exists
         solely for product analytics keyed by Supabase user_id; it never leaves
         our infrastructure.
-      - The only required-reason API declared is UserDefaults (CA92.1). If you
-        add new system API usage (ATTrackingManager, file timestamps, disk
-        space, system boot time, active keyboards), declare them here AND in
-        Sentry's own manifest if they're reached via Sentry.
+      - Required-reason APIs declared: UserDefaults (CA92.1) and file
+        timestamps (C617.1, `MealThumbnailStore.purgeOld`). If you add new
+        system API usage (ATTrackingManager, disk space, system boot time,
+        active keyboards), declare them here AND in Sentry's own manifest if
+        they're reached via Sentry. The widget extension has its OWN manifest
+        (`KiwioWidgets/PrivacyInfo.xcprivacy`).
     =============================================================================
     -->
 
@@ -92,23 +94,14 @@
             </array>
         </dict>
 
-        <!-- ==== Other User Content ==== -->
-        <!-- 1) Meal photos imported from the photo library via `PhotosPicker`.
-             Sent to our AI backend for nutrient analysis, then discarded —
-             the photo itself is never persisted server-side, only the
-             derived nutrient breakdown. Still declared here because the
-             bytes transit our infrastructure.
-             2) Voice-dictated meal descriptions (`VoiceMealService`). The
-             AUDIO is never collected by us: SFSpeechRecognizer transcribes it
-             on-device when the device supports it, otherwise through Apple's
-             own service. Only the resulting TEXT reaches our edge function
-             `parse-meal-voice`, which returns the identified foods. The text
-             is not persisted server-side either — only the journal entry is.
-             No `NSPrivacyCollectedDataTypeAudioData` declaration is required
-             precisely because no audio ever reaches our infrastructure. -->
+        <!-- ==== Sensitive Info ==== -->
+        <!-- Le questionnaire demande si la personne est enceinte, allaite ou
+             cherche à concevoir (`UserProfile.pregnancyStatus`) : Apple classe « grossesse ou
+             accouchement » en Sensitive Info, en plus de Health. Déjà déclaré
+             sur la fiche App Store ; le manifeste le dit aussi. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
-            <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+            <string>NSPrivacyCollectedDataTypeSensitiveInfo</string>
             <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
             <key>NSPrivacyCollectedDataTypeTracking</key>
@@ -116,6 +109,88 @@
             <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
+            </array>
+        </dict>
+
+        <!-- ==== Fitness ==== -->
+        <!-- Apple Santé, lecture seule (`HealthKitService`) : le nombre de pas
+             du jour devient le niveau d'activité du profil, envoyé avec le
+             questionnaire (`profiles.questionnaire_data`). L'énergie active
+             brûlée ne sert qu'à la jauge du Journal, sur l'appareil. Le poids
+             et le sommeil importés relèvent de Health (ci-dessus). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeFitness</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
+            </array>
+        </dict>
+
+        <!-- ==== Photos or Videos ==== -->
+        <!-- Photos de repas (caméra ou `PhotosPicker`) et photo d'une prise de
+             sang : envoyées à notre serveur pour l'analyse IA, puis jetées —
+             aucune photo n'est gardée côté serveur (aucun bucket de stockage
+             utilisateur), seules les valeurs lues le sont. Déclarées parce que
+             les octets transitent par notre infrastructure et par l'IA.
+             La dictée d'un repas (`VoiceMealService`) n'est PAS de l'audio
+             collecté : SFSpeechRecognizer transcrit sur l'appareil quand il le
+             peut, sinon chez Apple ; seul le TEXTE atteint `parse-meal-voice`,
+             qui n'est pas gardé non plus — seul le repas du Journal l'est
+             (Health). D'où aucune déclaration AudioData. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+
+        <!-- ==== Purchase History ==== -->
+        <!-- Abonnements Premium : RevenueCat (StoreKit 2) et notre table
+             `receipt_transactions` (vérification du reçu par `verify-receipt`)
+             gardent la formule, les dates et l'identifiant de transaction,
+             rattachés au compte. Aucun moyen de paiement : Apple seul le
+             connaît. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+
+        <!-- ==== User ID ==== -->
+        <!-- L'identifiant Supabase Auth du compte : clé de toutes les lignes en
+             base, `appUserID` RevenueCat (`SubscriptionService.identify`),
+             `user_id` des statistiques d'usage (`analytics_events`). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeUserID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
             </array>
         </dict>
 
@@ -191,14 +266,32 @@
                - ScoreHistoryView: @AppStorage for range selection
                - CheckinViewModel: last-checkin-date throttling
 
-             All reads/writes stay inside the app sandbox. No App Group.
-             No Shared Web Credentials. CA92.1 is the correct reason. -->
+             Ces UserDefaults ne sont lus que par l'app elle-même (CA92.1).
+             Les widgets ne les voient pas : l'app leur parle par un TROUSSEAU
+             partagé (`keychain-access-groups` fr.healthmap.app.partage,
+             `Partage/BoiteCommune.swift`), pas par un App Group. L'extension
+             a son propre manifeste pour son repli UserDefaults local.
+             No Shared Web Credentials. -->
         <dict>
             <key>NSPrivacyAccessedAPIType</key>
             <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
             <key>NSPrivacyAccessedAPITypeReasons</key>
             <array>
                 <string>CA92.1</string>
+            </array>
+        </dict>
+
+        <!-- ==== File timestamps (C617.1) ==== -->
+        <!-- `MealThumbnailStore.purgeOld` lit la date de modification
+             (`contentModificationDateKey`) des vignettes de repas rangées
+             dans le conteneur de l'app, pour jeter celles de plus de 30
+             jours. Fichiers du conteneur de l'app uniquement : C617.1. -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
             </array>
         </dict>
     </array>
