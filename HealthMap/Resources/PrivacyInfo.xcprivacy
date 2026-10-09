@@ -94,6 +94,25 @@
             </array>
         </dict>
 
+        <!-- ==== Sensitive Info ==== -->
+        <!-- Le questionnaire demande si la personne est enceinte, allaite ou
+             cherche à concevoir (`UserProfile.pregnancyStatus`) : Apple classe « grossesse ou
+             accouchement » en Sensitive Info, en plus de Health. Déjà déclaré
+             sur la fiche App Store ; le manifeste le dit aussi. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeSensitiveInfo</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
+            </array>
+        </dict>
+
         <!-- ==== Fitness ==== -->
         <!-- Apple Santé, lecture seule (`HealthKitService`) : le nombre de pas
              du jour devient le niveau d'activité du profil, envoyé avec le
