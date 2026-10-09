@@ -182,7 +182,7 @@ struct KiwiWordmark: View {
 
     var body: some View {
         Text("Kiwio")
-            .dsPolice(taille, .bold, design: .rounded)
+            .font(.system(size: taille, weight: .bold, design: .rounded))
             .tracking(-0.045 * taille)
             .foregroundStyle(Color.dsTexte)
     }
@@ -238,7 +238,7 @@ struct KiwiPiedDePage: View {
             KiwiSigne(taille: 20, variante: .mono, encre: .dsTexte)
             KiwiWordmark(taille: 16)
             Text(detail)
-                .dsPolice(12)
+                .font(.system(size: 12))
                 .foregroundStyle(Color.dsTertiaire)
         }
         .accessibilityElement(children: .combine)
