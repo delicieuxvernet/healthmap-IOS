@@ -754,6 +754,47 @@ final class ScreenshotsUITests: XCTestCase {
         fermerFeuille()
     }
 
+    // MARK: - 8. Le comparatif « Standard ou Premium ? » (Kiwio 2.0, 9 octobre 2026)
+    //
+    // Réglages, puis le bouton de la carte Kiwio Premium (compte gratuit) : la
+    // feuille Premium s'ouvre sur la carte aux kiwis. On laisse les kiwis se
+    // poser, puis « Passer à Premium » mène aux formules. ⚠️ Ne touche JAMAIS
+    // un bouton d'achat.
+
+    func test08_ComparatifPremium() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.reglages"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
+        attendreChargement()
+        app.buttons["tab.reglages"].tap()
+        sleep(2)
+
+        let porte = app.buttons.matching(NSPredicate(
+            format: "label BEGINSWITH %@ OR label BEGINSWITH %@", "Essayer", "Découvrir")).firstMatch
+        guard porte.waitForExistence(timeout: 8) else {
+            snap("57-comparatif-porte-absente")
+            return
+        }
+        taper(porte)
+        // La carte monte, puis les kiwis se posent ligne après ligne.
+        sleep(4)
+        snap("57-comparatif")
+
+        let continuer = app.buttons["comparatif.continuer"]
+        if continuer.waitForExistence(timeout: 3) {
+            taper(continuer)
+            sleep(3)
+            snap("58-formules")
+        }
+        fermerFeuille()
+    }
+
     /// Laisse le temps au Journal de charger ses données (journal, bilan).
     private func attendreChargement() {
         autoriserSante()
