@@ -222,10 +222,14 @@ final class DataExportService {
             note: serveurComplet ? nil : Self.notePartielle
         )
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(export)
+        // Le JSON peut peser plusieurs centaines de Ko : encodé hors du fil principal.
+        let data = try await Task.detached(priority: .userInitiated) {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            return try encoder.encode(export)
+        }.value
+        dernierExportPartiel = !serveurComplet
 
         let dateStr = {
             let f = DateFormatter()
@@ -241,17 +245,42 @@ final class DataExportService {
     }
 
     /// L'export de l'edge function `export-user-data` (session de la personne).
-    /// `nil` si elle ne répond pas : le fichier le dira, plutôt que de passer
-    /// pour complet. Rejouable sans danger (lecture seule).
+    /// `nil` si elle ne répond pas dans les 30 s : l'export local part quand
+    /// même, marqué partiel, plutôt que de laisser le bouton tourner plusieurs
+    /// minutes (délais hérités du client : 210 à 300 s). Même patron que
+    /// `AIAnalysisService`. Rejouable sans danger (lecture seule).
     private func chargerExportServeur() async -> ServeurJSON? {
+        let client: SupabaseClient = SupabaseService.shared.client
+        let delai = Self.delaiServeur
         do {
-            let reponse: ServeurJSON = try await SupabaseService.shared.client.functions.invoke("export-user-data")
-            return reponse
+            return try await withThrowingTaskGroup(of: ServeurJSON.self) { groupe in
+                groupe.addTask {
+                    try await client.functions.invoke("export-user-data")
+                }
+                groupe.addTask {
+                    try await Task.sleep(for: delai)
+                    throw URLError(.timedOut)
+                }
+                guard let premier = try await groupe.next() else { throw URLError(.timedOut) }
+                groupe.cancelAll()
+                return premier
+            }
         } catch {
             AppLogger.app.report(error, context: "export-user-data")
             return nil
         }
     }
+
+    /// Délai maximal accordé au serveur pour l'export.
+    private static let delaiServeur: Duration = .seconds(30)
+
+    /// L'export qui vient d'être généré est-il partiel ? Lu à la fermeture de
+    /// la feuille de partage pour le dire aussi à l'écran, pas seulement dans
+    /// le fichier.
+    private var dernierExportPartiel = false
+
+    /// Message affiché quand l'export est partiel.
+    nonisolated static let messagePartiel = "Export partiel : une partie de tes données n'a pas pu être récupérée. Réessaie plus tard."
 
     // MARK: - Present Share Sheet
 
@@ -267,8 +296,13 @@ final class DataExportService {
         )
 
         // Clean up temp file after share sheet dismissal
+        let partiel = dernierExportPartiel
         activityVC.completionWithItemsHandler = { _, _, _, _ in
             try? FileManager.default.removeItem(at: tempURL)
+            // Le fichier le dit déjà (`note`) ; l'écran le dit aussi.
+            if partiel {
+                Task { @MainActor in ToastService.shared.confirmer(DataExportService.messagePartiel) }
+            }
         }
 
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
