@@ -350,6 +350,65 @@ abort_with("apps", code, body) unless code == 200 && body["data"]&.any?
 app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
+# ── MODE accessibility : étiquette accessibilité de la fiche App Store ──────
+#    (Accessibility Nutrition Labels, iPhone.) Crée ou met à jour le brouillon,
+#    SANS le publier : l'étiquette ne doit décrire que ce que la version EN
+#    LIGNE sait faire. Options : PUBLISH=1 publie le brouillon (une fois la
+#    version accessible sortie) ; VOICE_CONTROL=1 coche Contrôle vocal (à
+#    cocher seulement après un essai sur appareil).
+#    Restent à false : interface sombre (l'app force le mode clair), sous-titres
+#    et audiodescription (l'app n'a aucune vidéo).
+if MODE == "accessibility"
+  declaration = {
+    "supportsVoiceover" => true,
+    "supportsVoiceControl" => ENV["VOICE_CONTROL"] == "1",
+    "supportsLargerText" => true,
+    "supportsDarkInterface" => false,
+    "supportsDifferentiateWithoutColorAlone" => true,
+    "supportsSufficientContrast" => true,
+    "supportsReducedMotion" => true,
+    "supportsCaptions" => false,
+    "supportsAudioDescriptions" => false,
+  }
+  decrire = lambda do |d|
+    a = d["attributes"] || {}
+    coches = a.select { |k, v| k.start_with?("supports") && v }.keys.map { |k| k.sub("supports", "") }
+    puts "  #{d['id']} #{a['deviceFamily']} #{a['state']} : #{coches.empty? ? '(rien)' : coches.join(', ')}"
+  end
+
+  puts "Déclarations existantes :"
+  existantes = get_all("/v1/apps/#{app_id}/accessibilityDeclarations")
+  existantes.each(&decrire)
+  puts "  (aucune)" if existantes.empty?
+
+  brouillon = existantes.find do |d|
+    d.dig("attributes", "deviceFamily") == "IPHONE" && d.dig("attributes", "state") == "DRAFT"
+  end
+  if brouillon
+    ok, resp = write("mise à jour du brouillon iPhone", :patch, "/v1/accessibilityDeclarations/#{brouillon['id']}",
+                     { data: { type: "accessibilityDeclarations", id: brouillon["id"], attributes: declaration } })
+  else
+    ok, resp = write("création du brouillon iPhone", :post, "/v1/accessibilityDeclarations",
+                     { data: { type: "accessibilityDeclarations",
+                               attributes: declaration.merge("deviceFamily" => "IPHONE"),
+                               relationships: { app: { data: { type: "apps", id: app_id } } } } })
+  end
+  exit 1 unless ok
+  id = resp.dig("data", "id")
+
+  if ENV["PUBLISH"] == "1"
+    ok, = write("publication de l'étiquette", :patch, "/v1/accessibilityDeclarations/#{id}",
+                { data: { type: "accessibilityDeclarations", id: id, attributes: { publish: true } } })
+    exit 1 unless ok
+  else
+    puts "Brouillon prêt, NON publié. Relancer avec options PUBLISH=1 quand la version accessible est en ligne."
+  end
+
+  puts "État final :"
+  get_all("/v1/apps/#{app_id}/accessibilityDeclarations").each(&decrire)
+  exit 0
+end
+
 # ── MODE app-audit : état de préparation à la soumission App Store ──────────
 # ── MODE fix-subs : corrige la config des abonnements (défauts deep-audit) ──
 #    1) reviewNote : App Review y cherche le chemin de l'achat dans l'app —
