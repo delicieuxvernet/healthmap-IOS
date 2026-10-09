@@ -2145,7 +2145,7 @@ struct JournalView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.scoreLow)
-                Text("Attention").font(Theme.captionBoldFont).foregroundStyle(Color.scoreLow)
+                Text("Attention").font(Theme.captionBoldFont).foregroundStyle(Color.dsARenforcerTexte)
             }
             ForEach(warnings, id: \.self) { warning in
                 Text("• \(warning)")

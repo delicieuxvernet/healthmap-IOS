@@ -184,7 +184,7 @@ struct ForgotPasswordSheet: View {
         if let err = authVM.errorMessage {
             Text(err)
                 .font(Theme.captionFont)
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.dsAComblerTexte)
                 .multilineTextAlignment(.center)
         }
 
@@ -243,12 +243,12 @@ struct ForgotPasswordSheet: View {
                 ForEach(PasswordValidator.validate(newPassword), id: \.self) { issue in
                     Label(issue.message, systemImage: "xmark.circle.fill")
                         .font(Theme.captionFont)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.dsAComblerTexte)
                 }
                 if !confirmPassword.isEmpty && confirmPassword != newPassword {
                     Label("Les deux mots de passe ne correspondent pas.", systemImage: "xmark.circle.fill")
                         .font(Theme.captionFont)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.dsAComblerTexte)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -257,7 +257,7 @@ struct ForgotPasswordSheet: View {
         if let err = authVM.errorMessage {
             Text(err)
                 .font(Theme.captionFont)
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.dsAComblerTexte)
                 .multilineTextAlignment(.center)
         }
 
@@ -391,7 +391,7 @@ struct EmailCodeVerificationSheet: View {
                 if let err = authVM.errorMessage {
                     Text(err)
                         .font(Theme.captionFont)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.dsAComblerTexte)
                         .multilineTextAlignment(.center)
                 }
 

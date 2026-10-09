@@ -7,7 +7,7 @@ import SwiftUI
 // haut et bas, liseré). Onglet actif : une PASTILLE de verre blanc (62 × 52)
 // qui GLISSE d'un onglet à l'autre sur un ressort, en s'étirant à 80 pendant
 // le trajet ; l'icône touchée rebondit à 1,22 ; icône et libellé verts.
-// Inactif : `secondaryLabel`. Libellés en 10 pt (600 actif, 500 sinon).
+// Inactif : `dsSecondaire`. Libellés en 10 pt (600 actif, 500 sinon).
 // Haptique `.selection` au changement d'onglet.
 //
 // Cinq onglets qui nomment des OBJETS, pas des concepts :
@@ -19,9 +19,9 @@ import SwiftUI
 // eux-mêmes via `.kiwiTabBarBottomInset()` (voir plus bas).
 struct KiwiFloatingTabBar: View {
     @Binding var selected: MainTabView.Tab
-    /// Onglets estompés (`tertiaryLabel`) : avant le questionnaire, Progrès,
-    /// Plan et Compléments n'ont aucune donnée perso. Ils restent ouverts
-    /// (entrée libre), seule leur présence dans la barre s'efface.
+    /// Onglets estompés : avant le questionnaire, Progrès, Plan et Compléments
+    /// n'ont aucune donnée perso. Ils restent ouverts (entrée libre) : seule
+    /// leur icône pâlit (`dsTertiaire`), le libellé reste lisible.
     var estompes: Set<MainTabView.Tab> = []
 
     /// Hauteur de la capsule.
@@ -108,6 +108,11 @@ struct KiwiFloatingTabBar: View {
 
     // MARK: - Onglet
 
+    private func couleurIcone(_ item: Item, actif: Bool) -> Color {
+        if actif { return Color.dsAccent }
+        return estompes.contains(item.tab) ? Color.dsTertiaire : Color.dsSecondaire
+    }
+
     private func tabButton(_ item: Item) -> some View {
         let actif = selected == item.tab
         return Button {
@@ -117,6 +122,9 @@ struct KiwiFloatingTabBar: View {
                 Image(systemName: item.icon)
                     .font(.system(size: 22, weight: .medium))
                     .symbolRenderingMode(.monochrome)
+                    // Estompé : seule l'icône pâlit (objet graphique, 3:1) ;
+                    // le libellé, lui, reste lisible (4,5:1, audit du 9 oct.).
+                    .foregroundStyle(couleurIcone(item, actif: actif))
                     .scaleEffect(rebond == item.tab ? KiwiEchelle.iconeOnglet : 1)
                     .animation(reduceMotion ? nil : Animation.kiwiRebond, value: rebond)
                 Text(item.label)
@@ -129,7 +137,7 @@ struct KiwiFloatingTabBar: View {
                     // de barre et s'affichait « Complém… » (audit captures).
                     .minimumScaleFactor(0.7)
             }
-            .foregroundStyle(actif ? Color.dsAccent : (estompes.contains(item.tab) ? Color.dsTertiaire : Color.dsSecondaire))
+            .foregroundStyle(actif ? Color.dsAccent : Color.dsSecondaire)
             .animation(reduceMotion ? nil : Animation.easeInOut(duration: 0.2), value: selected)
             .padding(.horizontal, 2)
             .frame(maxWidth: .infinity)

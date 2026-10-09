@@ -211,7 +211,7 @@ struct CauseApportSheet: View {
             Text("Une estimation de notre calcul, pas une mesure.")
                 .font(.dsLegende)
                 .tracking(DSTracking.legende)
-                .foregroundStyle(Color.dsTertiaire)
+                .foregroundStyle(Color.dsSecondaire)
                 .padding(.top, 4)
         }
         .padding(20)

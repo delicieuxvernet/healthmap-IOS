@@ -133,10 +133,27 @@ extension Color {
             ? UIColor.label
             : UIColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1E / 255, alpha: 1)
     })
-    /// Texte secondaire — `rgba(60,60,67,.6)`.
-    static let dsSecondaire = Color(uiColor: .secondaryLabel)
-    /// Texte tertiaire, chevron passif, jour futur — `rgba(60,60,67,.3)`.
-    static let dsTertiaire = Color(uiColor: .tertiaryLabel)
+    /// Texte secondaire — le gris d'iOS, plus dense : `rgba(60,60,67,.80)`
+    /// (au lieu de .60), et `.94` sous « Augmenter le contraste ».
+    ///
+    /// Conformité WCAG AA (audit du 9 oct. 2026, maquette validée par Arthur) :
+    /// à .60 il ne tenait que 3,1 à 3,4:1 ; à .80 il tient 5,0:1 sur l'en-tête
+    /// vert du Journal (le fond le plus foncé) et 5,6 à 6,0:1 sur les cartes.
+    /// Il reste translucide : il prend la teinte du verre comme celui d'iOS.
+    static let dsSecondaire = Color(uiColor: UIColor { trait in
+        if trait.userInterfaceStyle == .dark { return .secondaryLabel }
+        return UIColor(red: 60 / 255, green: 60 / 255, blue: 67 / 255,
+                       alpha: trait.accessibilityContrast == .high ? 0.94 : 0.80)
+    })
+    /// Chevron passif, icône discrète, jour futur — `rgba(60,60,67,.62)`
+    /// (au lieu de .30), `.75` sous « Augmenter le contraste ». C'est une
+    /// teinte d'OBJET graphique (≥ 3:1, ici 3,2 à 3,4:1) : un texte qui doit
+    /// se lire prend `dsSecondaire`.
+    static let dsTertiaire = Color(uiColor: UIColor { trait in
+        if trait.userInterfaceStyle == .dark { return .tertiaryLabel }
+        return UIColor(red: 60 / 255, green: 60 / 255, blue: 67 / 255,
+                       alpha: trait.accessibilityContrast == .high ? 0.75 : 0.62)
+    })
     /// Filet séparateur — `rgba(60,60,67,.22)` sur 0,5 pt.
     static let dsSeparateur = Color(uiColor: UIColor { trait in
         trait.userInterfaceStyle == .dark
@@ -157,8 +174,25 @@ extension Color {
 
     // Accent : UNIQUEMENT l'interactif.
 
-    /// Vert Kiwio — onglet actif, bouton, lien, `+`, chevron d'action.
-    static let dsAccent = Color.kiwiGreen
+    /// Vert Kiwio de l'interactif — onglet actif, lien, `+`, chevron
+    /// d'action, coche : le vert forêt `#3B6D11` (le « vert kiwi texte » de la
+    /// palette), `#2F5A16` sous « Augmenter le contraste ».
+    ///
+    /// Conformité WCAG AA (audit du 9 oct. 2026, maquette validée par Arthur) :
+    /// le kiwi vif `#5DA838` ne tenait que 2,2 à 2,95:1 en texte. Le forêt
+    /// tient 4,7:1 sur l'en-tête vert du Journal, 4,9:1 sur le fond de
+    /// Progrès, 5,7 à 6,2:1 sur les cartes, et 6,2:1 sous un texte blanc. Le
+    /// kiwi vif reste la couleur de marque (`teinteKiwi`, halos, mascotte,
+    /// haut du bouton principal).
+    static let dsAccent = Color(uiColor: UIColor { trait in
+        trait.accessibilityContrast == .high
+            ? UIColor(red: 0x2F / 255, green: 0x5A / 255, blue: 0x16 / 255, alpha: 1)
+            : UIColor(red: 0x3B / 255, green: 0x6D / 255, blue: 0x11 / 255, alpha: 1)
+    })
+    /// Remplissage d'une jauge « couverte » : `#4C982B`, le bas du dégradé du
+    /// bouton historique. Objet graphique : 3,3:1 sur une carte (seuil 3:1),
+    /// là où le kiwi vif tombait à 2,7:1.
+    static let dsCouvert = Color(hex: "4C982B")
     /// Voile de marque (haut d'écran) — `#E9F2E2`, fondu vers le transparent.
     static let dsVoile = Color(hex: "E9F2E2")
     /// Pastille de l'avatar (Réglages), pastille d'un conseil numéroté.
@@ -190,7 +224,13 @@ extension Color {
     /// Un apport couvert garde l'accent vert sur sa jauge : c'est le seul cas
     /// où le vert porte un sens et non une action, assumé par la maquette.
     static func dsStatut(_ pct: Int) -> Color {
-        pct >= 60 ? .dsAccent : (pct >= 30 ? .dsARenforcer : .dsACombler)
+        pct >= 60 ? .dsCouvert : (pct >= 30 ? .dsARenforcer : .dsACombler)
+    }
+
+    /// La même échelle, pour un TEXTE (pourcentage, mot d'état) : les encres
+    /// foncées de la palette, qui tiennent 4,5:1 sur le verre.
+    static func dsStatutTexte(_ pct: Int) -> Color {
+        pct >= 60 ? .dsAccent : (pct >= 30 ? .dsARenforcerTexte : .dsAComblerTexte)
     }
 }
 

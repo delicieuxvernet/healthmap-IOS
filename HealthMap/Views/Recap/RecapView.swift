@@ -218,7 +218,7 @@ struct RecapView: View {
                     } label: {
                         Text("Passer")
                             .dsPolice(14, .medium)
-                            .foregroundStyle(Color.dsTexte.opacity(0.6))
+                            .foregroundStyle(Color.dsSecondaire)
                             .frame(height: 44)
                             .padding(.horizontal, Theme.spacingSM)
                             .contentShape(Rectangle())

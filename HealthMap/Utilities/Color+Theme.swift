@@ -52,24 +52,18 @@ extension Color {
             ? UIColor(red: 0xF2/255, green: 0xF2/255, blue: 0xF7/255, alpha: 1.0)
             : UIColor(red: 0x1A/255, green: 0x1A/255, blue: 0x1A/255, alpha: 1.0)
     })
-    static let healthMapSecondary = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0xAE/255, green: 0xAE/255, blue: 0xB2/255, alpha: 1.0)
-            : UIColor(red: 0x6B/255, green: 0x72/255, blue: 0x80/255, alpha: 1.0)
-    })
+    /// Le gris secondaire historique : désormais le même que celui du DS
+    /// (`dsSecondaire`, `rgba(60,60,67,.80)`). À `#6B7280` il ne tenait que
+    /// 4,4:1 sur le verre des cartes (audit du 9 oct. 2026).
+    static let healthMapSecondary = Color.dsSecondaire
     // Le gris d'habillage. En clair, #9CA3AF ne tient que 2,54:1 sur carte
     // blanche et 2,36:1 sur crème — or c'est la couleur de 17 des 22 usages de
     // `Theme.chromeFont`, un corps de 10,5 pt (le jeton est fixe ; sur un
     // texte isolé, `.dsPolice(10.5, .medium)` le fait suivre Dynamic Type).
-    // Un si petit texte qui passe sous 2,6:1 n'est rattrapé par rien. Il prend donc la valeur de
-    // `healthMapSecondary` : 4,83:1 sur blanc, 4,50:1 sur crème. Aucune teinte
-    // inventée — il n'existe pas de gris plus clair qui tienne le seuil.
-    // La variante sombre n'est pas concernée (l'app force `.light`).
-    static let healthMapMuted = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0x7A/255, green: 0x7A/255, blue: 0x80/255, alpha: 1.0)
-            : UIColor(red: 0x6B/255, green: 0x72/255, blue: 0x80/255, alpha: 1.0)
-    })
+    // Un si petit texte qui passe sous 2,6:1 n'est rattrapé par rien. Il prend
+    // donc la valeur de `healthMapSecondary`, le gris du DS (5,6 à 6,0:1 sur
+    // les cartes depuis le 9 oct. 2026).
+    static let healthMapMuted = Color.dsSecondaire
 
     // Score colors — tokens consommés par l'échelle unique HealthScale
     // (DESIGN-PAGES loi 3 : < 45 rouge, 45-69 orange, >= 70 vert).

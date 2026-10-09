@@ -314,7 +314,7 @@ private struct LigneGain: View {
                     Text("\(gain.avant)")
                         .font(.system(.footnote, design: .default).monospacedDigit())
                         .strikethrough()
-                        .foregroundStyle(Color.dsTertiaire)
+                        .foregroundStyle(Color.dsSecondaire)
                     Text("\(remplie ? gain.apres : gain.avant) %")
                         .font(.system(.title3, design: .default).weight(.bold).monospacedDigit())
                         .tracking(-0.5)

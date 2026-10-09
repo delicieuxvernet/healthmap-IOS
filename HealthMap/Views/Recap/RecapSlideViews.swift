@@ -87,7 +87,7 @@ struct RecapSlideView: View {
                 .recapApparition(0)
 
             HStack(alignment: .lastTextBaseline, spacing: 4) {
-                RecapCompteur(valeur: valeur, taille: 84, couleur: HealthScale.color(for: valeur))
+                RecapCompteur(valeur: valeur, taille: 84, couleur: HealthScale.couleurTexte(for: valeur))
                 Text("/ 100")
                     .dsPolice(22, .semibold)
                     .foregroundStyle(Color.dsSecondaire)
@@ -98,7 +98,7 @@ struct RecapSlideView: View {
 
             Text(mot)
                 .dsPolice(15, .semibold)
-                .foregroundStyle(HealthScale.color(for: valeur))
+                .foregroundStyle(HealthScale.couleurTexte(for: valeur))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .background(Capsule().fill(HealthScale.color(for: valeur).opacity(0.12)))
@@ -123,7 +123,7 @@ struct RecapSlideView: View {
                     .foregroundStyle(Color.scoreDeficient)
                 Text("À regarder de près")
                     .dsPolice(15, .semibold)
-                    .foregroundStyle(Color.scoreDeficient)
+                    .foregroundStyle(Color.dsAComblerTexte)
             }
             .recapApparition(0)
 
@@ -210,7 +210,7 @@ struct RecapSlideView: View {
             // visible — on masque le contenu, jamais l'existence.
             Text(apport.verrouille ? "Réservé à Premium" : apport.nom)
                 .dsPolice(30, .bold)
-                .foregroundStyle(apport.verrouille ? Color.dsTexte.opacity(0.35) : Color.dsTexte)
+                .foregroundStyle(apport.verrouille ? Color.dsSecondaire : Color.dsTexte)
                 .recapApparition(1)
 
             Text(apport.mot)
@@ -268,7 +268,7 @@ struct RecapSlideView: View {
             if interaction.verrouille {
                 Text("Une autre interaction t'attend")
                     .dsPolice(26, .bold)
-                    .foregroundStyle(Color.dsTexte.opacity(0.4))
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
                     .recapApparition(1)
 
@@ -362,7 +362,7 @@ struct RecapSlideView: View {
                 RecapVoile(titre: "\(aliments.autresVerrouilles) autres recommandations sont réservées à Premium") {
                     Text("\(aliments.autresVerrouilles) autres recommandations")
                         .dsPolice(15, .semibold)
-                        .foregroundStyle(Color.dsTexte.opacity(0.55))
+                        .foregroundStyle(Color.dsSecondaire)
                     RecapLignesMasquees(lignes: 2)
                 }
                 .recapApparition(3)
@@ -569,19 +569,19 @@ struct RecapCartePartage: View {
                     Text("\(carte.score)")
                         .dsPolice(64, .bold)
                         .monospacedDigit()
-                        .foregroundStyle(HealthScale.color(for: carte.score))
+                        .foregroundStyle(HealthScale.couleurTexte(for: carte.score))
                     Text("/ 100")
                         .dsPolice(18, .semibold)
                         .foregroundStyle(Color.dsSecondaire)
                 }
                 Text(carte.mot)
                     .dsPolice(15, .semibold)
-                    .foregroundStyle(HealthScale.color(for: carte.score))
+                    .foregroundStyle(HealthScale.couleurTexte(for: carte.score))
             }
 
             HStack(spacing: Theme.spacingSM) {
                 chiffre(carte.besoinsNourris, "besoins nourris", .dsAccent)
-                chiffre(carte.apportsARenforcer, "à surveiller", .scoreLow)
+                chiffre(carte.apportsARenforcer, "à surveiller", .dsARenforcerTexte)
             }
 
             Text("Estimation basée sur mes déclarations.\nNe remplace pas un avis médical.")

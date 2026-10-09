@@ -681,7 +681,7 @@ struct FicheApportSheet: View {
                     Text(texteBornage)
                         .font(.dsLegende)
                         .tracking(DSTracking.legende)
-                        .foregroundStyle(Color(uiColor: .secondaryLabel).opacity(0.9))
+                        .foregroundStyle(Color.dsSecondaire)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 13)

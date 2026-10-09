@@ -656,7 +656,7 @@ struct PortionSheet: View {
                 Text(title)
                     .font(.dsHeadline)
                     .tracking(DSTracking.corps)
-                    .foregroundStyle(Color.dsACombler)
+                    .foregroundStyle(Color.dsAComblerTexte)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .padding(.horizontal, 16)
@@ -667,7 +667,7 @@ struct PortionSheet: View {
                 Text(title)
                     .font(.dsSousTitre)
                     .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsACombler)
+                    .foregroundStyle(Color.dsAComblerTexte)
                     .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
                     .contentShape(Rectangle())
             }

@@ -1023,7 +1023,7 @@ struct JournalSaisieBloc: View {
                 Text(compteur)
                     .font(.dsLegende)
                     .tracking(DSTracking.legende)
-                    .foregroundStyle(Color.dsTertiaire)
+                    .foregroundStyle(Color.dsSecondaire)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 10)
             }

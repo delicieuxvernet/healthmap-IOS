@@ -895,7 +895,7 @@ struct VoiceMealSheet: View {
 
                 Text("« \(dernierTranscript) »")
                     .font(.dsLegende)
-                    .foregroundStyle(Color.dsTertiaire)
+                    .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .padding(.horizontal, 8)
@@ -1973,7 +1973,7 @@ private struct RegleGrammes: View {
                 if k % 20 == 0 {
                     contexte.draw(Text(UnitPortionCatalog.formater(valeur))
                                     .font(Font.caption2.monospacedDigit())
-                                    .foregroundStyle(Color.dsTertiaire),
+                                    .foregroundStyle(Color.dsSecondaire),
                                   at: CGPoint(x: x, y: 42))
                 }
                 if reperes.contains(where: { abs($0 - valeur) < pas / 2 }) {
@@ -1991,8 +1991,9 @@ private struct RegleGrammes: View {
             ], startPoint: .leading, endPoint: .trailing)
         }
         .overlay(alignment: .top) {
+            // Le repère du curseur : un objet à voir (3:1), en vert forêt.
             Capsule(style: .continuous)
-                .fill(Color.teinteKiwi)
+                .fill(Color.dsAccent)
                 .frame(width: 4, height: 30)
                 .padding(.top, 4)
         }

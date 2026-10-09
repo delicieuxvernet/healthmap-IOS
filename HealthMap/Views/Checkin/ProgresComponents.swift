@@ -254,7 +254,7 @@ enum ProgresToile {
             let rayonPoint: CGFloat = (choisi ? 7 : (apport.aRenforcer ? 5.5 : 4)) * e
             let disque = cercle(points[index], rayon: rayonPoint)
             calque.fill(disque, with: .color(apport.aRenforcer ? Color.dsARenforcer
-                                              : (apport.estAAffiner ? Color.dsSecondaire : Color.teinteKiwi)))
+                                              : (apport.estAAffiner ? Color.dsSecondaire : Color.dsCouvert)))
             calque.stroke(disque, with: .color(Color.white), lineWidth: 2)
 
             let a = angle(index, sur: total)
@@ -509,6 +509,10 @@ struct ProgresMiniToile: View {
 struct ProgresToileLegende: View {
     let apports: [ProgresToileApport]
 
+    /// « Différencier sans couleur » (réglage d'iOS) : chaque pastille devient
+    /// un symbole, le statut ne tient plus à la seule teinte.
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var sansCouleur
+
     private var detailARenforcer: String { detail(apports.filter(\.aRenforcer)) }
     private var detailAAffiner: String { detail(apports.filter(\.estAAffiner)) }
 
@@ -534,13 +538,16 @@ struct ProgresToileLegende: View {
         let couverts = ProgresToile.couverts(apports)
         VStack(spacing: 6) {
             if apports.contains(where: \.aRenforcer) {
-                ligne(couleur: Color.dsARenforcer, titre: titreOrange, detail: detailARenforcer)
+                ligne(couleur: Color.dsARenforcer, symbole: "exclamationmark.triangle.fill",
+                      titre: titreOrange, detail: detailARenforcer)
             }
             if apports.contains(where: \.estAAffiner) {
-                ligne(couleur: Color.dsSecondaire, titre: "À affiner", detail: detailAAffiner)
+                ligne(couleur: Color.dsSecondaire, symbole: "questionmark.circle.fill",
+                      titre: "À affiner", detail: detailAAffiner)
             }
             if couverts > 0 {
-                ligne(couleur: Color.teinteKiwi, titre: "À ton besoin", detail: detailCouverts)
+                ligne(couleur: Color.dsCouvert, symbole: "checkmark.circle.fill",
+                      titre: "À ton besoin", detail: detailCouverts)
             }
             HStack(spacing: 6) {
                 Path { chemin in
@@ -555,20 +562,28 @@ struct ProgresToileLegende: View {
             }
             Text("Touche un apport pour le détail")
                 .font(.system(.caption, design: .default))
-                .foregroundStyle(Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.45))
+                .foregroundStyle(Color.dsSecondaire)
         }
         .font(.dsLegende)
         .foregroundStyle(Color.dsSecondaire)
         .multilineTextAlignment(.center)
     }
 
-    private func ligne(couleur: Color, titre: String, detail: String) -> some View {
+    private func ligne(couleur: Color, symbole: String, titre: String, detail: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Circle()
-                .fill(couleur)
-                .frame(width: 8, height: 8)
-                .alignmentGuide(.firstTextBaseline) { dimensions in dimensions[.bottom] - 0.5 }
-                .accessibilityHidden(true)
+            Group {
+                if sansCouleur {
+                    Image(systemName: symbole)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(couleur)
+                } else {
+                    Circle()
+                        .fill(couleur)
+                        .frame(width: 8, height: 8)
+                        .alignmentGuide(.firstTextBaseline) { dimensions in dimensions[.bottom] - 0.5 }
+                }
+            }
+            .accessibilityHidden(true)
             (Text(titre).fontWeight(.semibold).foregroundColor(Color.dsTexte) + Text(" " + detail))
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -640,7 +655,7 @@ struct ProgresBarChart: View {
                     ForEach(points) { point in
                         Text(point.libelle)
                             .dsPolice(12)
-                            .foregroundStyle(point.futur ? Color.dsTertiaire : Color.dsSecondaire)
+                            .foregroundStyle(Color.dsSecondaire)
                             .frame(width: colonne)
                     }
                 }

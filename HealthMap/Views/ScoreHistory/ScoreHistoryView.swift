@@ -205,7 +205,7 @@ struct ScoreHistoryView: View {
 
                     Text("\(snapshot.score)%")
                         .dsPolice(13, .bold)
-                        .foregroundStyle(Color.globalScoreColor(for: snapshot.score))
+                        .foregroundStyle(HealthScale.couleurTexte(for: snapshot.score))
                         .frame(minWidth: 40, alignment: .trailing)
                 }
                 // Une ligne = un élément VoiceOver : « 3 sept., 68 % ».
