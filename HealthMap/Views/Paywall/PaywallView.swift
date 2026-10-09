@@ -32,6 +32,27 @@ struct PlanOption: Identifiable, Equatable {
     static func == (lhs: PlanOption, rhs: PlanOption) -> Bool { lhs.id == rhs.id }
 }
 
+/// Le rythme du comparatif « Standard ou Premium ? » : une fois par semaine au
+/// plus, sur ce téléphone. Les autres ouvertures du paywall vont droit aux
+/// formules.
+enum RythmeComparatif {
+    static let intervalle: TimeInterval = 7 * 24 * 3_600
+    private static let cle = "kiwio_comparatif_vu"
+
+    static func peutMontrer(derniere: Date?, maintenant: Date) -> Bool {
+        guard let derniere else { return true }
+        return maintenant.timeIntervalSince(derniere) >= intervalle
+    }
+
+    static func peutMontrer(defaults: UserDefaults = .standard, maintenant: Date = Date()) -> Bool {
+        peutMontrer(derniere: defaults.object(forKey: cle) as? Date, maintenant: maintenant)
+    }
+
+    static func marquerVu(defaults: UserDefaults = .standard, maintenant: Date = Date()) {
+        defaults.set(maintenant, forKey: cle)
+    }
+}
+
 /// Fond de la feuille Premium : verre épais et BLANC
 /// (`rgba(255,255,255,.9) → .76` sur un flou de 40), sans le liseré des autres
 /// feuilles — la maquette n'en dessine pas ici. Opaque sous « Réduire la
@@ -105,14 +126,16 @@ struct PaywallView: View {
     /// Marge latérale de la feuille (maquette : 24).
     private static let marge: CGFloat = 24
 
-    /// Le comparatif « Standard ou Premium ? » passe avant les formules, à
-    /// chaque ouverture tant qu'on n'est pas abonné (décision d'Arthur,
-    /// 9 octobre 2026). Décidé une fois, à l'ouverture.
+    /// Le comparatif « Standard ou Premium ? » passe avant les formules tant
+    /// qu'on n'est pas abonné (décision d'Arthur, 9 octobre 2026), au plus une
+    /// fois par semaine (audit de conformité du même jour : l'écran de plus à
+    /// chaque ouverture devenait une barrière). Décidé une fois, à l'ouverture.
     @State private var montreComparatif: Bool
 
     init(source: String = "generic") {
         self.source = source
-        _montreComparatif = State(initialValue: !SubscriptionService.shared.isPremium)
+        _montreComparatif = State(initialValue: !SubscriptionService.shared.isPremium
+                                  && RythmeComparatif.peutMontrer())
     }
 
     /// Formules disponibles : celles de l'offering RevenueCat, COMPLÉTÉES par
@@ -176,6 +199,7 @@ struct PaywallView: View {
             if !montreComparatif { revele = true }
         }
         .onAppear {
+            if montreComparatif { RythmeComparatif.marquerVu() }
             AnalyticsService.shared.track(.paywallShown, properties: [
                 "source": source,
                 "comparatif": montreComparatif,
@@ -539,7 +563,7 @@ struct PaywallView: View {
                 .multilineTextAlignment(.center)
 
             Button {
-                Task { await loadOfferingsWithTimeout(force: true) }
+                Task { await loadOfferingsWithTimeout() }
             } label: {
                 Text("Réessayer")
                     .font(.dsSousTitreFort)
@@ -711,20 +735,11 @@ struct PaywallView: View {
     }
 
     /// « 7 jours » / « 1 mois »… lu depuis l'offre d'introduction StoreKit.
-    /// Nil si le produit n'a pas d'essai gratuit — on ne promet jamais un
-    /// essai qui n'existe pas côté App Store.
+    /// Nil si le produit n'a pas d'essai gratuit, OU si Apple dit que cette
+    /// personne l'a déjà eu (App Store 3.1.2) : on ne promet jamais un essai
+    /// qu'Apple ne donnera pas. Le bouton dit alors « Continuer », et le prix.
     private func trialLabel(for plan: PlanOption?) -> String? {
-        guard let discount = plan?.introductoryDiscount,
-              discount.paymentMode == .freeTrial else {
-            return nil
-        }
-        let period = discount.subscriptionPeriod
-        switch period.unit {
-        case .day: return "\(period.value) jours"
-        case .week: return "\(period.value * 7) jours"
-        case .month: return period.value == 1 ? "1 mois" : "\(period.value) mois"
-        case .year: return period.value == 1 ? "1 an" : "\(period.value) ans"
-        }
+        OffrePremium.essaiGratuit(SubscriptionService.essaiGratuit(de: plan?.product))
     }
 
     /// Équivalent mensuel d'une formule, quelle que soit sa durée : c'est la
@@ -749,24 +764,28 @@ struct PaywallView: View {
 
     /// Charge les offerings avec un timeout : au-delà de `offeringsTimeout`
     /// sans paquet exploitable, on bascule sur l'état d'échec (Réessayer).
-    /// `force: true` (bouton Réessayer) relance même si un cache vide existe.
-    private func loadOfferingsWithTimeout(force: Bool = false) async {
+    ///
+    /// Relu à CHAQUE ouverture, pas seulement quand rien n'est en mémoire
+    /// (9 octobre 2026) : les formules chargées au lancement restaient
+    /// affichées toute la session, et un prix lu chez Apple dans la mauvaise
+    /// boutique (« 24,99 $US / an ») restait à l'écran alors que la feuille de
+    /// paiement Apple, elle, demandait 30 €. Les formules déjà en mémoire
+    /// restent visibles le temps de la relecture.
+    private func loadOfferingsWithTimeout() async {
         offeringsFailed = false
 
-        if force || subscriptionService.offerings == nil {
-            // Chien de garde : si loadOfferings (réseau RevenueCat) traîne,
-            // on affiche l'échec sans attendre son retour. La tâche de chargement
-            // continue en arrière-plan — si elle aboutit finalement, onChange
-            // des offerings resélectionne un paquet et l'UI se rétablit seule.
-            let watchdog = Task {
-                try? await Task.sleep(for: Self.offeringsTimeout)
-                if !Task.isCancelled && annualPlan == nil && shortPlan == nil {
-                    offeringsFailed = true
-                }
+        // Chien de garde : si loadOfferings (réseau RevenueCat) traîne,
+        // on affiche l'échec sans attendre son retour. La tâche de chargement
+        // continue en arrière-plan — si elle aboutit finalement, onChange
+        // des offerings resélectionne un paquet et l'UI se rétablit seule.
+        let watchdog = Task {
+            try? await Task.sleep(for: Self.offeringsTimeout)
+            if !Task.isCancelled && annualPlan == nil && shortPlan == nil {
+                offeringsFailed = true
             }
-            await subscriptionService.loadOfferings()
-            watchdog.cancel()
         }
+        await subscriptionService.loadOfferings()
+        watchdog.cancel()
 
         if selectedPlan == nil {
             selectedPlan = annualPlan ?? shortPlan

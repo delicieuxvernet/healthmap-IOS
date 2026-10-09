@@ -161,6 +161,12 @@ struct PortionSheet: View {
                                     .kiwiEntrance(2)
                             }
                         }
+                        // Un produit de marque (code-barres scanné ou
+                        // recherche) vient d'Open Food Facts : licence ODbL,
+                        // la source se cite sur la fiche (audit du 9 oct. 2026).
+                        if detail.source == "off" || detail.id.hasPrefix("off:") {
+                            CreditOpenFoodFacts()
+                        }
                     case .edit:
                         editorControls
                             .kiwiEntrance(1)

@@ -734,7 +734,8 @@ struct QuestionnaireContainerView: View {
     private func sliderConfig(for questionId: String) -> (range: ClosedRange<Double>, step: Double, suffix: String?, defaultValue: Double)? {
         switch questionId {
         // ── Personnel ──────────────────────────────────────────────────────
-        case "age":      return (14...100, 1, "ans", 30)
+        // 16 ans minimum (`AgeMinimum`, audit du 9 octobre 2026).
+        case "age":      return (Double(AgeMinimum.ans)...100, 1, "ans", 30)
         case "height":   return (140...220, 1, "cm", 170)
         case "weight":   return (35...180, 0.5, "kg", 70)
 

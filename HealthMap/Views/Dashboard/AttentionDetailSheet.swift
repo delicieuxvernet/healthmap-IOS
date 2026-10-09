@@ -153,6 +153,19 @@ struct AttentionDetailSheet: View {
         if let mechanism {
             schemaView(mechanism)
                 .padding(.top, 18)
+            // Un chiffre d'effet s'affiche avec sa source (audit de
+            // conformité du 9 octobre 2026).
+            if let source = mechanism.source {
+                Text("Source : \(source)")
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+                    .padding(.top, 6)
+                    .verreCascade(arrive, delai: 0.4, decalage: 10)
+            }
             solutionCard(text: mechanism.solution)
                 .padding(.top, DS.interCarte)
                 .verreCascade(arrive, delai: 0.45, decalage: 10)

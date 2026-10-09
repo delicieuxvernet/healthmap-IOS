@@ -161,6 +161,21 @@ struct RechercheSectionTitre: View {
     }
 }
 
+/// Sur la fiche d'un produit de marque (code-barres scanné, recherche) : la
+/// source et sa licence, comme l'exige l'ODbL. Le détail des licences est dans
+/// Réglages, « Licences ».
+struct CreditOpenFoodFacts: View {
+    var body: some View {
+        Text("Données du produit : Open Food Facts, licence ODbL. Photos sous licence CC BY-SA.")
+            .font(.system(.caption, design: .default))
+            .foregroundStyle(Color.dsSecondaire)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 4)
+            .padding(.horizontal, 2)
+    }
+}
+
 /// Les photos et les données des produits de marque viennent d'Open Food
 /// Facts (base ouverte, licences ODbL et CC BY-SA) : on le dit.
 struct RechercheCreditPhotos: View {

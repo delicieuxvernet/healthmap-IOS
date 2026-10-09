@@ -409,6 +409,45 @@ if MODE == "accessibility"
   exit 0
 end
 
+# ── MODE age-rating : classification d'âge de la fiche (lecture ; APPLY=1 règle) ──
+#    Décision du 9 octobre 2026 : Kiwio est réservé aux 16 ans et plus (CGU,
+#    politique de confidentialité, molette du questionnaire). Lecture seule par
+#    défaut ; avec OPTIONS « APPLY=1 », la déclaration de chaque fiche encore
+#    modifiable reçoit ageRatingOverrideV2 = SIXTEEN_PLUS (AGE_RATING_OVERRIDE
+#    pour une autre valeur), healthOrWellnessTopics = true et le lien des CGU.
+#    Une fiche déjà publiée ne se modifie pas : c'est celle de la prochaine
+#    version qui porte le changement.
+if MODE == "age-rating"
+  cible = ENV["AGE_RATING_OVERRIDE"].to_s.strip
+  cible = "SIXTEEN_PLUS" if cible.empty?
+  get_all("/v1/apps/#{app_id}/appInfos").each do |info|
+    etat = info.dig("attributes", "state") || info.dig("attributes", "appStoreState")
+    code, decl = req(:get, "/v1/appInfos/#{info["id"]}/ageRatingDeclaration")
+    unless code == 200
+      puts "appInfo #{info["id"]} (#{etat}) : déclaration illisible -> HTTP #{code}"
+      puts(decl.is_a?(String) ? decl : JSON.pretty_generate(decl)) if decl
+      next
+    end
+    attrs = decl.dig("data", "attributes") || {}
+    puts "appInfo #{info["id"]} (#{etat}) : note affichée #{info.dig("attributes", "appStoreAgeRating")}, " \
+         "override #{attrs["ageRatingOverrideV2"] || attrs["ageRatingOverride"] || "aucun"}, " \
+         "santé/bien-être #{attrs["healthOrWellnessTopics"].inspect}"
+    puts JSON.pretty_generate(attrs)
+    next unless ENV["APPLY"] == "1"
+    if %w[READY_FOR_DISTRIBUTION READY_FOR_SALE ACCEPTED].include?(etat)
+      puts "  fiche publiée : non modifiable, on passe"
+      next
+    end
+    write("classification #{cible} (appInfo #{info["id"]})", :patch,
+      "/v1/ageRatingDeclarations/#{decl.dig("data", "id")}",
+      { data: { type: "ageRatingDeclarations", id: decl.dig("data", "id"),
+                attributes: { ageRatingOverrideV2: cible,
+                              healthOrWellnessTopics: true,
+                              developerAgeRatingInfoUrl: "https://www.healthmap.fr/cgu.html" } } })
+  end
+  exit 0
+end
+
 # ── MODE app-audit : état de préparation à la soumission App Store ──────────
 # ── MODE fix-subs : corrige la config des abonnements (défauts deep-audit) ──
 #    1) reviewNote : App Review y cherche le chemin de l'achat dans l'app —
