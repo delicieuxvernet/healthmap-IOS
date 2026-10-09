@@ -48,27 +48,6 @@ enum TexteAchat {
     }
 }
 
-/// Le rythme du comparatif « Standard ou Premium ? » : une fois par semaine au
-/// plus, sur ce téléphone. Les autres ouvertures du paywall vont droit aux
-/// formules.
-enum RythmeComparatif {
-    static let intervalle: TimeInterval = 7 * 24 * 3_600
-    private static let cle = "kiwio_comparatif_vu"
-
-    static func peutMontrer(derniere: Date?, maintenant: Date) -> Bool {
-        guard let derniere else { return true }
-        return maintenant.timeIntervalSince(derniere) >= intervalle
-    }
-
-    static func peutMontrer(defaults: UserDefaults = .standard, maintenant: Date = Date()) -> Bool {
-        peutMontrer(derniere: defaults.object(forKey: cle) as? Date, maintenant: maintenant)
-    }
-
-    static func marquerVu(defaults: UserDefaults = .standard, maintenant: Date = Date()) {
-        defaults.set(maintenant, forKey: cle)
-    }
-}
-
 /// Fond de la feuille Premium : verre épais et BLANC
 /// (`rgba(255,255,255,.9) → .76` sur un flou de 40), sans le liseré des autres
 /// feuilles — la maquette n'en dessine pas ici. Opaque sous « Réduire la
@@ -142,16 +121,16 @@ struct PaywallView: View {
     /// Marge latérale de la feuille (maquette : 24).
     private static let marge: CGFloat = 24
 
-    /// Le comparatif « Standard ou Premium ? » passe avant les formules tant
-    /// qu'on n'est pas abonné (décision d'Arthur, 9 octobre 2026), au plus une
-    /// fois par semaine (audit de conformité du même jour : l'écran de plus à
-    /// chaque ouverture devenait une barrière). Décidé une fois, à l'ouverture.
+    /// Le comparatif « Standard ou Premium ? » passe avant les formules à
+    /// chaque ouverture, tant qu'on n'est pas abonné (décision d'Arthur,
+    /// 9 octobre 2026). Le plafond d'une fois par semaine ajouté par la
+    /// conformité l'avait fait disparaître : retiré le 10 octobre à sa demande.
+    /// Décidé une fois, à l'ouverture.
     @State private var montreComparatif: Bool
 
     init(source: String = "generic") {
         self.source = source
-        _montreComparatif = State(initialValue: !SubscriptionService.shared.isPremium
-                                  && RythmeComparatif.peutMontrer())
+        _montreComparatif = State(initialValue: !SubscriptionService.shared.isPremium)
     }
 
     /// Formules disponibles : celles de l'offering RevenueCat, COMPLÉTÉES par
@@ -215,7 +194,6 @@ struct PaywallView: View {
             if !montreComparatif { revele = true }
         }
         .onAppear {
-            if montreComparatif { RythmeComparatif.marquerVu() }
             AnalyticsService.shared.track(.paywallShown, properties: [
                 "source": source,
                 "comparatif": montreComparatif,
@@ -1058,8 +1036,9 @@ private struct PremiumPurchaseSuccessView: View {
                 }
             }
         }
-        // Plus de plancher ni de plafond : la feuille défile, elle peut
-        // grandir jusqu'à AX5 (audit d'accessibilité du 9 oct. 2026).
+        // Plancher `.large` comme partout dans l'app, sans plafond : la
+        // feuille défile, elle peut grandir jusqu'à AX5.
+        .dynamicTypeSize(DynamicTypeSize.large...)
     }
 
     private func benefitRow(icon: String, title: String) -> some View {

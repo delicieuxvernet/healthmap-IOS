@@ -398,9 +398,9 @@ final class ScreenshotsUITests: XCTestCase {
             retour()
         }
 
-        // Paywall depuis la carte Premium, deux fois : le comparatif ne revient
-        // qu'une fois par semaine (après).
-        let carte = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@", "Essayer", "Découvrir Kiwio Premium")).firstMatch
+        // Paywall depuis la carte Premium, deux fois : le comparatif passe à
+        // chaque ouverture (rétabli le 10 oct. 2026).
+        let carte = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@", "Essayer", "Découvrir Kiwio Premium", "Kiwio Premium")).firstMatch
         if carte.waitForExistence(timeout: 5) {
             taper(carte)
             sleep(3)

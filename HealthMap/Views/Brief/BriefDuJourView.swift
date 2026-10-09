@@ -112,7 +112,7 @@ struct BriefDuJourView: View {
         }
         // Plus de plancher : les petites tailles de texte s'appliquent aussi.
         // Le plafond AX3 reste : le brief tient sur un écran, sans défiler.
-        .dynamicTypeSize(...DynamicTypeSize.accessibility3)
+        .dynamicTypeSize(.large ... .accessibility3)
     }
 
     // MARK: - Chrome
