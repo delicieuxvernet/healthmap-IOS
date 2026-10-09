@@ -315,7 +315,6 @@ final class QuestionnaireViewModel: ObservableObject {
 
     // MARK: - Update Answers
 
-    /// Update a single-value answer by question ID (maps to UserProfile property)
     /// Un brouillon d'avant la mise à jour peut porter 14 ou 15 ans : on le
     /// voit dès la reprise. L'âge est retiré, le brouillon effacé, et la
     /// reprise retombe sur l'écran de l'âge (il n'est plus complet), où le
@@ -340,6 +339,7 @@ final class QuestionnaireViewModel: ObservableObject {
         updateAnswer(questionId: "age", value: String(ans))
     }
 
+    /// Update a single-value answer by question ID (maps to UserProfile property)
     func updateAnswer(questionId: String, value: Any) {
         switch questionId {
         // Section 1: Profil
