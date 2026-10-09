@@ -241,8 +241,10 @@ struct AnneauDeCause: View {
                 .padding(.horizontal, taille.trait)
             } else {
                 // Le score nu, sans « % » : c'est un score sur 100, pas un taux mesuré.
+                // Taille fixe : le chiffre vit dans l'anneau (46 pt de vide dans
+                // la tuile de 64), il ne peut pas suivre Dynamic Type.
                 ChiffreQuiCompte(valeur: dessine ? Double(score) : 0)
-                    .dsPolice(taille.police, .bold, design: taille.dessin, chiffres: true)
+                    .font(.system(size: taille.police, weight: .bold, design: taille.dessin).monospacedDigit())
                     .tracking(taille.tracking)
                     .foregroundStyle(Color.dsTexte)
                     .animation(reduceMotion ? nil : animationDuCompteur, value: deploye)

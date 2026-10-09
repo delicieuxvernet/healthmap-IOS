@@ -227,29 +227,6 @@ final class ScreenshotsUITests: XCTestCase {
             snap("56-paywall")
             fermerFeuille()
         }
-
-        // Récap animé, rejoué depuis les Réglages (lecture seule : sa fin ne
-        // marque que le brief du jour comme vu, sur le simulateur).
-        app.buttons["tab.reglages"].tap()
-        sleep(1)
-        let rejouer = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "bilan animé")).firstMatch
-        for _ in 0..<4 where !rejouer.exists {
-            app.swipeUp()
-            sleep(1)
-        }
-        if rejouer.waitForExistence(timeout: 5) {
-            taper(rejouer)
-            sleep(3)
-            snap("57-recap")
-            let fermer = app.buttons["Fermer le bilan animé"]
-            if fermer.waitForExistence(timeout: 3) {
-                fermer.tap()
-                sleep(1)
-                let sortie = app.buttons["Aller à mon bilan"]
-                if sortie.waitForExistence(timeout: 3) { sortie.tap() }
-                sleep(1)
-            }
-        }
     }
 
     // MARK: - 3. Avant le questionnaire + questionnaire (hook DEBUG `-captureDecouverte`)

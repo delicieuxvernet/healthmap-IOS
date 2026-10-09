@@ -354,8 +354,11 @@ puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 #    (Accessibility Nutrition Labels, iPhone.) Crée ou met à jour le brouillon,
 #    SANS le publier : l'étiquette ne doit décrire que ce que la version EN
 #    LIGNE sait faire. Options : PUBLISH=1 publie le brouillon (une fois la
-#    version accessible sortie) ; VOICE_CONTROL=1 coche Contrôle vocal (à
-#    cocher seulement après un essai sur appareil).
+#    version accessible sortie, et la liste validée par Arthur) ;
+#    VOICE_CONTROL=1 coche Contrôle vocal (après un essai sur appareil) ;
+#    SANS_COULEUR=1 coche « Différencier sans couleur » (seulement quand
+#    aucun statut de l'app ne tient plus à la seule couleur : au 9 oct. 2026,
+#    seule la légende de Progrès le gère).
 #    Restent à false : interface sombre (l'app force le mode clair), sous-titres
 #    et audiodescription (l'app n'a aucune vidéo).
 if MODE == "accessibility"
@@ -364,7 +367,7 @@ if MODE == "accessibility"
     "supportsVoiceControl" => ENV["VOICE_CONTROL"] == "1",
     "supportsLargerText" => true,
     "supportsDarkInterface" => false,
-    "supportsDifferentiateWithoutColorAlone" => true,
+    "supportsDifferentiateWithoutColorAlone" => ENV["SANS_COULEUR"] == "1",
     "supportsSufficientContrast" => true,
     "supportsReducedMotion" => true,
     "supportsCaptions" => false,

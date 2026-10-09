@@ -92,6 +92,10 @@ struct RecapSlideView: View {
                     .dsPolice(22, .semibold)
                     .foregroundStyle(Color.dsSecondaire)
             }
+            // Chiffre décoratif de 84 pt : il grossit jusqu'à AX2 (~130 pt),
+            // pas au-delà (148 pt en AX5, à l'étroit à côté de « / 100 »).
+            // VoiceOver lit « Score global … sur 100 ».
+            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
             .recapApparition(1)
             .accessibilityElement()
             .accessibilityLabel("Score global \(valeur) sur 100, \(mot)")
@@ -574,6 +578,8 @@ struct RecapCartePartage: View {
                         .dsPolice(18, .semibold)
                         .foregroundStyle(Color.dsSecondaire)
                 }
+                // Même plafond que le score du slide : chiffre décoratif.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                 Text(carte.mot)
                     .dsPolice(15, .semibold)
                     .foregroundStyle(HealthScale.couleurTexte(for: carte.score))

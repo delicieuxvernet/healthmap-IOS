@@ -528,7 +528,9 @@ struct VerreMatiere {
         refletHaut: 0.7,
         lisere: 0.5,
         flouVivant: true,
-        opaque: Color(uiColor: .systemGray)
+        // Sous « Réduire la transparence » : un gris très clair, l'encre y
+        // tient 15:1 (le gris système moyen la portait à 5:1).
+        opaque: Color(uiColor: .systemGray5)
     )
 
     /// Action principale : verre vert profond, même reflet, libellé blanc.

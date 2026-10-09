@@ -51,6 +51,10 @@ final class RecapProgress: ObservableObject {
     func definirAvanceAuto(_ active: Bool) {
         guard avanceAutoCoupee == active else { return }
         avanceAutoCoupee = !active
+        // Sans avance automatique la barre était pleine : l'avance qui reprend
+        // repart du début du slide, même s'il est en pause (sinon il sauterait
+        // dès la reprise).
+        if active { avancee = 0 }
         guard !enPause, !terminee else { return }
         relancerMinuteur(depuis: active ? 0 : avancee)
     }
