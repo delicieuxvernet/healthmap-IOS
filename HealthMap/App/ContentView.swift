@@ -591,7 +591,6 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $showPaywallFromDeepLink) {
             PaywallView()
-                .healthMapFullSheet()
         }
         // Entrée libre (V12a) : le questionnaire se lance/reprend depuis
         // n'importe quel onglet via `dashboardVM.demarrerBilan()`. Feuille

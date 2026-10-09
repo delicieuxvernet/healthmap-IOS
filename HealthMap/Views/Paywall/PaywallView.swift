@@ -105,14 +105,14 @@ struct PaywallView: View {
     /// Marge latérale de la feuille (maquette : 24).
     private static let marge: CGFloat = 24
 
-    /// Le tableau « Gratuit ou Premium ? » passe avant les formules : la
-    /// première fois que la feuille s'ouvre, puis au plus une fois par
-    /// semaine (`RythmeComparatif`). Décidé une fois, à l'ouverture.
+    /// Le comparatif « Standard ou Premium ? » passe avant les formules, à
+    /// chaque ouverture tant qu'on n'est pas abonné (décision d'Arthur,
+    /// 9 octobre 2026). Décidé une fois, à l'ouverture.
     @State private var montreComparatif: Bool
 
     init(source: String = "generic") {
         self.source = source
-        _montreComparatif = State(initialValue: RythmeComparatif.doitMontrer())
+        _montreComparatif = State(initialValue: !SubscriptionService.shared.isPremium)
     }
 
     /// Formules disponibles : celles de l'offering RevenueCat, COMPLÉTÉES par
@@ -153,7 +153,17 @@ struct PaywallView: View {
         }
         // La feuille Premium a SA matière dans la maquette : blanche (90 → 76 %),
         // plus claire que le verre légèrement vert des autres feuilles.
-        .presentationBackground { FeuillePremiumFond() }
+        // Pendant le comparatif, la présentation est transparente : la carte
+        // de verre détachée dessine la sienne et laisse voir l'écran au-dessus.
+        .presentationBackground {
+            if montreComparatif {
+                Color.clear
+            } else {
+                FeuillePremiumFond()
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(montreComparatif ? .hidden : .visible)
         .presentationCornerRadius(Verre.rayonFeuille)
         .task {
             await loadOfferingsWithTimeout()
@@ -166,7 +176,6 @@ struct PaywallView: View {
             if !montreComparatif { revele = true }
         }
         .onAppear {
-            if montreComparatif { RythmeComparatif.noterVu() }
             AnalyticsService.shared.track(.paywallShown, properties: [
                 "source": source,
                 "comparatif": montreComparatif,
@@ -1051,7 +1060,6 @@ struct PaywallModifier: ViewModifier {
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
-                    .healthMapFullSheet()
             }
     }
 }

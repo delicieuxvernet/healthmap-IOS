@@ -88,7 +88,6 @@ struct RecapView: View {
         }
         .sheet(isPresented: $affichePaywall) {
             PaywallView(source: "recap")
-                .healthMapFullSheet()
         }
         .sheet(item: $imageAPartager) { partage in
             RecapPartageSheet(image: partage.image)

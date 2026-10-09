@@ -1,42 +1,42 @@
 import Foundation
 
-// MARK: - Gratuit ou Premium : le tableau comparatif (7 octobre 2026)
+// MARK: - Standard ou Premium : le comparatif (maquette « kiwi », 9 octobre 2026)
 //
-// Demande d'Arthur : la première fois qu'on propose Premium, puis de temps en
-// temps, un tableau en très gros caractères qui met côte à côte ce qu'on a
-// avec Kiwio gratuit et ce qu'on a avec Kiwio Premium.
-//
-// Gratuit : 2 dictées par jour, les photos de repas du gratuit, les calories
-// et les macronutriments, l'onglet Compléments. Premium : tout le reste.
+// Demande d'Arthur : chaque fois que Premium est proposé, un comparatif qui
+// met côte à côte Kiwio Standard (la formule gratuite) et Kiwio Premium. Un
+// kiwi frais : c'est inclus ; un kiwi raplapla : ça ne l'est pas. Dix lignes,
+// l'essentiel seulement, lisibles d'un coup d'œil sans faire défiler.
 //
 // Chaque ligne dit ce que l'app fait VRAIMENT aujourd'hui (inventaire du
-// gating du 7 octobre 2026) : le tableau ne promet rien que le code ne tient
-// pas. Une ligne qui change de camp se change ici ET dans le gating.
+// gating du 8 octobre 2026) : Apple vérifie qu'un abonnement décrit
+// exactement ce qu'il apporte. D'où « Solutions à tes interactions » (le
+// Standard nomme déjà l'interaction, seule la solution est Premium) et
+// « Plan guidé pas à pas » (le Standard voit le plan et ses liens, pas les
+// solutions détaillées). Une ligne qui change de camp se change ici ET dans
+// le gating.
 
-/// Ce qu'une formule offre sur une ligne du tableau.
+/// Ce qu'une formule offre sur une ligne du comparatif.
 enum OffreComparee: Equatable {
-    /// Inclus, sans chiffre à dire.
+    /// Inclus : le kiwi frais.
     case inclus
-    /// Pas inclus.
+    /// Pas inclus : le kiwi raplapla.
     case absent
-    /// Inclus avec une limite à lire (« 2 / jour », « 30 / jour »).
-    case valeur(String)
+    /// Inclus avec un plafond quotidien (« 2 /j »).
+    case parJour(Int)
 }
 
 struct LigneComparatif: Identifiable, Equatable {
     let id: String
-    /// SF Symbol de la ligne.
-    let symbole: String
     let libelle: String
-    let gratuit: OffreComparee
+    let standard: OffreComparee
     let premium: OffreComparee
 }
 
 enum ComparatifPremium {
-    /// Scans photo par jour, gratuit et Premium. ⚠️ DOIVENT rester égaux aux
-    /// quotas de l'Edge Function `analyze-meal-photo` (3 et 30 au 7 octobre
+    /// Scans photo par jour, Standard et Premium. ⚠️ DOIVENT rester égaux aux
+    /// quotas de l'Edge Function `analyze-meal-photo` (3 et 30 au 8 octobre
     /// 2026), comme le reste de l'app (`QuotaWall`, `MealScanViewModel`).
-    static let photosGratuitesParJour = 3
+    static let photosStandardParJour = 3
     static let photosPremiumParJour = 30
 
     /// Dictées par jour en Premium. ⚠️ Pas « illimitées » : `parse-meal-voice`
@@ -46,107 +46,45 @@ enum ComparatifPremium {
     /// 7 octobre 2026).
     static let dicteesPremiumParJour = 60
 
-    /// Les lignes, dans l'ordre d'affichage : d'abord ce que le gratuit a
-    /// (avec ses limites), puis tout ce que Premium ajoute.
+    /// Les lignes, dans l'ordre d'affichage : noter un repas, puis ce que le
+    /// bilan en tire, puis le reste.
     static var lignes: [LigneComparatif] {
         [
-            LigneComparatif(
-                id: "dictee",
-                symbole: "mic.fill",
-                libelle: "Repas dictés",
-                gratuit: .valeur("\(VoiceMealService.QuotaStore.dictéesGratuitesParJour) / jour"),
-                premium: .valeur("\(dicteesPremiumParJour) / jour")
-            ),
-            LigneComparatif(
-                id: "photo",
-                symbole: "camera.fill",
-                libelle: "Repas en photo",
-                gratuit: .valeur("\(photosGratuitesParJour) / jour"),
-                premium: .valeur("\(photosPremiumParJour) / jour")
-            ),
-            LigneComparatif(
-                id: "macros",
-                symbole: "flame.fill",
-                libelle: "Calories et macros",
-                gratuit: .inclus,
-                premium: .inclus
-            ),
-            LigneComparatif(
-                id: "complements",
-                symbole: "pills.fill",
-                libelle: "Tes compléments",
-                gratuit: .inclus,
-                premium: .inclus
-            ),
-            LigneComparatif(
-                id: "micros",
-                symbole: "atom",
-                libelle: "Tes vitamines et minéraux du jour",
-                gratuit: .absent,
-                premium: .inclus
-            ),
-            LigneComparatif(
-                id: "plan",
-                symbole: "map.fill",
-                libelle: "Ton plan, pas à pas",
-                gratuit: .absent,
-                premium: .inclus
-            ),
-            LigneComparatif(
-                id: "gestes",
-                symbole: "fork.knife",
-                libelle: "Quoi manger pour chaque apport",
-                gratuit: .absent,
-                premium: .inclus
-            ),
-            LigneComparatif(
-                id: "progres",
-                symbole: "chart.xyaxis.line",
-                libelle: "Ta progression et tes courbes",
-                gratuit: .absent,
-                premium: .inclus
-            ),
-            LigneComparatif(
-                id: "prise_de_sang",
-                symbole: "drop.fill",
-                libelle: "Ta prise de sang lue par Kiwio",
-                gratuit: .absent,
-                premium: .inclus
-            ),
-            LigneComparatif(
-                id: "recap",
-                symbole: "sparkles",
-                libelle: "Ton récap complet",
-                gratuit: .absent,
-                premium: .inclus
-            ),
+            LigneComparatif(id: "dictee", libelle: "Repas dictés à l'IA",
+                            standard: .parJour(VoiceMealService.QuotaStore.dictéesGratuitesParJour),
+                            premium: .parJour(dicteesPremiumParJour)),
+            LigneComparatif(id: "photo", libelle: "Repas en photo",
+                            standard: .parJour(photosStandardParJour),
+                            premium: .parJour(photosPremiumParJour)),
+            LigneComparatif(id: "recherche", libelle: "Recherche et code-barres",
+                            standard: .inclus, premium: .inclus),
+            LigneComparatif(id: "macros", libelle: "Calories et macros",
+                            standard: .inclus, premium: .inclus),
+            LigneComparatif(id: "micros", libelle: "Vitamines et minéraux en détail",
+                            standard: .absent, premium: .inclus),
+            LigneComparatif(id: "interactions", libelle: "Solutions à tes interactions",
+                            standard: .absent, premium: .inclus),
+            LigneComparatif(id: "plan", libelle: "Plan guidé pas à pas",
+                            standard: .absent, premium: .inclus),
+            LigneComparatif(id: "progres", libelle: "Courbes de progression",
+                            standard: .absent, premium: .inclus),
+            LigneComparatif(id: "prise_de_sang", libelle: "Prise de sang (bêta)",
+                            standard: .absent, premium: .inclus),
+            LigneComparatif(id: "widgets", libelle: "Widgets",
+                            standard: .inclus, premium: .inclus),
         ]
     }
-}
 
-// MARK: - Quand le montrer
-
-/// Le tableau passe AVANT les formules à l'ouverture de la feuille Premium :
-/// la toute première fois, puis au plus une fois par semaine. Entre deux, la
-/// feuille s'ouvre directement sur les formules — revoir le même tableau à
-/// chaque porte touchée finirait par le rendre invisible.
-enum RythmeComparatif {
-    static let intervalle: TimeInterval = 7 * 24 * 3_600
-
-    static func doitMontrer(dernier: Date?, maintenant: Date) -> Bool {
-        guard let dernier else { return true }
-        return maintenant.timeIntervalSince(dernier) >= intervalle
-    }
-
-    // Hors préfixe `healthmap_` : le rythme est celui du téléphone, comme
-    // celui de l'offre annuelle (`OffreCentre`).
-    static let cle = "kiwio_comparatif_dernier"
-
-    static func doitMontrer(defaults: UserDefaults = .standard, maintenant: Date = Date()) -> Bool {
-        doitMontrer(dernier: defaults.object(forKey: cle) as? Date, maintenant: maintenant)
-    }
-
-    static func noterVu(defaults: UserDefaults = .standard, maintenant: Date = Date()) {
-        defaults.set(maintenant, forKey: cle)
+    /// Ce que VoiceOver lit pour une ligne : « Repas dictés à l'IA. Standard :
+    /// 2 par jour. Premium : 60 par jour. »
+    static func descriptionVocale(_ ligne: LigneComparatif) -> String {
+        func lire(_ offre: OffreComparee) -> String {
+            switch offre {
+            case .inclus: return "inclus"
+            case .absent: return "non inclus"
+            case .parJour(let n): return "\(n) par jour"
+            }
+        }
+        return "\(ligne.libelle). Standard : \(lire(ligne.standard)). Premium : \(lire(ligne.premium))."
     }
 }

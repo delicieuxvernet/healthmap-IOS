@@ -503,14 +503,22 @@
 >   et plus, feuille simple sur iOS 17 : `feuillePremium`, `premiumOrigine` / `premiumDepuis` dans
 >   `PremiumGating.swift`). **Contenu verrouillé, partout** : un seul traitement, flou 8 et opacité
 >   0,5, sans voile blanc ; portes (`UnlockDoor`), jauges de quota et écrin Premium en verre.
-  **Étape « Gratuit ou Premium ? »** (7 oct. 2026, `ComparatifPremiumView.swift`, lignes dans
-  `Core/ComparatifPremium.swift`) : la première fois que la feuille s'ouvre, puis au plus une fois
-  par semaine (`RythmeComparatif`), un tableau en très gros caractères passe AVANT les formules —
-  libellé (19), colonne Gratuit, colonne Premium sur un aplat vert pâle. Gratuit : 2 dictées et
-  3 photos par jour, calories et macros, compléments ; Premium : tout le reste (30 photos par jour,
-  60 dictées par jour, micros du jour, plan, gestes, progression, prise de sang, récap). « Passer à
-  Premium » mène aux formules de la même feuille, « Plus tard » referme. Une ligne qui change de
-  camp se change dans le fichier des lignes ET dans le gating.
+  **Étape « Standard ou Premium ? »** (maquette « kiwi » validée par Arthur le 9 oct. 2026,
+  `ComparatifPremiumView.swift`, lignes dans `Core/ComparatifPremium.swift`) : à CHAQUE ouverture
+  tant qu'on n'est pas abonné, une carte de verre DÉTACHÉE des bords (comme la feuille de dictée :
+  marges de 8, rayon 44, présentation transparente) passe AVANT les formules et laisse voir l'écran
+  au-dessus. Titre 22/700, « Kiwi frais : c'est inclus. Kiwi raplapla : ça ne l'est pas. », puis
+  dix lignes sans défiler : libellé, colonne Standard, colonne Premium sur une bande de verre vert
+  pâle (`clairActif`, liseré kiwi), la mascotte animée perchée en haut. Inclus = la tranche 3D
+  `fluent_kiwi` (elle arrive en tournant) ; pas inclus = `fluent_kiwi_ecrase`, le même kiwi aplati,
+  terni, chair et jus répandus (il tombe, s'étire, s'écrase, se tasse) ; plafonds en « 2 /j ».
+  Standard : 2 dictées et 3 photos par jour, recherche et code-barres, calories et macros, widgets.
+  Premium : 60 dictées et 30 photos par jour, et en plus vitamines et minéraux en détail, solutions
+  à tes interactions, plan guidé pas à pas, courbes de progression, prise de sang (bêta). Les
+  intitulés ne promettent que ce qui est vraiment réservé (le Standard nomme déjà une interaction et
+  montre le plan avec ses liens). « Passer à Premium » mène aux formules de la même feuille, « Plus
+  tard » et la croix referment. Une ligne qui change de camp se change dans le fichier des lignes
+  ET dans le gating.
 >
 > - **Widgets, écran verrouillé, activité en direct** (refonte « en verre » du 3 oct. 2026, maquette
 >   Claude Design « Kiwio - Widgets », W1 à W7 ; briques dans `Partage/VuesWidgets.swift`, vues dans

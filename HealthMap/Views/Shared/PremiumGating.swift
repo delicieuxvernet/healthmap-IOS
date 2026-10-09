@@ -128,7 +128,6 @@ private struct FeuillePremium: ViewModifier {
             .premiumOrigine("premium", dans: espace)
             .sheet(isPresented: $estPresentee) {
                 PaywallView(source: source)
-                    .healthMapFullSheet()
                     .premiumDepuis("premium", dans: espace)
             }
     }

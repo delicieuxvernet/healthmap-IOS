@@ -1,262 +1,275 @@
 import SwiftUI
 
-// MARK: - Gratuit ou Premium : le tableau (7 octobre 2026)
+// MARK: - Standard ou Premium : la carte aux kiwis (maquette validée le 9 octobre 2026)
 //
-// Première étape de la feuille Premium, la première fois qu'elle s'ouvre puis
-// au plus une fois par semaine (`RythmeComparatif`). Un tableau en très gros
-// caractères : à gauche ce que fait chaque ligne, puis la colonne Gratuit,
-// puis la colonne Premium, posée sur un aplat vert pâle pour qu'on la suive
-// de l'œil du haut en bas. « Passer à Premium » mène aux formules de la même
-// feuille (prix, essai et mentions restent lus chez Apple, dans PaywallView) ;
-// « Plus tard » referme.
+// Première étape de la feuille Premium, à chaque ouverture tant qu'on n'est
+// pas abonné. Une carte de verre DÉTACHÉE des bords (comme la feuille de
+// dictée), posée en bas, qui laisse voir l'écran au-dessus et tient sans
+// défiler : le titre, puis dix lignes, la colonne Standard, puis la colonne
+// Premium posée sur une bande vert pâle, la mascotte perchée en haut.
 //
-// Les lignes viennent de `ComparatifPremium.lignes` : rien n'est écrit ici.
-// En très grande taille de texte, chaque ligne s'empile (libellé, puis les
-// deux formules côte à côte) au lieu d'écraser les colonnes.
+// Un kiwi frais (`fluent_kiwi`) : c'est inclus. Un kiwi raplapla
+// (`fluent_kiwi_ecrase`, le même kiwi aplati, terni, sa chair et son jus
+// répandus) : ça ne l'est pas. À l'arrivée, les frais apparaissent en
+// tournant, les raplaplas tombent et s'écrasent, ligne après ligne.
+//
+// « Passer à Premium » mène aux formules de la même feuille (prix, essai et
+// mentions restent lus chez Apple, dans PaywallView) ; « Plus tard » et la
+// croix referment. Les lignes viennent de `ComparatifPremium.lignes` : rien
+// n'est écrit ici. En très grande taille de texte, la carte défile.
 
 struct ComparatifPremiumView: View {
     let onContinuer: () -> Void
     let onPlusTard: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dynamicTypeSize) private var tailleTexte
-    @State private var revele = false
+    /// Les kiwis se posent, une fois la carte montée.
+    @State private var poses = false
 
-    /// Titre : 30 / 700 — plus gros que la feuille des formules, c'est le but.
-    @ScaledMetric(relativeTo: .largeTitle) private var tailleTitre: CGFloat = 30
-    /// Libellé d'une ligne : 19 / 600.
-    @ScaledMetric(relativeTo: .body) private var tailleLigne: CGFloat = 19
-    /// Valeur d'une cellule (« 2 / jour ») : 18 / 700, chiffres arrondis.
-    @ScaledMetric(relativeTo: .body) private var tailleValeur: CGFloat = 18
-    /// Coche et croix des cellules.
-    @ScaledMetric(relativeTo: .body) private var tailleSigne: CGFloat = 24
-    /// Largeur d'une colonne de formule.
-    @ScaledMetric(relativeTo: .body) private var largeurColonne: CGFloat = 86
-
-    private static let marge: CGFloat = 20
-
-    private var empile: Bool { tailleTexte.isAccessibilitySize }
+    /// Marge entre la carte et les bords de l'écran.
+    private static let marge: CGFloat = 8
+    private static let largeurStandard: CGFloat = 68
+    private static let largeurPremium: CGFloat = 76
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                entete
-                    .padding(.top, 44)
-                    .verreCascade(revele, delai: 0.05, decalage: 10)
-
-                tableau
-                    .padding(.top, 24)
-
-                PremiumAction(titre: "Passer à Premium", action: onContinuer)
-                    .padding(.top, 24)
-                    .verreCascade(revele, delai: 0.2 + Double(ComparatifPremium.lignes.count) * 0.04)
-
-                Button(action: onPlusTard) {
-                    Text("Plus tard")
-                        .font(.dsSousTitre)
-                        .foregroundStyle(Color.dsAccent)
-                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.dsPress)
-                .padding(.top, 2)
-            }
-            .padding(.horizontal, Self.marge)
-            .padding(.bottom, 18)
-            .frame(maxWidth: .infinity)
-            .containerRelativeFrame(.horizontal)
-            .overlay(alignment: .topTrailing) {
-                DSCloseButton(action: onPlusTard)
-                    .padding(.top, Theme.spacingSM)
-                    .padding(.trailing, 12)
-            }
+        ViewThatFits(in: .vertical) {
+            carte
+            ScrollView { carte }
         }
+        .padding(.horizontal, Self.marge)
+        .padding(.bottom, Self.marge)
+        // La carte se pose en bas, à la taille de ce qu'elle montre.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        // Au-dessus d'elle : presque rien, mais touchable, pour que le glissé
+        // qui referme parte aussi de là.
+        .background(Color.black.opacity(0.001))
+        .ignoresSafeArea(.container, edges: .bottom)
         .task {
-            try? await Task.sleep(for: .milliseconds(150))
-            revele = true
+            guard !reduceMotion else {
+                poses = true
+                return
+            }
+            // La carte monte d'abord, les kiwis se posent ensuite.
+            try? await Task.sleep(for: .milliseconds(250))
+            poses = true
         }
     }
 
-    // MARK: En-tête
+    // MARK: La carte
 
-    private var entete: some View {
-        VStack(spacing: 6) {
-            Text("Kiwio Premium")
-                .font(.system(.footnote, design: .default).weight(.bold))
-                .foregroundStyle(Color.teinteKiwiTexte)
+    private var carte: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Standard ou Premium ?")
+                        .font(.system(size: 22, weight: .bold))
+                        .tracking(-0.6)
+                        .foregroundStyle(Color.dsTexte)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Kiwi frais : c'est inclus. Kiwi raplapla : ça ne l'est pas.")
+                        .font(.dsLegende)
+                        .foregroundStyle(Color.dsSecondaire)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                DSCloseButton { onPlusTard() }
+            }
 
-            Text("Gratuit ou Premium ?")
-                .font(.system(size: tailleTitre, weight: .bold))
-                .tracking(-0.6)
-                .foregroundStyle(Color.dsTexte)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
+            tableau
+                .padding(.top, 16)
 
-            Text("Tout ce que Premium débloque, d'un coup d'œil.")
-                .font(.dsSousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            PremiumAction(titre: "Passer à Premium", action: onContinuer)
+                .padding(.top, 20)
+                .accessibilityIdentifier("comparatif.continuer")
+
+            Button(action: onPlusTard) {
+                Text("Plus tard")
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 8)
+        .verreFeuilleDetachee()
     }
 
-    // MARK: Tableau
+    // MARK: Le tableau
 
     private var tableau: some View {
         VStack(spacing: 0) {
-            if !empile {
-                ligneTitres
-            }
+            enTeteColonnes
             ForEach(Array(ComparatifPremium.lignes.enumerated()), id: \.element.id) { rang, ligne in
-                if rang > 0 || empile {
+                if rang > 0 {
                     Rectangle()
                         .fill(Color.dsSeparateur)
                         .frame(height: 0.5)
-                        .padding(.trailing, empile ? 16 : largeurColonne + 6)
                         .accessibilityHidden(true)
                 }
-                Group {
-                    if empile {
-                        ligneEmpilee(ligne)
-                    } else {
-                        ligneColonnes(ligne)
-                    }
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(descriptionVocale(ligne))
-                .verreCascade(revele, delai: 0.12 + Double(rang) * 0.04, decalage: 8)
+                ligneVue(ligne, rang: rang)
             }
         }
-        .padding(.leading, 16)
-        .padding(.vertical, 6)
-        // La colonne Premium : un aplat vert pâle sur toute la hauteur, qu'on
-        // suit de l'œil. En taille empilée, il n'y a plus de colonne à suivre.
-        .background(alignment: .trailing) {
-            if !empile {
-                RoundedRectangle(cornerRadius: DS.rayonCarte - 6, style: .continuous)
-                    .fill(Color.teinteKiwi.opacity(0.14))
-                    .frame(width: largeurColonne)
-                    .padding(.vertical, 6)
-                    .padding(.trailing, 6)
-            }
-        }
-        .dsCard()
+        // La colonne Premium, sur toute la hauteur du tableau.
+        .background(alignment: .trailing) { bandePremium }
     }
 
-    /// « Gratuit » | « Premium », en tête des deux colonnes.
-    private var ligneTitres: some View {
-        HStack(spacing: 0) {
+    private var bandePremium: some View {
+        let forme = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        return VerrePlaque(forme: forme, matiere: VerreMatiere.clairActif)
+            .overlay(forme.strokeBorder(Color.teinteKiwi.opacity(0.5), lineWidth: 1.5))
+            .frame(width: Self.largeurPremium)
+            .padding(.vertical, -4)
+            .accessibilityHidden(true)
+    }
+
+    private var enTeteColonnes: some View {
+        HStack(alignment: .bottom, spacing: 0) {
             Spacer(minLength: 0)
-            Text("Gratuit")
-                .font(.system(.headline, design: .rounded).weight(.bold))
+            Text("Standard")
+                .font(Font.dsLegende.weight(.semibold))
                 .foregroundStyle(Color.dsSecondaire)
-                .frame(width: largeurColonne)
-            Text("Premium")
-                .font(.system(.headline, design: .rounded).weight(.bold))
-                .foregroundStyle(Color.teinteKiwiTexte)
-                .frame(width: largeurColonne)
-                .padding(.trailing, 6)
+                .frame(width: Self.largeurStandard)
+                .padding(.bottom, 8)
+            VStack(spacing: 2) {
+                KiwiMascotte(animee: true)
+                    .frame(width: 48, height: 48)
+                Text("Premium")
+                    .font(Font.dsLegende.weight(.bold))
+                    .foregroundStyle(Color.teinteKiwiTexte)
+            }
+            .frame(width: Self.largeurPremium)
+            .padding(.bottom, 6)
         }
-        .lineLimit(1)
-        .minimumScaleFactor(0.8)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .frame(height: 76)
         .accessibilityHidden(true)
     }
 
-    private func ligneColonnes(_ ligne: LigneComparatif) -> some View {
+    private func ligneVue(_ ligne: LigneComparatif, rang: Int) -> some View {
         HStack(spacing: 0) {
-            libelle(ligne)
-                .padding(.trailing, 8)
-            Spacer(minLength: 0)
-            cellule(ligne.gratuit, premium: false)
-                .frame(width: largeurColonne)
-            cellule(ligne.premium, premium: true)
-                .frame(width: largeurColonne)
-                .padding(.trailing, 6)
-        }
-        .padding(.vertical, 12)
-        .frame(minHeight: DS.cibleTactile)
-    }
-
-    private func ligneEmpilee(_ ligne: LigneComparatif) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            libelle(ligne)
-            HStack(spacing: 12) {
-                celluleNommee("Gratuit", ligne.gratuit, premium: false)
-                celluleNommee("Premium", ligne.premium, premium: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 14)
-        .padding(.trailing, 16)
-    }
-
-    private func libelle(_ ligne: LigneComparatif) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: ligne.symbole)
-                .font(.system(size: tailleLigne - 2, weight: .semibold))
-                .foregroundStyle(Color.dsSecondaire)
-                .frame(width: tailleLigne + 6)
             Text(ligne.libelle)
-                .font(.system(size: tailleLigne, weight: .semibold))
+                .font(.dsSousTitre)
                 .foregroundStyle(Color.dsTexte)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            cellule(ligne.standard, rang: rang, premium: false)
+                .frame(width: Self.largeurStandard)
+            cellule(ligne.premium, rang: rang, premium: true)
+                .frame(width: Self.largeurPremium)
         }
+        .frame(minHeight: 38)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ComparatifPremium.descriptionVocale(ligne))
     }
 
-    /// Une cellule : la coche, la croix, ou la limite à lire. La colonne
-    /// Premium écrit en vert foncé, la colonne Gratuit en gris.
+    /// Une cellule : le kiwi frais, le kiwi raplapla ou un plafond par jour.
+    /// Les kiwis se posent ligne après ligne, la colonne Premium juste après
+    /// la colonne Standard.
     @ViewBuilder
-    private func cellule(_ offre: OffreComparee, premium: Bool) -> some View {
+    private func cellule(_ offre: OffreComparee, rang: Int, premium: Bool) -> some View {
+        let delai = 0.1 + Double(rang) * 0.07 + (premium ? 0.12 : 0)
         switch offre {
         case .inclus:
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: tailleSigne, weight: .semibold))
-                .foregroundStyle(premium ? Color.teinteKiwiTexte : Color.dsSecondaire)
+            KiwiFrais(pose: poses, delai: delai)
         case .absent:
-            Image(systemName: "xmark")
-                .font(.system(size: tailleSigne - 6, weight: .bold))
-                .foregroundStyle(Color.dsTertiaire)
-        case .valeur(let texte):
-            Text(texte)
-                .font(.system(size: tailleValeur, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(premium ? Color.teinteKiwiTexte : Color.dsTexte)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.75)
-        }
-    }
-
-    /// Taille empilée : la cellule porte le nom de sa formule, puisqu'il n'y
-    /// a plus de colonne au-dessus pour le dire.
-    private func celluleNommee(_ nom: String, _ offre: OffreComparee, premium: Bool) -> some View {
-        VStack(spacing: 4) {
-            Text(nom)
-                .font(.system(.subheadline, design: .rounded).weight(.bold))
-                .foregroundStyle(premium ? Color.teinteKiwiTexte : Color.dsSecondaire)
-            cellule(offre, premium: premium)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(premium ? Color.teinteKiwi.opacity(0.14) : Color.dsRemplissage)
-        )
-    }
-
-    /// « Repas dictés. Gratuit : 2 par jour. Premium : 60 par jour. »
-    private func descriptionVocale(_ ligne: LigneComparatif) -> String {
-        func dire(_ offre: OffreComparee) -> String {
-            switch offre {
-            case .inclus: return "inclus"
-            case .absent: return "non inclus"
-            case .valeur(let texte): return texte.replacingOccurrences(of: " / jour", with: " par jour")
+            KiwiRaplapla(pose: poses, delai: delai)
+        case .parJour(let nombre):
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("\(nombre)")
+                    .font(Font.dsSousTitreFort.monospacedDigit())
+                Text("/j")
+                    .font(.dsLegende)
             }
+            .foregroundStyle(premium ? Color.teinteKiwiTexte : Color.dsSecondaire)
         }
-        return "\(ligne.libelle). Gratuit : \(dire(ligne.gratuit)). Premium : \(dire(ligne.premium))."
+    }
+}
+
+// MARK: - Les deux kiwis
+
+/// Inclus : la tranche de kiwi 3D, qui arrive en tournant.
+private struct KiwiFrais: View {
+    let pose: Bool
+    let delai: Double
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Fluent3DIcon(name: Fluent3D.kiwi, size: 26)
+            .shadow(color: Verre.encreOmbre.opacity(0.22), radius: 2, y: 2)
+            .scaleEffect(pose ? 1 : 0.3)
+            .rotationEffect(.degrees(pose ? 0 : -40))
+            .opacity(pose ? 1 : 0)
+            .animation(reduceMotion ? nil : Animation.kiwiRebond.delay(delai), value: pose)
+    }
+}
+
+/// Pas inclus : le même kiwi, raplapla. Il tombe, s'étire en touchant la
+/// table, s'écrase, puis se tasse. Sous « Réduire les animations », il est
+/// posé d'emblée.
+private struct KiwiRaplapla: View {
+    let pose: Bool
+    let delai: Double
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// L'état de repos : posé, à plat, à sa taille.
+    private struct Chute {
+        var y: CGFloat = 0
+        var largeur: CGFloat = 1
+        var hauteur: CGFloat = 1
+        var opacite: Double = 1
+    }
+
+    private var image: some View {
+        Image("fluent_kiwi_ecrase")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 36)
+            .accessibilityHidden(true)
+    }
+
+    var body: some View {
+        if reduceMotion {
+            image.opacity(pose ? 1 : 0)
+        } else {
+            image
+                .keyframeAnimator(initialValue: Chute(), trigger: pose) { vue, chute in
+                    vue
+                        .scaleEffect(x: chute.largeur, y: chute.hauteur, anchor: .bottom)
+                        .offset(y: chute.y)
+                        .opacity(chute.opacite)
+                } keyframes: { _ in
+                    KeyframeTrack(\.y) {
+                        MoveKeyframe(-22)
+                        LinearKeyframe(-22, duration: delai)
+                        CubicKeyframe(0, duration: 0.28)
+                    }
+                    KeyframeTrack(\.opacite) {
+                        MoveKeyframe(0)
+                        LinearKeyframe(0, duration: delai)
+                        LinearKeyframe(1, duration: 0.12)
+                    }
+                    KeyframeTrack(\.largeur) {
+                        MoveKeyframe(0.55)
+                        LinearKeyframe(0.55, duration: delai)
+                        CubicKeyframe(0.7, duration: 0.28)
+                        CubicKeyframe(1.18, duration: 0.12)
+                        SpringKeyframe(1, duration: 0.3)
+                    }
+                    KeyframeTrack(\.hauteur) {
+                        MoveKeyframe(1.5)
+                        LinearKeyframe(1.5, duration: delai)
+                        CubicKeyframe(1.35, duration: 0.28)
+                        CubicKeyframe(0.7, duration: 0.12)
+                        SpringKeyframe(1, duration: 0.3)
+                    }
+                }
+                // Avant que la carte ne soit montée : rien à voir.
+                .opacity(pose ? 1 : 0)
+        }
     }
 }

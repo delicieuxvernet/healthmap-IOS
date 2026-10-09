@@ -155,7 +155,6 @@ struct AbonnementReglagesView: View {
         .kiwiNavigationBarBackground()
         .sheet(isPresented: $showPaywall) {
             PaywallView(source: "reglages_abonnement")
-                .healthMapFullSheet()
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
         .alerteRestauration(restauration)
