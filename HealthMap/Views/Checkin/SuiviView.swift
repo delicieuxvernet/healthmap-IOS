@@ -235,7 +235,6 @@ struct SuiviView: View {
             )
         case .offre(let zone, let origine):
             PaywallView(source: zone)
-                .healthMapFullSheet()
                 .premiumDepuis(origine, dans: espaceOffre)
         }
     }

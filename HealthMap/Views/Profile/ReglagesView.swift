@@ -151,7 +151,6 @@ struct ReglagesView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showPaywall) {
                 PaywallView(source: "reglages")
-                    .healthMapFullSheet()
                     .premiumDepuis("premium", dans: espacePremium)
             }
             .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)

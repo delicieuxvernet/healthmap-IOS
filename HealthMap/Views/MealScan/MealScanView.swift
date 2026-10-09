@@ -424,7 +424,7 @@ struct JournalView: View {
                     onImage: { data in viewModel.selectedImage = data }
                 ))
                 .sheet(isPresented: $showPaywall) {
-                    PaywallView().healthMapFullSheet()
+                    PaywallView()
                 }
                 .sheet(item: $repasOuvert) { slot in
                     // La fiche de CE repas. Cibles réelles du profil : jamais
@@ -1118,7 +1118,6 @@ struct JournalView: View {
             .padding(.top, DS.interCarte)
             .sheet(isPresented: $porteMicros) {
                 PaywallView(source: "journal_micros")
-                    .healthMapFullSheet()
             }
         } else {
             JournalMicrosCard(tableau: tableauMicros) { ligne in

@@ -105,8 +105,14 @@ struct PaywallView: View {
     /// Marge latérale de la feuille (maquette : 24).
     private static let marge: CGFloat = 24
 
+    /// Le comparatif « Standard ou Premium ? » passe avant les formules, à
+    /// chaque ouverture tant qu'on n'est pas abonné (décision d'Arthur,
+    /// 9 octobre 2026). Décidé une fois, à l'ouverture.
+    @State private var montreComparatif: Bool
+
     init(source: String = "generic") {
         self.source = source
+        _montreComparatif = State(initialValue: !SubscriptionService.shared.isPremium)
     }
 
     /// Formules disponibles : celles de l'offering RevenueCat, COMPLÉTÉES par
@@ -133,44 +139,47 @@ struct PaywallView: View {
     private var shortPlan: PlanOption? { weeklyPlan }
 
     var body: some View {
-        // Ton calme, sans capitales ni compte à rebours (refonte du 23 août
-        // 2026). Aucun aplat en fond : la feuille est en verre (`FeuillePremiumFond`).
-        ScrollView {
-            VStack(spacing: 0) {
-                embleme
-                    .padding(.top, 39)
-
-                header
-                    .padding(.top, 16)
-                    .verreCascade(revele, delai: 0.12, decalage: 10)
-
-                featureList
-                    .padding(.top, 20)
-
-                achat
-                    .verreCascade(revele, delai: 0.42)
+        Group {
+            if montreComparatif {
+                ComparatifPremiumView(
+                    onContinuer: { passerAuxFormules() },
+                    onPlusTard: { fermer() }
+                )
+                .transition(.opacity)
+            } else {
+                formules
+                    .transition(.opacity)
             }
-            .padding(.horizontal, Self.marge)
-            // Maquette : 18 pt sous le dernier élément.
-            .padding(.bottom, 18)
-            .frame(maxWidth: .infinity)
-            .overlay(alignment: .topTrailing) { closeButton }
         }
         // La feuille Premium a SA matière dans la maquette : blanche (90 → 76 %),
         // plus claire que le verre légèrement vert des autres feuilles.
-        .presentationBackground { FeuillePremiumFond() }
+        // Pendant le comparatif, la présentation est transparente : la carte
+        // de verre détachée dessine la sienne et laisse voir l'écran au-dessus.
+        .presentationBackground {
+            if montreComparatif {
+                Color.clear
+            } else {
+                FeuillePremiumFond()
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(montreComparatif ? .hidden : .visible)
         .presentationCornerRadius(Verre.rayonFeuille)
         .task {
             await loadOfferingsWithTimeout()
         }
         .task {
             // La maquette laisse la feuille s'installer 200 ms avant de jouer
-            // l'éclosion et la cascade.
+            // l'éclosion et la cascade. Derrière le tableau comparatif, la
+            // cascade attend qu'on passe aux formules (`passerAuxFormules`).
             try? await Task.sleep(for: .milliseconds(200))
-            revele = true
+            if !montreComparatif { revele = true }
         }
         .onAppear {
-            AnalyticsService.shared.track(.paywallShown, properties: ["source": source])
+            AnalyticsService.shared.track(.paywallShown, properties: [
+                "source": source,
+                "comparatif": montreComparatif,
+            ])
         }
         // L'offering peut arriver après l'apparition (cold start, réseau lent) :
         // on sélectionne alors la formule annuelle par défaut dès qu'elle existe,
@@ -206,6 +215,46 @@ struct PaywallView: View {
         }
     }
 
+    /// La feuille des formules : la mascotte, la promesse, les bénéfices,
+    /// puis l'achat. Ton calme, sans capitales ni compte à rebours (refonte du
+    /// 23 août 2026). Aucun aplat en fond : la feuille est en verre
+    /// (`FeuillePremiumFond`).
+    private var formules: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                embleme
+                    .padding(.top, 39)
+
+                header
+                    .padding(.top, 16)
+                    .verreCascade(revele, delai: 0.12, decalage: 10)
+
+                featureList
+                    .padding(.top, 20)
+
+                achat
+                    .verreCascade(revele, delai: 0.42)
+            }
+            .padding(.horizontal, Self.marge)
+            // Maquette : 18 pt sous le dernier élément.
+            .padding(.bottom, 18)
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .topTrailing) { closeButton }
+        }
+    }
+
+    /// « Passer à Premium » sur le tableau : place aux formules, et la
+    /// cascade de la feuille se joue à ce moment-là.
+    private func passerAuxFormules() {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
+            montreComparatif = false
+        }
+        Task {
+            try? await Task.sleep(for: .milliseconds(150))
+            revele = true
+        }
+    }
+
     // MARK: - Header
 
     /// Ferme la feuille sans achat (croix ou « Plus tard »).
@@ -213,6 +262,7 @@ struct PaywallView: View {
         AnalyticsService.shared.track(.paywallDismissed, properties: [
             "source": source,
             "outcome": "closed",
+            "etape": montreComparatif ? "comparatif" : "formules",
         ])
         dismiss()
     }
@@ -1010,7 +1060,6 @@ struct PaywallModifier: ViewModifier {
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
-                    .healthMapFullSheet()
             }
     }
 }
