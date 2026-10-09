@@ -337,6 +337,84 @@ final class ScreenshotsUITests: XCTestCase {
         }
     }
 
+    // MARK: - 7. Grande taille de texte : les onglets, sans aucune saisie
+    //
+    // Audit d'accessibilité (9 oct. 2026) : comparer chaque écran principal
+    // à la taille par défaut et à une taille d'accessibilité (entrée
+    // `taille_texte` du workflow). Lecture seule : on ne fait que changer
+    // d'onglet, défiler et ouvrir puis fermer le paywall et le Récap. Rien
+    // n'est ajouté au journal du compte d'audit.
+
+    func test07_GrandeTaille() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
+        attendreChargement()
+
+        for (onglet, nom) in [("tab.journal", "journal"), ("tab.progres", "progres"), ("tab.plan", "plan"),
+                              ("tab.complements", "complements"), ("tab.reglages", "reglages")] {
+            app.buttons[onglet].tap()
+            sleep(2)
+            // Le check-in du jour peut s'ouvrir sur Progrès : on le passe.
+            let passer = app.buttons["Passer pour aujourd'hui"]
+            if passer.waitForExistence(timeout: 2) {
+                taper(passer)
+                sleep(1)
+            }
+            snap("20-\(nom)-haut")
+            app.swipeUp()
+            sleep(1)
+            snap("21-\(nom)-milieu")
+            app.swipeUp()
+            sleep(1)
+            snap("22-\(nom)-bas")
+            app.swipeDown()
+            app.swipeDown()
+            app.swipeDown()
+            sleep(1)
+        }
+
+        // Paywall, depuis la carte Premium des Réglages.
+        app.buttons["tab.reglages"].tap()
+        sleep(1)
+        let essai = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Premium")).firstMatch
+        if essai.waitForExistence(timeout: 4) {
+            taper(essai)
+            sleep(3)
+            snap("30-paywall-haut")
+            app.swipeUp()
+            sleep(1)
+            snap("31-paywall-bas")
+            fermerFeuille()
+            sleep(1)
+        }
+
+        // Récap animé, rejoué depuis les Réglages.
+        let rejouer = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "bilan animé")).firstMatch
+        for _ in 0..<5 where !(rejouer.exists && rejouer.isHittable) {
+            app.swipeUp()
+            sleep(1)
+        }
+        if rejouer.waitForExistence(timeout: 4) {
+            taper(rejouer)
+            sleep(3)
+            snap("40-recap")
+            let fermer = app.buttons["Fermer le bilan animé"]
+            if fermer.waitForExistence(timeout: 3) {
+                fermer.tap()
+                sleep(1)
+                let sortie = app.buttons["Aller à mon bilan"]
+                if sortie.waitForExistence(timeout: 3) { sortie.tap() }
+            }
+        }
+    }
+
     // MARK: - Outils
 
     /// Se connecte si la page de garde est affichée (session absente).

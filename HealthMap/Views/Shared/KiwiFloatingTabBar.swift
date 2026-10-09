@@ -84,9 +84,10 @@ struct KiwiFloatingTabBar: View {
         .padding(.horizontal, Self.margeLaterale)
         .padding(.bottom, Self.margeBas)
         // La capsule garde sa hauteur : ses libellés suivent Dynamic Type
-        // jusqu'à xxxLarge, au-delà c'est la loupe de grand contenu qui prend
-        // le relais (appui long sur un onglet).
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        // jusqu'à xxLarge (au-delà, « Compléments » ne tient plus dans son
+        // cinquième de barre, captures AX3 du 9 oct.), puis la loupe de grand
+        // contenu prend le relais (appui long sur un onglet).
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .accessibilityElement(children: .contain)
         .onChange(of: selected) { _, nouvel in
             // Le changement peut venir d'ailleurs que d'un toucher (lien
