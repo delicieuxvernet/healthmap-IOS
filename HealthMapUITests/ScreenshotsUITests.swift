@@ -697,6 +697,104 @@ final class ScreenshotsUITests: XCTestCase {
         }
     }
 
+    // MARK: - 7. La dictée en un toucher (Kiwio 2.0, 8 octobre 2026)
+    //
+    // « Écrire » un repas, puis « Lancer l'analyse » : la feuille de résultats
+    // arrive déjà comptée, les doutes marqués sur leur ligne. Puis le réglage
+    // fin d'une ligne (règle graduée). ⚠️ Lance UNE analyse (un appel
+    // `parse-meal-voice`, quelques centimes) mais ne touche JAMAIS « Ajouter » :
+    // rien n'est enregistré dans le Journal du compte de captures.
+
+    func test07_DicteeUnToucher() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
+        attendreChargement()
+        sleep(2)
+
+        guard app.buttons["journal.autres"].waitForExistence(timeout: 5) else { return }
+        if !app.buttons["Écrire"].exists { taper(app.buttons["journal.autres"]) }
+        let ecrire = app.buttons["Écrire"].firstMatch
+        guard ecrire.waitForExistence(timeout: 5) else { return }
+        taper(ecrire)
+        sleep(2)
+        let champ = app.textFields["journal.texte"].exists ? app.textFields["journal.texte"] : app.textViews["journal.texte"]
+        guard champ.waitForExistence(timeout: 5) else { fermerFeuille(); return }
+        fermerTutorielClavier()
+        champ.typeText("Des pâtes à la bolognaise, une salade verte et du fromage râpé")
+        sleep(1)
+        let analyser = app.buttons["journal.texte.analyser"]
+        guard analyser.waitForExistence(timeout: 3) else { fermerFeuille(); return }
+        taper(analyser)
+
+        // L'analyse est réseau : on attend le titre-menu du repas.
+        guard app.buttons["dictee.resultat.repas"].waitForExistence(timeout: 60) else {
+            snap("09-dictee-sans-resultat")
+            fermerFeuille()
+            return
+        }
+        // La cascade des lignes et le total qui compte.
+        sleep(3)
+        snap("09-dictee-un-toucher")
+
+        // Le réglage fin de la première ligne : grammes, kcal, règle graduée.
+        let ligne = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@ AND NOT (label BEGINSWITH %@)", "kilocalories", "Ajouter")).firstMatch
+        if ligne.waitForExistence(timeout: 3) {
+            taper(ligne)
+            sleep(2)
+            snap("10-dictee-reglage-fin")
+        }
+        fermerFeuille()
+    }
+
+    // MARK: - 8. Le comparatif « Standard ou Premium ? » (Kiwio 2.0, 9 octobre 2026)
+    //
+    // Réglages, puis le bouton de la carte Kiwio Premium (compte gratuit) : la
+    // feuille Premium s'ouvre sur la carte aux kiwis. On laisse les kiwis se
+    // poser, puis « Passer à Premium » mène aux formules. ⚠️ Ne touche JAMAIS
+    // un bouton d'achat.
+
+    func test08_ComparatifPremium() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.reglages"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
+        attendreChargement()
+        app.buttons["tab.reglages"].tap()
+        sleep(2)
+
+        let porte = app.buttons.matching(NSPredicate(
+            format: "label BEGINSWITH %@ OR label BEGINSWITH %@", "Essayer", "Découvrir")).firstMatch
+        guard porte.waitForExistence(timeout: 8) else {
+            snap("57-comparatif-porte-absente")
+            return
+        }
+        taper(porte)
+        // La carte monte, puis les kiwis se posent ligne après ligne.
+        sleep(4)
+        snap("57-comparatif")
+
+        let continuer = app.buttons["comparatif.continuer"]
+        if continuer.waitForExistence(timeout: 3) {
+            taper(continuer)
+            sleep(3)
+            snap("58-formules")
+        }
+        fermerFeuille()
+    }
+
     /// Laisse le temps au Journal de charger ses données (journal, bilan).
     private func attendreChargement() {
         autoriserSante()
