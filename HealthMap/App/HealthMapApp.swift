@@ -75,10 +75,10 @@ struct HealthMapApp: App {
                 // Forced light theme (locked product decision, DESIGN-PAGES
                 // law 2): the app does NOT follow the iPhone dark mode.
                 .preferredColorScheme(.light)
-                // Dynamic Type: clamp to a readable range.
-                // Accessibility users can still scale up, but we cap at
-                // .accessibility3 so layouts don't break.
-                .dynamicTypeSize(.large ... .accessibility3)
+                // Dynamic Type : aucune borne. La taille choisie dans
+                // Réglages s'applique telle quelle, des plus petites à
+                // `.accessibility5` (accessibilité, 9 oct. 2026 : l'ancien
+                // plancher `.large` et le plafond `.accessibility3` sautent).
                 .task {
                     await pushService.refreshAuthorizationStatus()
 

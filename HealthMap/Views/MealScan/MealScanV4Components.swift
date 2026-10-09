@@ -712,7 +712,7 @@ struct FoodDetailSheetV4: View {
     private func macroTile(_ label: String, _ value: String, _ unit: String, encre: Color) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 17, weight: .bold, design: .rounded).monospacedDigit())
+                .dsPolice(17, .bold, design: .rounded, chiffres: true)
                 .foregroundStyle(Color.dsTexte)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

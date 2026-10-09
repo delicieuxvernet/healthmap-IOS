@@ -634,7 +634,9 @@ struct JournalView: View {
     /// « Journal » à gauche (34 / 700), la capsule du jour à droite. La barre
     /// de navigation native est masquée : c'est cette ligne qui porte le titre.
     private var enTete: some View {
-        HStack(alignment: .center, spacing: 8) {
+        // Aux tailles d'accessibilité, la capsule du jour passe sous le titre :
+        // à côté, elle se réduisait à « Auj… » (AX3).
+        DSLigneOuColonne(alignementLigne: .center, espacement: 8) {
             DSLargeTitle(titre: "Journal")
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -1599,6 +1601,7 @@ struct JournalView: View {
                     .frame(height: 220)
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
+                    .accessibilityLabel("Photo de ton repas, prête à être analysée")
                     .overlay(
                         Button {
                             viewModel.selectedImage = nil
@@ -1720,11 +1723,13 @@ struct JournalView: View {
             Group {
                 if let uiImage = viewModel.apercuPhoto {
                     Image(uiImage: uiImage).resizable().scaledToFill()
+                        .accessibilityLabel(libellePhoto(result))
                 } else {
                     ZStack {
                         Color.dsRemplissage
                         Fluent3DIcon(name: Fluent3D.spaghetti, size: 90)
                     }
+                    .accessibilityHidden(true)
                 }
             }
             .frame(height: 236)
@@ -1750,13 +1755,13 @@ struct JournalView: View {
                 Spacer()
                 VStack(alignment: .leading, spacing: 6) {
                     Text(headerTitle(result))
-                        .font(.system(size: 27, weight: .bold))
+                        .dsPolice(27, .bold)
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
                     if let subtitle = headerSubtitle(result) {
                         Text(subtitle)
-                            .font(.system(size: 13, weight: .medium))
+                            .dsPolice(13, .medium)
                             .foregroundStyle(.white.opacity(0.9))
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1799,6 +1804,17 @@ struct JournalView: View {
     /// Titre du header : nom du plat rédigé par le serveur (contrat v2,
     /// `scan_v2.plat.nom`) quand présent — remplace le créneau générique
     /// (Déjeuner, Dîner…), comme le prévoit la maquette. Sinon inchangé.
+    /// Ce que VoiceOver dit de la photo : ce qu'on y a reconnu, pas
+    /// seulement « image ».
+    private func libellePhoto(_ result: MealScanViewModel.MealAnalysisResult) -> String {
+        let aliments = result.detectedFoods
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .prefix(4)
+        guard !aliments.isEmpty else { return "Photo de ton repas" }
+        return "Photo de ton repas : " + aliments.joined(separator: ", ")
+    }
+
     private func headerTitle(_ result: MealScanViewModel.MealAnalysisResult) -> String {
         if let nom = result.scanV2?.plat?.nom?.trimmingCharacters(in: .whitespacesAndNewlines),
            !nom.isEmpty {
@@ -1947,19 +1963,19 @@ struct JournalView: View {
             .frame(height: 6)
             if let why = besoin.why, !why.isEmpty {
                 Text(why)
-                    .font(.system(size: 12))
+                    .dsPolice(12)
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let complements = besoin.alimentsComplement, !complements.isEmpty {
                 HStack(spacing: 6) {
                     Text("À compléter :")
-                        .font(.system(size: 11.5))
+                        .dsPolice(11.5)
                         .foregroundStyle(Color.dsSecondaire)
                     ForEach(Array(complements.prefix(3).enumerated()), id: \.offset) { _, aliment in
                         if let nom = aliment.nom, !nom.isEmpty {
                             Text(nom)
-                                .font(.system(size: 11.5, weight: .medium))
+                                .dsPolice(11.5, .medium)
                                 .foregroundStyle(Color.dsTexte)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -2129,7 +2145,7 @@ struct JournalView: View {
         VStack(alignment: .leading, spacing: Theme.spacingSM) {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.scoreLow)
-                Text("Attention").font(Theme.captionBoldFont).foregroundStyle(Color.scoreLow)
+                Text("Attention").font(Theme.captionBoldFont).foregroundStyle(Color.dsARenforcerTexte)
             }
             ForEach(warnings, id: \.self) { warning in
                 Text("• \(warning)")
@@ -2247,18 +2263,18 @@ private struct NeedImpactDetailSheet: View {
                     .padding(.top, 18)
 
                 Text("Ce que ce repas apporte")
-                    .font(.system(size: 13, weight: .bold))
+                    .dsPolice(13, .bold)
                     .foregroundStyle(Color.dsTexte)
                     .padding(.top, 16)
                     .padding(.bottom, 6)
                 Text(why)
-                    .font(.system(size: 13.5, weight: .medium))
+                    .dsPolice(13.5, .medium)
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if !foods.isEmpty {
                     Text("Pour le compléter")
-                        .font(.system(size: 13, weight: .bold))
+                        .dsPolice(13, .bold)
                         .foregroundStyle(Color.dsTexte)
                         .padding(.top, 20)
                         .padding(.bottom, 12)
@@ -2267,7 +2283,7 @@ private struct NeedImpactDetailSheet: View {
                             VStack(spacing: 8) {
                                 Fluent3DIcon(name: food.asset, size: 40)
                                 Text(food.label)
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .dsPolice(12, .semibold)
                                     .foregroundStyle(Color.dsTexte)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
@@ -2326,12 +2342,12 @@ private struct NeedImpactDetailSheet: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(label)
-                    .font(.system(size: 20, weight: .bold))
+                    .dsPolice(20, .bold)
                     .foregroundStyle(Color.dsTexte)
                 HStack(spacing: 5) {
                     Circle().fill(color).frame(width: 7, height: 7)
                     Text(statusText)
-                        .font(.system(size: 11, weight: .bold))
+                        .dsPolice(11, .bold)
                         .foregroundStyle(color)
                 }
                 .padding(.horizontal, 10)

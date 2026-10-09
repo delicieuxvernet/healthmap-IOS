@@ -73,6 +73,9 @@ enum Theme {
 
     /// Sous-label discret : la précision qui accompagne un titre de section.
     /// 11.5 / bold · encre pâle (`healthMapSecondary` ou `healthMapMuted`).
+    /// Taille fixe : sur un texte isolé, poser `.dsPolice(11.5, .bold)`, qui
+    /// suit Dynamic Type (accessibilité, 9 oct. 2026). Le jeton reste pour
+    /// les `Text` concaténés.
     static let subLabelFont: Font = .system(size: 11.5, weight: .bold)
 
     /// Conclusion : ce que les données veulent dire, le pic de sa carte.
@@ -109,7 +112,10 @@ enum Theme {
 
     /// Habillage : unité, date, mention, note de bas de carte.
     /// 10.5 / medium · `healthMapMuted`. Jamais de fond coloré si la
-    /// donnée-héros du même bloc n'en porte pas.
+    /// donnée-héros du même bloc n'en porte pas. Taille fixe : sur un texte
+    /// isolé, poser `.dsPolice(10.5, .medium)`, qui suit Dynamic Type
+    /// (accessibilité, 9 oct. 2026). Le jeton reste pour les `Text`
+    /// concaténés et les chiffres logés dans un anneau.
     static let chromeFont: Font = .system(size: 10.5, weight: .medium)
 
     /// CTA primaire : un seul par carte, 15 / semibold, blanc sur `kiwiGreen`,

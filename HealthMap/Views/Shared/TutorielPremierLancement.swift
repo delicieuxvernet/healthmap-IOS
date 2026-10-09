@@ -299,7 +299,7 @@ struct TutorielBulle: View {
                     if let onPasser {
                         Button(action: onPasser) {
                             Text("Passer")
-                                .font(.system(size: 15, weight: .medium))
+                                .dsPolice(15, .medium)
                                 .foregroundStyle(Color.dsSecondaire)
                                 // La cible déborde du libellé pour atteindre
                                 // 44 pt sans grandir l'en-tête : la marge est
@@ -317,7 +317,7 @@ struct TutorielBulle: View {
             }
 
             Text(titre)
-                .font(.system(size: 19, weight: .bold))
+                .dsPolice(19, .bold)
                 .tracking(-0.45)
                 .lineSpacing(2)
                 .foregroundStyle(Color.dsTexte)
@@ -325,7 +325,7 @@ struct TutorielBulle: View {
                 .padding(.top, 11)
 
             texte
-                .font(.system(size: 15))
+                .dsPolice(15)
                 .lineSpacing(3)
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
@@ -334,7 +334,7 @@ struct TutorielBulle: View {
             if let actionTitre, let action {
                 Button(action: action) {
                     Text(actionTitre)
-                        .font(.system(size: 17, weight: .semibold))
+                        .dsPolice(17, .semibold)
                         .tracking(-0.4)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -373,7 +373,7 @@ struct TutorielCarteBienvenue: View {
             }
 
             Text("Ton premier repas, maintenant")
-                .font(.system(size: 24, weight: .bold))
+                .dsPolice(24, .bold)
                 .tracking(-0.7)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color.dsTexte)
@@ -381,7 +381,7 @@ struct TutorielCarteBienvenue: View {
                 .padding(.top, 16)
 
             Text("Quatre étapes pour dicter un plat et voir ce qu'il couvre de tes besoins. Tu peux arrêter quand tu veux.")
-                .font(.system(size: 16))
+                .dsPolice(16)
                 .lineSpacing(3)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color.dsSecondaire)
@@ -390,7 +390,7 @@ struct TutorielCarteBienvenue: View {
 
             Button(action: onCommencer) {
                 Text("Commencer")
-                    .font(.system(size: 17, weight: .semibold))
+                    .dsPolice(17, .semibold)
                     .tracking(-0.4)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -403,7 +403,7 @@ struct TutorielCarteBienvenue: View {
 
             Button(action: onPlusTard) {
                 Text("Plus tard")
-                    .font(.system(size: 15, weight: .medium))
+                    .dsPolice(15, .medium)
                     .foregroundStyle(Color.dsSecondaire)
                     .frame(minHeight: 44)
             }

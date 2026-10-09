@@ -23,6 +23,16 @@ enum HealthScale {
         return .scoreExcellent                     // vert
     }
 
+    /// La même échelle pour un TEXTE (chiffre, mot d'état) : les encres
+    /// foncées de la palette. Les teintes vives ci-dessus ne tiennent pas
+    /// 4,5:1 en texte (orange 2,0:1, vert 2,2:1 ; audit du 9 oct. 2026) ;
+    /// elles restent pour les anneaux, jauges et pastilles.
+    static func couleurTexte(for score: Int) -> Color {
+        if score < 45 { return .dsAComblerTexte }  // rouge foncé #C0322A
+        if score < 70 { return .dsARenforcerTexte } // ambre foncé #995600
+        return .dsAccent                           // vert forêt #3B6D11
+    }
+
     // MARK: - Labels d'état fixes (loi 4)
 
     /// Mot d'état d'un NUTRIMENT :

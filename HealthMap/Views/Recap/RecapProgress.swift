@@ -25,6 +25,9 @@ final class RecapProgress: ObservableObject {
 
     private var slides: [RecapSlide] = []
     private var animationsReduites = false
+    /// Avance automatique coupée : VoiceOver lit à son rythme, un slide qui
+    /// part tout seul couperait la lecture au milieu d'une phrase.
+    private var avanceAutoCoupee = false
     private var minuteur: Task<Void, Never>?
 
     var slideCourant: RecapSlide? {
@@ -34,12 +37,26 @@ final class RecapProgress: ObservableObject {
     var nombreDeSlides: Int { slides.count }
 
     /// Démarre (ou redémarre) la lecture sur une séquence.
-    func demarrer(slides: [RecapSlide], animationsReduites: Bool) {
+    func demarrer(slides: [RecapSlide], animationsReduites: Bool, avanceAuto: Bool = true) {
         self.slides = slides
         self.animationsReduites = animationsReduites
+        self.avanceAutoCoupee = !avanceAuto
         index = 0
         terminee = false
         relancerMinuteur()
+    }
+
+    /// VoiceOver allumé ou éteint en cours de lecture : le slide courant
+    /// s'arrête (ou repart) sans changer de place.
+    func definirAvanceAuto(_ active: Bool) {
+        guard avanceAutoCoupee == active else { return }
+        avanceAutoCoupee = !active
+        // Sans avance automatique la barre était pleine : l'avance qui reprend
+        // repart du début du slide, même s'il est en pause (sinon il sauterait
+        // dès la reprise).
+        if active { avancee = 0 }
+        guard !enPause, !terminee else { return }
+        relancerMinuteur(depuis: active ? 0 : avancee)
     }
 
     // MARK: - Navigation
@@ -95,11 +112,13 @@ final class RecapProgress: ObservableObject {
         arreterMinuteur()
         avancee = depart
 
-        guard let slide = slideCourant,
+        guard !avanceAutoCoupee,
+              let slide = slideCourant,
               let duree = slide.dureeAffichage.secondes(animationsReduites: animationsReduites),
               duree > 0 else {
-            // Slide sans avance automatique (carte, offre) : la barre reste
-            // pleine, l'utilisateur décide quand passer.
+            // Slide sans avance automatique (carte, offre, ou VoiceOver
+            // allumé) : la barre reste pleine, l'utilisateur décide quand
+            // passer.
             avancee = 1
             return
         }

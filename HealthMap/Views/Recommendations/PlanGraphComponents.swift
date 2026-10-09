@@ -502,13 +502,23 @@ private struct PlanGraphNoeudView: View {
 // MARK: - Légende des trois anneaux
 
 struct PlanGraphLegende: View {
+    /// Aux tailles d'accessibilité, une pastille par ligne : côte à côte,
+    /// elles se coupaient en « obje… », « sympt… » (AX3).
+    @Environment(\.dynamicTypeSize) private var tailleTexte
+
     var body: some View {
-        HStack(spacing: 16) {
+        let disposition = tailleTexte.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 16))
+        disposition {
             pastille(PlanGraphTeintes.objectif, "objectif")
             pastille(PlanGraphTeintes.symptome, "symptômes")
             pastille(PlanGraphTeintes.levier, "leviers")
-            Spacer(minLength: 0)
+            if !tailleTexte.isAccessibilitySize {
+                Spacer(minLength: 0)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Vert : ton objectif. Bleu : tes symptômes. Gris : les leviers.")
     }
@@ -552,6 +562,9 @@ struct PlanSelectionBandeau: View {
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Aux tailles d'accessibilité, la carte s'empile : pastille, textes,
+    /// puis « détail ». Côte à côte, « Symptôme suivi » devenait « Symptô… ».
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     /// Le nouveau contenu sort du flou ; l'ancien s'efface aussitôt. Sous
     /// « Réduire les animations », un simple fondu.
@@ -570,7 +583,7 @@ struct PlanSelectionBandeau: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            DSLigneOuColonne(alignementLigne: .center, espacement: 14) {
                 // L'ancien et le nouveau contenu se superposent le temps de
                 // l'échange : la carte ne saute pas.
                 ZStack(alignment: .leading) {
@@ -603,7 +616,7 @@ struct PlanSelectionBandeau: View {
     /// Pastille de 48 (rayon 14), catégorie en 15 / 600 dans sa teinte, nom en
     /// 20 / 700, résumé en 15.
     private var resumeDuNoeud: some View {
-        HStack(spacing: 14) {
+        DSLigneOuColonne(alignementLigne: .center, espacement: 14) {
             Image(systemName: symbole)
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(PlanGraphTeintes.icone(noeud.genre))
@@ -622,13 +635,13 @@ struct PlanSelectionBandeau: View {
                     .font(.system(.title3, design: .default).weight(.bold))
                     .tracking(-0.5)
                     .foregroundStyle(Color.dsTexte)
-                    .lineLimit(2)
+                    .lineLimit(tailleTexte.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
                 if !resume.isEmpty {
                     Text(resume)
                         .font(.dsSousTitre)
                         .foregroundStyle(Color.dsSecondaire)
-                        .lineLimit(2)
+                        .lineLimit(tailleTexte.isAccessibilitySize ? nil : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

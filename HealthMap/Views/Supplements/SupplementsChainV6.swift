@@ -113,7 +113,7 @@ struct ComplementsRituelStrip: View {
                 Text(rituel.insight)
                     .font(.dsSousTitre)
                     .tracking(DSTracking.sousTitre)
-                    .foregroundStyle(Color.dsTertiaire)
+                    .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 HStack(alignment: .top, spacing: 8) {

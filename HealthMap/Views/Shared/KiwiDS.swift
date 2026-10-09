@@ -133,10 +133,27 @@ extension Color {
             ? UIColor.label
             : UIColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1E / 255, alpha: 1)
     })
-    /// Texte secondaire — `rgba(60,60,67,.6)`.
-    static let dsSecondaire = Color(uiColor: .secondaryLabel)
-    /// Texte tertiaire, chevron passif, jour futur — `rgba(60,60,67,.3)`.
-    static let dsTertiaire = Color(uiColor: .tertiaryLabel)
+    /// Texte secondaire — le gris d'iOS, plus dense : `rgba(60,60,67,.80)`
+    /// (au lieu de .60), et `.94` sous « Augmenter le contraste ».
+    ///
+    /// Conformité WCAG AA (audit du 9 oct. 2026, maquette validée par Arthur) :
+    /// à .60 il ne tenait que 3,1 à 3,4:1 ; à .80 il tient 5,0:1 sur l'en-tête
+    /// vert du Journal (le fond le plus foncé) et 5,6 à 6,0:1 sur les cartes.
+    /// Il reste translucide : il prend la teinte du verre comme celui d'iOS.
+    static let dsSecondaire = Color(uiColor: UIColor { trait in
+        if trait.userInterfaceStyle == .dark { return .secondaryLabel }
+        return UIColor(red: 60 / 255, green: 60 / 255, blue: 67 / 255,
+                       alpha: trait.accessibilityContrast == .high ? 0.94 : 0.80)
+    })
+    /// Chevron passif, icône discrète, jour futur — `rgba(60,60,67,.62)`
+    /// (au lieu de .30), `.75` sous « Augmenter le contraste ». C'est une
+    /// teinte d'OBJET graphique (≥ 3:1, ici 3,2 à 3,4:1) : un texte qui doit
+    /// se lire prend `dsSecondaire`.
+    static let dsTertiaire = Color(uiColor: UIColor { trait in
+        if trait.userInterfaceStyle == .dark { return .tertiaryLabel }
+        return UIColor(red: 60 / 255, green: 60 / 255, blue: 67 / 255,
+                       alpha: trait.accessibilityContrast == .high ? 0.75 : 0.62)
+    })
     /// Filet séparateur — `rgba(60,60,67,.22)` sur 0,5 pt.
     static let dsSeparateur = Color(uiColor: UIColor { trait in
         trait.userInterfaceStyle == .dark
@@ -157,8 +174,25 @@ extension Color {
 
     // Accent : UNIQUEMENT l'interactif.
 
-    /// Vert Kiwio — onglet actif, bouton, lien, `+`, chevron d'action.
-    static let dsAccent = Color.kiwiGreen
+    /// Vert Kiwio de l'interactif — onglet actif, lien, `+`, chevron
+    /// d'action, coche : le vert forêt `#3B6D11` (le « vert kiwi texte » de la
+    /// palette), `#2F5A16` sous « Augmenter le contraste ».
+    ///
+    /// Conformité WCAG AA (audit du 9 oct. 2026, maquette validée par Arthur) :
+    /// le kiwi vif `#5DA838` ne tenait que 2,2 à 2,95:1 en texte. Le forêt
+    /// tient 4,7:1 sur l'en-tête vert du Journal, 4,9:1 sur le fond de
+    /// Progrès, 5,7 à 6,2:1 sur les cartes, et 6,2:1 sous un texte blanc. Le
+    /// kiwi vif reste la couleur de marque (`teinteKiwi`, halos, mascotte,
+    /// haut du bouton principal).
+    static let dsAccent = Color(uiColor: UIColor { trait in
+        trait.accessibilityContrast == .high
+            ? UIColor(red: 0x2F / 255, green: 0x5A / 255, blue: 0x16 / 255, alpha: 1)
+            : UIColor(red: 0x3B / 255, green: 0x6D / 255, blue: 0x11 / 255, alpha: 1)
+    })
+    /// Remplissage d'une jauge « couverte » : `#4C982B`, le bas du dégradé du
+    /// bouton historique. Objet graphique : 3,3:1 sur une carte (seuil 3:1),
+    /// là où le kiwi vif tombait à 2,7:1.
+    static let dsCouvert = Color(hex: "4C982B")
     /// Voile de marque (haut d'écran) — `#E9F2E2`, fondu vers le transparent.
     static let dsVoile = Color(hex: "E9F2E2")
     /// Pastille de l'avatar (Réglages), pastille d'un conseil numéroté.
@@ -190,7 +224,13 @@ extension Color {
     /// Un apport couvert garde l'accent vert sur sa jauge : c'est le seul cas
     /// où le vert porte un sens et non une action, assumé par la maquette.
     static func dsStatut(_ pct: Int) -> Color {
-        pct >= 60 ? .dsAccent : (pct >= 30 ? .dsARenforcer : .dsACombler)
+        pct >= 60 ? .dsCouvert : (pct >= 30 ? .dsARenforcer : .dsACombler)
+    }
+
+    /// La même échelle, pour un TEXTE (pourcentage, mot d'état) : les encres
+    /// foncées de la palette, qui tiennent 4,5:1 sur le verre.
+    static func dsStatutTexte(_ pct: Int) -> Color {
+        pct >= 60 ? .dsAccent : (pct >= 30 ? .dsARenforcerTexte : .dsAComblerTexte)
     }
 }
 
@@ -217,10 +257,8 @@ extension Font {
     static let dsLegende: Font = .system(.footnote, design: .default)
     /// Légende appuyée : 13 / 500.
     static let dsLegendeMoyenne: Font = .system(.footnote, design: .default).weight(.medium)
-    /// Libellé de tab bar : 10 / 500-600.
-    static func dsOnglet(actif: Bool) -> Font {
-        .system(size: 10, weight: actif ? .semibold : .medium)
-    }
+    // Libellé de tab bar : plus de jeton figé à 10 pt. La barre pose
+    // `.dsPolice(10, …)`, qui suit Dynamic Type (voir `KiwiFloatingTabBar`).
 
     // Chiffres : SF Pro à chasse tabulaire, jamais SF Mono.
 
@@ -238,6 +276,87 @@ extension Font {
     static let dsJour: Font = .system(.subheadline, design: .default).weight(.semibold).monospacedDigit()
     /// Petite valeur au centre d'un anneau : 17 / 700, tabulaire.
     static let dsValeurAnneau: Font = .system(.headline, design: .default).weight(.bold).monospacedDigit()
+}
+
+// MARK: - Taille de maquette qui suit Dynamic Type (accessibilité, 9 oct. 2026)
+//
+// Un texte en `.system(size: 15)` ne grossit jamais : la personne qui a
+// monté la taille du texte dans Réglages ne le voit pas bouger. `.dsPolice(15)`
+// garde EXACTEMENT 15 pt à la taille par défaut et suit ensuite la courbe du
+// style iOS le plus proche (`@ScaledMetric(relativeTo:)`). Aucun écran ne
+// change de rendu à la taille par défaut.
+
+/// Le style de texte iOS dont la courbe de grossissement s'applique à une
+/// taille de maquette : celui dont la taille par défaut est la plus proche.
+enum DSEchelle {
+    static func style(pour taille: CGFloat) -> Font.TextStyle {
+        switch taille {
+        case ..<11.5: return .caption2      // 11
+        case ..<12.5: return .caption       // 12
+        case ..<14: return .footnote        // 13
+        case ..<15.5: return .subheadline   // 15
+        case ..<16.5: return .callout       // 16
+        case ..<18.5: return .body          // 17
+        case ..<21: return .title3          // 20
+        case ..<25: return .title2          // 22
+        case ..<31: return .title           // 28
+        default: return .largeTitle         // 34
+        }
+    }
+}
+
+/// Police système à la taille de la maquette, qui grossit avec Dynamic Type.
+struct DSPoliceAjustee: ViewModifier {
+    @ScaledMetric private var taille: CGFloat
+    private let poids: Font.Weight
+    private let design: Font.Design
+    private let chiffres: Bool
+
+    init(taille: CGFloat, poids: Font.Weight, design: Font.Design, chiffres: Bool) {
+        _taille = ScaledMetric(wrappedValue: taille, relativeTo: DSEchelle.style(pour: taille))
+        self.poids = poids
+        self.design = design
+        self.chiffres = chiffres
+    }
+
+    func body(content: Content) -> some View {
+        let police = Font.system(size: taille, weight: poids, design: design)
+        return content.font(chiffres ? police.monospacedDigit() : police)
+    }
+}
+
+extension View {
+    /// `.font(.system(size: 15, weight: .semibold))` qui suit Dynamic Type :
+    /// 15 pt à la taille par défaut, puis la courbe du style le plus proche.
+    /// `chiffres` : chiffres à chasse fixe (`monospacedDigit`).
+    func dsPolice(_ taille: CGFloat,
+                  _ poids: Font.Weight = .regular,
+                  design: Font.Design = .default,
+                  chiffres: Bool = false) -> some View {
+        modifier(DSPoliceAjustee(taille: taille, poids: poids, design: design, chiffres: chiffres))
+    }
+}
+
+// MARK: - Ligne qui passe en colonne aux tailles d'accessibilité
+
+/// Une rangée (`HStack`) à toutes les tailles de texte standard, une colonne
+/// alignée à gauche aux tailles d'accessibilité (AX1 à AX5) : c'est là que les
+/// libellés côte à côte se coupaient (« Én-ergie », « Symptô… », captures AX3
+/// du 9 oct. 2026). À la taille par défaut, le rendu est celui de la rangée.
+struct DSLigneOuColonne<Contenu: View>: View {
+    var alignementLigne: VerticalAlignment = .center
+    var alignementColonne: HorizontalAlignment = .leading
+    var espacement: CGFloat? = nil
+    @ViewBuilder let contenu: () -> Contenu
+
+    @Environment(\.dynamicTypeSize) private var tailleTexte
+
+    var body: some View {
+        let disposition = tailleTexte.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: alignementColonne, spacing: espacement))
+            : AnyLayout(HStackLayout(alignment: alignementLigne, spacing: espacement))
+        disposition { contenu() }
+    }
 }
 
 /// Tracking optique par taille : c'est ce qui fait qu'un texte « sonne » iOS.

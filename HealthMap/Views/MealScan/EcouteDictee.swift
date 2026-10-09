@@ -508,6 +508,10 @@ private struct EcouteScene: View {
     let taille: CGSize
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// « Réduire la transparence » : le voile devient opaque à 55 % et l'encre
+    /// n'y tient plus que 4,1:1. Les consignes prennent alors une capsule
+    /// blanche sous leur texte.
+    @Environment(\.accessibilityReduceTransparency) private var reduireTransparence
     /// La scène est installée : le voile est tombé, la bulle a quitté le bouton.
     @State private var ouverte = false
     /// Le calcul dure : on laisse une sortie.
@@ -632,13 +636,15 @@ private struct EcouteScene: View {
 
     private var controles: some View {
         VStack(spacing: 14) {
+            // En encre : le blanc ombré ne tenait pas 4,5:1 sur le voile clair
+            // (audit du 9 oct. 2026).
             Text("Dis ce que tu as mangé, avec les quantités")
                 .font(.dsSousTitreMoyen)
                 .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.white)
+                .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .shadow(color: Color.black.opacity(0.25), radius: 4, x: 0, y: 1)
+                .lisibleSurVoile(reduireTransparence)
                 .padding(.horizontal, DS.marge)
 
             if centre.mainsLibres {
@@ -675,10 +681,12 @@ private struct EcouteScene: View {
         Button {
             centre.toucherAnnuler()
         } label: {
+            // Encre sur verre blanc : le blanc sur le voile ne tenait que
+            // 1,5:1 (audit du 9 oct. 2026).
             Text("Annuler")
                 .font(.dsHeadline)
                 .tracking(DSTracking.corps)
-                .foregroundStyle(Color.white)
+                .foregroundStyle(Color.dsTexte)
                 .padding(.horizontal, 22)
                 .frame(minHeight: 50)
                 .verre(VerreMatiere.surVoile, forme: Capsule(style: .continuous))
@@ -718,7 +726,7 @@ private struct EcouteScene: View {
                 .font(.dsSousTitreFort)
                 .tracking(DSTracking.sousTitre)
         }
-        .foregroundStyle(Color.white)
+        .foregroundStyle(Color.dsTexte)
         .lineLimit(1)
         .padding(.horizontal, 18)
         .frame(minHeight: 50)
@@ -752,11 +760,13 @@ private struct EcouteScene: View {
     private var consigneCalcul: some View {
         let actif = centre.phase == .calcul
         return VStack(spacing: 18) {
+            // En encre : en blanc, même ombré, il ne tenait que 1,5:1 sur le
+            // voile clair (audit du 9 oct. 2026).
             Text("Kiwio relit ta dictée…")
                 .font(.dsSousTitreFort)
                 .tracking(DSTracking.sousTitre)
-                .foregroundStyle(Color.white)
-                .shadow(color: Color.black.opacity(0.25), radius: 4, x: 0, y: 1)
+                .foregroundStyle(Color.dsTexte)
+                .lisibleSurVoile(reduireTransparence)
 
             // La transcription peut durer (longue dictée, modèle absent de
             // l'appareil) : on ne garde personne devant un écran sans sortie.
@@ -768,7 +778,7 @@ private struct EcouteScene: View {
                     Text("Annuler")
                         .font(.dsSousTitreFort)
                         .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.white)
+                        .foregroundStyle(Color.dsTexte)
                         .padding(.horizontal, 20)
                         .frame(minHeight: DS.cibleTactile)
                         .verre(VerreMatiere.surVoile, forme: Capsule(style: .continuous))
@@ -1102,5 +1112,22 @@ private struct PointsDeCalcul: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Texte posé sur le voile
+
+private extension View {
+    /// Sous « Réduire la transparence », une capsule blanche sous le texte :
+    /// l'encre y tient 16:1, contre 4,1:1 sur le voile opaque à 55 %.
+    @ViewBuilder
+    func lisibleSurVoile(_ actif: Bool) -> some View {
+        if actif {
+            padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Capsule(style: .continuous).fill(Color.white.opacity(0.92)))
+        } else {
+            self
+        }
     }
 }

@@ -523,12 +523,12 @@ struct QuotaMeter: View {
                         .font(.system(size: 15, weight: .semibold))
                         .accessibilityHidden(true)
                     Text(label)
-                        .font(.system(size: 13, weight: .bold))
+                        .dsPolice(13, .bold)
                 }
                 .foregroundStyle(Color.dsTexte)
                 Spacer()
                 Text("\(used) / \(total)")
-                    .font(.system(size: 12, weight: .bold, design: .default).monospacedDigit())
+                    .dsPolice(12, .bold, chiffres: true)
                     .foregroundStyle(Color.dsSecondaire)
             }
 
@@ -582,13 +582,13 @@ struct QuotaWall: View {
                 .accessibilityHidden(true)
 
             Text(title)
-                .font(.system(size: 16, weight: .bold))
+                .dsPolice(16, .bold)
                 .tracking(-0.3)
                 .foregroundStyle(Color.dsTexte)
                 .padding(.top, 12)
 
             Text(message)
-                .font(.system(size: 12.5, weight: .medium))
+                .dsPolice(12.5, .medium)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .lineSpacing(1.5)
@@ -600,7 +600,7 @@ struct QuotaWall: View {
                 .padding(.top, 15)
 
             Text(escapeText)
-                .font(.system(size: 11, weight: .semibold))
+                .dsPolice(11, .semibold)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .padding(.top, 10)
@@ -617,9 +617,9 @@ struct QuotaWall: View {
         VStack(spacing: 16) {
             GatedOverlay(intensity: .teaser) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Où la trouver").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.dsTexte)
+                    Text("Où la trouver").dsPolice(11, .bold).foregroundStyle(Color.dsTexte)
                     Text("Œufs · Sardines · Fromage. Associe la B12 à des folates pour doubler l'assimilation.")
-                        .font(.system(size: 12))
+                        .dsPolice(12)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

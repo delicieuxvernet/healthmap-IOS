@@ -25,6 +25,11 @@ on:
         required: false
         default: ""
         type: string
+      taille_texte:
+        description: "Taille du texte du simulateur (simctl content_size, ex. accessibility-extra-large ; vide = taille par défaut)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -107,6 +112,13 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
           xcrun simctl ui "$UDID" appearance light
+          # Taille du texte (Dynamic Type) : comparer un écran à la taille par
+          # défaut et à une taille d'accessibilité (audit de conformité, 9 oct.).
+          TAILLE="${{ inputs.taille_texte }}"
+          if [ -n "$TAILLE" ]; then
+            xcrun simctl ui "$UDID" content_size "$TAILLE"
+            echo "Taille du texte : $TAILLE"
+          fi
           echo "Simulateur $DEVICE = $UDID"
 
       # Signature ad hoc (« - ») et non CODE_SIGNING_ALLOWED=NO : sans signature,

@@ -129,7 +129,7 @@ struct BilanV7SectionLabel: View {
 struct BilanV7PremiumBadge: View {
     var body: some View {
         Text("Premium")
-            .font(.system(size: 11, weight: .semibold))
+            .dsPolice(11, .semibold)
             .foregroundStyle(Color.dsSecondaire)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -275,7 +275,7 @@ struct BilanV7Header: View {
                         Image(systemName: "sparkles")
                             .font(.system(size: 14, weight: .semibold))
                         Text("Premium")
-                            .font(.system(size: 12, weight: .bold))
+                            .dsPolice(12, .bold)
                     }
                     .foregroundStyle(Color.dsTexte)
                     .padding(.horizontal, 12)
@@ -666,7 +666,7 @@ struct BilanV7SymptomesCard: View {
                                 // la ligne : le nom du symptôme devient son
                                 // kicker teinté, le verdict prend le dessus.
                                 Text(row.nom)
-                                    .font(Theme.subLabelFont)
+                                    .dsPolice(11.5, .bold)
                                     .foregroundStyle(encre)
                                     .multilineTextAlignment(.leading)
                                 HStack(spacing: 5) {
@@ -718,7 +718,7 @@ struct BilanV7SymptomesCard: View {
                         .foregroundStyle(.white)
                     if solutionsCount > 0 {
                         Text("\(solutionsCount)")
-                            .font(.system(size: 12, weight: .bold, design: .default).monospacedDigit())
+                            .dsPolice(12, .bold, chiffres: true)
                             .foregroundStyle(.white)
                             .frame(minWidth: 22, minHeight: 22)
                             .background(Color.white.opacity(0.25), in: Capsule())
@@ -1150,7 +1150,7 @@ struct BilanV7SourcesFooter: View {
                     .font(.system(size: 13, weight: .semibold))
                     .accessibilityHidden(true)
                 Text("Sources scientifiques")
-                    .font(Theme.subLabelFont)
+                    .dsPolice(11.5, .bold)
             }
             .foregroundStyle(BilanV7.soft)
 
@@ -1158,7 +1158,7 @@ struct BilanV7SourcesFooter: View {
                 ForEach(ScientificSources.all) { source in
                     Link(destination: source.url) {
                         Text("\(source.name) — \(source.subtitle)")
-                            .font(Theme.chromeFont)
+                            .dsPolice(10.5, .medium)
                             .foregroundStyle(BilanV7.sourcesInk)
                             .underline()
                             .multilineTextAlignment(.leading)
@@ -1166,7 +1166,7 @@ struct BilanV7SourcesFooter: View {
                     }
                 }
                 Text("Kiwio ne remplace pas un avis médical.")
-                    .font(Theme.chromeFont)
+                    .dsPolice(10.5, .medium)
                     .foregroundStyle(BilanV7.sourcesInk)
                     .padding(.top, 2)
             }

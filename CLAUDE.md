@@ -106,7 +106,7 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
 8. **Palette et tokens : `KiwiDS.swift` (refonte 23 août 2026, préfixe `ds`) sur tout écran refondu ; `Color+Theme.swift` pour l'historique.** Fond neutre, cartes sans ombre rayon 14, gras ≤ 700, vert réservé à l'interactif. Pas de règle d'absolu inventée — demander au user avant de proposer une nouvelle teinte.
 9. **Touch targets ≥ 44×44 pt** (HIG Apple).
 10. **Appui : scale 0.96** via `.dsPress` (refonte, `KiwiEchelle.appui`, ressort `kiwiVif` — maquette « Motion » du 1er octobre 2026) ; `.healthMapPressed` (historique) reste à 0.97. Les ressorts et les échelles se lisent dans `KiwiMotion.swift` : on consomme, on n'invente pas de courbe.
-11. **Dynamic Type clamped** `.large ... .accessibility3` (ne pas exploser le layout).
+11. **Dynamic Type sans borne** (depuis le 9 oct. 2026, conformité accessibilité) : plus de plancher `.large` ni de plafond global. Un texte en taille de maquette passe par `.dsPolice(15, .semibold)` (`KiwiDS.swift`, `@ScaledMetric`) : rendu identique à la taille par défaut, il grossit ensuite. `.font(.system(size:))` reste réservé aux icônes et aux chiffres logés dans une forme de taille fixe (anneau, pastille). Un plafond local se justifie en commentaire (barre d'onglets : taille d'iOS, `...large`, et loupe de grand contenu au-delà ; bulle de dictée : `accessibility1` ; gros chiffres décoratifs du Récap : `accessibility2`). Aux tailles d'accessibilité, ce qui est côte à côte passe en colonne avec `DSLigneOuColonne` (`KiwiDS.swift`).
 12. **Reduce-motion respecté** sur toute animation (`@Environment(\.accessibilityReduceMotion)`).
 
 ### 2.4 — RGPD & App Store

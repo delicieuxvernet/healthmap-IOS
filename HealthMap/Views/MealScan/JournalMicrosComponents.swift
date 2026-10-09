@@ -513,6 +513,10 @@ private struct LigneMicroVue: View {
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Aux tailles d'accessibilité, la ligne passe sur deux rangs : le nom,
+    /// puis la jauge (ou la pastille Premium). Sur un seul rang, la pastille
+    /// à largeur figée poussait la carte hors de l'écran (AX3).
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     /// Ce qui s'affiche à droite quand l'apport n'a pas de chiffre.
     private var sansChiffre: String {
@@ -540,33 +544,37 @@ private struct LigneMicroVue: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                // Le point et la jauge portent la teinte de l'apport.
-                Circle()
-                    .fill(ligne.teinte)
-                    .frame(width: 8, height: 8)
-                HStack(spacing: 5) {
-                    Text(ligne.nom)
-                        .font(enAvant ? Font.dsSousTitreFort : Font.dsSousTitre)
-                        .tracking(DSTracking.sousTitre)
-                        .foregroundStyle(Color.dsTexte)
-                        // En gratuit, la pastille prend la place du chiffre :
-                        // un nom long (« Oméga-3 EPA + DHA », le rapport
-                        // oméga) passe sur deux lignes au lieu d'être coupé
-                        // (captures du 8 octobre 2026).
-                        .lineLimit(verrouille ? 2 : 1)
-                        .minimumScaleFactor(0.8)
-                    if !verrouille, ligne.statut != .normal {
-                        RepereDeStatut(couleur: ligne.statut.couleurDeRepere)
+            Group {
+                if tailleTexte.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 10) {
+                            pastilleDeTeinte
+                            nom
+                        }
+                        HStack(spacing: 10) {
+                            if verrouille {
+                                pastillePremium
+                            } else {
+                                valeur
+                                Spacer(minLength: 8)
+                                DSChevron()
+                            }
+                        }
                     }
-                }
-                Spacer(minLength: 8)
-                if verrouille {
-                    pastillePremium
+                    .padding(.vertical, 6)
                 } else {
-                    valeur
-                    // Le chevron : la ligne entière ouvre le détail, il le dit.
-                    DSChevron()
+                    HStack(spacing: 10) {
+                        pastilleDeTeinte
+                        nom
+                        Spacer(minLength: 8)
+                        if verrouille {
+                            pastillePremium
+                        } else {
+                            valeur
+                            // Le chevron : la ligne entière ouvre le détail, il le dit.
+                            DSChevron()
+                        }
+                    }
                 }
             }
             .padding(.horizontal, DS.paddingCarte)
@@ -581,6 +589,33 @@ private struct LigneMicroVue: View {
         .accessibilityHint(verrouille ? "Ouvre l'abonnement Premium" : "Ouvre les informations sur cet apport")
     }
 
+    /// Le point porte la teinte de l'apport, comme la jauge.
+    private var pastilleDeTeinte: some View {
+        Circle()
+            .fill(ligne.teinte)
+            .frame(width: 8, height: 8)
+    }
+
+    /// Le nom, en gras pour une priorité, et le repère de statut.
+    private var nom: some View {
+        HStack(spacing: 5) {
+            Text(ligne.nom)
+                .font(enAvant ? Font.dsSousTitreFort : Font.dsSousTitre)
+                .tracking(DSTracking.sousTitre)
+                .foregroundStyle(Color.dsTexte)
+                // En gratuit, la pastille prend la place du chiffre :
+                // un nom long (« Oméga-3 EPA + DHA », le rapport
+                // oméga) passe sur deux lignes au lieu d'être coupé
+                // (captures du 8 octobre 2026). Idem aux tailles
+                // d'accessibilité, où le nom a son propre rang.
+                .lineLimit(verrouille || tailleTexte.isAccessibilitySize ? 2 : 1)
+                .minimumScaleFactor(0.8)
+            if !verrouille, ligne.statut != .normal {
+                RepereDeStatut(couleur: ligne.statut.couleurDeRepere)
+            }
+        }
+    }
+
     /// « Débloquer avec Premium », dans le vert kiwi de la carte.
     private var pastillePremium: some View {
         HStack(spacing: 5) {
@@ -590,13 +625,13 @@ private struct LigneMicroVue: View {
             Text("Débloquer avec Premium")
                 .font(.dsLegendeMoyenne)
                 .tracking(DSTracking.legende)
-                .lineLimit(1)
+                .lineLimit(tailleTexte.isAccessibilitySize ? 2 : 1)
         }
         .foregroundStyle(Color.teinteKiwiTexte)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Capsule(style: .continuous).fill(Color.dsVoile))
-        .fixedSize()
+        .fixedSize(horizontal: !tailleTexte.isAccessibilitySize, vertical: true)
     }
 
     /// Après un repas, la jauge et le chiffre glissent ENSEMBLE vers leur
@@ -945,7 +980,7 @@ struct MicroDuJourSheet: View {
             .frame(width: Self.tailleAnneau, height: Self.tailleAnneau)
         } else if ligne.sens == .rapport, let valeur = ligne.rapport {
             Text(MicrosDuJour.texteDuRapport(valeur))
-                .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
+                .dsPolice(34, .bold, design: .rounded, chiffres: true)
                 .tracking(-1)
                 .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
@@ -1122,7 +1157,7 @@ private struct SemaineMicroGraphe: View {
                             }
                         }
                         Text(Self.initiale.string(from: jour.jour).uppercased())
-                            .font(.system(size: 12))
+                            .dsPolice(12)
                             .foregroundStyle(Color.dsSecondaire)
                     }
                     .frame(maxWidth: .infinity)
@@ -1142,7 +1177,7 @@ private struct SemaineMicroGraphe: View {
             .accessibilityHidden(true)
 
             Text(resume)
-                .font(.system(size: 12))
+                .dsPolice(12)
                 .foregroundStyle(Color.dsSecondaire)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

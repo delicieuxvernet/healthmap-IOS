@@ -216,7 +216,9 @@ struct PastilleConfirmation: View {
     private func contenu(_ confirmation: ConfirmationAjout) -> some View {
         HStack(spacing: 12) {
             ZStack {
-                Circle().fill(Color.teinteKiwi)
+                // Vert forêt : la coche blanche tient 6,2:1 (2,95 sur le
+                // kiwi vif, audit du 9 oct. 2026).
+                Circle().fill(Color.dsAccent)
                 // 20 pt comme la coche de la maquette ; semi-gras, l'épaisseur
                 // du trait Tabler.
                 Image(systemName: "checkmark")

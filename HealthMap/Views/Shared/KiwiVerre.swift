@@ -418,9 +418,26 @@ struct VerreMatiere {
 
     private static func blanc(_ haut: Double, _ bas: Double) -> [Gradient.Stop] {
         [
-            Gradient.Stop(color: Color.white.opacity(haut), location: 0),
-            Gradient.Stop(color: Color.white.opacity(bas), location: 1),
+            Gradient.Stop(color: blancContraste(haut), location: 0),
+            Gradient.Stop(color: blancContraste(bas), location: 1),
         ]
+    }
+
+    /// Un blanc translucide qui se densifie sous « Augmenter le contraste » :
+    /// l'opacité gagne 70 % de ce qui lui manque (.58 → .87, .40 → .82). Le
+    /// texte posé dessus garde alors son contraste quel que soit le fond.
+    private static func blancContraste(_ opacite: Double) -> Color {
+        Color(uiColor: UIColor { trait in
+            let alpha = trait.accessibilityContrast == .high ? opacite + (1 - opacite) * 0.7 : opacite
+            return UIColor(white: 1, alpha: alpha)
+        })
+    }
+
+    /// Une couleur, et sa version plus foncée sous « Augmenter le contraste ».
+    private static func vert(_ normal: String, eleve: String) -> Color {
+        Color(uiColor: UIColor { trait in
+            UIColor(Color(hex: trait.accessibilityContrast == .high ? eleve : normal))
+        })
     }
 
     /// Carte en verre dépoli : blanc 80 → 58 %, liseré intérieur.
@@ -504,37 +521,45 @@ struct VerreMatiere {
     )
 
     /// Verre posé sur le voile (bouton « Annuler » de la dictée) : blanc
-    /// 34 → 14 %, texte blanc.
+    /// 74 → 50 %, libellé en encre. Blanc sur un verre à 34 → 14 %, il ne
+    /// tenait que 1,5:1 (audit du 9 oct. 2026) ; l'encre tient 11:1.
     static let surVoile = VerreMatiere(
-        arrets: blanc(0.34, 0.14),
+        arrets: blanc(0.74, 0.50),
         refletHaut: 0.7,
         lisere: 0.5,
         flouVivant: true,
-        opaque: Color(uiColor: .systemGray)
+        // Sous « Réduire la transparence » : un gris très clair, l'encre y
+        // tient 15:1 (le gris système moyen la portait à 5:1).
+        opaque: Color(uiColor: .systemGray5)
     )
 
-    /// Action principale : verre teinté vert, même reflet.
+    /// Action principale : verre vert profond, même reflet, libellé blanc.
+    ///
+    /// Conformité WCAG AA (audit du 9 oct. 2026, maquette validée par Arthur) :
+    /// le blanc sur `#8AD262 → #5DA838 → #4C982B` ne tenait que 2,4 à 3,1:1
+    /// sous le libellé. `#4C9330 → #387A1C → #2C6416` tient 4,6 à 5,7:1 ;
+    /// sous « Augmenter le contraste », `#3E8424 → #2F6A19 → #24550F`.
     static let principal = VerreMatiere(
         arrets: [
-            Gradient.Stop(color: Color(hex: "8AD262"), location: 0),
-            Gradient.Stop(color: Color(hex: "5DA838"), location: 0.55),
-            Gradient.Stop(color: Color(hex: "4C982B"), location: 1),
+            Gradient.Stop(color: vert("4C9330", eleve: "3E8424"), location: 0),
+            Gradient.Stop(color: vert("387A1C", eleve: "2F6A19"), location: 0.55),
+            Gradient.Stop(color: vert("2C6416", eleve: "24550F"), location: 1),
         ],
         refletHaut: 0.75,
         refletBas: 0.28,
         refletBasCouleur: Color(red: 20 / 255, green: 60 / 255, blue: 0),
         lisere: 0.3,
         ombre: VerreOmbre(couleur: Color(red: 66 / 255, green: 132 / 255, blue: 38 / 255).opacity(0.42), rayon: 12, y: 9),
-        opaque: Color.teinteKiwi
+        opaque: vert("387A1C", eleve: "2F6A19")
     )
 
-    /// Le bouton Dicter : le même verre vert, bombé (éclat sur la moitié
-    /// haute, dégradé en biais).
+    /// Le bouton Dicter : le même verre vert profond, bombé (éclat sur la
+    /// moitié haute, dégradé en biais).
     static let principalBombe = VerreMatiere(
         arrets: [
-            Gradient.Stop(color: Color(hex: "8AD262"), location: 0),
-            Gradient.Stop(color: Color(hex: "5DA838"), location: 0.52),
-            Gradient.Stop(color: Color(hex: "4A962A"), location: 1),
+            Gradient.Stop(color: vert("4C9330", eleve: "3E8424"), location: 0),
+            Gradient.Stop(color: vert("387A1C", eleve: "2F6A19"), location: 0.52),
+            Gradient.Stop(color: vert("2C6416", eleve: "24550F"), location: 1),
         ],
         debut: UnitPoint(x: 0.3, y: 0),
         fin: UnitPoint(x: 0.7, y: 1),
@@ -544,7 +569,7 @@ struct VerreMatiere {
         lisere: 0.35,
         eclat: 0.38,
         ombre: VerreOmbre(couleur: Color(red: 66 / 255, green: 132 / 255, blue: 38 / 255).opacity(0.45), rayon: 13, y: 11),
-        opaque: Color.teinteKiwi
+        opaque: vert("387A1C", eleve: "2F6A19")
     )
 
     /// Carte en verre teintée d'une couleur de catégorie dans son coin haut
@@ -580,10 +605,13 @@ struct VerrePlaque<Forme: InsettableShape>: View {
     let matiere: VerreMatiere
 
     @Environment(\.accessibilityReduceTransparency) private var reduireTransparence
+    @Environment(\.colorSchemeContrast) private var contraste
 
     var body: some View {
         if #available(iOS 26.0, *) {
-            if let liquide = matiere.liquide, !reduireTransparence {
+            // Sous « Augmenter le contraste », la recette dessinée, dont le
+            // blanc se densifie : le verre natif laisserait trop voir le fond.
+            if let liquide = matiere.liquide, !reduireTransparence, contraste != .increased {
                 VerreLiquideNatif(forme: forme, liquide: liquide)
             } else {
                 recette
@@ -913,12 +941,58 @@ struct VerreBascule<Valeur: Hashable>: View {
     let options: [(valeur: Valeur, libelle: String)]
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     private var index: Int {
         options.firstIndex { $0.valeur == selection } ?? 0
     }
 
+    @ViewBuilder
     var body: some View {
+        if tailleTexte.isAccessibilitySize {
+            empilee
+        } else {
+            enLigne
+        }
+    }
+
+    /// Aux tailles d'accessibilité, les options s'empilent sur toute la
+    /// largeur : en deux moitiés de 38 pt, « Compléments » se coupait (AX3).
+    /// L'option choisie porte le curseur de verre blanc.
+    private var empilee: some View {
+        VStack(spacing: 2) {
+            ForEach(Array(options.enumerated()), id: \.offset) { _, option in
+                let actif = option.valeur == selection
+                Button {
+                    guard !actif else { return }
+                    HapticService.shared.selection()
+                    selection = option.valeur
+                } label: {
+                    Text(option.libelle)
+                        .font(.system(.subheadline, design: .default).weight(actif ? .semibold : .medium))
+                        .foregroundStyle(Color.dsTexte)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                        .background {
+                            if actif {
+                                Color.clear
+                                    .verre(.curseur, forme: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(actif ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+        .padding(3)
+        .verre(.piste, forme: RoundedRectangle(cornerRadius: 19, style: .continuous))
+    }
+
+    private var enLigne: some View {
         GeometryReader { geo in
             let largeur = max(0, (geo.size.width - 6) / CGFloat(max(1, options.count)))
             ZStack(alignment: .leading) {

@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import Accessibility
 
 // MARK: - Score History View (evolution du score)
 struct ScoreHistoryView: View {
@@ -87,7 +88,7 @@ struct ScoreHistoryView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(text)
-                    .font(.system(size: 16, weight: .bold))
+                    .dsPolice(16, .bold)
                     .foregroundStyle(delta > 0 ? Color.scoreGood : delta < 0 ? Color.scoreDeficient : Color.dsSecondaire)
 
                 if let first = history.sorted(by: { $0.date < $1.date }).first {
@@ -145,6 +146,13 @@ struct ScoreHistoryView: View {
             }
             .frame(height: 200)
             .padding(.horizontal, Theme.spacingLG)
+            // VoiceOver : une phrase qui résume la courbe, puis le graphique
+            // audio (rotor « Graphique audio ») pour l'écouter point par point.
+            // Le détail chiffré reste dans l'historique juste en dessous.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Courbe de ton score")
+            .accessibilityValue(ScoreHistoriqueAudio.resume(history))
+            .accessibilityChartDescriptor(ScoreHistoriqueAudio(points: history))
         }
         .padding(.vertical, Theme.spacingSM)
         .dsCard()
@@ -180,9 +188,9 @@ struct ScoreHistoryView: View {
             ForEach(history.sorted(by: { $0.date > $1.date }).prefix(12)) { snapshot in
                 HStack(spacing: Theme.spacingSM) {
                     Text(snapshot.dateFormatted)
-                        .font(.system(size: 13, weight: .medium))
+                        .dsPolice(13, .medium)
                         .foregroundStyle(Color.dsTexte)
-                        .frame(width: 60, alignment: .leading)
+                        .frame(minWidth: 60, alignment: .leading)
 
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -196,10 +204,12 @@ struct ScoreHistoryView: View {
                     .frame(height: 16)
 
                     Text("\(snapshot.score)%")
-                        .font(.system(size: 13, weight: .bold, design: .default))
-                        .foregroundStyle(Color.globalScoreColor(for: snapshot.score))
-                        .frame(width: 40, alignment: .trailing)
+                        .dsPolice(13, .bold)
+                        .foregroundStyle(HealthScale.couleurTexte(for: snapshot.score))
+                        .frame(minWidth: 40, alignment: .trailing)
                 }
+                // Une ligne = un élément VoiceOver : « 3 sept., 68 % ».
+                .accessibilityElement(children: .combine)
             }
         }
         .padding(Theme.spacingMD)
@@ -239,6 +249,69 @@ struct ScoreHistoryView: View {
         scoreDeltaInfo = ScoreHistoryService.shared.getScoreDelta(history: history)
 
         isLoading = false
+    }
+}
+
+// MARK: - Courbe lue par VoiceOver
+
+/// La courbe du score pour VoiceOver : un résumé parlé, et la description
+/// qui alimente le graphique audio d'iOS.
+private struct ScoreHistoriqueAudio: AXChartDescriptorRepresentable {
+    let points: [ScoreSnapshot]
+
+    private static func jour(_ date: Date) -> String {
+        date.formatted(.dateTime.day().month(.wide).locale(Locale(identifier: "fr_FR")))
+    }
+
+    /// « De 52 le 3 septembre à 68 le 9 octobre. Plus haut 70, plus bas 48,
+    /// sur 12 relevés. »
+    static func resume(_ historique: [ScoreSnapshot]) -> String {
+        let tries = historique.sorted { $0.date < $1.date }
+        guard let premier = tries.first, let dernier = tries.last else {
+            return "Aucun relevé."
+        }
+        let scores = tries.map(\.score)
+        let haut = scores.max() ?? dernier.score
+        let bas = scores.min() ?? dernier.score
+        return "De \(premier.score) le \(jour(premier.date)) à \(dernier.score) le \(jour(dernier.date)). "
+            + "Plus haut \(haut), plus bas \(bas), sur \(tries.count) relevés."
+    }
+
+    func makeChartDescriptor() -> AXChartDescriptor {
+        let tries = points.sorted { $0.date < $1.date }
+        let debut = tries.first?.date.timeIntervalSince1970 ?? 0
+        // Un axe ne peut pas être réduit à un point : un jour de marge.
+        let fin = max(tries.last?.date.timeIntervalSince1970 ?? 0, debut + 86_400)
+
+        let axeDates = AXNumericDataAxisDescriptor(
+            title: "Date",
+            range: debut...fin,
+            gridlinePositions: []
+        ) { valeur in
+            Self.jour(Date(timeIntervalSince1970: valeur))
+        }
+        let axeScore = AXNumericDataAxisDescriptor(
+            title: "Score",
+            range: 0...100,
+            gridlinePositions: [50, 75]
+        ) { valeur in
+            "\(Int(valeur.rounded())) sur 100"
+        }
+        let serie = AXDataSeriesDescriptor(
+            name: "Score",
+            isContinuous: true,
+            dataPoints: tries.map {
+                AXDataPoint(x: $0.date.timeIntervalSince1970, y: Double($0.score))
+            }
+        )
+        return AXChartDescriptor(
+            title: "Évolution de ton score",
+            summary: Self.resume(points),
+            xAxis: axeDates,
+            yAxis: axeScore,
+            additionalAxes: [],
+            series: [serie]
+        )
     }
 }
 

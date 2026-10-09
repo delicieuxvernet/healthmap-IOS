@@ -21,6 +21,9 @@ struct RecapView: View {
     let onTerminer: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Sous VoiceOver, plus d'avance automatique : la personne passe d'un
+    /// slide à l'autre par les actions de la barre de progression.
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var progression = RecapProgress()
 
@@ -51,11 +54,14 @@ struct RecapView: View {
             }
         }
         .onAppear {
-            progression.demarrer(slides: slides, animationsReduites: reduceMotion)
+            progression.demarrer(slides: slides, animationsReduites: reduceMotion, avanceAuto: !voiceOver)
             debutSlide = Date()
             AnalyticsService.shared.track(.recapStarted, properties: [
                 "slides": slides.count,
             ])
+        }
+        .onChange(of: voiceOver) { _, actif in
+            progression.definirAvanceAuto(!actif)
         }
         .onDisappear { progression.arreter() }
         .onChange(of: progression.index) { ancien, _ in
@@ -97,7 +103,7 @@ struct RecapView: View {
             Button("Aller à mon bilan") { terminer() }
             Button("Reprendre", role: .cancel) { progression.reprendre() }
         }
-        .dynamicTypeSize(.large ... .accessibility3)
+        // Plus de borne Dynamic Type : le slide défile, il peut grandir.
     }
 
     // MARK: - Contenu
@@ -159,6 +165,25 @@ struct RecapView: View {
                 avancee: progression.avancee
             )
             .padding(.horizontal, Theme.spacingMD)
+            // Les gestes du slide (toucher à gauche ou à droite, appui long)
+            // n'existent pas sous VoiceOver : ils passent ici, en actions
+            // nommées et en balayage haut / bas.
+            .accessibilityAdjustableAction { sens in
+                switch sens {
+                case .increment: progression.suivant()
+                case .decrement: progression.precedent()
+                @unknown default: break
+                }
+            }
+            .accessibilityActions {
+                Button("Slide suivant") { progression.suivant() }
+                Button("Slide précédent") { progression.precedent() }
+                if !voiceOver {
+                    Button(progression.enPause ? "Reprendre" : "Mettre en pause") {
+                        progression.enPause ? progression.reprendre() : progression.mettreEnPause()
+                    }
+                }
+            }
 
             HStack {
                 Button {
@@ -192,8 +217,8 @@ struct RecapView: View {
                         progression.allerALOffre()
                     } label: {
                         Text("Passer")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color.dsTexte.opacity(0.6))
+                            .dsPolice(14, .medium)
+                            .foregroundStyle(Color.dsSecondaire)
                             .frame(height: 44)
                             .padding(.horizontal, Theme.spacingSM)
                             .contentShape(Rectangle())
@@ -210,7 +235,7 @@ struct RecapView: View {
                 afficheListe = true
             } label: {
                 Text("Voir en liste")
-                    .font(.system(size: 13, weight: .medium))
+                    .dsPolice(13, .medium)
                     .underline()
                     .foregroundStyle(Color.dsTexte)
                     .frame(minHeight: 44)
@@ -220,7 +245,7 @@ struct RecapView: View {
             // Disclaimer permanent : l'estimation vient d'un déclaratif, jamais
             // d'un dosage. Une ligne, en bas, sur tous les slides.
             Text("Estimation basée sur tes déclarations. Ne remplace pas un avis médical.")
-                .font(.system(size: 11))
+                .dsPolice(11)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -355,6 +380,5 @@ struct RecapListeView: View {
                 }
             }
         }
-        .dynamicTypeSize(.large ... .accessibility3)
     }
 }

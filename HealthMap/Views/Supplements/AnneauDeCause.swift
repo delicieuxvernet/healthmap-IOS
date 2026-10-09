@@ -241,6 +241,8 @@ struct AnneauDeCause: View {
                 .padding(.horizontal, taille.trait)
             } else {
                 // Le score nu, sans « % » : c'est un score sur 100, pas un taux mesuré.
+                // Taille fixe : le chiffre vit dans l'anneau (46 pt de vide dans
+                // la tuile de 64), il ne peut pas suivre Dynamic Type.
                 ChiffreQuiCompte(valeur: dessine ? Double(score) : 0)
                     .font(.system(size: taille.police, weight: .bold, design: taille.dessin).monospacedDigit())
                     .tracking(taille.tracking)
@@ -384,13 +386,13 @@ struct TuileApportHero: View {
                         .frame(width: 10, height: 10)
                         .accessibilityHidden(true)
                     Text(ligne.libelle)
-                        .font(.system(size: tailleCause))
+                        .dsPolice(tailleCause)
                         .foregroundStyle(Color.dsTexte)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(PointsApport.signe(ligne.delta))
-                        .font(.system(size: tailleCause, weight: .semibold).monospacedDigit())
+                        .dsPolice(tailleCause, .semibold, chiffres: true)
                         .foregroundStyle(Color.dsTexte)
                 }
                 .verreCascade(visible, delai: 0.35 + Double(rang) * 0.07, decalage: 8)
