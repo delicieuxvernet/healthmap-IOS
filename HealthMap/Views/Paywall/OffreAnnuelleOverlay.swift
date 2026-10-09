@@ -5,7 +5,8 @@ import SwiftUI
 // Monte du bas de l'écran, par-dessus la barre d'onglets. Une pastille, ce que
 // l'annuel fait économiser, le prix, et deux sorties : « Voir l'offre » ouvre
 // le paywall (c'est lui qui porte les mentions d'abonnement), « Plus tard »
-// referme. Ton calme, sans capitales ni compte à rebours, comme le paywall.
+// referme, « Ne plus me proposer » l'arrête pour de bon. Ton calme, sans
+// capitales ni compte à rebours, comme le paywall.
 //
 // Surcouche de la racine, pas une `.sheet` : voir `OffreCentre`.
 //
@@ -20,6 +21,8 @@ struct OffreAnnuelleOverlay: View {
     let onFermer: () -> Void
     /// « Voir l'offre » : la carte redescend, puis le paywall s'ouvre.
     let onVoir: () -> Void
+    /// « Ne plus me proposer » : la carte redescend et ne reviendra plus.
+    let onRefuser: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var montee = false
@@ -96,6 +99,21 @@ struct OffreAnnuelleOverlay: View {
             }
             .buttonStyle(.dsPress)
             .padding(.top, 2)
+
+            // Une sortie définitive, toujours visible (audit de conformité du
+            // 9 octobre 2026) : la relance s'arrête quand on le demande.
+            Button {
+                fermer(puis: onRefuser)
+            } label: {
+                Text("Ne plus me proposer")
+                    .font(.dsLegende)
+                    .tracking(DSTracking.legende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityHint("Cette offre ne sera plus proposée.")
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 18)

@@ -108,8 +108,13 @@ enum RythmeOffre {
     static let vuesRapprochees = 3
     /// …puis deux semaines : qui a dit trois fois « plus tard » l'a dit.
     static let intervalleEspace: TimeInterval = 14 * 24 * 3_600
+    /// Et jamais plus de six cartes en tout (audit de conformité du 9 octobre
+    /// 2026) : une relance sans fin est une pression, pas une information.
+    /// « Ne plus me proposer » arrête tout, dès la première.
+    static let vuesMax = 6
 
     static func peutProposer(premierPassage: Date?, derniere: Date?, vues: Int, maintenant: Date) -> Bool {
+        guard vues < vuesMax else { return false }
         guard let premierPassage,
               maintenant.timeIntervalSince(premierPassage) >= anciennete else { return false }
         guard let derniere else { return true }
@@ -136,12 +141,20 @@ final class OffreCentre: ObservableObject {
         static let premierPassage = "kiwio_offre_premier_passage"
         static let derniere = "kiwio_offre_derniere"
         static let vues = "kiwio_offre_vues"
+        static let refusee = "kiwio_offre_refusee"
+    }
+
+    /// « Ne plus me proposer » : la carte ne revient plus jamais sur ce
+    /// téléphone. Le paywall reste ouvert à qui va le chercher.
+    func nePlusProposer() {
+        defaults.set(true, forKey: Cle.refusee)
+        courante = nil
     }
 
     /// Dépose l'offre si le moment s'y prête. L'appelant a déjà vérifié que la
     /// personne n'est pas Premium et que l'écran est libre.
     func proposer(maintenant: Date = Date()) async {
-        guard courante == nil else { return }
+        guard courante == nil, !defaults.bool(forKey: Cle.refusee) else { return }
 
         let premierPassage = defaults.object(forKey: Cle.premierPassage) as? Date
         if premierPassage == nil {

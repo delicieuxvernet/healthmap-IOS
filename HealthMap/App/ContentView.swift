@@ -653,6 +653,8 @@ struct MainTabView: View {
                 }, onVoir: {
                     offres.courante = nil
                     showPaywallFromDeepLink = true
+                }, onRefuser: {
+                    offres.nePlusProposer()
                 })
                 .zIndex(60)
             }
@@ -893,7 +895,8 @@ struct MainTabView: View {
 
     /// Rappelle l'offre annuelle à un compte gratuit, sur le Journal, quand
     /// rien d'autre n'occupe l'écran. Le rythme (jamais le premier jour, pas
-    /// plus d'une fois tous les trois jours) est tenu par `OffreCentre`.
+    /// plus d'une fois tous les trois jours, six cartes au plus, plus jamais
+    /// après « Ne plus me proposer ») est tenu par `OffreCentre`.
     private func proposerOffre() {
         guard dashboardVM.premiumVisible, !estModeCaptures, tutoriel.etape == nil,
               !afficheBrief, !afficheRecap, !afficheInvitationNotifs,
