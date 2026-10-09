@@ -461,9 +461,16 @@ final class SubscriptionService: ObservableObject {
         let statuts = await Purchases.shared.checkTrialOrIntroDiscountEligibility(
             productIdentifiers: Self.subscriptionProductIds
         )
-        let autorises = statuts.mapValues { $0.status.isEligible }
+        let autorises = Self.droits(statuts.mapValues(\.status))
         Self.droitEssai.remplacer(par: autorises)
         essaiAutorise = autorises
+    }
+
+    /// Seul « eligible » ouvre l'essai. Un échec réseau (RevenueCat rend alors
+    /// `unknown`), un essai déjà consommé ou une formule sans essai valent un
+    /// refus : l'écran montre le prix réel, et l'achat reste possible.
+    nonisolated static func droits(_ statuts: [String: IntroEligibilityStatus]) -> [String: Bool] {
+        statuts.mapValues { $0 == .eligible }
     }
 
     /// L'essai gratuit d'un produit, SEULEMENT si Apple dit que la personne y

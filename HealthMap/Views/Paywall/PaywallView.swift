@@ -32,6 +32,22 @@ struct PlanOption: Identifiable, Equatable {
     static func == (lhs: PlanOption, rhs: PlanOption) -> Bool { lhs.id == rhs.id }
 }
 
+/// Le bouton d'achat et la mention de prix du paywall. Sans essai (pas de
+/// droit chez Apple, réseau en échec, formule sans essai) : « Continuer » et
+/// le prix réel, jamais le mot « gratuit ».
+enum TexteAchat {
+    static func titre(essai: String?) -> String {
+        guard let essai else { return "Continuer" }
+        let accord = essai.hasPrefix("1 ") ? "gratuit" : "gratuits"
+        return "Essayer \(essai) \(accord)"
+    }
+
+    static func prix(_ prix: String, periode: String, essai: String?) -> String {
+        guard let essai else { return "\(prix) / \(periode)." }
+        return "Gratuit \(essai), puis \(prix) / \(periode)."
+    }
+}
+
 /// Le rythme du comparatif « Standard ou Premium ? » : une fois par semaine au
 /// plus, sur ce téléphone. Les autres ouvertures du paywall vont droit aux
 /// formules.
@@ -665,11 +681,7 @@ struct PaywallView: View {
     /// « Essayer 7 jours gratuits » (maquette), la durée lue chez Apple ;
     /// « Continuer » quand la formule choisie n'a pas d'essai.
     private var ctaTitle: String {
-        if let trial = trialLabel(for: selectedPlan) {
-            let accord = trial.hasPrefix("1 ") ? "gratuit" : "gratuits"
-            return "Essayer \(trial) \(accord)"
-        }
-        return "Continuer"
+        TexteAchat.titre(essai: trialLabel(for: selectedPlan))
     }
 
     private var ctaNote: String {
@@ -682,12 +694,7 @@ struct PaywallView: View {
         case .day: period = "jour"
         default: period = "mois"
         }
-        let base: String
-        if let trial = trialLabel(for: plan) {
-            base = "Gratuit \(trial), puis \(price) / \(period)."
-        } else {
-            base = "\(price) / \(period)."
-        }
+        let base = TexteAchat.prix(price, periode: period, essai: trialLabel(for: plan))
         // Divulgation d'auto-renouvellement exigée par App Store 3.1.2 : montant,
         // durée, renouvellement automatique, et où/quand résilier. Affichée au
         // point d'achat, sous le bouton, en plus du titre/durée/prix des cartes.
