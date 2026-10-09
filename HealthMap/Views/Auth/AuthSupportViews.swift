@@ -1,5 +1,22 @@
 import SwiftUI
 
+/// Le code reçu par mail (réinitialisation, confirmation). Supabase le règle
+/// entre 6 et 10 chiffres (« Email OTP Length ») : l'app accepte toute cette
+/// plage. Elle n'en acceptait que 6, et un code de 8 chiffres laissait le
+/// bouton grisé, sans explication (10 oct. 2026).
+enum CodeEmail {
+    static let longueurs = 6...10
+
+    /// Garde les chiffres seulement (espaces, tirets d'un copier-coller), au plus 10.
+    static func nettoyer(_ texte: String) -> String {
+        String(texte.filter { $0.isASCII && $0.isNumber }.prefix(longueurs.upperBound))
+    }
+
+    static func estComplet(_ code: String) -> Bool {
+        code.allSatisfy { $0.isASCII && $0.isNumber } && longueurs.contains(code.count)
+    }
+}
+
 // MARK: - Champ de saisie en verre
 //
 // Verre liquide (2 octobre 2026) : un champ n'est plus un aplat gris, c'est
@@ -115,7 +132,7 @@ struct AuthSecureField: View {
 // MARK: - Forgot Password Sheet
 //
 // Flow Clerk en 2 étapes :
-//   1. email -> Clerk envoie un code à 6 chiffres par mail
+//   1. email -> Supabase envoie un code par mail (6 à 10 chiffres, cf. CodeEmail)
 //   2. user entre le code + son nouveau mot de passe -> session active
 struct ForgotPasswordSheet: View {
     enum Step { case email, codeAndPassword, success }
@@ -215,17 +232,21 @@ struct ForgotPasswordSheet: View {
 
     @ViewBuilder
     private var codeStep: some View {
-        Text("Un code à 6 chiffres vient de partir vers \(email). Regarde tes mails, et le dossier spam.")
+        Text("Un code vient de partir vers \(email). Regarde tes mails, et le dossier spam.")
             .font(Theme.bodyFont)
             .foregroundStyle(Color.dsSecondaire)
             .multilineTextAlignment(.center)
             .padding(.top, Theme.spacingMD)
 
-        TextField("Code à 6 chiffres", text: $code)
+        TextField("Code reçu par mail", text: $code)
             .textContentType(.oneTimeCode)
             .keyboardType(.numberPad)
             .focused($focusedField, equals: .code)
             .authChampVerre()
+            .onChange(of: code) { _, nouveau in
+                let propre = CodeEmail.nettoyer(nouveau)
+                if propre != nouveau { code = propre }
+            }
 
         SecureField("Nouveau mot de passe", text: $newPassword)
             .textContentType(.newPassword)
@@ -299,12 +320,11 @@ struct ForgotPasswordSheet: View {
         .disabled(authVM.isProcessing)
     }
 
-    /// True when code is exactly 6 digits, password meets PasswordValidator,
-    /// and confirm matches. C2 : `==` au lieu de `>=` pour éviter qu'un
-    /// copier-coller accidentel de 7+ chiffres bloque le submit silencieusement
-    /// (le filtre numberPad cap déjà à 6 mais belt-and-braces).
+    /// Vrai quand le code a la longueur réglée chez Supabase (6 à 10 chiffres),
+    /// que le mot de passe respecte PasswordValidator et que la confirmation
+    /// correspond.
     private var canSubmitReset: Bool {
-        code.count == 6
+        CodeEmail.estComplet(code)
             && PasswordValidator.validate(newPassword).isEmpty
             && newPassword == confirmPassword
     }
@@ -345,7 +365,7 @@ struct ForgotPasswordSheet: View {
 // MARK: - Email Code Verification Sheet (Clerk signup step 2)
 //
 // Présenté automatiquement après `AuthViewModel.signUp()` quand Clerk a envoyé
-// un code à 6 chiffres par email. L'user entre son code, on appelle
+// un code par email (6 à 10 chiffres, cf. CodeEmail). L'user entre son code, on appelle
 // `verifySignUpCode()` qui bascule Clerk en `.complete` et pose la session.
 // Ne PAS exposer de dismiss manuel tant que le code n'est pas validé : sinon
 // l'user pourrait fermer le sheet et se retrouver dans un état "compte créé
@@ -367,13 +387,13 @@ struct EmailCodeVerificationSheet: View {
                 Text("Vérifie ton email")
                     .font(Theme.headlineFont)
 
-                Text("On t'a envoyé un code à 6 chiffres sur \(email). Saisis-le ci-dessous pour finaliser ton compte.")
+                Text("On t'a envoyé un code sur \(email). Saisis-le ci-dessous pour finaliser ton compte.")
                     .font(Theme.bodyFont)
                     .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.spacingMD)
 
-                TextField("Code à 6 chiffres", text: $code)
+                TextField("Code reçu par mail", text: $code)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
                     .dsPolice(24, .semibold, chiffres: true)
@@ -381,11 +401,9 @@ struct EmailCodeVerificationSheet: View {
                     .authChampVerre(hauteur: 60)
                     .focused($isCodeFocused)
                     .onChange(of: code) { _, newValue in
-                        // Cap à 6 chiffres, strip tout ce qui n'est pas numérique.
-                        let digits = newValue.filter(\.isNumber)
-                        if digits != newValue || digits.count > 6 {
-                            code = String(digits.prefix(6))
-                        }
+                        // Chiffres seulement, jusqu'à la longueur maximale du code.
+                        let propre = CodeEmail.nettoyer(newValue)
+                        if propre != newValue { code = propre }
                     }
 
                 if let err = authVM.errorMessage {
@@ -415,7 +433,7 @@ struct EmailCodeVerificationSheet: View {
                     .authActionVerre()
                 }
                 .buttonStyle(.dsPress)
-                .disabled(code.count != 6 || authVM.isProcessing)
+                .disabled(!CodeEmail.estComplet(code) || authVM.isProcessing)
 
                 // B1 : bouton "Renvoyer le code" — utile si l'user a raté l'email,
                 // s'il a expiré, ou s'il est tombé en spam. Plafonné à 3 envois

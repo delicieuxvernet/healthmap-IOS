@@ -195,8 +195,8 @@ final class AuthService {
 
     // MARK: - Reset Password
 
-    /// Email de la récupération en cours. `verifyOTP` en a besoin : le code à
-    /// 6 chiffres ne vaut que couplé à l'adresse qui l'a demandé.
+    /// Email de la récupération en cours. `verifyOTP` en a besoin : le code reçu
+    /// par mail (6 à 10 chiffres) ne vaut que couplé à l'adresse qui l'a demandé.
     private(set) var pendingResetEmail: String?
 
     func resetPassword(email: String) async throws {
@@ -214,7 +214,7 @@ final class AuthService {
     /// boucle. Aucun mot de passe n'a jamais pu être réinitialisé depuis l'app.
     ///
     /// ⚠️ CÔTÉ SUPABASE : le template d'email « Reset Password » DOIT contenir
-    /// `{{ .Token }}` (le code à 6 chiffres). Le template par défaut ne pose
+    /// `{{ .Token }}` (le code, 6 à 10 chiffres selon « Email OTP Length »). Le template par défaut ne pose
     /// qu'un lien `{{ .ConfirmationURL }}` — avec lui, l'utilisateur ne reçoit
     /// aucun code à saisir et cet écran n'a rien à valider.
     func completeResetPassword(code: String, newPassword: String) async throws {
