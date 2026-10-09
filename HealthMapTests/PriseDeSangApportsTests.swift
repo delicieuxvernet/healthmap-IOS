@@ -103,7 +103,8 @@ final class PriseDeSangApportsTests: XCTestCase {
         let r = registre(["iron": 70, "fiber": 60])
         let p = prise("2026-09-12", [marqueur("folates", nil, .sousRepere)])
         XCTAssertEqual(PriseDeSangApports.appliquer(r, priseDeSang: p, maintenant: maintenant), r)
-        XCTAssertEqual(PriseDeSangApports.etat(p.markers[0]), .aOptimiser)
+        XCTAssertEqual(PriseDeSangApports.etat(p.markers[0]), .sousIntervalle)
+        XCTAssertTrue(PriseDeSangApports.rappelleLAssiette(p.markers[0]))
         XCTAssertFalse(PriseDeSangApports.aliments(pour: p.markers[0]).isEmpty)
     }
 

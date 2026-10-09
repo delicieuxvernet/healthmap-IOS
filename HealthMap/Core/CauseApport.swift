@@ -89,13 +89,13 @@ enum CauseApport {
     /// La prise de sang (30 sept. 2026) : une mesure, pas une déclaration.
     /// Rien à « changer » : le geste passe par l'assiette, l'avis par le médecin.
     static let priseDeSangPese = Explication(
-        pourquoi: "Ta prise de sang situe cette valeur dans le bas, ou sous le repère imprimé par ton laboratoire. Une mesure pèse plus qu'une réponse au questionnaire : elle corrige ton score.",
+        pourquoi: "Ta prise de sang place cette valeur dans le bas de l'intervalle imprimé par ton laboratoire, ou en dessous. Une mesure pèse plus qu'une réponse au questionnaire : elle corrige l'estimation de ton apport.",
         geste: nil,
-        avis: "Montre ces résultats à ton médecin : lui seul peut les interpréter avec ton histoire.")
+        avis: "Montre tes résultats à ton médecin.")
     static let priseDeSangAide = Explication(
-        pourquoi: "Ta prise de sang situe cette valeur dans le repère imprimé par ton laboratoire : ce que tu fais aujourd'hui suffit, et ton score le reflète.",
+        pourquoi: "Ta prise de sang place cette valeur dans l'intervalle imprimé par ton laboratoire. Une mesure pèse plus qu'une réponse au questionnaire : elle corrige l'estimation de ton apport.",
         geste: nil,
-        avis: nil)
+        avis: "Montre tes résultats à ton médecin.")
 
     private static func cle(_ texte: String) -> String {
         texte.folding(options: .diacriticInsensitive, locale: Locale(identifier: "fr_FR")).lowercased()

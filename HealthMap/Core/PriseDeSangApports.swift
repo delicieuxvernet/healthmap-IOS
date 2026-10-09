@@ -23,8 +23,13 @@ import Foundation
 //     valeur DANS l'intervalle ne dit rien des apports, seule une valeur hors
 //     de l'intervalle compte ;
 //   · la correction tire le score de 70 % de l'écart, bornée à ±35 points ;
-//   · aucun verdict : l'écran parle de « repères du laboratoire » et renvoie
-//     vers le médecin (compliance du 6 juil. 2026).
+//   · aucun verdict : l'écran dit où la valeur se situe dans l'intervalle
+//     imprimé par le laboratoire, en le citant comme tel, et renvoie vers le
+//     médecin (compliance du 6 juil. 2026). Depuis l'audit de conformité du
+//     9 oct. 2026 (règlement 2017/745, règle 11 : rester hors du dispositif
+//     médical), aucun mot de Kiwio ne qualifie une valeur, aucune couleur ne
+//     change avec elle : l'usage affiché est nutritionnel (la mesure corrige
+//     l'estimation d'un apport).
 
 /// Où une valeur se situe dans l'intervalle imprimé par le laboratoire.
 /// Calculé par le serveur ; l'app n'en fait que la lecture.
@@ -246,33 +251,42 @@ enum PriseDeSangApports {
 
     // MARK: Lecture à l'écran
 
-    /// Les trois états montrés à la personne — jamais un verdict.
+    /// Où la valeur se situe par rapport à l'intervalle IMPRIMÉ par le
+    /// laboratoire — une position, jamais un verdict de Kiwio.
     enum Etat: Equatable {
-        case aOptimiser
-        case dansLesReperes
+        case sousIntervalle
+        case dansIntervalle
         case auDessus
         case sansRepere
 
         var libelle: String {
             switch self {
-            case .aOptimiser: return "à optimiser"
-            case .dansLesReperes: return "dans les repères"
-            case .auDessus: return "au-dessus du repère"
-            case .sansRepere: return "sans repère imprimé"
+            case .sousIntervalle: return "sous l'intervalle du labo"
+            case .dansIntervalle: return "dans l'intervalle du labo"
+            case .auDessus: return "au-dessus de l'intervalle du labo"
+            case .sansRepere: return "sans intervalle imprimé"
             }
         }
     }
 
     static func etat(_ m: MarqueurSanguin) -> Etat {
         switch m.position {
-        case .sousRepere, .basDuRepere: return .aOptimiser
-        case .dansRepere: return .dansLesReperes
+        case .sousRepere: return .sousIntervalle
+        case .basDuRepere, .dansRepere: return .dansIntervalle
         case .auDessus: return .auDessus
         case .sansRepere: return .sansRepere
         }
     }
 
-    /// Les aliments à mettre dans l'assiette pour une valeur à optimiser.
+    /// La mesure tire l'estimation de l'apport vers le bas (valeur sous
+    /// l'intervalle, ou dans sa partie basse) : la carte rappelle alors où
+    /// l'apport se trouve dans l'assiette. Usage nutritionnel, pas un conseil
+    /// sur la valeur elle-même.
+    static func rappelleLAssiette(_ m: MarqueurSanguin) -> Bool {
+        m.position == .sousRepere || m.position == .basDuRepere
+    }
+
+    /// Les aliments où se trouve l'apport mesuré (`rappelleLAssiette`).
     static func aliments(pour m: MarqueurSanguin) -> [String] {
         if let n = m.nutriment, let liste = SourcesAlimentaires.parNutriment[n] { return liste }
         if m.code == "folates" { return ["Légumes verts", "Légumineuses", "Avocat"] }
@@ -288,12 +302,13 @@ enum PriseDeSangApports {
         return f.string(from: NSNumber(value: v)) ?? String(v)
     }
 
-    /// « repère 30–100 », « repère ≥ 30 », « repère ≤ 5 », ou nil.
+    /// « intervalle du labo : 30–100 », « ≥ 30 », « ≤ 5 », ou nil. La
+    /// fourchette est celle IMPRIMÉE sur le compte rendu, citée comme telle.
     static func repereLisible(_ m: MarqueurSanguin) -> String? {
         switch (m.borneBasse, m.borneHaute) {
-        case let (b?, h?): return "repère \(valeurLisible(b))–\(valeurLisible(h))"
-        case let (b?, nil): return "repère ≥ \(valeurLisible(b))"
-        case let (nil, h?): return "repère ≤ \(valeurLisible(h))"
+        case let (b?, h?): return "intervalle du labo : \(valeurLisible(b))–\(valeurLisible(h))"
+        case let (b?, nil): return "intervalle du labo : ≥ \(valeurLisible(b))"
+        case let (nil, h?): return "intervalle du labo : ≤ \(valeurLisible(h))"
         default: return nil
         }
     }

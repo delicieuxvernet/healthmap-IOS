@@ -1,6 +1,11 @@
 import Foundation
 
 // MARK: - Red Flag Detector (exact translation of detectRedFlags in health.js)
+//
+// Mêmes règles de déclenchement que health.js. Les MESSAGES ont divergé le
+// 9 octobre 2026 (audit de conformité, le web n'est plus maintenu) : un fait
+// tiré des réponses, puis « parles-en à un professionnel de santé ». Aucun
+// pronostic, aucun mot de risque, aucune promesse de ce qu'un suivi apporte.
 enum RedFlagDetector {
 
     static func detect(profile: UserProfile) -> [RedFlag] {
@@ -20,7 +25,7 @@ enum RedFlagDetector {
         if ["vegan", "vegetarien", "vegetarian"].contains(diet) && !hasSupplement("b12") {
             flags.append(RedFlag(
                 id: .veganNoB12, urgency: .soon,
-                message: "Tu manges végé sans B12 en soutien. Sur la durée, ça compte vraiment : la B12 ne se trouve pas dans les végétaux."
+                message: "Tu manges végé sans B12 en soutien, et la B12 ne se trouve pas dans les végétaux. Parles-en à un professionnel de santé."
             ))
         }
 
@@ -28,7 +33,7 @@ enum RedFlagDetector {
         if profile.pregnancyStatus == "pregnant" && !hasSupplement("folate") {
             flags.append(RedFlag(
                 id: .pregnantNoFolate, urgency: .immediate,
-                message: "Enceinte sans folate : parles-en à ton médecin dès maintenant. Le folate est essentiel au développement du bébé."
+                message: "Enceinte, sans folate en soutien : parles-en dès maintenant à ton médecin ou à ta sage-femme."
             ))
         }
 
@@ -36,7 +41,7 @@ enum RedFlagDetector {
         if profile.pregnancyStatus == "pregnant" && profile.isSmoker {
             flags.append(RedFlag(
                 id: .pregnantSmoking, urgency: .immediate,
-                message: "Enceinte et fumeuse : c'est un risque important pour le bébé. Parles-en à ton médecin sans attendre."
+                message: "Enceinte et fumeuse : parles-en sans attendre à ton médecin ou à ta sage-femme."
             ))
         }
 
@@ -46,7 +51,7 @@ enum RedFlagDetector {
                 id: .tryingConceiveNoFolate, urgency: .soon,
                 // Aucune dose dans Kiwio (doctrine du 20 sept. 2026) : la posologie
                 // appartient au médecin ou au pharmacien.
-                message: "Projet de grossesse sans folate. L'idéal est de commencer avant la conception : parles-en à ton médecin ou à ton pharmacien."
+                message: "Projet de grossesse, sans folate en soutien : parles-en à ton médecin ou à ton pharmacien."
             ))
         }
 
@@ -54,7 +59,7 @@ enum RedFlagDetector {
         if profile.periodFlow == "very_heavy" && !hasSupplement("iron") {
             flags.append(RedFlag(
                 id: .heavyPeriodsNoIron, urgency: .soon,
-                message: "Règles abondantes et pas de fer en soutien. Une prise de sang (ferritine) te donnera une réponse claire."
+                message: "Règles abondantes et pas de fer en soutien : parles-en à un professionnel de santé."
             ))
         }
 
@@ -62,7 +67,7 @@ enum RedFlagDetector {
         if profile.periodFlow == "very_heavy" && ["vegan", "vegetarien", "vegetarian"].contains(diet) {
             flags.append(RedFlag(
                 id: .heavyPeriodsPlantBased, urgency: .soon,
-                message: "Règles abondantes et régime végétarien, le fer est doublement sollicité. Celui des végétaux s'absorbe environ 3 fois moins bien."
+                message: "Règles abondantes et régime végétarien : le fer des végétaux s'absorbe moins bien que celui de la viande. Parles-en à un professionnel de santé."
             ))
         }
 
@@ -70,7 +75,7 @@ enum RedFlagDetector {
         if profile.weightTrend == "losing_unintentionally" {
             flags.append(RedFlag(
                 id: .unintentionalWeightLoss, urgency: .soon,
-                message: "Tu perds du poids sans le chercher. Ça mérite un avis médical, sans attendre."
+                message: "Tu perds du poids sans le chercher : parles-en sans attendre à un professionnel de santé."
             ))
         }
 
@@ -78,7 +83,7 @@ enum RedFlagDetector {
         if conditions.contains(where: { ["celiac", "crohns_uc", "pancreatic_insufficiency"].contains($0) }) {
             flags.append(RedFlag(
                 id: .malabsorptionCondition, urgency: .routine,
-                message: "Avec un intestin fragile, le fer, la B12, le calcium, le zinc, la vitamine D et les folates passent moins bien. Un suivi médical fait la différence."
+                message: "Avec un intestin fragile, le fer, la B12, le calcium, le zinc, la vitamine D et les folates peuvent moins bien passer. Parles-en à un professionnel de santé."
             ))
         }
 
@@ -88,7 +93,7 @@ enum RedFlagDetector {
         if surgeries.contains(where: { ["bariatric", "gastrectomy", "small_bowel_resection"].contains($0) }) {
             flags.append(RedFlag(
                 id: .majorDigestiveSurgery, urgency: .soon,
-                message: "Après une opération qui touche l'estomac ou l'intestin grêle, la B12 ne s'absorbe plus comme avant, souvent pour longtemps. Un dosage régulier avec ton médecin, c'est la base."
+                message: "Après une opération qui touche l'estomac ou l'intestin grêle, la B12 peut moins bien s'absorber. Parles-en à ton médecin."
             ))
         }
 
@@ -98,19 +103,19 @@ enum RedFlagDetector {
         if history.contains("cancer_treatment") {
             flags.append(RedFlag(
                 id: .cancerFollowUp, urgency: .soon,
-                message: "Pendant un traitement lourd, tes besoins bougent vite et l'appétit avec. C'est ton équipe soignante qui pilote : ce que tu lis ici ne remplace rien."
+                message: "Pendant un traitement lourd, parles-en à ton équipe soignante avant de changer ton alimentation : ce que tu lis ici ne remplace pas son avis."
             ))
         }
         if history.contains("hemochromatosis") {
             flags.append(RedFlag(
                 id: .hemochromatosisIron, urgency: .routine,
-                message: "Avec une hémochromatose, le fer s'accumule au lieu de manquer. On ne te proposera jamais de fer, et méfie-toi des multivitamines qui en contiennent."
+                message: "Avec une hémochromatose, Kiwio ne te propose jamais de fer. Les multivitamines en contiennent souvent : parles-en à ton médecin."
             ))
         }
         if history.contains("kidney_condition") {
             flags.append(RedFlag(
                 id: .kidneySupplementCaution, urgency: .routine,
-                message: "Des reins fragiles évacuent moins bien le magnésium et le potassium. Avant de te supplémenter, demande l'avis de ton médecin."
+                message: "Avec des reins fragiles, demande l'avis de ton médecin avant de prendre un complément."
             ))
         }
 
@@ -118,7 +123,7 @@ enum RedFlagDetector {
         if medications.contains("ppi") && medications.contains("metformin") {
             flags.append(RedFlag(
                 id: .ppiMetforminB12, urgency: .soon,
-                message: "Ton anti-acide et ta metformine freinent chacun la B12. Un dosage sanguin permet de faire le point."
+                message: "Ton anti-acide et ta metformine peuvent chacun freiner l'absorption de la B12 : parles-en à ton médecin ou à ton pharmacien."
             ))
         }
 
@@ -135,7 +140,7 @@ enum RedFlagDetector {
             (["vegan", "vegetarien"].contains(diet) || medications.contains("ppi") || medications.contains("metformin")) {
             flags.append(RedFlag(
                 id: .tinglingB12Risk, urgency: .soon,
-                message: "Des fourmillements alors que ta B12 est à risque, c'est à voir vite. Les nerfs récupèrent mal si on laisse traîner."
+                message: "Des fourmillements, et plusieurs de tes réponses qui pèsent sur la B12 : parles-en vite à un professionnel de santé."
             ))
         }
 
@@ -144,7 +149,7 @@ enum RedFlagDetector {
             (profile.periodFlow == "heavy" || profile.periodFlow == "very_heavy" || ["vegan", "vegetarien"].contains(diet)) {
             flags.append(RedFlag(
                 id: .hairLossIronRisk, urgency: .soon,
-                message: "Tes cheveux tombent et plusieurs signaux pointent le fer. Fais doser ta ferritine : ton médecin saura la lire."
+                message: "Tes cheveux tombent, et plusieurs de tes réponses pèsent sur le fer : parles-en à un professionnel de santé."
             ))
         }
 
@@ -154,7 +159,7 @@ enum RedFlagDetector {
         if symptoms.contains("digestive_bleeding") {
             flags.append(RedFlag(
                 id: .digestiveBleeding, urgency: .immediate,
-                message: "Selles noires ou du sang dans les selles, consulte vite un médecin. Il faut chercher la cause côté digestif avant toute conclusion sur ton alimentation."
+                message: "Selles noires ou du sang dans les selles : consulte un médecin sans attendre. Kiwio n'en tire aucune conclusion sur ton alimentation."
             ))
         }
 

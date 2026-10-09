@@ -35,20 +35,26 @@ final class PriseDeSangBlocTests: XCTestCase {
         XCTAssertEqual(PriseDeSangCarte.sousTitre(nil), PriseDeSangCarte.invitation)
     }
 
-    func testUnePriseRecenteDitSaDateEtCeQuiResteAOptimiser() {
-        let deux = prise("2026-09-12", [
+    /// Audit de conformité du 9 oct. 2026 : la carte dit ce qui a été lu,
+    /// jamais combien de valeurs sont « à optimiser » ou « dans les repères ».
+    func testUnePriseRecenteDitSaDateEtCeQuiAEteLu() {
+        let trois = prise("2026-09-12", [
             marqueur("ferritine", "iron", .sousRepere),
             marqueur("vit_d_25oh", "vitD", .basDuRepere),
             marqueur("vit_b12", "vitB12", .dansRepere),
         ])
-        XCTAssertEqual(PriseDeSangCarte.sousTitre(deux, maintenant: maintenant),
-                       "Prélèvement du 12 sept. · 2 valeurs à optimiser")
+        XCTAssertEqual(PriseDeSangCarte.sousTitre(trois, maintenant: maintenant),
+                       "Prélèvement du 12 sept. · 3 valeurs lues")
 
         let une = prise("2026-09-12", [marqueur("ferritine", "iron", .sousRepere)])
-        XCTAssertTrue(PriseDeSangCarte.sousTitre(une, maintenant: maintenant).hasSuffix("1 valeur à optimiser"))
+        XCTAssertTrue(PriseDeSangCarte.sousTitre(une, maintenant: maintenant).hasSuffix("1 valeur lue"))
 
-        let aucune = prise("2026-09-12", [marqueur("vit_b12", "vitB12", .dansRepere)])
-        XCTAssertTrue(PriseDeSangCarte.sousTitre(aucune, maintenant: maintenant).hasSuffix("tout est dans les repères"))
+        for texte in [PriseDeSangCarte.sousTitre(trois, maintenant: maintenant), PriseDeSangCarte.invitation] {
+            for verdict in ["optimiser", "dans les repères", "normal"] {
+                XCTAssertFalse(texte.contains(verdict), "« \(verdict) » dans « \(texte) »")
+            }
+        }
+        XCTAssertTrue(PriseDeSangCarte.avis.contains("médecin"))
     }
 
     func testUneDateNonLueSeDitCommeUnImport() {
