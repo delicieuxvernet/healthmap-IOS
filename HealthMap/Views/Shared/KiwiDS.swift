@@ -297,6 +297,28 @@ extension View {
     }
 }
 
+// MARK: - Ligne qui passe en colonne aux tailles d'accessibilité
+
+/// Une rangée (`HStack`) à toutes les tailles de texte standard, une colonne
+/// alignée à gauche aux tailles d'accessibilité (AX1 à AX5) : c'est là que les
+/// libellés côte à côte se coupaient (« Én-ergie », « Symptô… », captures AX3
+/// du 9 oct. 2026). À la taille par défaut, le rendu est celui de la rangée.
+struct DSLigneOuColonne<Contenu: View>: View {
+    var alignementLigne: VerticalAlignment = .center
+    var alignementColonne: HorizontalAlignment = .leading
+    var espacement: CGFloat? = nil
+    @ViewBuilder let contenu: () -> Contenu
+
+    @Environment(\.dynamicTypeSize) private var tailleTexte
+
+    var body: some View {
+        let disposition = tailleTexte.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: alignementColonne, spacing: espacement))
+            : AnyLayout(HStackLayout(alignment: alignementLigne, spacing: espacement))
+        disposition { contenu() }
+    }
+}
+
 /// Tracking optique par taille : c'est ce qui fait qu'un texte « sonne » iOS.
 enum DSTracking {
     static let grandTitre: CGFloat = -0.95

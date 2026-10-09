@@ -223,7 +223,9 @@ struct JournalEnergieCard: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 12) {
+            // Aux tailles d'accessibilité, l'anneau passe sous le chiffre :
+            // côte à côte, « Énergie » se coupait en « Én-ergie » (AX3).
+            DSLigneOuColonne(alignementLigne: .center, espacement: 12) {
                 VStack(alignment: .leading, spacing: 0) {
                     enTete
                     chiffres
@@ -251,7 +253,7 @@ struct JournalEnergieCard: View {
 
     /// Le libellé de la catégorie et, aujourd'hui, la pastille Apple Santé.
     private var enTete: some View {
-        HStack(alignment: .center, spacing: 6) {
+        DSLigneOuColonne(alignementLigne: .center, espacement: 6) {
             ScanCardHeader(
                 icon: "flame",
                 title: "Énergie",
@@ -294,7 +296,7 @@ struct JournalEnergieCard: View {
     /// Le chiffre héros, sa légende, puis la sous-ligne : lus d'une traite.
     private var chiffres: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            DSLigneOuColonne(alignementLigne: .firstTextBaseline, espacement: 6) {
                 // Le chiffre COMPTE jusqu'à sa nouvelle valeur.
                 ChiffreQuiCompte(valeur: Double(heros))
                     .font(.system(.largeTitle, design: .rounded).weight(.bold).monospacedDigit())
@@ -387,6 +389,7 @@ struct JournalMacrosCard: View {
     let lignes: [Ligne]
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     /// Les quatre lignes du jour. Les fibres suivent la référence
     /// canonique (`NutrientData`, 30 g) ; les trois macros, les cibles calculées
@@ -415,12 +418,25 @@ struct JournalMacrosCard: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            ForEach(lignes) { ligne in
-                colonne(ligne)
+        if tailleTexte.isAccessibilitySize {
+            // Deux par deux : sur quatre colonnes, « Protéines » devenait
+            // « Proté… » (AX3).
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10, alignment: .topLeading),
+                                GridItem(.flexible(), spacing: 10, alignment: .topLeading)],
+                      alignment: .leading, spacing: 12) {
+                ForEach(lignes) { ligne in
+                    colonne(ligne)
+                }
             }
+            .frame(maxWidth: .infinity)
+        } else {
+            HStack(alignment: .top, spacing: 10) {
+                ForEach(lignes) { ligne in
+                    colonne(ligne)
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
     }
 
     private func colonne(_ ligne: Ligne) -> some View {
@@ -934,6 +950,9 @@ struct JournalSaisieBloc: View {
     let onEcrire: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Aux tailles d'accessibilité, « Dicter » prend la rangée et « Photo »,
+    /// « Autres » passent dessous : à 72 pt de large, ils se coupaient (AX3).
+    @Environment(\.dynamicTypeSize) private var tailleTexte
     /// La scène d'écoute : c'est elle qui dit quand le bouton est « parti »
     /// en bulle. Ne publie qu'aux changements de phase, jamais au rythme du micro.
     @ObservedObject private var ecoute = EcouteCentre.partage
@@ -952,6 +971,10 @@ struct JournalSaisieBloc: View {
     /// Largeur de « Photo » et de « Autres ».
     private static let largeurSecondaire: CGFloat = 72
 
+    private var grandTexte: Bool { tailleTexte.isAccessibilitySize }
+    /// 72 pt, sauf aux tailles d'accessibilité : la moitié de la rangée.
+    private var largeurFixe: CGFloat? { grandTexte ? nil : Self.largeurSecondaire }
+
     /// Le verre vert pâle du bouton « Autres » déplié, sans son ombre : il se
     /// fond par-dessus le verre clair, qui porte déjà la sienne.
     private static let clairActifSansOmbre: VerreMatiere = {
@@ -962,15 +985,27 @@ struct JournalSaisieBloc: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 8) {
-                boutonDicter
-                boutonPhotographier
-                boutonAutres
+            Group {
+                if grandTexte {
+                    VStack(spacing: 8) {
+                        boutonDicter
+                        HStack(alignment: .center, spacing: 8) {
+                            boutonPhotographier
+                            boutonAutres
+                        }
+                    }
+                } else {
+                    HStack(alignment: .center, spacing: 8) {
+                        boutonDicter
+                        boutonPhotographier
+                        boutonAutres
+                    }
+                }
             }
             .fixedSize(horizontal: false, vertical: true)
 
             if deplie {
-                HStack(alignment: .top, spacing: 8) {
+                DSLigneOuColonne(alignementLigne: .top, alignementColonne: .center, espacement: 8) {
                     option("pencil", "Écrire", action: onEcrire)
                     option("magnifyingglass", "Rechercher", action: onRechercher)
                     option("barcode.viewfinder", "Code-barres", action: onCodeBarres)
@@ -1086,8 +1121,8 @@ struct JournalSaisieBloc: View {
             }
             .foregroundStyle(Color.dsTexte)
             .padding(.horizontal, 4)
-            .frame(width: Self.largeurSecondaire)
-            .frame(minHeight: Verre.hauteurSaisie, maxHeight: .infinity)
+            .frame(width: largeurFixe)
+            .frame(maxWidth: grandTexte ? .infinity : nil, minHeight: Verre.hauteurSaisie, maxHeight: .infinity)
             .verreClair()
             .contentShape(Capsule(style: .continuous))
         }
@@ -1119,8 +1154,8 @@ struct JournalSaisieBloc: View {
             }
             .foregroundStyle(deplie ? Color.teinteKiwiTexte : Color.dsTexte)
             .padding(.horizontal, 4)
-            .frame(width: Self.largeurSecondaire)
-            .frame(minHeight: Verre.hauteurSaisie, maxHeight: .infinity)
+            .frame(width: largeurFixe)
+            .frame(maxWidth: grandTexte ? .infinity : nil, minHeight: Verre.hauteurSaisie, maxHeight: .infinity)
             .background {
                 // Deux plaques superposées : le verre vert pâle se fond sur le
                 // verre clair au lieu de le remplacer d'un coup.

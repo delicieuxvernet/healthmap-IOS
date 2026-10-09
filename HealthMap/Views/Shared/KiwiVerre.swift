@@ -913,12 +913,58 @@ struct VerreBascule<Valeur: Hashable>: View {
     let options: [(valeur: Valeur, libelle: String)]
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var tailleTexte
 
     private var index: Int {
         options.firstIndex { $0.valeur == selection } ?? 0
     }
 
+    @ViewBuilder
     var body: some View {
+        if tailleTexte.isAccessibilitySize {
+            empilee
+        } else {
+            enLigne
+        }
+    }
+
+    /// Aux tailles d'accessibilité, les options s'empilent sur toute la
+    /// largeur : en deux moitiés de 38 pt, « Compléments » se coupait (AX3).
+    /// L'option choisie porte le curseur de verre blanc.
+    private var empilee: some View {
+        VStack(spacing: 2) {
+            ForEach(Array(options.enumerated()), id: \.offset) { _, option in
+                let actif = option.valeur == selection
+                Button {
+                    guard !actif else { return }
+                    HapticService.shared.selection()
+                    selection = option.valeur
+                } label: {
+                    Text(option.libelle)
+                        .font(.system(.subheadline, design: .default).weight(actif ? .semibold : .medium))
+                        .foregroundStyle(Color.dsTexte)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
+                        .background {
+                            if actif {
+                                Color.clear
+                                    .verre(.curseur, forme: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(actif ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+        .padding(3)
+        .verre(.piste, forme: RoundedRectangle(cornerRadius: 19, style: .continuous))
+    }
+
+    private var enLigne: some View {
         GeometryReader { geo in
             let largeur = max(0, (geo.size.width - 6) / CGFloat(max(1, options.count)))
             ZStack(alignment: .leading) {

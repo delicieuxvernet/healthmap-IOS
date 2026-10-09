@@ -634,7 +634,9 @@ struct JournalView: View {
     /// « Journal » à gauche (34 / 700), la capsule du jour à droite. La barre
     /// de navigation native est masquée : c'est cette ligne qui porte le titre.
     private var enTete: some View {
-        HStack(alignment: .center, spacing: 8) {
+        // Aux tailles d'accessibilité, la capsule du jour passe sous le titre :
+        // à côté, elle se réduisait à « Auj… » (AX3).
+        DSLigneOuColonne(alignementLigne: .center, espacement: 8) {
             DSLargeTitle(titre: "Journal")
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
