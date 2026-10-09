@@ -112,7 +112,9 @@ L'architecture canonique de HealthMap (web + iOS) vit dans le **vault Obsidian**
 ### 2.4 — RGPD & App Store
 13. **Edge Functions `delete-user` (Art. 17) + `export-user-data` (Art. 20)** déjà déployées côté Supabase. Boutons UI à câbler dans `ProfileView.swift`.
 14. **Sign in with Apple** : capability à activer dans Xcode + entitlements (App Store guideline 4.8).
-15. **NSCameraUsageDescription + NSPhotoLibraryUsageDescription** déjà dans Info.plist (meal scan).
+15. **NSCameraUsageDescription** dans Info.plist (scan repas, code-barres). **Pas de NSPhotoLibraryUsageDescription** :
+    la galerie passe par `PhotosPicker`, qui n'en demande pas (retirée le 9 oct. 2026, audit de conformité).
+    Toute donnée nouvellement envoyée au serveur se déclare dans `PrivacyInfo.xcprivacy` (app) — les widgets ont le leur.
 
 ### 2.5 — Lifecycle
 16. **Session refresh 10 min** (matche le web) via `AuthViewModel`.

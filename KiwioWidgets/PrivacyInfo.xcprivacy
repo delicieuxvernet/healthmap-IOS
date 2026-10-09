@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+    =============================================================================
+    Kiwio — manifeste de confidentialité de l'extension de widgets (KiwioWidgets)
+    Apple exige un manifeste PAR binaire qui appelle une « required reason API ».
+
+      - Aucune donnée collectée : l'extension n'a ni réseau, ni SDK, ni secret.
+        Elle ne lit que la boîte commune que l'app remplit (trousseau partagé
+        `fr.healthmap.app.partage`, `Partage/BoiteCommune.swift`), et n'y écrit
+        que les gestes faits sur un widget (verre d'eau, prise cochée), que
+        l'app relit à son retour au premier plan. Ce que l'app collecte est
+        déclaré dans `HealthMap/Resources/PrivacyInfo.xcprivacy`.
+      - UserDefaults (CA92.1) : `BoiteCommune` se replie sur le UserDefaults
+        du processus quand le trousseau est indisponible. Ces valeurs restent
+        dans l'extension ; rien n'est partagé par un App Group.
+    =============================================================================
+    -->
+
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

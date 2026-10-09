@@ -62,11 +62,18 @@
     <key>POSTHOG_HOST</key>
     <string>$(POSTHOG_HOST)</string>
     <!-- Privacy usage descriptions (required by App Store review) -->
-    <!-- Photo library only: meal scan flow relies on UIImagePickerController in .photoLibrary mode. -->
+    <!-- Pas de NSPhotoLibraryUsageDescription : les photos de la galerie passent
+         par PhotosPicker, qui tourne hors du processus de l'app et ne demande
+         aucune autorisation (seule la photo choisie nous parvient). Retirée le
+         9 oct. 2026 (audit de conformité) : déclarée, jamais utilisée.
+         En revanche, NSPhotoLibraryAddUsageDescription EST requise : le Récap se
+         partage en image (`RecapView`, UIActivityViewController avec une UIImage)
+         et la feuille propose « Enregistrer l'image » ; sans cette clé, l'app
+         plante à ce geste. -->
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Kiwio enregistre l'image de ton récap dans tes photos, seulement quand tu le demandes.</string>
     <key>NSCameraUsageDescription</key>
     <string>Kiwio utilise la caméra pour photographier tes repas et lire le code-barres des produits, afin d'analyser ce qu'ils t'apportent.</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>HealthMap accède à vos photos pour importer des images de repas ou d'étiquettes nutritionnelles que vous souhaitez analyser.</string>
     <!-- Saisie vocale (fonction phare) : dictée du repas via Speech.framework.
          Les DEUX clés sont obligatoires — sans elles l'app plante à la première
          dictée et la soumission est rejetée. La reconnaissance est demandée

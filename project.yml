@@ -112,8 +112,6 @@ targets:
         product: Supabase
       - package: RevenueCat
         product: RevenueCat
-      - package: RevenueCat
-        product: RevenueCatUI
       - package: Sentry
         product: Sentry
 

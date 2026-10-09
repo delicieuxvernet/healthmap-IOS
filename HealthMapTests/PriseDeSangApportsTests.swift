@@ -103,8 +103,24 @@ final class PriseDeSangApportsTests: XCTestCase {
         let r = registre(["iron": 70, "fiber": 60])
         let p = prise("2026-09-12", [marqueur("folates", nil, .sousRepere)])
         XCTAssertEqual(PriseDeSangApports.appliquer(r, priseDeSang: p, maintenant: maintenant), r)
-        XCTAssertEqual(PriseDeSangApports.etat(p.markers[0]), .aOptimiser)
+        XCTAssertEqual(PriseDeSangApports.etat(p.markers[0]), .sousIntervalle)
+        XCTAssertTrue(PriseDeSangApports.rappelleLAssiette(p.markers[0]))
         XCTAssertFalse(PriseDeSangApports.aliments(pour: p.markers[0]).isEmpty)
+    }
+
+    /// Une valeur dans la partie basse de l'intervalle : affichée « dans
+    /// l'intervalle du labo » (aucun verdict), mais l'estimation est tirée vers
+    /// le bas, donc la carte rappelle où l'apport se trouve dans l'assiette.
+    func testUneValeurBasseDansLIntervalle_estDiteDedansEtGardeLAssiette() {
+        let m = marqueur("ferritine", "iron", .basDuRepere)
+        XCTAssertEqual(PriseDeSangApports.etat(m), .dansIntervalle)
+        XCTAssertEqual(PriseDeSangApports.etat(m).libelle, "dans l'intervalle du labo")
+        XCTAssertTrue(PriseDeSangApports.rappelleLAssiette(m))
+        XCTAssertFalse(PriseDeSangApports.aliments(pour: m).isEmpty)
+        // Pleinement dans l'intervalle : ni verdict, ni rappel de l'assiette.
+        let dedans = marqueur("ferritine", "iron", .dansRepere)
+        XCTAssertEqual(PriseDeSangApports.etat(dedans), .dansIntervalle)
+        XCTAssertFalse(PriseDeSangApports.rappelleLAssiette(dedans))
     }
 
     func testSansPriseDeSangLeRegistreEstIntact() {
@@ -134,7 +150,8 @@ final class PriseDeSangApportsTests: XCTestCase {
         XCTAssertNil(p.markers[1].nutriment)
         XCTAssertEqual(p.markers[2].position, .sansRepere)
         XCTAssertNil(p.markers[2].borneBasse)
-        XCTAssertEqual(PriseDeSangApports.repereLisible(p.markers[0]), "repère 30–100")
+        // L'intervalle imprimé par le labo, cité comme tel (audit du 9 oct. 2026).
+        XCTAssertEqual(PriseDeSangApports.repereLisible(p.markers[0]), "intervalle du labo : 30–100")
         XCTAssertEqual(PriseDeSangApports.valeurLisible(4.1), "4,1")
     }
 

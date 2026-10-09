@@ -162,7 +162,7 @@ enum LectureEstimation {
     static func notePriseDeSang(_ id: String) -> String? {
         guard marqueursRegules.contains(id) else { return nil }
         let x = id == "calcium" ? "calcium" : "magnésium"
-        return "Un \(x) sanguin normal écarte un manque sévère, mais reflète peu ce que tu manges : les deux peuvent être vrais à la fois."
+        return "Le corps garde le \(x) du sang dans une fourchette serrée, quoi que tu manges : une prise de sang en dit peu sur tes apports en \(x)."
     }
 
     // MARK: D'où vient l'apport
