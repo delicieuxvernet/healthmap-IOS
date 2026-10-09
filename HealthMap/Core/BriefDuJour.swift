@@ -141,8 +141,8 @@ struct BriefDuJour: Equatable {
     /// hier pour que le chiffre veuille dire quelque chose.
     let besoinsCouvertsHier: Int?
     let besoinsCouvertsAvantHier: Int?
-    /// Apports du bilan, du plus bas au plus haut hier (3 au plus). Vide si
-    /// hier est trop peu noté.
+    /// Apports suivis (`BriefDuJourBuilder.suivis`), du plus bas au plus haut
+    /// hier (3 au plus). Vide si hier est trop peu noté.
     let manquesHier: [Manque]
     let effort: Effort?
     /// L'apport sur lequel miser aujourd'hui.
@@ -268,6 +268,25 @@ enum BriefDuJourBuilder {
         NutrientData.all.filter { (couverture[$0.id.rawValue] ?? 0) >= seuilCouvert }.count
     }
 
+    /// Les apports parmi lesquels on cherche ce qui a manqué : les cibles du
+    /// bilan d'abord (leurs idées de repas sont personnalisées), puis les
+    /// autres besoins de `NutrientData` que les repas de ce jour-là
+    /// RENSEIGNENT. Un apport qu'aucun repas ne renseigne n'est pas un zéro :
+    /// hors bilan, on n'en dit rien. Libellé canonique, aucune idée de repas
+    /// propre (`alimentsAffichables` prend alors le repli écrit à la main).
+    static func suivis(
+        cibles: [CibleNutritionnelle],
+        couverture: [String: Int]
+    ) -> [CibleNutritionnelle] {
+        let dejaCibles = Set(cibles.map(\.id))
+        let autres = NutrientData.all.compactMap { definition -> CibleNutritionnelle? in
+            let id = definition.id.rawValue
+            guard !dejaCibles.contains(id), couverture[id] != nil else { return nil }
+            return CibleNutritionnelle(id: id, nom: definition.label, aliments: [], conseil: nil)
+        }
+        return cibles + autres
+    }
+
     // MARK: Construction
 
     /// Depuis le bilan fraîchement chargé.
@@ -322,19 +341,32 @@ enum BriefDuJourBuilder {
 
         let hierAssezNote = repasHier >= repasMinimum
 
-        let manques: [BriefDuJour.Manque] = hierAssezNote
-            ? toutesLesCibles
-                .map { BriefDuJour.Manque(id: $0.id, nom: $0.nom, pourcent: couvertureHier[$0.id] ?? 0) }
-                .sorted { $0.pourcent < $1.pourcent }
-                .prefix(3)
-                .map { $0 }
-            : []
+        // Ce qui a manqué hier se lit sur TOUS les apports que les repas d'hier
+        // renseignent, pas sur les seules cibles du bilan. Retour d'Arthur du
+        // 9 oct. 2026 : le brief du matin, bâti sur le bilan gardé la veille,
+        // disait « vitamine D, 11 % » ; rejoué depuis les Réglages une fois le
+        // nouveau bilan arrivé (vitamine D « à affiner », donc plus une
+        // cible), il disait « calcium, 48 % ». L'apport le plus bas d'hier ne
+        // dépend plus que des repas : les deux ne peuvent plus se contredire.
+        let suivis = Self.suivis(cibles: toutesLesCibles, couverture: couvertureHier)
+        var manques: [BriefDuJour.Manque] = []
+        if hierAssezNote {
+            let tous = suivis.map {
+                BriefDuJour.Manque(id: $0.id, nom: $0.nom, pourcent: couvertureHier[$0.id] ?? 0)
+            }
+            // Du plus bas au plus haut ; à égalité, les cibles du bilan (en
+            // tête de `suivis`) passent devant.
+            let ordre = tous.indices.sorted { a, b in
+                tous[a].pourcent == tous[b].pourcent ? a < b : tous[a].pourcent < tous[b].pourcent
+            }
+            manques = ordre.prefix(3).map { tous[$0] }
+        }
 
-        // La cible du jour : l'apport du bilan le plus bas HIER ; sans données
+        // La cible du jour : l'apport le plus bas HIER ; sans données
         // exploitables d'hier, la priorité du bilan.
         let cible: CibleNutritionnelle? = {
             if let plusBas = manques.first,
-               let trouvee = toutesLesCibles.first(where: { $0.id == plusBas.id }) {
+               let trouvee = suivis.first(where: { $0.id == plusBas.id }) {
                 return trouvee
             }
             return toutesLesCibles.first
@@ -359,8 +391,9 @@ enum BriefDuJourBuilder {
     // MARK: Priorité du jour
 
     /// L'apport le plus bas d'hier et l'aliment qui le remonte le plus. nil
-    /// quand hier est trop peu noté, ou que tout est au-dessus du repère : le
-    /// brief retombe alors sur l'écran « Aujourd'hui, mise sur ».
+    /// quand hier est trop peu noté (le brief propose alors d'ajouter les
+    /// repas d'hier), ou que tout est au-dessus du repère (« Aujourd'hui, mise
+    /// sur »).
     static func priorite(brief: BriefDuJour, compositions: Compositions) -> PrioriteDuJour? {
         guard let plusBas = brief.manquesHier.first, plusBas.pourcent < seuilCouvert else { return nil }
         // La cible du brief EST l'apport le plus bas d'hier (`construire`) ;
@@ -421,31 +454,30 @@ enum BriefDuJourBuilder {
 
     // MARK: Séquence
 
-    /// Les écrans du brief, dans l'ordre. Moins de deux écrans = rien à dire :
-    /// l'appelant ne présente alors pas le brief.
+    /// Les écrans du brief, dans l'ordre. Vide = rien à dire : l'appelant ne
+    /// présente alors pas le brief.
     ///
-    /// La priorité du jour vient en dernier, avant l'invitation : c'est l'écran
-    /// qui donne le geste du jour, le brief se ferme sur lui.
+    /// UN écran, celui de ce qui a manqué hier (retour d'Arthur du 9 oct.
+    /// 2026 : « il faut que ce soit directement ce qui m'a manqué hier, et
+    /// c'est tout »). Plus de « Bonjour », plus de « 7 / 10 besoins
+    /// couverts », plus d'effort de la semaine devant lui. Hier trop peu noté,
+    /// il n'y a rien à dire de ce qui a manqué : l'écran propose d'ajouter les
+    /// repas de la veille. Tout au-dessus du repère : « Aujourd'hui, mise
+    /// sur ». L'invitation aux notifications, quand elle est due, suit.
     static func slides(
         brief: BriefDuJour,
         proposerInvitation: Bool,
         compositions: Compositions = [:]
     ) -> [BriefSlide] {
-        var slides: [BriefSlide] = [.intro(prenom: brief.prenom)]
-        if let couverts = brief.besoinsCouvertsHier {
-            slides.append(.hier(couverts: couverts, avantHier: brief.besoinsCouvertsAvantHier))
-        } else {
-            slides.append(.rienHier(repas: brief.repasHier))
-        }
-        if let effort = brief.effort {
-            slides.append(.effort(effort))
-        }
+        var slides: [BriefSlide] = []
         if let priorite = priorite(brief: brief, compositions: compositions) {
             slides.append(.priorite(priorite))
+        } else if !brief.hierAssezNote {
+            slides.append(.rienHier(repas: brief.repasHier))
         } else if let cible = brief.cible {
             slides.append(.cible(cible))
         }
-        if proposerInvitation {
+        if proposerInvitation, !slides.isEmpty {
             slides.append(.invitation(cible: brief.cible))
         }
         return slides
@@ -494,12 +526,11 @@ struct PrioriteDuJour: Equatable {
 
 // MARK: - Écrans du brief
 
+/// Depuis le 9 oct. 2026, plus d'écran « Bonjour », « Hier : 7 / 10 » ni
+/// « Ton effort qui paie » : le brief ouvre directement sur ce qui a manqué.
 enum BriefSlide: Equatable, Identifiable {
-    case intro(prenom: String?)
-    case hier(couverts: Int, avantHier: Int?)
     /// Hier trop peu noté : on propose d'ajouter les repas de la veille.
     case rienHier(repas: Int)
-    case effort(BriefDuJour.Effort)
     /// Ce qui a manqué hier et l'aliment qui le remonte (remplace, le 8 oct.
     /// 2026, l'écran des trois jauges « Ce qui a manqué hier »).
     case priorite(PrioriteDuJour)
@@ -509,10 +540,7 @@ enum BriefSlide: Equatable, Identifiable {
 
     var id: String {
         switch self {
-        case .intro: return "intro"
-        case .hier: return "hier"
         case .rienHier: return "rien-hier"
-        case .effort: return "effort"
         case .priorite: return "priorite"
         case .cible: return "cible"
         case .invitation: return "invitation"

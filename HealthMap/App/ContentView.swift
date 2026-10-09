@@ -987,7 +987,7 @@ struct MainTabView: View {
             // priorité du jour se chiffre sans attendre la base.
             compositions: CompositionsStore.shared.connuesSansReseau()
         )
-        guard slides.count >= 2 else { return }
+        guard !slides.isEmpty else { return }
         BriefDuJourStore.marquerVu()
         slidesBrief = slides
         afficheBrief = true

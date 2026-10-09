@@ -9,7 +9,8 @@ import UserNotifications
 // gauche = précédent, glisser vers le bas ou la croix = fermer.
 //
 // Il ne bloque jamais rien : fermable à tout moment, et l'appelant ne le
-// présente que s'il a au moins deux écrans à montrer.
+// présente que s'il a un écran à montrer. Depuis le 9 oct. 2026, c'est
+// presque toujours UN écran : ce qui a manqué hier (`BriefDuJourBuilder.slides`).
 //
 // Verre liquide (2 octobre 2026) : la chorégraphie ne bouge pas. Seules les
 // surfaces changent : fond de verre (teinte kiwi), cartes de verre (`.dsCard()`),
@@ -116,8 +117,12 @@ struct BriefDuJourView: View {
 
     private var entete: some View {
         VStack(spacing: Theme.spacingSM) {
-            RecapProgressBar(total: slides.count, index: index, avancee: 1)
-                .padding(.horizontal, Theme.spacingMD)
+            // Un seul écran (le cas courant depuis le 9 oct. 2026) : pas de
+            // barre de progression à un segment.
+            if slides.count > 1 {
+                RecapProgressBar(total: slides.count, index: index, avancee: 1)
+                    .padding(.horizontal, Theme.spacingMD)
+            }
 
             HStack {
                 Button {
@@ -173,69 +178,14 @@ struct BriefDuJourView: View {
     @ViewBuilder
     private func contenu(_ slide: BriefSlide) -> some View {
         switch slide {
-        case .intro(let prenom):
-            ecranIntro(prenom: prenom)
-        case .hier(let couverts, let avantHier):
-            ecranHier(couverts: couverts, avantHier: avantHier)
         case .rienHier(let repas):
             ecranRienHier(repas: repas)
-        case .effort(let effort):
-            ecranEffort(effort)
         case .priorite(let priorite):
             ecranPriorite(priorite)
         case .cible(let cible):
             ecranCible(cible)
         case .invitation(let cible):
             ecranInvitation(cible: cible)
-        }
-    }
-
-    private func ecranIntro(prenom: String?) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende(prenom.map { "Bonjour \($0)" } ?? "Bonjour")
-            Text("Voici où tu en étais hier, et ce qui compte aujourd'hui.")
-                .font(.dsSection)
-                .foregroundStyle(Color.dsTexte)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: Theme.spacingXL)
-            HStack {
-                Spacer()
-                KiwiSigne(taille: 72)
-                    .accessibilityHidden(true)
-                Spacer()
-            }
-            Spacer(minLength: Theme.spacingXL)
-            indiceTap
-        }
-    }
-
-    private func ecranHier(couverts: Int, avantHier: Int?) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Hier")
-            Spacer(minLength: Theme.spacingXL)
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Spacer()
-                RecapCompteur(valeur: couverts, taille: 88, couleur: .dsAccent)
-                Text("/ 10")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(Color.dsSecondaire)
-                Spacer()
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(couverts) besoins sur 10 couverts hier")
-            Text("besoins couverts")
-                .font(.dsHeadline)
-                .foregroundStyle(Color.dsTexte)
-                .frame(maxWidth: .infinity)
-            if let comparaison = Self.comparaison(couverts: couverts, avantHier: avantHier) {
-                Text(comparaison)
-                    .font(.dsSousTitre)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-            }
-            Spacer(minLength: Theme.spacingXL)
-            if estDernier { boutonFin }
         }
     }
 
@@ -269,30 +219,6 @@ struct BriefDuJourView: View {
         BriefPrioriteContenu(priorite: priorite)
     }
 
-    private func ecranEffort(_ effort: BriefDuJour.Effort) -> some View {
-        VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Ton effort qui paie")
-            Spacer(minLength: Theme.spacingXL)
-            Text("+\(effort.points)")
-                .font(.system(size: 72, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(Color.dsAccent)
-                .frame(maxWidth: .infinity)
-            Text("points \(NomNutriment.complement(id: effort.id, nom: effort.nom)) cette semaine")
-                .font(.dsHeadline)
-                .foregroundStyle(Color.dsTexte)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-            Text("Par rapport à la semaine dernière. Continue comme ça.")
-                .font(.dsSousTitre)
-                .foregroundStyle(Color.dsSecondaire)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-            Spacer(minLength: Theme.spacingXL)
-            if estDernier { boutonFin }
-        }
-    }
-
     private func ecranCible(_ cible: CibleNutritionnelle) -> some View {
         VStack(alignment: .leading, spacing: Theme.spacingMD) {
             legende("Aujourd'hui, mise sur")
@@ -300,9 +226,11 @@ struct BriefDuJourView: View {
                 .font(.dsGrandTitre)
                 .foregroundStyle(Color.dsTexte)
 
-            if !cible.aliments.isEmpty {
+            // Le repli écrit à la main quand l'apport n'est pas une cible du
+            // bilan (`BriefDuJourBuilder.suivis`) : jamais d'écran sans idée.
+            if !cible.alimentsAffichables.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(cible.aliments.enumerated()), id: \.offset) { position, aliment in
+                    ForEach(Array(cible.alimentsAffichables.enumerated()), id: \.offset) { position, aliment in
                         if position > 0 { DSSeparator() }
                         HStack(spacing: 12) {
                             Image(systemName: "fork.knife")
@@ -382,19 +310,6 @@ struct BriefDuJourView: View {
     private var boutonFin: some View {
         DSCapsuleButton(titre: "C'est parti") {
             terminer(raison: "fin")
-        }
-    }
-
-    /// « Un de plus qu'avant-hier. » — jamais culpabilisant quand ça baisse.
-    static func comparaison(couverts: Int, avantHier: Int?) -> String? {
-        guard let avantHier else { return nil }
-        let ecart = couverts - avantHier
-        switch ecart {
-        case 0: return "Autant qu'avant-hier."
-        case 1: return "Un de plus qu'avant-hier."
-        case 2...: return "\(ecart) de plus qu'avant-hier."
-        case -1: return "Un de moins qu'avant-hier : aujourd'hui, on remonte."
-        default: return "\(-ecart) de moins qu'avant-hier : aujourd'hui, on remonte."
         }
     }
 }

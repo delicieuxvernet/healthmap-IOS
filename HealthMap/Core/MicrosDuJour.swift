@@ -252,7 +252,7 @@ enum MicrosDuJour {
             ))
         }
 
-        return TableauMicros(priorites: priorites(lignes, symptomes: contexte.symptomes), toutes: lignes)
+        return TableauMicros(priorites: priorites(lignes), toutes: lignes)
     }
 
     // MARK: Le statut
@@ -403,36 +403,46 @@ enum MicrosDuJour {
 
     // MARK: Les priorités
 
-    /// Les apports qui comptent le plus pour cette personne : les plus bas
-    /// d'abord, puis ceux en alerte prolongée, puis ceux qu'un symptôme déclaré
-    /// éclaire. Le détail d'un autre apport (ALA, EPA et DHA) n'y entre pas, ni
-    /// un apport sans chiffre.
-    static func priorites(_ lignes: [LigneMicro], symptomes: [String]) -> [LigneMicro] {
+    /// Les apports les plus BAS, du plus bas au plus haut. Retour d'Arthur du
+    /// 9 oct. 2026 : « les trois premiers, ça devrait être ceux sur lesquels
+    /// on a les apports les plus bas ». Avant, le statut passait devant le
+    /// chiffre : sur ses captures, oméga-9 à 91 %, oméga-6 à 92 % et vitamine
+    /// C à 93 % coiffaient la vitamine D à 33 % et la vitamine K à 55 %.
+    ///
+    /// Le statut ne fait plus que départager deux chiffres égaux. Un apport
+    /// couvert (y compris par un complément) ne passe jamais devant un apport
+    /// qui ne l'est pas. Le détail d'un autre apport (ALA, EPA et DHA) n'y
+    /// entre pas, ni un apport sans chiffre.
+    static func priorites(_ lignes: [LigneMicro]) -> [LigneMicro] {
         struct Candidat {
             let rang: Int
-            let poids: Int
+            let couvert: Bool
+            let niveau: Int
+            let gravite: Int
             let ligne: LigneMicro
         }
         var candidats: [Candidat] = []
         for (rang, ligne) in lignes.enumerated() {
             guard ligne.sens == .besoin, let niveau = ligne.niveau,
                   Micronutriments.parId[ligne.id]?.detailDe == nil else { continue }
-            var poids = 100 - niveau
-            // Le statut d'abord : une alerte sûre, puis « à surveiller », puis
-            // « à affiner » ; un apport couvert ne passe jamais devant.
+            let couvert: Bool
+            let gravite: Int
             switch ligne.statutApport {
-            case .aRenforcer?, .auDessusDeLaLimite?: poids += 300
-            case .aSurveiller?: poids += 200
-            case .peuPrecise?: poids += 100
-            case .couvert?, .couvertParComplement?, .sousLaLimite?: poids -= 100
-            case nil: break
+            case .aRenforcer?, .auDessusDeLaLimite?: couvert = false; gravite = 3
+            case .aSurveiller?: couvert = false; gravite = 2
+            case .peuPrecise?: couvert = false; gravite = 1
+            case .couvert?, .couvertParComplement?, .sousLaLimite?: couvert = true; gravite = 0
+            case nil:
+                couvert = false
+                if case .basProlonge = ligne.statut { gravite = 1 } else { gravite = 0 }
             }
-            if case .basProlonge = ligne.statut { poids += 40 }
-            poids += bonusSymptome(ligne.id, niveau: niveau, symptomes: symptomes)
-            candidats.append(Candidat(rang: rang, poids: poids, ligne: ligne))
+            candidats.append(Candidat(rang: rang, couvert: couvert, niveau: niveau, gravite: gravite, ligne: ligne))
         }
         candidats.sort { gauche, droite in
-            gauche.poids == droite.poids ? gauche.rang < droite.rang : gauche.poids > droite.poids
+            if gauche.couvert != droite.couvert { return !gauche.couvert }
+            if gauche.niveau != droite.niveau { return gauche.niveau < droite.niveau }
+            if gauche.gravite != droite.gravite { return gauche.gravite > droite.gravite }
+            return gauche.rang < droite.rang
         }
         return candidats.prefix(nombreDePriorites).map(\.ligne)
     }
@@ -445,13 +455,6 @@ enum MicrosDuJour {
         return SymptomesApports.liens.filter {
             $0.nutriment == apport && declares.contains($0.symptome) && $0.niveau != .faible
         }
-    }
-
-    private static func bonusSymptome(_ id: String, niveau: Int, symptomes: [String]) -> Int {
-        guard niveau < seuilBas else { return 0 }
-        let liens = liensSolides(id, symptomes: symptomes)
-        if liens.contains(where: { $0.niveau == .fort }) { return 30 }
-        return liens.isEmpty ? 0 : 20
     }
 
     // MARK: Les faits

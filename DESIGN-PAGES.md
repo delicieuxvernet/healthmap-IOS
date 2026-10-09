@@ -245,7 +245,8 @@
 >   pastille « 🔒 Débloquer avec Premium » à la place de la jauge et du chiffre ; ni priorités, ni
 >   repère « bas », ni phrase sur la personne (rien ne se devine). Le bouton d'essai (StoreKit)
 >   clôt la carte ; toucher une ligne ou ce bouton ouvre l'abonnement (zone `journal_micros`). La carte porte son en-tête (feuille verte, « Micronutriments », « touche
->   pour le détail ») ; **les trois apports qui comptent le plus pour la personne**, puis tous les
+>   pour le détail ») ; **les trois apports les plus BAS** (9 oct. 2026 : le chiffre d'abord, le
+>   statut ne départage que les égalités, un apport couvert passe après), puis tous les
 >   autres derrière « Voir les N micronutriments ». Une ligne = le nom, un point et une jauge à la
 >   TEINTE de l'apport, le pourcentage, un chevron ; un apport bas porte un petit signe rouge ou
 >   orange après son nom. **Un seul chiffre par apport : la part du besoin couverte**, le même que
@@ -323,8 +324,15 @@
 >   que le code Ciqual et la portion ; l'apport se calcule depuis la composition de la base, avec
 >   la référence des repas notés (`canonRDA`). Parmi les idées du bilan, l'aliment proposé est
 >   celui qui apporte le plus ; sous 5 points, ou sans composition sur le téléphone, la première
->   idée s'affiche sans portion, sans chiffre ni ligne pointillée. Tout au-dessus de 70 % hier, ou
->   hier trop peu noté : l'écran « Aujourd'hui, mise sur » reste.
+>   idée s'affiche sans portion, sans chiffre ni ligne pointillée. Tout au-dessus de 70 % hier :
+>   l'écran « Aujourd'hui, mise sur » reste ; hier trop peu noté : l'écran « Ajouter mes repas
+>   d'hier ». **Depuis le 9 oct. 2026, c'est le SEUL écran du brief** (retour d'Arthur : « il faut
+>   que ce soit directement ce qui m'a manqué hier, et c'est tout ») : plus de « Bonjour », plus
+>   de « 7 / 10 besoins couverts », plus d'« effort qui paie » ; la barre segmentée disparaît
+>   quand il n'y a qu'un écran (l'invitation aux notifications, quand elle est due, le suit).
+>   L'apport se choisit parmi TOUS ceux que les repas d'hier renseignent, cibles du bilan en tête
+>   à égalité (`BriefDuJourBuilder.suivis`) : le brief du matin et « Revoir le brief du jour »
+>   (Réglages) disent le même apport et le même chiffre, quel que soit le bilan gardé.
 > - **Fiche apport** (`BilanV6Components.swift` → `ApportV2DetailSheet`) — **réordonnée le 21 sept.
 >   2026** (retour d'Arthur : « on ne sait pas où regarder en premier »), la même d'où qu'on vienne
 >   (Journal, Bilan, Progrès). Elle répond dans l'ordre des questions, et tout ce qui s'y calcule

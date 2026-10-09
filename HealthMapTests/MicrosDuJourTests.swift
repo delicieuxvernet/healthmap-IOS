@@ -217,13 +217,34 @@ final class MicrosDuJourTests: XCTestCase {
         XCTAssertEqual(resultat.priorites.map(\.id), ["omega3", "vitD", "iron"])
     }
 
-    func testUnSymptomeDeclareFaitRemonterUnApportBas() {
-        let scores = ["vitD": 50, "iron": 55, "magnesium": 52, "zinc": 54]
-        let sans = tableau([], contexte: contexte(scores: scores))
-        XCTAssertEqual(sans.priorites.first?.id, "vitD")
+    private func ligneMicro(_ id: String, niveau: Int, statut: StatutApport?) -> LigneMicro {
+        LigneMicro(id: id, nom: id, unite: "", famille: .vitamines, sens: .besoin, niveau: niveau,
+                   partDuQuestionnaire: true, besoin: 100, quantiteDuJour: nil, rapport: nil, semaine: [],
+                   statut: .normal, faits: [], contributeurs: [], role: "", sources: [], statutApport: statut)
+    }
 
-        let avec = tableau([], contexte: contexte(scores: scores, symptomes: ["fatigue_chronic"]))
-        XCTAssertEqual(avec.priorites.first?.id, "iron")
+    /// Retour d'Arthur du 9 oct. 2026 : oméga-9 à 91 %, oméga-6 à 92 % et
+    /// vitamine C à 93 % passaient devant la vitamine D à 33 % et la K à 55 %.
+    func testLeChiffreLePlusBasPasseDevantLeStatut() {
+        let lignes = [
+            ligneMicro("vitD", niveau: 33, statut: .peuPrecise),
+            ligneMicro("vitC", niveau: 93, statut: .aSurveiller),
+            ligneMicro("vitK", niveau: 55, statut: .peuPrecise),
+            ligneMicro("omega6", niveau: 92, statut: .aSurveiller),
+            ligneMicro("omega9", niveau: 91, statut: .aSurveiller),
+            ligneMicro("vitB12", niveau: 100, statut: .couvert),
+        ]
+        XCTAssertEqual(MicrosDuJour.priorites(lignes).map(\.id), ["vitD", "vitK", "omega9"])
+    }
+
+    func testUnApportCouvertPasseApres_etLeStatutDepartageLesEgalites() {
+        let lignes = [
+            ligneMicro("vitD", niveau: 20, statut: .couvertParComplement),
+            ligneMicro("iron", niveau: 60, statut: .peuPrecise),
+            ligneMicro("zinc", niveau: 60, statut: .aRenforcer),
+            ligneMicro("vitC", niveau: 95, statut: .aSurveiller),
+        ]
+        XCTAssertEqual(MicrosDuJour.priorites(lignes).map(\.id), ["zinc", "iron", "vitC"])
     }
 
     func testLeDetailDesOmega3NEntrePasDansLesPriorites() throws {
