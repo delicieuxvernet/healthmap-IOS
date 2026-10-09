@@ -108,6 +108,21 @@ final class PriseDeSangApportsTests: XCTestCase {
         XCTAssertFalse(PriseDeSangApports.aliments(pour: p.markers[0]).isEmpty)
     }
 
+    /// Une valeur dans la partie basse de l'intervalle : affichée « dans
+    /// l'intervalle du labo » (aucun verdict), mais l'estimation est tirée vers
+    /// le bas, donc la carte rappelle où l'apport se trouve dans l'assiette.
+    func testUneValeurBasseDansLIntervalle_estDiteDedansEtGardeLAssiette() {
+        let m = marqueur("ferritine", "iron", .basDuRepere)
+        XCTAssertEqual(PriseDeSangApports.etat(m), .dansIntervalle)
+        XCTAssertEqual(PriseDeSangApports.etat(m).libelle, "dans l'intervalle du labo")
+        XCTAssertTrue(PriseDeSangApports.rappelleLAssiette(m))
+        XCTAssertFalse(PriseDeSangApports.aliments(pour: m).isEmpty)
+        // Pleinement dans l'intervalle : ni verdict, ni rappel de l'assiette.
+        let dedans = marqueur("ferritine", "iron", .dansRepere)
+        XCTAssertEqual(PriseDeSangApports.etat(dedans), .dansIntervalle)
+        XCTAssertFalse(PriseDeSangApports.rappelleLAssiette(dedans))
+    }
+
     func testSansPriseDeSangLeRegistreEstIntact() {
         let r = registre(["iron": 70])
         XCTAssertEqual(PriseDeSangApports.appliquer(r, priseDeSang: nil, maintenant: maintenant), r)

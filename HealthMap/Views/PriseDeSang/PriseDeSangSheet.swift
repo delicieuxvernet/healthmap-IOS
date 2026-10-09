@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 //   · gratuit : l'écran verrouillé, une porte (`UnlockDoor`, zone `prise_de_sang`) ;
 //   · dépôt : photographier la page, choisir une photo, ou importer le PDF ;
 //   · lecture : « Kiwio lit tes résultats… » ;
-//   · « Tes repères » : compteurs, précision médicale (une seule, en haut comme
+//   · « Tes valeurs mesurées » : compteurs, précision médicale (une seule, en haut comme
 //     la maquette), une carte par valeur, puis ce que ça change à ton bilan.
 //
 // Vocabulaire (audit de conformité du 9 oct. 2026, règlement 2017/745) :
@@ -119,7 +119,8 @@ struct PriseDeSangSheet: View {
     }
 
     private var titre: String {
-        etape == .resultat ? "Tes repères" : "Prise de sang"
+        // Plus de « repères » : les valeurs, situées dans l'intervalle du labo.
+        etape == .resultat ? "Tes valeurs mesurées" : "Prise de sang"
     }
 
     @ViewBuilder
@@ -399,7 +400,7 @@ struct PriseDeSangSheet: View {
         }
     }
 
-    // MARK: Résultat — « Tes repères »
+    // MARK: Résultat — « Tes valeurs mesurées »
 
     private func resultat(_ prise: PriseDeSang) -> some View {
         let effets = dashboardVM.effetsPriseDeSang()
