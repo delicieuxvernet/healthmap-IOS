@@ -104,6 +104,21 @@ final class DroitEssaiGratuit: @unchecked Sendable {
     }
 }
 
+/// La première des deux issues d'une course (réponse ou délai) : `prendre`
+/// ne répond vrai qu'une seule fois.
+final class PremiereIssue: @unchecked Sendable {
+    private let verrou = NSLock()
+    private var prise = false
+
+    func prendre() -> Bool {
+        verrou.lock()
+        defer { verrou.unlock() }
+        guard !prise else { return false }
+        prise = true
+        return true
+    }
+}
+
 // MARK: - Subscription Service (RevenueCat)
 @MainActor
 final class SubscriptionService: ObservableObject {
@@ -457,13 +472,43 @@ final class SubscriptionService: ObservableObject {
     /// Demande à Apple, formule par formule, si cet identifiant Apple peut
     /// encore profiter de l'essai. Appelé à chaque chargement des formules :
     /// l'éligibilité est celle de l'identifiant Apple, pas du compte Kiwio.
+    ///
+    /// Bornée à `delaiDroitALEssai` : au-delà, on garde ce qu'on savait (rien
+    /// = pas d'essai affiché) et le chargement des formules continue, repli
+    /// StoreKit compris. Une réponse tardive n'est pas attendue.
     func rafraichirDroitALEssai() async {
-        let statuts = await Purchases.shared.checkTrialOrIntroDiscountEligibility(
-            productIdentifiers: Self.subscriptionProductIds
-        )
-        let autorises = Self.droits(statuts.mapValues(\.status))
+        let identifiants = Self.subscriptionProductIds
+        guard let autorises = await Self.auPlus(Self.delaiDroitALEssai, {
+            let statuts = await Purchases.shared.checkTrialOrIntroDiscountEligibility(productIdentifiers: identifiants)
+            return Self.droits(statuts.mapValues(\.status))
+        }) else {
+            AppLogger.subscription.notice("Droit à l'essai : pas de réponse d'Apple dans le délai, aucun essai affiché")
+            return
+        }
         Self.droitEssai.remplacer(par: autorises)
         essaiAutorise = autorises
+    }
+
+    nonisolated static let delaiDroitALEssai: Duration = .seconds(5)
+
+    /// Le résultat de `operation`, ou `nil` si elle n'a pas répondu dans le
+    /// délai. L'opération n'est pas attendue au-delà : on ne retient que la
+    /// première des deux issues.
+    nonisolated static func auPlus<T: Sendable>(
+        _ delai: Duration,
+        _ operation: @escaping @Sendable () async -> T
+    ) async -> T? {
+        await withCheckedContinuation { (suite: CheckedContinuation<T?, Never>) in
+            let issue = PremiereIssue()
+            Task {
+                let resultat = await operation()
+                if issue.prendre() { suite.resume(returning: resultat) }
+            }
+            Task {
+                try? await Task.sleep(for: delai)
+                if issue.prendre() { suite.resume(returning: nil) }
+            }
+        }
     }
 
     /// Seul « eligible » ouvre l'essai. Un échec réseau (RevenueCat rend alors

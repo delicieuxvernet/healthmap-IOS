@@ -90,6 +90,33 @@ final class ConformiteTests: XCTestCase {
         XCTAssertFalse(HealthCalculator.analyzeNutrientScores(profile: profil).isEmpty)
     }
 
+    /// Brouillon d'avant la mise à jour avec 15 ans : vu dès la reprise.
+    func testUnBrouillonRepriSousSeizeAns_estArreteALaReprise() {
+        XCTAssertTrue(AgeMinimum.estSousLeMinimum("15"))
+        XCTAssertFalse(AgeMinimum.estSousLeMinimum("16"))
+        XCTAssertFalse(AgeMinimum.estSousLeMinimum(""))
+        let vm = QuestionnaireViewModel()
+        var profil = vm.profile
+        profil.age = "15"
+        vm.profile = profil
+        vm.verifierAgeRepris()
+        XCTAssertTrue(vm.sousAgeMinimum)
+        XCTAssertEqual(vm.profile.age, "")
+    }
+
+    /// Le droit à l'essai n'attend jamais plus que son délai.
+    func testUneVerificationQuiTraine_nAttendPasPlusQueLeDelai() async {
+        let debut = Date()
+        let resultat: Bool? = await SubscriptionService.auPlus(.milliseconds(200)) {
+            try? await Task.sleep(for: .seconds(5))
+            return true
+        }
+        XCTAssertNil(resultat)
+        XCTAssertLessThan(Date().timeIntervalSince(debut), 2)
+        let rapide: Bool? = await SubscriptionService.auPlus(.seconds(2)) { true }
+        XCTAssertEqual(rapide, true)
+    }
+
     // MARK: Relances
 
     func testLeComparatif_auPlusUneFoisParSemaine() {
