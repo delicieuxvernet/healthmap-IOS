@@ -630,7 +630,8 @@ if MODE == "apply-app"
       HOW TO FIND THE IN-APP PURCHASES (2.1(b)) - two paths:
       1. Reglages tab (last tab) > "Kiwio Premium" card at the top > tap its
          button ("Essayer 7 jours gratuits" / "Decouvrir Kiwio Premium") >
-         the paywall opens.
+         the Premium sheet opens on a short "Standard ou Premium ?" comparison
+         card > tap "Passer a Premium" on it > the subscriptions appear.
       2. Reglages tab > "Abonnement" row (section "Compte") > "Decouvrir
          Kiwio Premium".
       The paywall displays the auto-renewable subscriptions of group Kiwio
@@ -647,7 +648,8 @@ if MODE == "apply-app"
       A screen recording captured on a physical iPhone was provided with
       version 1.0 (approved): Home Screen, sign-in with the demo account, core
       features, paywall and a successful sandbox purchase. The purchase flow
-      is unchanged in this update, and both subscriptions are already approved.
+      is unchanged in this update apart from the comparison card shown first,
+      and both subscriptions are already approved.
 
       Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
       Privacy Policy: https://healthmap.fr/privacy
@@ -1004,12 +1006,12 @@ end
 # pas à repasser en review (contrairement à la 1.0, cf. l'épisode des 4 refus).
 # VERSION_STRING (défaut : la version en cours ci-dessous) · WHATS_NEW (défaut : les notes ci-dessous).
 if MODE == "new-version"
-  # Version 1.0.5 (3 oct. 2026) : widgets en verre, verre liquide, bilan
-  # ludique, dictée en bulle, prise de sang (bêta), icône zoomée. Les textes
-  # de la fiche (description, notes, texte promo, mots-clés) ont été validés
-  # par Arthur avant l'envoi ; VERSION_STRING / WHATS_NEW restent des
-  # surcharges possibles.
-  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.5" : ENV["VERSION_STRING"]
+  # Version 2.0 (9 oct. 2026) : nouvelle interface, dictée en un toucher,
+  # analyse sur les références françaises, comparatif Standard / Premium.
+  # Les textes de la fiche (notes par familles, description, texte promo) ont
+  # été validés par Arthur avant l'envoi ; VERSION_STRING / WHATS_NEW restent
+  # des surcharges possibles.
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "2.0" : ENV["VERSION_STRING"]
 
   existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
     .find { |v| v.dig("attributes", "versionString") == vs }
@@ -1026,64 +1028,74 @@ if MODE == "new-version"
   end
 
   notes_fiche = <<~FICHE.strip
-    Kiwio passe au verre liquide, et vient jusque sur ton écran d'accueil.
+    Kiwio 2.0 : une nouvelle app, du premier écran au dernier.
 
-    Des widgets en verre : tes apports, ta journée, ton eau d'un toucher, ton rituel du jour, et un ajout rapide pour dicter ou photographier un repas sans ouvrir l'app. Ta journée s'affiche aussi en direct sur l'écran verrouillé et dans la Dynamic Island. À partir d'iOS 18, « Dicter un repas » et « Un verre d'eau » se posent dans le Centre de contrôle.
+    UNE INTERFACE ENTIÈREMENT REPENSÉE
+    - Le verre liquide, partout : chaque page a été redessinée, plus claire, plus douce, plus rapide à lire.
+    - Tes apports à renforcer s'affichent autrement : un seul chiffre par apport, le même partout, et ce qui pèse dessus en un coup d'œil.
+    - Un questionnaire refait de A à Z : quatre petites étapes, une question à la fois.
 
-    Le verre liquide, partout : des cartes en verre dépoli, un fond qui suit l'onglet, des mouvements tout en douceur. Progrès devient une toile : tes dix apports d'un coup d'œil. Et sur l'icône, le kiwi prend toute la place.
+    NOTER UN REPAS EN UN TOUCHER
+    - Dicte ou écris ton repas : il arrive déjà compté. Une portion non précisée, un aliment ambigu ? Kiwio te le signale sur la ligne et te propose les bons choix : un toucher suffit pour corriger.
+    - Ajuste au gramme près avec la nouvelle règle graduée, et relis ta dictée avant l'analyse.
+    - Une recherche instantanée, avec tes récents et tes favoris dès l'ouverture.
+    - Des unités qui te parlent : pièce, poignée, carré, tablette.
 
-    Un bilan plus ludique : quatre petites étapes, une question à la fois, et le kiwi qui te dit pourquoi il la pose. Tu remplis ta journée repas par repas, et chaque étape se termine par des pistes à retourner.
+    UNE ANALYSE PLUS PROFONDE
+    - Tes apports sont estimés à partir de quantités réelles, sur les références françaises : table Ciqual, enquête INCA 3 et références nutritionnelles de l'ANSES (2021).
+    - Tes vitamines et minéraux détaillés, directement dans le Journal (Premium).
 
-    La dictée en bulle : maintiens « Dicter », parle, relâche. Ce que tu as dit fait foi, quantités comprises.
+    TA JOURNÉE, SANS Y PENSER
+    - Ton poids et tes verres d'eau se notent depuis le Journal.
+    - Des widgets pour l'écran d'accueil et l'écran verrouillé, et ta journée dans la Dynamic Island.
+    - Des rappels personnalisés selon ton profil, qui partent d'un fait de ta journée.
+    - Le brief du jour va à l'essentiel : ta priorité, en un geste.
 
-    Des chiffres plus justes : un seul chiffre par apport, le même partout. Tes repas notés comptent plus vite, et tes besoins suivent ton âge, ton sexe et ta situation.
+    NOUVEAU DANS PREMIUM
+    - La prise de sang, en bêta : photographie tes résultats ou dépose le PDF du laboratoire, les valeurs mesurées comptent dans ton bilan. Elle ne remplace pas l'avis d'un médecin.
+    - Un comparatif clair entre Kiwio Standard et Kiwio Premium, pour choisir en connaissance de cause.
 
-    Poids et eau dans le Journal : règle ton poids souhaité, tes calories et tes macros s'ajustent. L'eau se remplit gobelet par gobelet.
-
-    Ton Plan prend vie : attrape une bulle, ses voisines suivent. Et chaque rappel part d'un fait de ta journée.
-
-    Pour les abonnés Premium : tes micronutriments sous tes macros, avec le rapport oméga-6 / oméga-3, le conseil du jour en widget, une offre à l'année, et, en bêta, la prise de sang. Photographie tes résultats ou dépose le PDF du laboratoire : les valeurs mesurées comptent dans tes apports et ton bilan, et ton document est lu, puis oublié. Elle ne remplace pas l'avis d'un médecin.
-
-    Et des corrections un peu partout.
+    Et de nombreuses corrections : plus de journée en double, l'app rouvre sur ton dernier bilan.
   FICHE
 
   description_fiche = <<~FICHE.strip
     Comprends enfin ce que ton alimentation t'apporte, et sache par où commencer aujourd'hui.
     Des chiffres clairs, et le pourquoi derrière chacun. Sans jargon, sans culpabilité.
 
+    NOTER UN REPAS EN UN TOUCHER
+    - Dicte ou écris ton repas : il arrive déjà compté. Si Kiwio hésite sur une portion ou un aliment, il te le signale et te propose les bons choix : un toucher corrige.
+    - Ajuste au gramme près avec la règle graduée.
+    - Ou photographie ton assiette, cherche un aliment (recherche instantanée, tes récents et favoris en tête), scanne un code-barres.
+    - Des unités qui te parlent : pièce, poignée, carré, tablette.
+    - Note ton eau et ton poids depuis le Journal, règle ton poids souhaité, et relie Apple Santé : ton activité élargit ton budget du jour.
+
     TON BILAN, EN QUATRE PETITES ÉTAPES
     - Une question à la fois : le kiwi te dit pourquoi il la pose, et tu remplis ta journée type repas par repas.
     - Kiwio en tire tes dix apports clés : vitamines D, B12 et C, fer, magnésium, calcium, zinc, iode, oméga-3 et fibres.
-    - Chacun a un seul chiffre, le même partout : la part de ton besoin couverte, selon ton âge, ton sexe et ta situation.
+    - Chacun a un seul chiffre, le même partout : la part de ton besoin couverte, estimée sur les références françaises (table Ciqual, enquête INCA 3, ANSES), selon ton âge, ton sexe et ta situation.
     - L'anneau de cause : pour chaque apport, ce qui pèse dessus, de combien, et ce que tu regagnerais en changeant une habitude.
 
-    NOTER UN REPAS EN QUELQUES SECONDES
-    - Dicte-le : touche ou maintiens « Dicter », et parle. Ce que tu dis fait foi, quantités comprises.
-    - Ou photographie ton assiette, écris-le, cherche un aliment, scanne un code-barres.
-    - Tes repas notés font bouger tes chiffres.
-    - Note ton eau et ton poids, règle ton poids souhaité, et relie Apple Santé : ton activité élargit ton budget du jour.
-
     SAVOIR QUOI FAIRE AUJOURD'HUI
-    - Ton brief du jour : ta veille en un coup d'œil, et ta priorité du jour.
+    - Ton brief du jour : ta priorité, en un geste.
     - Ton Plan relie tes objectifs, ce que tu ressens et tes apports, pour voir par où commencer.
-    - Des rappels qui partent d'un fait de ta journée, si tu choisis de les activer.
+    - Des rappels personnalisés selon ton profil, qui partent d'un fait de ta journée, si tu choisis de les activer.
 
     SUIVRE SANS Y PENSER
-    - Des widgets en verre pour l'écran d'accueil et l'écran verrouillé : tes apports, ta journée, ton eau d'un toucher, ton rituel du jour, et un ajout rapide pour noter un repas sans ouvrir l'app.
-    - Ta journée en direct sur l'écran verrouillé et dans la Dynamic Island.
+    - Des widgets en verre pour l'écran d'accueil et l'écran verrouillé, et ta journée en direct dans la Dynamic Island.
     - Progrès : tes dix apports sur une toile, et un check-in rapide pour suivre ce que tu ressens.
 
     DES COMPLÉMENTS SANS PARTI PRIS
     Quand ton bilan en fait ressortir, Kiwio te dit quoi chercher et pourquoi. Quand l'assiette suffit, il te le dit aussi. Kiwio ne gagne rien sur ce qu'il te recommande : aucune commission, aucun partenariat, tu achètes où tu veux.
 
-    KIWIO PREMIUM
-    Ton bilan, ton Journal, tes apports à renforcer et leurs causes restent gratuits. Premium ajoute :
-    - le détail de tes vitamines, minéraux et acides gras dans le Journal, avec le rapport oméga-6 / oméga-3 ;
-    - ce que tu peux faire pour chaque apport, et les solutions de ton Plan ;
-    - tes tendances et ta progression depuis le départ ;
+    KIWIO STANDARD OU KIWIO PREMIUM
+    Kiwio Standard est gratuit : ton bilan, tes apports à renforcer et leurs causes, ton Journal avec calories et macros, la recherche et le code-barres, les widgets, 2 repas dictés et 3 repas en photo par jour.
+    Kiwio Premium ajoute :
+    - 60 repas dictés et 30 repas en photo par jour ;
+    - le détail de tes vitamines et minéraux dans le Journal, avec le rapport oméga-6 / oméga-3 ;
+    - les solutions à tes interactions et ton plan guidé pas à pas ;
+    - tes courbes de progression depuis le départ ;
     - le conseil du jour, à cocher depuis son widget ;
-    - la prise de sang, en bêta : photographie tes résultats ou dépose le PDF du laboratoire, les valeurs mesurées comptent dans tes apports, et ton document est lu, puis oublié ;
-    - plus de dictées, et jusqu'à 30 scans photo par jour.
+    - la prise de sang, en bêta : photographie tes résultats ou dépose le PDF du laboratoire, les valeurs mesurées comptent dans tes apports, et ton document est lu, puis oublié.
 
     Kiwio ne remplace pas un avis médical, et sa lecture d'une prise de sang ne remplace pas celle d'un médecin : montre-lui toujours tes résultats. C'est ton compagnon bien-être au quotidien.
 
@@ -1092,7 +1104,7 @@ if MODE == "new-version"
   FICHE
 
   promo_fiche = <<~FICHE.strip
-    Comprends ce que ton assiette t'apporte et sache par où commencer. Nouveau : des widgets en verre, un bilan plus ludique et la dictée en bulle.
+    Kiwio 2.0 : une interface entièrement repensée, ton repas compté en un toucher et une analyse fondée sur les références françaises.
   FICHE
 
   mots_cles_fiche = "nutrition,vitamines,minéraux,micronutriments,calories,repas,alimentation,compléments,fibres,fer"
@@ -1860,7 +1872,8 @@ if MODE == "fix-meta"
     HOW TO FIND THE IN-APP PURCHASES (2.1(b)) - two paths:
     1. Reglages tab (last tab) > "Kiwio Premium" card at the top > tap its
        button ("Essayer 7 jours gratuits" / "Decouvrir Kiwio Premium") >
-       the paywall opens.
+       the Premium sheet opens on a short "Standard ou Premium ?" comparison
+       card > tap "Passer a Premium" on it > the subscriptions appear.
     2. Reglages tab > "Abonnement" row (section "Compte") > "Decouvrir
        Kiwio Premium".
     The paywall displays the auto-renewable subscriptions of group Kiwio
@@ -1877,7 +1890,8 @@ if MODE == "fix-meta"
     A screen recording captured on a physical iPhone was provided with
     version 1.0 (approved): Home Screen, sign-in with the demo account, core
     features, paywall and a successful sandbox purchase. The purchase flow
-    is unchanged in this update, and both subscriptions are already approved.
+    is unchanged in this update apart from the comparison card shown first,
+    and both subscriptions are already approved.
 
     Terms of Use (EULA): #{terms_url}
     Privacy Policy: #{privacy_url}
