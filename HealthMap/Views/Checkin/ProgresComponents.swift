@@ -263,12 +263,12 @@ enum ProgresToile {
             let lieu = point(centre: centre, rayon: rayonLibelles * e, angle: a)
             let fort = apport.aRenforcer || choisi
             let nom = Text(apport.court)
-                .dsPolice(police, fort ? Font.Weight.semibold : Font.Weight.medium)
+                .font(.system(size: police, weight: fort ? Font.Weight.semibold : Font.Weight.medium))
                 .foregroundColor(fort ? Color.dsTexte : encreLibelle)
             if apport.aRenforcer {
                 calque.draw(nom, at: CGPoint(x: lieu.x, y: lieu.y - 8 * e), anchor: ancre)
                 let chiffre = Text(DS.pourcent(Int(valeurs[index].rounded())))
-                    .dsPolice(police, Font.Weight.medium, chiffres: true)
+                    .font(.system(size: police, weight: Font.Weight.medium).monospacedDigit())
                     .foregroundColor(Color.dsARenforcerTexte)
                 calque.draw(chiffre, at: CGPoint(x: lieu.x, y: lieu.y + 8 * e), anchor: ancre)
             } else {

@@ -1124,7 +1124,7 @@ struct BesoinsCourbeCard: View {
             // jours
             let labels = Self.dayLabels(count: n)
             for (i, lab) in labels.enumerated() {
-                ctx.draw(Text(lab).dsPolice(10, .semibold, chiffres: true).foregroundColor(Color.dsSecondaire),
+                ctx.draw(Text(lab).font(.system(size: 10, weight: .semibold, design: .default).monospacedDigit()).foregroundColor(Color.dsSecondaire),
                          at: CGPoint(x: px(i), y: h + 11))
             }
         }
