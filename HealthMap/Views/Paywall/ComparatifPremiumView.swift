@@ -62,7 +62,7 @@ struct ComparatifPremiumView: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Standard ou Premium ?")
-                        .font(.system(size: 22, weight: .bold))
+                        .dsPolice(22, .bold)
                         .tracking(-0.6)
                         .foregroundStyle(Color.dsTexte)
                         .accessibilityAddTraits(.isHeader)

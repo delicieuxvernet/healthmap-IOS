@@ -120,7 +120,7 @@ struct TeaserCardView: View {
     var body: some View {
         HStack(alignment: .top, spacing: Theme.spacingSM) {
             Text(teaser.emoji)
-                .font(.system(size: 22))
+                .dsPolice(22)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Theme.spacingXS) {
@@ -129,7 +129,7 @@ struct TeaserCardView: View {
                     .foregroundStyle(Color.teinteKiwiTexte)
 
                 Text(teaser.message)
-                    .font(.system(size: 14, weight: .medium, design: .default))
+                    .dsPolice(14, .medium)
                     .foregroundStyle(Color.dsTexte)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.leading)

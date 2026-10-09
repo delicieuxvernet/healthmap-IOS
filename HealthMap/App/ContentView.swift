@@ -193,7 +193,7 @@ private struct OfflineBanner: View {
                     tailleIcone: 12
                 )
                 Text("Hors ligne. Certaines données ne sont pas à jour")
-                    .font(.system(size: 13, weight: .medium))
+                    .dsPolice(13, .medium)
                     .foregroundStyle(Color.dsTexte)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
@@ -208,7 +208,7 @@ private struct OfflineBanner: View {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 11, weight: .semibold))
                     Text("Reconnecté. Synchronisation...")
-                        .font(.system(size: 12, weight: .medium))
+                        .dsPolice(12, .medium)
                 }
                 .foregroundStyle(Color.teinteKiwiTexte)
                 .padding(.horizontal, 12)

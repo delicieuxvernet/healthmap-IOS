@@ -96,7 +96,7 @@ struct BriefDuJourView: View {
                     }
 
                     Text("Calculé sur les repas que tu as notés.")
-                        .font(.system(size: 11))
+                        .dsPolice(11)
                         .foregroundStyle(Color.dsSecondaire)
                         .padding(.bottom, Theme.spacingSM)
                 }
@@ -110,7 +110,9 @@ struct BriefDuJourView: View {
                 "slides": slides.count,
             ])
         }
-        .dynamicTypeSize(.large ... .accessibility3)
+        // Plus de plancher : les petites tailles de texte s'appliquent aussi.
+        // Le plafond AX3 reste : le brief tient sur un écran, sans défiler.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility3)
     }
 
     // MARK: - Chrome
@@ -303,7 +305,7 @@ struct BriefDuJourView: View {
     private var indiceTap: some View {
         Text("Touche l'écran pour continuer")
             .font(.dsLegende)
-            .foregroundStyle(Color.dsTertiaire)
+            .foregroundStyle(Color.dsSecondaire)
             .frame(maxWidth: .infinity)
     }
 

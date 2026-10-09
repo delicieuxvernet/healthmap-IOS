@@ -473,7 +473,7 @@ struct BilanMolette: View {
                 Text("\(valeur)")
                     .font(BilanTypo.molette)
                     .contentTransition(.numericText())
-                    .foregroundStyle(touchee ? Color.dsTexte : Color.dsTertiaire)
+                    .foregroundStyle(touchee ? Color.dsTexte : Color.dsSecondaire)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 3)
                     .overlay(alignment: .top) { filet }
@@ -514,7 +514,7 @@ struct BilanMolette: View {
     private func voisine(_ nombre: Int) -> some View {
         Text(plage.contains(nombre) ? "\(nombre)" : " ")
             .font(BilanTypo.moletteVoisine)
-            .foregroundStyle(Color.dsTertiaire)
+            .foregroundStyle(Color.dsSecondaire)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

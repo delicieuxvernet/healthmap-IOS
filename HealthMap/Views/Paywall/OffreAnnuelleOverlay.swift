@@ -69,7 +69,7 @@ struct OffreAnnuelleOverlay: View {
             .padding(.top, 8)
 
             Text(offre.titre)
-                .font(.system(size: tailleTitre, weight: .bold))
+                .dsPolice(tailleTitre, .bold)
                 .tracking(-0.6)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)

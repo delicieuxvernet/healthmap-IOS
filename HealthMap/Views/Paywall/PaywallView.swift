@@ -345,7 +345,7 @@ struct PaywallView: View {
             // « chaque jour » et non « sans limite » : le serveur plafonne les
             // scans photo à 30 par jour en Premium (`analyze-meal-photo`).
             Text("Ton bilan complet,\ntes solutions et tes scans,\nchaque jour.")
-                .font(.system(size: tailleTitre, weight: .bold))
+                .dsPolice(tailleTitre, .bold)
                 .tracking(-0.6)
                 .foregroundStyle(Color.dsTexte)
                 .multilineTextAlignment(.center)
@@ -987,12 +987,12 @@ private struct PremiumPurchaseSuccessView: View {
 
                 VStack(spacing: Theme.spacingXS) {
                     Text(titre)
-                        .font(.system(size: 23, weight: .bold, design: .default))
+                        .dsPolice(23, .bold)
                         .foregroundStyle(Color.dsTexte)
                         .multilineTextAlignment(.center)
 
                     Text(sousTitre)
-                        .font(.system(size: 14, weight: .medium))
+                        .dsPolice(14, .medium)
                         .foregroundStyle(Color.dsSecondaire)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1001,7 +1001,7 @@ private struct PremiumPurchaseSuccessView: View {
                     // pas deviner, et celle qui évite le prélèvement surprise.
                     if let echeance {
                         Text(echeance)
-                            .font(.system(size: 12, weight: .semibold))
+                            .dsPolice(12, .semibold)
                             .foregroundStyle(Color.dsTexte)
                             .padding(.horizontal, Theme.spacingSM)
                             .padding(.vertical, 5)
@@ -1050,7 +1050,8 @@ private struct PremiumPurchaseSuccessView: View {
                 }
             }
         }
-        .dynamicTypeSize(.large ... .accessibility3)
+        // Plus de plancher ni de plafond : la feuille défile, elle peut
+        // grandir jusqu'à AX5 (audit d'accessibilité du 9 oct. 2026).
     }
 
     private func benefitRow(icon: String, title: String) -> some View {
@@ -1061,7 +1062,7 @@ private struct PremiumPurchaseSuccessView: View {
                 .frame(width: 28, height: 44)
                 .accessibilityHidden(true)
             Text(title)
-                .font(.system(size: 13.5, weight: .semibold))
+                .dsPolice(13.5, .semibold)
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)

@@ -242,7 +242,7 @@ struct EditProfileView: View {
 
             if let note = healthNote {
                 Text(note)
-                    .font(.system(size: 12))
+                    .dsPolice(12)
                     .foregroundStyle(Color.dsSecondaire)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
