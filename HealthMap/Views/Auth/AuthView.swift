@@ -173,6 +173,21 @@ struct AuthView: View {
                     .disabled(authViewModel.isProcessing)
                     .padding(.horizontal, DS.marge)
 
+                    // À l'inscription, les textes qu'on accepte, sous le bouton
+                    // (audit de conformité du 9 octobre 2026). Ils valent aussi
+                    // pour Apple et Google, juste en dessous.
+                    if isSignUp {
+                        Text("En créant ton compte, tu acceptes les [conditions d'utilisation](https://www.healthmap.fr/cgu.html) et tu as lu la [politique de confidentialité](https://healthmap.fr/privacy).")
+                            .font(.dsLegende)
+                            .tracking(DSTracking.legende)
+                            .foregroundStyle(Color.dsSecondaire)
+                            .tint(Color.dsAccent)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, DS.marge)
+                            .transition(.opacity)
+                    }
+
                     // Divider
                     HStack {
                         Rectangle()
