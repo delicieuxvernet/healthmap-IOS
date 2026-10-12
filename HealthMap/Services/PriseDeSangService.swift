@@ -100,6 +100,18 @@ final class PriseDeSangService {
     func analyser(_ fichier: Fichier) async throws -> PriseDeSang {
         guard fichier.donnees.count <= Fichier.octetsMax else { throw Erreur.tropLourd }
         do {
+            return try await envoyer(fichier)
+        } catch Erreur.premiumRequis {
+            // Refusé comme à un compte gratuit alors que l'app voit un
+            // abonné : le serveur n'a pas encore suivi l'achat. Une seconde
+            // chance, une fois qu'il le reconnaît.
+            guard await SubscriptionService.shared.realignerLeServeur() else { throw Erreur.premiumRequis }
+            return try await envoyer(fichier)
+        }
+    }
+
+    private func envoyer(_ fichier: Fichier) async throws -> PriseDeSang {
+        do {
             let reponse: Reponse = try await TacheProtegee.executer("Prise de sang") {
                 try await client.functions.invoke(
                     "analyze-blood-report",
