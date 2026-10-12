@@ -837,6 +837,14 @@ if MODE == "apply-app"
       this submission contains the app version only. The Monthly subscription
       is not displayed in the app.
 
+      INTRODUCTORY OFFER (new in 2.0.2): from October 13 to October 31, 2026,
+      the Annual subscription has an App Store introductory offer (pay as
+      you go): 17.99 EUR for the first year, then 30 EUR per year. Accounts
+      eligible for it (no introductory offer used before) see it announced
+      once in a pop-up on launch and on the Annual card of the paywall
+      ("17,99 EUR la 1re annee - Puis 30,00 EUR / an"), with the renewal
+      price stated before purchase. Ineligible accounts see 30 EUR.
+
       HEALTHKIT (2.5.1): Apple Health is read-only. Path: Reglages tab >
       "Apple Sante" row (section "Compte") > "Apple Sante" card (imports
       weight, steps and sleep). The Journal tab also reads active energy
