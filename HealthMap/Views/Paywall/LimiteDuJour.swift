@@ -147,8 +147,9 @@ struct ApercuCapturesPremium: View {
     }
 
     private func capture<Ecran: View>(legende: String, @ViewBuilder ecran: () -> Ecran) -> some View {
-        VStack(spacing: 8) {
-            CadreTelephone { ecran() }
+        let contenu = ecran()
+        return VStack(spacing: 8) {
+            CadreTelephone { contenu }
             Text(legende)
                 .font(.dsLegendeMoyenne)
                 .foregroundStyle(Color.dsTexte)
