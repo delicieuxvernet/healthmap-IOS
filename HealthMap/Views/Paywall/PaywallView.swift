@@ -421,12 +421,24 @@ struct PaywallView: View {
     private var planCards: some View {
         VStack(spacing: DS.interCarte) {
             if let annual = annualPlan {
-                planCard(
-                    plan: annual,
-                    title: "Annuel",
-                    detail: perMonthLabel(for: annual).map { "soit \($0) par mois" },
-                    badge: annualBadge(annual)
-                )
+                // Offre de lancement (13 → 31 octobre 2026) : la carte montre le
+                // prix qu'Apple fera VRAIMENT payer cette première année.
+                if let lancement = offreLancement {
+                    planCard(
+                        plan: annual,
+                        title: "Annuel",
+                        detail: lancement.detailCarte,
+                        badge: lancement.badgeCarte,
+                        prix: lancement.prixCarte
+                    )
+                } else {
+                    planCard(
+                        plan: annual,
+                        title: "Annuel",
+                        detail: perMonthLabel(for: annual).map { "soit \($0) par mois" },
+                        badge: annualBadge(annual)
+                    )
+                }
             }
             // Aucun repli si l'hebdo manque : la carte reste vide plutôt que de
             // proposer une formule qui n'est pas en vente (le cas « plus aucune
@@ -447,8 +459,10 @@ struct PaywallView: View {
     /// seule ne se compare pas, et c'est le prix qu'on vient chercher ici.
     /// Le badge est posé à GAUCHE — à droite il chevauchait la coche de
     /// sélection. Carte de verre ; la formule choisie porte un liseré vert.
-    private func planCard(plan: PlanOption, title: String, detail: String?, badge: String?) -> some View {
+    private func planCard(plan: PlanOption, title: String, detail: String?, badge: String?,
+                          prix: String? = nil) -> some View {
         let isSelected = selectedPlan?.id == plan.id
+        let prix = prix ?? priceLabel(for: plan)
         let forme = RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous)
 
         return Button {
@@ -478,7 +492,7 @@ struct PaywallView: View {
                                 }
                         }
                     }
-                    Text(priceLabel(for: plan))
+                    Text(prix)
                         .font(.dsHeadline)
                         .tracking(DSTracking.corps)
                         .foregroundStyle(Color.dsTexte)
@@ -514,7 +528,7 @@ struct PaywallView: View {
             .contentShape(forme)
         }
         .buttonStyle(.dsPress)
-        .accessibilityLabel([title, priceLabel(for: plan), detail, badge].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityLabel([title, prix, detail, badge].compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -667,7 +681,19 @@ struct PaywallView: View {
     /// « Essayer 7 jours gratuits » (maquette), la durée lue chez Apple ;
     /// « Continuer » quand la formule choisie n'a pas d'essai.
     private var ctaTitle: String {
-        TexteAchat.titre(essai: trialLabel(for: selectedPlan))
+        if lancementChoisi != nil { return "Profiter de l'offre" }
+        return TexteAchat.titre(essai: trialLabel(for: selectedPlan))
+    }
+
+    /// L'offre de lancement de l'annuel, si Apple la propose à cette personne.
+    private var offreLancement: OffreLancement? {
+        OffreLancement.lire(annuel: annualPlan?.product)
+    }
+
+    /// L'offre de lancement, quand c'est l'annuel qui est choisi.
+    private var lancementChoisi: OffreLancement? {
+        guard let annual = annualPlan, selectedPlan?.id == annual.id else { return nil }
+        return offreLancement
     }
 
     private var ctaNote: String {
@@ -680,7 +706,8 @@ struct PaywallView: View {
         case .day: period = "jour"
         default: period = "mois"
         }
-        let base = TexteAchat.prix(price, periode: period, essai: trialLabel(for: plan))
+        let base = lancementChoisi?.noteAchat
+            ?? TexteAchat.prix(price, periode: period, essai: trialLabel(for: plan))
         // Divulgation d'auto-renouvellement exigée par App Store 3.1.2 : montant,
         // durée, renouvellement automatique, et où/quand résilier. Affichée au
         // point d'achat, sous le bouton, en plus du titre/durée/prix des cartes.

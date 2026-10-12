@@ -546,6 +546,21 @@ final class SubscriptionService: ObservableObject {
         return remise
     }
 
+    /// La remise payante d'un produit (offre de lancement : un prix réduit, pas
+    /// un essai), SEULEMENT si Apple dit que la personne y a droit. Le droit
+    /// est le même que celui de l'essai : une offre d'introduction par
+    /// abonnement et par identifiant Apple.
+    nonisolated static func remiseDeLancement(de produit: StoreProduct?) -> StoreProductDiscount? {
+        guard let produit else { return nil }
+        return remiseDeLancement(de: produit.introductoryDiscount,
+                                 autorise: droitEssai.autorise(produit.productIdentifier))
+    }
+
+    nonisolated static func remiseDeLancement(de remise: StoreProductDiscount?, autorise: Bool) -> StoreProductDiscount? {
+        guard autorise, let remise, remise.paymentMode != .freeTrial else { return nil }
+        return remise
+    }
+
     // MARK: - Purchase
     func purchase(package: Package) async throws -> PurchaseOutcome {
         do {
