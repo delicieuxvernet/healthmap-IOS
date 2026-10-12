@@ -369,14 +369,19 @@ if MODE == "intro-offers"
       else
         puts "  prix : HTTP #{code}"
       end
-      code, io = req(:get, "/v1/subscriptions/#{s["id"]}/introductoryOffers?include=subscriptionPricePoint,territory&limit=200")
-      unless code == 200
-        puts "  offres d'intro : HTTP #{code}"
-        next
+      # Paginé : 175 territoires par offre dépassent vite la page de 200.
+      lignes = []
+      pts = {}
+      url = "/v1/subscriptions/#{s["id"]}/introductoryOffers?include=subscriptionPricePoint,territory&limit=200"
+      while url
+        code, io = req(:get, url)
+        break puts("  offres d'intro : HTTP #{code}") unless code == 200
+        lignes.concat(io["data"])
+        (io["included"] || []).select { |i| i["type"] == "subscriptionPricePoints" }.each { |i| pts[i["id"]] = i.dig("attributes", "customerPrice") }
+        url = io.dig("links", "next")
       end
-      pts = (io["included"] || []).select { |i| i["type"] == "subscriptionPricePoints" }.to_h { |i| [i["id"], i.dig("attributes", "customerPrice")] }
       groupes = Hash.new { |h, k| h[k] = [] }
-      io["data"].each do |o|
+      lignes.each do |o|
         a = o["attributes"]
         terr = o.dig("relationships", "territory", "data", "id")
         ppid = o.dig("relationships", "subscriptionPricePoint", "data", "id")
