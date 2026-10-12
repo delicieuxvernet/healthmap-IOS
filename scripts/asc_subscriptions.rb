@@ -1203,12 +1203,11 @@ end
 # pas à repasser en review (contrairement à la 1.0, cf. l'épisode des 4 refus).
 # VERSION_STRING (défaut : la version en cours ci-dessous) · WHATS_NEW (défaut : les notes ci-dessous).
 if MODE == "new-version"
-  # Version 2.0 (9 oct. 2026) : nouvelle interface, dictée en un toucher,
-  # analyse sur les références françaises, comparatif Standard / Premium.
-  # Les textes de la fiche (notes par familles, description, texte promo) ont
-  # été validés par Arthur avant l'envoi ; VERSION_STRING / WHATS_NEW restent
-  # des surcharges possibles.
-  vs = ENV["VERSION_STRING"].to_s.empty? ? "2.0" : ENV["VERSION_STRING"]
+  # Version 2.0.2 (12 oct. 2026) : offre de lancement Premium (17,99 € la
+  # 1re année du 13 au 31 oct.), fiche réécrite pour vendre (dictée, données
+  # scientifiques, bilan personnalisé). Ton et plan validés par Arthur le
+  # 12 oct. 2026. VERSION_STRING / WHATS_NEW restent des surcharges possibles.
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "2.0.2" : ENV["VERSION_STRING"]
 
   existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
     .find { |v| v.dig("attributes", "versionString") == vs }
@@ -1225,64 +1224,43 @@ if MODE == "new-version"
   end
 
   notes_fiche = <<~FICHE.strip
-    Kiwio 2.0 : une nouvelle app, du premier écran au dernier.
+    Kiwio 2.0.2
 
-    UNE INTERFACE ENTIÈREMENT REPENSÉE
-    - Le verre liquide, partout : chaque page a été redessinée, plus claire, plus douce, plus rapide à lire.
-    - Tes apports à renforcer s'affichent autrement : un seul chiffre par apport, le même partout, et ce qui pèse dessus en un coup d'œil.
-    - Un questionnaire refait de A à Z : quatre petites étapes, une question à la fois.
-
-    NOTER UN REPAS EN UN TOUCHER
-    - Dicte ou écris ton repas : il arrive déjà compté. Une portion non précisée, un aliment ambigu ? Kiwio te le signale sur la ligne et te propose les bons choix : un toucher suffit pour corriger.
-    - Ajuste au gramme près avec la nouvelle règle graduée, et relis ta dictée avant l'analyse.
-    - Une recherche instantanée, avec tes récents et tes favoris dès l'ouverture.
-    - Des unités qui te parlent : pièce, poignée, carré, tablette.
-
-    UNE ANALYSE PLUS PROFONDE
-    - Tes apports sont estimés à partir de quantités réelles, sur les références françaises : table Ciqual, enquête INCA 3 et références nutritionnelles de l'ANSES (2021).
-    - Tes vitamines et minéraux détaillés, directement dans le Journal (Premium).
-
-    TA JOURNÉE, SANS Y PENSER
-    - Ton poids et tes verres d'eau se notent depuis le Journal.
-    - Des widgets pour l'écran d'accueil et l'écran verrouillé, et ta journée dans la Dynamic Island.
-    - Des rappels personnalisés selon ton profil, qui partent d'un fait de ta journée.
-    - Le brief du jour va à l'essentiel : ta priorité, en un geste.
-
-    NOUVEAU DANS PREMIUM
-    - La prise de sang, en bêta : photographie tes résultats ou dépose le PDF du laboratoire, les valeurs mesurées comptent dans ton bilan. Elle ne remplace pas l'avis d'un médecin.
-    - Un comparatif clair entre Kiwio Standard et Kiwio Premium, pour choisir en connaissance de cause.
-
-    Et de nombreuses corrections : plus de journée en double, l'app rouvre sur ton dernier bilan.
+    - Offre de lancement jusqu'au 31 octobre : Kiwio Premium à 17,99 € la première année au lieu de 30 €, pour les nouveaux abonnés.
+    - Le prix affiché pour l'abonnement annuel est celui que tu paies vraiment la première année.
+    - Corrections et améliorations.
   FICHE
 
   description_fiche = <<~FICHE.strip
-    Comprends enfin ce que ton alimentation t'apporte, et sache par où commencer aujourd'hui.
-    Des chiffres clairs, et le pourquoi derrière chacun. Sans jargon, sans culpabilité.
+    Dis ce que tu as mangé. Kiwio s'occupe du reste.
 
-    NOTER UN REPAS EN UN TOUCHER
-    - Dicte ou écris ton repas : il arrive déjà compté. Si Kiwio hésite sur une portion ou un aliment, il te le signale et te propose les bons choix : un toucher corrige.
-    - Ajuste au gramme près avec la règle graduée.
-    - Ou photographie ton assiette, cherche un aliment (recherche instantanée, tes récents et favoris en tête), scanne un code-barres.
+    Kiwio t'écoute, te connaît et te dit quoi faire aujourd'hui pour mieux manger. Pas un tableau de chiffres : des réponses, faites pour toi.
+
+    PARLE, C'EST NOTÉ
+    « Un bol de muesli, une banane et un café au lait. » En quelques secondes, ton repas est compté aliment par aliment : calories, protéines, glucides, lipides et 26 vitamines et minéraux. Pas de balance, pas de recherche interminable. Une portion floue ? Kiwio te le signale, et un toucher suffit pour corriger.
+
+    DES CHIFFRES SCIENTIFIQUES, PAS INVENTÉS
+    Chaque aliment est lu dans la table Ciqual de l'ANSES, la référence française de composition des aliments. Tes besoins suivent les références nutritionnelles de l'ANSES et l'enquête INCA 3, selon ton âge, ton sexe et ta situation. L'IA comprend ce que tu dis ; les chiffres, eux, sont calculés.
+
+    UN BILAN QUI TE CONNAÎT VRAIMENT
+    Sommeil, soleil, sport, régime, ressentis, journée type : en quatre petites étapes, une question à la fois, Kiwio fait ton portrait. Il en tire tes dix apports clés (vitamines D, B12 et C, fer, magnésium, calcium, zinc, iode, oméga-3 et fibres) et, pour chacun, ce qui pèse dessus chez toi : le thé pendant le repas, le peu de soleil, le poisson qui manque. Deux profils, deux bilans différents.
+
+    QUOI FAIRE, DÈS AUJOURD'HUI
+    - Ton brief du jour : ta priorité, en un geste concret.
+    - Ton Plan relie ce que tu ressens, tes objectifs et ton assiette.
+    - Des rappels qui partent de ta vraie journée, jamais de messages génériques.
+
+    TOUT NOTER, SANS EFFORT
+    - Photographie ton assiette, scanne un code-barres ou cherche un aliment : tes récents et tes favoris en tête.
     - Des unités qui te parlent : pièce, poignée, carré, tablette.
-    - Note ton eau et ton poids depuis le Journal, règle ton poids souhaité, et relie Apple Santé : ton activité élargit ton budget du jour.
+    - Ton eau, ton poids, et Apple Santé : ton activité élargit ton budget du jour.
+    - Des widgets pour l'écran d'accueil et l'écran verrouillé, et ta journée en direct dans la Dynamic Island.
 
-    TON BILAN, EN QUATRE PETITES ÉTAPES
-    - Une question à la fois : le kiwi te dit pourquoi il la pose, et tu remplis ta journée type repas par repas.
-    - Kiwio en tire tes dix apports clés : vitamines D, B12 et C, fer, magnésium, calcium, zinc, iode, oméga-3 et fibres.
-    - Chacun a un seul chiffre, le même partout : la part de ton besoin couverte, estimée sur les références françaises (table Ciqual, enquête INCA 3, ANSES), selon ton âge, ton sexe et ta situation.
-    - L'anneau de cause : pour chaque apport, ce qui pèse dessus, de combien, et ce que tu regagnerais en changeant une habitude.
+    VOIS TES PROGRÈS
+    Tes dix apports sur une toile, semaine après semaine, et un check-in rapide pour suivre ce que tu ressens.
 
-    SAVOIR QUOI FAIRE AUJOURD'HUI
-    - Ton brief du jour : ta priorité, en un geste.
-    - Ton Plan relie tes objectifs, ce que tu ressens et tes apports, pour voir par où commencer.
-    - Des rappels personnalisés selon ton profil, qui partent d'un fait de ta journée, si tu choisis de les activer.
-
-    SUIVRE SANS Y PENSER
-    - Des widgets en verre pour l'écran d'accueil et l'écran verrouillé, et ta journée en direct dans la Dynamic Island.
-    - Progrès : tes dix apports sur une toile, et un check-in rapide pour suivre ce que tu ressens.
-
-    DES COMPLÉMENTS SANS PARTI PRIS
-    Quand ton bilan en fait ressortir, Kiwio te dit quoi chercher et pourquoi. Quand l'assiette suffit, il te le dit aussi. Kiwio ne gagne rien sur ce qu'il te recommande : aucune commission, aucun partenariat, tu achètes où tu veux.
+    DES CONSEILS SANS PARTI PRIS
+    Quand l'assiette suffit, Kiwio te le dit. Quand un complément peut aider, il t'explique quoi chercher et pourquoi. Aucune commission, aucun partenariat : tu achètes où tu veux.
 
     KIWIO STANDARD OU KIWIO PREMIUM
     Kiwio Standard est gratuit : ton bilan, tes apports à renforcer et leurs causes, ton Journal avec calories et macros, la recherche et le code-barres, les widgets, 2 repas dictés et 3 repas en photo par jour.
@@ -1300,8 +1278,10 @@ if MODE == "new-version"
     Confidentialité : https://healthmap.fr/privacy
   FICHE
 
-  promo_fiche = <<~FICHE.strip
-    Kiwio 2.0 : une interface entièrement repensée, ton repas compté en un toucher et une analyse fondée sur les références françaises.
+  # Le texte promo se modifie sans nouvelle version : l'offre de lancement y
+  # vit jusqu'au 31 oct., puis repasser le mode `promo` (ou ce texte) sans elle.
+  promo_fiche = ENV["PROMO"].to_s.empty? ? <<~FICHE.strip : ENV["PROMO"]
+    Offre de lancement : Kiwio Premium à 17,99 € la première année au lieu de 30 €, jusqu'au 31 octobre. Pour les nouveaux abonnés.
   FICHE
 
   mots_cles_fiche = "nutrition,vitamines,minéraux,micronutriments,calories,repas,alimentation,compléments,fibres,fer"
