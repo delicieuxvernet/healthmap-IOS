@@ -350,6 +350,39 @@ abort_with("apps", code, body) unless code == 200 && body["data"]&.any?
 app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
+# ── MODE auto-submit : attendre un build, le rattacher, soumettre ───────────
+#    Tourne seul dans GitHub (aucun ordinateur allumé) : attend que le build
+#    BUILD soit traité par Apple (VALID), puis enchaîne apply-app
+#    (AFTER_APPROVAL), stage-version et send-submission. Demande d'Arthur du
+#    12 oct. 2026 : « je ne veux rien faire, éteins l'ordinateur ».
+if MODE == "auto-submit"
+  numero = ENV["BUILD"].to_s
+  abort_with("auto-submit", 0, "BUILD manquant") if numero.empty?
+  limite = Time.now + 140 * 60
+  loop do
+    code, b = req(:get, "/v1/builds?filter[app]=#{app_id}&filter[version]=#{numero}&limit=5")
+    etat = code == 200 && b["data"].first ? b["data"].first.dig("attributes", "processingState") : nil
+    puts "#{Time.now.utc.strftime("%H:%M")} build ##{numero} : #{etat || "pas encore reçu"}"
+    $stdout.flush
+    break if etat == "VALID"
+    abort_with("auto-submit", 0, "build #{etat}") if %w[FAILED INVALID].include?(etat)
+    abort_with("auto-submit", 0, "délai dépassé") if Time.now > limite
+    sleep 60
+  end
+  lancer = lambda do |mode, extra = {}|
+    sortie = IO.popen(ENV.to_h.merge("MODE" => mode).merge(extra), ["ruby", __FILE__], err: [:child, :out], &:read)
+    puts sortie
+    [$?.success?, sortie]
+  end
+  ok, sortie = lancer.call("apply-app", "RELEASE_TYPE" => "AFTER_APPROVAL")
+  abort_with("auto-submit", 0, "apply-app") unless ok && sortie.include?("##{numero}")
+  ok, sortie = lancer.call("stage-version")
+  dossier = sortie[/Brouillon (\S+) :/, 1]
+  abort_with("auto-submit", 0, "stage-version") unless ok && dossier
+  ok, = lancer.call("send-submission", "SUBMISSION_ID" => dossier)
+  exit(ok ? 0 : 1)
+end
+
 # ── MODE trial-from : essai gratuit 7 j de l'annuel à partir d'une date ─────
 #    Reprend l'essai après l'offre de lancement (17,99 € du 13 au 31 oct. 2026,
 #    décision d'Arthur du 12 oct. : essai 7 j SEULEMENT à partir du 1er nov.).
