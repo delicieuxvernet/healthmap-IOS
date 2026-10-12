@@ -148,7 +148,6 @@ struct ForgotPasswordSheet: View {
     @State private var newPassword = ""
     @State private var confirmPassword = ""
     @State private var step: Step = .email
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
