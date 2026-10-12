@@ -350,6 +350,53 @@ abort_with("apps", code, body) unless code == 200 && body["data"]&.any?
 app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
+# ── MODE intro-offers : lecture seule des offres d'introduction et des prix ──
+#    Dates, type, durée et prix FRA de chaque offre d'introduction, prix courant
+#    de chaque abonnement en France, et versions de l'app. Aucune écriture.
+if MODE == "intro-offers"
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      pid = s.dig("attributes", "productId")
+      puts "
+=== #{pid} (#{s["id"]}) état=#{s.dig("attributes", "state")} période=#{s.dig("attributes", "subscriptionPeriod")}"
+      code, pr = req(:get, "/v1/subscriptions/#{s["id"]}/prices?filter[territory]=FRA&include=subscriptionPricePoint&limit=50")
+      if code == 200
+        pts = (pr["included"] || []).to_h { |i| [i["id"], i.dig("attributes", "customerPrice")] }
+        pr["data"].each do |p|
+          ppid = p.dig("relationships", "subscriptionPricePoint", "data", "id")
+          puts "  prix FRA : #{pts[ppid]} € dès #{p.dig("attributes", "startDate") || "toujours"} (preserved=#{p.dig("attributes", "preserved")})"
+        end
+      else
+        puts "  prix : HTTP #{code}"
+      end
+      code, io = req(:get, "/v1/subscriptions/#{s["id"]}/introductoryOffers?include=subscriptionPricePoint,territory&limit=200")
+      unless code == 200
+        puts "  offres d'intro : HTTP #{code}"
+        next
+      end
+      pts = (io["included"] || []).select { |i| i["type"] == "subscriptionPricePoints" }.to_h { |i| [i["id"], i.dig("attributes", "customerPrice")] }
+      groupes = Hash.new { |h, k| h[k] = [] }
+      io["data"].each do |o|
+        a = o["attributes"]
+        terr = o.dig("relationships", "territory", "data", "id")
+        ppid = o.dig("relationships", "subscriptionPricePoint", "data", "id")
+        cle = [a["offerMode"], a["duration"], a["numberOfPeriods"], a["startDate"], a["endDate"]]
+        groupes[cle] << terr
+        puts "  FRA : #{a["offerMode"]} #{a["duration"]} x#{a["numberOfPeriods"]} du #{a["startDate"] || "-"} au #{a["endDate"] || "-"} prix=#{pts[ppid] || "-"}" if terr == "FRA"
+      end
+      groupes.each { |k, t| puts "  offre #{k.inspect} -> #{t.size} territoire(s)" }
+      puts "  aucune offre d'introduction" if groupes.empty?
+    end
+  end
+  puts "
+=== Versions de l'app"
+  get_all("/v1/apps/#{app_id}/appStoreVersions?limit=10").each do |v|
+    a = v["attributes"]
+    puts "  #{a["versionString"]} #{a["appStoreState"]} #{a["releaseType"]} créée=#{a["createdDate"]}"
+  end
+  exit 0
+end
+
 # ── MODE accessibility : étiquette accessibilité de la fiche App Store ──────
 #    (Accessibility Nutrition Labels, iPhone.) Crée ou met à jour le brouillon,
 #    SANS le publier : l'étiquette ne doit décrire que ce que la version EN
