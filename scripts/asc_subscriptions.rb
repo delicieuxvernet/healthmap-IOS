@@ -1228,6 +1228,10 @@ if MODE == "new-version"
 
     - Offre de lancement jusqu'au 31 octobre : Kiwio Premium à 17,99 € la première année au lieu de 30 €, pour les nouveaux abonnés.
     - Le prix affiché pour l'abonnement annuel est celui que tu paies vraiment la première année.
+    - Ajouter un aliment est plus rapide : une coche d'un toucher, et garde le doigt sur « − » ou « + » pour faire défiler les quantités.
+    - Pendant que Kiwio calcule ton bilan, des astuces défilent.
+    - Arrivé au bout de tes repas gratuits du jour ? Kiwio te le dit clairement et te montre ce que Premium ajoute.
+    - Après un achat Premium, tout s'ouvre immédiatement.
     - Corrections et améliorations.
   FICHE
 
