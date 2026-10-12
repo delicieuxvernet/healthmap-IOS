@@ -350,6 +350,50 @@ abort_with("apps", code, body) unless code == 200 && body["data"]&.any?
 app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
+# ── MODE trial-from : essai gratuit 7 j de l'annuel à partir d'une date ─────
+#    Reprend l'essai après l'offre de lancement (17,99 € du 13 au 31 oct. 2026,
+#    décision d'Arthur du 12 oct. : essai 7 j SEULEMENT à partir du 1er nov.).
+#    Option START=AAAA-MM-JJ (défaut 2026-11-01). Idempotent : un territoire qui
+#    a déjà un essai partant de cette date est sauté. Sans date de fin.
+if MODE == "trial-from"
+  debut = ENV["START"] || "2026-11-01"
+  annuel = nil
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      annuel = s["id"] if s.dig("attributes", "productId") == "healthmap_annual"
+    end
+  end
+  abort_with("trial-from", 0, "annuel introuvable") unless annuel
+  existants = []
+  url = "/v1/subscriptions/#{annuel}/introductoryOffers?include=territory&limit=200"
+  while url
+    code, io = req(:get, url)
+    abort_with("intro", code, io) unless code == 200
+    existants.concat(io["data"])
+    url = io.dig("links", "next")
+  end
+  territoires = existants.map { |o| o.dig("relationships", "territory", "data", "id") }.compact.uniq
+  deja = existants.select { |o| o.dig("attributes", "offerMode") == "FREE_TRIAL" && o.dig("attributes", "startDate") == debut }
+                  .map { |o| o.dig("relationships", "territory", "data", "id") }
+  ok_n = 0
+  echecs = []
+  (territoires - deja).each do |t|
+    code, body = req(:post, "/v1/subscriptionIntroductoryOffers",
+      { data: { type: "subscriptionIntroductoryOffers",
+                attributes: { duration: "ONE_WEEK", offerMode: "FREE_TRIAL", numberOfPeriods: 1, startDate: debut },
+                relationships: { subscription: { data: { type: "subscriptions", id: annuel } },
+                                 territory: { data: { type: "territories", id: t } } } } })
+    if (200..299).cover?(code)
+      ok_n += 1
+    else
+      echecs << t
+      puts "  #{t} : HTTP #{code} #{(body.is_a?(Hash) ? body["errors"]&.first&.dig("detail") : body).to_s[0, 200]}" if echecs.size <= 5
+    end
+  end
+  puts "Essai 7 j dès le #{debut} : #{ok_n} créé(s), #{deja.size} déjà là, #{echecs.size} échec(s) sur #{territoires.size} territoires"
+  exit(echecs.empty? ? 0 : 1)
+end
+
 # ── MODE intro-offers : lecture seule des offres d'introduction et des prix ──
 #    Dates, type, durée et prix FRA de chaque offre d'introduction, prix courant
 #    de chaque abonnement en France, et versions de l'app. Aucune écriture.
