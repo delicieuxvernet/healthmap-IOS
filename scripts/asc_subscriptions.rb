@@ -350,6 +350,28 @@ abort_with("apps", code, body) unless code == 200 && body["data"]&.any?
 app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
+# ── MODE promo : ne change QUE le texte promotionnel fr-FR ──────────────────
+#    Le texte promo se modifie sans nouvelle version ni revue d'Apple. Il porte
+#    l'offre de lancement jusqu'au 31 oct. 2026 ; ce mode le remplace ensuite.
+#    PROMO=<texte> (sans virgule : OPTIONS coupe sur les virgules) ; vide = le
+#    texte par défaut ci-dessous. Vise la dernière version EN VENTE.
+if MODE == "promo"
+  texte = ENV["PROMO"].to_s.empty? ? "Dis ce que tu as mangé : Kiwio le compte aliment par aliment et te dit quoi faire aujourd'hui pour mieux manger." : ENV["PROMO"]
+  versions = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=20")
+  cible = versions.find { |v| v.dig("attributes", "appStoreState") == "READY_FOR_SALE" }
+  abort_with("promo", 0, "aucune version en vente") unless cible
+  puts "Version #{cible.dig("attributes", "versionString")} (#{cible["id"]})"
+  get_all("/v1/appStoreVersions/#{cible["id"]}/appStoreVersionLocalizations?limit=20").each do |l|
+    next unless l.dig("attributes", "locale") == "fr-FR"
+    puts "Avant : #{l.dig("attributes", "promotionalText")}"
+    ok, = write("texte promo fr-FR", :patch, "/v1/appStoreVersionLocalizations/#{l["id"]}",
+      { data: { type: "appStoreVersionLocalizations", id: l["id"], attributes: { promotionalText: texte } } })
+    exit 1 unless ok
+    puts "Après : #{texte}"
+  end
+  exit 0
+end
+
 # ── MODE trial-from : essai gratuit 7 j de l'annuel à partir d'une date ─────
 #    Reprend l'essai après l'offre de lancement (17,99 € du 13 au 31 oct. 2026,
 #    décision d'Arthur du 12 oct. : essai 7 j SEULEMENT à partir du 1er nov.).
