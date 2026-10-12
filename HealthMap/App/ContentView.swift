@@ -299,6 +299,8 @@ struct MainTabView: View {
     @ObservedObject private var gratifications = GratificationCentre.partage
     /// L'offre annuelle, rappelée de temps en temps aux comptes gratuits.
     @ObservedObject private var offres = OffreCentre.partage
+    /// L'offre de lancement (13 → 31 octobre 2026) : pop-up à l'arrivée.
+    @ObservedObject private var lancement = OffreLancementCentre.partage
 
     /// Récap animé : la séquence qui délivre le bilan juste après le
     /// questionnaire. Les slides sont construits UNE fois, au moment de
@@ -419,7 +421,11 @@ struct MainTabView: View {
             BriefDuJourView(
                 slides: slidesBrief,
                 onAjouterHier: ajouterRepasDHier,
-                onTerminer: { afficheBrief = false }
+                onTerminer: {
+                    afficheBrief = false
+                    // Le brief refermé, l'écran est libre pour l'offre de lancement.
+                    proposerLancement()
+                }
             )
         }
     }
@@ -662,6 +668,19 @@ struct MainTabView: View {
                 .zIndex(60)
             }
         }
+        // L'offre de lancement : même placement, annoncée à l'arrivée dans
+        // l'app. « Profiter de l'offre » ouvre le paywall.
+        .overlay {
+            if let offre = lancement.courante, !estModeCaptures {
+                OffreLancementOverlay(offre: offre, onFermer: {
+                    lancement.courante = nil
+                }, onVoir: {
+                    lancement.courante = nil
+                    showPaywallFromDeepLink = true
+                })
+                .zIndex(61)
+            }
+        }
         // Un repas dicté vient d'être rangé : la pastille le confirme en haut
         // de l'écran, par-dessus tout. La toucher ouvre ce repas. Repartie
         // seule, elle laisse la place à l'offre : un repas dicté compte autant
@@ -812,6 +831,7 @@ struct MainTabView: View {
         BriefDuJourStore.memoriserPrenom(dashboardVM.firstName)
         proposerBrief()
         replanifierRappels()
+        proposerLancement()
         // Les aliments que le brief peut proposer : leur composition est gardée
         // sur le téléphone (une seule demande, puis plus rien), pour que le
         // brief suivant chiffre « +30 % de ton besoin » sans réseau.
@@ -910,6 +930,24 @@ struct MainTabView: View {
             guard selectedTab == .journal, gratifications.courante == nil,
                   dashboardVM.premiumVisible else { return }
             await offres.proposer()
+        }
+    }
+
+    /// L'offre de lancement : recale ses deux rappels à chaque ouverture, et
+    /// l'annonce à l'écran quand rien d'autre ne l'occupe (brief, récap,
+    /// tutoriel, questionnaire, gratification). Une fois pour l'annonce, une
+    /// fois pour les derniers jours : tenu par `OffreLancementCentre`.
+    private func proposerLancement() {
+        guard !estModeCaptures else { return }
+        Task {
+            // Le temps que le brief finisse de sortir ou que l'app s'installe.
+            try? await Task.sleep(for: .milliseconds(1200))
+            let ecranLibre = dashboardVM.didFinishInitialLoad
+                && !afficheBrief && !afficheRecap && !afficheInvitationNotifs
+                && !dashboardVM.recapArme && !dashboardVM.questionnaireOuvert
+                && tutoriel.etape == nil && gratifications.courante == nil
+                && offres.courante == nil
+            await lancement.actualiser(presenter: ecranLibre)
         }
     }
 

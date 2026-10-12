@@ -580,8 +580,11 @@ enum RappelsPersonnalises {
         let anciens = Self.anciensIdentifiants
         UNUserNotificationCenter.current().getPendingNotificationRequests { requetes in
             let ids = requetes.map(\.identifier).filter { $0.hasPrefix(prefixe) }
+            // Les rappels de l'offre de lancement partent avec eux (déconnexion,
+            // rappels coupés, mode Zen).
             UNUserNotificationCenter.current()
-                .removePendingNotificationRequests(withIdentifiers: ids + anciens)
+                .removePendingNotificationRequests(withIdentifiers: ids + anciens
+                    + [RappelsLancement.idAnnonce, RappelsLancement.idDerniersJours])
         }
     }
 

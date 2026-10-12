@@ -350,6 +350,102 @@ abort_with("apps", code, body) unless code == 200 && body["data"]&.any?
 app_id = body["data"][0]["id"]
 puts "App #{BUNDLE_ID} -> #{app_id} | MODE=#{MODE}"
 
+# ── MODE trial-from : essai gratuit 7 j de l'annuel à partir d'une date ─────
+#    Reprend l'essai après l'offre de lancement (17,99 € du 13 au 31 oct. 2026,
+#    décision d'Arthur du 12 oct. : essai 7 j SEULEMENT à partir du 1er nov.).
+#    Option START=AAAA-MM-JJ (défaut 2026-11-01). Idempotent : un territoire qui
+#    a déjà un essai partant de cette date est sauté. Sans date de fin.
+if MODE == "trial-from"
+  debut = ENV["START"] || "2026-11-01"
+  annuel = nil
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      annuel = s["id"] if s.dig("attributes", "productId") == "healthmap_annual"
+    end
+  end
+  abort_with("trial-from", 0, "annuel introuvable") unless annuel
+  existants = []
+  url = "/v1/subscriptions/#{annuel}/introductoryOffers?include=territory&limit=200"
+  while url
+    code, io = req(:get, url)
+    abort_with("intro", code, io) unless code == 200
+    existants.concat(io["data"])
+    url = io.dig("links", "next")
+  end
+  territoires = existants.map { |o| o.dig("relationships", "territory", "data", "id") }.compact.uniq
+  deja = existants.select { |o| o.dig("attributes", "offerMode") == "FREE_TRIAL" && o.dig("attributes", "startDate") == debut }
+                  .map { |o| o.dig("relationships", "territory", "data", "id") }
+  ok_n = 0
+  echecs = []
+  (territoires - deja).each do |t|
+    code, body = req(:post, "/v1/subscriptionIntroductoryOffers",
+      { data: { type: "subscriptionIntroductoryOffers",
+                attributes: { duration: "ONE_WEEK", offerMode: "FREE_TRIAL", numberOfPeriods: 1, startDate: debut },
+                relationships: { subscription: { data: { type: "subscriptions", id: annuel } },
+                                 territory: { data: { type: "territories", id: t } } } } })
+    if (200..299).cover?(code)
+      ok_n += 1
+    else
+      echecs << t
+      puts "  #{t} : HTTP #{code} #{(body.is_a?(Hash) ? body["errors"]&.first&.dig("detail") : body).to_s[0, 200]}" if echecs.size <= 5
+    end
+  end
+  puts "Essai 7 j dès le #{debut} : #{ok_n} créé(s), #{deja.size} déjà là, #{echecs.size} échec(s) sur #{territoires.size} territoires"
+  exit(echecs.empty? ? 0 : 1)
+end
+
+# ── MODE intro-offers : lecture seule des offres d'introduction et des prix ──
+#    Dates, type, durée et prix FRA de chaque offre d'introduction, prix courant
+#    de chaque abonnement en France, et versions de l'app. Aucune écriture.
+if MODE == "intro-offers"
+  get_all("/v1/apps/#{app_id}/subscriptionGroups?limit=200").each do |g|
+    get_all("/v1/subscriptionGroups/#{g["id"]}/subscriptions?limit=50").each do |s|
+      pid = s.dig("attributes", "productId")
+      puts "
+=== #{pid} (#{s["id"]}) état=#{s.dig("attributes", "state")} période=#{s.dig("attributes", "subscriptionPeriod")}"
+      code, pr = req(:get, "/v1/subscriptions/#{s["id"]}/prices?filter[territory]=FRA&include=subscriptionPricePoint&limit=50")
+      if code == 200
+        pts = (pr["included"] || []).to_h { |i| [i["id"], i.dig("attributes", "customerPrice")] }
+        pr["data"].each do |p|
+          ppid = p.dig("relationships", "subscriptionPricePoint", "data", "id")
+          puts "  prix FRA : #{pts[ppid]} € dès #{p.dig("attributes", "startDate") || "toujours"} (preserved=#{p.dig("attributes", "preserved")})"
+        end
+      else
+        puts "  prix : HTTP #{code}"
+      end
+      # Paginé : 175 territoires par offre dépassent vite la page de 200.
+      lignes = []
+      pts = {}
+      url = "/v1/subscriptions/#{s["id"]}/introductoryOffers?include=subscriptionPricePoint,territory&limit=200"
+      while url
+        code, io = req(:get, url)
+        break puts("  offres d'intro : HTTP #{code}") unless code == 200
+        lignes.concat(io["data"])
+        (io["included"] || []).select { |i| i["type"] == "subscriptionPricePoints" }.each { |i| pts[i["id"]] = i.dig("attributes", "customerPrice") }
+        url = io.dig("links", "next")
+      end
+      groupes = Hash.new { |h, k| h[k] = [] }
+      lignes.each do |o|
+        a = o["attributes"]
+        terr = o.dig("relationships", "territory", "data", "id")
+        ppid = o.dig("relationships", "subscriptionPricePoint", "data", "id")
+        cle = [a["offerMode"], a["duration"], a["numberOfPeriods"], a["startDate"], a["endDate"]]
+        groupes[cle] << terr
+        puts "  FRA : #{a["offerMode"]} #{a["duration"]} x#{a["numberOfPeriods"]} du #{a["startDate"] || "-"} au #{a["endDate"] || "-"} prix=#{pts[ppid] || "-"}" if terr == "FRA"
+      end
+      groupes.each { |k, t| puts "  offre #{k.inspect} -> #{t.size} territoire(s)" }
+      puts "  aucune offre d'introduction" if groupes.empty?
+    end
+  end
+  puts "
+=== Versions de l'app"
+  get_all("/v1/apps/#{app_id}/appStoreVersions?limit=10").each do |v|
+    a = v["attributes"]
+    puts "  #{a["versionString"]} #{a["appStoreState"]} #{a["releaseType"]} créée=#{a["createdDate"]}"
+  end
+  exit 0
+end
+
 # ── MODE accessibility : étiquette accessibilité de la fiche App Store ──────
 #    (Accessibility Nutrition Labels, iPhone.) Crée ou met à jour le brouillon,
 #    SANS le publier : l'étiquette ne doit décrire que ce que la version EN
@@ -731,7 +827,8 @@ if MODE == "apply-app"
       HOW TO FIND THE IN-APP PURCHASES (2.1(b)) - two paths:
       1. Reglages tab (last tab) > "Kiwio Premium" card at the top > tap its
          button ("Essayer 7 jours gratuits" / "Decouvrir Kiwio Premium") >
-         the paywall opens.
+         the Premium sheet opens on a short "Standard ou Premium ?" comparison
+         card > tap "Passer a Premium" on it > the subscriptions appear.
       2. Reglages tab > "Abonnement" row (section "Compte") > "Decouvrir
          Kiwio Premium".
       The paywall displays the auto-renewable subscriptions of group Kiwio
@@ -748,7 +845,8 @@ if MODE == "apply-app"
       A screen recording captured on a physical iPhone was provided with
       version 1.0 (approved): Home Screen, sign-in with the demo account, core
       features, paywall and a successful sandbox purchase. The purchase flow
-      is unchanged in this update, and both subscriptions are already approved.
+      is unchanged in this update apart from the comparison card shown first,
+      and both subscriptions are already approved.
 
       Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
       Privacy Policy: https://healthmap.fr/privacy
@@ -1105,12 +1203,11 @@ end
 # pas à repasser en review (contrairement à la 1.0, cf. l'épisode des 4 refus).
 # VERSION_STRING (défaut : la version en cours ci-dessous) · WHATS_NEW (défaut : les notes ci-dessous).
 if MODE == "new-version"
-  # Version 1.0.5 (3 oct. 2026) : widgets en verre, verre liquide, bilan
-  # ludique, dictée en bulle, prise de sang (bêta), icône zoomée. Les textes
-  # de la fiche (description, notes, texte promo, mots-clés) ont été validés
-  # par Arthur avant l'envoi ; VERSION_STRING / WHATS_NEW restent des
-  # surcharges possibles.
-  vs = ENV["VERSION_STRING"].to_s.empty? ? "1.0.5" : ENV["VERSION_STRING"]
+  # Version 2.0.2 (12 oct. 2026) : offre de lancement Premium (17,99 € la
+  # 1re année du 13 au 31 oct.), fiche réécrite pour vendre (dictée, données
+  # scientifiques, bilan personnalisé). Ton et plan validés par Arthur le
+  # 12 oct. 2026. VERSION_STRING / WHATS_NEW restent des surcharges possibles.
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "2.0.2" : ENV["VERSION_STRING"]
 
   existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
     .find { |v| v.dig("attributes", "versionString") == vs }
@@ -1127,64 +1224,53 @@ if MODE == "new-version"
   end
 
   notes_fiche = <<~FICHE.strip
-    Kiwio passe au verre liquide, et vient jusque sur ton écran d'accueil.
+    Kiwio 2.0.2
 
-    Des widgets en verre : tes apports, ta journée, ton eau d'un toucher, ton rituel du jour, et un ajout rapide pour dicter ou photographier un repas sans ouvrir l'app. Ta journée s'affiche aussi en direct sur l'écran verrouillé et dans la Dynamic Island. À partir d'iOS 18, « Dicter un repas » et « Un verre d'eau » se posent dans le Centre de contrôle.
-
-    Le verre liquide, partout : des cartes en verre dépoli, un fond qui suit l'onglet, des mouvements tout en douceur. Progrès devient une toile : tes dix apports d'un coup d'œil. Et sur l'icône, le kiwi prend toute la place.
-
-    Un bilan plus ludique : quatre petites étapes, une question à la fois, et le kiwi qui te dit pourquoi il la pose. Tu remplis ta journée repas par repas, et chaque étape se termine par des pistes à retourner.
-
-    La dictée en bulle : maintiens « Dicter », parle, relâche. Ce que tu as dit fait foi, quantités comprises.
-
-    Des chiffres plus justes : un seul chiffre par apport, le même partout. Tes repas notés comptent plus vite, et tes besoins suivent ton âge, ton sexe et ta situation.
-
-    Poids et eau dans le Journal : règle ton poids souhaité, tes calories et tes macros s'ajustent. L'eau se remplit gobelet par gobelet.
-
-    Ton Plan prend vie : attrape une bulle, ses voisines suivent. Et chaque rappel part d'un fait de ta journée.
-
-    Pour les abonnés Premium : tes micronutriments sous tes macros, avec le rapport oméga-6 / oméga-3, le conseil du jour en widget, une offre à l'année, et, en bêta, la prise de sang. Photographie tes résultats ou dépose le PDF du laboratoire : les valeurs mesurées comptent dans tes apports et ton bilan, et ton document est lu, puis oublié. Elle ne remplace pas l'avis d'un médecin.
-
-    Et des corrections un peu partout.
+    - Offre de lancement jusqu'au 31 octobre : Kiwio Premium à 17,99 € la première année au lieu de 30 €, pour les nouveaux abonnés.
+    - Le prix affiché pour l'abonnement annuel est celui que tu paies vraiment la première année.
+    - Corrections et améliorations.
   FICHE
 
   description_fiche = <<~FICHE.strip
-    Comprends enfin ce que ton alimentation t'apporte, et sache par où commencer aujourd'hui.
-    Des chiffres clairs, et le pourquoi derrière chacun. Sans jargon, sans culpabilité.
+    Dis ce que tu as mangé. Kiwio s'occupe du reste.
 
-    TON BILAN, EN QUATRE PETITES ÉTAPES
-    - Une question à la fois : le kiwi te dit pourquoi il la pose, et tu remplis ta journée type repas par repas.
-    - Kiwio en tire tes dix apports clés : vitamines D, B12 et C, fer, magnésium, calcium, zinc, iode, oméga-3 et fibres.
-    - Chacun a un seul chiffre, le même partout : la part de ton besoin couverte, selon ton âge, ton sexe et ta situation.
-    - L'anneau de cause : pour chaque apport, ce qui pèse dessus, de combien, et ce que tu regagnerais en changeant une habitude.
+    Kiwio t'écoute, te connaît et te dit quoi faire aujourd'hui pour mieux manger. Pas un tableau de chiffres : des réponses, faites pour toi.
 
-    NOTER UN REPAS EN QUELQUES SECONDES
-    - Dicte-le : touche ou maintiens « Dicter », et parle. Ce que tu dis fait foi, quantités comprises.
-    - Ou photographie ton assiette, écris-le, cherche un aliment, scanne un code-barres.
-    - Tes repas notés font bouger tes chiffres.
-    - Note ton eau et ton poids, règle ton poids souhaité, et relie Apple Santé : ton activité élargit ton budget du jour.
+    PARLE, C'EST NOTÉ
+    « Un bol de muesli, une banane et un café au lait. » En quelques secondes, ton repas est compté aliment par aliment : calories, protéines, glucides, lipides et 26 vitamines et minéraux. Pas de balance, pas de recherche interminable. Une portion floue ? Kiwio te le signale, et un toucher suffit pour corriger.
 
-    SAVOIR QUOI FAIRE AUJOURD'HUI
-    - Ton brief du jour : ta veille en un coup d'œil, et ta priorité du jour.
-    - Ton Plan relie tes objectifs, ce que tu ressens et tes apports, pour voir par où commencer.
-    - Des rappels qui partent d'un fait de ta journée, si tu choisis de les activer.
+    DES CHIFFRES SCIENTIFIQUES, PAS INVENTÉS
+    Chaque aliment est lu dans la table Ciqual de l'ANSES, la référence française de composition des aliments. Tes besoins suivent les références nutritionnelles de l'ANSES et l'enquête INCA 3, selon ton âge, ton sexe et ta situation. L'IA comprend ce que tu dis ; les chiffres, eux, sont calculés.
 
-    SUIVRE SANS Y PENSER
-    - Des widgets en verre pour l'écran d'accueil et l'écran verrouillé : tes apports, ta journée, ton eau d'un toucher, ton rituel du jour, et un ajout rapide pour noter un repas sans ouvrir l'app.
-    - Ta journée en direct sur l'écran verrouillé et dans la Dynamic Island.
-    - Progrès : tes dix apports sur une toile, et un check-in rapide pour suivre ce que tu ressens.
+    UN BILAN QUI TE CONNAÎT VRAIMENT
+    Sommeil, soleil, sport, régime, ressentis, journée type : en quatre petites étapes, une question à la fois, Kiwio fait ton portrait. Il en tire tes dix apports clés (vitamines D, B12 et C, fer, magnésium, calcium, zinc, iode, oméga-3 et fibres) et, pour chacun, ce qui pèse dessus chez toi : le thé pendant le repas, le peu de soleil, le poisson qui manque. Deux profils, deux bilans différents.
 
-    DES COMPLÉMENTS SANS PARTI PRIS
-    Quand ton bilan en fait ressortir, Kiwio te dit quoi chercher et pourquoi. Quand l'assiette suffit, il te le dit aussi. Kiwio ne gagne rien sur ce qu'il te recommande : aucune commission, aucun partenariat, tu achètes où tu veux.
+    QUOI FAIRE, DÈS AUJOURD'HUI
+    - Ton brief du jour : ta priorité, en un geste concret.
+    - Ton Plan relie ce que tu ressens, tes objectifs et ton assiette.
+    - Des rappels qui partent de ta vraie journée, jamais de messages génériques.
 
-    KIWIO PREMIUM
-    Ton bilan, ton Journal, tes apports à renforcer et leurs causes restent gratuits. Premium ajoute :
-    - le détail de tes vitamines, minéraux et acides gras dans le Journal, avec le rapport oméga-6 / oméga-3 ;
-    - ce que tu peux faire pour chaque apport, et les solutions de ton Plan ;
-    - tes tendances et ta progression depuis le départ ;
+    TOUT NOTER, SANS EFFORT
+    - Photographie ton assiette, scanne un code-barres ou cherche un aliment : tes récents et tes favoris en tête.
+    - Des unités qui te parlent : pièce, poignée, carré, tablette.
+    - Ton eau, ton poids, et Apple Santé : ton activité élargit ton budget du jour.
+    - Des widgets pour l'écran d'accueil et l'écran verrouillé, et ta journée en direct dans la Dynamic Island.
+
+    VOIS TES PROGRÈS
+    Tes dix apports sur une toile, semaine après semaine, et un check-in rapide pour suivre ce que tu ressens.
+
+    DES CONSEILS SANS PARTI PRIS
+    Quand l'assiette suffit, Kiwio te le dit. Quand un complément peut aider, il t'explique quoi chercher et pourquoi. Aucune commission, aucun partenariat : tu achètes où tu veux.
+
+    KIWIO STANDARD OU KIWIO PREMIUM
+    Kiwio Standard est gratuit : ton bilan, tes apports à renforcer et leurs causes, ton Journal avec calories et macros, la recherche et le code-barres, les widgets, 2 repas dictés et 3 repas en photo par jour.
+    Kiwio Premium ajoute :
+    - 60 repas dictés et 30 repas en photo par jour ;
+    - le détail de tes vitamines et minéraux dans le Journal, avec le rapport oméga-6 / oméga-3 ;
+    - les solutions à tes interactions et ton plan guidé pas à pas ;
+    - tes courbes de progression depuis le départ ;
     - le conseil du jour, à cocher depuis son widget ;
-    - la prise de sang, en bêta : photographie tes résultats ou dépose le PDF du laboratoire, les valeurs mesurées comptent dans tes apports, et ton document est lu, puis oublié ;
-    - plus de dictées, et jusqu'à 30 scans photo par jour.
+    - la prise de sang, en bêta : photographie tes résultats ou dépose le PDF du laboratoire, les valeurs mesurées comptent dans tes apports, et ton document est lu, puis oublié.
 
     Kiwio ne remplace pas un avis médical, et sa lecture d'une prise de sang ne remplace pas celle d'un médecin : montre-lui toujours tes résultats. C'est ton compagnon bien-être au quotidien.
 
@@ -1192,8 +1278,10 @@ if MODE == "new-version"
     Confidentialité : https://healthmap.fr/privacy
   FICHE
 
-  promo_fiche = <<~FICHE.strip
-    Comprends ce que ton assiette t'apporte et sache par où commencer. Nouveau : des widgets en verre, un bilan plus ludique et la dictée en bulle.
+  # Le texte promo se modifie sans nouvelle version : l'offre de lancement y
+  # vit jusqu'au 31 oct., puis repasser le mode `promo` (ou ce texte) sans elle.
+  promo_fiche = ENV["PROMO"].to_s.empty? ? <<~FICHE.strip : ENV["PROMO"]
+    Offre de lancement : Kiwio Premium à 17,99 € la première année au lieu de 30 €, jusqu'au 31 octobre. Pour les nouveaux abonnés.
   FICHE
 
   mots_cles_fiche = "nutrition,vitamines,minéraux,micronutriments,calories,repas,alimentation,compléments,fibres,fer"
@@ -1961,7 +2049,8 @@ if MODE == "fix-meta"
     HOW TO FIND THE IN-APP PURCHASES (2.1(b)) - two paths:
     1. Reglages tab (last tab) > "Kiwio Premium" card at the top > tap its
        button ("Essayer 7 jours gratuits" / "Decouvrir Kiwio Premium") >
-       the paywall opens.
+       the Premium sheet opens on a short "Standard ou Premium ?" comparison
+       card > tap "Passer a Premium" on it > the subscriptions appear.
     2. Reglages tab > "Abonnement" row (section "Compte") > "Decouvrir
        Kiwio Premium".
     The paywall displays the auto-renewable subscriptions of group Kiwio
@@ -1978,7 +2067,8 @@ if MODE == "fix-meta"
     A screen recording captured on a physical iPhone was provided with
     version 1.0 (approved): Home Screen, sign-in with the demo account, core
     features, paywall and a successful sandbox purchase. The purchase flow
-    is unchanged in this update, and both subscriptions are already approved.
+    is unchanged in this update apart from the comparison card shown first,
+    and both subscriptions are already approved.
 
     Terms of Use (EULA): #{terms_url}
     Privacy Policy: #{privacy_url}
