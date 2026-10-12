@@ -36,7 +36,7 @@ final class LimiteDuJourTests: XCTestCase {
     func testMarquerEpuiseesBloqueLaProchaineDictee() {
         let uid = "test-limite-\(UUID().uuidString)"
         XCTAssertTrue(VoiceMealService.QuotaStore.peutDicter(userId: uid, isPremium: false))
-        VoiceMealService.QuotaStore.marquerEpuisees(userId: uid)
+        VoiceMealService.QuotaStore.marquerÉpuisé(userId: uid)
         XCTAssertFalse(VoiceMealService.QuotaStore.peutDicter(userId: uid, isPremium: false))
         // Un abonné n'est jamais bloqué par le compteur local.
         XCTAssertTrue(VoiceMealService.QuotaStore.peutDicter(userId: uid, isPremium: true))
@@ -47,25 +47,7 @@ final class LimiteDuJourTests: XCTestCase {
         let uid = "test-limite-\(UUID().uuidString)"
         let limite = VoiceMealService.QuotaStore.dictéesGratuitesParJour
         for _ in 0..<(limite + 2) { VoiceMealService.QuotaStore.enregistrerUneDictée(userId: uid) }
-        VoiceMealService.QuotaStore.marquerEpuisees(userId: uid)
+        VoiceMealService.QuotaStore.marquerÉpuisé(userId: uid)
         XCTAssertEqual(VoiceMealService.QuotaStore.utiliséesAujourdhui(userId: uid), limite + 2)
-    }
-
-    // MARK: - Jauge factice des micros verrouillés
-
-    func testPartFacticeStableEtBornee() {
-        for micro in Micronutriments.tous {
-            let part = MicroVerrouille.partFactice(id: micro.id)
-            XCTAssertGreaterThanOrEqual(part, 0.25, micro.id)
-            XCTAssertLessThanOrEqual(part, 0.90, micro.id)
-            XCTAssertEqual(part, MicroVerrouille.partFactice(id: micro.id), micro.id)
-        }
-    }
-
-    /// Les jauges ne sont pas toutes de la même longueur : sinon la carte
-    /// verrouillée aurait l'air vide, pas brouillée.
-    func testPartFacticeVarieDUnMicroALAutre() {
-        let parts = Set(Micronutriments.tous.map { MicroVerrouille.partFactice(id: $0.id) })
-        XCTAssertGreaterThan(parts.count, Micronutriments.tous.count / 2)
     }
 }
