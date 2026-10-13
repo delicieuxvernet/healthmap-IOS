@@ -13,13 +13,17 @@
 //   au body client. Montée ET descente de tier (en l'absence d'événement
 //   webhook, c'est l'unique chemin de retour à free après expiration).
 //
+//   v6 (2026-10-13) : profiles.id (l'identifiant RevenueCat de l'app) lu en
+//   premier, un entitlement en cours préféré à un expiré, et le tier
+//   « premium » posé par le webhook recalé sur RevenueCat.
+//
 // Auth (inchangée, v4) : Supabase Auth d'abord (iOS), Clerk JWKS en repli (web).
 // Le body est ignoré pour toute décision ; `user_id` n'est jamais lu.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jwtVerify, createRemoteJWKSet } from "https://esm.sh/jose@5";
-import { rcCandidateIds, shouldWriteTier, targetTier } from "./logic.ts";
+import { entitlementActive, rcCandidateIds, shouldWriteTier, targetTier } from "./logic.ts";
 
 const CLERK_ISSUER = "https://clerk.healthmap.fr";
 const CLERK_AUDIENCE = "authenticated";
@@ -126,6 +130,12 @@ async function fetchRcPremium(candidates: string[]): Promise<{
   }
   let degraded = false;
   let subscriptionsVues: Record<string, Record<string, unknown>> | undefined;
+  // Un entitlement EXPIRÉ sous un identifiant ne doit pas masquer un
+  // entitlement EN COURS sous le suivant : on garde le premier vu, et on
+  // continue de chercher un actif (audit du 13 oct. 2026).
+  let entVu:
+    | { ent: { expires_date: string | null; product_identifier?: string }; subs: Record<string, Record<string, unknown>> | undefined }
+    | undefined;
   for (const id of candidates) {
     try {
       const r = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(id)}`, {
@@ -138,7 +148,10 @@ async function fetchRcPremium(candidates: string[]): Promise<{
         | Record<string, Record<string, unknown>>
         | undefined;
       const ent = subscriber.entitlements?.premium;
-      if (ent) return { ent, subscriptions: subs, connu: true, degraded: false };
+      if (ent && entitlementActive(ent, new Date())) {
+        return { ent, subscriptions: subs, connu: true, degraded: false };
+      }
+      if (ent && !entVu) entVu = { ent, subs };
       // Pas d'entitlement, mais un historique d'achat : il tranche à lui seul
       // (repli) ET prouve qu'on regarde le bon identifiant.
       if (subs && Object.keys(subs).length > 0) subscriptionsVues = subs;
@@ -146,6 +159,9 @@ async function fetchRcPremium(candidates: string[]): Promise<{
       console.warn("revenuecat fetch failed:", String(err));
       degraded = true;
     }
+  }
+  if (entVu) {
+    return { ent: entVu.ent, subscriptions: entVu.subs ?? subscriptionsVues, connu: true, degraded: false };
   }
   return {
     ent: undefined,
