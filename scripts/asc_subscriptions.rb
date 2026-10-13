@@ -1248,7 +1248,8 @@ if MODE == "new-version"
   # 1re année du 13 au 31 oct.), fiche réécrite pour vendre (dictée, données
   # scientifiques, bilan personnalisé). Ton et plan validés par Arthur le
   # 12 oct. 2026. VERSION_STRING / WHATS_NEW restent des surcharges possibles.
-  vs = ENV["VERSION_STRING"].to_s.empty? ? "2.0.2" : ENV["VERSION_STRING"]
+  # Version 2.0.3 (13 oct. 2026) : correctifs Premium, fiche de la 2.0.2 gardée.
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "2.0.3" : ENV["VERSION_STRING"]
 
   existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
     .find { |v| v.dig("attributes", "versionString") == vs }
@@ -1265,14 +1266,10 @@ if MODE == "new-version"
   end
 
   notes_fiche = <<~FICHE.strip
-    Kiwio 2.0.2
+    Kiwio 2.0.3
 
-    - Offre de lancement jusqu'au 31 octobre : Kiwio Premium à 17,99 € la première année au lieu de 30 €, pour les nouveaux abonnés.
-    - Le prix affiché pour l'abonnement annuel est celui que tu paies vraiment la première année.
-    - Ajouter un aliment est plus rapide : une coche d'un toucher, et garde le doigt sur « − » ou « + » pour faire défiler les quantités.
-    - Pendant que Kiwio calcule ton bilan, des astuces défilent.
-    - Arrivé au bout de tes repas gratuits du jour ? Kiwio te le dit clairement et te montre ce que Premium ajoute.
-    - Après un achat Premium, tout s'ouvre immédiatement.
+    - Tu supprimes ton compte puis tu en recrées un ? Ton abonnement Premium te suit, sans rien faire.
+    - Le bilan et le scan photo reconnaissent mieux ton abonnement : plus de limite du gratuit par erreur.
     - Corrections et améliorations.
   FICHE
 
