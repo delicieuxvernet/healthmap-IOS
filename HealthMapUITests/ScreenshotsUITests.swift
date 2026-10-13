@@ -1011,6 +1011,12 @@ final class ScreenshotsUITests: XCTestCase {
         connecterSiBesoin()
         XCTAssertTrue(app.buttons["tab.reglages"].waitForExistence(timeout: 120), "Barre d'onglets absente")
         sleep(8)
+        snap("59-paywall-comparatif")
+        let continuer = app.buttons["comparatif.continuer"]
+        if continuer.waitForExistence(timeout: 5) {
+            taper(continuer)
+            sleep(4)
+        }
         snap("60-paywall-haut")
         app.swipeUp()
         sleep(2)
