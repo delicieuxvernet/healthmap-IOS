@@ -470,12 +470,10 @@ final class SubscriptionService: ObservableObject {
     /// ne remonte pas toujours de lui-même.
     nonisolated static let paliersResync: Set<Int> = [3, 8]
 
-    /// Ouvre la feuille système Apple de saisie d'un code promo, puis ATTEND que
-    /// l'accès s'ouvre pour de bon (cf. `attendreActivation`).
-    func saisirCodePromo() async -> CodePromoOutcome {
-        Purchases.shared.presentCodeRedemptionSheet()
-        return await attendreActivation()
-    }
+    // La feuille Apple de saisie d'un code est présentée par les écrans
+    // (`offerCodeRedemption`, depuis la feuille où l'on se trouve), qui
+    // appellent ensuite `attendreActivation`. Elle remplace
+    // `Purchases.presentCodeRedemptionSheet()` (13 oct. 2026).
 
     /// Relit l'abonnement par paliers jusqu'à ce que l'accès s'ouvre.
     func attendreActivation(
