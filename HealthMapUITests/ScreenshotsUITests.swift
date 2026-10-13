@@ -998,6 +998,31 @@ final class ScreenshotsUITests: XCTestCase {
         fermerFeuille()
     }
 
+    // MARK: - Capture : code promo épinglé en haut de la feuille Premium
+
+    func test10_PaywallCodePromo() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES", "-capturePaywall"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.reglages"].waitForExistence(timeout: 120), "Barre d'onglets absente")
+        sleep(8)
+        snap("60-paywall-haut")
+        app.swipeUp()
+        sleep(2)
+        snap("61-paywall-defile")
+        let code = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "code promo")).firstMatch
+        if code.waitForExistence(timeout: 3) {
+            taper(code)
+            sleep(4)
+            snap("62-feuille-code-apple")
+        }
+    }
+
     // MARK: - 9. Réglages › Exporter mes données (audit de conformité, 9 oct. 2026)
 
     /// Le fichier part dans la feuille de partage : son nom et son poids s'y

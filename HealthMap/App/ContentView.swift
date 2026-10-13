@@ -601,6 +601,15 @@ struct MainTabView: View {
         .sheet(isPresented: $showPaywallFromDeepLink) {
             PaywallView()
         }
+        #if DEBUG
+        // Branche de capture uniquement (jamais fusionnée) : ouvre la feuille
+        // Premium au lancement pour photographier le code promo épinglé.
+        .task {
+            guard ProcessInfo.processInfo.arguments.contains("-capturePaywall") else { return }
+            try? await Task.sleep(for: .seconds(4))
+            showPaywallFromDeepLink = true
+        }
+        #endif
         // Entrée libre (V12a) : le questionnaire se lance/reprend depuis
         // n'importe quel onglet via `dashboardVM.demarrerBilan()`. Feuille
         // plein écran qui ne se ferme PAS en glissant (on la quittait par
