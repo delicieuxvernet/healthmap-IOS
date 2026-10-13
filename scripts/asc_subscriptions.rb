@@ -1268,6 +1268,7 @@ if MODE == "new-version"
   notes_fiche = <<~FICHE.strip
     Kiwio 2.0.3
 
+    - Tu as un code promo ? « J'ai un code promo » est maintenant en haut de l'écran Premium.
     - Tu supprimes ton compte puis tu en recrées un ? Ton abonnement Premium te suit, sans rien faire.
     - Le bilan et le scan photo reconnaissent mieux ton abonnement : plus de limite du gratuit par erreur.
     - Corrections et améliorations.
