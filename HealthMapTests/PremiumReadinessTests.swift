@@ -295,4 +295,30 @@ final class PremiumReadinessTests: XCTestCase {
         XCTAssertFalse(SubscriptionService.tierPayant(""))
         XCTAssertFalse(SubscriptionService.tierPayant(nil))
     }
+
+    // MARK: - Achat Apple resté sur un autre compte Kiwio (13 oct. 2026)
+
+    func testRattachement_abonneAppleInconnuDeRevenueCatPourCeCompte() {
+        // Compte supprimé puis recréé : Apple voit l'abonnement, RevenueCat
+        // le garde sur l'ancien identifiant. Sans rattachement, le serveur
+        // appliquait les 2 dictées du gratuit à un abonné.
+        XCTAssertTrue(SubscriptionService.doitRattacherAchatApple(
+            storeKitActif: true, accesRevenueCat: false, dejaTente: false
+        ))
+    }
+
+    func testRattachement_jamaisSansAchatAppleNiEnBoucle() {
+        // Gratuit : rien à rattacher.
+        XCTAssertFalse(SubscriptionService.doitRattacherAchatApple(
+            storeKitActif: false, accesRevenueCat: false, dejaTente: false
+        ))
+        // Abonné que RevenueCat voit déjà : aucun appel de plus.
+        XCTAssertFalse(SubscriptionService.doitRattacherAchatApple(
+            storeKitActif: true, accesRevenueCat: true, dejaTente: false
+        ))
+        // Une tentative par compte et par lancement.
+        XCTAssertFalse(SubscriptionService.doitRattacherAchatApple(
+            storeKitActif: true, accesRevenueCat: false, dejaTente: true
+        ))
+    }
 }
