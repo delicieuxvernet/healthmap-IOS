@@ -28,7 +28,9 @@ struct PlanOption: Identifiable, Equatable {
     var localizedPriceString: String { product.localizedPriceString }
     var price: Decimal { product.price }
     var introductoryDiscount: StoreProductDiscount? { product.introductoryDiscount }
-    var periodUnit: SubscriptionPeriod.Unit? { product.subscriptionPeriod?.unit }
+    // `RevenueCat.` : StoreKit (importé pour `offerCodeRedemption`) déclare
+    // aussi un `SubscriptionPeriod`.
+    var periodUnit: RevenueCat.SubscriptionPeriod.Unit? { product.subscriptionPeriod?.unit }
 
     static func == (lhs: PlanOption, rhs: PlanOption) -> Bool { lhs.id == rhs.id }
 }
