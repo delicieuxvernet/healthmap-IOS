@@ -300,6 +300,9 @@ struct SuiviView: View {
     /// La série ne s'affiche que lorsqu'elle existe : un « 0 » dans une puce
     /// n'encourage personne.
     private var serieAffichee: Int? {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-captureDemo") { return 12 }
+        #endif
         guard !gamification.isZenMode, gamification.currentStreak > 0 else { return nil }
         return gamification.currentStreak
     }
@@ -990,6 +993,14 @@ struct SuiviView: View {
     /// sa fiche, quel que soit le moteur de score (questionnaire ou caddie).
     /// Vide tant que le bilan n'est pas fait : aucun score à montrer.
     private var scoresDuRegistre: [String: Int] {
+        #if DEBUG
+        // Branche de capture uniquement (jamais fusionnée) : une journée de
+        // démonstration pour le visuel LinkedIn, rien n'est écrit en base.
+        if ProcessInfo.processInfo.arguments.contains("-captureDemo") {
+            return ["vitD": 48, "vitB12": 86, "iron": 72, "magnesium": 64, "omega3": 41,
+                    "vitC": 94, "calcium": 78, "zinc": 69, "iodine": 52, "fiber": 83]
+        }
+        #endif
         guard dashboardVM.profile.completed else { return [:] }
         return dashboardVM.registre.mapValues { max(0, min(100, $0.score)) }
     }

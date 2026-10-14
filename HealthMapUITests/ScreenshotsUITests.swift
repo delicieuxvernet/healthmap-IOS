@@ -998,6 +998,25 @@ final class ScreenshotsUITests: XCTestCase {
         fermerFeuille()
     }
 
+    // MARK: - Capture : la toile de Progrès sur une journée de démonstration
+
+    func test11_ProgresDemo() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES", "-captureDemo"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente")
+        attendreChargement()
+        app.buttons["tab.progres"].tap()
+        // La toile se dessine en cascade : on la laisse finir.
+        sleep(5)
+        snap("70-progres-demo")
+    }
+
     // MARK: - Capture : code promo épinglé en haut de la feuille Premium
 
     func test10_PaywallCodePromo() throws {
