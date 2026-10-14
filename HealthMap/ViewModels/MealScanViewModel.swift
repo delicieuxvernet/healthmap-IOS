@@ -623,9 +623,18 @@ final class MealScanViewModel: ObservableObject {
                 errorMessage = "L'analyse n'a pas abouti. Réessaie dans un instant."
             }
         } catch {
-            // Handle HTTP / Supabase errors by inspecting the error description
+            // Handle HTTP / Supabase errors by inspecting the error description.
+            // Le quota se lit sur le code HTTP : « rate » ou « quota » dans le
+            // texte d'une autre erreur (« generate », « moderate »…) faisait
+            // annoncer à un abonné qu'il avait épuisé ses scans (audit du
+            // 13 oct. 2026).
             let desc = String(describing: error).lowercased()
-            if desc.contains("429") || desc.contains("quota") || desc.contains("rate") {
+            let quotaAtteint: Bool = {
+                if case let erreur as FunctionsError = error,
+                   case .httpError(let code, _) = erreur { return code == 429 }
+                return desc.contains("429")
+            }()
+            if quotaAtteint {
                 handleDailyQuotaReached()
             } else if desc.contains("413") || desc.contains("too large") || desc.contains("payload") {
                 errorMessage = "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère."

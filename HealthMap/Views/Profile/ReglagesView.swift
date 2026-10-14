@@ -631,6 +631,9 @@ enum ReglagesLiens {
     static let eulaApple = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
     /// Les abonnements App Store se remboursent chez Apple.
     static let remboursement = URL(string: "https://reportaproblem.apple.com")!
+    /// Page de l'App Store où se saisit un code d'offre de Kiwio : le repli
+    /// quand la feuille Apple de l'app n'a ouvert aucun accès.
+    static let codePromoAppStore = URL(string: "https://apps.apple.com/redeem?ctx=offercodes&id=6775217627")!
 }
 
 // MARK: - Grammaire d'une ligne (pastille carrée, libellé, filet)

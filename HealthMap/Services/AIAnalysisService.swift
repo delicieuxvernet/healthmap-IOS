@@ -19,6 +19,22 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
 
     private init() {}
 
+    /// Bilan refusé pour quota (429) alors que l'app voit un abonné : le
+    /// serveur applique encore le quota du gratuit (5 par jour), faute
+    /// d'avoir suivi l'achat. Comme la dictée, le scan et la prise de sang :
+    /// on fait recouper l'abonnement, puis une seule seconde chance. Avant,
+    /// l'abonné lisait « Patiente quelques minutes » sans issue (audit du
+    /// 13 oct. 2026).
+    private func invoquerEnAbonne<Corps: Encodable, Reponse: Decodable>(_ corps: Corps) async throws -> Reponse {
+        do {
+            return try await client.functions.invoke("generate-analysis", options: .init(body: corps))
+        } catch let erreur as FunctionsError {
+            guard case .httpError(let code, _) = erreur, code == 429,
+                  await SubscriptionService.shared.realignerLeServeur() else { throw erreur }
+            return try await client.functions.invoke("generate-analysis", options: .init(body: corps))
+        }
+    }
+
     // MARK: - Fetch Full Analysis
     /// Main entry point — checks cache, calls Edge Function if needed, validates, merges
     func fetchFullAnalysis(userId: String, profile: UserProfile, scores: [String: Int]? = nil) async throws -> MergedAnalysis? {
@@ -78,10 +94,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         do {
             rawAnalysis = try await withThrowingTaskGroup(of: AIAnalysisResponse.self) { group in
                 group.addTask {
-                    try await self.client.functions.invoke(
-                        "generate-analysis",
-                        options: .init(body: requestBody)
-                    )
+                    try await self.invoquerEnAbonne(requestBody)
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(185))
@@ -247,10 +260,7 @@ final class AIAnalysisService: AIAnalysisServiceProtocol {
         do {
             analysis = try await withThrowingTaskGroup(of: AIAnalysisV2.self) { group in
                 group.addTask {
-                    try await self.client.functions.invoke(
-                        "generate-analysis",
-                        options: .init(body: requestBody)
-                    )
+                    try await self.invoquerEnAbonne(requestBody)
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(185))

@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 import RevenueCat
 
 // MARK: - Paywall View (natif, maquette validée le 3 juillet 2026)
@@ -27,7 +28,9 @@ struct PlanOption: Identifiable, Equatable {
     var localizedPriceString: String { product.localizedPriceString }
     var price: Decimal { product.price }
     var introductoryDiscount: StoreProductDiscount? { product.introductoryDiscount }
-    var periodUnit: SubscriptionPeriod.Unit? { product.subscriptionPeriod?.unit }
+    // `RevenueCat.` : StoreKit (importé pour `offerCodeRedemption`) déclare
+    // aussi un `SubscriptionPeriod`.
+    var periodUnit: RevenueCat.SubscriptionPeriod.Unit? { product.subscriptionPeriod?.unit }
 
     static func == (lhs: PlanOption, rhs: PlanOption) -> Bool { lhs.id == rhs.id }
 }
@@ -99,10 +102,15 @@ struct PaywallView: View {
     /// l'activation) : le bouton dit ce qu'il fait au lieu de rester inerte.
     @State private var isRedeemingPromo = false
 
-    /// Message affiché sous le bouton de code promo quand l'attente n'a rien
-    /// ouvert. Jamais « code invalide » : la feuille système ne dit pas ce que
-    /// l'utilisateur y a fait.
-    @State private var promoNotice: String?
+    /// Feuille Apple de saisie d'un code (`offerCodeRedemption`) ouverte.
+    @State private var feuilleCodePromo = false
+
+    /// L'attente après la feuille n'a ouvert aucun accès : on le dit, et on
+    /// propose la page de l'App Store où le même code se saisit aussi. Jamais
+    /// « code invalide » : la feuille système ne dit pas ce qui y a été fait.
+    @State private var codeSansEffet = false
+
+    @Environment(\.openURL) private var openURL
 
     /// Ce qui vient d'ouvrir l'accès — le texte de confirmation n'est pas le
     /// même après un paiement et après un code promo.
@@ -167,7 +175,9 @@ struct PaywallView: View {
             if montreComparatif {
                 ComparatifPremiumView(
                     onContinuer: { passerAuxFormules() },
-                    onPlusTard: { fermer() }
+                    onPlusTard: { fermer() },
+                    codePromoEnCours: isRedeemingPromo,
+                    onCodePromo: { ouvrirCodePromo() }
                 )
                 .transition(.opacity)
             } else {
@@ -218,6 +228,17 @@ struct PaywallView: View {
         .onChange(of: subscriptionService.isPremium) { _, actif in
             if actif { showPurchaseSuccess = true }
         }
+        // Feuille Apple native de saisie d'un code d'offre : présentée depuis
+        // la feuille Premium elle-même, elle prévient l'app à sa fermeture.
+        .offerCodeRedemption(isPresented: $feuilleCodePromo) { _ in
+            Task { await apresFeuilleCodePromo() }
+        }
+        .alert("Code promo", isPresented: $codeSansEffet) {
+            Button("Saisir sur l'App Store") { openURL(ReglagesLiens.codePromoAppStore) }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Aucun code n'a été appliqué. Si tu viens d'en saisir un, laisse-lui quelques secondes puis touche « Restaurer mes achats ». Tu peux aussi saisir ton code directement sur l'App Store.")
+        }
         .alert("Kiwio Premium", isPresented: $showAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -250,7 +271,7 @@ struct PaywallView: View {
                     // Limite du jour atteinte : « Oups ! » d'abord, en très
                     // grand, puis les captures de ce que Premium montre.
                     OupsEnTete(limite: limite)
-                        .padding(.top, 44)
+                        .padding(.top, 60)
                         .verreCascade(revele, delai: 0.05, decalage: 10)
 
                     ApercuCapturesPremium()
@@ -264,7 +285,7 @@ struct PaywallView: View {
                         .padding(.top, 26)
                 } else {
                     embleme
-                        .padding(.top, 39)
+                        .padding(.top, 60)
 
                     header
                         .padding(.top, 16)
@@ -281,8 +302,11 @@ struct PaywallView: View {
             // Maquette : 18 pt sous le dernier élément.
             .padding(.bottom, 18)
             .frame(maxWidth: .infinity)
-            .overlay(alignment: .topTrailing) { closeButton }
         }
+        // Épinglée : le code promo et la croix ne défilent pas. Un code reçu
+        // se saisit dès l'ouverture, sans chercher en bas de la feuille
+        // (demande d'Arthur, 13 oct. 2026).
+        .overlay(alignment: .top) { barreDuHaut }
     }
 
     /// « Passer à Premium » sur le tableau : place aux formules, et la
@@ -309,12 +333,31 @@ struct PaywallView: View {
         dismiss()
     }
 
-    /// La croix : un rond de verre, dans le coin de la feuille. Elle défile
-    /// avec le contenu, comme avant.
-    private var closeButton: some View {
-        DSCloseButton { fermer() }
-            .padding(.top, Theme.spacingSM)
-            .padding(.trailing, 12)
+    /// Le haut de la feuille, épinglé : « J'ai un code promo » à gauche, la
+    /// croix à droite, chacun dans son verre (lisibles quand le contenu passe
+    /// dessous).
+    private var barreDuHaut: some View {
+        HStack(alignment: .center, spacing: 8) {
+            boutonCodePromo
+            Spacer(minLength: 0)
+            DSCloseButton { fermer() }
+        }
+        .padding(.top, Theme.spacingSM)
+        .padding(.horizontal, 12)
+    }
+
+    /// Le même bouton que sur le comparatif (`BoutonCodePromo`).
+    private var boutonCodePromo: some View {
+        BoutonCodePromo(enCours: isRedeemingPromo) { ouvrirCodePromo() }
+    }
+
+    /// Ouvre la feuille Apple de saisie d'un code d'offre (codes créés dans
+    /// App Store Connect : codes uniques et codes personnalisés comme
+    /// NAIA08), depuis l'une ou l'autre étape de la feuille.
+    private func ouvrirCodePromo() {
+        isRedeemingPromo = true
+        successKind = .codePromo
+        feuilleCodePromo = true
     }
 
     /// La mascotte de 84 pt sur son halo tournant (il déborde de 14) : elle
@@ -410,8 +453,8 @@ struct PaywallView: View {
     }
 
     /// Le bas de la feuille : les formules et l'achat (ou l'attente, ou
-    /// l'échec), « Plus tard », puis le code promo, la restauration et les
-    /// liens. Un seul bloc : il arrive d'un trait, en dernier.
+    /// l'échec), « Plus tard », puis la restauration et les liens. Un seul
+    /// bloc : il arrive d'un trait, en dernier.
     private var achat: some View {
         VStack(spacing: 0) {
             if annualPlan == nil && shortPlan == nil {
@@ -634,40 +677,7 @@ struct PaywallView: View {
 
     private var footerLinks: some View {
         VStack(spacing: Theme.spacingSM) {
-            // Feuille système Apple de saisie d'un code promo (offer code).
-            // Permet d'utiliser un code comme « NAIA » ou « LANCEMENT50 ».
-            // Le bouton reste occupé tant que l'app n'a pas su si l'accès s'est
-            // ouvert : la feuille Apple, elle, ne rend jamais de résultat.
-            Button {
-                Task { await saisirCodePromo() }
-            } label: {
-                HStack(spacing: Theme.spacingXS) {
-                    if isRedeemingPromo {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .tint(Color.dsAccent)
-                    }
-                    Text(isRedeemingPromo ? "Vérification de ton code…" : "J'ai un code promo")
-                        .font(.dsSousTitreFort)
-                }
-                .foregroundStyle(Color.dsAccent)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.dsPress)
-            .disabled(isRedeemingPromo)
-            .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
-
-            if let promoNotice {
-                Text(promoNotice)
-                    .font(.dsLegende)
-                    .foregroundStyle(Color.dsSecondaire)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isStaticText)
-            }
-
+            // Le code promo est en haut de la feuille, épinglé (`barreDuHaut`).
             Button {
                 Task { await restore() }
             } label: {
@@ -859,14 +869,10 @@ struct PaywallView: View {
     /// s'ouvre avant de conclure. Sans cette attente, la feuille se refermait
     /// et le paywall restait identique — l'utilisateur ne savait pas si son
     /// code avait marché.
-    private func saisirCodePromo() async {
-        guard !isRedeemingPromo else { return }
-        isRedeemingPromo = true
-        promoNotice = nil
-        successKind = .codePromo
+    private func apresFeuilleCodePromo() async {
         defer { isRedeemingPromo = false }
 
-        switch await subscriptionService.saisirCodePromo() {
+        switch await subscriptionService.attendreActivation() {
         case .active:
             AnalyticsService.shared.track(.paywallConverted, properties: [
                 "source": source,
@@ -878,7 +884,7 @@ struct PaywallView: View {
             showPurchaseSuccess = true
         case .aucuneActivation:
             successKind = .achat
-            promoNotice = "Aucun code n'a été appliqué. Si tu viens d'en saisir un, laisse-lui quelques secondes puis touche « Restaurer mes achats »."
+            codeSansEffet = true
         }
     }
 

@@ -85,6 +85,11 @@ struct AbonnementReglagesView: View {
     @State private var isRedeemingPromo = false
     @State private var promoResultMessage: String?
     @State private var showPromoResult = false
+    /// Feuille Apple de saisie d'un code (`offerCodeRedemption`) ouverte.
+    @State private var feuilleCodePromo = false
+    /// Le dernier code n'a ouvert aucun accès : l'alerte propose l'App Store.
+    @State private var codeSansEffet = false
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         ZStack {
@@ -118,7 +123,8 @@ struct AbonnementReglagesView: View {
 
                         if !subscriptionService.isPremium {
                             Button {
-                                Task { await saisirCodePromo() }
+                                isRedeemingPromo = true
+                                feuilleCodePromo = true
                             } label: {
                                 ReglageLigne(symbole: "ticket",
                                              titre: isRedeemingPromo ? "Vérification de ton code…" : "J'ai un code",
@@ -174,7 +180,15 @@ struct AbonnementReglagesView: View {
         }
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
         .alerteRestauration(restauration)
+        // Feuille Apple native de saisie d'un code d'offre (codes créés dans
+        // App Store Connect) : elle prévient l'app à sa fermeture.
+        .offerCodeRedemption(isPresented: $feuilleCodePromo) { _ in
+            Task { await apresFeuilleCodePromo() }
+        }
         .alert("Code promo", isPresented: $showPromoResult) {
+            if codeSansEffet {
+                Button("Saisir sur l'App Store") { openURL(ReglagesLiens.codePromoAppStore) }
+            }
             Button("OK", role: .cancel) { }
         } message: {
             if let promoResultMessage { Text(promoResultMessage) }
@@ -212,17 +226,16 @@ struct AbonnementReglagesView: View {
 
     // MARK: - Code promo
 
-    /// Ouvre la feuille Apple de saisie d'un code, puis attend vraiment que
-    /// l'accès s'ouvre avant de répondre. La feuille système ne dit jamais si
-    /// un code a été saisi : le message d'échec ne parle donc pas de « code
+    /// La feuille Apple vient de se fermer : on attend vraiment que l'accès
+    /// s'ouvre avant de répondre. La feuille système ne dit jamais si un code
+    /// a été saisi : le message d'échec ne parle donc pas de « code
     /// invalide », il constate seulement qu'aucun accès n'est apparu.
-    private func saisirCodePromo() async {
-        guard !isRedeemingPromo else { return }
-        isRedeemingPromo = true
+    private func apresFeuilleCodePromo() async {
         defer { isRedeemingPromo = false }
 
-        switch await subscriptionService.saisirCodePromo() {
+        switch await subscriptionService.attendreActivation() {
         case .active:
+            codeSansEffet = false
             var message = "Ton accès Premium est ouvert. Tout est débloqué dès maintenant."
             if let entitlement = subscriptionService.customerInfo?
                 .entitlements[SubscriptionService.entitlementId],
@@ -237,7 +250,8 @@ struct AbonnementReglagesView: View {
                 "package": "code_promo",
             ])
         case .aucuneActivation:
-            promoResultMessage = "Aucun code n'a été appliqué. Si tu viens d'en saisir un, laisse-lui quelques secondes puis touche « Restaurer mes achats »."
+            codeSansEffet = true
+            promoResultMessage = "Aucun code n'a été appliqué. Si tu viens d'en saisir un, laisse-lui quelques secondes puis touche « Restaurer mes achats ». Tu peux aussi saisir ton code directement sur l'App Store."
         }
         showPromoResult = true
     }

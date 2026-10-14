@@ -353,6 +353,10 @@ final class SubscriptionService: ObservableObject {
     /// requête, une seule fois.
     func realignerLeServeur() async -> Bool {
         guard isPremium else { return false }
+        // L'achat Apple est peut-être resté sur un ancien compte Kiwio :
+        // tant qu'il n'est pas rattaché à celui-ci, RevenueCat ne le voit pas
+        // et `verify-receipt` répondrait encore « free ».
+        await rattacherAchatApple()
         let tier = await ReceiptValidationService.shared.verifyCurrentEntitlements(
             userId: Purchases.shared.appUserID,
             force: true
@@ -381,6 +385,69 @@ final class SubscriptionService: ObservableObject {
         }
     }
 
+    // MARK: - Achat Apple resté sur un autre compte Kiwio (13 oct. 2026)
+
+    /// Faut-il re-déposer l'achat Apple chez RevenueCat sous le compte courant ?
+    ///
+    /// Oui quand Apple voit un abonnement actif sur cet appareil alors que
+    /// RevenueCat ne donne aucun accès à ce compte : l'abonné a supprimé son
+    /// compte Kiwio puis en a recréé un, ou s'est connecté à un autre compte.
+    /// L'achat reste alors rattaché, chez RevenueCat, à l'ancien identifiant.
+    /// L'app ouvrait l'accès (filet StoreKit) mais le serveur, qui ne lit que
+    /// `profiles.tier`, appliquait les quotas du gratuit : 2 dictées par jour
+    /// pour un abonné (incident du 13 oct. 2026).
+    ///
+    /// Une seule tentative réussie par compte et par lancement : jamais de
+    /// boucle, même si RevenueCat refuse le transfert.
+    nonisolated static func doitRattacherAchatApple(
+        storeKitActif: Bool,
+        accesRevenueCat: Bool,
+        dejaTente: Bool
+    ) -> Bool {
+        storeKitActif && !accesRevenueCat && !dejaTente
+    }
+
+    /// Comptes RevenueCat déjà rattachés (ou dont RevenueCat a refusé le
+    /// rattachement) pendant ce lancement.
+    private var rattachementsTentes: Set<String> = []
+
+    /// Re-dépose l'achat Apple de cet appareil chez RevenueCat sous le compte
+    /// courant. `syncPurchases` n'ouvre aucune fenêtre Apple (contrairement à
+    /// « Restaurer ») ; RevenueCat transfère l'abonnement depuis l'ancien
+    /// identifiant, et son webhook TRANSFER passe `profiles.tier` en Premium.
+    /// - Returns: vrai si l'accès vient d'apparaître chez RevenueCat grâce au
+    ///   rattachement (l'appelant prévient alors le serveur).
+    @discardableResult
+    func rattacherAchatApple() async -> Bool {
+        let identifiant = Purchases.shared.appUserID
+        guard Self.doitRattacherAchatApple(
+            storeKitActif: abonnementStoreKitActif,
+            accesRevenueCat: customerInfo?.entitlements[Self.entitlementId]?.isActive == true,
+            dejaTente: rattachementsTentes.contains(identifiant)
+        ) else { return false }
+        do {
+            let info = try await Purchases.shared.syncPurchases()
+            // Un échec réseau (catch) laisse retenter au prochain retour dans
+            // l'app ; une réponse, même sans accès, clôt la tentative.
+            rattachementsTentes.insert(identifiant)
+            applyFresh(customerInfo: info)
+        } catch {
+            AppLogger.subscription.report(error, context: "rattacherAchatApple")
+            return false
+        }
+        let rattache = customerInfo?.entitlements[Self.entitlementId]?.isActive == true
+        if rattache {
+            AppLogger.subscription.notice("Achat Apple rattaché au compte courant chez RevenueCat")
+        } else {
+            AppLogger.subscription.error("Abonnement actif chez Apple, toujours aucun accès RevenueCat après synchronisation")
+            CrashReportingService.shared.captureMessage(
+                "active StoreKit subscription not transferred to current RevenueCat user",
+                level: .warning
+            )
+        }
+        return rattache
+    }
+
     // MARK: - Code promo (offer code)
 
     /// Paliers d'attente (en secondes) après l'ouverture de la feuille Apple.
@@ -403,12 +470,10 @@ final class SubscriptionService: ObservableObject {
     /// ne remonte pas toujours de lui-même.
     nonisolated static let paliersResync: Set<Int> = [3, 8]
 
-    /// Ouvre la feuille système Apple de saisie d'un code promo, puis ATTEND que
-    /// l'accès s'ouvre pour de bon (cf. `attendreActivation`).
-    func saisirCodePromo() async -> CodePromoOutcome {
-        Purchases.shared.presentCodeRedemptionSheet()
-        return await attendreActivation()
-    }
+    // La feuille Apple de saisie d'un code est présentée par les écrans
+    // (`offerCodeRedemption`, depuis la feuille où l'on se trouve), qui
+    // appellent ensuite `attendreActivation`. Elle remplace
+    // `Purchases.presentCodeRedemptionSheet()` (13 oct. 2026).
 
     /// Relit l'abonnement par paliers jusqu'à ce que l'accès s'ouvre.
     func attendreActivation(
@@ -470,6 +535,14 @@ final class SubscriptionService: ObservableObject {
             // Hors-ligne : on GARDE l'état courant (initialisé du cache au
             // cold start) — un échec de lecture ne dégrade jamais un abonné.
             AppLogger.subscription.report(error, context: "checkPremiumStatus")
+            return
+        }
+
+        // Apple voit un abonnement que RevenueCat ne donne pas à ce compte :
+        // on le rattache maintenant, avant que le serveur n'applique les
+        // quotas du gratuit, puis on lui fait relire l'abonnement.
+        if await rattacherAchatApple() {
+            prevenirLeServeur()
         }
     }
 
