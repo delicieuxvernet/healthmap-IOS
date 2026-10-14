@@ -117,7 +117,10 @@ export function targetTier(
  * - Jamais d'écriture si le tier actuel n'est pas une valeur gérée par
  *   RevenueCat (free/weekly/monthly/annual) : valeur inconnue = on n'y touche pas.
  */
-const RC_MANAGED_TIERS = new Set(["free", "weekly", "monthly", "annual"]);
+// « premium » : écrit par le webhook (transfert, accès temporaire) sans
+// formule connue ; verify-receipt le recale sur ce que RevenueCat voit
+// vraiment. « lifetime » reste hors de portée (accès offert à la main).
+const RC_MANAGED_TIERS = new Set(["free", "weekly", "monthly", "annual", "premium"]);
 
 export function shouldWriteTier(
   currentTier: string,
@@ -130,17 +133,22 @@ export function shouldWriteTier(
   return currentTier !== target;
 }
 
-/** Candidats app_user_id RevenueCat, du plus probable au moins probable.
- *  iOS identifie avec `session.user.id.uuidString` (MAJUSCULES) ; on couvre
- *  aussi la casse basse et le profileId (variantes historiques). */
+/** Candidats app_user_id RevenueCat, du plus probable au moins probable :
+ *  profiles.id (MAJUSCULES puis minuscules), puis l'id Supabase Auth
+ *  (variantes historiques). */
 export function rcCandidateIds(authUserId: string | null, profileId: string): string[] {
   const out: string[] = [];
   const push = (v: string | null | undefined) => {
     if (v && !out.includes(v)) out.push(v);
   };
-  push(authUserId?.toUpperCase());
-  push(authUserId ?? undefined);
+  // iOS se connecte à RevenueCat avec profiles.id en MAJUSCULES
+  // (AuthService : `session.user.id` = profiles.id). L'id Supabase Auth ne
+  // vient qu'ensuite : le lire d'abord créait des abonnés vides chez
+  // RevenueCat, et un vieil entitlement expiré sous cet id pouvait masquer
+  // l'abonnement en cours (audit du 13 oct. 2026).
   push(profileId.toUpperCase());
   push(profileId);
+  push(authUserId?.toUpperCase());
+  push(authUserId ?? undefined);
   return out;
 }
