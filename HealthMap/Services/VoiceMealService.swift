@@ -280,7 +280,7 @@ final class VoiceMealService {
             // Protégée : verrouiller le téléphone pendant l'analyse ne coupe
             // plus l'envoi.
             let analysis: Analysis = try await TacheProtegee.executer("Dictée du repas") {
-                try await envoyerAvecUneRelance(corps)
+                try await envoyerEnAbonne(corps)
             }
             // Aligné sur le serveur (7 oct. 2026) : il a compté cette dictée à
             // « Lancer l'analyse », le compteur de l'app aussi — même si aucun
@@ -308,6 +308,20 @@ final class VoiceMealService {
         } catch {
             AppLogger.analysis.report(error, context: "parse-meal-voice")
             throw VoiceError.unavailable
+        }
+    }
+
+    /// Limite du jour atteinte alors que l'app voit un abonné : c'est le
+    /// quota du GRATUIT que le serveur applique encore (achat à l'instant,
+    /// webhook en retard). Une seconde chance une fois le serveur réaligné ;
+    /// s'il répond encore 429, c'est la vraie limite.
+    private func envoyerEnAbonne(_ corps: Body) async throws -> Analysis {
+        do {
+            return try await envoyerAvecUneRelance(corps)
+        } catch let erreur as FunctionsError {
+            guard case .httpError(let code, _) = erreur, code == 429,
+                  await SubscriptionService.shared.realignerLeServeur() else { throw erreur }
+            return try await envoyerAvecUneRelance(corps)
         }
     }
 

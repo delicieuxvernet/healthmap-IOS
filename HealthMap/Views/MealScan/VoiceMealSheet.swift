@@ -67,6 +67,10 @@ struct VoiceMealSheet: View {
     @ObservedObject var speech: SpeechCaptureService
     /// Appelé après enregistrement, juste avant que la feuille ne redescende.
     var onAdded: (Ajout) -> Void
+    /// La limite gratuite du jour est atteinte (429 du serveur, non-abonné) :
+    /// la feuille redescend et l'appelant ouvre la feuille Premium « Oups ! »
+    /// (`LimiteDuJour`), au lieu d'un message d'erreur sans issue.
+    var onLimiteAtteinte: (() -> Void)? = nil
 
     /// Ce que la feuille vient d'enregistrer.
     struct Ajout: Equatable {
@@ -84,6 +88,8 @@ struct VoiceMealSheet: View {
     enum Depart: Equatable {
         case transcription(String)
         case echec(message: String, transcript: String)
+        /// Le serveur refuse : limite du jour atteinte (HTTP 429).
+        case limiteAtteinte(transcript: String)
     }
 
     @Environment(\.dismiss) private var dismiss
@@ -250,7 +256,7 @@ struct VoiceMealSheet: View {
         if !amorce, let depart {
             switch depart {
             case .transcription: return .relecture
-            case .echec: return .failed
+            case .echec, .limiteAtteinte: return .failed
             }
         }
         return saisieAuClavier && phase == .analyzing && dernierTranscript.isEmpty ? .saisie : phase
@@ -1259,6 +1265,17 @@ struct VoiceMealSheet: View {
             dernierTranscript = transcript
             errorMessage = message
             phase = .failed
+        case .limiteAtteinte(let transcript):
+            // Un non-abonné n'arrive pas ici (la Page ouvre « Oups ! » sans
+            // monter la feuille) ; un abonné au bout de son plafond lit la
+            // vérité, il n'y a rien à lui vendre.
+            dernierTranscript = transcript
+            if onLimiteAtteinte != nil, !SubscriptionService.shared.isPremium {
+                limiteAtteinte()
+            } else {
+                errorMessage = VoiceMealService.VoiceError.rateLimited.errorDescription
+                phase = .failed
+            }
         }
     }
 
@@ -1272,6 +1289,14 @@ struct VoiceMealSheet: View {
         champActif = true
     }
 
+    /// Limite gratuite du jour : on aligne le compteur local sur le serveur,
+    /// la feuille redescend, l'appelant ouvre la feuille Premium.
+    private func limiteAtteinte() {
+        VoiceMealService.QuotaStore.marquerÉpuisé(userId: userId)
+        onLimiteAtteinte?()
+        fermer()
+    }
+
     /// Analyse d'un texte déjà transcrit. Séparé de la capture pour qu'un échec
     /// serveur se rejoue d'un bouton, au lieu d'imposer une nouvelle dictée.
     private func analyser(_ text: String) async {
@@ -1280,6 +1305,8 @@ struct VoiceMealSheet: View {
         do {
             let analysis = try await VoiceMealService.shared.analyze(transcript: text)
             appliquer(analysis)
+        } catch VoiceMealService.VoiceError.rateLimited {
+            appliquer(Depart.limiteAtteinte(transcript: text))
         } catch {
             errorMessage = error.localizedDescription
             phase = .failed

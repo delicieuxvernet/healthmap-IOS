@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch: # Manual trigger (recommended for the FIRST run)
+    inputs:
+      sans_tests:
+        description: "Envoyer le build sans passer par les tests (décision d'Arthur au cas par cas)"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   # ── Tests (gate de PR + gate de déploiement) ─────────────────────────────
@@ -19,6 +25,7 @@ jobs:
   # direct ou un merge forcé). Coût : ~10-15 min ajoutées à chaque déploiement
   # main, assumé pour ce garde-fou (audit d'architecture du 2026-07-05).
   tests:
+    if: ${{ !inputs.sans_tests }}
     runs-on: macos-15
     timeout-minutes: 40
 
@@ -103,7 +110,7 @@ jobs:
   # push direct sur main sans passer par une PR ne peut plus livrer en
   # TestFlight sans tests verts.
   build-and-upload:
-    if: github.event_name != 'pull_request'
+    if: ${{ always() && github.event_name != 'pull_request' && (needs.tests.result == 'success' || (needs.tests.result == 'skipped' && inputs.sans_tests)) }}
     needs: tests
     runs-on: macos-15
     timeout-minutes: 60

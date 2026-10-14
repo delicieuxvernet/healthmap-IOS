@@ -519,6 +519,20 @@
   montre le plan avec ses liens). « Passer à Premium » mène aux formules de la même feuille, « Plus
   tard » et la croix referment. Une ligne qui change de camp se change dans le fichier des lignes
   ET dans le gating.
+>   (Exception : la carte Micronutriments du Journal, défloutée — voir plus haut.)
+> - **Feuille Premium « Oups ! » — limite du jour atteinte** (7 oct. 2026, `LimiteDuJour.swift`,
+>   `PaywallView(limite:)`) : quand un non-abonné bute sur ses scans photo, ses dictées ou ses
+>   repas écrits (429 du serveur, ou bouton dont le quota local est épuisé), plus jamais de simple
+>   message d'erreur : la feuille Premium monte en mode limite. De haut en bas : **« Oups ! » en
+>   64 arrondi**, ce qui est épuisé (« Tu as utilisé tes 3 scans photo du jour » ; dictée et
+>   texte partagent leur quota, la phrase le dit), « Ça se recharge demain. Ou passe à Kiwio
+>   Premium pour suivre tes apports de fond en comble » ; **« Ce qui t'attend »** : trois
+>   captures dessinées en téléphones (micronutriments chiffrés, semaine d'un apport, aliments qui
+>   en apportent) sur des **données d'exemple, étiquetées comme telles** ; « Avec Kiwio Premium » et
+>   six bénéfices (30 scans, dictées et repas écrits, micronutriments chiffrés, tendances,
+>   pourquoi de chaque apport, plan) ; puis l'achat habituel. Vaut pour tout non-abonné, bilan
+>   fait ou non (l'événement « limite » n'est pas la porte permanente de `ScanQuotaUI`). Un abonné
+>   au bout de son plafond lit toujours « ça se recharge demain ».
 >
 > - **Widgets, écran verrouillé, activité en direct** (refonte « en verre » du 3 oct. 2026, maquette
 >   Claude Design « Kiwio - Widgets », W1 à W7 ; briques dans `Partage/VuesWidgets.swift`, vues dans
@@ -957,6 +971,12 @@ Lois de l'écran :
 9. **Mouvement** : jetons de `KiwiMotion` uniquement, rien au-delà du plafond `KiwiEchelle.plafond`
    (1,22 depuis le verre), tout coupé par « Réduire les animations ». La gerbe de fin d'étape se
    joue une fois.
+10. **L'attente du bilan** (7 oct. 2026) : après « Voir mon bilan », la gate plein écran
+    (`FullAnalysisLoadingView`) garde le signe qui charge, la phrase qui tourne et la barre ; en
+    bas, une **carte d'astuces** (`AstucesAttenteCarte`, `Views/Dashboard/AstucesAttente.swift`)
+    change toutes les **17 s**, ou au toucher. Ordre fixe : « Bon à savoir » × 2 (ne remplace pas
+    un avis médical ; les compléments ne remplacent pas l'assiette), puis « Kiwio Premium » × 4,
+    chacune un avantage RÉEL du paywall. Un abonné ne voit que les deux mises en garde.
 
 L'ancien flux (`QuestionnaireContainerView`, `GroceryShoppingView`, `SectionIntroView`,
 `TeaserEngine`, `QuantityBracket`) reste dans le dépôt, plus présenté, tant que le nouveau n'est
