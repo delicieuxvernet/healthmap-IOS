@@ -992,6 +992,15 @@ struct SuiviView: View {
     /// notés, puis prise de sang. C'est LE chiffre d'un apport, le même que
     /// sa fiche, quel que soit le moteur de score (questionnaire ou caddie).
     /// Vide tant que le bilan n'est pas fait : aucun score à montrer.
+    /// Branche de capture : la journée de démonstration ignore les statuts du compte.
+    private static var captureDemo: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-captureDemo")
+        #else
+        return false
+        #endif
+    }
+
     private var scoresDuRegistre: [String: Int] {
         #if DEBUG
         // Branche de capture uniquement (jamais fusionnée) : une journée de
@@ -1016,7 +1025,7 @@ struct SuiviView: View {
                 nom: definition.label,
                 court: ProgresToile.libelleCourt(id, defaut: definition.label),
                 pct: score,
-                statut: dashboardVM.statuts[id]
+                statut: Self.captureDemo ? nil : dashboardVM.statuts[id]
             )
         }
     }

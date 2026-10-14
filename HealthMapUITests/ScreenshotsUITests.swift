@@ -1011,7 +1011,13 @@ final class ScreenshotsUITests: XCTestCase {
         connecterSiBesoin()
         XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente")
         attendreChargement()
+        sleep(3)
+        // Le check-in du jour peut monter par-dessus : on le passe.
+        let passer = app.buttons["Passer pour aujourd'hui"]
+        if passer.waitForExistence(timeout: 4) { taper(passer); sleep(2) }
         app.buttons["tab.progres"].tap()
+        sleep(2)
+        if passer.waitForExistence(timeout: 3) { taper(passer); sleep(2) }
         // La toile se dessine en cascade : on la laisse finir.
         sleep(5)
         snap("70-progres-demo")
