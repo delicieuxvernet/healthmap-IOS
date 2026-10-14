@@ -175,7 +175,9 @@ struct PaywallView: View {
             if montreComparatif {
                 ComparatifPremiumView(
                     onContinuer: { passerAuxFormules() },
-                    onPlusTard: { fermer() }
+                    onPlusTard: { fermer() },
+                    codePromoEnCours: isRedeemingPromo,
+                    onCodePromo: { ouvrirCodePromo() }
                 )
                 .transition(.opacity)
             } else {
@@ -344,42 +346,18 @@ struct PaywallView: View {
         .padding(.horizontal, 12)
     }
 
+    /// Le même bouton que sur le comparatif (`BoutonCodePromo`).
+    private var boutonCodePromo: some View {
+        BoutonCodePromo(enCours: isRedeemingPromo) { ouvrirCodePromo() }
+    }
+
     /// Ouvre la feuille Apple de saisie d'un code d'offre (codes créés dans
     /// App Store Connect : codes uniques et codes personnalisés comme
-    /// NAIA08). Le bouton dit ce qu'il fait tant que l'accès n'a pas été
-    /// vérifié : la feuille Apple ne rend jamais de résultat.
-    private var boutonCodePromo: some View {
-        Button {
-            HapticService.shared.tap()
-            isRedeemingPromo = true
-            successKind = .codePromo
-            feuilleCodePromo = true
-        } label: {
-            HStack(spacing: 6) {
-                if isRedeemingPromo {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(Color.teinteKiwiTexte)
-                } else {
-                    Image(systemName: "ticket")
-                        .font(.system(size: 14, weight: .semibold))
-                        .accessibilityHidden(true)
-                }
-                Text(isRedeemingPromo ? "Vérification…" : "J'ai un code promo")
-                    .font(.dsSousTitreFort)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(Color.teinteKiwiTexte)
-            .padding(.horizontal, 14)
-            .frame(height: 36)
-            .verreClair()
-            .frame(minHeight: DS.cibleTactile)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.dsPress)
-        .disabled(isRedeemingPromo)
-        .accessibilityHint("Ouvre la fenêtre Apple pour saisir un code promotionnel.")
+    /// NAIA08), depuis l'une ou l'autre étape de la feuille.
+    private func ouvrirCodePromo() {
+        isRedeemingPromo = true
+        successKind = .codePromo
+        feuilleCodePromo = true
     }
 
     /// La mascotte de 84 pt sur son halo tournant (il déborde de 14) : elle

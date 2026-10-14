@@ -21,6 +21,10 @@ import SwiftUI
 struct ComparatifPremiumView: View {
     let onContinuer: () -> Void
     let onPlusTard: () -> Void
+    /// « J'ai un code promo » en haut de la carte : l'étape d'ouverture de la
+    /// feuille Premium pour un compte gratuit, le code doit s'y voir.
+    var codePromoEnCours = false
+    var onCodePromo: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Aux tailles d'accessibilité, un libellé de ligne prend autant de
@@ -62,21 +66,29 @@ struct ComparatifPremiumView: View {
 
     private var carte: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Standard ou Premium ?")
-                        .dsPolice(22, .bold)
-                        .tracking(-0.6)
-                        .foregroundStyle(Color.dsTexte)
-                        .accessibilityAddTraits(.isHeader)
-                    Text("Kiwi frais : c'est inclus. Kiwi raplapla : ça ne l'est pas.")
-                        .font(.dsLegende)
-                        .foregroundStyle(Color.dsSecondaire)
-                        .fixedSize(horizontal: false, vertical: true)
+            // En haut : le code promo à gauche, la croix à droite (comme sur
+            // les formules), puis le titre sur toute la largeur.
+            HStack(alignment: .center, spacing: 8) {
+                if let onCodePromo {
+                    BoutonCodePromo(enCours: codePromoEnCours, action: onCodePromo)
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
                 DSCloseButton { onPlusTard() }
             }
+            .padding(.top, -6)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Standard ou Premium ?")
+                    .dsPolice(22, .bold)
+                    .tracking(-0.6)
+                    .foregroundStyle(Color.dsTexte)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Kiwi frais : c'est inclus. Kiwi raplapla : ça ne l'est pas.")
+                    .font(.dsLegende)
+                    .foregroundStyle(Color.dsSecondaire)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, 6)
 
             tableau
                 .padding(.top, 16)
