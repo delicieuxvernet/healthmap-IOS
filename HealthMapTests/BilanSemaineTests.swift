@@ -156,6 +156,15 @@ final class BilanSemaineTests: XCTestCase {
         XCTAssertFalse(json.contains("eau"), "l'eau ne quitte pas le téléphone")
     }
 
+    /// Au milieu d'une phrase, seule l'initiale baisse, avec l'élision.
+    func testLeNomDUnApportDansUnePhrase() {
+        XCTAssertEqual(BilanSemaineTeintes.deNom("vitD"), "de vitamine D")
+        XCTAssertEqual(BilanSemaineTeintes.deNom("omega3"), "d'oméga-3")
+        XCTAssertEqual(BilanSemaineTeintes.deNom("iodine"), "d'iode")
+        XCTAssertEqual(BilanSemaineTeintes.deNom("fiber"), "de fibres")
+        XCTAssertEqual(BilanSemaineTeintes.deNom("proteines"), "de protéines")
+    }
+
     #if DEBUG
     /// Le bilan d'exemple des captures se termine aujourd'hui : la carte de
     /// Progrès le montre « prêt », jamais un ancien bilan périmé.

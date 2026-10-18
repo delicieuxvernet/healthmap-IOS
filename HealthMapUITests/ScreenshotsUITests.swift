@@ -369,19 +369,25 @@ final class ScreenshotsUITests: XCTestCase {
             essais += 1
         }
         XCTAssertTrue(carte.exists, "la carte du bilan de la semaine est absente de Progrès")
+        // La carte entière au-dessus de la barre d'onglets.
+        if carte.frame.maxY > app.frame.height * 0.75 {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)))
+            sleep(1)
+        }
         snap("98-bilan-semaine-carte")
 
         taper(carte)
         let titre = app.staticTexts["Une semaine régulière, il manque le poisson"]
         XCTAssertTrue(titre.waitForExistence(timeout: 10), "la feuille du bilan de la semaine ne s'est pas ouverte")
         sleep(1)
-        snap("99a-bilan-semaine-haut")
+        snap("99-bilan-semaine-haut")
         app.swipeUp()
         sleep(1)
-        snap("99b-bilan-semaine-milieu")
+        snap("99-bilan-semaine-milieu")
         app.swipeUp()
         sleep(1)
-        snap("99c-bilan-semaine-bas")
+        snap("99-bilan-semaine-bas")
     }
 
     // MARK: - 7. Conformité (9 octobre 2026) : avant / après

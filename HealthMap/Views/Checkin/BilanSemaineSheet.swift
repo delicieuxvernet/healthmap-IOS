@@ -229,7 +229,7 @@ struct BilanSemaineSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let gain = reco.gainPct, let id = reco.apports.first {
                     let portion = reco.portion.isEmpty ? "" : " avec \(reco.portion)"
-                    pastille("+\(DS.pourcent(gain)) de \(BilanSemaineTeintes.nom(id).lowercased())\(portion)", id: id)
+                    pastille("+\(DS.pourcent(gain)) \(BilanSemaineTeintes.deNom(id))\(portion)", id: id)
                         .padding(.top, 4)
                 } else {
                     pastilles(reco.apports)
@@ -437,6 +437,14 @@ enum BilanSemaineTeintes {
                 ?? Micronutriments.tous.first { $0.id == id }?.nom
                 ?? id
         }
+    }
+
+    /// « de vitamine D », « d'oméga-3 », « d'iode » : au milieu d'une phrase,
+    /// seule la première lettre baisse (pas « vitamine d »).
+    static func deNom(_ id: String) -> String {
+        let texte = NomNutriment.minusculeInitiale(Self.nom(id))
+        let voyelle = texte.first.map { "aeéèêiîoôu".contains($0) } ?? false
+        return voyelle ? "d'\(texte)" : "de \(texte)"
     }
 
     static func fond(_ id: String) -> Color {
