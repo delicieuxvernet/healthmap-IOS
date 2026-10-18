@@ -34,7 +34,7 @@ final class ScreenshotsUITests: XCTestCase {
     // MARK: - 1. Page de garde, onboarding, connexion (compte neuf)
 
     func test01_AccueilEtConnexion() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "NO", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
         app.launch()
 
@@ -63,7 +63,7 @@ final class ScreenshotsUITests: XCTestCase {
     // MARK: - 2. Parcours connecté : les cinq onglets et leurs feuilles
 
     func test02_ParcoursConnecte() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -231,7 +231,7 @@ final class ScreenshotsUITests: XCTestCase {
     // MARK: - 3. Avant le questionnaire + questionnaire (hook DEBUG `-captureDecouverte`)
 
     func test03_AvantQuestionnaireEtQuestionnaire() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES", "-captureDecouverte", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -286,7 +286,7 @@ final class ScreenshotsUITests: XCTestCase {
     // MARK: - 4. Tutoriel du premier lancement (hook DEBUG `-captureTutoriel`)
 
     func test04_Tutoriel() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES", "-captureTutoriel", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -324,7 +324,7 @@ final class ScreenshotsUITests: XCTestCase {
     // restent dans le brouillon local du simulateur.
 
     func test07_Conformite() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -427,7 +427,7 @@ final class ScreenshotsUITests: XCTestCase {
         // La molette d'âge réglée sous 16 ans, dans le questionnaire d'un
         // compte « sans bilan » (en mémoire seulement).
         app.terminate()
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES", "-captureDecouverte", "YES"]
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
         app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
@@ -468,7 +468,7 @@ final class ScreenshotsUITests: XCTestCase {
     // n'est ajouté au journal du compte d'audit.
 
     func test08_GrandeTaille() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -606,7 +606,7 @@ final class ScreenshotsUITests: XCTestCase {
     // local du simulateur.
 
     func test05_QuestionnaireEnQuatreEtapes() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES", "-captureDecouverte", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -829,7 +829,7 @@ final class ScreenshotsUITests: XCTestCase {
     // rien n'est envoyé ni enregistré.
 
     func test06_MicrosGratuitEtEcrire() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -909,7 +909,7 @@ final class ScreenshotsUITests: XCTestCase {
     // rien n'est enregistré dans le Journal du compte de captures.
 
     func test07_DicteeUnToucher() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -965,7 +965,7 @@ final class ScreenshotsUITests: XCTestCase {
     // un bouton d'achat.
 
     func test08_ComparatifPremium() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -1006,7 +1006,7 @@ final class ScreenshotsUITests: XCTestCase {
     /// aucune donnée de la personne. Le bouton est cherché par son libellé
     /// (pas d'identifiant d'accessibilité sur cette ligne).
     func test09_ExporterMesDonnees() throws {
-        app = XCUIApplication()
+        app = applicationDansLaLangue()
         app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES", "-kiwioCaptures", "YES"]
         let env = ProcessInfo.processInfo.environment
         app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
@@ -1118,6 +1118,17 @@ final class ScreenshotsUITests: XCTestCase {
     /// overlays), et refuse alors le tap classique.
     private func taper(_ element: XCUIElement) {
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
+    /// L'app, lancée dans la langue des captures (entrée `langue` du workflow,
+    /// français par défaut). Sans ces arguments, l'app suivrait la langue du
+    /// simulateur : l'anglais sur la CI.
+    private func applicationDansLaLangue() -> XCUIApplication {
+        let app = XCUIApplication()
+        let demandee = ProcessInfo.processInfo.environment["LANGUE_CAPTURES"] ?? ""
+        let langue = demandee.isEmpty ? "fr" : demandee
+        app.launchArguments += ["-AppleLanguages", "(\(langue))", "-AppleLocale", langue == "en" ? "en_AU" : "fr_FR"]
+        return app
     }
 
     private func snap(_ name: String) {

@@ -1,0 +1,100 @@
+# Traduction de l'app (14 oct. 2026) : compile, lance les tests, puis relève
+# TOUS les textes traduisibles repérés par le compilateur (fichiers
+# `.stringsdata`) et dit lesquels n'ont pas encore leur anglais dans
+# `Partage/Localizable.xcstrings`.
+#
+# Tourne à chaque push sur une branche `feat/anglais-*` (pas besoin d'ouvrir
+# une PR) et à la demande. Ne signe rien, n'envoie rien sur TestFlight.
+name: Localisation
+
+on:
+  push:
+    branches: ['feat/anglais-*']
+  workflow_dispatch:
+
+concurrency:
+  group: localisation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  textes:
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    env:
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26.2
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Inject Config.xcconfig
+        env:
+          CONFIG_XCCONFIG_BASE64: ${{ secrets.CONFIG_XCCONFIG_BASE64 }}
+        run: |
+          mkdir -p HealthMap/Resources
+          echo -n "$CONFIG_XCCONFIG_BASE64" | base64 --decode > HealthMap/Resources/Config.xcconfig
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', 'project.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Build and test (French, like the PR gate)
+        timeout-minutes: 30
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project HealthMap.xcodeproj \
+            -scheme HealthMap \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            CODE_SIGNING_ALLOWED=NO SWIFT_EMIT_LOC_STRINGS=YES
+
+      - name: Collect extracted strings
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/chaines"
+          find "$RUNNER_TEMP/dd/Build/Intermediates.noindex" -name '*.stringsdata' \
+            \( -path '*HealthMap.build*' -o -path '*KiwioWidgets.build*' \) \
+            -exec cp {} "$RUNNER_TEMP/chaines/" \; || true
+          echo "Fichiers .stringsdata : $(ls "$RUNNER_TEMP/chaines" | wc -l)"
+          node scripts/localisation/catalogue.mjs verifier --extraits "$RUNNER_TEMP/chaines" \
+            --rapport "$RUNNER_TEMP/chaines/manquants.json" | tee -a "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload extracted strings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaines-extraites
+          path: ${{ runner.temp }}/chaines
+          if-no-files-found: warn
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults.xcresult
+          path: ${{ runner.temp }}/TestResults.xcresult
+          if-no-files-found: warn

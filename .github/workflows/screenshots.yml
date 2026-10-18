@@ -25,6 +25,11 @@ on:
         required: false
         default: ""
         type: string
+      langue:
+        description: "Langue de l'app pendant les captures (fr ou en ; vide = fr)"
+        required: false
+        default: "fr"
+        type: string
       taille_texte:
         description: "Taille du texte du simulateur (simctl content_size, ex. accessibility-extra-large ; vide = taille par défaut)"
         required: false
@@ -133,6 +138,7 @@ jobs:
         env:
           TEST_RUNNER_SCREENSHOT_EMAIL: audit-b@test.com
           TEST_RUNNER_SCREENSHOT_PASSWORD: ${{ secrets.DEMO_ACCOUNT_PASSWORD }}
+          TEST_RUNNER_LANGUE_CAPTURES: ${{ inputs.langue }}
           SEULEMENT: ${{ inputs.seulement }}
         run: |
           set -o pipefail

@@ -1,0 +1,7 @@
+/* iOS permission texts, in English. */
+"NSPhotoLibraryAddUsageDescription" = "Kiwio saves your recap image to your photos, only when you ask it to.";
+"NSCameraUsageDescription" = "Kiwio uses the camera to photograph your meals and read product barcodes, so it can work out what they give you.";
+"NSMicrophoneUsageDescription" = "Kiwio uses the microphone so you can say your meal instead of typing it. The recording isn't kept: only the transcribed text is used to identify your foods.";
+"NSSpeechRecognitionUsageDescription" = "Kiwio turns your voice into text to recognise the foods in your meal and count your calories. Transcription happens on your iPhone when it can; otherwise it's processed by Apple's servers. Only the resulting text is sent to Kiwio, never the recording.";
+"NSHealthShareUsageDescription" = "Kiwio reads your activity, weight and sleep from Apple Health to pre-fill your profile and personalise your report. Read only: Kiwio never writes to Health.";
+"NSHealthUpdateUsageDescription" = "Kiwio doesn't write any data to Apple Health. This permission, which Apple requires for Health-related apps, isn't used.";

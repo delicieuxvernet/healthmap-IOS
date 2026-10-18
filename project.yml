@@ -23,6 +23,10 @@ settings:
     SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
     CLANG_ANALYZER_NONNULL: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: NO
+    # Kiwio en anglais (14 oct. 2026) : le compilateur repère les textes
+    # traduisibles (Text("…"), String(localized:)…) pour le catalogue
+    # `Partage/Localizable.xcstrings`.
+    SWIFT_EMIT_LOC_STRINGS: YES
   configs:
     Debug:
       SWIFT_OPTIMIZATION_LEVEL: "-Onone"
@@ -216,6 +220,10 @@ schemes:
       config: Debug
     test:
       config: Debug
+      # Les tests vérifient les textes français : l'app testée tourne en
+      # français, quelle que soit la langue du simulateur de la CI.
+      language: fr
+      region: FR
       targets:
         - HealthMapTests
     profile:
@@ -230,5 +238,7 @@ schemes:
         HealthMapTests: [test]
     test:
       config: Debug
+      language: fr
+      region: FR
       targets:
         - HealthMapTests
