@@ -241,10 +241,10 @@ enum RecapDuJourExemple {
             return RecapDuJour(cas: .rienNaManque)
         default:
             return RecapDuJour(cas: .manques([
-                RecapDuJour.Colonne(id: "vitD", nom: "Vitamine D", pourcentHier: 22,
-                                    aliment: RecapDuJour.Aliment(nom: "Sardines", portion: "1 boîte", gain: 33, illustration: "fluent_fish")),
-                RecapDuJour.Colonne(id: "iron", nom: "Fer", pourcentHier: 38,
-                                    aliment: RecapDuJour.Aliment(nom: "Lentilles", portion: "1 portion", gain: 23, illustration: nil)),
+                RecapDuJour.Colonne(id: "vitD", nom: String(localized: "Vitamine D"), pourcentHier: 22,
+                                    aliment: RecapDuJour.Aliment(nom: String(localized: "Sardines"), portion: String(localized: "1 boîte"), gain: 33, illustration: "fluent_fish")),
+                RecapDuJour.Colonne(id: "iron", nom: String(localized: "Fer"), pourcentHier: 38,
+                                    aliment: RecapDuJour.Aliment(nom: String(localized: "Lentilles"), portion: String(localized: "1 portion"), gain: 23, illustration: nil)),
             ]))
         }
     }

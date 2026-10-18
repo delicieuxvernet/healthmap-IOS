@@ -63,10 +63,10 @@ struct BilanSemaine: Codable, Equatable, Identifiable {
 
         var verbe: String {
             switch action {
-            case "remplacer": return "REMPLACE"
-            case "garder": return "GARDE"
-            case "deplacer": return "DÉPLACE"
-            default: return "AJOUTE"
+            case "remplacer": return String(localized: "REMPLACE")
+            case "garder": return String(localized: "GARDE")
+            case "deplacer": return String(localized: "DÉPLACE")
+            default: return String(localized: "AJOUTE")
             }
         }
     }
@@ -149,7 +149,11 @@ enum BilanSemaineRegle {
     static func date(_ texte: String) -> Date? { iso.date(from: texte) }
     static func texte(_ date: Date) -> String { iso.string(from: date) }
 
-    private static let moisCourts = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
+    private static let moisCourts = [
+        String(localized: "janv."), String(localized: "févr."), String(localized: "mars"), String(localized: "avr."),
+        String(localized: "mai"), String(localized: "juin"), String(localized: "juil."), String(localized: "août"),
+        String(localized: "sept."), String(localized: "oct."), String(localized: "nov."), String(localized: "déc."),
+    ]
 
     /// « 7 – 13 oct. », ou « 28 sept. – 4 oct. » à cheval sur deux mois.
     static func periodeLisible(debut: String, fin: String, calendrier: Calendar = .current) -> String {
@@ -200,43 +204,43 @@ enum BilanSemaineExemple {
             periode: .init(debut: BilanSemaineRegle.texte(debut), fin: BilanSemaineRegle.texte(fin)),
             repasNotes: 14,
             joursNotes: 6,
-            titre: "Une semaine régulière, il manque le poisson",
-            resume: "14 repas notés sur 6 jours. Tes protéines suivent, mais la vitamine D et les oméga-3 restent bas : aucun poisson gras cette semaine.",
+            titre: String(localized: "Une semaine régulière, il manque le poisson"),
+            resume: String(localized: "14 repas notés sur 6 jours. Tes protéines suivent, mais la vitamine D et les oméga-3 restent bas : aucun poisson gras cette semaine."),
             manques: [
-                .init(id: "vitD", nom: "Vitamine D", moyennePct: 24, joursBas: 6, joursMesures: 6,
-                      explication: "Ni poisson gras ni œufs cette semaine : tes repas en apportent très peu, et le soleil d'octobre ne compense plus.",
+                .init(id: "vitD", nom: String(localized: "Vitamine D"), moyennePct: 24, joursBas: 6, joursMesures: 6,
+                      explication: String(localized: "Ni poisson gras ni œufs cette semaine : tes repas en apportent très peu, et le soleil d'octobre ne compense plus."),
                       type: "apport"),
-                .init(id: "omega3", nom: "Oméga-3", moyennePct: 31, joursBas: 5, joursMesures: 6,
-                      explication: "Tes matières grasses viennent surtout du beurre et de l'huile de tournesol, pauvres en oméga-3.",
+                .init(id: "omega3", nom: String(localized: "Oméga-3"), moyennePct: 31, joursBas: 5, joursMesures: 6,
+                      explication: String(localized: "Tes matières grasses viennent surtout du beurre et de l'huile de tournesol, pauvres en oméga-3."),
                       type: "apport"),
-                .init(id: "fiber", nom: "Fibres", moyennePct: 58, joursBas: 4, joursMesures: 6,
-                      explication: "Pain blanc et pâtes le midi : les versions complètes apportent deux à trois fois plus de fibres.",
+                .init(id: "fiber", nom: String(localized: "Fibres"), moyennePct: 58, joursBas: 4, joursMesures: 6,
+                      explication: String(localized: "Pain blanc et pâtes le midi : les versions complètes apportent deux à trois fois plus de fibres."),
                       type: "apport"),
             ],
             habitudes: [
-                .init(type: "frein", titre: "Des pâtes blanches 5 midis sur 6",
-                      constat: "Le même plat revient presque chaque midi : c'est là que tes fibres se perdent.",
+                .init(type: "frein", titre: String(localized: "Des pâtes blanches 5 midis sur 6"),
+                      constat: String(localized: "Le même plat revient presque chaque midi : c'est là que tes fibres se perdent."),
                       apports: ["fiber", "magnesium"], illustration: "pates"),
-                .init(type: "atout", titre: "Un fruit chaque matin",
-                      constat: "L'orange du petit-déjeuner couvre ta vitamine C presque tous les jours.",
+                .init(type: "atout", titre: String(localized: "Un fruit chaque matin"),
+                      constat: String(localized: "L'orange du petit-déjeuner couvre ta vitamine C presque tous les jours."),
                       apports: ["vitC"], illustration: "agrume"),
             ],
             recommandations: [
-                .init(action: "ajouter", titre: "Des sardines deux fois par semaine",
-                      detail: "En boîte, sur du pain complet ou dans une salade : c'est ce qui remonte le plus ta vitamine D et tes oméga-3.",
-                      apports: ["vitD", "omega3"], aliment: "Sardines", portion: "1 boîte", gainPct: 33,
+                .init(action: "ajouter", titre: String(localized: "Des sardines deux fois par semaine"),
+                      detail: String(localized: "En boîte, sur du pain complet ou dans une salade : c'est ce qui remonte le plus ta vitamine D et tes oméga-3."),
+                      apports: ["vitD", "omega3"], aliment: "Sardines", portion: String(localized: "1 boîte"), gainPct: 33,
                       illustration: "poisson"),
-                .init(action: "remplacer", titre: "Les pâtes blanches par des complètes",
-                      detail: "Même plat, même cuisson : deux fois plus de fibres, et du magnésium en plus.",
+                .init(action: "remplacer", titre: String(localized: "Les pâtes blanches par des complètes"),
+                      detail: String(localized: "Même plat, même cuisson : deux fois plus de fibres, et du magnésium en plus."),
                       apports: ["fiber", "magnesium"], aliment: "", portion: "", gainPct: nil,
                       illustration: "pates"),
-                .init(action: "garder", titre: "Ton fruit du matin",
-                      detail: "Il couvre ta vitamine C chaque jour : garde-le.",
+                .init(action: "garder", titre: String(localized: "Ton fruit du matin"),
+                      detail: String(localized: "Il couvre ta vitamine C chaque jour : garde-le."),
                       apports: ["vitC"], aliment: "", portion: "", gainPct: nil,
                       illustration: "agrume"),
             ],
-            objectif: .init(titre: "Deux repas de poisson gras",
-                            detail: "Note-les : ton prochain bilan montrera ce qu'ils changent pour ta vitamine D."),
+            objectif: .init(titre: String(localized: "Deux repas de poisson gras"),
+                            detail: String(localized: "Note-les : ton prochain bilan montrera ce qu'ils changent pour ta vitamine D.")),
             meta: .init(modele: "exemple", genere_le: nil)
         )
     }

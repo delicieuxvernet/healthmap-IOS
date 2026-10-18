@@ -127,13 +127,13 @@ struct RecapDuJourView: View {
                         manques(colonnes, t: t, inclinaison: inclinaison)
                     case .rienHier(let repas):
                         centre(t: t, inclinaison: inclinaison,
-                               titre: repas == 0 ? "Rien de noté hier" : "Un seul repas noté hier",
-                               texte: "Ajoute tes repas d'hier pour voir ce qui t'a manqué.",
+                               titre: repas == 0 ? String(localized: "Rien de noté hier") : String(localized: "Un seul repas noté hier"),
+                               texte: String(localized: "Ajoute tes repas d'hier pour voir ce qui t'a manqué."),
                                sphereVerte: false)
                     case .rienNaManque:
                         centre(t: t, inclinaison: inclinaison,
-                               titre: "Rien n'a manqué hier",
-                               texte: "Tes apports ont tous passé 70 %. Refais pareil aujourd'hui.",
+                               titre: String(localized: "Rien n'a manqué hier"),
+                               texte: String(localized: "Tes apports ont tous passé 70 %. Refais pareil aujourd'hui."),
                                sphereVerte: true)
                     }
                 }
@@ -153,7 +153,7 @@ struct RecapDuJourView: View {
     private func manques(_ colonnes: [RecapDuJour.Colonne], t: Double, inclinaison: CGPoint) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             surtitre.apparition(t, delai: 0.05)
-            titre("Hier, il te manquait")
+            titre(String(localized: "Hier, il te manquait"))
                 .padding(.top, 4)
                 .padding(.bottom, 22)
                 .apparition(t, delai: 0.15)
@@ -166,7 +166,7 @@ struct RecapDuJourView: View {
             }
 
             if colonnes.contains(where: { $0.aliment != nil }) {
-                titre("Ajoute aujourd'hui")
+                titre(String(localized: "Ajoute aujourd'hui"))
                     .padding(.top, 26)
                     .padding(.bottom, 16)
                     .apparition(t, delai: RecapChoregraphie.aliments - 0.25)
@@ -257,7 +257,7 @@ struct RecapDuJourView: View {
                 .multilineTextAlignment(.center)
                 .padding(.top, 10)
             if let gain = aliment.gain {
-                Text(gain >= 100 ? "Tout ton besoin du jour" : "+\(DS.pourcent(gain)) de ton besoin")
+                Text(gain >= 100 ? String(localized: "Tout ton besoin du jour") : String(localized: "+\(DS.pourcent(gain)) de ton besoin"))
                     .dsPolice(14, .bold)
                     .foregroundStyle(Color.teinteApportTexte(for: colonne.id))
                     .multilineTextAlignment(.center)
@@ -346,12 +346,12 @@ struct RecapDuJourView: View {
     private var bouton: some View {
         switch recap.cas {
         case .rienHier:
-            DSCapsuleButton(titre: "Ajouter mes repas d'hier", hauteur: Verre.hauteurAction) {
+            DSCapsuleButton(titre: String(localized: "Ajouter mes repas d'hier"), hauteur: Verre.hauteurAction) {
                 AnalyticsService.shared.track(.screenViewed, properties: ["screen": "brief_ajouter_hier"])
                 onAjouterHier()
             }
         case .manques, .rienNaManque:
-            DSCapsuleButton(titre: "C'est parti", hauteur: Verre.hauteurAction, action: cestParti)
+            DSCapsuleButton(titre: String(localized: "C'est parti"), hauteur: Verre.hauteurAction, action: cestParti)
         }
     }
 
@@ -393,13 +393,11 @@ struct RecapDuJourView: View {
     }
 
     private func libelleAliment(_ aliment: RecapDuJour.Aliment, colonne: RecapDuJour.Colonne) -> String {
-        var phrase = "À ajouter aujourd'hui pour \(NomNutriment.possessif(id: colonne.id, nom: colonne.nom)) : \(aliment.nom)"
+        let possessif = NomNutriment.possessif(id: colonne.id, nom: colonne.nom)
         if let portion = aliment.portion, let projection = colonne.projection {
-            phrase += ", \(portion). Tu passerais à \(projection) % de ton besoin."
-        } else {
-            phrase += "."
+            return String(localized: "À ajouter aujourd'hui pour \(possessif) : \(aliment.nom), \(portion). Tu passerais à \(projection) % de ton besoin.")
         }
-        return phrase
+        return String(localized: "À ajouter aujourd'hui pour \(possessif) : \(aliment.nom).")
     }
 
     // MARK: - Actions

@@ -36,10 +36,10 @@ struct BilanSemaineSheet: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        VerrePuce(libelle: "Repas notés", valeur: "\(bilan.repasNotes)", espacement: 10) {
+                        VerrePuce(libelle: String(localized: "Repas notés"), valeur: "\(bilan.repasNotes)", espacement: 10) {
                             VerrePastilleIcone(symbole: "fork.knife", teinte: Color.teinteKiwi)
                         }
-                        VerrePuce(libelle: "Jours notés", valeur: "\(bilan.joursNotes) sur 7", espacement: 10) {
+                        VerrePuce(libelle: String(localized: "Jours notés"), valeur: String(localized: "\(bilan.joursNotes) sur 7"), espacement: 10) {
                             VerrePastilleIcone(symbole: "calendar", teinte: Color.teinteEnergie)
                         }
                     }
@@ -58,7 +58,7 @@ struct BilanSemaineSheet: View {
                 }
 
                 if !bilan.manques.isEmpty {
-                    section("Ce qui t'a manqué")
+                    section(String(localized: "Ce qui t'a manqué"))
                     VStack(spacing: 0) {
                         ForEach(Array(bilan.manques.enumerated()), id: \.element.id) { rang, manque in
                             if rang > 0 { DSSeparator(retrait: 0) }
@@ -71,14 +71,14 @@ struct BilanSemaineSheet: View {
                 }
 
                 if !bilan.habitudes.isEmpty {
-                    section("Ce qu'on a remarqué")
+                    section(String(localized: "Ce qu'on a remarqué"))
                     VStack(spacing: DS.interCarte) {
                         ForEach(bilan.habitudes) { carteHabitude($0) }
                     }
                 }
 
                 if !bilan.recommandations.isEmpty {
-                    section("À changer cette semaine")
+                    section(String(localized: "À changer cette semaine"))
                     VStack(spacing: DS.interCarte) {
                         ForEach(bilan.recommandations) { carteRecommandation($0) }
                     }
@@ -115,7 +115,7 @@ struct BilanSemaineSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 20)
 
-                DSCapsuleButton(titre: "C'est noté", hauteur: Verre.hauteurAction) { dismiss() }
+                DSCapsuleButton(titre: String(localized: "C'est noté"), hauteur: Verre.hauteurAction) { dismiss() }
                     .padding(.top, 14)
                     .padding(.bottom, 24)
             }
@@ -147,17 +147,22 @@ struct BilanSemaineSheet: View {
 
     private func ligneManque(_ manque: BilanSemaine.Manque) -> some View {
         let estMacro = manque.type == "macro"
+        // Le nom est celui que l'app a envoyé au serveur (les macros partent en français).
+        let nom = Langue.texte(manque.nom)
         let sousTitre: String = {
             if estMacro {
                 let atteints = max(0, manque.joursMesures - manque.joursBas)
-                return atteints == 0 ? "jamais à ton objectif cette semaine" : "à ton objectif \(atteints) jours sur \(manque.joursMesures)"
+                return atteints == 0 ? String(localized: "jamais à ton objectif cette semaine") : String(localized: "à ton objectif \(atteints) jours sur \(manque.joursMesures)")
             }
-            return manque.joursBas > 1 ? "bas \(manque.joursBas) jours sur \(manque.joursMesures)" : "à suivre cette semaine"
+            return manque.joursBas > 1 ? String(localized: "bas \(manque.joursBas) jours sur \(manque.joursMesures)") : String(localized: "à suivre cette semaine")
         }()
+        let etiquette = estMacro
+            ? String(localized: "\(nom) : \(manque.moyennePct) % de ton objectif, \(sousTitre). \(manque.explication)")
+            : String(localized: "\(nom) : \(manque.moyennePct) % de ton besoin, \(sousTitre). \(manque.explication)")
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(manque.nom)
+                    Text(nom)
                         .dsPolice(16, .bold)
                         .foregroundStyle(Color.dsTexte)
                     Text(sousTitre)
@@ -183,14 +188,14 @@ struct BilanSemaineSheet: View {
         }
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(manque.nom) : \(manque.moyennePct) % \(estMacro ? "de ton objectif" : "de ton besoin"), \(sousTitre). \(manque.explication)")
+        .accessibilityLabel(etiquette)
     }
 
     private func carteHabitude(_ habitude: BilanSemaine.Habitude) -> some View {
         HStack(alignment: .top, spacing: 12) {
             BilanSemaineIllustration(nom: habitude.illustration, taille: 44)
             VStack(alignment: .leading, spacing: 3) {
-                Text(habitude.estUnAtout ? "ÇA PAIE" : "ÇA FREINE")
+                Text(habitude.estUnAtout ? String(localized: "ÇA PAIE") : String(localized: "ÇA FREINE"))
                     .dsPolice(11, .bold)
                     .tracking(0.4)
                     .foregroundStyle(habitude.estUnAtout ? Color.teinteKiwiTexte : Color.teinteEnergieTexte)
@@ -228,8 +233,7 @@ struct BilanSemaineSheet: View {
                     .foregroundStyle(Color.dsSecondaire)
                     .fixedSize(horizontal: false, vertical: true)
                 if let gain = reco.gainPct, let id = reco.apports.first {
-                    let portion = reco.portion.isEmpty ? "" : " avec \(reco.portion)"
-                    pastille("+\(DS.pourcent(gain)) \(BilanSemaineTeintes.deNom(id))\(portion)", id: id)
+                    pastille(BilanSemaineTeintes.gain(DS.pourcent(gain), id: id, portion: reco.portion), id: id)
                         .padding(.top, 4)
                 } else {
                     pastilles(reco.apports)
@@ -331,9 +335,9 @@ struct BilanSemaineCarte: View {
 
     private var titre: String {
         switch etat {
-        case .pret, .verrouille: return "Ton bilan de la semaine est prêt"
-        case .enPreparation: return "Ton bilan de la semaine se prépare"
-        case .enCours, .erreur: return "Ton bilan de la semaine"
+        case .pret, .verrouille: return String(localized: "Ton bilan de la semaine est prêt")
+        case .enPreparation: return String(localized: "Ton bilan de la semaine se prépare")
+        case .enCours, .erreur: return String(localized: "Ton bilan de la semaine")
         }
     }
 
@@ -341,14 +345,14 @@ struct BilanSemaineCarte: View {
         switch etat {
         case .enCours(let repas):
             let reste = max(1, BilanSemaineRegle.repasMinimum - repas)
-            return reste == 1 ? "Encore 1 repas à noter pour le débloquer" : "Encore \(reste) repas à noter pour le débloquer"
+            return reste == 1 ? String(localized: "Encore 1 repas à noter pour le débloquer") : String(localized: "Encore \(reste) repas à noter pour le débloquer")
         case .enPreparation:
-            return "Kiwio relit tes repas de la semaine."
+            return String(localized: "Kiwio relit tes repas de la semaine.")
         case .pret(let bilan):
             let n = bilan.recommandations.count
-            return "\(bilan.repasNotes) repas relus · \(n) changement\(n > 1 ? "s" : "")"
+            return n > 1 ? String(localized: "\(bilan.repasNotes) repas relus · \(n) changements") : String(localized: "\(bilan.repasNotes) repas relus · \(n) changement")
         case .verrouille(let repas):
-            return "\(repas) repas notés cette semaine : de quoi faire ton bilan."
+            return String(localized: "\(repas) repas notés cette semaine : de quoi faire ton bilan.")
         case .erreur(let message):
             return message
         }
@@ -378,9 +382,9 @@ struct BilanSemaineCarte: View {
 
     private var indice: String {
         switch etat {
-        case .pret: return "Ouvre ton bilan de la semaine"
-        case .verrouille: return "Ouvre l'abonnement Premium"
-        case .erreur: return "Relance la préparation du bilan"
+        case .pret: return String(localized: "Ouvre ton bilan de la semaine")
+        case .verrouille: return String(localized: "Ouvre l'abonnement Premium")
+        case .erreur: return String(localized: "Relance la préparation du bilan")
         default: return ""
         }
     }
@@ -429,9 +433,9 @@ struct BilanSemaineIllustration: View {
 enum BilanSemaineTeintes {
     static func nom(_ id: String) -> String {
         switch id {
-        case "proteines": return "Protéines"
-        case "glucides": return "Glucides"
-        case "lipides": return "Lipides"
+        case "proteines": return String(localized: "Protéines")
+        case "glucides": return String(localized: "Glucides")
+        case "lipides": return String(localized: "Lipides")
         default:
             return NutrientData.definition(for: id)?.label
                 ?? Micronutriments.tous.first { $0.id == id }?.nom
@@ -445,6 +449,19 @@ enum BilanSemaineTeintes {
         let texte = NomNutriment.minusculeInitiale(Self.nom(id))
         let voyelle = texte.first.map { "aeéèêiîoôu".contains($0) } ?? false
         return voyelle ? "d'\(texte)" : "de \(texte)"
+    }
+
+    /// « +33 % de vitamine D avec 1 boîte », « +33 % d'iode » : la phrase
+    /// entière, pour qu'en anglais le nom n'emporte pas l'article français.
+    static func gain(_ pourcent: String, id: String, portion: String) -> String {
+        let libelle = NomNutriment.minusculeInitiale(Self.nom(id))
+        let voyelle = libelle.first.map { "aeéèêiîoôu".contains($0) } ?? false
+        switch (voyelle, portion.isEmpty) {
+        case (true, true): return String(localized: "+\(pourcent) d'\(libelle)")
+        case (true, false): return String(localized: "+\(pourcent) d'\(libelle) avec \(portion)")
+        case (false, true): return String(localized: "+\(pourcent) de \(libelle)")
+        case (false, false): return String(localized: "+\(pourcent) de \(libelle) avec \(portion)")
+        }
     }
 
     static func fond(_ id: String) -> Color {

@@ -23,13 +23,13 @@ final class BilanSemaineService {
         var errorDescription: String? {
             switch self {
             case .premiumRequis:
-                return "Le bilan de la semaine fait partie de Kiwio Premium."
+                return String(localized: "Le bilan de la semaine fait partie de Kiwio Premium.")
             case .trop:
-                return "Tu as demandé beaucoup de bilans aujourd'hui. Réessaie demain."
+                return String(localized: "Tu as demandé beaucoup de bilans aujourd'hui. Réessaie demain.")
             case .pasAssezDeRepas:
-                return "Note encore quelques repas cette semaine pour avoir ton bilan."
+                return String(localized: "Note encore quelques repas cette semaine pour avoir ton bilan.")
             case .indisponible:
-                return "Ton bilan n'a pas pu être préparé. Réessaie dans un moment."
+                return String(localized: "Ton bilan n'a pas pu être préparé. Réessaie dans un moment.")
             }
         }
     }
