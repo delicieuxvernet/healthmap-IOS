@@ -214,8 +214,8 @@ struct JournalMicrosCard: View {
         let basses = tableau.priorites.filter(\.estBas)
         guard let premiere = basses.first else {
             return tableau.priorites.count > 1
-                ? "Tes \(tableau.priorites.count) priorités, en part de ton besoin couverte"
-                : "Ta priorité, en part de ton besoin couverte"
+                ? "Tes \(tableau.priorites.count) apports les plus bas, en % de ton besoin"
+                : "Ton apport le plus bas, en % de ton besoin"
         }
         let noms = basses.map(Self.possessif)
         let sujet: String
@@ -603,13 +603,13 @@ private struct LigneMicroVue: View {
                 .font(enAvant ? Font.dsSousTitreFort : Font.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsTexte)
-                // En gratuit, la pastille prend la place du chiffre :
-                // un nom long (« Oméga-3 EPA + DHA », le rapport
-                // oméga) passe sur deux lignes au lieu d'être coupé
-                // (captures du 8 octobre 2026). Idem aux tailles
-                // d'accessibilité, où le nom a son propre rang.
-                .lineLimit(verrouille || tailleTexte.isAccessibilitySize ? 2 : 1)
+                // Un nom long (« Oméga-3 EPA et DHA », le rapport oméga)
+                // passe sur deux lignes au lieu d'être coupé : « Oméga-3 EPA
+                // et D… » à côté de la jauge (Arthur, 14 oct. 2026), comme
+                // en gratuit (captures du 8 octobre 2026).
+                .lineLimit(2)
                 .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
             if !verrouille, ligne.statut != .normal {
                 RepereDeStatut(couleur: ligne.statut.couleurDeRepere)
             }
@@ -791,8 +791,8 @@ struct MicroDuJourSheet: View {
     private var sousTitre: String {
         if ligne.sens == .rapport {
             return ligne.rapport == nil
-                ? "Pas encore de chiffre : il faut une journée de repas assez notée. Le repère de l'ANSES : 5 pour 1 ou moins."
-                : "Pour 1 g d'oméga-3, tes repas notés apportent ce nombre de grammes d'oméga-6. Le repère de l'ANSES : 5 pour 1 ou moins."
+                ? "Pas encore de chiffre : il faut une journée de repas assez notée. Le repère conseillé : 5 pour 1 ou moins."
+                : "Pour 1 g d'oméga-3, tes repas notés apportent ce nombre de grammes d'oméga-6. Le repère conseillé : 5 pour 1 ou moins."
         }
         if ligne.sens == .limite {
             return "Une limite à ne pas dépasser, suivie sur tes repas notés."
@@ -801,7 +801,7 @@ struct MicroDuJourSheet: View {
             return "Pas encore de chiffre : il faut une journée de repas assez notée."
         }
         if ligne.statutApport != nil {
-            return "Part de la référence ANSES couverte, estimée : pas un résultat d'analyse."
+            return "Une estimation d'après tes réponses et tes repas, pas une prise de sang."
         }
         return ligne.partDuQuestionnaire
             ? "D'après ton questionnaire, puis tes repas notés."

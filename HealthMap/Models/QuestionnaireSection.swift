@@ -395,7 +395,7 @@ extension QuestionnaireSection {
             type: .singleChoice,
             options: [
                 .init("almost_all", "100%"), .init("mostly", "Majoritairement"),
-                .init("half", "50/50"), .init("mostly_out", "Surtout extérieur"),
+                .init("half", "50/50"), .init("mostly_out", "Surtout à l'extérieur"),
                 .init("rarely", "Rarement"),
             ]
         ),
@@ -451,7 +451,7 @@ extension QuestionnaireSection {
         ),
         Question(
             id: "saltLevel",
-            text: "Ton niveau de sel ?",
+            text: "Ta consommation de sel ?",
             type: .singleChoice,
             options: [.init("none", "Aucun"), .init("little", "Peu"), .init("moderate", "Modéré"), .init("a_lot", "Beaucoup")]
         ),
@@ -481,7 +481,7 @@ extension QuestionnaireSection {
                 .init("none", "Aucun"), .init("vitD", "Vitamine D", emoji: "☀️"),
                 .init("omega3", "Oméga-3", emoji: "🐟"), .init("magnesium", "Magnésium", emoji: "⚡"),
                 .init("iron", "Fer", emoji: "🩸"), .init("b12", "Vitamine B12", emoji: "🔴"),
-                .init("zinc", "Zinc", emoji: "🛡️"), .init("folate", "Folate", emoji: "🧬"),
+                .init("zinc", "Zinc", emoji: "🛡️"), .init("folate", "Folates (B9)", emoji: "🧬"),
                 .init("probiotics", "Probiotiques", emoji: "🦠"), .init("multivitamin", "Multivitamine", emoji: "💊"),
                 .init("vitC", "Vitamine C", emoji: "🍊"), .init("calcium", "Calcium", emoji: "🦴"),
                 .init("collagene", "Collagène", emoji: "✨"), .init("creatine", "Créatine", emoji: "💪"),
@@ -520,7 +520,7 @@ extension QuestionnaireSection {
                 .init("diuretics", "Diurétiques", emoji: "💧"),
                 .init("statins", "Statines", emoji: "❤️"),
                 .init("anticoagulant", "Anticoagulant", emoji: "🩸"),
-                .init("thyroid_med", "Thyroïde", emoji: "🦋"),
+                .init("thyroid_med", "Traitement thyroïdien", emoji: "🦋"),
                 .init("laxatives", "Laxatifs", emoji: "💊"),
                 .init("antispasmodics", "Antispasmodiques", emoji: "💊"),
                 .init("antidiarrheal", "Anti-diarrhéiques", emoji: "💊"),

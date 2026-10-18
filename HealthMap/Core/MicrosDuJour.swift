@@ -377,7 +377,7 @@ enum MicrosDuJour {
         if let duJourAffiche {
             raisons.append(FaitMicro(genre: .jour, texte: "\(moment) : \(texteDuRapport(duJourAffiche))."))
         } else {
-            raisons.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+            raisons.append(FaitMicro(genre: .jour, texte: phraseDuJourSansDonnee(aujourdhui: jourEstAujourdhui)))
         }
 
         return LigneMicro(
@@ -474,12 +474,12 @@ enum MicrosDuJour {
         mois: Int
     ) -> [FaitMicro] {
         var faits: [FaitMicro] = [FaitMicro(genre: .questionnaire, texte: LectureEstimation.provenance(e))]
-        let unite = LectureEstimation.uniteAffichage(micro.id, estimation: e)
+        // Sans quantité ni unité : « 63,9 UI par jour » ne parlait à personne
+        // (Arthur, 14 oct. 2026). Le détail chiffré reste dans « Voir le calcul ».
         if let premiere = LectureEstimation.sources(micro.id, e, profil: profil ?? ProfilEstimation()).first {
-            let valeur = DS.decimal(LectureEstimation.arrondiLisible(premiere.valeur))
             faits.append(FaitMicro(
                 genre: premiere.section == .journal ? .repas : .questionnaire,
-                texte: "Ta plus grosse source : \(LectureEstimation.enMinuscule(premiere.libelle)), \(valeur)\(DS.fine)\(unite) par jour."
+                texte: "Ce qui t'en apporte le plus : \(LectureEstimation.enMinuscule(premiere.libelle))."
             ))
         }
         if let restant = LectureEstimation.journeesAvantFiabilite(e) {
@@ -493,19 +493,41 @@ enum MicrosDuJour {
         } else if micro.id == "vitD", [10, 11, 12, 1, 2, 3].contains(mois) {
             faits.append(FaitMicro(
                 genre: .saison,
-                texte: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes."
+                texte: "D'octobre à mars, le soleil est trop faible en France pour que ta peau en fabrique assez."
             ))
         }
-        let moment = jourEstAujourdhui ? "Aujourd'hui" : "Ce jour-là"
         if let quantiteDuJour, besoin > 0 {
-            faits.append(FaitMicro(
-                genre: .jour,
-                texte: "\(moment) : \(quantite(quantiteDuJour)) noté\(DS.fine)\(micro.unite)."
-            ))
+            faits.append(FaitMicro(genre: .jour, texte: phraseDuJour(quantite: quantiteDuJour, besoin: besoin, aujourdhui: jourEstAujourdhui)))
         } else {
-            faits.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+            faits.append(FaitMicro(genre: .jour, texte: phraseDuJourSansDonnee(aujourdhui: jourEstAujourdhui)))
         }
         return faits
+    }
+
+    /// La journée affichée, dite en mots : « Aujourd'hui, tes repas notés
+    /// couvrent environ un tiers de ton besoin. » Ni unité (UI, µg) ni second
+    /// pourcentage à côté du chiffre de l'apport : « Aujourd'hui : 217 noté
+    /// UI. » n'était pas lisible (Arthur, 14 oct. 2026).
+    static func phraseDuJour(quantite: Double, besoin: Double, aujourdhui: Bool) -> String {
+        let moment = aujourdhui ? "Aujourd'hui" : "Ce jour-là"
+        let couvrent = aujourdhui ? "couvrent" : "couvraient"
+        let part = besoin > 0 ? quantite / besoin : 0
+        switch part {
+        case ..<0.05: return "\(moment), tes repas notés n'en \(aujourdhui ? "apportent" : "apportaient") presque pas."
+        case ..<0.15: return "\(moment), tes repas notés \(couvrent) environ un dixième de ton besoin."
+        case ..<0.30: return "\(moment), tes repas notés \(couvrent) environ un quart de ton besoin."
+        case ..<0.42: return "\(moment), tes repas notés \(couvrent) environ un tiers de ton besoin."
+        case ..<0.60: return "\(moment), tes repas notés \(couvrent) environ la moitié de ton besoin."
+        case ..<0.85: return "\(moment), tes repas notés \(couvrent) environ les trois quarts de ton besoin."
+        case ..<1: return "\(moment), tes repas notés \(couvrent) presque tout ton besoin."
+        default: return "\(moment), tes repas notés \(couvrent) tout ton besoin."
+        }
+    }
+
+    static func phraseDuJourSansDonnee(aujourdhui: Bool) -> String {
+        aujourdhui
+            ? "Aujourd'hui, tes repas notés ne permettent pas encore de le calculer."
+            : "Ce jour-là, tes repas notés ne permettaient pas de le calculer."
     }
 
     private static func points(_ delta: Int) -> String {
@@ -580,7 +602,7 @@ enum MicrosDuJour {
             } else if micro.id == "vitD", [10, 11, 12, 1, 2, 3].contains(mois) {
                 faits.append(FaitMicro(
                     genre: .saison,
-                    texte: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes."
+                    texte: "D'octobre à mars, le soleil est trop faible en France pour que ta peau en fabrique assez."
                 ))
             }
         } else if niveau != nil {
@@ -595,16 +617,18 @@ enum MicrosDuJour {
             ))
         }
 
-        // Toujours : ce que la journée affichée a apporté.
+        // Toujours : ce que la journée affichée a apporté. Une limite (sodium)
+        // garde ses chiffres : « au plus » n'a pas d'équivalent en mots.
         let moment = jourEstAujourdhui ? "Aujourd'hui" : "Ce jour-là"
-        if let quantiteDuJour, besoin > 0 {
-            let suffixe = micro.sens == .limite ? " au plus" : ""
+        if let quantiteDuJour, besoin > 0, micro.sens == .limite {
             faits.append(FaitMicro(
                 genre: .jour,
-                texte: "\(moment) : \(quantite(quantiteDuJour)) sur \(quantite(besoin))\(DS.fine)\(micro.unite)\(suffixe)."
+                texte: "\(moment) : \(quantite(quantiteDuJour)) sur \(quantite(besoin))\(DS.fine)\(micro.unite) au plus."
             ))
+        } else if let quantiteDuJour, besoin > 0 {
+            faits.append(FaitMicro(genre: .jour, texte: phraseDuJour(quantite: quantiteDuJour, besoin: besoin, aujourdhui: jourEstAujourdhui)))
         } else {
-            faits.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+            faits.append(FaitMicro(genre: .jour, texte: phraseDuJourSansDonnee(aujourdhui: jourEstAujourdhui)))
         }
         return faits
     }

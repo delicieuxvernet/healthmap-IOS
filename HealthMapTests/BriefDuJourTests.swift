@@ -454,7 +454,7 @@ final class BriefDuJourTests: XCTestCase {
 
         // Et le brief de demain le dit tel quel, en ouvrant sur l'ajout d'un repas.
         let brief1 = rappel("brief", 1, dans: rappels)
-        XCTAssertEqual(brief1?.titre, "Ton brief attend tes repas")
+        XCTAssertEqual(brief1?.titre, "Ton récap attend tes repas")
         XCTAssertEqual(brief1?.ecran, "meal_scan")
     }
 
@@ -585,7 +585,7 @@ final class BriefDuJourTests: XCTestCase {
         let rappels = RappelsPersonnalises.planifier(
             contexte: ContexteRappels(cibles: cibles), maintenant: maintenant, calendar: cal
         )
-        XCTAssertEqual(rappel("brief", 1, dans: rappels)?.titre, "Ton brief du jour est prêt")
+        XCTAssertEqual(rappel("brief", 1, dans: rappels)?.titre, "Ton récap du jour est prêt")
         for type in ["encas", "appel", "semaine"] {
             XCTAssertTrue(rappels.allSatisfy { $0.type != type }, "\(type) affirme un fait du journal")
         }

@@ -618,7 +618,7 @@ final class AuthViewModel: ObservableObject {
     /// d'erreur clair invitant à patienter.
     func resendResetPasswordCode() async -> Bool {
         guard let email = resetPasswordEmail else {
-            errorMessage = "Aucune réinitialisation en cours. Recommence depuis l'écran email."
+            errorMessage = "Aucune réinitialisation en cours. Recommence depuis l'écran où tu saisis ton e-mail."
             return false
         }
         guard resendAttempts < Self.maxResendAttempts else {
@@ -796,7 +796,7 @@ final class AuthViewModel: ObservableObject {
               "use a different password"],
              "Ce mot de passe figure dans une fuite de données connue. Choisis-en un autre."),
             (["form_password_validation_failed", "password_too_short", "weak password"],
-             "Le mot de passe ne respecte pas les règles (8 caractères min, majuscule, chiffre, spécial)."),
+             "Le mot de passe ne respecte pas les règles : 8 caractères minimum, dont une majuscule, un chiffre et un caractère spécial."),
             (["form_code_incorrect", "verification_failed"],
              "Code incorrect. Vérifie tes mails et réessaie."),
             (["form_code_expired", "verification_expired"],
@@ -806,7 +806,7 @@ final class AuthViewModel: ObservableObject {
             (["session_exists", "you're already signed in", "already signed in"],
              "Tu es déjà connecté. Patiente un instant…"),
             (["client_state_invalid"],
-             "Quelque chose s'est mal passé. Recommence depuis l'écran de connexion."),
+             "Un problème est survenu. Recommence depuis l'écran de connexion."),
             (["too_many_requests", "rate limit"],
              "Trop de tentatives. Réessaie dans quelques minutes."),
             (["captcha_invalid", "captcha_failed"],

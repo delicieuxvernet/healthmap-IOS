@@ -927,7 +927,7 @@ struct ProgresRecapRow: View {
         ProgresLigneAction(
             symbole: "sunrise",
             titre: "Voir mon récap du jour",
-            sousTitre: "Le brief de ce matin, à nouveau",
+            sousTitre: "Celui de ce matin, à nouveau",
             action: action
         )
     }

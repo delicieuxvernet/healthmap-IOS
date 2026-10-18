@@ -568,7 +568,7 @@ extension HealthCalculator {
             r.add(
                 ["iron", "vitB12", "calcium", "zinc", "vitD"],
                 [-15, -10, -10, -10, -10],
-                "Condition digestive déclarée",
+                "Trouble digestif déclaré",
                 .sante
             )
         }
@@ -599,7 +599,7 @@ extension HealthCalculator {
             r.add(
                 ["vitD", "vitB12", "iron", "zinc", "vitC", "iodine"],
                 [10, 15, 8, 8, 10, 10],
-                "Tu prends déjà un multivitamines",
+                "Tu prends déjà des multivitamines",
                 .medical
             )
         }

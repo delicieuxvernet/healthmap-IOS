@@ -109,9 +109,9 @@ struct ObjectifPoids: Equatable {
     func phrase(calories: Int?, tdee: Int?, maintenant: Date = Date()) -> String {
         switch reserve {
         case .grossesse?:
-            return "Enceinte ou allaitante, on ne vise pas de perte de poids. Tes calories restent au maintien."
+            return "Pendant la grossesse ou l'allaitement, on ne vise pas de perte de poids. Tes calories restent au maintien."
         case .sousLeRepere?:
-            return "Ce poids passe sous le repère de corpulence (IMC 18,5). Tes calories restent au maintien, parles-en à un professionnel de santé."
+            return "Ce poids passe sous le seuil conseillé pour ta taille (IMC 18,5). Tes calories restent au maintien : parles-en à un professionnel de santé."
         case nil:
             break
         }
@@ -167,11 +167,14 @@ struct ObjectifPoids: Equatable {
         return String(format: "%.1f", valeur)
     }
 
+    /// « 30 octobre », « 3 janvier 2027 » : le mois en toutes lettres. L'abrégé
+    /// (« 30 oct. ») finissait par un point, et la phrase en ajoutait un second
+    /// (« vers le 30 oct.. », vu par Arthur le 14 oct. 2026).
     private static func jour(_ date: Date, depuis maintenant: Date) -> String {
         let formateur = DateFormatter()
         formateur.locale = Locale(identifier: "fr_FR")
         let memeAnnee = Calendar.current.isDate(date, equalTo: maintenant, toGranularity: .year)
-        formateur.dateFormat = memeAnnee ? "d MMM" : "d MMM yyyy"
+        formateur.dateFormat = memeAnnee ? "d MMMM" : "d MMMM yyyy"
         return formateur.string(from: date)
     }
 }
