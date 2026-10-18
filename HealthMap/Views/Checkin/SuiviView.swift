@@ -77,15 +77,24 @@ struct SuiviView: View {
         case apport(EnrichedNutrient)
         case checkin
         case offre(zone: String, origine: String)
+        case bilanSemaine(BilanSemaine)
 
         var id: String {
             switch self {
             case .apport(let nutriment): return "apport-" + nutriment.id
             case .checkin: return "checkin"
             case .offre(let zone, let origine): return "offre-" + zone + "-" + origine
+            case .bilanSemaine(let bilan): return "bilan-semaine-" + bilan.periode.fin
             }
         }
     }
+
+    /// Bilan de la semaine (14 oct. 2026) : le dernier, gardé sur le téléphone,
+    /// et l'état de sa préparation.
+    @State private var bilanSemaine: BilanSemaine? = BilanSemaineStore.dernier()
+    @State private var bilanEnPreparation = false
+    @State private var bilanErreur: String?
+    private static let origineBilan = "progres.offre.bilan_semaine"
 
     /// Ce d'où part la feuille Premium. Une carte de symptôme ajoute son rang
     /// à `origineCourbe` : chaque bouton « Voir ta courbe » est une source à
@@ -174,11 +183,15 @@ struct SuiviView: View {
                 // suivaient déjà avant l'arrivée des rappels quotidiens.
                 await LocalNotificationService.scheduleDailyReminders()
                 await journal.load()
+                await preparerBilanSemaine()
             }
             // Un repas ajouté dans le Journal ne relance pas ce `.task` (l'onglet
             // reste vivant) : on recharge pour que le verdict l'intègre.
             .onReceive(NotificationCenter.default.publisher(for: .healthmapMealScanned)) { _ in
-                Task { await journal.load() }
+                Task {
+                    await journal.load()
+                    await preparerBilanSemaine()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .healthmapTabDidChange)) { notification in
                 guard notification.object as? String == NavCardDestination.suivi.rawValue else { return }
@@ -204,6 +217,8 @@ struct SuiviView: View {
             if d.aLaToile {
                 equilibre(d, defilement: defilement)
             }
+
+            carteBilanSemaine
 
             ceQuiAChange(d)
 
@@ -236,6 +251,8 @@ struct SuiviView: View {
         case .offre(let zone, let origine):
             PaywallView(source: zone)
                 .premiumDepuis(origine, dans: espaceOffre)
+        case .bilanSemaine(let bilan):
+            BilanSemaineSheet(bilan: bilan)
         }
     }
 
@@ -928,6 +945,109 @@ struct SuiviView: View {
                 feuille = .checkin
             }
             .padding(.top, 20)
+        }
+    }
+
+    // MARK: - Bilan de la semaine
+
+    /// Repas notés (créneaux distincts) et jours notés des 7 derniers jours.
+    private var saisieDeLaSemaine: (repas: Int, jours: Int) {
+        let semaine = BilanSemaineBuilder.repasDeLaSemaine(journal.fortnight)
+        return (BilanSemaineBuilder.repasDistincts(semaine), BilanSemaineBuilder.joursNotes(semaine))
+    }
+
+    private var etatBilanSemaine: BilanSemaineCarte.Etat? {
+        guard dashboardVM.hasCompletedQuestionnaire else { return nil }
+        let saisie = saisieDeLaSemaine
+        switch BilanSemaineRegle.etat(repas: saisie.repas, jours: saisie.jours, dernier: bilanSemaine) {
+        case .pret(let bilan):
+            return .pret(bilan)
+        case .enCours(let repas):
+            // Rien de noté cette semaine : la carte attend le premier repas.
+            return repas == 0 ? nil : .enCours(repas: repas)
+        case .aPreparer(let repas):
+            if !SubscriptionService.shared.isPremium { return .verrouille(repas: repas) }
+            if bilanEnPreparation { return .enPreparation }
+            if let bilanErreur { return .erreur(bilanErreur) }
+            return .enPreparation
+        }
+    }
+
+    @ViewBuilder
+    private var carteBilanSemaine: some View {
+        if let etat = etatBilanSemaine {
+            BilanSemaineCarte(etat: etat) {
+                switch etat {
+                case .pret(let bilan):
+                    HapticService.shared.tap()
+                    feuille = .bilanSemaine(bilan)
+                case .verrouille:
+                    ouvrirOffre("bilan_semaine", depuis: Self.origineBilan)
+                case .erreur:
+                    bilanErreur = nil
+                    Task { await preparerBilanSemaine() }
+                case .enCours, .enPreparation:
+                    break
+                }
+            }
+            .premiumOrigine(Self.origineBilan, dans: espaceOffre)
+            .padding(.top, 24)
+        }
+    }
+
+    /// Le même contexte que la carte Micronutriments du Journal : le bilan
+    /// envoie les chiffres que la personne voit, rien d'autre.
+    private var contexteMicros: ContexteMicros {
+        let depense = Double(dashboardVM.physicalMetrics.tdee ?? Int(BesoinsMicros.depenseParDefaut))
+        return ContexteMicros(
+            besoins: BesoinsMicros.tous(profil: dashboardVM.profile, depense: depense),
+            depense: depense,
+            scores: dashboardVM.profile.completed ? dashboardVM.nutrientScores : [:],
+            couvertureJournal: dashboardVM.observationsJournal?.couverture ?? [:],
+            joursJournal: dashboardVM.observationsJournal?.jours ?? [:],
+            symptomes: dashboardVM.profile.symptoms,
+            estimations: dashboardVM.profile.completed ? (dashboardVM.estimation?.apports ?? [:]) : [:],
+            statuts: dashboardVM.profile.completed ? dashboardVM.statuts : [:],
+            profil: ProfilEstimation(profile: dashboardVM.profile)
+        )
+    }
+
+    /// Prépare le bilan dès qu'il est dû, en Premium seulement (aucun appel
+    /// d'IA en gratuit), une fois par semaine : la carte dit « prêt » sans
+    /// attente quand on revient.
+    private func preparerBilanSemaine() async {
+        #if DEBUG
+        // Captures : un bilan d'exemple, et aucun appel au serveur.
+        if let exemple = BilanSemaineExemple.depuisLesArguments() {
+            bilanSemaine = exemple
+            return
+        }
+        #endif
+        guard dashboardVM.hasCompletedQuestionnaire, SubscriptionService.shared.isPremium,
+              !bilanEnPreparation, bilanErreur == nil else { return }
+        let saisie = saisieDeLaSemaine
+        guard case .aPreparer = BilanSemaineRegle.etat(repas: saisie.repas, jours: saisie.jours, dernier: bilanSemaine) else { return }
+        let profil = dashboardVM.profile
+        guard let entree = BilanSemaineBuilder.construire(
+            repas: journal.fortnight,
+            tableau: journal.tableauMicros(contexteMicros) { dashboardVM.registre },
+            metrics: dashboardVM.physicalMetrics,
+            profil: profil,
+            compositions: CompositionsStore.shared.connuesSansReseau(),
+            profilAlimentaire: ProfilAlimentaire(regime: profil.dietType, allergies: profil.allergies,
+                                                 enceinte: profil.pregnancyStatus == "pregnant")
+        ) else { return }
+
+        bilanEnPreparation = true
+        defer { bilanEnPreparation = false }
+        do {
+            let bilan = try await BilanSemaineService.shared.generer(entree)
+            BilanSemaineStore.enregistrer(bilan)
+            bilanSemaine = bilan
+            AnalyticsService.shared.track(.screenViewed, properties: ["screen": "bilan_semaine_pret", "repas": bilan.repasNotes])
+        } catch {
+            bilanErreur = (error as? BilanSemaineService.Erreur)?.errorDescription
+                ?? BilanSemaineService.Erreur.indisponible.errorDescription
         }
     }
 

@@ -337,6 +337,59 @@ final class ScreenshotsUITests: XCTestCase {
         }
     }
 
+    // MARK: - 11. Bilan de la semaine (hook DEBUG `-captureBilanSemaine`)
+    //
+    // Un bilan d'exemple posé sur la carte de Progrès, sans appel au serveur
+    // ni enregistrement : la carte, puis la feuille de haut en bas.
+
+    func test11_BilanSemaine() throws {
+        app = XCUIApplication()
+        app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES",
+                                "-kiwioCaptures", "YES", "-captureBilanSemaine", "YES"]
+        let env = ProcessInfo.processInfo.environment
+        app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+        app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+        app.launch()
+        connecterSiBesoin()
+        XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120), "Barre d'onglets absente : connexion ou chargement du profil en échec")
+        app.buttons["tab.progres"].tap()
+        sleep(2)
+        let passer = app.buttons["Passer pour aujourd'hui"]
+        if passer.waitForExistence(timeout: 4) {
+            taper(passer)
+            sleep(2)
+        }
+
+        let carte = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ton bilan de la semaine est prêt")).firstMatch
+        _ = carte.waitForExistence(timeout: 30)
+        var essais = 0
+        while !(carte.exists && carte.isHittable), essais < 6 {
+            app.swipeUp()
+            sleep(1)
+            essais += 1
+        }
+        XCTAssertTrue(carte.exists, "la carte du bilan de la semaine est absente de Progrès")
+        // La carte entière au-dessus de la barre d'onglets.
+        if carte.frame.maxY > app.frame.height * 0.75 {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)))
+            sleep(1)
+        }
+        snap("98-bilan-semaine-carte")
+
+        taper(carte)
+        let titre = app.staticTexts["Une semaine régulière, il manque le poisson"]
+        XCTAssertTrue(titre.waitForExistence(timeout: 10), "la feuille du bilan de la semaine ne s'est pas ouverte")
+        sleep(1)
+        snap("99-bilan-semaine-haut")
+        app.swipeUp()
+        sleep(1)
+        snap("99-bilan-semaine-milieu")
+        app.swipeUp()
+        sleep(1)
+        snap("99-bilan-semaine-bas")
+    }
+
     // MARK: - 7. Conformité (9 octobre 2026) : avant / après
     //
     // Les écrans touchés par le lot 1 de l'audit de conformité, photographiés
