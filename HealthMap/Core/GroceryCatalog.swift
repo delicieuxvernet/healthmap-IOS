@@ -35,9 +35,10 @@ struct GroceryAisle: Identifiable, Equatable {
     let items: [GroceryItem]
 }
 
-/// Fabrique compacte pour la déclaration du catalogue.
+/// Fabrique compacte pour la déclaration du catalogue. Le nom est le libellé
+/// affiché : il est traduit ici, une seule fois (l'`id` reste la donnée).
 private func gi(_ id: String, _ name: String, _ emoji: String, _ nutrients: [GroceryNutrient] = []) -> GroceryItem {
-    GroceryItem(id: id, name: name, emoji: emoji, nutrients: nutrients)
+    GroceryItem(id: id, name: Langue.texte(name), emoji: emoji, nutrients: nutrients)
 }
 
 enum GroceryCatalog {
@@ -46,7 +47,7 @@ enum GroceryCatalog {
 
     static let aisles: [GroceryAisle] = [
 
-        GroceryAisle(id: "fruits", label: "Fruits", emoji: "🍎", items: [
+        GroceryAisle(id: "fruits", label: String(localized: "Fruits"), emoji: "🍎", items: [
             gi("bananes", "Bananes", "🍌", [.magnesium, .fiber]),
             gi("pommes", "Pommes", "🍎", [.fiber]),
             gi("clementines", "Clémentines", "🍊", [.vitC, .fiber]),
@@ -74,7 +75,7 @@ enum GroceryCatalog {
             gi("noix_coco", "Noix de coco", "🥥", [.fiber]),
         ]),
 
-        GroceryAisle(id: "legumes", label: "Légumes frais", emoji: "🥕", items: [
+        GroceryAisle(id: "legumes", label: String(localized: "Légumes frais"), emoji: "🥕", items: [
             gi("tomates", "Tomates", "🍅", [.vitC]),
             gi("carottes", "Carottes", "🥕", [.fiber]),
             gi("pommes_de_terre", "Pommes de terre", "🥔", [.vitC, .fiber]),
@@ -106,7 +107,7 @@ enum GroceryCatalog {
             gi("blettes", "Blettes", "🥬", [.iron, .magnesium]),
         ]),
 
-        GroceryAisle(id: "viandes", label: "Viandes & charcuterie", emoji: "🥩", items: [
+        GroceryAisle(id: "viandes", label: String(localized: "Viandes & charcuterie"), emoji: "🥩", items: [
             gi("escalopes_poulet", "Escalopes de poulet", "🍗", [.vitB12, .zinc]),
             gi("steak_hache", "Steak haché", "🍔", [.iron, .zinc, .vitB12]),
             gi("boeuf", "Bœuf", "🥩", [.iron, .zinc, .vitB12]),
@@ -130,7 +131,7 @@ enum GroceryCatalog {
             gi("nuggets_poulet", "Nuggets de poulet", "🍗", [.vitB12]),
         ]),
 
-        GroceryAisle(id: "poissons", label: "Poissons & fruits de mer", emoji: "🐟", items: [
+        GroceryAisle(id: "poissons", label: String(localized: "Poissons & fruits de mer"), emoji: "🐟", items: [
             gi("saumon", "Saumon", "🍣", [.omega3, .vitD, .vitB12]),
             gi("thon_boite", "Thon en boîte", "🥫", [.vitB12, .iodine]),
             gi("cabillaud", "Cabillaud", "🐟", [.vitB12, .iodine]),
@@ -152,7 +153,7 @@ enum GroceryCatalog {
             gi("bar", "Bar", "🐟", [.vitB12, .iodine]),
         ]),
 
-        GroceryAisle(id: "laitiers", label: "Œufs & produits laitiers", emoji: "🥚", items: [
+        GroceryAisle(id: "laitiers", label: String(localized: "Œufs & produits laitiers"), emoji: "🥚", items: [
             gi("oeufs", "Œufs", "🥚", [.vitD, .vitB12, .iodine]),
             gi("lait", "Lait demi-écrémé", "🥛", [.calcium, .vitB12, .iodine]),
             gi("yaourt_nature", "Yaourt nature", "🍶", [.calcium, .vitB12, .iodine]),
@@ -183,7 +184,7 @@ enum GroceryCatalog {
             gi("boisson_amande", "Boisson à l'amande", "🌱", [.calcium]),
         ]),
 
-        GroceryAisle(id: "feculents", label: "Féculents & légumes secs", emoji: "🍚", items: [
+        GroceryAisle(id: "feculents", label: String(localized: "Féculents & légumes secs"), emoji: "🍚", items: [
             gi("pates", "Pâtes", "🍝", []),
             gi("riz_blanc", "Riz blanc", "🍚", []),
             gi("baguette", "Baguette", "🥖", []),
@@ -213,7 +214,7 @@ enum GroceryCatalog {
             gi("epeautre", "Épeautre", "🌾", [.fiber, .magnesium]),
         ]),
 
-        GroceryAisle(id: "secs", label: "Fruits secs, graines & grignotage", emoji: "🥜", items: [
+        GroceryAisle(id: "secs", label: String(localized: "Fruits secs, graines & grignotage"), emoji: "🥜", items: [
             gi("cacahuetes", "Cacahuètes", "🥜", [.magnesium, .fiber, .zinc]),
             gi("beurre_cacahuete", "Beurre de cacahuète", "🥜", [.magnesium, .fiber]),
             gi("amandes", "Amandes", "🌰", [.magnesium, .calcium, .fiber]),
@@ -241,7 +242,7 @@ enum GroceryCatalog {
             gi("graines_pavot", "Graines de pavot", "⚪", [.calcium]),
         ]),
 
-        GroceryAisle(id: "gras", label: "Matières grasses & placard", emoji: "🫒", items: [
+        GroceryAisle(id: "gras", label: String(localized: "Matières grasses & placard"), emoji: "🫒", items: [
             gi("huile_olive", "Huile d'olive", "🫒", []),
             gi("huile_tournesol", "Huile de tournesol", "🌻", []),
             gi("huile_colza", "Huile de colza", "🌼", [.omega3]),

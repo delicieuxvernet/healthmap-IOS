@@ -15,18 +15,18 @@ struct OnboardingView: View {
     private let featurePages: [OnboardingPage] = [
         OnboardingPage(
             icon: "fork.knife",
-            title: "Analyse ton alimentation",
-            description: "Réponds à quelques questions sur ton mode de vie et ton alimentation. Notre algorithme évalue 10 nutriments essentiels."
+            title: String(localized: "Analyse ton alimentation"),
+            description: String(localized: "Réponds à quelques questions sur ton mode de vie et ton alimentation. Notre algorithme évalue 10 nutriments essentiels.")
         ),
         OnboardingPage(
             icon: "chart.bar.fill",
-            title: "Détecte tes points faibles",
-            description: "Découvre ton score nutritionnel global, les nutriments à renforcer et les interactions entre tes habitudes."
+            title: String(localized: "Détecte tes points faibles"),
+            description: String(localized: "Découvre ton score nutritionnel global, les nutriments à renforcer et les interactions entre tes habitudes.")
         ),
         OnboardingPage(
             icon: "list.clipboard",
-            title: "Plan d'action personnalisé",
-            description: "Reçois un plan sur mesure : aliments à privilégier, compléments recommandés et astuces pratiques."
+            title: String(localized: "Plan d'action personnalisé"),
+            description: String(localized: "Reçois un plan sur mesure : aliments à privilégier, compléments recommandés et astuces pratiques.")
         ),
     ]
 
@@ -113,8 +113,8 @@ struct OnboardingView: View {
     }
 
     private var ctaLabel: String {
-        if currentPage == 0 { return "C'est parti" }
-        return currentPage == pageCount - 1 ? "Commencer" : "Suivant"
+        if currentPage == 0 { return String(localized: "C'est parti") }
+        return currentPage == pageCount - 1 ? String(localized: "Commencer") : String(localized: "Suivant")
     }
 }
 
@@ -172,9 +172,9 @@ private struct OnboardingCoverPageView: View {
 
             // Marqueurs de confiance (miroir web : Gratuit / Données privées / 5 min)
             HStack(spacing: Theme.spacingMD) {
-                trustMarker(icon: "shield.fill", text: "Gratuit")
-                trustMarker(icon: "lock.fill", text: "Données privées")
-                trustMarker(icon: "bolt.fill", text: "5 min")
+                trustMarker(icon: "shield.fill", text: String(localized: "Gratuit"))
+                trustMarker(icon: "lock.fill", text: String(localized: "Données privées"))
+                trustMarker(icon: "bolt.fill", text: String(localized: "5 min"))
             }
             .opacity(appeared ? 1 : 0)
             .animation(staged(0.32), value: appeared)

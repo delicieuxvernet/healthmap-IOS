@@ -112,11 +112,11 @@ struct PlanNoeudSheet: View {
 
     private var surTitre: String {
         switch topic.kind {
-        case .objectif: return "Ton objectif"
-        case .symptome: return "Symptôme suivi"
+        case .objectif: return String(localized: "Ton objectif")
+        case .symptome: return String(localized: "Symptôme suivi")
         case .apport:
-            guard let statut = topic.statut else { return "Apport à renforcer" }
-            return statut.estASuivre ? "Apport \(statut.libelleCourt.lowercased())" : "Apport"
+            guard let statut = topic.statut else { return String(localized: "Apport à renforcer") }
+            return statut.estASuivre ? String(localized: "Apport \(statut.libelleCourt.lowercased())") : String(localized: "Apport")
         }
     }
 
@@ -142,8 +142,8 @@ struct PlanNoeudSheet: View {
 
                 if !liens.isEmpty {
                     PlanTitreDeBloc(symbole: "point.3.connected.trianglepath.dotted",
-                                    texte: "À quoi c'est relié",
-                                    sousTitre: "\(liens.count) lien\(liens.count > 1 ? "s" : "") sur ton graphe",
+                                    texte: String(localized: "À quoi c'est relié"),
+                                    sousTitre: liens.count > 1 ? String(localized: "\(liens.count) liens sur ton graphe") : String(localized: "\(liens.count) lien sur ton graphe"),
                                     teinte: Color.dsAccent,
                                     encre: Color.teinteKiwiTexte)
                     rangeeDeLiens
@@ -157,8 +157,8 @@ struct PlanNoeudSheet: View {
                     GatedOverlay(intensity: .locked) { solutions }
                     UnlockDoor(
                         icon: "lock.fill",
-                        title: "Débloque tes solutions pour « \(topic.name) »",
-                        subtitle: "Nutrition, compléments et habitudes : le détail à appliquer.",
+                        title: String(localized: "Débloque tes solutions pour « \(topic.name) »"),
+                        subtitle: String(localized: "Nutrition, compléments et habitudes : le détail à appliquer."),
                         zone: "plan_solutions"
                     )
                     .padding(.top, 12)
@@ -331,8 +331,8 @@ struct PlanNoeudSheet: View {
     private var solutions: some View {
         if !topic.nutrition.isEmpty {
             PlanTitreDeBloc(symbole: "fork.knife",
-                            texte: "Quoi changer dans ton assiette",
-                            sousTitre: "ajoute-les quand tu peux, sans compter",
+                            texte: String(localized: "Quoi changer dans ton assiette"),
+                            sousTitre: String(localized: "ajoute-les quand tu peux, sans compter"),
                             teinte: Color.dsAccent,
                             encre: Color.teinteKiwiTexte)
             assiette
@@ -340,16 +340,16 @@ struct PlanNoeudSheet: View {
 
         if !topic.habitudes.isEmpty {
             PlanTitreDeBloc(symbole: "repeat",
-                            texte: "Tes habitudes",
-                            sousTitre: "ce qui bloque ou aide, sans rien acheter",
+                            texte: String(localized: "Tes habitudes"),
+                            sousTitre: String(localized: "ce qui bloque ou aide, sans rien acheter"),
                             teinte: Color.teinteProteines,
                             encre: Color.teinteProteinesTexte)
             habitudes
         }
 
         PlanTitreDeBloc(symbole: "pills",
-                        texte: "En complément",
-                        sousTitre: topic.complements.isEmpty ? "l'assiette suffit" : "Kiwio ne gagne rien dessus",
+                        texte: String(localized: "En complément"),
+                        sousTitre: topic.complements.isEmpty ? String(localized: "l'assiette suffit") : String(localized: "Kiwio ne gagne rien dessus"),
                         teinte: Color.teinteIode,
                         encre: Color.teinteIodeTexte)
         complements
@@ -418,8 +418,8 @@ struct PlanNoeudSheet: View {
 
     /// Ce que l'analyse a rédigé pour cet aliment — les champs vides sont sautés.
     static func details(_ aliment: PlanNutritionSolution) -> [(cle: String, valeur: String)] {
-        [("combien", aliment.qty), ("quand", aliment.moment), ("comment", aliment.cuisson),
-         ("astuce", aliment.astuce), ("note", aliment.note)]
+        [(String(localized: "combien"), aliment.qty), (String(localized: "quand"), aliment.moment), (String(localized: "comment"), aliment.cuisson),
+         (String(localized: "astuce"), aliment.astuce), (String(localized: "note"), aliment.note)]
             .filter { !$0.1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .map { (cle: $0.0, valeur: $0.1) }
     }
@@ -462,8 +462,8 @@ struct PlanNoeudSheet: View {
     private var complements: some View {
         VStack(alignment: .leading, spacing: 0) {
             if topic.complements.isEmpty {
-                ligneComplement(nom: "Aucun complément nécessaire", etiquette: "assiette d'abord", forte: true,
-                                note: "L'assiette et les habitudes suffisent ici. Kiwio ne recommande un complément que quand l'alimentation ne peut pas combler l'écart.")
+                ligneComplement(nom: String(localized: "Aucun complément nécessaire"), etiquette: String(localized: "assiette d'abord"), forte: true,
+                                note: String(localized: "L'assiette et les habitudes suffisent ici. Kiwio ne recommande un complément que quand l'alimentation ne peut pas combler l'écart."))
             } else {
                 ForEach(Array(topic.complementsSansDose.enumerated()), id: \.element.id) { index, complement in
                     if index > 0 {
@@ -660,7 +660,7 @@ extension PlanTopic {
     private var scoreEvidence: String {
         evidence
             .prefix(2)
-            .map { $0.statut == .peuPrecise ? "\($0.label) : à affiner" : "\($0.label) à \($0.score)\u{202F}%" }
+            .map { $0.statut == .peuPrecise ? String(localized: "\($0.label) : à affiner") : String(localized: "\($0.label) à \($0.score)\u{202F}%") }
             .joined(separator: " · ")
     }
 

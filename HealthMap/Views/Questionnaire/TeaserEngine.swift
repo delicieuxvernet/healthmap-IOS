@@ -56,7 +56,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "vitD",
                 emoji: "🔍",
-                message: "Beaucoup d'intérieur et peu de soleil… On soupçonne un besoin en vitamine D. Continue, ton bilan le confirmera !"
+                message: String(localized: "Beaucoup d'intérieur et peu de soleil… On soupçonne un besoin en vitamine D. Continue, ton bilan le confirmera !")
             ))
         }
 
@@ -66,7 +66,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "magnesium",
                 emoji: "🔍",
-                message: "Ton niveau de stress nous met la puce à l'oreille : possible besoin en magnésium. Le bilan le confirmera !"
+                message: String(localized: "Ton niveau de stress nous met la puce à l'oreille : possible besoin en magnésium. Le bilan le confirmera !")
             ))
         }
 
@@ -76,7 +76,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "iron",
                 emoji: "🔍",
-                message: "Fatigue au réveil ? On va surveiller tes apports en fer et en B12. Continue, le bilan affinera tout ça !"
+                message: String(localized: "Fatigue au réveil ? On va surveiller tes apports en fer et en B12. Continue, le bilan affinera tout ça !")
             ))
         }
 
@@ -86,7 +86,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "b12",
                 emoji: "🔍",
-                message: "Régime végétarien ou végan ? On soupçonne un besoin en B12. Encore quelques questions et ton bilan le précisera !"
+                message: String(localized: "Régime végétarien ou végan ? On soupçonne un besoin en B12. Encore quelques questions et ton bilan le précisera !")
             ))
         }
 
@@ -99,7 +99,7 @@ enum TeaserEngine {
             result.append(Teaser(
                 id: "omega3",
                 emoji: "🔍",
-                message: "Peu de poisson gras au menu… On soupçonne un besoin en oméga-3. Ton bilan le confirmera !"
+                message: String(localized: "Peu de poisson gras au menu… On soupçonne un besoin en oméga-3. Ton bilan le confirmera !")
             ))
         }
 

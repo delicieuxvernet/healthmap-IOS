@@ -38,17 +38,17 @@ enum HealthScale {
     /// Mot d'état d'un NUTRIMENT :
     /// < 45 « À renforcer » · 45-69 « Limite » · ≥ 70 « Solide ».
     static func nutrientLabel(for score: Int) -> String {
-        if score < 45 { return "À renforcer" }
-        if score < 70 { return "Limite" }
-        return "Solide"
+        if score < 45 { return String(localized: "À renforcer") }
+        if score < 70 { return String(localized: "Limite") }
+        return String(localized: "Solide")
     }
 
     /// Mot d'état du score GLOBAL :
     /// < 45 « Priorité » · 45-69 « À surveiller » · 70-84 « Solide » · ≥ 85 « Optimal ».
     static func globalLabel(for score: Int) -> String {
-        if score < 45 { return "Priorité" }
-        if score < 70 { return "À surveiller" }
-        if score < 85 { return "Solide" }
-        return "Optimal"
+        if score < 45 { return String(localized: "Priorité") }
+        if score < 70 { return String(localized: "À surveiller") }
+        if score < 85 { return String(localized: "Solide") }
+        return String(localized: "Optimal")
     }
 }

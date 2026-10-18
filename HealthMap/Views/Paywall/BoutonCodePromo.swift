@@ -30,7 +30,7 @@ struct BoutonCodePromo: View {
                         .font(.system(size: 14, weight: .semibold))
                         .accessibilityHidden(true)
                 }
-                Text(enCours ? "Vérification…" : "J'ai un code promo")
+                Text(enCours ? String(localized: "Vérification…") : String(localized: "J'ai un code promo"))
                     .font(.dsSousTitreFort)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)

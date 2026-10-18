@@ -90,12 +90,12 @@ struct MealCoverageHero: View {
             return insight
         }
         if totalCount == 0 {
-            return "Voici ce que ce repas t'apporte"
+            return String(localized: "Voici ce que ce repas t'apporte")
         }
         if coveredCount == 0 {
-            return "Ce repas ne couvre pas encore tes besoins du jour"
+            return String(localized: "Ce repas ne couvre pas encore tes besoins du jour")
         }
-        return "Ce repas renforce \(coveredCount) de tes besoins du jour"
+        return String(localized: "Ce repas renforce \(coveredCount) de tes besoins du jour")
     }
 
     /// Étiquette d'état : verte quand le repas renforce au moins un besoin,
@@ -116,7 +116,7 @@ struct MealCoverageHero: View {
                 HStack(spacing: 5) {
                     Fluent3DIcon(name: Fluent3D.sparkles, size: 16)
                         .offset(y: floaty ? -2 : 0)
-                    Text(coveredCount > 0 ? "beau geste" : "à compléter")
+                    Text(coveredCount > 0 ? String(localized: "beau geste") : String(localized: "à compléter"))
                         .font(.system(.footnote, design: .default).weight(.semibold))
                         .foregroundStyle(encreEtat)
                 }
@@ -212,11 +212,11 @@ struct FoodTileV4: View {
         switch food.status {
         case .covers:
             let n = food.contributions.filter { $0.pctRDA >= 40 }.count
-            return ("arrow.up", n > 1 ? "renforce \(n) besoins" : "renforce un besoin")
+            return ("arrow.up", n > 1 ? String(localized: "renforce \(n) besoins") : String(localized: "renforce un besoin"))
         case .weak:
-            return ("arrow.up", "apport à renforcer")
+            return ("arrow.up", String(localized: "apport à renforcer"))
         case .neutral:
-            return ("minus", "\(food.macros.calories) kcal · neutre")
+            return ("minus", String(localized: "\(food.macros.calories) kcal · neutre"))
         }
     }
 
@@ -390,9 +390,9 @@ struct MacrosCardV4: View {
             .animation(animationBarre, value: apparu)
             .accessibilityHidden(true)
             HStack(spacing: 10) {
-                legend("Protéines", p, .dsProteines)
-                legend("Glucides", c, .dsGlucides)
-                legend("Lipides", f, .dsLipides)
+                legend(String(localized: "Protéines"), p, .dsProteines)
+                legend(String(localized: "Glucides"), c, .dsGlucides)
+                legend(String(localized: "Lipides"), f, .dsLipides)
             }
             if macros.fiber > 0 {
                 Rectangle()
@@ -529,13 +529,13 @@ struct CompleteMealCardV4: View {
         if v2Manques.isEmpty {
             HStack(spacing: 8) {
                 Fluent3DIcon(name: Fluent3D.sparkles, size: 20)
-                titre("Pour compléter ce repas")
+                titre(String(localized: "Pour compléter ce repas"))
             }
             .padding(.bottom, 4)
         } else {
             HStack(spacing: 9) {
                 VerrePastilleIcone(symbole: "plus", teinte: Color.dsACombler, taille: 28, tailleIcone: 14)
-                titre("Ce qui manque à ton plat")
+                titre(String(localized: "Ce qui manque à ton plat"))
             }
             .padding(.bottom, 4)
         }
@@ -587,14 +587,14 @@ struct FoodDetailSheetV4: View {
                 header
 
                 Group {
-                    titreDeBloc("Macros")
+                    titreDeBloc(String(localized: "Macros"))
                     macrosCarte
                 }
                 .kiwiEntrance(1)
 
                 if !food.contributions.isEmpty {
                     Group {
-                        titreDeBloc("Ce qu'il apporte à tes besoins")
+                        titreDeBloc(String(localized: "Ce qu'il apporte à tes besoins"))
                         jauges(food.contributions)
                     }
                     .kiwiEntrance(2)
@@ -602,7 +602,7 @@ struct FoodDetailSheetV4: View {
 
                 if !extraNutrients.isEmpty {
                     Group {
-                        titreDeBloc("Ses autres forces")
+                        titreDeBloc(String(localized: "Ses autres forces"))
                         jauges(extraNutrients)
                     }
                     .kiwiEntrance(3)
@@ -658,9 +658,9 @@ struct FoodDetailSheetV4: View {
     private var transparencyLine: String? {
         var parts: [String] = []
         if let conf = food.confidence, conf > 0 {
-            parts.append("reconnu à \(Int((conf * 100).rounded())) %")
+            parts.append(String(localized: "reconnu à \(Int((conf * 100).rounded())) %"))
         }
-        if food.isUltraProcessed { parts.append("ultra-transformé") }
+        if food.isUltraProcessed { parts.append(String(localized: "ultra-transformé")) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -677,7 +677,9 @@ struct FoodDetailSheetV4: View {
     static func amountText(_ v: Double) -> String {
         v >= 100 || v == v.rounded()
             ? String(Int(v.rounded()))
-            : String(format: "%.1f", v).replacingOccurrences(of: ".", with: ",")
+            : (Langue.estFrancais
+                ? String(format: "%.1f", v).replacingOccurrences(of: ".", with: ",")
+                : String(format: "%.1f", v))
     }
 
     private func gram(_ v: Double) -> String { String(format: "%.0f", v) }
@@ -697,11 +699,11 @@ struct FoodDetailSheetV4: View {
     /// Les cinq mesures de l'aliment dans une seule carte de verre.
     private var macrosCarte: some View {
         HStack(alignment: .top, spacing: 0) {
-            macroTile("Calories", "\(food.macros.calories)", "kcal", encre: Color.teinteEnergieTexte)
-            macroTile("Prot.", gram(food.macros.proteins), "g", encre: Color.teinteProteinesTexte)
-            macroTile("Gluc.", gram(food.macros.carbs), "g", encre: Color.teinteGlucidesTexte)
-            macroTile("Lip.", gram(food.macros.fats), "g", encre: Color.teinteLipidesTexte)
-            macroTile("Fibres", gram(food.macros.fiber), "g", encre: Color.teinteFibresTexte)
+            macroTile(String(localized: "Calories"), "\(food.macros.calories)", "kcal", encre: Color.teinteEnergieTexte)
+            macroTile(String(localized: "Prot."), gram(food.macros.proteins), "g", encre: Color.teinteProteinesTexte)
+            macroTile(String(localized: "Gluc."), gram(food.macros.carbs), "g", encre: Color.teinteGlucidesTexte)
+            macroTile(String(localized: "Lip."), gram(food.macros.fats), "g", encre: Color.teinteLipidesTexte)
+            macroTile(String(localized: "Fibres"), gram(food.macros.fiber), "g", encre: Color.teinteFibresTexte)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 14)
@@ -811,7 +813,7 @@ struct ScanNeedTile: View {
     /// texte (les vifs ne tiennent pas 4,5:1 sur blanc).
     private var ink: Color { pct >= 60 ? Color.dsTexte : (pct >= 30 ? Color.dsARenforcerTexte : BilanV7.alertInk) }
     private var label: String { NutrientData.definition(for: micro.nutrientId)?.label ?? micro.label }
-    private var status: String { pct >= 60 ? "couvert" : (pct >= 30 ? "à renforcer" : "à combler") }
+    private var status: String { pct >= 60 ? String(localized: "couvert") : (pct >= 30 ? String(localized: "à renforcer") : String(localized: "à combler")) }
     private var combler: Bool { pct < 30 }
 
     var body: some View {
@@ -957,7 +959,7 @@ struct TaJourneeCard: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .padding(.top, 10)
-            Text(slot.isCurrent ? "ce repas" : (slot.done ? "scanné" : "à scanner"))
+            Text(slot.isCurrent ? String(localized: "ce repas") : (slot.done ? String(localized: "scanné") : String(localized: "à scanner")))
                 .font(.dsLegende)
                 .foregroundStyle(active ? Color.teinteKiwiTexte : Color.dsSecondaire)
                 .lineLimit(1)
@@ -1025,8 +1027,8 @@ struct BesoinsCourbeCard: View {
                     .frame(height: 150)
                     .padding(.top, 10)
                 HStack(spacing: 16) {
-                    legend(color: .dsAccent, dashed: false, text: "Tes apports", strong: true)
-                    legend(color: Self.teinteBesoin, dashed: true, text: "Ton besoin du jour", strong: false)
+                    legend(color: .dsAccent, dashed: false, text: String(localized: "Tes apports"), strong: true)
+                    legend(color: Self.teinteBesoin, dashed: true, text: String(localized: "Ton besoin du jour"), strong: false)
                 }
                 .padding(.top, 2)
             } else {
@@ -1150,7 +1152,7 @@ struct BesoinsCourbeCard: View {
 
     /// Lettres de jour (lun→dim) pour les `count` derniers jours, finissant aujourd'hui.
     private static func dayLabels(count: Int) -> [String] {
-        let letters = ["L", "M", "M", "J", "V", "S", "D"] // lundi=1
+        let letters = Langue.estFrancais ? ["L", "M", "M", "J", "V", "S", "D"] : ["M", "T", "W", "T", "F", "S", "S"] // lundi=1
         let cal = Calendar(identifier: .gregorian)
         let today = cal.startOfDay(for: Date())
         var out: [String] = []

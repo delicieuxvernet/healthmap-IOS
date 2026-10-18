@@ -36,23 +36,28 @@ struct GratificationRepas: Identifiable, Equatable {
 
     /// « Ce déjeuner fait bouger deux de tes apports. »
     var phrase: String {
-        let repas: String
-        switch creneau {
-        case .breakfast: repas = "Ce petit-déjeuner"
-        case .lunch: repas = "Ce déjeuner"
-        case .dinner: repas = "Ce dîner"
-        case .snack: repas = "Cet encas"
+        if gains.count > 1 {
+            let nombre = Self.enLettres(gains.count)
+            switch creneau {
+            case .breakfast: return String(localized: "Ce petit-déjeuner fait bouger \(nombre) de tes apports.")
+            case .lunch: return String(localized: "Ce déjeuner fait bouger \(nombre) de tes apports.")
+            case .dinner: return String(localized: "Ce dîner fait bouger \(nombre) de tes apports.")
+            case .snack: return String(localized: "Cet encas fait bouger \(nombre) de tes apports.")
+            }
         }
-        return gains.count > 1
-            ? "\(repas) fait bouger \(Self.enLettres(gains.count)) de tes apports."
-            : "\(repas) fait bouger un de tes apports."
+        switch creneau {
+        case .breakfast: return String(localized: "Ce petit-déjeuner fait bouger un de tes apports.")
+        case .lunch: return String(localized: "Ce déjeuner fait bouger un de tes apports.")
+        case .dinner: return String(localized: "Ce dîner fait bouger un de tes apports.")
+        case .snack: return String(localized: "Cet encas fait bouger un de tes apports.")
+        }
     }
 
     /// « 13 jours d'affilée » ; la fenêtre chargée s'arrête à deux semaines, on
     /// ne prétend pas en savoir plus.
     var libelleSerie: String? {
         guard let serie else { return nil }
-        return serie >= Self.fenetreSerie ? "Deux semaines d'affilée" : "\(serie) jours d'affilée"
+        return serie >= Self.fenetreSerie ? String(localized: "Deux semaines d'affilée") : String(localized: "\(serie) jours d'affilée")
     }
 
     // MARK: Règles
@@ -122,7 +127,7 @@ struct GratificationRepas: Identifiable, Equatable {
         guard repas.items.count > 1, let premier = parts.max(by: { $0.pct < $1.pct }) else { return nil }
         let total = parts.reduce(0) { $0 + $1.pct }
         guard total > 0, Double(premier.pct) / Double(total) >= partPourNommer else { return nil }
-        return "\(premier.nom.lowercased()), surtout"
+        return String(localized: "\(premier.nom.lowercased()), surtout")
     }
 
     /// Jours d'affilée, aujourd'hui compris, avec au moins un repas.
@@ -141,7 +146,7 @@ struct GratificationRepas: Identifiable, Equatable {
     }
 
     private static func enLettres(_ n: Int) -> String {
-        let mots = ["zéro", "un", "deux", "trois"]
+        let mots = [String(localized: "zéro"), String(localized: "un"), String(localized: "deux"), String(localized: "trois")]
         return n >= 0 && n < mots.count ? mots[n] : "\(n)"
     }
 }
@@ -153,10 +158,10 @@ extension MealJournalService.MealSlot {
     /// l'infinitif (`VoiceMealSheet.titreAjout`).
     var libelleAjout: String {
         switch self {
-        case .breakfast: return "Ajouté au petit-déjeuner"
-        case .lunch: return "Ajouté au déjeuner"
-        case .dinner: return "Ajouté au dîner"
-        case .snack: return "Ajouté en encas"
+        case .breakfast: return String(localized: "Ajouté au petit-déjeuner")
+        case .lunch: return String(localized: "Ajouté au déjeuner")
+        case .dinner: return String(localized: "Ajouté au dîner")
+        case .snack: return String(localized: "Ajouté en encas")
         }
     }
 }

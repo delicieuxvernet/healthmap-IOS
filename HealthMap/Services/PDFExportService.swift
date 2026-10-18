@@ -101,12 +101,12 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 14, weight: .regular),
             .foregroundColor: UIColor.white.withAlphaComponent(0.85),
         ]
-        let subtitle = "Bilan Nutritionnel Personnalise" as NSString
+        let subtitle = String(localized: "Bilan Nutritionnel Personnalise") as NSString
         subtitle.draw(at: CGPoint(x: margin, y: y + 48), withAttributes: subtitleAttrs)
 
         // Date + name
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.locale = Langue.locale
         formatter.dateFormat = "d MMMM yyyy"
         let dateStr = formatter.string(from: Date())
 
@@ -167,7 +167,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 14, weight: .bold),
             .foregroundColor: UIColor.black,
         ]
-        ("Profil" as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
+        (String(localized: "Profil") as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
         currentY += 22
 
         let infoAttrs: [NSAttributedString.Key: Any] = [
@@ -176,11 +176,11 @@ final class PDFExportService {
         ]
 
         let age = profile.age.isEmpty ? "-" : profile.age
-        let genre = profile.gender == .homme ? "Homme" : "Femme"
+        let genre = profile.gender == .homme ? String(localized: "Homme") : String(localized: "Femme")
         let regime = profile.dietType
-        let pathway = profile.pathway == .express ? "Express" : "Complet"
+        let pathway = profile.pathway == .express ? String(localized: "Express") : (Langue.estFrancais ? "Complet" : "Full")
 
-        let infoText = "Âge : \(age) ans  |  Genre : \(genre)  |  Régime : \(regime)  |  Questionnaire : \(pathway)"
+        let infoText = String(localized: "Âge : \(age) ans  |  Genre : \(genre)  |  Régime : \(regime)  |  Questionnaire : \(pathway)")
         (infoText as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: infoAttrs)
 
         return currentY + 30
@@ -194,7 +194,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 14, weight: .bold),
             .foregroundColor: UIColor.systemRed,
         ]
-        ("⚠️ Alertes importantes" as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
+        (String(localized: "⚠️ Alertes importantes") as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
         currentY += 22
 
         for flag in flags {
@@ -222,7 +222,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 14, weight: .bold),
             .foregroundColor: UIColor.black,
         ]
-        ("Nutriments analyses" as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
+        (String(localized: "Nutriments analyses") as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
         currentY += 24
 
         // Table header
@@ -230,10 +230,10 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 10, weight: .bold),
             .foregroundColor: UIColor.gray,
         ]
-        ("Nutriment" as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: colHeaderAttrs)
-        ("Score" as NSString).draw(at: CGPoint(x: margin + 200, y: currentY), withAttributes: colHeaderAttrs)
-        ("Statut" as NSString).draw(at: CGPoint(x: margin + 260, y: currentY), withAttributes: colHeaderAttrs)
-        ("Verdict" as NSString).draw(at: CGPoint(x: margin + 340, y: currentY), withAttributes: colHeaderAttrs)
+        (String(localized: "Nutriment") as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: colHeaderAttrs)
+        (String(localized: "Score") as NSString).draw(at: CGPoint(x: margin + 200, y: currentY), withAttributes: colHeaderAttrs)
+        (String(localized: "Statut") as NSString).draw(at: CGPoint(x: margin + 260, y: currentY), withAttributes: colHeaderAttrs)
+        (String(localized: "Verdict") as NSString).draw(at: CGPoint(x: margin + 340, y: currentY), withAttributes: colHeaderAttrs)
         currentY += 18
 
         // Separator
@@ -270,7 +270,14 @@ final class PDFExportService {
                 .font: UIFont.systemFont(ofSize: 9, weight: .semibold),
                 .foregroundColor: statusColor,
             ]
-            (status.rawValue.capitalized as NSString).draw(at: CGPoint(x: margin + 260, y: currentY), withAttributes: statusAttrs)
+            let statusLabel: String
+            switch status {
+            case .deficient: statusLabel = String(localized: "Deficient")
+            case .low: statusLabel = String(localized: "Low")
+            case .adequate: statusLabel = String(localized: "Adequate")
+            case .good: statusLabel = String(localized: "Good")
+            }
+            (statusLabel as NSString).draw(at: CGPoint(x: margin + 260, y: currentY), withAttributes: statusAttrs)
 
             // Verdict (truncated)
             if let verdict = nutrient.verdict {
@@ -304,7 +311,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 14, weight: .bold),
             .foregroundColor: UIColor.black,
         ]
-        ("Interactions détectées" as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
+        (String(localized: "Interactions détectées") as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
         currentY += 24
 
         for inter in interactions.prefix(5) {
@@ -360,7 +367,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 14, weight: .bold),
             .foregroundColor: UIColor.black,
         ]
-        ("Actions prioritaires" as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
+        (String(localized: "Actions prioritaires") as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
         currentY += 24
 
         let sorted = actions.sorted { ($0.rank ?? 0) < ($1.rank ?? 0) }
@@ -384,7 +391,7 @@ final class PDFExportService {
                     .font: UIFont.systemFont(ofSize: 9, weight: .regular),
                     .foregroundColor: UIColor.gray,
                 ]
-                ("Impact : \(impact)" as NSString).draw(at: CGPoint(x: margin + 28, y: currentY), withAttributes: impactAttrs)
+                (String(localized: "Impact : \(impact)") as NSString).draw(at: CGPoint(x: margin + 28, y: currentY), withAttributes: impactAttrs)
                 currentY += 16
             }
         }
@@ -412,7 +419,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 14, weight: .bold),
             .foregroundColor: UIColor.black,
         ]
-        ("Programme supplements" as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
+        (String(localized: "Programme supplements") as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: headerAttrs)
         currentY += 24
 
         let slotAttrs: [NSAttributedString.Key: Any] = [
@@ -425,7 +432,7 @@ final class PDFExportService {
         ]
 
         if !morning.isEmpty {
-            ("☀️ Matin" as NSString).draw(at: CGPoint(x: margin + 8, y: currentY), withAttributes: slotAttrs)
+            (String(localized: "☀️ Matin") as NSString).draw(at: CGPoint(x: margin + 8, y: currentY), withAttributes: slotAttrs)
             currentY += 16
             for item in morning {
                 ("  • \(item.displayText)" as NSString).draw(at: CGPoint(x: margin + 16, y: currentY), withAttributes: itemAttrs)
@@ -435,7 +442,7 @@ final class PDFExportService {
         }
 
         if !afternoon.isEmpty {
-            ("🌤️ Midi" as NSString).draw(at: CGPoint(x: margin + 8, y: currentY), withAttributes: slotAttrs)
+            (String(localized: "🌤️ Midi") as NSString).draw(at: CGPoint(x: margin + 8, y: currentY), withAttributes: slotAttrs)
             currentY += 16
             for item in afternoon {
                 ("  • \(item.displayText)" as NSString).draw(at: CGPoint(x: margin + 16, y: currentY), withAttributes: itemAttrs)
@@ -445,7 +452,7 @@ final class PDFExportService {
         }
 
         if !evening.isEmpty {
-            ("🌙 Soir" as NSString).draw(at: CGPoint(x: margin + 8, y: currentY), withAttributes: slotAttrs)
+            (String(localized: "🌙 Soir") as NSString).draw(at: CGPoint(x: margin + 8, y: currentY), withAttributes: slotAttrs)
             currentY += 16
             for item in evening {
                 ("  • \(item.displayText)" as NSString).draw(at: CGPoint(x: margin + 16, y: currentY), withAttributes: itemAttrs)
@@ -492,7 +499,7 @@ final class PDFExportService {
             .font: UIFont.systemFont(ofSize: 8, weight: .regular),
             .foregroundColor: UIColor.gray,
         ]
-        let text = "Ce document est généré à titre informatif uniquement. Il ne constitue pas un avis médical. Les scores et recommandations reposent sur les informations fournies dans le questionnaire. Consulte un professionnel de santé avant de modifier ton alimentation ou de commencer une complémentation."
+        let text = String(localized: "Ce document est généré à titre informatif uniquement. Il ne constitue pas un avis médical. Les scores et recommandations reposent sur les informations fournies dans le questionnaire. Consulte un professionnel de santé avant de modifier ton alimentation ou de commencer une complémentation.")
         let rect = CGRect(x: margin, y: currentY, width: pageWidth - margin * 2, height: 40)
         (text as NSString).draw(in: rect, withAttributes: disclaimerAttrs)
 
@@ -512,7 +519,7 @@ final class PDFExportService {
         formatter.dateFormat = "dd/MM/yyyy"
         let dateStr = formatter.string(from: Date())
 
-        ("Page \(pageNumber) — \(dateStr) — www.healthmap.fr" as NSString).draw(at: CGPoint(x: margin, y: y), withAttributes: footerAttrs)
+        (String(localized: "Page \(pageNumber) — \(dateStr) — www.healthmap.fr") as NSString).draw(at: CGPoint(x: margin, y: y), withAttributes: footerAttrs)
 
         let pageStr = "Kiwio" as NSString
         let size = pageStr.size(withAttributes: footerAttrs)
@@ -529,10 +536,10 @@ final class PDFExportService {
     }
 
     private func scoreLabel(_ score: Int) -> String {
-        if score >= 75 { return "Excellent" }
-        if score >= 60 { return "Bon" }
-        if score >= 40 { return "A ameliorer" }
-        return "Critique"
+        if score >= 75 { return String(localized: "Excellent") }
+        if score >= 60 { return String(localized: "Bon") }
+        if score >= 40 { return String(localized: "A ameliorer") }
+        return String(localized: "Critique")
     }
 
     // MARK: - Generate & Share
@@ -555,8 +562,8 @@ final class PDFExportService {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let dateStr = formatter.string(from: Date())
-        let firstName = profile.firstName.isEmpty ? "Utilisateur" : profile.firstName
-        let fileName = "Kiwio_Bilan_\(firstName)_\(dateStr).pdf"
+        let firstName = profile.firstName.isEmpty ? String(localized: "Utilisateur") : profile.firstName
+        let fileName = String(localized: "Kiwio_Bilan_\(firstName)_\(dateStr).pdf")
 
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
         try? pdfData.write(to: tempURL)

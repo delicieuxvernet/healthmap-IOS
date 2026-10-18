@@ -50,7 +50,7 @@ struct OffreLancement: Equatable {
     static let fin: Date = paris.date(from: DateComponents(year: 2026, month: 11, day: 1)) ?? .distantPast
     /// Début des « derniers jours » : le 29 octobre 2026, 0 h à Paris.
     static let debutDerniersJours: Date = paris.date(from: DateComponents(year: 2026, month: 10, day: 29)) ?? .distantPast
-    static let finAffichee = "31 octobre"
+    static let finAffichee = String(localized: "31 octobre")
 
     static func joursRestants(maintenant: Date) -> Int {
         let jours = paris.dateComponents([.day], from: paris.startOfDay(for: maintenant), to: fin).day ?? 0
@@ -122,43 +122,43 @@ struct OffreLancement: Equatable {
 
     static func durees(unite: SubscriptionPeriod.Unit, total: Int) -> (ta: String, la: String) {
         switch (unite, total) {
-        case (.year, 1): return ("ta première année", "la 1re année")
-        case (.year, _): return ("tes \(total) premières années", "les \(total) premières années")
-        case (.month, 1): return ("ton premier mois", "le 1er mois")
-        case (.month, _): return ("tes \(total) premiers mois", "les \(total) premiers mois")
-        case (.week, 1): return ("ta première semaine", "la 1re semaine")
-        case (.week, _): return ("tes \(total) premières semaines", "les \(total) premières semaines")
-        case (.day, _): return ("tes \(total) premiers jours", "les \(total) premiers jours")
+        case (.year, 1): return (String(localized: "ta première année"), String(localized: "la 1re année"))
+        case (.year, _): return (String(localized: "tes \(total) premières années"), String(localized: "les \(total) premières années"))
+        case (.month, 1): return (String(localized: "ton premier mois"), String(localized: "le 1er mois"))
+        case (.month, _): return (String(localized: "tes \(total) premiers mois"), String(localized: "les \(total) premiers mois"))
+        case (.week, 1): return (String(localized: "ta première semaine"), String(localized: "la 1re semaine"))
+        case (.week, _): return (String(localized: "tes \(total) premières semaines"), String(localized: "les \(total) premières semaines"))
+        case (.day, _): return (String(localized: "tes \(total) premiers jours"), String(localized: "les \(total) premiers jours"))
         }
     }
 
     // MARK: Textes
 
-    var badge: String { "Offre de lancement" }
+    var badge: String { String(localized: "Offre de lancement") }
 
     /// « Premium à 17,99 € » + retour à la ligne + « ta première année ».
-    var titre: String { "Premium à \(prixReduit)\n\(dureeTa)" }
+    var titre: String { String(localized: "Premium à \(prixReduit)\n\(dureeTa)") }
 
     var detail: String {
         switch moment {
         case .annonce:
-            return "Au lieu de \(prixNormal). Jusqu'au \(Self.finAffichee)."
+            return String(localized: "Au lieu de \(prixNormal). Jusqu'au \(Self.finAffichee).")
         case .derniersJours:
-            if joursRestants <= 1 { return "Au lieu de \(prixNormal). Dernier jour pour en profiter." }
-            return "Au lieu de \(prixNormal). Plus que \(joursRestants) jours, jusqu'au \(Self.finAffichee)."
+            if joursRestants <= 1 { return String(localized: "Au lieu de \(prixNormal). Dernier jour pour en profiter.") }
+            return String(localized: "Au lieu de \(prixNormal). Plus que \(joursRestants) jours, jusqu'au \(Self.finAffichee).")
         }
     }
 
     var mentions: String {
-        "Puis \(prixNormal) par an. Réservé à qui n'a jamais essayé Premium."
+        String(localized: "Puis \(prixNormal) par an. Réservé à qui n'a jamais essayé Premium.")
     }
 
     /// Ce que Premium ajoute, en trois lignes (mêmes chiffres que le comparatif).
     static var atouts: [(symbole: String, texte: String)] {
         [
-            ("mic.fill", "\(ComparatifPremium.dicteesPremiumParJour) repas dictés par jour"),
-            ("sparkles", "Tes vitamines et minéraux en détail"),
-            ("map.fill", "Ton plan guidé, pas à pas")
+            ("mic.fill", String(localized: "\(ComparatifPremium.dicteesPremiumParJour) repas dictés par jour")),
+            ("sparkles", String(localized: "Tes vitamines et minéraux en détail")),
+            ("map.fill", String(localized: "Ton plan guidé, pas à pas"))
         ]
     }
 
@@ -168,7 +168,7 @@ struct OffreLancement: Equatable {
     var prixCarte: String { "\(prixReduit) \(dureeLa)" }
 
     /// Sous la carte : « Puis 30,00 € / an ».
-    var detailCarte: String { "Puis \(prixNormal) / an" }
+    var detailCarte: String { String(localized: "Puis \(prixNormal) / an") }
 
     var badgeCarte: String {
         guard let pourcent else { return badge }
@@ -177,7 +177,7 @@ struct OffreLancement: Equatable {
 
     /// Mention au point d'achat (App Store 3.1.2) : le montant de la période
     /// réduite, puis le prix normal.
-    var noteAchat: String { "\(prixReduit) pour \(dureeLa), puis \(prixNormal) / an." }
+    var noteAchat: String { String(localized: "\(prixReduit) pour \(dureeLa), puis \(prixNormal) / an.") }
 }
 
 // MARK: - Notifications
@@ -217,17 +217,17 @@ enum RappelsLancement {
 
     static func titre(_ offre: OffreLancement, moment: OffreLancement.Moment) -> String {
         switch moment {
-        case .annonce: return "Premium à \(offre.prixReduit) \(offre.dureeLa)"
-        case .derniersJours: return "Plus que 3 jours à \(offre.prixReduit)"
+        case .annonce: return String(localized: "Premium à \(offre.prixReduit) \(offre.dureeLa)")
+        case .derniersJours: return String(localized: "Plus que 3 jours à \(offre.prixReduit)")
         }
     }
 
     static func corps(_ offre: OffreLancement, moment: OffreLancement.Moment) -> String {
         switch moment {
         case .annonce:
-            return "Jusqu'au \(OffreLancement.finAffichee), au lieu de \(offre.prixNormal). Dicte \(ComparatifPremium.dicteesPremiumParJour) repas par jour et vois tes vitamines en détail."
+            return String(localized: "Jusqu'au \(OffreLancement.finAffichee), au lieu de \(offre.prixNormal). Dicte \(ComparatifPremium.dicteesPremiumParJour) repas par jour et vois tes vitamines en détail.")
         case .derniersJours:
-            return "Ton offre de lancement Premium se termine le \(OffreLancement.finAffichee)."
+            return String(localized: "Ton offre de lancement Premium se termine le \(OffreLancement.finAffichee).")
         }
     }
 

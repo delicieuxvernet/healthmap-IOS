@@ -108,7 +108,7 @@ struct SupplementsView: View {
                 let rec = recs.first { $0.nutrientID.rawValue == id }
                 return ComplementChain(
                     id: id,
-                    nom: apport.nom ?? rec?.nutrientLabel ?? id,
+                    nom: Langue.texte(apport.nom ?? rec?.nutrientLabel ?? id),
                     symbol: Fluent3D.symbol(for: id),
                     tint: Color.nutrientColor(for: id),
                     rec: rec,
@@ -120,7 +120,7 @@ struct SupplementsView: View {
         return recs.map { rec in
             ComplementChain(
                 id: rec.id,
-                nom: rec.nutrientLabel,
+                nom: Langue.texte(rec.nutrientLabel),
                 symbol: Fluent3D.symbol(for: rec.nutrientID.rawValue),
                 tint: rec.nutrientColor,
                 rec: rec,
@@ -438,7 +438,7 @@ struct SupplementsView: View {
                 .foregroundStyle(Color.dsTexte)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            Text("\(nombre) apport\(nombre > 1 ? "s" : "")")
+            Text(nombre > 1 ? String(localized: "\(nombre) apports") : String(localized: "\(nombre) apport"))
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
@@ -495,9 +495,10 @@ struct SupplementsView: View {
     private func lignesAssiette(_ items: [Tuile]) -> [LigneAssiette] {
         items.map { item in
             let autres = aliments(for: item.chain).dropFirst().map { LectureApport.enCoursDePhrase($0) }
+            let listeAutres = autres.joined(separator: ", ")
             let precision = autres.isEmpty
-                ? "pour \(item.chain.avecArticle)"
-                : "ou " + autres.joined(separator: ", ")
+                ? String(localized: "pour \(Langue.texte(item.chain.avecArticle))")
+                : String(localized: "ou \(listeAutres)")
             return LigneAssiette(
                 id: item.id,
                 symbole: symbole(item),
@@ -574,26 +575,26 @@ struct SupplementsView: View {
     /// une tuile, comme la maquette (le mot du statut passe à VoiceOver par
     /// `TuileApport.statutMot`). En voie assiette, l'apport que l'aliment sert.
     private func statutLigne(_ item: Tuile, complet: Bool) -> String {
-        guard voie == .complements else { return "pour \(item.chain.avecArticle)" }
+        guard voie == .complements else { return String(localized: "pour \(Langue.texte(item.chain.avecArticle))") }
         // Apport estimé : ses contributions sont des sources, pas des causes.
         if item.detail.estimation != nil {
             let n = item.detail.appuis.count
-            let sources = n == 1 ? "1 source" : "\(n) sources"
+            let sources = n == 1 ? String(localized: "1 source") : String(localized: "\(n) sources")
             return complet ? "\(FicheApportContexte.statutMot(detail: item.detail)) · \(sources)" : sources
         }
         let causes = item.detail.freins.count
         guard complet else {
             switch causes {
-            case 0: return "sans cause nommée"
-            case 1: return "1 cause"
-            default: return "\(causes) causes"
+            case 0: return String(localized: "sans cause nommée")
+            case 1: return String(localized: "1 cause")
+            default: return String(localized: "\(causes) causes")
             }
         }
         let mot = FicheApportContexte.statutMot(detail: item.detail)
         switch causes {
-        case 0: return "\(mot) · sans cause nommée"
-        case 1: return "\(mot) · 1 cause nommée"
-        default: return "\(mot) · \(causes) causes nommées"
+        case 0: return String(localized: "\(mot) · sans cause nommée")
+        case 1: return String(localized: "\(mot) · 1 cause nommée")
+        default: return String(localized: "\(mot) · \(causes) causes nommées")
         }
     }
 
@@ -610,15 +611,15 @@ struct SupplementsView: View {
     }
 
     private func ctaHeros(_ item: Tuile) -> String {
-        if voie == .assiette { return "Comment l'intégrer" }
-        return item.detail.contributions.isEmpty ? "Voir la fiche" : "Voir le calcul"
+        if voie == .assiette { return String(localized: "Comment l'intégrer") }
+        return item.detail.contributions.isEmpty ? String(localized: "Voir la fiche") : String(localized: "Voir le calcul")
     }
 
     /// La même dans les deux voies : la maquette la pose hors du corps qui bascule.
     private func noteMosaique(_ items: [Tuile]) -> String {
         items.contains { !$0.detail.freins.isEmpty }
-            ? "Le creux de l'anneau, ce sont tes réponses. Touche un apport pour voir le calcul."
-            : "Touche un apport pour voir comment le renforcer."
+            ? String(localized: "Le creux de l'anneau, ce sont tes réponses. Touche un apport pour voir le calcul.")
+            : String(localized: "Touche un apport pour voir comment le renforcer.")
     }
 
     // MARK: - La fiche (contexte assemblé depuis les sources existantes)
@@ -659,7 +660,7 @@ struct SupplementsView: View {
                     nom: produit.name,
                     sousTitre: precisionLabel(for: produit)
                 )]
-                cta = "Voir le complément"
+                cta = String(localized: "Voir le complément")
             } else {
                 alternatives = []
                 cta = nil
@@ -690,7 +691,7 @@ struct SupplementsView: View {
             alternatives = aliments.map {
                 FicheApportContexte.Alternative(id: $0, symbole: "fork.knife", nom: $0.capitalizedFirstLetter, sousTitre: nil)
             }
-            cta = "Voir la voie par l'assiette"
+            cta = String(localized: "Voir la voie par l'assiette")
         }
 
         return FicheApportContexte(
@@ -732,13 +733,13 @@ struct SupplementsView: View {
     static func noteSansComplement(statut: StatutApport?) -> String {
         switch statut {
         case .peuPrecise?:
-            return "Ton apport reste à préciser : pas de complément à envisager pour l'instant. Coche plus d'aliments ou note quelques repas."
+            return String(localized: "Ton apport reste à préciser : pas de complément à envisager pour l'instant. Coche plus d'aliments ou note quelques repas.")
         case .aSurveiller?:
-            return "Ton apport semble un peu juste : l'assiette suffit pour le renforcer, sans gélule."
+            return String(localized: "Ton apport semble un peu juste : l'assiette suffit pour le renforcer, sans gélule.")
         case .couvert?, .couvertParComplement?, .sousLaLimite?:
-            return "Ton apport couvre ta référence : pas besoin de complément."
+            return String(localized: "Ton apport couvre ta référence : pas besoin de complément.")
         default:
-            return "Ton écart est petit : l'alimentation le comble seule, sans gélule."
+            return String(localized: "Ton écart est petit : l'alimentation le comble seule, sans gélule.")
         }
     }
 
@@ -773,12 +774,12 @@ struct SupplementsView: View {
     /// s'adresse à quelqu'un.
     private func momentPhrase(_ slot: TimingSlot) -> String {
         switch slot {
-        case .matinAJeun: return "le matin à jeun"
-        case .matinRepas: return "le matin au petit-déjeuner"
-        case .midiRepas: return "le midi, pendant le repas"
-        case .soirRepas: return "le soir, pendant le dîner"
-        case .coucher: return "au coucher"
-        case .entreRepas: return "entre deux repas"
+        case .matinAJeun: return String(localized: "le matin à jeun")
+        case .matinRepas: return String(localized: "le matin au petit-déjeuner")
+        case .midiRepas: return String(localized: "le midi, pendant le repas")
+        case .soirRepas: return String(localized: "le soir, pendant le dîner")
+        case .coucher: return String(localized: "au coucher")
+        case .entreRepas: return String(localized: "entre deux repas")
         }
     }
 
@@ -855,9 +856,9 @@ struct SupplementsView: View {
         // suit pas les statuts ; rien à ajouter plutôt qu'une contradiction.
         if dashboardVM.statuts.isEmpty, let schedule = aiSchedule {
             let blocks: [(String, String, [SupplementEntry])] = [
-                ("Matin", "sunrise.fill", schedule.morning ?? []),
-                ("Midi", "sun.max.fill", schedule.afternoon ?? []),
-                ("Soir", "moon.fill", schedule.evening ?? []),
+                (String(localized: "Matin"), "sunrise.fill", schedule.morning ?? []),
+                (String(localized: "Midi"), "sun.max.fill", schedule.afternoon ?? []),
+                (String(localized: "Soir"), "moon.fill", schedule.evening ?? []),
             ]
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in

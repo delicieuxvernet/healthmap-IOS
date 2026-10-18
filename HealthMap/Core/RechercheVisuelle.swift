@@ -183,12 +183,12 @@ enum RechercheVisuelle {
                           sousGroupe: String?, kcal100g: Double?) -> String {
         let tete: String
         if source == "off" {
-            tete = marqueCourte(marque) ?? "Produit de marque"
+            tete = marqueCourte(marque) ?? String(localized: "Produit de marque")
         } else {
-            tete = famille(groupe: groupe, sousGroupe: sousGroupe) ?? "Générique"
+            tete = famille(groupe: groupe, sousGroupe: sousGroupe) ?? String(localized: "Générique")
         }
         guard let kcal100g else { return tete }
-        return "\(tete) · \(Int(kcal100g.rounded())) kcal / 100 g"
+        return String(localized: "\(tete) · \(Int(kcal100g.rounded())) kcal / 100 g")
     }
 
     // MARK: Les sections
@@ -199,8 +199,8 @@ enum RechercheVisuelle {
         let lignes: [Ligne]
     }
 
-    static let titreAliments = "Aliments"
-    static let titreProduits = "Marques"
+    static let titreAliments = String(localized: "Aliments")
+    static let titreProduits = String(localized: "Marques")
 
     /// Les familles qu'on achète DE MARQUE (retour d'Arthur, 7 oct. 2026 :
     /// « les céréales, on va mettre les Trésor ; pareil pour les yaourts »).

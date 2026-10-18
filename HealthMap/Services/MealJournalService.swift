@@ -54,10 +54,10 @@ final class MealJournalService {
 
         var label: String {
             switch self {
-            case .breakfast: return "Matin"
-            case .lunch:     return "Midi"
-            case .dinner:    return "Soir"
-            case .snack:     return "Encas"
+            case .breakfast: return String(localized: "Matin")
+            case .lunch:     return String(localized: "Midi")
+            case .dinner:    return String(localized: "Soir")
+            case .snack:     return String(localized: "Encas")
             }
         }
         /// Le créneau tel qu'on l'enchaîne après un verbe (« Ajouter … »).
@@ -66,10 +66,10 @@ final class MealJournalService {
         /// elle ne peut pas être collée à l'appel.
         var complementDeTemps: String {
             switch self {
-            case .breakfast: return "le matin"
-            case .lunch:     return "le midi"
-            case .dinner:    return "le soir"
-            case .snack:     return "en encas"
+            case .breakfast: return String(localized: "le matin")
+            case .lunch:     return String(localized: "le midi")
+            case .dinner:    return String(localized: "le soir")
+            case .snack:     return String(localized: "en encas")
             }
         }
         var emoji: String {

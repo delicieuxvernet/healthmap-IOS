@@ -38,36 +38,36 @@ enum AstucesAttente {
     static let misesEnGarde: [AstuceAttente] = [
         AstuceAttente(
             id: "avis-medical", genre: .bonASavoir, icone: "stethoscope",
-            titre: "Kiwio ne remplace pas ton médecin",
-            texte: "Ton bilan ne remplace ni l'avis d'un médecin ni des analyses médicales. Il te donne des pistes, basées sur tes réponses."
+            titre: String(localized: "Kiwio ne remplace pas ton médecin"),
+            texte: String(localized: "Ton bilan ne remplace ni l'avis d'un médecin ni des analyses médicales. Il te donne des pistes, basées sur tes réponses.")
         ),
         AstuceAttente(
             id: "assiette-d-abord", genre: .bonASavoir, icone: "fork.knife",
-            titre: "L'assiette d'abord",
-            texte: "Les compléments alimentaires ne remplacent pas de bonnes habitudes alimentaires. Kiwio est là pour t'aider à les construire, repas après repas."
+            titre: String(localized: "L'assiette d'abord"),
+            texte: String(localized: "Les compléments alimentaires ne remplacent pas de bonnes habitudes alimentaires. Kiwio est là pour t'aider à les construire, repas après repas.")
         ),
     ]
 
     static let premium: [AstuceAttente] = [
         AstuceAttente(
             id: "carences", genre: .premium, icone: "testtube.2",
-            titre: "Tes carences, une par une",
-            texte: "Découvre les nutriments sur lesquels tu as de potentielles carences, d'où elles viennent et le geste qui les comble. Grâce à Kiwio Premium."
+            titre: String(localized: "Tes carences, une par une"),
+            texte: String(localized: "Découvre les nutriments sur lesquels tu as de potentielles carences, d'où elles viennent et le geste qui les comble. Grâce à Kiwio Premium.")
         ),
         AstuceAttente(
             id: "progres", genre: .premium, icone: "chart.xyaxis.line",
-            titre: "Suis tes progrès",
-            texte: "Constate l'évolution de tes apports, en pourcentage, semaine après semaine. Grâce à Kiwio Premium."
+            titre: String(localized: "Suis tes progrès"),
+            texte: String(localized: "Constate l'évolution de tes apports, en pourcentage, semaine après semaine. Grâce à Kiwio Premium.")
         ),
         AstuceAttente(
             id: "plan", genre: .premium, icone: "map",
-            titre: "Ton plan, pas à pas",
-            texte: "Compléments, solutions, rituels : ton plan complet, étape par étape. Grâce à Kiwio Premium."
+            titre: String(localized: "Ton plan, pas à pas"),
+            texte: String(localized: "Compléments, solutions, rituels : ton plan complet, étape par étape. Grâce à Kiwio Premium.")
         ),
         AstuceAttente(
             id: "scans", genre: .premium, icone: "camera.fill",
-            titre: "Tes repas, chaque jour",
-            texte: "Jusqu'à 30 scans par jour pour voir ce que chaque assiette t'apporte. Grâce à Kiwio Premium."
+            titre: String(localized: "Tes repas, chaque jour"),
+            texte: String(localized: "Jusqu'à 30 scans par jour pour voir ce que chaque assiette t'apporte. Grâce à Kiwio Premium.")
         ),
     ]
 
@@ -100,7 +100,7 @@ struct AstucesAttenteCarte: View {
                 HStack(spacing: 6) {
                     Image(systemName: astuce.genre == .premium ? "sparkles" : "info.circle.fill")
                         .font(.dsLegende.weight(.semibold))
-                    Text(astuce.genre == .premium ? "Kiwio Premium" : "Bon à savoir")
+                    Text(astuce.genre == .premium ? "Kiwio Premium" : String(localized: "Bon à savoir"))
                         .font(.dsLegende.weight(.semibold))
                     Spacer(minLength: 8)
                     pagination
@@ -136,7 +136,7 @@ struct AstucesAttenteCarte: View {
         }
         .buttonStyle(.dsPress)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(astuce.genre == .premium ? "Kiwio Premium" : "Bon à savoir"). \(astuce.titre). \(astuce.texte)")
+        .accessibilityLabel("\(astuce.genre == .premium ? "Kiwio Premium" : String(localized: "Bon à savoir")). \(astuce.titre). \(astuce.texte)")
         .accessibilityHint("Touche deux fois pour l'astuce suivante.")
         .accessibilityAddTraits(.updatesFrequently)
         .task(id: cycle) {

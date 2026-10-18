@@ -58,7 +58,7 @@ struct AnalysisErrorRetryView: View {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 16, weight: .semibold))
                     }
-                    Text(isRetrying ? "Nouvel essai..." : "Réessayer")
+                    Text(isRetrying ? String(localized: "Nouvel essai...") : String(localized: "Réessayer"))
                         .font(.dsHeadline)
                         .tracking(DSTracking.corps)
                 }
@@ -116,7 +116,7 @@ struct AllNutrientsSheet: View {
                 // Titre et fermeture hors de la barre d'outils : un seul rond
                 // de verre, cible tactile de 44 pt (loi 20). Voir
                 // `FeuilleEnTeteFermer` pour le pourquoi.
-                FeuilleEnTeteFermer(titre: "Tous mes nutriments") { dismiss() }
+                FeuilleEnTeteFermer(titre: String(localized: "Tous mes nutriments")) { dismiss() }
 
                 ScrollView {
                     LazyVGrid(

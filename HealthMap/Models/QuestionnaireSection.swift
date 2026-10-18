@@ -13,6 +13,19 @@ enum QuestionnaireSection: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .profil: return String(localized: "Profil")
+        case .modeDeVie: return String(localized: "Mode de vie")
+        case .sante: return String(localized: "Santé")
+        case .nutrition: return String(localized: "Nutrition")
+        case .symptomes: return String(localized: "Symptômes")
+        case .medical: return String(localized: "Médical")
+        }
+    }
+
+    /// Nom de la section tel qu'il part dans les événements d'analyse : toujours
+    /// en français, quelle que soit la langue de l'app (`title` est traduit).
+    var nomAnalytics: String {
+        switch self {
         case .profil: return "Profil"
         case .modeDeVie: return "Mode de vie"
         case .sante: return "Santé"
@@ -106,7 +119,7 @@ struct Question: Identifiable {
         isExpressOnly: Bool = false
     ) {
         self.id = id
-        self.text = text
+        self.text = Langue.texte(text)
         self.type = type
         self.options = options
         self.showIf = showIf
@@ -132,7 +145,7 @@ struct QuestionOption: Identifiable {
 
     init(_ id: String, _ label: String, emoji: String? = nil) {
         self.id = id
-        self.label = label
+        self.label = Langue.texte(label)
         self.emoji = emoji
     }
 }
@@ -191,8 +204,8 @@ extension QuestionnaireSection {
         // (`prenomConnuDuCompte`) et surtout PAS dans un `showIf` : un `showIf`
         // qui lit le champ que la question remplit la fait disparaître à la
         // première lettre tapée (bug du 17 juil. au 1er oct. 2026).
-        Question(id: "firstName", text: "Comment tu t'appelles ?", type: .textInput(placeholder: "Prénom")),
-        Question(id: "age", text: "Quel âge as-tu ?", type: .numericInput(placeholder: "25", suffix: "ans")),
+        Question(id: "firstName", text: "Comment tu t'appelles ?", type: .textInput(placeholder: String(localized: "Prénom"))),
+        Question(id: "age", text: "Quel âge as-tu ?", type: .numericInput(placeholder: "25", suffix: String(localized: "ans"))),
         Question(
             id: "gender",
             text: "Tu es...",

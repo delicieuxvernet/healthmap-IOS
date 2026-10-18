@@ -11,10 +11,10 @@ enum ImpactClassification: String, Codable {
 
     var label: String {
         switch self {
-        case .tresPositif: return "Tres positif"
-        case .positif: return "Positif"
-        case .neutre: return "Neutre"
-        case .negatif: return "Negatif"
+        case .tresPositif: return String(localized: "Tres positif")
+        case .positif: return String(localized: "Positif")
+        case .neutre: return String(localized: "Neutre")
+        case .negatif: return String(localized: "Negatif")
         }
     }
 
@@ -71,9 +71,9 @@ struct DataQuality {
 
         var label: String {
             switch self {
-            case .complete: return "Donnees completes"
-            case .partial: return "Donnees partielles"
-            case .limited: return "Donnees limitees"
+            case .complete: return String(localized: "Donnees completes")
+            case .partial: return String(localized: "Donnees partielles")
+            case .limited: return String(localized: "Donnees limitees")
             }
         }
 
@@ -135,13 +135,13 @@ enum FoodScanError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .productNotFound:
-            return "Produit introuvable. Vérifie le code-barres."
+            return String(localized: "Produit introuvable. Vérifie le code-barres.")
         case .networkError(let error):
-            return "Erreur reseau : \(error.localizedDescription)"
+            return String(localized: "Erreur reseau : \(error.localizedDescription)")
         case .timeout:
-            return "Délai dépassé. Réessaie."
+            return String(localized: "Délai dépassé. Réessaie.")
         case .invalidResponse:
-            return "Reponse invalide du serveur."
+            return String(localized: "Reponse invalide du serveur.")
         }
     }
 }
@@ -195,13 +195,13 @@ final class FoodScanService {
 
     // Open Food Facts field -> NutrientID + unit + RDA
     private static let MICRO_MAPPING: [MicroMapping] = [
-        MicroMapping(offField: "vitamin-d_100g",  nutrientId: .vitD,      label: "Vitamine D",  emoji: "☀️",  unit: "µg", rda: 20),
-        MicroMapping(offField: "vitamin-c_100g",  nutrientId: .vitC,      label: "Vitamine C",  emoji: "🍊",  unit: "mg", rda: 90),
-        MicroMapping(offField: "calcium_100g",    nutrientId: .calcium,   label: "Calcium",     emoji: "🦴",  unit: "mg", rda: 1000),
-        MicroMapping(offField: "iron_100g",       nutrientId: .iron,      label: "Fer",         emoji: "🩸",  unit: "mg", rda: 18),
-        MicroMapping(offField: "magnesium_100g",  nutrientId: .magnesium, label: "Magnesium",   emoji: "⚡",  unit: "mg", rda: 400),
-        MicroMapping(offField: "zinc_100g",       nutrientId: .zinc,      label: "Zinc",        emoji: "🛡️",  unit: "mg", rda: 11),
-        MicroMapping(offField: "iodine_100g",     nutrientId: .iodine,    label: "Iode",        emoji: "🌊",  unit: "µg", rda: 150),
+        MicroMapping(offField: "vitamin-d_100g",  nutrientId: .vitD,      label: String(localized: "Vitamine D"),  emoji: "☀️",  unit: "µg", rda: 20),
+        MicroMapping(offField: "vitamin-c_100g",  nutrientId: .vitC,      label: String(localized: "Vitamine C"),  emoji: "🍊",  unit: "mg", rda: 90),
+        MicroMapping(offField: "calcium_100g",    nutrientId: .calcium,   label: String(localized: "Calcium"),     emoji: "🦴",  unit: "mg", rda: 1000),
+        MicroMapping(offField: "iron_100g",       nutrientId: .iron,      label: String(localized: "Fer"),         emoji: "🩸",  unit: "mg", rda: 18),
+        MicroMapping(offField: "magnesium_100g",  nutrientId: .magnesium, label: String(localized: "Magnesium"),   emoji: "⚡",  unit: "mg", rda: 400),
+        MicroMapping(offField: "zinc_100g",       nutrientId: .zinc,      label: String(localized: "Zinc"),        emoji: "🛡️",  unit: "mg", rda: 11),
+        MicroMapping(offField: "iodine_100g",     nutrientId: .iodine,    label: String(localized: "Iode"),        emoji: "🌊",  unit: "µg", rda: 150),
     ]
 
     // Total micro fields tracked for data quality denominator
@@ -259,8 +259,8 @@ final class FoodScanService {
         // Parse basic info
         let name = productDict["product_name"] as? String
             ?? productDict["product_name_fr"] as? String
-            ?? "Produit inconnu"
-        let brand = productDict["brands"] as? String ?? "Marque inconnue"
+            ?? String(localized: "Produit inconnu")
+        let brand = productDict["brands"] as? String ?? String(localized: "Marque inconnue")
         let imageURL = productDict["image_url"] as? String
             ?? productDict["image_front_url"] as? String
         let nutriScoreRaw = productDict["nutriscore_grade"] as? String
@@ -397,7 +397,7 @@ final class FoodScanService {
         if sugars > 12.5 {
             impacts.append(NutrientImpact(
                 nutrientId: nil,
-                label: "Sucres eleves",
+                label: String(localized: "Sucres eleves"),
                 emoji: "🍬",
                 classification: .negatif,
                 pctRDA: 0
@@ -408,7 +408,7 @@ final class FoodScanService {
         if saturatedFat > 5 {
             impacts.append(NutrientImpact(
                 nutrientId: nil,
-                label: "Graisses saturees",
+                label: String(localized: "Graisses saturees"),
                 emoji: "🧈",
                 classification: .negatif,
                 pctRDA: 0

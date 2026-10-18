@@ -15,9 +15,9 @@ enum ProgresSegment: String, CaseIterable, Identifiable {
     var id: Self { self }
     var libelle: String {
         switch self {
-        case .symptomes: return "Symptômes"
-        case .apports: return "Apports"
-        case .calories: return "Calories"
+        case .symptomes: return String(localized: "Symptômes")
+        case .apports: return String(localized: "Apports")
+        case .calories: return String(localized: "Calories")
         }
     }
 }
@@ -74,9 +74,9 @@ struct ProgresToileApport: Identifiable, Equatable {
 
     /// Le mot posé sous le chiffre.
     var mot: String {
-        if estCouvert { return "à ton besoin" }
-        if estAAffiner { return "à affiner" }
-        return statut == .aSurveiller ? "à surveiller" : "à renforcer"
+        if estCouvert { return String(localized: "à ton besoin") }
+        if estAAffiner { return String(localized: "à affiner") }
+        return statut == .aSurveiller ? String(localized: "à surveiller") : String(localized: "à renforcer")
     }
 }
 
@@ -350,12 +350,12 @@ struct ProgresToileDessin: View, Animatable {
 
     private var resume: String {
         let couverts = ProgresToile.couverts(apports)
-        return "Toile de tes apports : \(couverts) sur \(apports.count) à ton besoin"
+        return String(localized: "Toile de tes apports : \(couverts) sur \(apports.count) à ton besoin")
     }
 
     private static func valeurVocale(_ apport: ProgresToileApport) -> String {
         let statut = apport.mot
-        return "\(apport.pct) pour cent de ton besoin, \(statut)"
+        return String(localized: "\(apport.pct) pour cent de ton besoin, \(statut)")
     }
 
     var body: some View {
@@ -517,21 +517,21 @@ struct ProgresToileLegende: View {
     private var detailAAffiner: String { detail(apports.filter(\.estAAffiner)) }
 
     private func detail(_ liste: [ProgresToileApport]) -> String {
-        if liste.count > 3 { return "\(liste.count) apports" }
+        if liste.count > 3 { return String(localized: "\(liste.count) apports") }
         return liste.map { ProgresToile.nomEnPhrase($0.nom) }.joined(separator: ", ")
     }
 
     /// « À renforcer » s'il y a une alerte sûre ; sinon « À surveiller ».
     private var titreOrange: String {
         let avecStatut = apports.contains { $0.statut != nil }
-        guard avecStatut else { return "À renforcer" }
-        return apports.contains { $0.statut == .aRenforcer } ? "À renforcer ou à surveiller" : "À surveiller"
+        guard avecStatut else { return String(localized: "À renforcer") }
+        return apports.contains { $0.statut == .aRenforcer } ? String(localized: "À renforcer ou à surveiller") : String(localized: "À surveiller")
     }
 
     private var detailCouverts: String {
         let couverts = ProgresToile.couverts(apports)
-        if couverts == apports.count { return "tes \(couverts) apports" }
-        return couverts == 1 ? "1 autre" : "les \(couverts) autres"
+        if couverts == apports.count { return String(localized: "tes \(couverts) apports") }
+        return couverts == 1 ? String(localized: "1 autre") : String(localized: "les \(couverts) autres")
     }
 
     var body: some View {
@@ -543,11 +543,11 @@ struct ProgresToileLegende: View {
             }
             if apports.contains(where: \.estAAffiner) {
                 ligne(couleur: Color.dsSecondaire, symbole: "questionmark.circle.fill",
-                      titre: "À affiner", detail: detailAAffiner)
+                      titre: String(localized: "À affiner"), detail: detailAAffiner)
             }
             if couverts > 0 {
                 ligne(couleur: Color.dsCouvert, symbole: "checkmark.circle.fill",
-                      titre: "À ton besoin", detail: detailCouverts)
+                      titre: String(localized: "À ton besoin"), detail: detailCouverts)
             }
             HStack(spacing: 6) {
                 Path { chemin in
@@ -693,9 +693,11 @@ struct ProgresBarChart: View {
     private var libelleVocal: String {
         let jours = points.compactMap { p -> String? in
             guard let v = p.valeur else { return nil }
-            return "\(p.libelle) \(Int(v.rounded()))\(p.horsCible ? ", hors cible" : "")"
+            return p.horsCible
+                ? String(localized: "\(p.libelle) \(Int(v.rounded())), hors cible")
+                : "\(p.libelle) \(Int(v.rounded()))"
         }
-        guard !jours.isEmpty else { return "Aucun repas suivi sur les sept derniers jours." }
+        guard !jours.isEmpty else { return String(localized: "Aucun repas suivi sur les sept derniers jours.") }
         return jours.joined(separator: ", ")
     }
 }
@@ -750,7 +752,7 @@ struct ProgresPremierJourCard: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
-            DSCapsuleButton(titre: "Suivre mon premier repas", action: onSuivre)
+            DSCapsuleButton(titre: String(localized: "Suivre mon premier repas"), action: onSuivre)
                 .padding(.top, 20)
         }
         .padding(.vertical, 28)

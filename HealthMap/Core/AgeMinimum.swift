@@ -27,5 +27,5 @@ enum AgeMinimum {
     }
 
     /// Ce que l'écran dit à quelqu'un de plus jeune.
-    static let message = "Kiwio est réservé aux personnes de 16 ans et plus. Rien de ce que tu as répondu n'est gardé."
+    static let message = String(localized: "Kiwio est réservé aux personnes de 16 ans et plus. Rien de ce que tu as répondu n'est gardé.")
 }

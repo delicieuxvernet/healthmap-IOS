@@ -47,7 +47,7 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
         let rest = section.tipRest?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let joined = [bold, rest].filter { !$0.isEmpty }.joined(separator: " ")
         let causes = (section.causes ?? []).compactMap { $0.label }.filter { !$0.isEmpty }
-        let causesIntro = causes.isEmpty ? "Ton plan personnalisé pour ce point." : causes.joined(separator: ", ")
+        let causesIntro = causes.isEmpty ? String(localized: "Ton plan personnalisé pour ce point.") : causes.joined(separator: ", ")
         let intro: String
         let introTeasing: String?
         if !joined.isEmpty {
@@ -64,9 +64,9 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
             let slot: PlanRitualStep.Slot
             let title: String
             switch moment {
-            case "matin": slot = .matin;   title = "Matin"
-            case "midi":  slot = .journee; title = "Midi"
-            case "soir":  slot = .soir;    title = "Soir"
+            case "matin": slot = .matin;   title = String(localized: "Matin")
+            case "midi":  slot = .journee; title = String(localized: "Midi")
+            case "soir":  slot = .soir;    title = String(localized: "Soir")
             default:      slot = .journee; title = String(moment.prefix(1)).uppercased() + moment.dropFirst()
             }
             let detail = (r.actions ?? []).joined(separator: "\n")
@@ -78,12 +78,12 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
             let asset = n.icone.map { $0.hasPrefix("fluent_") ? $0 : "fluent_\($0)" } ?? "fluent_leaf"
             return PlanNutritionSolution(
                 asset: asset,
-                label: n.aliment ?? "Aliment",
-                note: n.niveau2 ?? "Riche en nutriments",
-                qty: "1 portion par jour",
-                moment: "Au repas principal",
-                cuisson: "Cuisson douce pour préserver les apports",
-                astuce: n.niveau3 ?? "À associer à une source de vitamine C"
+                label: n.aliment ?? String(localized: "Aliment"),
+                note: n.niveau2 ?? String(localized: "Riche en nutriments"),
+                qty: String(localized: "1 portion par jour"),
+                moment: String(localized: "Au repas principal"),
+                cuisson: String(localized: "Cuisson douce pour préserver les apports"),
+                astuce: n.niveau3 ?? String(localized: "À associer à une source de vitamine C")
             )
         }
 
@@ -96,8 +96,8 @@ func planTopicsFromV2(_ analysis: AIAnalysisV2) -> [PlanTopic] {
 
         // Solutions « par les compléments ».
         let complements: [PlanSupplementSolution] = (section.solutions?.complements ?? []).map { c in
-            let name = c.complementId.flatMap { complementNames[$0] } ?? "Complément"
-            return PlanSupplementSolution(name: name, note: c.phrase ?? "", tag: "Si besoin", strong: false)
+            let name = c.complementId.flatMap { complementNames[$0] } ?? String(localized: "Complément")
+            return PlanSupplementSolution(name: name, note: c.phrase ?? "", tag: String(localized: "Si besoin"), strong: false)
         }
 
         return PlanTopic(

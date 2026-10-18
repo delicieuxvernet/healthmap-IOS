@@ -133,7 +133,7 @@ struct PriseDeSang: Codable, Equatable, Identifiable {
     func dateCourte(maintenant: Date = Date()) -> String {
         guard let date else { return takenAt }
         let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
+        f.locale = Langue.locale
         f.timeZone = TimeZone(identifier: "UTC")
         let memeAnnee = Calendar.current.component(.year, from: date) == Calendar.current.component(.year, from: maintenant)
         f.dateFormat = memeAnnee ? "d MMM" : "d MMM yyyy"
@@ -187,7 +187,7 @@ enum PriseDeSangApports {
     }
 
     static func libelle(_ prise: PriseDeSang, maintenant: Date = Date()) -> String {
-        "Ta prise de sang du \(prise.dateCourte(maintenant: maintenant))"
+        String(localized: "Ta prise de sang du \(prise.dateCourte(maintenant: maintenant))")
     }
 
     /// Ce que la prise de sang apporte au hash du bilan : sa date, puis ce
@@ -261,10 +261,10 @@ enum PriseDeSangApports {
 
         var libelle: String {
             switch self {
-            case .sousIntervalle: return "sous l'intervalle du labo"
-            case .dansIntervalle: return "dans l'intervalle du labo"
-            case .auDessus: return "au-dessus de l'intervalle du labo"
-            case .sansRepere: return "sans intervalle imprimé"
+            case .sousIntervalle: return String(localized: "sous l'intervalle du labo")
+            case .dansIntervalle: return String(localized: "dans l'intervalle du labo")
+            case .auDessus: return String(localized: "au-dessus de l'intervalle du labo")
+            case .sansRepere: return String(localized: "sans intervalle imprimé")
             }
         }
     }
@@ -289,14 +289,14 @@ enum PriseDeSangApports {
     /// Les aliments où se trouve l'apport mesuré (`rappelleLAssiette`).
     static func aliments(pour m: MarqueurSanguin) -> [String] {
         if let n = m.nutriment, let liste = SourcesAlimentaires.parNutriment[n] { return liste }
-        if m.code == "folates" { return ["Légumes verts", "Légumineuses", "Avocat"] }
+        if m.code == "folates" { return [String(localized: "Légumes verts"), String(localized: "Légumineuses"), String(localized: "Avocat")] }
         return []
     }
 
     /// « 18 ng/mL » — virgule décimale, sans zéro inutile.
     static func valeurLisible(_ v: Double) -> String {
         let f = NumberFormatter()
-        f.locale = Locale(identifier: "fr_FR")
+        f.locale = Langue.locale
         f.minimumFractionDigits = 0
         f.maximumFractionDigits = v < 10 ? 2 : (v < 100 ? 1 : 0)
         return f.string(from: NSNumber(value: v)) ?? String(v)
@@ -306,9 +306,9 @@ enum PriseDeSangApports {
     /// fourchette est celle IMPRIMÉE sur le compte rendu, citée comme telle.
     static func repereLisible(_ m: MarqueurSanguin) -> String? {
         switch (m.borneBasse, m.borneHaute) {
-        case let (b?, h?): return "intervalle du labo : \(valeurLisible(b))–\(valeurLisible(h))"
-        case let (b?, nil): return "intervalle du labo : ≥ \(valeurLisible(b))"
-        case let (nil, h?): return "intervalle du labo : ≤ \(valeurLisible(h))"
+        case let (b?, h?): return String(localized: "intervalle du labo : \(valeurLisible(b))–\(valeurLisible(h))")
+        case let (b?, nil): return String(localized: "intervalle du labo : ≥ \(valeurLisible(b))")
+        case let (nil, h?): return String(localized: "intervalle du labo : ≤ \(valeurLisible(h))")
         default: return nil
         }
     }

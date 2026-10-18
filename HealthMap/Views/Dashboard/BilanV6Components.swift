@@ -21,10 +21,10 @@ extension StatutV2 {
     /// alerte que la validation permet d'affirmer, gris = à affiner.
     var displayLabel: String {
         switch self {
-        case .couvre:      return "Couvert"
-        case .aRenforcer:  return "À surveiller"
-        case .aCombler:    return "À renforcer"
-        case .neutre:      return "À affiner"
+        case .couvre:      return String(localized: "Couvert")
+        case .aRenforcer:  return String(localized: "À surveiller")
+        case .aCombler:    return String(localized: "À renforcer")
+        case .neutre:      return String(localized: "À affiner")
         }
     }
 }
@@ -119,7 +119,7 @@ struct ApportV2DetailSheet: View {
     private var definition: NutrientDefinition? {
         apport.id.flatMap { NutrientData.definition(for: $0) }
     }
-    private var nom: String { apport.nom ?? definition?.label ?? "Apport" }
+    private var nom: String { apport.nom ?? definition?.label ?? String(localized: "Apport") }
     private var avecArticle: String { NomApport.avecArticle(id: apport.id ?? "", repli: nom) }
     private var aliments: [AlimentV2] {
         Array((apport.aliments ?? []).filter { $0.nom?.isEmpty == false }.prefix(4))
@@ -179,7 +179,7 @@ struct ApportV2DetailSheet: View {
 
     private var uniteAuCentre: String? {
         guard let id = apport.id, let estimation else { return nil }
-        return "\(LectureEstimation.uniteAffichage(id, estimation: estimation)) / jour"
+        return String(localized: "\(LectureEstimation.uniteAffichage(id, estimation: estimation)) / jour")
     }
 
     private var uniteAffichee: String {
@@ -221,36 +221,36 @@ struct ApportV2DetailSheet: View {
 
                     let sources = sourcesEstimees
                     if !sources.isEmpty {
-                        FicheBloc(titre: "D'où vient cet apport", rang: 1) {
+                        FicheBloc(titre: String(localized: "D'où vient cet apport"), rang: 1) {
                             sourcesCarte(sources)
                         }
                     }
 
                     if let restant = LectureEstimation.journeesAvantFiabilite(estimation) {
-                        FicheBloc(titre: "Pour une estimation fiable", rang: 1) {
+                        FicheBloc(titre: String(localized: "Pour une estimation fiable"), rang: 1) {
                             fiabiliteCarte(notees: restant.notees, conseillees: restant.conseillees)
                         }
                     } else if !estimation.alerteOuverte,
                               let resultat = dashboardVM.estimation,
                               let caddie = LectureEstimation.alimentsACocher(resultat) {
-                        FicheBloc(titre: "Pour une estimation fiable", rang: 1) {
+                        FicheBloc(titre: String(localized: "Pour une estimation fiable"), rang: 1) {
                             caddieCarte(coches: caddie.coches, minimum: caddie.minimum)
                         }
                     }
 
                     if let id = apport.id, let note = LectureEstimation.notePriseDeSang(id) {
-                        FicheBloc(titre: "Et ta prise de sang ?", rang: 2) {
+                        FicheBloc(titre: String(localized: "Et ta prise de sang ?"), rang: 2) {
                             FicheTexteCarte(texte: note)
                         }
                     }
                 } else if !causes.isEmpty {
-                    FicheBloc(titre: "Ce qui pèse le plus", note: "touche pour comprendre", rang: 1) {
+                    FicheBloc(titre: String(localized: "Ce qui pèse le plus"), note: String(localized: "touche pour comprendre"), rang: 1) {
                         causesCarte(causes)
                     }
                 }
 
                 if aDesGestes {
-                    FicheBloc(titre: "Ce que tu peux faire, dès aujourd'hui", rang: 2) {
+                    FicheBloc(titre: String(localized: "Ce que tu peux faire, dès aujourd'hui"), rang: 2) {
                         if premium {
                             gestesCarte(gestes)
                         } else {
@@ -262,7 +262,7 @@ struct ApportV2DetailSheet: View {
                 }
 
                 if !aliments.isEmpty {
-                    FicheBloc(titre: "Où le trouver", rang: 3) {
+                    FicheBloc(titre: String(localized: "Où le trouver"), rang: 3) {
                         if premium {
                             alimentsPastilles
                         } else {
@@ -498,7 +498,7 @@ struct ApportV2DetailSheet: View {
                 .background(Color.teinteKiwiPale, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(restantes == 1 ? "Note encore 1 journée de repas" : "Note encore \(restantes) journées de repas")
+                Text(restantes == 1 ? String(localized: "Note encore 1 journée de repas") : String(localized: "Note encore \(restantes) journées de repas"))
                     .font(.dsSousTitreFort)
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
@@ -527,7 +527,7 @@ struct ApportV2DetailSheet: View {
                 .background(Color.teinteKiwiPale, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(restants == 1 ? "Coche encore 1 aliment dans tes courses" : "Coche encore \(restants) aliments dans tes courses")
+                Text(restants == 1 ? String(localized: "Coche encore 1 aliment dans tes courses") : String(localized: "Coche encore \(restants) aliments dans tes courses"))
                     .font(.dsSousTitreFort)
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
@@ -630,7 +630,7 @@ struct ApportV2DetailSheet: View {
     /// et le facteur auquel il répond.
     private func sousLigne(_ geste: LectureApport.Geste) -> String {
         let cause = geste.cause.prefix(1).lowercased() + geste.cause.dropFirst()
-        guard let regain = LectureApport.libelleRegain(geste.regain) else { return "répond à : \(cause)" }
+        guard let regain = LectureApport.libelleRegain(geste.regain) else { return String(localized: "répond à : \(cause)") }
         return "\(regain) · \(cause)"
     }
 
@@ -710,21 +710,21 @@ struct ApportV2DetailSheet: View {
                     }
                     .buttonStyle(.dsPress)
                     .dsCard()
-                    .accessibilityValue(enSavoirPlus ? "déplié" : "replié")
+                    .accessibilityValue(enSavoirPlus ? String(localized: "déplié") : String(localized: "replié"))
 
                     if enSavoirPlus {
                         VStack(alignment: .leading, spacing: 0) {
                             if let role {
-                                FicheBloc(titre: "À quoi ça sert", rang: 0) { FicheTexteCarte(texte: role) }
+                                FicheBloc(titre: String(localized: "À quoi ça sert"), rang: 0) { FicheTexteCarte(texte: role) }
                             }
                             if let signes {
-                                FicheBloc(titre: "À quoi ça répond chez toi", rang: 0) { FicheTexteCarte(texte: signes) }
+                                FicheBloc(titre: String(localized: "À quoi ça répond chez toi"), rang: 0) { FicheTexteCarte(texte: signes) }
                             }
                             if let why {
-                                FicheBloc(titre: "Ce que dit ton bilan", rang: 0) { FicheTexteCarte(texte: why) }
+                                FicheBloc(titre: String(localized: "Ce que dit ton bilan"), rang: 0) { FicheTexteCarte(texte: why) }
                             }
                             if calcul {
-                                FicheBloc(titre: "Le détail du calcul", note: "touche une ligne", rang: 0) {
+                                FicheBloc(titre: String(localized: "Le détail du calcul"), note: String(localized: "touche une ligne"), rang: 0) {
                                     CascadeApport(detail: detail, couleur: couleurApport,
                                                   apportAvecArticle: avecArticle, surligne: $surligne)
                                         .padding(.horizontal, DS.paddingCarte)
@@ -746,10 +746,10 @@ struct ApportV2DetailSheet: View {
     /// s'y trouve vraiment.
     private func resumeDuReplie(role: Bool, signes: Bool, calcul: Bool) -> String {
         var morceaux: [String] = []
-        if role { morceaux.append("à quoi ça sert") }
-        if signes { morceaux.append("tes signes") }
-        if calcul { morceaux.append("le détail du calcul") }
-        if morceaux.isEmpty { return "Ce que dit ton bilan" }
+        if role { morceaux.append(String(localized: "à quoi ça sert")) }
+        if signes { morceaux.append(String(localized: "tes signes")) }
+        if calcul { morceaux.append(String(localized: "le détail du calcul")) }
+        if morceaux.isEmpty { return String(localized: "Ce que dit ton bilan") }
         return NomNutriment.majusculeInitiale(morceaux.joined(separator: ", "))
     }
 
@@ -759,22 +759,24 @@ struct ApportV2DetailSheet: View {
     /// « Passe Premium » générique. Le compte annoncé est celui des gestes
     /// réellement floutés, rien de plus.
     private func titreDeLaPorte(gestes n: Int) -> String {
-        guard n > 0 else { return "Où trouver \(avecArticle)" }
-        let mots = ["", "Un", "Deux", "Trois", "Quatre"]
-        let nombre = n < mots.count ? mots[n] : "\(n)"
-        return n == 1 ? "\(nombre) geste t'attend" : "\(nombre) gestes t'attendent"
+        guard n > 0 else { return String(localized: "Où trouver \(avecArticle)") }
+        switch n {
+        case 1: return String(localized: "Un geste t'attend")
+        case 2: return String(localized: "Deux gestes t'attendent")
+        case 3: return String(localized: "Trois gestes t'attendent")
+        case 4: return String(localized: "Quatre gestes t'attendent")
+        default: return String(localized: "\(n) gestes t'attendent")
+        }
     }
 
     private func sousTitreDeLaPorte(aDesGestes: Bool) -> String {
-        let quoi: String
         if aDesGestes && !aliments.isEmpty {
-            quoi = "Ce que tu peux faire dès aujourd'hui, et où le trouver."
+            return String(localized: "Ce que tu peux faire dès aujourd'hui, et où le trouver. Les causes, elles, restent toujours gratuites.")
         } else if aDesGestes {
-            quoi = "Ce que tu peux faire dès aujourd'hui."
+            return String(localized: "Ce que tu peux faire dès aujourd'hui. Les causes, elles, restent toujours gratuites.")
         } else {
-            quoi = "Les aliments qui couvrent ce besoin."
+            return String(localized: "Les aliments qui couvrent ce besoin. Les causes, elles, restent toujours gratuites.")
         }
-        return quoi + " Les causes, elles, restent toujours gratuites."
     }
 }
 
@@ -789,7 +791,7 @@ enum QuantiteApport {
         guard let definition = NutrientData.definition(for: id) else { return nil }
         let besoin = BesoinsDeReference.besoin(definition.id, profil: profil)
         let absolu = besoin * Double(score) / 100
-        return "\(DS.decimal(absolu)) sur \(DS.decimal(besoin))\(DS.fine)\(definition.unit) par jour"
+        return String(localized: "\(DS.decimal(absolu)) sur \(DS.decimal(besoin))\(DS.fine)\(definition.unit) par jour")
     }
 }
 

@@ -13,10 +13,10 @@ enum PasswordStrength: Int, Comparable {
 
     var label: String {
         switch self {
-        case .weak:      return "Faible"
-        case .fair:      return "Moyen"
-        case .strong:    return "Fort"
-        case .veryStrong: return "Très fort"
+        case .weak:      return String(localized: "Faible")
+        case .fair:      return String(localized: "Moyen")
+        case .strong:    return String(localized: "Fort")
+        case .veryStrong: return String(localized: "Très fort")
         }
     }
 }
@@ -32,15 +32,15 @@ enum PasswordValidationIssue: Equatable {
     var message: String {
         switch self {
         case .tooShort:
-            return "Le mot de passe doit contenir au moins 8 caracteres."
+            return String(localized: "Le mot de passe doit contenir au moins 8 caracteres.")
         case .noUppercase:
-            return "Le mot de passe doit contenir au moins une lettre majuscule."
+            return String(localized: "Le mot de passe doit contenir au moins une lettre majuscule.")
         case .noDigit:
-            return "Le mot de passe doit contenir au moins un chiffre."
+            return String(localized: "Le mot de passe doit contenir au moins un chiffre.")
         case .noSpecialCharacter:
-            return "Le mot de passe doit contenir au moins un caractère spécial (!@#$%…)."
+            return String(localized: "Le mot de passe doit contenir au moins un caractère spécial (!@#$%…).")
         case .commonPassword:
-            return "Ce mot de passe est trop courant. Choisissez-en un plus unique."
+            return String(localized: "Ce mot de passe est trop courant. Choisissez-en un plus unique.")
         }
     }
 }

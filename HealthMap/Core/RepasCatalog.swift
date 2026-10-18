@@ -29,10 +29,10 @@ enum RepasBilan: String, CaseIterable, Identifiable {
     /// Libellé court de l'onglet.
     var onglet: String {
         switch self {
-        case .petitDej: return "Petit déj"
-        case .midi: return "Midi"
-        case .gouter: return "Goûter"
-        case .soir: return "Soir"
+        case .petitDej: return String(localized: "Petit déj")
+        case .midi: return String(localized: "Midi")
+        case .gouter: return String(localized: "Goûter")
+        case .soir: return String(localized: "Soir")
         }
     }
 
@@ -49,10 +49,10 @@ enum RepasBilan: String, CaseIterable, Identifiable {
     /// Titre de l'écran.
     var titre: String {
         switch self {
-        case .petitDej: return "Ton petit déj"
-        case .midi: return "Ton midi"
-        case .gouter: return "Ton goûter"
-        case .soir: return "Ton soir"
+        case .petitDej: return String(localized: "Ton petit déj")
+        case .midi: return String(localized: "Ton midi")
+        case .gouter: return String(localized: "Ton goûter")
+        case .soir: return String(localized: "Ton soir")
         }
     }
 }
@@ -223,13 +223,13 @@ enum RepasCatalog {
     /// Nom raccourci de quelques vedettes, pour tenir sur une tuile : le
     /// catalogue dit « Escalopes de poulet », la tuile dit « Poulet ».
     static let nomsCourts: [String: String] = [
-        "escalopes_poulet": "Poulet",
-        "escalopes_dinde": "Dinde",
-        "cereales_petit_dej": "Céréales",
-        "lait": "Lait",
-        "sardines": "Sardines",
-        "champignons": "Champignons",
-        "confiture": "Confiture",
+        "escalopes_poulet": String(localized: "Poulet"),
+        "escalopes_dinde": String(localized: "Dinde"),
+        "cereales_petit_dej": String(localized: "Céréales"),
+        "lait": String(localized: "Lait"),
+        "sardines": String(localized: "Sardines"),
+        "champignons": String(localized: "Champignons"),
+        "confiture": String(localized: "Confiture"),
     ]
 
     /// Le nom affiché sur une tuile.

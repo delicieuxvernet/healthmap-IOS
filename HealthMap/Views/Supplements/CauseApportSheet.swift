@@ -35,18 +35,18 @@ struct CauseApportSheet: View {
     private var explication: CauseApport.Explication { CauseApport.explication(pour: contribution) }
     private var estUnFrein: Bool { contribution.delta < 0 }
     private var scoreSans: Int { detail.scoreSans(contribution) }
-    private var possessif: String { NomApport.possessif(apportAvecArticle) }
+    private var possessif: String { Langue.texte(NomApport.possessif(apportAvecArticle)) }
 
     /// « Sans ce facteur, ton fer passerait de 47 à 62. »
     private var phraseSimulation: String {
         if estUnFrein {
             return scoreSans > detail.score
-                ? "Sans ce facteur, \(possessif) passerait de \(detail.score) à \(scoreSans)."
-                : "Sans ce facteur, \(possessif) resterait à \(detail.score) : d'autres facteurs pèsent plus lourd."
+                ? String(localized: "Sans ce facteur, \(possessif) passerait de \(detail.score) à \(scoreSans).")
+                : String(localized: "Sans ce facteur, \(possessif) resterait à \(detail.score) : d'autres facteurs pèsent plus lourd.")
         }
         return scoreSans < detail.score
-            ? "Sans cette habitude, \(possessif) serait à \(scoreSans) au lieu de \(detail.score)."
-            : "Cette habitude tient \(possessif) à son niveau."
+            ? String(localized: "Sans cette habitude, \(possessif) serait à \(scoreSans) au lieu de \(detail.score).")
+            : String(localized: "Cette habitude tient \(possessif) à son niveau.")
     }
 
     var body: some View {
@@ -58,11 +58,11 @@ struct CauseApportSheet: View {
                     .padding(.top, 18)
                     .kiwiEntrance(1)
 
-                FicheBloc(titre: estUnFrein ? "Pourquoi ça pèse" : "Pourquoi ça aide", rang: 2) {
+                FicheBloc(titre: estUnFrein ? String(localized: "Pourquoi ça pèse") : String(localized: "Pourquoi ça aide"), rang: 2) {
                     FicheTexteCarte(texte: explication.pourquoi)
                 }
 
-                FicheBloc(titre: "D'où ça vient", rang: 3) {
+                FicheBloc(titre: String(localized: "D'où ça vient"), rang: 3) {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("C'est ce que tu nous as \(contribution.provenance).")
                             .font(.dsSousTitre)
@@ -85,15 +85,15 @@ struct CauseApportSheet: View {
                 }
 
                 if let geste = explication.geste {
-                    FicheBloc(titre: "Par où commencer", rang: 4) {
+                    FicheBloc(titre: String(localized: "Par où commencer"), rang: 4) {
                         if subscriptionService.isPremium {
                             FicheTexteCarte(texte: geste)
                         } else {
                             GatedOverlay(intensity: .teaser) { FicheTexteCarte(texte: geste) }
                             UnlockDoor(
                                 icon: "lock.fill",
-                                title: "Débloque le geste qui fait remonter \(possessif)",
-                                subtitle: "Le détail à appliquer, cause par cause.",
+                                title: String(localized: "Débloque le geste qui fait remonter \(possessif)"),
+                                subtitle: String(localized: "Le détail à appliquer, cause par cause."),
                                 zone: "cause_apport"
                             )
                         }
@@ -182,7 +182,7 @@ struct CauseApportSheet: View {
                     .foregroundStyle(estUnFrein ? Color.dsAccent : Color.dsSecondaire)
                     .contentTransition(.numericText())
                 Spacer(minLength: 8)
-                Text(estUnFrein ? "à regagner" : "ce qu'elle tient")
+                Text(estUnFrein ? String(localized: "à regagner") : String(localized: "ce qu'elle tient"))
                     .font(.dsLegende.weight(.semibold))
                     .foregroundStyle(Color.dsSecondaire)
             }

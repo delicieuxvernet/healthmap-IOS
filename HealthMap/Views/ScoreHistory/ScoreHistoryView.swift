@@ -52,8 +52,8 @@ struct ScoreHistoryView: View {
                                 }
                                 UnlockDoor(
                                     icon: "chart.xyaxis.line",
-                                    title: "Vois ta trajectoire complète",
-                                    subtitle: "Ta courbe et ton historique, semaine après semaine",
+                                    title: String(localized: "Vois ta trajectoire complète"),
+                                    subtitle: String(localized: "Ta courbe et ton historique, semaine après semaine"),
                                     zone: "historique_score"
                                 )
                                 .padding(.horizontal, Theme.spacingLG)
@@ -260,7 +260,7 @@ private struct ScoreHistoriqueAudio: AXChartDescriptorRepresentable {
     let points: [ScoreSnapshot]
 
     private static func jour(_ date: Date) -> String {
-        date.formatted(.dateTime.day().month(.wide).locale(Locale(identifier: "fr_FR")))
+        date.formatted(.dateTime.day().month(.wide).locale(Langue.locale))
     }
 
     /// « De 52 le 3 septembre à 68 le 9 octobre. Plus haut 70, plus bas 48,
@@ -268,13 +268,12 @@ private struct ScoreHistoriqueAudio: AXChartDescriptorRepresentable {
     static func resume(_ historique: [ScoreSnapshot]) -> String {
         let tries = historique.sorted { $0.date < $1.date }
         guard let premier = tries.first, let dernier = tries.last else {
-            return "Aucun relevé."
+            return String(localized: "Aucun relevé.")
         }
         let scores = tries.map(\.score)
         let haut = scores.max() ?? dernier.score
         let bas = scores.min() ?? dernier.score
-        return "De \(premier.score) le \(jour(premier.date)) à \(dernier.score) le \(jour(dernier.date)). "
-            + "Plus haut \(haut), plus bas \(bas), sur \(tries.count) relevés."
+        return String(localized: "De \(premier.score) le \(jour(premier.date)) à \(dernier.score) le \(jour(dernier.date)). Plus haut \(haut), plus bas \(bas), sur \(tries.count) relevés.")
     }
 
     func makeChartDescriptor() -> AXChartDescriptor {
@@ -284,28 +283,28 @@ private struct ScoreHistoriqueAudio: AXChartDescriptorRepresentable {
         let fin = max(tries.last?.date.timeIntervalSince1970 ?? 0, debut + 86_400)
 
         let axeDates = AXNumericDataAxisDescriptor(
-            title: "Date",
+            title: String(localized: "Date"),
             range: debut...fin,
             gridlinePositions: []
         ) { valeur in
             Self.jour(Date(timeIntervalSince1970: valeur))
         }
         let axeScore = AXNumericDataAxisDescriptor(
-            title: "Score",
+            title: String(localized: "Score"),
             range: 0...100,
             gridlinePositions: [50, 75]
         ) { valeur in
-            "\(Int(valeur.rounded())) sur 100"
+            String(localized: "\(Int(valeur.rounded())) sur 100")
         }
         let serie = AXDataSeriesDescriptor(
-            name: "Score",
+            name: String(localized: "Score"),
             isContinuous: true,
             dataPoints: tries.map {
                 AXDataPoint(x: $0.date.timeIntervalSince1970, y: Double($0.score))
             }
         )
         return AXChartDescriptor(
-            title: "Évolution de ton score",
+            title: String(localized: "Évolution de ton score"),
             summary: Self.resume(points),
             xAxis: axeDates,
             yAxis: axeScore,

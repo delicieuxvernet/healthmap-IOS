@@ -30,18 +30,18 @@ private enum PortionMacro {
 
     var nom: String {
         switch self {
-        case .proteines: return "Protéines"
-        case .glucides: return "Glucides"
-        case .lipides: return "Lipides"
+        case .proteines: return String(localized: "Protéines")
+        case .glucides: return String(localized: "Glucides")
+        case .lipides: return String(localized: "Lipides")
         }
     }
 
     /// Libellé court, quand les trois puces ne tiennent pas sur une ligne.
     var abrege: String {
         switch self {
-        case .proteines: return "Prot."
-        case .glucides: return "Gluc."
-        case .lipides: return "Lip."
+        case .proteines: return String(localized: "Prot.")
+        case .glucides: return String(localized: "Gluc.")
+        case .lipides: return String(localized: "Lip.")
         }
     }
 
@@ -222,7 +222,7 @@ struct PortionSheet: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.dsPress)
-                .accessibilityLabel(favori.wrappedValue ? "Retirer des favoris" : "Ajouter aux favoris")
+                .accessibilityLabel(favori.wrappedValue ? String(localized: "Retirer des favoris") : String(localized: "Ajouter aux favoris"))
             }
         }
     }
@@ -237,10 +237,10 @@ struct PortionSheet: View {
     private var subtitleText: String {
         switch mode {
         case .add(let d, _):
-            let base = d.kcal100g.map { "\(Int($0.rounded())) kcal / 100 g" } ?? "calories inconnues"
+            let base = d.kcal100g.map { "\(Int($0.rounded())) kcal / 100 g" } ?? String(localized: "calories inconnues")
             return d.brand.map { "\($0) · \(base)" } ?? base
         case .edit(let r):
-            return "\(r.record.slot.label) · aujourd'hui"
+            return String(localized: "\(r.record.slot.label) · aujourd'hui")
         case .info(let r):
             var parts = ["\(r.calories) kcal"]
             if let g = r.grams { parts.append("\(Int(g.rounded())) g") }
@@ -380,7 +380,7 @@ struct PortionSheet: View {
             let n = UnitPortionCatalog.nombreSuivant(nombre(unite), delta: delta)
             allerA(Self.auDixieme(n * unite.poids(taille: taille)))
         }
-        .accessibilityLabel(delta > 0 ? "Ajouter une unité" : "Retirer une unité")
+        .accessibilityLabel(delta > 0 ? String(localized: "Ajouter une unité") : String(localized: "Retirer une unité"))
     }
 
     /// Un « − » ou un « + ». Maintenu, il répète son pas de plus en plus vite
@@ -413,9 +413,9 @@ struct PortionSheet: View {
     private var controlesGrammes: some View {
         VStack(spacing: 12) {
             HStack(spacing: 8) {
-                presetPill("Petite", 80)
-                presetPill("Moyenne", 150)
-                presetPill("Grande", 250)
+                presetPill(String(localized: "Petite"), 80)
+                presetPill(String(localized: "Moyenne"), 150)
+                presetPill(String(localized: "Grande"), 250)
             }
 
             HStack(spacing: Theme.spacingMD) {
@@ -483,7 +483,7 @@ struct PortionSheet: View {
         boutonPas(symbol, enButee: delta < 0 ? grams <= 1 : grams >= 1500) {
             allerA((grams + Double(delta)).rounded())
         }
-        .accessibilityLabel(delta > 0 ? "Plus 10 grammes" : "Moins 10 grammes")
+        .accessibilityLabel(delta > 0 ? String(localized: "Plus 10 grammes") : String(localized: "Moins 10 grammes"))
     }
 
     /// Rond de verre clair de 44 pt, signe dans le vert de ce qui se touche.
@@ -568,16 +568,16 @@ struct PortionSheet: View {
     private func infoBody(_ row: MealJournalRow) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             macroPuces(p: row.macros.proteins, c: row.macros.carbs, f: row.macros.fats)
-            noteCard("Cette ligne vient d'un ancien scan ou d'un ajout à la main : le détail aliment par aliment n'existe pas. Tu ne peux pas changer la quantité, et la supprimer retire le repas en entier.")
+            noteCard(String(localized: "Cette ligne vient d'un ancien scan ou d'un ajout à la main : le détail aliment par aliment n'existe pas. Tu ne peux pas changer la quantité, et la supprimer retire le repas en entier."))
         }
     }
 
     private var incomputableNote: some View {
-        noteCard("Les calories de ce produit ne sont pas renseignées dans sa fiche. Tu ne peux donc pas l'ajouter au compteur.")
+        noteCard(String(localized: "Les calories de ce produit ne sont pas renseignées dans sa fiche. Tu ne peux donc pas l'ajouter au compteur."))
     }
 
     private var microsNote: some View {
-        noteCard("Produit de marque : les macros sont complètes, mais seules les fibres sont connues côté micronutriments.")
+        noteCard(String(localized: "Produit de marque : les macros sont complètes, mais seules les fibres sont connues côté micronutriments."))
     }
 
     private func noteCard(_ text: String) -> some View {
@@ -603,7 +603,7 @@ struct PortionSheet: View {
     private var actions: some View {
         switch mode {
         case .add(let detail, let slot):
-            primaryButton("Ajouter \(slot.complementDeTemps)",
+            primaryButton(String(localized: "Ajouter \(slot.complementDeTemps)"),
                           enabled: grams > 0 && detail.kcal100g != nil) {
                 guard let onAdd else { return }
                 isWorking = true
@@ -615,15 +615,15 @@ struct PortionSheet: View {
                 }
             }
         case .edit(let row):
-            primaryButton("Enregistrer", enabled: grams > 0) {
+            primaryButton(String(localized: "Enregistrer"), enabled: grams > 0) {
                 onSave?(Double(grams))
                 HapticService.shared.success()
                 dismiss()
             }
-            deleteButton(title: row.deletesWholeRecord ? "Supprimer du journal" : "Retirer cet aliment",
+            deleteButton(title: row.deletesWholeRecord ? String(localized: "Supprimer du journal") : String(localized: "Retirer cet aliment"),
                          filled: false)
         case .info(let row):
-            deleteButton(title: row.deletesWholeRecord ? "Supprimer du journal" : "Retirer cet aliment",
+            deleteButton(title: row.deletesWholeRecord ? String(localized: "Supprimer du journal") : String(localized: "Retirer cet aliment"),
                          filled: true)
         }
     }
@@ -716,10 +716,10 @@ struct PastillesUnites: View {
                 ForEach(Array(unites.enumerated()), id: \.offset) { _, u in
                     let poids = UnitPortionCatalog.formater(u.grammes)
                     pastille("\(u.singulier) · \(poids) g",
-                             vocal: "\(u.singulier), \(poids) grammes",
+                             vocal: String(localized: "\(u.singulier), \(poids) grammes"),
                              retenue: active == u) { onChoisir(u) }
                 }
-                pastille("g", vocal: "En grammes", retenue: active == nil) { onChoisir(nil) }
+                pastille("g", vocal: String(localized: "En grammes"), retenue: active == nil) { onChoisir(nil) }
             }
         }
         // L'ombre des pastilles de verre déborde de la rangée.
@@ -959,7 +959,7 @@ struct FoodSearchSheet: View {
             let distants = vm.hits.filter { !idsLocaux.contains($0.id) }
             if !locaux.isEmpty {
                 VStack(spacing: 8) {
-                    RechercheSectionTitre(titre: "Tes aliments")
+                    RechercheSectionTitre(titre: String(localized: "Tes aliments"))
                     carteHabituels(locaux)
                 }
             }
@@ -1002,13 +1002,13 @@ struct FoodSearchSheet: View {
         } else {
             if !recentsVus.isEmpty {
                 VStack(spacing: 8) {
-                    RechercheSectionTitre(titre: "Récents")
+                    RechercheSectionTitre(titre: String(localized: "Récents"))
                     carteHabituels(recentsVus)
                 }
             }
             if !habituels.favoris.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    RechercheSectionTitre(titre: "Favoris")
+                    RechercheSectionTitre(titre: String(localized: "Favoris"))
                     DSFlow(espacement: 8) {
                         ForEach(Array(habituels.favoris.enumerated()), id: \.element.id) { index, favori in
                             favoriChip(favori, index: index)
@@ -1045,7 +1045,7 @@ struct FoodSearchSheet: View {
                 }
                 ligne(hit: aliment.hit, sousTitre: aliment.sousTitre,
                       ouvrir: { ouvrir(aliment) }, ajouter: { ajouter(aliment) },
-                      libelleAjout: "Ajouter \(aliment.nom), \(Int(aliment.grammes.rounded())) grammes")
+                      libelleAjout: String(localized: "Ajouter \(aliment.nom), \(Int(aliment.grammes.rounded())) grammes"))
                     .kiwiEntrance(index)
             }
         }
@@ -1176,8 +1176,8 @@ struct FoodSearchSheet: View {
     private func hitRow(_ hit: MealJournalService.FoodHit) -> some View {
         ligne(hit: hit, sousTitre: nil,
               ouvrir: { openDetail(hit) }, ajouter: { quickAdd(hit) },
-              libelleAjout: UnitPortionCatalog.unite(pourNom: hit.name).map { "Ajouter \(hit.name), \($0.libelle(nombre: 1))" }
-                  ?? "Ajouter \(hit.name), 100 grammes")
+              libelleAjout: UnitPortionCatalog.unite(pourNom: hit.name).map { String(localized: "Ajouter \(hit.name), \($0.libelle(nombre: 1))") }
+                  ?? String(localized: "Ajouter \(hit.name), 100 grammes"))
     }
 
     /// Une ligne : toucher ouvre la fiche portion, le « + » ajoute d'un geste,
@@ -1362,7 +1362,7 @@ struct FoodSearchSheet: View {
     private func showConfirmation(for detail: MealJournalService.FoodDetail, grams: Double) {
         let kcal = Int(((detail.kcal100g ?? 0) * grams / 100).rounded())
         nombreAjouts += 1
-        withAnimation(animationConfirmation) { confirmation = "\(detail.name) ajouté · \(kcal) kcal" }
+        withAnimation(animationConfirmation) { confirmation = String(localized: "\(detail.name) ajouté · \(kcal) kcal") }
         Task {
             try? await Task.sleep(nanoseconds: 2_200_000_000)
             withAnimation(animationConfirmation) { confirmation = nil }

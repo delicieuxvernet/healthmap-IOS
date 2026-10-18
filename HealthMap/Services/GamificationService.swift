@@ -433,17 +433,17 @@ enum BadgeType: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .firstCheckin: return "Premier pas"
-        case .streak3: return "3 jours d'affilee"
-        case .streak7: return "Semaine parfaite"
-        case .streak30: return "Mois d'or"
-        case .dedicated10: return "Assidu"
-        case .dedicated50: return "Expert"
-        case .scoreHigh: return "Score > 80"
-        case .scoreExcellent: return "Score > 90"
-        case .questionnaireComplete: return "Bilan complet"
-        case .mealScanned: return "Premier scan"
-        case .explorer: return "Explorateur"
+        case .firstCheckin: return String(localized: "Premier pas")
+        case .streak3: return String(localized: "3 jours d'affilee")
+        case .streak7: return String(localized: "Semaine parfaite")
+        case .streak30: return String(localized: "Mois d'or")
+        case .dedicated10: return String(localized: "Assidu")
+        case .dedicated50: return String(localized: "Expert")
+        case .scoreHigh: return String(localized: "Score > 80")
+        case .scoreExcellent: return String(localized: "Score > 90")
+        case .questionnaireComplete: return String(localized: "Bilan complet")
+        case .mealScanned: return String(localized: "Premier scan")
+        case .explorer: return String(localized: "Explorateur")
         }
     }
 

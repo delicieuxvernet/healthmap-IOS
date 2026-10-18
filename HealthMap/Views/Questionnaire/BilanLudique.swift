@@ -163,7 +163,7 @@ struct BilanChemin: View {
 
     private var descriptionVocale: String {
         let finies = avancements.filter { $0 >= 1 }.count
-        return "\(finies) étapes terminées sur \(EtapeBilan.allCases.count)"
+        return String(localized: "\(finies) étapes terminées sur \(EtapeBilan.allCases.count)")
     }
 }
 
@@ -306,8 +306,8 @@ struct BilanQuestions: View {
         }
         .buttonStyle(.dsPress)
         .transition(.scale(scale: 0.9).combined(with: .opacity))
-        .accessibilityLabel(question.resume.map { "\(question.titre) : \($0)" } ?? question.titre)
-        .accessibilityHint(question.resume == nil ? "Touche pour y répondre." : "Touche pour modifier ta réponse.")
+        .accessibilityLabel(question.resume.map { String(localized: "\(question.titre) : \($0)") } ?? question.titre)
+        .accessibilityHint(question.resume == nil ? Text("Touche pour y répondre.") : Text("Touche pour modifier ta réponse."))
     }
 
     /// Après une réponse, on laisse le choix s'allumer, puis on passe à la
@@ -446,7 +446,7 @@ struct BilanVisage: View {
                 .transition(.scale(scale: 0.85).combined(with: .opacity))
                 .accessibilityHidden(true)
 
-            Text(repondu && choix.indices.contains(index) ? choix[index].titre : "Glisse pour répondre")
+            Text(repondu && choix.indices.contains(index) ? choix[index].titre : String(localized: "Glisse pour répondre"))
                 .font(repondu ? .dsHeadline : .dsSousTitre)
                 .foregroundStyle(repondu ? Color.dsTexte : Color.dsSecondaire)
 
@@ -464,7 +464,7 @@ struct BilanVisage: View {
                 .tint(Color.dsAccent)
                 .opacity(repondu ? 1 : 0.5)
                 .accessibilityLabel(titre)
-                .accessibilityValue(repondu ? choix[index].titre : "Pas encore répondu")
+                .accessibilityValue(repondu ? choix[index].titre : String(localized: "Pas encore répondu"))
                 .padding(.top, 4)
 
                 HStack {
@@ -569,14 +569,14 @@ struct BilanAssiette: View {
         .animation(reduceMotion ? nil : Animation.kiwiFluide, value: jauges)
         .animation(reduceMotion ? nil : Animation.kiwiVif, value: nombre)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(nombre == 1 ? "Ton assiette, 1 aliment" : "Ton assiette, \(nombre) aliments")
+        .accessibilityLabel(nombre == 1 ? Text("Ton assiette, 1 aliment") : Text("Ton assiette, \(nombre) aliments"))
         .accessibilityValue(descriptionVocale(apports))
     }
 
     private func descriptionVocale(_ apports: [NutrientDefinition]) -> String {
         apports.map { apport in
             let pourcent = Int(((jauges[apport.id] ?? 0) * 100).rounded())
-            return "\(apport.label) \(min(100, pourcent)) pour cent"
+            return String(localized: "\(apport.label) \(min(100, pourcent)) pour cent")
         }
         .joined(separator: ", ")
     }
@@ -811,8 +811,8 @@ struct BilanCartePisteCachee: View {
             )
         }
         .buttonStyle(.dsPress)
-        .accessibilityLabel(retournee ? "\(definition.label), \(EtatApport.aSurveiller.mention)" : "Piste \(rang + 1)")
-        .accessibilityHint(retournee ? "" : "Touche pour la découvrir.")
+        .accessibilityLabel(retournee ? Text("\(definition.label), \(EtatApport.aSurveiller.mention)") : Text("Piste \(rang + 1)"))
+        .accessibilityHint(retournee ? Text(verbatim: "") : Text("Touche pour la découvrir."))
     }
 
     private var dos: some View {

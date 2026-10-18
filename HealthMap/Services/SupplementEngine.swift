@@ -42,16 +42,16 @@ enum SupplementEngine {
 
     static func nutrientLabel(for id: NutrientID) -> String {
         switch id {
-        case .vitD: return "Vitamine D"
-        case .vitB12: return "Vitamine B12"
-        case .iron: return "Fer"
-        case .magnesium: return "Magnésium"
-        case .omega3: return "Oméga-3"
-        case .vitC: return "Vitamine C"
-        case .calcium: return "Calcium"
-        case .zinc: return "Zinc"
-        case .iodine: return "Iode"
-        case .fiber: return "Fibres"
+        case .vitD: return String(localized: "Vitamine D")
+        case .vitB12: return String(localized: "Vitamine B12")
+        case .iron: return String(localized: "Fer")
+        case .magnesium: return String(localized: "Magnésium")
+        case .omega3: return String(localized: "Oméga-3")
+        case .vitC: return String(localized: "Vitamine C")
+        case .calcium: return String(localized: "Calcium")
+        case .zinc: return String(localized: "Zinc")
+        case .iodine: return String(localized: "Iode")
+        case .fiber: return String(localized: "Fibres")
         }
     }
 
@@ -158,37 +158,38 @@ enum SupplementEngine {
         let isDeficient = score < 40
         let diet = getDietType(profile)
 
-        var why = "Ton score \(label) est de \(score)/100"
-        why += isDeficient ? ", à renforcer en priorité." : ", à surveiller."
+        var why = isDeficient
+            ? String(localized: "Ton score \(label) est de \(score)/100, à renforcer en priorité.")
+            : String(localized: "Ton score \(label) est de \(score)/100, à surveiller.")
 
         // Diet-specific context
         if difficulty >= 8 {
             if diet == "vegan" && nutrientID == .vitB12 {
-                why += " La B12 est absente des aliments végétaux, un complément est indispensable."
+                why += " " + String(localized: "La B12 est absente des aliments végétaux, un complément est indispensable.")
             } else if nutrientID == .vitD {
-                why += " La vitamine D est presque impossible à obtenir par l'alimentation seule."
+                why += " " + String(localized: "La vitamine D est presque impossible à obtenir par l'alimentation seule.")
             } else {
-                why += " Ce nutriment est très difficile à rattraper par l'alimentation seule."
+                why += " " + String(localized: "Ce nutriment est très difficile à rattraper par l'alimentation seule.")
             }
         } else if difficulty >= 6 {
-            why += " Ce nutriment est difficile à obtenir en quantité suffisante avec ton profil."
+            why += " " + String(localized: "Ce nutriment est difficile à obtenir en quantité suffisante avec ton profil.")
         }
 
         // Profile-specific reasons
         if nutrientID == .iron && hasHeavyPeriods(profile) {
-            why += " Tes règles abondantes augmentent tes pertes de fer."
+            why += " " + String(localized: "Tes règles abondantes augmentent tes pertes de fer.")
         }
         if nutrientID == .iron && (diet == "vegan" || diet == "vegetarien") {
-            why += " Le fer des végétaux est moins bien absorbé."
+            why += " " + String(localized: "Le fer des végétaux est moins bien absorbé.")
         }
         if nutrientID == .vitB12 && isSenior(profile) {
-            why += " L'absorption de la B12 diminue avec l'âge."
+            why += " " + String(localized: "L'absorption de la B12 diminue avec l'âge.")
         }
         if nutrientID == .magnesium && hasHighStress(profile) {
-            why += " Un stress qui dure épuise tes réserves de magnésium."
+            why += " " + String(localized: "Un stress qui dure épuise tes réserves de magnésium.")
         }
         if nutrientID == .omega3 && (diet == "vegan" || diet == "vegetarien") {
-            why += " Sans poisson, l'apport en oméga-3 marins est presque nul."
+            why += " " + String(localized: "Sans poisson, l'apport en oméga-3 marins est presque nul.")
         }
 
         // « Comment on l'a vu » : ce que les symptômes déclarés permettent
@@ -356,7 +357,7 @@ enum SupplementEngine {
             let first = groupProducts[0]
             return ScheduleGroup(
                 id: groupName,
-                label: groupName,
+                label: Langue.texte(groupName),
                 icon: first.timing.displayGroupIcon,
                 color: first.timing.displayGroupColor,
                 products: groupProducts
@@ -373,32 +374,32 @@ enum SupplementEngine {
         (
             pair: ["calcium", "iron"],
             emoji: "🦴🩸",
-            message: "Ne prends jamais le fer et le calcium en même temps : ils se gênent l'un l'autre. Espace les prises de 2h minimum.",
+            message: String(localized: "Ne prends jamais le fer et le calcium en même temps : ils se gênent l'un l'autre. Espace les prises de 2h minimum."),
             severity: .moderate
         ),
         (
             pair: ["iron", "zinc"],
             emoji: "🩸🛡️",
-            message: "Le fer et le zinc se gênent l'un l'autre. Prends le fer le matin et le zinc le soir.",
+            message: String(localized: "Le fer et le zinc se gênent l'un l'autre. Prends le fer le matin et le zinc le soir."),
             severity: .moderate
         ),
         (
             pair: ["calcium", "zinc"],
             emoji: "🦴🛡️",
-            message: "Le calcium réduit l'absorption du zinc. Espace les prises de 2h.",
+            message: String(localized: "Le calcium réduit l'absorption du zinc. Espace les prises de 2h."),
             severity: .moderate
         ),
         (
             pair: ["calcium", "magnesium"],
             emoji: "🦴⚡",
-            message: "À forte dose, le calcium et le magnésium se gênent l'un l'autre. Prends-les à des repas différents.",
+            message: String(localized: "À forte dose, le calcium et le magnésium se gênent l'un l'autre. Prends-les à des repas différents."),
             severity: .moderate
         ),
         // Zinc haute dose reduit l'absorption du cuivre
         (
             pair: ["zinc", "copper"],
             emoji: "🛡️🟤",
-            message: "À forte dose (plus de 25 mg par jour), le zinc réduit l'absorption du cuivre. Préfère un complément zinc + cuivre, ou fais des cures plus courtes.",
+            message: String(localized: "À forte dose (plus de 25 mg par jour), le zinc réduit l'absorption du cuivre. Préfère un complément zinc + cuivre, ou fais des cures plus courtes."),
             severity: .moderate
         ),
     ]
@@ -436,7 +437,7 @@ enum SupplementEngine {
                         let antiLabel = NutrientID(rawValue: anti).map { nutrientLabel(for: $0) } ?? anti
                         warnings.append(InteractionWarning(
                             emoji: "⚠️",
-                            message: "\(product.name) : à ne pas prendre avec \(antiLabel). Espace les prises de 2h minimum.",
+                            message: String(localized: "\(product.name) : à ne pas prendre avec \(antiLabel). Espace les prises de 2h minimum."),
                             nutrients: Array(pair),
                             severity: .moderate
                         ))
@@ -469,7 +470,7 @@ enum SupplementEngine {
         if medicationSet.contains("anticoagulant") && recommendedNutrients.contains(.omega3) {
             warnings.append(InteractionWarning(
                 emoji: "🩸⚠️",
-                message: "Anticoagulant + oméga-3 : risque de saignement plus élevé. Demande l'avis de ton médecin avant de prendre des oméga-3.",
+                message: String(localized: "Anticoagulant + oméga-3 : risque de saignement plus élevé. Demande l'avis de ton médecin avant de prendre des oméga-3."),
                 nutrients: ["omega3", "anticoagulant"],
                 severity: .critical
             ))
@@ -479,7 +480,7 @@ enum SupplementEngine {
         if medicationSet.contains("ppi") && recommendedNutrients.contains(.iron) {
             warnings.append(InteractionWarning(
                 emoji: "💊🩸",
-                message: "IPP + fer : les IPP réduisent l'acidité de l'estomac, dont le fer a besoin pour être absorbé. Prends le fer 2h avant l'IPP.",
+                message: String(localized: "IPP + fer : les IPP réduisent l'acidité de l'estomac, dont le fer a besoin pour être absorbé. Prends le fer 2h avant l'IPP."),
                 nutrients: ["iron", "ppi"],
                 severity: .moderate
             ))
@@ -489,7 +490,7 @@ enum SupplementEngine {
         if medicationSet.contains("ppi") && recommendedNutrients.contains(.calcium) {
             warnings.append(InteractionWarning(
                 emoji: "💊🦴",
-                message: "IPP + calcium : ton estomac est moins acide, et le calcium en a besoin pour être absorbé. Prends-le pendant un repas, jamais à jeun.",
+                message: String(localized: "IPP + calcium : ton estomac est moins acide, et le calcium en a besoin pour être absorbé. Prends-le pendant un repas, jamais à jeun."),
                 nutrients: ["calcium", "ppi"],
                 severity: .moderate
             ))
@@ -499,7 +500,7 @@ enum SupplementEngine {
         if medicationSet.contains("ppi") && recommendedNutrients.contains(.magnesium) {
             warnings.append(InteractionWarning(
                 emoji: "💊⚡",
-                message: "IPP + magnésium : pris longtemps, les IPP peuvent épuiser le magnésium. À surveiller avec ton médecin.",
+                message: String(localized: "IPP + magnésium : pris longtemps, les IPP peuvent épuiser le magnésium. À surveiller avec ton médecin."),
                 nutrients: ["magnesium", "ppi"],
                 severity: .moderate
             ))
@@ -509,7 +510,7 @@ enum SupplementEngine {
         if medicationSet.contains("metformin") && recommendedNutrients.contains(.vitB12) {
             warnings.append(InteractionWarning(
                 emoji: "💉🔴",
-                message: "Metformine + B12 : la metformine réduit l'absorption de la B12. Un complément est recommandé (méthylcobalamine, ou une forme à laisser fondre sous la langue).",
+                message: String(localized: "Metformine + B12 : la metformine réduit l'absorption de la B12. Un complément est recommandé (méthylcobalamine, ou une forme à laisser fondre sous la langue)."),
                 nutrients: ["vitB12", "metformin"],
                 severity: .moderate
             ))
@@ -522,7 +523,7 @@ enum SupplementEngine {
             if recommendedNutrients.contains(.iodine) {
                 warnings.append(InteractionWarning(
                     emoji: "🦋🌊",
-                    message: "Traitement thyroïdien + iode : l'iode peut interférer avec ton traitement. Demande l'avis de ton médecin avant d'en prendre.",
+                    message: String(localized: "Traitement thyroïdien + iode : l'iode peut interférer avec ton traitement. Demande l'avis de ton médecin avant d'en prendre."),
                     nutrients: ["iodine", "thyroid_med"],
                     severity: .critical
                 ))
@@ -530,7 +531,7 @@ enum SupplementEngine {
             for nutriment in [NutrientID.iron, .calcium] where recommendedNutrients.contains(nutriment) {
                 warnings.append(InteractionWarning(
                     emoji: "🦋💊",
-                    message: "Traitement thyroïdien + \(nutrientLabel(for: nutriment).lowercased()) : pris au même moment, il réduit l'absorption de ton traitement. Espace les prises de 4h.",
+                    message: String(localized: "Traitement thyroïdien + \(nutrientLabel(for: nutriment).lowercased()) : pris au même moment, il réduit l'absorption de ton traitement. Espace les prises de 4h."),
                     nutrients: [nutriment.rawValue, "thyroid_med"],
                     severity: .moderate
                 ))
@@ -546,7 +547,7 @@ enum SupplementEngine {
             where produit.antiInteractions.contains(antiInteractionMedicaments) {
                 warnings.append(InteractionWarning(
                     emoji: "🌾💊",
-                    message: "\(produit.name) : les fibres ralentissent l'absorption des médicaments pris en même temps. Espace les prises de 2h.",
+                    message: String(localized: "\(produit.name) : les fibres ralentissent l'absorption des médicaments pris en même temps. Espace les prises de 2h."),
                     nutrients: [produit.nutrientID.rawValue, antiInteractionMedicaments],
                     severity: .moderate
                 ))
@@ -575,7 +576,7 @@ enum SupplementEngine {
             && recommendedNutrients.contains(.magnesium) {
             warnings.append(InteractionWarning(
                 emoji: "🫘⚡",
-                message: "Tes reins filtrent moins bien : le magnésium peut s'accumuler. Valide la dose avec ton médecin avant de commencer.",
+                message: String(localized: "Tes reins filtrent moins bien : le magnésium peut s'accumuler. Valide la dose avec ton médecin avant de commencer."),
                 nutrients: ["magnesium", "kidney_condition"],
                 severity: .critical
             ))
@@ -588,7 +589,7 @@ enum SupplementEngine {
             && recommendedNutrients.contains(.iodine) {
             warnings.append(InteractionWarning(
                 emoji: "🦋🌊",
-                message: "Avec une thyroïde qui s'emballe ou qui traîne, l'iode ne se prend pas à l'aveugle. Demande l'avis de ton médecin avant.",
+                message: String(localized: "Avec une thyroïde qui s'emballe ou qui traîne, l'iode ne se prend pas à l'aveugle. Demande l'avis de ton médecin avant."),
                 nutrients: ["iodine", "thyroid_condition"],
                 severity: .critical
             ))
@@ -597,7 +598,7 @@ enum SupplementEngine {
         if isPregnant(profile) && recommendedNutrients.contains(.iron) {
             warnings.append(InteractionWarning(
                 emoji: "🤰🩸",
-                message: "Grossesse : tes besoins en fer augmentent, mais valide le dosage avec ton médecin ou ta sage-femme avant de te supplémenter.",
+                message: String(localized: "Grossesse : tes besoins en fer augmentent, mais valide le dosage avec ton médecin ou ta sage-femme avant de te supplémenter."),
                 nutrients: ["iron", "grossesse"],
                 severity: .moderate
             ))

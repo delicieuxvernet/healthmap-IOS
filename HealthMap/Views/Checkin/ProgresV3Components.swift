@@ -14,7 +14,7 @@ enum ProgresDates {
     /// « 17 sept. » — le formatter est coûteux, les cartes se redessinent souvent.
     private static let formatJour: DateFormatter = {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
+        f.locale = Langue.locale
         f.dateFormat = "d MMM"
         return f
     }()
@@ -49,7 +49,7 @@ enum ProgresTeintes {
     static func sujetCourt(_ trend: SymptomTrend) -> String {
         let mots = trend.noun.split(separator: " ", maxSplits: 1)
         let sujet = mots.count == 2 ? String(mots[1]) : trend.noun
-        return ProgresVerdict.majuscule(sujet)
+        return ProgresVerdict.majuscule(Langue.texte(sujet))
     }
 }
 
@@ -311,10 +311,10 @@ struct ProgresCourbeSymptome: View {
     }
 
     private var libelleVocal: String {
-        if gatee { return "Courbe du symptôme, réservée à Kiwio Premium" }
-        let symptome = "Courbe du symptôme, de \(libelleBas) en bas à \(libelleHaut) en haut"
+        if gatee { return String(localized: "Courbe du symptôme, réservée à Kiwio Premium") }
+        let symptome = String(localized: "Courbe du symptôme, de \(libelleBas) en bas à \(libelleHaut) en haut")
         guard apportTraceable, let nom = apport?.nom else { return symptome }
-        return symptome + ", avec celle de \(nom) d'après tes repas notés"
+        return symptome + String(localized: ", avec celle de \(nom) d'après tes repas notés")
     }
 
     /// La courbe de l'apport a-t-elle au moins un morceau (deux jours de suite)
@@ -462,7 +462,7 @@ struct ProgresBarresSemaines: View {
             .frame(height: Self.hauteurBarres, alignment: .bottom)
 
             HStack(alignment: .firstTextBaseline) {
-                Text(semaines.first.map { "Sem. du " + ProgresDates.jourCourt($0.debut) } ?? "")
+                Text(semaines.first.map { String(localized: "Sem. du \(ProgresDates.jourCourt($0.debut))") } ?? "")
                 Spacer(minLength: 8)
                 Text("Cette sem.")
             }
@@ -497,13 +497,15 @@ struct ProgresBarresSemaines: View {
     }
 
     private var libelleVocal: String {
-        if gatee { return "Tes réponses semaine par semaine, réservées à Kiwio Premium" }
+        if gatee { return String(localized: "Tes réponses semaine par semaine, réservées à Kiwio Premium") }
         let detail = semaines.map { semaine -> String in
-            guard semaine.repondus > 0 else { return "pas de réponse" }
-            return "\(semaine.mieux) jour\(semaine.mieux > 1 ? "s" : "") mieux"
+            guard semaine.repondus > 0 else { return String(localized: "pas de réponse") }
+            return semaine.mieux > 1
+                ? String(localized: "\(semaine.mieux) jours mieux")
+                : String(localized: "\(semaine.mieux) jour mieux")
         }
-        return "Tes réponses semaine par semaine, de la plus ancienne à cette semaine : "
-            + detail.joined(separator: ", ")
+        let liste = detail.joined(separator: ", ")
+        return String(localized: "Tes réponses semaine par semaine, de la plus ancienne à cette semaine : \(liste)")
     }
 }
 
@@ -580,7 +582,7 @@ struct ProgresBarresCheckin: View {
 
     private var libelleVocal: String {
         let repondus = jours.filter { $0.ressenti != nil }.count
-        return "Tes réponses au check-in : \(repondus) sur \(jours.count) jours"
+        return String(localized: "Tes réponses au check-in : \(repondus) sur \(jours.count) jours")
     }
 }
 
@@ -720,13 +722,13 @@ struct ProgresDepuisLeDebutCard: View {
     private var titre: String {
         let progresse = lignes.contains(where: { $0.ecart >= ProgresVerdict.ecartMinimum })
         return (!verrouille && progresse)
-            ? "Ce qui progresse avant que tu le sentes."
-            : "Ce qui bouge avant que tu le sentes."
+            ? String(localized: "Ce qui progresse avant que tu le sentes.")
+            : String(localized: "Ce qui bouge avant que tu le sentes.")
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ProgresCarteEntete(symbole: "hourglass", titre: "En coulisses",
+            ProgresCarteEntete(symbole: "hourglass", titre: String(localized: "En coulisses"),
                                teinte: Color.teinteFer, teinteTexte: Color.teinteFerTexte)
 
             Text(titre)
@@ -764,16 +766,16 @@ struct ProgresDepuisLeDebutCard: View {
 
     /// Sous l'écart minimum, un mouvement est du bruit : on dit « stable ».
     private func verdict(_ ligne: Ligne) -> String {
-        if verrouille { return "Ta tendance" }
-        if ligne.ecart >= ProgresVerdict.ecartMinimum { return "En hausse" }
-        if ligne.ecart <= -ProgresVerdict.ecartMinimum { return "En baisse" }
-        return "Stable"
+        if verrouille { return String(localized: "Ta tendance") }
+        if ligne.ecart >= ProgresVerdict.ecartMinimum { return String(localized: "En hausse") }
+        if ligne.ecart <= -ProgresVerdict.ecartMinimum { return String(localized: "En baisse") }
+        return String(localized: "Stable")
     }
 
     private func detail(_ ligne: Ligne) -> String {
-        if verrouille { return "Elle se mesure, repas après repas." }
-        if ligne.ecart == 0 { return "Toujours \(DS.pourcent(ligne.apres)) de ton besoin." }
-        return "De \(ligne.avant) à \(DS.pourcent(ligne.apres)) de ton besoin."
+        if verrouille { return String(localized: "Elle se mesure, repas après repas.") }
+        if ligne.ecart == 0 { return String(localized: "Toujours \(DS.pourcent(ligne.apres)) de ton besoin.") }
+        return String(localized: "De \(ligne.avant) à \(DS.pourcent(ligne.apres)) de ton besoin.")
     }
 
     private func rangee(_ ligne: Ligne) -> some View {
@@ -818,9 +820,9 @@ struct ProgresDepuisLeDebutCard: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(verrouille
-            ? "\(ligne.nom), tendance réservée à Kiwio Premium"
-            : "\(ligne.nom), de \(ligne.avant) à \(ligne.apres) pour cent")
-        .accessibilityHint(verrouille ? "Ouvre l'offre Premium" : "Ouvre la fiche de cet apport")
+            ? String(localized: "\(ligne.nom), tendance réservée à Kiwio Premium")
+            : String(localized: "\(ligne.nom), de \(ligne.avant) à \(ligne.apres) pour cent"))
+        .accessibilityHint(verrouille ? String(localized: "Ouvre l'offre Premium") : String(localized: "Ouvre la fiche de cet apport"))
     }
 
     /// Ordonnée d'un score dans la vignette (46 pt de haut).
@@ -908,8 +910,10 @@ struct ProgresCheckinRow: View {
     var body: some View {
         ProgresLigneAction(
             symbole: "face.smiling",
-            titre: "Comment tu te sens aujourd'hui\(DS.fine)?",
-            sousTitre: "\(questions) question\(questions > 1 ? "s" : "") · nourrit tes graphiques",
+            titre: String(localized: "Comment tu te sens aujourd'hui\u{202F}?"),
+            sousTitre: questions > 1
+                ? String(localized: "\(questions) questions · nourrit tes graphiques")
+                : String(localized: "\(questions) question · nourrit tes graphiques"),
             action: action
         )
     }
@@ -926,8 +930,8 @@ struct ProgresRecapRow: View {
     var body: some View {
         ProgresLigneAction(
             symbole: "sunrise",
-            titre: "Voir mon récap du jour",
-            sousTitre: "Le brief de ce matin, à nouveau",
+            titre: String(localized: "Voir mon récap du jour"),
+            sousTitre: String(localized: "Le brief de ce matin, à nouveau"),
             action: action
         )
     }
@@ -972,14 +976,14 @@ struct CheckinSymptomesSheet: View {
             }
 
             ProgresEncart(symbole: "chart.dots.scatter",
-                          texte: "Ta réponse ajoute un point à ta courbe. Trois réponses et la tendance apparaît.")
+                          texte: String(localized: "Ta réponse ajoute un point à ta courbe. Trois réponses et la tendance apparaît."))
                 .padding(.top, 16)
 
             Button {
                 HapticService.shared.selection()
                 rendre()
             } label: {
-                Text(reponses.isEmpty ? "Passer pour aujourd'hui" : "Terminer")
+                Text(reponses.isEmpty ? String(localized: "Passer pour aujourd'hui") : String(localized: "Terminer"))
                     .font(.system(.subheadline, design: .default).weight(.medium))
                     .foregroundStyle(Color.dsSecondaire)
                     .frame(maxWidth: .infinity, minHeight: DS.cibleTactile)
@@ -1031,7 +1035,7 @@ struct CheckinSymptomesSheet: View {
                 .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(ProgresVerdict.majuscule(symptome.trend.noun)), aujourd'hui")
+                    Text("\(ProgresVerdict.majuscule(Langue.texte(symptome.trend.noun))), aujourd'hui")
                         .font(.dsLegende.weight(.semibold))
                         .foregroundStyle(teintes.texte)
                     Text(symptome.trend.questionVersLeMieux)
@@ -1046,12 +1050,12 @@ struct CheckinSymptomesSheet: View {
             .accessibilityAddTraits(.isHeader)
 
             VStack(spacing: 10) {
-                reponse(0, symbole: "arrow.up.right", titre: "Oui, mieux",
-                        detail: symptome.trend.betterLabel.lowercased(), pour: symptome.id)
-                reponse(1, symbole: "arrow.left.and.right", titre: "Pareil",
-                        detail: "pas de changement", pour: symptome.id)
-                reponse(2, symbole: "arrow.down.right", titre: "Moins bien",
-                        detail: symptome.trend.worseLabel.lowercased(), pour: symptome.id)
+                reponse(0, symbole: "arrow.up.right", titre: String(localized: "Oui, mieux"),
+                        detail: Langue.texte(symptome.trend.betterLabel).lowercased(), pour: symptome.id)
+                reponse(1, symbole: "arrow.left.and.right", titre: String(localized: "Pareil"),
+                        detail: String(localized: "pas de changement"), pour: symptome.id)
+                reponse(2, symbole: "arrow.down.right", titre: String(localized: "Moins bien"),
+                        detail: Langue.texte(symptome.trend.worseLabel).lowercased(), pour: symptome.id)
             }
             .padding(.top, 22)
         }

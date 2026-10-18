@@ -51,10 +51,10 @@ struct FicheRepas: Equatable {
         let cibleFibres = NutrientData.definition(for: "fiber").map { Int($0.rda) }
 
         let macros = [
-            Macro(id: "proteines", nom: "Protéines", grammes: proteines, partDeLaCible: part(proteines, cibleProteines)),
-            Macro(id: "glucides", nom: "Glucides", grammes: glucides, partDeLaCible: part(glucides, cibleGlucides)),
-            Macro(id: "lipides", nom: "Lipides", grammes: lipides, partDeLaCible: part(lipides, cibleLipides)),
-            Macro(id: "fibres", nom: "Fibres", grammes: fibres, partDeLaCible: part(fibres, cibleFibres)),
+            Macro(id: "proteines", nom: String(localized: "Protéines"), grammes: proteines, partDeLaCible: part(proteines, cibleProteines)),
+            Macro(id: "glucides", nom: String(localized: "Glucides"), grammes: glucides, partDeLaCible: part(glucides, cibleGlucides)),
+            Macro(id: "lipides", nom: String(localized: "Lipides"), grammes: lipides, partDeLaCible: part(lipides, cibleLipides)),
+            Macro(id: "fibres", nom: String(localized: "Fibres"), grammes: fibres, partDeLaCible: part(fibres, cibleFibres)),
         ]
 
         // Apport par apport : la somme de ce que chaque saisie du repas apporte.
@@ -92,7 +92,9 @@ struct FicheRepas: Equatable {
         let premiers = noms.prefix(3).joined(separator: ", ")
         let reste = noms.count - 3
         guard reste > 0 else { return premiers }
-        return "\(premiers) et \(reste) autre\(reste > 1 ? "s" : "")"
+        return reste > 1
+            ? String(localized: "\(premiers) et \(reste) autres")
+            : String(localized: "\(premiers) et \(reste) autre")
     }
 
     /// Le premier apport à renforcer que ce repas ne couvre presque pas. Rien à
@@ -103,7 +105,7 @@ struct FicheRepas: Equatable {
             guard let definition = NutrientData.definition(for: id) else { continue }
             // Deux-points plutôt que « de » : pas d'élision à gérer (« d'iode »).
             let nom = definition.label.prefix(1).lowercased() + definition.label.dropFirst()
-            return "Ce repas couvre très peu un de tes apports à renforcer : \(nom)."
+            return String(localized: "Ce repas couvre très peu un de tes apports à renforcer : \(String(nom)).")
         }
         return nil
     }

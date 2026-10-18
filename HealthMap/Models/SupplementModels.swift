@@ -18,12 +18,12 @@ enum TimingSlot: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .matinAJeun: return "Matin à jeun"
-        case .matinRepas: return "Matin avec le petit-déjeuner"
-        case .midiRepas: return "Midi avec le repas"
-        case .soirRepas: return "Soir avec le dîner"
-        case .coucher: return "Au coucher"
-        case .entreRepas: return "Entre les repas"
+        case .matinAJeun: return String(localized: "Matin à jeun")
+        case .matinRepas: return String(localized: "Matin avec le petit-déjeuner")
+        case .midiRepas: return String(localized: "Midi avec le repas")
+        case .soirRepas: return String(localized: "Soir avec le dîner")
+        case .coucher: return String(localized: "Au coucher")
+        case .entreRepas: return String(localized: "Entre les repas")
         }
     }
 
@@ -91,26 +91,26 @@ enum Contraindication: String, CaseIterable, Equatable {
     /// Titre court de la précaution.
     var title: String {
         switch self {
-        case .grossesse: return "Grossesse"
-        case .allaitement: return "Allaitement"
-        case .hemochromatose: return "Hémochromatose"
-        case .hyperthyroidie: return "Thyroïde"
-        case .hypercalcemie: return "Hypercalcémie"
-        case .insuffisanceRenaleSevere: return "Reins"
-        case .allergiePoisson: return "Allergie poisson"
+        case .grossesse: return String(localized: "Grossesse")
+        case .allaitement: return String(localized: "Allaitement")
+        case .hemochromatose: return String(localized: "Hémochromatose")
+        case .hyperthyroidie: return String(localized: "Thyroïde")
+        case .hypercalcemie: return String(localized: "Hypercalcémie")
+        case .insuffisanceRenaleSevere: return String(localized: "Reins")
+        case .allergiePoisson: return String(localized: "Allergie poisson")
         }
     }
 
     /// Message affiché à l'utilisateur.
     var warningLabel: String {
         switch self {
-        case .grossesse: return "Demande l'avis de ton médecin ou ta sage-femme avant de te supplémenter."
-        case .allaitement: return "Demande l'avis de ton médecin avant de te supplémenter pendant l'allaitement."
-        case .hemochromatose: return "Déconseillé en cas d'hémochromatose (surcharge en fer)."
-        case .hyperthyroidie: return "Déconseillé en cas d'hyperthyroïdie. Demande l'avis de ton médecin."
-        case .hypercalcemie: return "Déconseillé en cas d'hypercalcémie."
-        case .insuffisanceRenaleSevere: return "Prudence en cas d'insuffisance rénale sévère. Demande l'avis de ton médecin."
-        case .allergiePoisson: return "Contient de l'huile de poisson. À éviter en cas d'allergie, préfère la version à base d'algues."
+        case .grossesse: return String(localized: "Demande l'avis de ton médecin ou ta sage-femme avant de te supplémenter.")
+        case .allaitement: return String(localized: "Demande l'avis de ton médecin avant de te supplémenter pendant l'allaitement.")
+        case .hemochromatose: return String(localized: "Déconseillé en cas d'hémochromatose (surcharge en fer).")
+        case .hyperthyroidie: return String(localized: "Déconseillé en cas d'hyperthyroïdie. Demande l'avis de ton médecin.")
+        case .hypercalcemie: return String(localized: "Déconseillé en cas d'hypercalcémie.")
+        case .insuffisanceRenaleSevere: return String(localized: "Prudence en cas d'insuffisance rénale sévère. Demande l'avis de ton médecin.")
+        case .allergiePoisson: return String(localized: "Contient de l'huile de poisson. À éviter en cas d'allergie, préfère la version à base d'algues.")
         }
     }
 }
@@ -213,9 +213,9 @@ struct CostSummary {
         let minStr = String(format: "%.0f", minEstimate)
         let maxStr = String(format: "%.0f", maxEstimate)
         if minStr == maxStr {
-            return "\(minStr) EUR/mois"
+            return String(localized: "\(minStr) EUR/mois")
         }
-        return "\(minStr) - \(maxStr) EUR/mois"
+        return String(localized: "\(minStr) - \(maxStr) EUR/mois")
     }
 }
 

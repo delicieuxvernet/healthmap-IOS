@@ -108,9 +108,9 @@ struct BriefPrioriteContenu: View {
     }
 
     private var libelleHeros: String {
-        var texte = "\(priorite.nom) : \(priorite.pourcentHier) % de ton besoin couvert hier."
+        var texte = String(localized: "\(priorite.nom) : \(priorite.pourcentHier) % de ton besoin couvert hier.")
         if let projection = priorite.projection, let remede = priorite.remede {
-            texte += " Avec \(NomNutriment.minusculeInitiale(remede.nom)), tu passerais à \(projection) %."
+            texte += " " + String(localized: "Avec \(NomNutriment.minusculeInitiale(remede.nom)), tu passerais à \(projection) %.")
         }
         return texte
     }
@@ -175,8 +175,8 @@ struct BriefPrioriteContenu: View {
     /// « 1 boîte · +30 % de ton besoin ». nil quand l'aliment n'est pas chiffré.
     static func ligneApport(_ remede: PrioriteDuJour.Remede) -> String? {
         guard let portion = remede.portion, let apport = remede.apport else { return nil }
-        if apport >= 100 { return "\(portion) · tout ton besoin du jour" }
-        return "\(portion) · +\(DS.pourcent(apport)) de ton besoin"
+        if apport >= 100 { return String(localized: "\(portion) · tout ton besoin du jour") }
+        return String(localized: "\(portion) · +\(DS.pourcent(apport)) de ton besoin")
     }
 
     @ViewBuilder

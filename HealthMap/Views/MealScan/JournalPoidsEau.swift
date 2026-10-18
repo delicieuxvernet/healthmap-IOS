@@ -33,7 +33,7 @@ struct JournalPoidsCard: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 0) {
-                ColonnePoids(titre: "Poids actuel", kilos: actuel, enAttente: false, onChange: onActuel)
+                ColonnePoids(titre: String(localized: "Poids actuel"), kilos: actuel, enAttente: false, onChange: onActuel)
                 Rectangle()
                     .fill(Color.dsSeparateur)
                     .frame(width: 0.5)
@@ -41,7 +41,7 @@ struct JournalPoidsCard: View {
                     .accessibilityHidden(true)
                 // Sans poids souhaité, la colonne part du poids actuel, en
                 // retrait : le premier toucher le règle.
-                ColonnePoids(titre: "Poids souhaité", kilos: souhaite ?? actuel,
+                ColonnePoids(titre: String(localized: "Poids souhaité"), kilos: souhaite ?? actuel,
                              enAttente: souhaite == nil, onChange: onSouhaite)
             }
 
@@ -199,7 +199,7 @@ private struct ColonnePoids: View {
         // VoiceOver : un seul élément réglable, plutôt que deux boutons muets.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(titre)
-        .accessibilityValue(enAttente ? "à choisir" : "\(ObjectifPoids.affichage(kilos)) kilos")
+        .accessibilityValue(enAttente ? String(localized: "à choisir") : String(localized: "\(ObjectifPoids.affichage(kilos)) kilos"))
         .accessibilityAdjustableAction { sens in
             switch sens {
             case .increment: regler(ObjectifPoids.pas)
@@ -301,8 +301,8 @@ struct JournalEauCard: View {
             .padding(.top, 12)
 
             Text(objectifAtteint
-                 ? "Objectif du jour atteint."
-                 : "Touche un gobelet pour noter \(SuiviEau.centilitresParGobelet) cl.")
+                 ? String(localized: "Objectif du jour atteint.")
+                 : String(localized: "Touche un gobelet pour noter \(SuiviEau.centilitresParGobelet) cl."))
                 .font(objectifAtteint ? Font.dsLegende.weight(.semibold) : Font.dsLegende)
                 .foregroundStyle(objectifAtteint ? Color.teinteEauTexte : Color.dsSecondaire)
                 .contentTransition(.opacity)
@@ -353,7 +353,7 @@ struct JournalEauCard: View {
         }
         .buttonStyle(GobeletPressStyle())
         .accessibilityLabel("Gobelet \(rang + 1) sur \(SuiviEau.gobeletsParJour)")
-        .accessibilityValue(rang < bus ? "bu" : "vide")
+        .accessibilityValue(rang < bus ? String(localized: "bu") : String(localized: "vide"))
         .verreEnvol(envols[rang], texte: texteEnvol, couleur: Color.teinteEauTexte)
     }
 

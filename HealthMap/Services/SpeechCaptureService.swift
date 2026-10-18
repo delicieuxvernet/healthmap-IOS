@@ -50,13 +50,13 @@ final class SpeechCaptureService: ObservableObject {
         var message: String {
             switch self {
             case .permissionDenied:
-                return "Kiwio a besoin du micro et de la reconnaissance vocale. Autorise-les dans Réglages pour dicter tes repas."
+                return String(localized: "Kiwio a besoin du micro et de la reconnaissance vocale. Autorise-les dans Réglages pour dicter tes repas.")
             case .recognizerUnavailable:
-                return "La dictée en français n'est pas disponible sur cet appareil."
+                return String(localized: "La dictée en français n'est pas disponible sur cet appareil.")
             case .failed:
-                return "La dictée s'est interrompue. Réessaie."
+                return String(localized: "La dictée s'est interrompue. Réessaie.")
             case .silence:
-                return "Je n'ai rien entendu. Réessaie en parlant un peu plus fort."
+                return String(localized: "Je n'ai rien entendu. Réessaie en parlant un peu plus fort.")
             }
         }
     }

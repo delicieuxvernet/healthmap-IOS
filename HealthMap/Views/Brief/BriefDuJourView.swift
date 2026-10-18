@@ -193,8 +193,8 @@ struct BriefDuJourView: View {
 
     private func ecranRienHier(repas: Int) -> some View {
         VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Hier")
-            Text(repas == 0 ? "Rien de noté hier." : "Un seul repas noté hier.")
+            legende(String(localized: "Hier"))
+            Text(repas == 0 ? String(localized: "Rien de noté hier.") : String(localized: "Un seul repas noté hier."))
                 .font(.dsSection)
                 .foregroundStyle(Color.dsTexte)
             Text("Tes repas d'hier comptent encore : ajoute-les, et ton suivi se met à jour.")
@@ -202,7 +202,7 @@ struct BriefDuJourView: View {
                 .foregroundStyle(Color.dsSecondaire)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: Theme.spacingLG)
-            DSCapsuleButton(titre: "Ajouter mes repas d'hier") {
+            DSCapsuleButton(titre: String(localized: "Ajouter mes repas d'hier")) {
                 AnalyticsService.shared.track(.screenViewed, properties: ["screen": "brief_ajouter_hier"])
                 onAjouterHier()
             }
@@ -223,7 +223,7 @@ struct BriefDuJourView: View {
 
     private func ecranCible(_ cible: CibleNutritionnelle) -> some View {
         VStack(alignment: .leading, spacing: Theme.spacingMD) {
-            legende("Aujourd'hui, mise sur")
+            legende(String(localized: "Aujourd'hui, mise sur"))
             Text(cible.avecPossessif)
                 .font(.dsGrandTitre)
                 .foregroundStyle(Color.dsTexte)
@@ -310,7 +310,7 @@ struct BriefDuJourView: View {
     }
 
     private var boutonFin: some View {
-        DSCapsuleButton(titre: "C'est parti") {
+        DSCapsuleButton(titre: String(localized: "C'est parti")) {
             terminer(raison: "fin")
         }
     }
@@ -371,7 +371,7 @@ struct InvitationNotificationsContenu: View {
 
             Spacer(minLength: Theme.spacingLG)
 
-            DSCapsuleButton(titre: "Oui, préviens-moi", chargement: demandeEnCours, action: onAccepter)
+            DSCapsuleButton(titre: String(localized: "Oui, préviens-moi"), chargement: demandeEnCours, action: onAccepter)
 
             Button(action: onPlusTard) {
                 Text("Plus tard")
@@ -389,18 +389,21 @@ struct InvitationNotificationsContenu: View {
     static func explication(cible: CibleNutritionnelle?) -> String {
         let frequence = RappelsPersonnalises.frequenceAnnoncee
         guard let cible else {
-            return "Chaque rappel part d'un chiffre tiré de tes repas notés. \(frequence)"
+            return String(localized: "Chaque rappel part d'un chiffre tiré de tes repas notés. \(frequence)")
         }
-        let verbe = NomNutriment.accord(id: cible.id, singulier: "est", pluriel: "sont")
-        return "\(NomNutriment.majusculeInitiale(cible.avecPossessif)) \(verbe) ton apport le plus bas. Kiwio te dit où tu en es, et quoi mettre dans l'assiette. \(frequence)"
+        let sujet = NomNutriment.majusculeInitiale(cible.avecPossessif)
+        if NomNutriment.estPluriel(id: cible.id) {
+            return String(localized: "\(sujet) sont ton apport le plus bas. Kiwio te dit où tu en es, et quoi mettre dans l'assiette. \(frequence)")
+        }
+        return String(localized: "\(sujet) est ton apport le plus bas. Kiwio te dit où tu en es, et quoi mettre dans l'assiette. \(frequence)")
     }
 
     static func exemple(cible: CibleNutritionnelle?) -> String {
-        guard let cible else { return "Photographie ton repas : Kiwio s'occupe de l'analyse." }
+        guard let cible else { return String(localized: "Photographie ton repas : Kiwio s'occupe de l'analyse.") }
         if cible.aliments.isEmpty {
-            return "C'est le moment de renforcer \(cible.avecPossessif). Scanne ton assiette."
+            return String(localized: "C'est le moment de renforcer \(cible.avecPossessif). Scanne ton assiette.")
         }
-        return "\(NomNutriment.enumeration(cible.aliments)) ce midi ? \(NomNutriment.majusculeInitiale(cible.avecPossessif)) te dira merci."
+        return String(localized: "\(NomNutriment.enumeration(cible.aliments)) ce midi ? \(NomNutriment.majusculeInitiale(cible.avecPossessif)) te dira merci.")
     }
 }
 

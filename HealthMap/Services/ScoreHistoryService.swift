@@ -18,16 +18,16 @@ struct ScoreSnapshot: Identifiable {
 
     var dateFormatted: String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
+        f.locale = Langue.locale
         f.dateFormat = "d MMM"
         return f.string(from: date)
     }
 
     var label: String {
-        if score >= 75 { return "Excellent" }
-        if score >= 60 { return "Bon" }
-        if score >= 40 { return "A ameliorer" }
-        return "Critique"
+        if score >= 75 { return String(localized: "Excellent") }
+        if score >= 60 { return String(localized: "Bon") }
+        if score >= 40 { return String(localized: "A ameliorer") }
+        return String(localized: "Critique")
     }
 }
 
@@ -195,12 +195,12 @@ final class ScoreHistoryService {
     // MARK: - Score Delta
     func getScoreDelta(history: [ScoreSnapshot]) -> (delta: Int, weeks: Int, text: String) {
         guard history.count >= 2 else {
-            return (delta: 0, weeks: 0, text: "Pas encore assez de données")
+            return (delta: 0, weeks: 0, text: String(localized: "Pas encore assez de données"))
         }
 
         let sorted = history.sorted { $0.date < $1.date }
         guard let first = sorted.first, let last = sorted.last else {
-            return (delta: 0, weeks: 0, text: "Pas encore assez de données")
+            return (delta: 0, weeks: 0, text: String(localized: "Pas encore assez de données"))
         }
 
         let delta = last.score - first.score
@@ -209,11 +209,17 @@ final class ScoreHistoryService {
 
         let text: String
         if delta > 0 {
-            text = "+\(delta) points en \(weeks) semaine\(weeks > 1 ? "s" : "")"
+            text = weeks > 1
+                ? String(localized: "+\(delta) points en \(weeks) semaines")
+                : String(localized: "+\(delta) points en \(weeks) semaine")
         } else if delta < 0 {
-            text = "\(delta) points en \(weeks) semaine\(weeks > 1 ? "s" : "")"
+            text = weeks > 1
+                ? String(localized: "\(delta) points en \(weeks) semaines")
+                : String(localized: "\(delta) points en \(weeks) semaine")
         } else {
-            text = "Stable sur \(weeks) semaine\(weeks > 1 ? "s" : "")"
+            text = weeks > 1
+                ? String(localized: "Stable sur \(weeks) semaines")
+                : String(localized: "Stable sur \(weeks) semaine")
         }
 
         return (delta: delta, weeks: weeks, text: text)

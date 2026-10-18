@@ -87,13 +87,13 @@ struct QuestionnaireContainerView: View {
     /// Libellé du bouton primaire selon l'étape : intro de section, question
     /// intermédiaire, ou dernière question (avec état d'envoi / retry).
     private var primaryButtonLabel: String {
-        if introSection != nil { return "C'est parti" }
-        if !viewModel.isLastQuestion { return "Continuer" }
-        if viewModel.isSubmitting { return "Envoi en cours…" }
-        if viewModel.errorMessage != nil { return "Réessayer" }
+        if introSection != nil { return String(localized: "C'est parti") }
+        if !viewModel.isLastQuestion { return String(localized: "Continuer") }
+        if viewModel.isSubmitting { return String(localized: "Envoi en cours…") }
+        if viewModel.errorMessage != nil { return String(localized: "Réessayer") }
         // Dernière question visible : s'il reste un bloc à approfondir, on
         // propose le carrefour (« Continuer ») ; sinon on termine.
-        return viewModel.nextLockedGate != nil ? "Continuer" : "Terminer"
+        return viewModel.nextLockedGate != nil ? String(localized: "Continuer") : String(localized: "Terminer")
     }
 
     var body: some View {
@@ -451,7 +451,7 @@ struct QuestionnaireContainerView: View {
             }
             Button("Annuler", role: .cancel) { }
         } message: {
-            Text(viewModel.errorMessage ?? "La sauvegarde a échoué. Réessaie dans un instant.")
+            Text(viewModel.errorMessage ?? String(localized: "La sauvegarde a échoué. Réessaie dans un instant."))
         }
     }
 
@@ -735,7 +735,7 @@ struct QuestionnaireContainerView: View {
         switch questionId {
         // ── Personnel ──────────────────────────────────────────────────────
         // 16 ans minimum (`AgeMinimum`, audit du 9 octobre 2026).
-        case "age":      return (Double(AgeMinimum.ans)...100, 1, "ans", 30)
+        case "age":      return (Double(AgeMinimum.ans)...100, 1, String(localized: "ans"), 30)
         case "height":   return (140...220, 1, "cm", 170)
         case "weight":   return (35...180, 0.5, "kg", 70)
 
@@ -743,15 +743,15 @@ struct QuestionnaireContainerView: View {
         // Range 0-21 = jusqu'à 3 portions par jour (cas extrême honnête).
         case "vegetableServings", "fruitServings",
              "wholegrainPerWeek", "dairyServings":
-            return (0...21, 1, "/sem", 7)
+            return (0...21, 1, String(localized: "/sem"), 7)
         case "legumesPerWeek", "nutsPerWeek", "seedsPerDay":
-            return (0...14, 1, "/sem", 3)
+            return (0...14, 1, String(localized: "/sem"), 3)
         case "fattyFish":
-            return (0...7, 1, "/sem", 2)
+            return (0...7, 1, String(localized: "/sem"), 2)
         case "meatPoultry":
-            return (0...14, 1, "/sem", 4)
+            return (0...14, 1, String(localized: "/sem"), 4)
         case "eggsPerWeek":
-            return (0...14, 1, "/sem", 4)
+            return (0...14, 1, String(localized: "/sem"), 4)
 
         default: return nil
         }
@@ -855,25 +855,25 @@ private struct QuestionnaireGateView: View {
     private var copy: Copy {
         switch gate {
         case .nutrition:
-            return Copy(asset: Fluent3D.kiwi, kicker: "On a repéré quelque chose",
-                       title: "Certains apports semblent sous tes besoins",
-                       sub: "Voyons lesquels à partir de ton alimentation.",
-                       cta: "Analyser mon alimentation", skip: "Ignorer l'analyse")
+            return Copy(asset: Fluent3D.kiwi, kicker: String(localized: "On a repéré quelque chose"),
+                       title: String(localized: "Certains apports semblent sous tes besoins"),
+                       sub: String(localized: "Voyons lesquels à partir de ton alimentation."),
+                       cta: String(localized: "Analyser mon alimentation"), skip: String(localized: "Ignorer l'analyse"))
         case .symptomes:
-            return Copy(asset: Fluent3D.loupe, kicker: "Tes signaux comptent",
-                       title: "Tes symptômes en disent long",
-                       sub: "On relie ongles, énergie, digestion à tes apports.",
-                       cta: "Analyser mes symptômes", skip: "Ignorer mes symptômes")
+            return Copy(asset: Fluent3D.loupe, kicker: String(localized: "Tes signaux comptent"),
+                       title: String(localized: "Tes symptômes en disent long"),
+                       sub: String(localized: "On relie ongles, énergie, digestion à tes apports."),
+                       cta: String(localized: "Analyser mes symptômes"), skip: String(localized: "Ignorer mes symptômes"))
         case .medical:
-            return Copy(asset: Fluent3D.pill, kicker: "Point sécurité",
-                       title: "Tes traitements changent la donne",
-                       sub: "Certains interagissent avec tes vitamines et minéraux.",
-                       cta: "Vérifier mes interactions", skip: "Ignorer les interactions")
+            return Copy(asset: Fluent3D.pill, kicker: String(localized: "Point sécurité"),
+                       title: String(localized: "Tes traitements changent la donne"),
+                       sub: String(localized: "Certains interagissent avec tes vitamines et minéraux."),
+                       cta: String(localized: "Vérifier mes interactions"), skip: String(localized: "Ignorer les interactions"))
         default:
-            return Copy(asset: Fluent3D.kiwi, kicker: "On a repéré quelque chose",
-                       title: "Quelques questions de plus",
-                       sub: "Pour rendre ton bilan plus fiable.",
-                       cta: "Continuer", skip: "Ignorer")
+            return Copy(asset: Fluent3D.kiwi, kicker: String(localized: "On a repéré quelque chose"),
+                       title: String(localized: "Quelques questions de plus"),
+                       sub: String(localized: "Pour rendre ton bilan plus fiable."),
+                       cta: String(localized: "Continuer"), skip: String(localized: "Ignorer"))
         }
     }
 

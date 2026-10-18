@@ -60,17 +60,17 @@ final class PriseDeSangService {
         var errorDescription: String? {
             switch self {
             case .premiumRequis:
-                return "La prise de sang fait partie de Kiwio Premium."
+                return String(localized: "La prise de sang fait partie de Kiwio Premium.")
             case .trop:
-                return "Tu as importé beaucoup de documents aujourd'hui. Réessaie demain."
+                return String(localized: "Tu as importé beaucoup de documents aujourd'hui. Réessaie demain.")
             case .pasUneAnalyse:
-                return "Ce document ne ressemble pas à un compte rendu d'analyse de sang. Essaie avec la page des résultats."
+                return String(localized: "Ce document ne ressemble pas à un compte rendu d'analyse de sang. Essaie avec la page des résultats.")
             case .aucuneValeur:
-                return "Kiwio n'a trouvé aucune valeur qu'il sait lire (vitamine D, B12, ferritine, magnésium…). Essaie avec une autre page."
+                return String(localized: "Kiwio n'a trouvé aucune valeur qu'il sait lire (vitamine D, B12, ferritine, magnésium…). Essaie avec une autre page.")
             case .tropLourd:
-                return "Ce fichier est trop lourd. Essaie avec une photo de la page des résultats."
+                return String(localized: "Ce fichier est trop lourd. Essaie avec une photo de la page des résultats.")
             case .indisponible:
-                return "La lecture n'a pas abouti. Vérifie que la photo est nette, puis réessaie."
+                return String(localized: "La lecture n'a pas abouti. Vérifie que la photo est nette, puis réessaie.")
             }
         }
     }

@@ -111,10 +111,14 @@ final class LoginThrottleService {
 
         if remaining >= 60 {
             let minutes = Int(ceil(remaining / 60))
-            return "Trop de tentatives. Reessayez dans \(minutes) minute\(minutes > 1 ? "s" : "")."
+            return minutes > 1
+                ? String(localized: "Trop de tentatives. Reessayez dans \(minutes) minutes.")
+                : String(localized: "Trop de tentatives. Reessayez dans \(minutes) minute.")
         } else {
             let seconds = Int(ceil(remaining))
-            return "Trop de tentatives. Reessayez dans \(seconds) seconde\(seconds > 1 ? "s" : "")."
+            return seconds > 1
+                ? String(localized: "Trop de tentatives. Reessayez dans \(seconds) secondes.")
+                : String(localized: "Trop de tentatives. Reessayez dans \(seconds) seconde.")
         }
     }
 

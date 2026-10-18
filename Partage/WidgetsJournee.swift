@@ -187,8 +187,8 @@ struct VueActiviteJournee: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(fait
-                    ? "Compléments du \(moment.libelle.lowercased()) pris. Toucher pour décocher"
-                    : "Cocher mes compléments du \(moment.libelle.lowercased())")
+                    ? String(localized: "Compléments du \(moment.libelle.lowercased()) pris. Toucher pour décocher")
+                    : String(localized: "Cocher mes compléments du \(moment.libelle.lowercased())"))
             }
         }
     }
@@ -272,7 +272,7 @@ struct VueIleEtendue: View {
                 // Le repas de l'heure déjà noté (tard le soir) : on ne
                 // l'annonce pas comme « prochain ».
                 if etat.kcal(repas) == 0 {
-                    Text(verbatim: "Prochain : \(repas.prochain)")
+                    Text(verbatim: String(localized: "Prochain : \(repas.prochain)"))
                         .font(.texteW(12))
                         .foregroundStyle(TeinteW.encre(0.7))
                         .lineLimit(1)
@@ -378,7 +378,7 @@ struct VueJourneePetite: View {
         if let etat = exploitableW(etat) {
             let calories = FormatW.ligneCalories(etat)
             VStack(alignment: .leading, spacing: 0) {
-                EnTeteW(icone: .signe, titre: "Ta journée") {
+                EnTeteW(icone: .signe, titre: String(localized: "Ta journée")) {
                     SerieW(serie: etat.serie)
                 }
                 Spacer(minLength: 8)
@@ -416,7 +416,7 @@ struct VueJourneeMoyenne: View {
         if let etat = exploitableW(etat) {
             let calories = FormatW.ligneCalories(etat)
             VStack(alignment: .leading, spacing: 0) {
-                EnTeteW(icone: .signe, titre: "Ta journée") {
+                EnTeteW(icone: .signe, titre: String(localized: "Ta journée")) {
                     // Mêmes écarts que l'en-tête de la carte W7 : 6 entre le
                     // chiffre et sa légende, 6 + 6 avant la série.
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -543,20 +543,21 @@ private struct JourneeBoutonEauW: View {
         if eau.atteint {
             fond
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Eau : objectif atteint. " + compte)
+                .accessibilityLabel(String(localized: "Eau : objectif atteint. \(compte)"))
         } else {
             Button(intent: AjouterVerreEnDirectIntent()) {
                 fond
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Ajouter un verre d'eau. " + compte)
+            .accessibilityLabel(String(localized: "Ajouter un verre d'eau. \(compte)"))
         }
     }
 
     /// « 3 verres sur 8 », pour VoiceOver.
     private var compte: String {
-        let mot = eau.verres > 1 ? "verres" : "verre"
-        return "\(eau.verres) \(mot) sur \(eau.objectif)"
+        return eau.verres > 1
+            ? String(localized: "\(eau.verres) verres sur \(eau.objectif)")
+            : String(localized: "\(eau.verres) verre sur \(eau.objectif)")
     }
 
     @ViewBuilder
@@ -626,8 +627,8 @@ private struct JourneeTuileRepasW: View {
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(kcal > 0
-            ? "\(creneau.libelle), \(kcal) kilocalories. Ajouter un aliment"
-            : "\(creneau.libelle), rien encore. Ajouter un aliment")
+            ? String(localized: "\(creneau.libelle), \(kcal) kilocalories. Ajouter un aliment")
+            : String(localized: "\(creneau.libelle), rien encore. Ajouter un aliment"))
     }
 }
 
@@ -641,25 +642,25 @@ private enum JourneeLectureW {
     /// « 428 kilocalories restantes ».
     static func calories(_ etat: InstantaneJour) -> String {
         guard let restantes = etat.kcalRestantes else {
-            return "\(etat.kcalConsommees) kilocalories aujourd'hui"
+            return String(localized: "\(etat.kcalConsommees) kilocalories aujourd'hui")
         }
         return restantes < 0
-            ? "\(-restantes) kilocalories au-dessus"
-            : "\(restantes) kilocalories restantes"
+            ? String(localized: "\(-restantes) kilocalories au-dessus")
+            : String(localized: "\(restantes) kilocalories restantes")
     }
 
     /// « Matin 412 kilocalories, Midi 688 kilocalories… »
     static func repas(_ etat: InstantaneJour) -> String {
         CreneauWidget.allCases
-            .map { "\($0.libelle) \(etat.kcal($0)) kilocalories" }
+            .map { String(localized: "\($0.libelle) \(etat.kcal($0)) kilocalories") }
             .joined(separator: ", ")
     }
 
     /// « Ta journée, 428 kilocalories restantes, série de 3 jours ».
     static func resume(_ etat: InstantaneJour) -> String {
-        var morceaux = ["Ta journée", calories(etat)]
+        var morceaux = [String(localized: "Ta journée"), calories(etat)]
         if etat.serie > 0 {
-            morceaux.append("série de \(etat.serie) \(etat.serie > 1 ? "jours" : "jour")")
+            morceaux.append(etat.serie > 1 ? String(localized: "série de \(etat.serie) jours") : String(localized: "série de \(etat.serie) jour"))
         }
         return morceaux.joined(separator: ", ")
     }

@@ -85,7 +85,7 @@ struct BilanParcoursView: View {
             Button("Réessayer") { envoyer() }
             Button("Annuler", role: .cancel) { }
         } message: {
-            Text(viewModel.errorMessage ?? "La sauvegarde a échoué. Réessaie dans un instant.")
+            Text(viewModel.errorMessage ?? String(localized: "La sauvegarde a échoué. Réessaie dans un instant."))
         }
     }
 
@@ -166,14 +166,14 @@ struct BilanParcoursView: View {
         )
         if !reste.isEmpty { phrase += ", \(reste)" }
         let pistes = viewModel.lectureBilan.pistes.count
-        if pistes > 0 { phrase += pistes == 1 ? ", 1 piste repérée" : ", \(pistes) pistes repérées" }
+        if pistes > 0 { phrase += ", " + (pistes == 1 ? String(localized: "1 piste repérée") : String(localized: "\(pistes) pistes repérées")) }
         return phrase
     }
 
     /// Le nom de l'étape en cours. `nil` sur l'accueil et sur la fin.
     private var chapitre: String? {
         if let etape = ecran.etape { return etape.titre }
-        return ecran.estAffinage ? "Pour affiner" : nil
+        return ecran.estAffinage ? String(localized: "Pour affiner") : nil
     }
 
     /// « 2 pistes » : ce que les réponses ont déjà fait apparaître.
@@ -185,7 +185,7 @@ struct BilanParcoursView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Verre.iconeNeutre)
-                Text(nombre == 1 ? "1 piste" : "\(nombre) pistes")
+                Text(nombre == 1 ? String(localized: "1 piste") : String(localized: "\(nombre) pistes"))
                     .font(.system(.caption, design: .default).weight(.semibold))
                     .foregroundStyle(Color.dsTexte)
             }
@@ -255,15 +255,15 @@ struct BilanParcoursView: View {
             .buttonStyle(.dsPress)
             .disabled(!viewModel.ecranComplet)
             .animation(reduceMotion ? nil : Animation.kiwiVif, value: viewModel.ecranComplet)
-            .accessibilityHint(viewModel.ecranComplet ? "" : "Réponds d'abord aux questions de cet écran.")
+            .accessibilityHint(viewModel.ecranComplet ? Text(verbatim: "") : Text("Réponds d'abord aux questions de cet écran."))
 
             if ecran == .accueil && !dashboardVM.bilanComplete {
-                lien("Explorer d'abord", indication: "Découvre l'app d'abord, ton bilan t'attendra ici.") {
+                lien(String(localized: "Explorer d'abord"), indication: String(localized: "Découvre l'app d'abord, ton bilan t'attendra ici.")) {
                     HapticService.shared.tap()
                     fermer()
                 }
             } else if ecran == .fin && viewModel.resteAAffiner {
-                lien("Affiner d'abord", indication: "Quelques questions de plus sur tes traitements et tes habitudes à table.") {
+                lien(String(localized: "Affiner d'abord"), indication: String(localized: "Quelques questions de plus sur tes traitements et tes habitudes à table.")) {
                     affiner()
                 }
             }
@@ -288,15 +288,15 @@ struct BilanParcoursView: View {
 
     private var libelleDuBouton: String {
         switch ecran {
-        case .accueil: return "Commencer"
-        case .provisoire: return "Passer à table"
+        case .accueil: return String(localized: "Commencer")
+        case .provisoire: return String(localized: "Passer à table")
         case .petitDej, .midi, .gouter:
             let suivant = ParcoursBilan.suivant(apres: ecran, viewModel.contexteBilan)?.repas
-            return suivant.map { "Repas suivant : \($0.onglet)" } ?? "Repas suivant"
-        case .soir: return "J'ai fini ma journée"
-        case .fin: return viewModel.errorMessage == nil ? "Voir mon bilan" : "Réessayer"
+            return suivant.map { String(localized: "Repas suivant : \($0.onglet)") } ?? String(localized: "Repas suivant")
+        case .soir: return String(localized: "J'ai fini ma journée")
+        case .fin: return viewModel.errorMessage == nil ? String(localized: "Voir mon bilan") : String(localized: "Réessayer")
         default:
-            return ParcoursBilan.suivant(apres: ecran, viewModel.contexteBilan) == .fin ? "Terminer" : "Continuer"
+            return ParcoursBilan.suivant(apres: ecran, viewModel.contexteBilan) == .fin ? String(localized: "Terminer") : String(localized: "Continuer")
         }
     }
 
@@ -366,9 +366,9 @@ struct BilanParcoursView: View {
 
     private var messageDeFermeture: String {
         if let etape = ecran.etape {
-            return "Tes réponses sont gardées. Tu reprendras là où tu en es, à l'étape \(etape.numero) sur \(EtapeBilan.allCases.count)."
+            return String(localized: "Tes réponses sont gardées. Tu reprendras là où tu en es, à l'étape \(etape.numero) sur \(EtapeBilan.allCases.count).")
         }
-        return "Tes réponses sont gardées. Tu reprendras là où tu en es."
+        return String(localized: "Tes réponses sont gardées. Tu reprendras là où tu en es.")
     }
 
     /// Referme la feuille. Le brouillon est sauvegardé en continu par le

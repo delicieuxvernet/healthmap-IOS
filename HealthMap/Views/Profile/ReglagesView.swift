@@ -80,7 +80,7 @@ struct ReglagesView: View {
                     VStack(spacing: 0) {
                         // Le titre vit dans la page (34 / 700, −0,95) et défile
                         // sous le bord haut flouté, comme sur Progrès.
-                        DSLargeTitle(titre: "Réglages")
+                        DSLargeTitle(titre: String(localized: "Réglages"))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, DS.hautTitreOnglet)
 
@@ -196,7 +196,7 @@ struct ReglagesView: View {
         if let email = authViewModel.userEmail, let local = email.split(separator: "@").first {
             return String(local)
         }
-        return "Toi"
+        return String(localized: "Toi")
     }
 
     // MARK: - Premium actif (abonné : l'état, et la porte de sortie Apple)
@@ -206,7 +206,7 @@ struct ReglagesView: View {
         guard let ent = subscriptionService.customerInfo?.entitlements[SubscriptionService.entitlementId],
               let exp = ent.expirationDate else { return nil }
         let date = exp.formatted(date: .long, time: .omitted)
-        return ent.willRenew ? "Se renouvelle le \(date)" : "Actif jusqu'au \(date)"
+        return ent.willRenew ? String(localized: "Se renouvelle le \(date)") : String(localized: "Actif jusqu'au \(date)")
     }
 
     private var premiumActif: some View {
@@ -214,8 +214,8 @@ struct ReglagesView: View {
             DSGroupedList {
                 // La même carte que l'offre, mascotte comprise ; pas de
                 // chevron : cette ligne dit un état, elle ne mène nulle part.
-                CartePremiumEntete(titre: "Premium actif",
-                                   sousLigne: echeance ?? "Tout est débloqué",
+                CartePremiumEntete(titre: String(localized: "Premium actif"),
+                                   sousLigne: echeance ?? String(localized: "Tout est débloqué"),
                                    chevron: false)
                     .accessibilityElement(children: .combine)
 
@@ -315,7 +315,7 @@ struct ReglagesView: View {
                 ObjectifsReglagesView()
                     .environmentObject(dashboardVM)
             } label: {
-                ReglageLigne(symbole: "target", titre: "Mes objectifs", valeur: objectifPrincipal, filet: true)
+                ReglageLigne(symbole: "target", titre: String(localized: "Mes objectifs"), valeur: objectifPrincipal, filet: true)
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.objectifs")
@@ -327,7 +327,7 @@ struct ReglagesView: View {
                     AbonnementReglagesView()
                         .environmentObject(dashboardVM)
                 } label: {
-                    ReglageLigne(symbole: "crown", titre: "Abonnement", valeur: "Gratuit", filet: true)
+                    ReglageLigne(symbole: "crown", titre: String(localized: "Abonnement"), valeur: String(localized: "Gratuit"), filet: true)
                 }
                 .buttonStyle(.dsPress)
                 .accessibilityIdentifier("reglages.abonnement")
@@ -341,7 +341,7 @@ struct ReglagesView: View {
                     .environmentObject(dashboardVM)
             } label: {
                 ReglageLigne(symbole: "heart", sens: healthLinked ? .actif : .neutre,
-                             titre: "Apple Santé", valeur: healthLinked ? "Connecté" : "Non connecté",
+                             titre: String(localized: "Apple Santé"), valeur: healthLinked ? String(localized: "Connecté") : String(localized: "Non connecté"),
                              filet: true)
             }
             .buttonStyle(.dsPress)
@@ -350,7 +350,7 @@ struct ReglagesView: View {
             Button {
                 Task { await exportUserData() }
             } label: {
-                ReglageLigne(symbole: "square.and.arrow.down", titre: "Exporter mes données") {
+                ReglageLigne(symbole: "square.and.arrow.down", titre: String(localized: "Exporter mes données")) {
                     if isExportingData { ProgressView() } else { DSChevron() }
                 }
             }
@@ -372,7 +372,7 @@ struct ReglagesView: View {
                 // Le libellé reste celui que cite la fiche d'une cause
                 // (`CauseApportSheet`) : il ne change qu'avec elle.
                 ReglageLigne(symbole: "list.clipboard",
-                             titre: "Modifier mes informations du questionnaire")
+                             titre: String(localized: "Modifier mes informations du questionnaire"))
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.questionnaire")
@@ -390,7 +390,7 @@ struct ReglagesView: View {
             NavigationLink {
                 WidgetsReglagesView()
             } label: {
-                ReglageLigne(symbole: "square.grid.2x2", titre: "Widgets et écran verrouillé", filet: true)
+                ReglageLigne(symbole: "square.grid.2x2", titre: String(localized: "Widgets et écran verrouillé"), filet: true)
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.widgets")
@@ -403,7 +403,7 @@ struct ReglagesView: View {
                 NotificationCenter.default.post(name: .healthmapNavigateToTab,
                                                 object: MainTabView.Tab.journal.route)
             } label: {
-                ReglageLigne(symbole: "graduationcap", titre: "Revoir le tutoriel", filet: true)
+                ReglageLigne(symbole: "graduationcap", titre: String(localized: "Revoir le tutoriel"), filet: true)
             }
             .buttonStyle(.dsPress)
             .verreCascade(lignesVisibles, delai: delai(8), decalage: 10)
@@ -416,7 +416,7 @@ struct ReglagesView: View {
                     HapticService.shared.tap()
                     NotificationCenter.default.post(name: .healthmapRevoirBrief, object: nil)
                 } label: {
-                    ReglageLigne(symbole: "sunrise", titre: "Revoir le brief du jour", filet: true)
+                    ReglageLigne(symbole: "sunrise", titre: String(localized: "Revoir le brief du jour"), filet: true)
                 }
                 .buttonStyle(.dsPress)
                 .verreCascade(lignesVisibles, delai: delai(8), decalage: 10)
@@ -429,7 +429,7 @@ struct ReglagesView: View {
                     HapticService.shared.tap()
                     NotificationCenter.default.post(name: .healthmapRejouerRecap, object: nil)
                 } label: {
-                    ReglageLigne(symbole: "play.circle", titre: "Revoir mon bilan animé", filet: true)
+                    ReglageLigne(symbole: "play.circle", titre: String(localized: "Revoir mon bilan animé"), filet: true)
                 }
                 .buttonStyle(.dsPress)
                 .verreCascade(lignesVisibles, delai: delai(9), decalage: 10)
@@ -438,7 +438,7 @@ struct ReglagesView: View {
             NavigationLink {
                 MethodeView()
             } label: {
-                ReglageLigne(symbole: "book.closed", titre: "Méthode et sources")
+                ReglageLigne(symbole: "book.closed", titre: String(localized: "Méthode et sources"))
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.methode")
@@ -453,7 +453,7 @@ struct ReglagesView: View {
     private var legalList: some View {
         DSGroupedList {
             Link(destination: ReglagesLiens.cgu) {
-                ReglageLigne(symbole: "doc.text", titre: "Conditions d'utilisation", filet: true) {
+                ReglageLigne(symbole: "doc.text", titre: String(localized: "Conditions d'utilisation"), filet: true) {
                     lienExterne
                 }
             }
@@ -462,7 +462,7 @@ struct ReglagesView: View {
             .verreCascade(lignesVisibles, delai: delai(10), decalage: 10)
 
             Link(destination: ReglagesLiens.mentionsLegales) {
-                ReglageLigne(symbole: "building.columns", titre: "Mentions légales", filet: true) {
+                ReglageLigne(symbole: "building.columns", titre: String(localized: "Mentions légales"), filet: true) {
                     lienExterne
                 }
             }
@@ -471,7 +471,7 @@ struct ReglagesView: View {
             .verreCascade(lignesVisibles, delai: delai(10), decalage: 10)
 
             Link(destination: ReglagesLiens.confidentialite) {
-                ReglageLigne(symbole: "hand.raised", titre: "Politique de confidentialité", filet: true) {
+                ReglageLigne(symbole: "hand.raised", titre: String(localized: "Politique de confidentialité"), filet: true) {
                     lienExterne
                 }
             }
@@ -482,7 +482,7 @@ struct ReglagesView: View {
             NavigationLink {
                 LicencesView()
             } label: {
-                ReglageLigne(symbole: "text.book.closed", titre: "Licences")
+                ReglageLigne(symbole: "text.book.closed", titre: String(localized: "Licences"))
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.licences")
@@ -555,7 +555,7 @@ struct ReglagesView: View {
                     await authViewModel.signOut()
                 }
             } label: {
-                ReglageLigne(symbole: "rectangle.portrait.and.arrow.right", titre: "Se déconnecter",
+                ReglageLigne(symbole: "rectangle.portrait.and.arrow.right", titre: String(localized: "Se déconnecter"),
                              filet: true) { EmptyView() }
             }
             .buttonStyle(.dsPress)
@@ -565,7 +565,7 @@ struct ReglagesView: View {
                 SuppressionCompteView()
                     .environmentObject(authViewModel)
             } label: {
-                ReglageLigne(symbole: "trash", sens: .destructif, titre: "Supprimer mon compte")
+                ReglageLigne(symbole: "trash", sens: .destructif, titre: String(localized: "Supprimer mon compte"))
             }
             .buttonStyle(.dsPress)
             .accessibilityIdentifier("reglages.suppression")
@@ -887,7 +887,7 @@ struct LigneIdentite: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(email.map { "Mon compte, \(prenom), \($0)" } ?? "Mon compte, \(prenom)")
+        .accessibilityLabel(email.map { String(localized: "Mon compte, \(prenom), \($0)") } ?? String(localized: "Mon compte, \(prenom)"))
     }
 }
 
@@ -944,21 +944,21 @@ struct BlocPremiumReglages: View {
     let action: () -> Void
 
     private var lignePlan: String {
-        guard let nombreApports, nombreApports > 1 else { return "Le plan complet pour tes apports" }
-        return "Le plan complet pour tes \(nombreApports) apports prioritaires"
+        guard let nombreApports, nombreApports > 1 else { return String(localized: "Le plan complet pour tes apports") }
+        return String(localized: "Le plan complet pour tes \(nombreApports) apports prioritaires")
     }
 
     /// L'essai quand Apple en propose un ; sinon la promesse, jamais un essai
     /// inventé.
     private var sousLigne: String {
-        if let essai { return "\(essai) offerts" }
+        if let essai { return String(localized: "\(essai) offerts") }
         return lignePlan
     }
 
     var body: some View {
         VStack(spacing: 8) {
             Button(action: action) {
-                CartePremiumEntete(titre: "Kiwio Premium", sousLigne: sousLigne)
+                CartePremiumEntete(titre: String(localized: "Kiwio Premium"), sousLigne: sousLigne)
                     .dsCard()
                     .contentShape(RoundedRectangle(cornerRadius: DS.rayonCarte, style: .continuous))
             }
@@ -1004,7 +1004,10 @@ struct LignePrixPremium: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Prix en cours de chargement. Annulable à tout moment.")
             case .chargee(let avecEssai, let montants):
-                Text((avecEssai ? "puis " : "") + montants.joined(separator: " · ou ") + " · annulable à tout moment")
+                let montantsTexte = montants.joined(separator: Langue.estFrancais ? " · ou " : " · or ")
+                Text(avecEssai
+                     ? String(localized: "puis \(montantsTexte) · annulable à tout moment")
+                     : String(localized: "\(montantsTexte) · annulable à tout moment"))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1072,9 +1075,9 @@ enum PremiumOffre {
         func montant(_ estLaBonne: (PlanOption) -> Bool, _ suffixe: String) -> String? {
             toutes.first(where: estLaBonne).map { "\($0.localizedPriceString)/\(suffixe)" }
         }
-        var montants = [montant({ $0.periodUnit == .year }, "an"),
-                        montant({ $0.periodUnit == .week }, "sem.")].compactMap { $0 }
-        if montants.isEmpty, let mensuel = montant({ $0.periodUnit == .month }, "mois") { montants = [mensuel] }
+        var montants = [montant({ $0.periodUnit == .year }, String(localized: "an")),
+                        montant({ $0.periodUnit == .week }, String(localized: "sem."))].compactMap { $0 }
+        if montants.isEmpty, let mensuel = montant({ $0.periodUnit == .month }, String(localized: "mois")) { montants = [mensuel] }
         if montants.isEmpty, let premiere = toutes.first { montants = [premiere.localizedPriceString] }
 
         let avecEssai = essai(formule(offerings: offerings, produits: produits)) != nil
@@ -1084,9 +1087,9 @@ enum PremiumOffre {
     /// « Essayer 7 jours gratuits », ou « Découvrir Kiwio Premium » sans essai.
     static func titreEssai(offerings: Offerings?, produits: [StoreProduct]) -> String {
         if let essai = essai(formule(offerings: offerings, produits: produits)) {
-            return "Essayer \(essai) gratuits"
+            return String(localized: "Essayer \(essai) gratuits")
         }
-        return "Découvrir Kiwio Premium"
+        return String(localized: "Découvrir Kiwio Premium")
     }
 }
 
@@ -1113,8 +1116,8 @@ private struct LigneNotifications: View {
     private var allume: Bool { autorise && voulus && !gamification.isZenMode }
 
     private var sousTitre: String {
-        if statut == .denied { return "Désactivées dans les réglages de l'iPhone" }
-        return allume ? "Dans la journée, avec tes chiffres du jour" : "Rappels coupés"
+        if statut == .denied { return String(localized: "Désactivées dans les réglages de l'iPhone") }
+        return allume ? String(localized: "Dans la journée, avec tes chiffres du jour") : String(localized: "Rappels coupés")
     }
 
     var body: some View {
@@ -1205,7 +1208,7 @@ private struct InterrupteurVerreStyle: ToggleStyle {
         // VoiceOver lit un interrupteur, avec son état, et le bascule.
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isToggle)
-        .accessibilityValue(configuration.isOn ? "Activé" : "Désactivé")
+        .accessibilityValue(configuration.isOn ? String(localized: "Activé") : String(localized: "Désactivé"))
         .accessibilityAction { configuration.isOn.toggle() }
     }
 }

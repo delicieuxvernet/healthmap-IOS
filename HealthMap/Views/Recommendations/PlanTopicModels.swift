@@ -56,14 +56,14 @@ struct PlanTopic: Identifiable {
 
     var kicker: String {
         switch kind {
-        case .symptome: return "SYMPTÔME"
-        case .objectif: return "OBJECTIF"
+        case .symptome: return String(localized: "SYMPTÔME")
+        case .objectif: return String(localized: "OBJECTIF")
         case .apport:
             switch statut {
-            case .aSurveiller?: return "APPORT À SURVEILLER"
-            case .peuPrecise?: return "APPORT À AFFINER"
-            case .couvert?, .couvertParComplement?, .sousLaLimite?: return "APPORT COUVERT"
-            default: return "APPORT À RENFORCER"
+            case .aSurveiller?: return String(localized: "APPORT À SURVEILLER")
+            case .peuPrecise?: return String(localized: "APPORT À AFFINER")
+            case .couvert?, .couvertParComplement?, .sousLaLimite?: return String(localized: "APPORT COUVERT")
+            default: return String(localized: "APPORT À RENFORCER")
             }
         }
     }
@@ -166,6 +166,15 @@ func planTopicsFromApports(_ nutrients: [EnrichedNutrient],
     return sorted.prefix(count).compactMap { planApportTopic($0, statut: statuts[$0.id], verdict: verdicts[$0.id]) }
 }
 
+/// Un nom de nutriment au milieu d'une phrase : en français tout le nom passe en
+/// minuscules (« vitamine d », comme avant) ; en anglais seule l'initiale
+/// (« vitamin D », pas « vitamin d »).
+func planNomEnMinuscule(_ label: String) -> String {
+    if Langue.estFrancais { return label.lowercased() }
+    guard let first = label.first else { return label }
+    return first.lowercased() + label.dropFirst()
+}
+
 /// Un nœud « apport » : mêmes composants et même pop-up que la vue objectifs,
 /// alimentés par les données déjà disponibles pour CE nutriment (sources
 /// d'aliments du catalogue, hack/synergie/solution de l'analyse quand ils
@@ -187,11 +196,11 @@ private func planApportTopic(_ n: EnrichedNutrient, statut: StatutApport? = nil,
         PlanNutritionSolution(
             asset: food.asset,
             label: food.label,
-            note: "Riche en \(def.label.lowercased())",
-            qty: "1 portion par jour",
-            moment: quand.isEmpty ? "Au repas principal" : quand,
-            cuisson: "Cuisson douce pour préserver les apports",
-            astuce: n.synergie?.isEmpty == false ? n.synergie! : "À associer à une source de vitamine C"
+            note: String(localized: "Riche en \(planNomEnMinuscule(def.label))"),
+            qty: String(localized: "1 portion par jour"),
+            moment: quand.isEmpty ? String(localized: "Au repas principal") : quand,
+            cuisson: String(localized: "Cuisson douce pour préserver les apports"),
+            astuce: n.synergie?.isEmpty == false ? n.synergie! : String(localized: "À associer à une source de vitamine C")
         )
     }
 
@@ -199,21 +208,21 @@ private func planApportTopic(_ n: EnrichedNutrient, statut: StatutApport? = nil,
     // à défaut, les repères génériques déjà posés par la vue objectifs.
     var habitudes: [PlanHabitSolution] = []
     if let hack = n.hack?.trimmingCharacters(in: .whitespacesAndNewlines), !hack.isEmpty {
-        habitudes.append(PlanHabitSolution(symbol: "lightbulb.fill", text: "Le bon geste", note: hack))
+        habitudes.append(PlanHabitSolution(symbol: "lightbulb.fill", text: String(localized: "Le bon geste"), note: hack))
     }
     if let synergie = n.synergie?.trimmingCharacters(in: .whitespacesAndNewlines), !synergie.isEmpty {
-        habitudes.append(PlanHabitSolution(symbol: "arrow.triangle.merge", text: "La bonne association", note: synergie))
+        habitudes.append(PlanHabitSolution(symbol: "arrow.triangle.merge", text: String(localized: "La bonne association"), note: synergie))
     }
     if habitudes.isEmpty {
         habitudes = [
-            PlanHabitSolution(symbol: "sun.max.fill", text: "Un peu de lumière le matin",
-                              note: "10 min dehors réveillent ton horloge interne"),
-            PlanHabitSolution(symbol: "bed.double.fill", text: "Un sommeil régulier",
-                              note: "Couche-toi à heure fixe pour mieux récupérer")
+            PlanHabitSolution(symbol: "sun.max.fill", text: String(localized: "Un peu de lumière le matin"),
+                              note: String(localized: "10 min dehors réveillent ton horloge interne")),
+            PlanHabitSolution(symbol: "bed.double.fill", text: String(localized: "Un sommeil régulier"),
+                              note: String(localized: "Couche-toi à heure fixe pour mieux récupérer"))
         ]
         if n.id == "iron" {
-            habitudes[0] = PlanHabitSolution(symbol: "cup.and.saucer.fill", text: "Décale thé et café",
-                                             note: "Loin des repas riches en fer pour mieux l'absorber")
+            habitudes[0] = PlanHabitSolution(symbol: "cup.and.saucer.fill", text: String(localized: "Décale thé et café"),
+                                             note: String(localized: "Loin des repas riches en fer pour mieux l'absorber"))
         }
     }
 
@@ -223,8 +232,8 @@ private func planApportTopic(_ n: EnrichedNutrient, statut: StatutApport? = nil,
     let strong = statut.map { $0 == .aRenforcer } ?? (n.score < 45)
     let complements = statut.map({ $0 == .aRenforcer }) ?? true ? [PlanSupplementSolution(
         name: def.label,
-        note: n.solution?.quand?.isEmpty == false ? n.solution!.quand! : "À envisager si l'alimentation ne suffit pas",
-        tag: strong ? "Prioritaire" : "Si besoin",
+        note: n.solution?.quand?.isEmpty == false ? n.solution!.quand! : String(localized: "À envisager si l'alimentation ne suffit pas"),
+        tag: strong ? String(localized: "Prioritaire") : String(localized: "Si besoin"),
         strong: strong
     )] : []
 

@@ -21,7 +21,7 @@ final class ToastService: ObservableObject {
     /// plutôt que de laisser un bouton sans effet : « rien ne se passe » est le
     /// pire retour qu'une interface puisse donner.
     func showÉchecRecap() {
-        show("Ton bilan animé n'est pas disponible pour l'instant.")
+        show(String(localized: "Ton bilan animé n'est pas disponible pour l'instant."))
     }
 
     /// Confirmation d'un geste que la personne vient de faire (« Objectifs mis

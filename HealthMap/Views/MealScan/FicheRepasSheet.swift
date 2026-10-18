@@ -50,14 +50,14 @@ struct FicheRepasSheet: View {
                 entete(fiche)
 
                 Group {
-                    titreDeBloc("Ce que tu as saisi")
+                    titreDeBloc(String(localized: "Ce que tu as saisi"))
                     saisies
                 }
                 .kiwiEntrance(1)
 
                 if !lignes.isEmpty {
                     Group {
-                        titreDeBloc("Ce qu'il t'a apporté", symbole: "flame",
+                        titreDeBloc(String(localized: "Ce qu'il t'a apporté"), symbole: "flame",
                                     teinte: Color.teinteEnergie, encre: Color.teinteEnergieTexte)
                         macros(fiche)
                     }
@@ -65,7 +65,7 @@ struct FicheRepasSheet: View {
 
                     if !fiche.apports.isEmpty {
                         Group {
-                            titreDeBloc("Vitamines et minéraux", symbole: "leaf",
+                            titreDeBloc(String(localized: "Vitamines et minéraux"), symbole: "leaf",
                                         teinte: Color.teinteKiwi, encre: Color.teinteKiwiTexte)
                             apports(fiche)
                         }
@@ -182,7 +182,7 @@ struct FicheRepasSheet: View {
     }
 
     private func sousTitre(_ fiche: FicheRepas) -> String {
-        guard !lignes.isEmpty else { return "Rien pour l'instant" }
+        guard !lignes.isEmpty else { return String(localized: "Rien pour l'instant") }
         let kcal = "\(DS.entier(fiche.calories)) kcal"
         return fiche.resume.isEmpty ? kcal : "\(fiche.resume) · \(kcal)"
     }
@@ -249,7 +249,7 @@ struct FicheRepasSheet: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.dsPress)
-                .accessibilityHint(ligne.isQuantityEditable ? "Modifier la quantité ou retirer" : "Voir le détail ou retirer")
+                .accessibilityHint(ligne.isQuantityEditable ? String(localized: "Modifier la quantité ou retirer") : String(localized: "Voir le détail ou retirer"))
                 .verreCascade(rempli, delai: delaiSaisie(index), decalage: 14)
             }
 
@@ -264,7 +264,7 @@ struct FicheRepasSheet: View {
                     Image(systemName: "plus")
                         .font(.system(size: 15, weight: .semibold))
                         .accessibilityHidden(true)
-                    Text(lignes.isEmpty ? "Ajouter un aliment" : "Ajouter à ce repas")
+                    Text(lignes.isEmpty ? String(localized: "Ajouter un aliment") : String(localized: "Ajouter à ce repas"))
                         .font(.dsSousTitreMoyen)
                         .tracking(DSTracking.sousTitre)
                     Spacer(minLength: 0)

@@ -8,9 +8,9 @@ struct RedFlag: Identifiable, Equatable {
     let disclaimer: String
 
     /// Global disclaimer shown alongside any red flag display.
-    static let disclaimer = "Ces signaux sont générés automatiquement à partir de tes réponses et ne constituent en aucun cas un diagnostic médical. Consulte un professionnel de santé pour toute décision médicale."
+    static let disclaimer = String(localized: "Ces signaux sont générés automatiquement à partir de tes réponses et ne constituent en aucun cas un diagnostic médical. Consulte un professionnel de santé pour toute décision médicale.")
 
-    init(id: RedFlagID, urgency: Urgency, message: String, disclaimer: String = "Information générale, ne remplace pas un avis médical") {
+    init(id: RedFlagID, urgency: Urgency, message: String, disclaimer: String = String(localized: "Information générale, ne remplace pas un avis médical")) {
         self.id = id
         self.urgency = urgency
         self.message = message

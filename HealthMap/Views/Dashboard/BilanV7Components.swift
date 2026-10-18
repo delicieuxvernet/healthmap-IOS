@@ -214,7 +214,7 @@ struct BilanV7ScoreRing: View {
             compteur = nil
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(score == nil ? "Score du jour indisponible" : "Score du jour : \(score ?? 0) sur 100")
+        .accessibilityLabel(score == nil ? String(localized: "Score du jour indisponible") : String(localized: "Score du jour : \(score ?? 0) sur 100"))
     }
 
     private func animate() {
@@ -250,7 +250,7 @@ struct BilanV7Header: View {
 
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
+        f.locale = Langue.locale
         f.setLocalizedDateFormatFromTemplate("EEEEdMMMM")
         return f
     }()
@@ -302,9 +302,9 @@ struct BilanV7ScoreCard: View {
     /// « En hausse : +5 cette semaine » (le delta en monospace, teinté sens).
     private var trendLine: Text {
         guard let delta, delta != 0 else {
-            return Text(insight ?? "Ton suivi démarre. Scanne tes repas pour le faire vivre.")
+            return Text(insight ?? String(localized: "Ton suivi démarre. Scanne tes repas pour le faire vivre."))
         }
-        let lead = delta > 0 ? "En hausse : " : "En baisse : "
+        let lead = delta > 0 ? String(localized: "En hausse : ") : String(localized: "En baisse : ")
         let value = delta > 0 ? "+\(delta)" : "\(delta)"
         let color = delta > 0 ? Color.dsTexte : BilanV7.alertInk
         var line = Text(lead)
@@ -385,10 +385,13 @@ enum BilanV7Nutrient {
 
     /// « La B12 est ta priorité aujourd'hui. »
     static func prioritySentence(id: String?, nom: String) -> String {
-        guard let id, !nom.isEmpty else { return "\(nom) est ta priorité aujourd'hui." }
-        let art = article(for: id)
-        let joint = art == "L'" ? "" : " "
-        return "\(art)\(joint)\(nom) est ta priorité aujourd'hui."
+        guard let id, !nom.isEmpty else { return String(localized: "\(nom) est ta priorité aujourd'hui.") }
+        switch article(for: id) {
+        case "La":  return String(localized: "La \(nom) est ta priorité aujourd'hui.")
+        case "Les": return String(localized: "Les \(nom) est ta priorité aujourd'hui.")
+        case "L'":  return String(localized: "L'\(nom) est ta priorité aujourd'hui.")
+        default:    return String(localized: "Le \(nom) est ta priorité aujourd'hui.")
+        }
     }
 }
 
@@ -400,7 +403,7 @@ struct BilanV7ApportsCard: View {
 
     private var priority: String {
         guard let first = apports.first, let nom = first.nom, !nom.isEmpty else {
-            return "Tes apports sont au vert aujourd'hui."
+            return String(localized: "Tes apports sont au vert aujourd'hui.")
         }
         return BilanV7Nutrient.prioritySentence(id: first.id, nom: nom)
     }
@@ -412,7 +415,7 @@ struct BilanV7ApportsCard: View {
                 // surveiller » et parfois « à affiner » (8 oct. 2026).
                 BilanV7SectionLabel(
                     icon: "target",
-                    text: "Tes apports à suivre",
+                    text: String(localized: "Tes apports à suivre"),
                     color: Color.dsARenforcerTexte,
                     teinte: Color.dsARenforcer
                 )
@@ -481,7 +484,7 @@ struct BilanV7ApportsCard: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.dsPress)
-            .accessibilityLabel("Voir comment renforcer \(apport.nom ?? "cet apport")")
+            .accessibilityLabel(apport.nom.map { String(localized: "Voir comment renforcer \($0)") } ?? String(localized: "Voir comment renforcer cet apport"))
         }
         .padding(.vertical, 13)
         .overlay(alignment: .top) {
@@ -532,7 +535,7 @@ struct BilanV7AttentionCard: View {
             guard let rest = item.tipRest, !rest.isEmpty else { return nil }
             return rest
         }
-        return "Détecté dans tes réponses"
+        return String(localized: "Détecté dans tes réponses")
     }
 
     var body: some View {
@@ -540,7 +543,7 @@ struct BilanV7AttentionCard: View {
             HStack {
                 BilanV7SectionLabel(
                     icon: "exclamationmark.triangle",
-                    text: "Points d'attention",
+                    text: String(localized: "Points d'attention"),
                     color: Color.teinteEnergieTexte,
                     teinte: Color.teinteEnergie
                 )
@@ -637,7 +640,7 @@ struct BilanV7SymptomesCard: View {
         VStack(alignment: .leading, spacing: 0) {
             BilanV7SectionLabel(
                 icon: "waveform.path.ecg",
-                text: "Tes symptômes suivis",
+                text: String(localized: "Tes symptômes suivis"),
                 color: Color.teinteSymptomesTexte,
                 teinte: Color.teinteSymptomes
             )
@@ -732,8 +735,8 @@ struct BilanV7SymptomesCard: View {
             .padding(.top, 10)
             .accessibilityLabel(
                 solutionsCount > 0
-                    ? "Voir mes solutions, \(solutionsCount) disponibles"
-                    : "Voir mes solutions"
+                    ? String(localized: "Voir mes solutions, \(solutionsCount) disponibles")
+                    : String(localized: "Voir mes solutions")
             )
         }
         .padding(16)
@@ -768,7 +771,7 @@ struct BilanV7SerieCard: View {
             + Text(rung.name).font(.system(.caption).weight(.bold)).foregroundStyle(BilanV7.ink)
             + Text(" dans ")
             + Text("\(daysLeft)").font(.system(.caption, design: .default).weight(.bold).monospacedDigit())
-            + Text(daysLeft > 1 ? " jours" : " jour")
+            + Text(daysLeft > 1 ? String(localized: " jours") : String(localized: " jour"))
     }
 
     var body: some View {
@@ -780,7 +783,7 @@ struct BilanV7SerieCard: View {
                 HStack {
                     BilanV7SectionLabel(
                         icon: "flame.fill",
-                        text: "Ta série",
+                        text: String(localized: "Ta série"),
                         color: Color.teinteEnergieTexte,
                         teinte: Color.teinteEnergie
                     )
@@ -803,7 +806,7 @@ struct BilanV7SerieCard: View {
                         // Pro Rounded, dans l'encre la plus foncée du bloc.
                         (Text(DS.entier(streak))
                             .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
-                            + Text(streak > 1 ? " jours d'affilée" : " jour d'affilée")
+                            + Text(streak > 1 ? String(localized: " jours d'affilée") : String(localized: " jour d'affilée"))
                                 .font(.dsSousTitreFort))
                             .tracking(-0.2)
                             .foregroundStyle(BilanV7.ink)
@@ -842,7 +845,7 @@ struct BilanV7RepasCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            BilanV7SectionLabel(icon: "fork.knife", text: "Tes derniers repas", color: Color.dsTexte)
+            BilanV7SectionLabel(icon: "fork.knife", text: String(localized: "Tes derniers repas"), color: Color.dsTexte)
 
             ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
                 HStack(alignment: .top, spacing: 9) {
@@ -981,7 +984,7 @@ struct BilanV7ApportsTeaserCard: View {
             HStack {
                 BilanV7SectionLabel(
                     icon: "target",
-                    text: "Tes apports à renforcer",
+                    text: String(localized: "Tes apports à renforcer"),
                     color: Color.dsARenforcerTexte,
                     teinte: Color.dsARenforcer
                 )
@@ -1012,7 +1015,7 @@ struct BilanV7ApportsTeaserCard: View {
             // bouton primaire du questionnaire, aucun style nouveau.
             BilanDoorButton(
                 title: BilanDoorButton.Libelle.bilanApports,
-                accessibilityText: "Voir mes apports, faire le bilan en 3 minutes",
+                accessibilityText: String(localized: "Voir mes apports, faire le bilan en 3 minutes"),
                 zone: .bilanApports,
                 action: onStart
             )
@@ -1083,7 +1086,7 @@ struct BilanV7AttentionTeaserCard: View {
         VStack(alignment: .leading, spacing: 0) {
             BilanV7SectionLabel(
                 icon: "exclamationmark.triangle",
-                text: "Points d'attention",
+                text: String(localized: "Points d'attention"),
                 color: Color.teinteEnergieTexte,
                 teinte: Color.teinteEnergie
             )

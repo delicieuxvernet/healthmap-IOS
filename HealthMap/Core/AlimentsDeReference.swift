@@ -156,11 +156,19 @@ enum AlimentsDeReference {
     static func trouver(_ nom: String) -> AlimentDeReference? {
         var cle = Self.cle(nom)
         while !cle.isEmpty {
-            if let aliment = parCle[cle] { return aliment }
+            if let aliment = parCle[cle] { return affichable(aliment) }
             guard let raccourcie = sansPrecision(cle) else { return nil }
             cle = raccourcie
         }
         return nil
+    }
+
+    /// Le même aliment, avec son nom et sa portion dans la langue de l'écran.
+    /// L'index `parCle` garde le français : c'est lui qui sert à reconnaître un nom.
+    private static func affichable(_ aliment: AlimentDeReference) -> AlimentDeReference {
+        AlimentDeReference(nom: Langue.texte(aliment.nom), foodId: aliment.foodId,
+                           portion: Langue.texte(aliment.portion), grammes: aliment.grammes,
+                           illustration: aliment.illustration, autresNoms: aliment.autresNoms)
     }
 
     /// Le nom ramené à sa forme comparable : minuscules, sans accents ni

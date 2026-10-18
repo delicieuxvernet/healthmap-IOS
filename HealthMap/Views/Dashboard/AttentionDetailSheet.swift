@@ -56,7 +56,7 @@ struct AttentionDetailSheet: View {
     private var teasing: String {
         AttentionMechanismCatalog.freeTitle(
             for: interaction,
-            neutral: "Une de tes habitudes du quotidien influence directement tes apports."
+            neutral: String(localized: "Une de tes habitudes du quotidien influence directement tes apports.")
         )
     }
 
@@ -275,19 +275,19 @@ struct AttentionDetailSheet: View {
                 PremiumTeasePromise(
                     id: "mecanisme",
                     emoji: "🔍",
-                    label: "Le mécanisme",
+                    label: String(localized: "Le mécanisme"),
                     blurred: "\(mechanism.mechanism.line1) \(mechanism.mechanism.line2)"
                 ),
                 PremiumTeasePromise(
                     id: "solution",
                     emoji: "💡",
-                    label: "Ta solution",
+                    label: String(localized: "Ta solution"),
                     blurred: mechanism.solution
                 ),
                 PremiumTeasePromise(
                     id: "effet",
                     emoji: "📈",
-                    label: "L'effet",
+                    label: String(localized: "L'effet"),
                     blurred: "\(mechanism.impact.line1) \(mechanism.impact.line2)"
                 ),
             ]
@@ -296,12 +296,12 @@ struct AttentionDetailSheet: View {
         var promises: [PremiumTeasePromise] = []
         if let rest = interaction.tipRest, !rest.isEmpty {
             promises.append(
-                PremiumTeasePromise(id: "mecanisme", emoji: "🔍", label: "Le mécanisme", blurred: rest)
+                PremiumTeasePromise(id: "mecanisme", emoji: "🔍", label: String(localized: "Le mécanisme"), blurred: rest)
             )
         }
         if let bold = interaction.tipBold, !bold.isEmpty {
             promises.append(
-                PremiumTeasePromise(id: "solution", emoji: "💡", label: "Ta solution", blurred: bold)
+                PremiumTeasePromise(id: "solution", emoji: "💡", label: String(localized: "Ta solution"), blurred: bold)
             )
         }
         return promises

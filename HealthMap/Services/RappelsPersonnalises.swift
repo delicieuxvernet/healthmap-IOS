@@ -174,7 +174,7 @@ enum RappelsPersonnalises {
     /// `planifier` ne dépasse jamais ce qui est écrit ici.
     static let maxParJourPlein = 6
     static let maxParJourAllege = 4
-    static let frequenceAnnoncee = "Jusqu'à 6 rappels par jour les deux premiers jours, puis 3 ou 4 : le matin, avant les repas et le soir. Un repas noté annule son rappel. Tu les coupes quand tu veux dans Réglages."
+    static let frequenceAnnoncee = String(localized: "Jusqu'à 6 rappels par jour les deux premiers jours, puis 3 ou 4 : le matin, avant les repas et le soir. Un repas noté annule son rappel. Tu les coupes quand tu veux dans Réglages.")
 
     enum Moment {
         static let brief = (heure: 8, minute: 30)

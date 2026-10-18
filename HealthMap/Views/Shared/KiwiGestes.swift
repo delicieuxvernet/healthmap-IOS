@@ -33,7 +33,7 @@ struct CompteurAjouts: View {
             .overlay(Capsule().stroke(Color.dsAccent, lineWidth: 1.5))
             .animation(reduceMotion ? nil : .kiwiVif, value: nombre)
             .kiwiImpulsion(nombre)
-            .accessibilityLabel(nombre > 1 ? "\(nombre) aliments ajoutés" : "\(nombre) aliment ajouté")
+            .accessibilityLabel(nombre > 1 ? String(localized: "\(nombre) aliments ajoutés") : String(localized: "\(nombre) aliment ajouté"))
     }
 }
 

@@ -153,7 +153,7 @@ struct GratificationOverlay: View {
                 .apparait(etape >= 7, sansTrajet: reduceMotion)
             }
 
-            DSCapsuleButton(titre: "Continuer") { fermer() }
+            DSCapsuleButton(titre: String(localized: "Continuer")) { fermer() }
                 .padding(.top, 18)
                 .apparait(etape >= 8, sansTrajet: reduceMotion)
         }

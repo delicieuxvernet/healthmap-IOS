@@ -52,16 +52,16 @@ enum Fluent3D {
 
     static func foodSources(for nutrientId: String) -> [Food] {
         switch nutrientId {
-        case "vitD":      return [Food(asset: fish, label: "Poisson gras"), Food(asset: egg, label: "Œufs"), Food(asset: milk, label: "Lait enrichi")]
-        case "vitB12":    return [Food(asset: fish, label: "Sardines"), Food(asset: egg, label: "Œufs"), Food(asset: cheese, label: "Fromage")]
-        case "iron":      return [Food(asset: meat, label: "Viande rouge"), Food(asset: leafyGreen, label: "Épinards"), Food(asset: egg, label: "Œufs")]
-        case "magnesium": return [Food(asset: leafyGreen, label: "Légumes verts"), Food(asset: banana, label: "Banane"), Food(asset: peanuts, label: "Oléagineux")]
-        case "omega3":    return [Food(asset: fish, label: "Poisson gras"), Food(asset: oyster, label: "Huîtres"), Food(asset: avocado, label: "Avocat")]
-        case "vitC":      return [Food(asset: tangerine, label: "Agrumes"), Food(asset: broccoli, label: "Brocoli"), Food(asset: strawberry, label: "Fraises")]
-        case "calcium":   return [Food(asset: milk, label: "Lait"), Food(asset: cheese, label: "Fromage"), Food(asset: broccoli, label: "Brocoli")]
-        case "zinc":      return [Food(asset: meat, label: "Viande"), Food(asset: oyster, label: "Huîtres"), Food(asset: cheese, label: "Fromage")]
-        case "iodine":    return [Food(asset: fish, label: "Poisson"), Food(asset: oyster, label: "Fruits de mer"), Food(asset: milk, label: "Lait")]
-        case "fiber":     return [Food(asset: broccoli, label: "Légumes"), Food(asset: banana, label: "Fruits"), Food(asset: leafyGreen, label: "Légumes verts")]
+        case "vitD":      return [Food(asset: fish, label: String(localized: "Poisson gras")), Food(asset: egg, label: String(localized: "Œufs")), Food(asset: milk, label: String(localized: "Lait enrichi"))]
+        case "vitB12":    return [Food(asset: fish, label: String(localized: "Sardines")), Food(asset: egg, label: String(localized: "Œufs")), Food(asset: cheese, label: String(localized: "Fromage"))]
+        case "iron":      return [Food(asset: meat, label: String(localized: "Viande rouge")), Food(asset: leafyGreen, label: String(localized: "Épinards")), Food(asset: egg, label: String(localized: "Œufs"))]
+        case "magnesium": return [Food(asset: leafyGreen, label: String(localized: "Légumes verts")), Food(asset: banana, label: String(localized: "Banane")), Food(asset: peanuts, label: String(localized: "Oléagineux"))]
+        case "omega3":    return [Food(asset: fish, label: String(localized: "Poisson gras")), Food(asset: oyster, label: String(localized: "Huîtres")), Food(asset: avocado, label: String(localized: "Avocat"))]
+        case "vitC":      return [Food(asset: tangerine, label: String(localized: "Agrumes")), Food(asset: broccoli, label: String(localized: "Brocoli")), Food(asset: strawberry, label: String(localized: "Fraises"))]
+        case "calcium":   return [Food(asset: milk, label: String(localized: "Lait")), Food(asset: cheese, label: String(localized: "Fromage")), Food(asset: broccoli, label: String(localized: "Brocoli"))]
+        case "zinc":      return [Food(asset: meat, label: String(localized: "Viande")), Food(asset: oyster, label: String(localized: "Huîtres")), Food(asset: cheese, label: String(localized: "Fromage"))]
+        case "iodine":    return [Food(asset: fish, label: String(localized: "Poisson")), Food(asset: oyster, label: String(localized: "Fruits de mer")), Food(asset: milk, label: String(localized: "Lait"))]
+        case "fiber":     return [Food(asset: broccoli, label: String(localized: "Légumes")), Food(asset: banana, label: String(localized: "Fruits")), Food(asset: leafyGreen, label: String(localized: "Légumes verts"))]
         default:          return []
         }
     }
@@ -129,10 +129,10 @@ enum Fluent3D {
     }
 
     static let harvestLadder: [HarvestRung] = [
-        HarvestRung(asset: strawberry,  name: "Fraise",    threshold: 1),
-        HarvestRung(asset: blueberries, name: "Myrtille",  threshold: 3),
-        HarvestRung(asset: lemon,       name: "Citron",    threshold: 7),
-        HarvestRung(asset: tangerine,   name: "Mandarine", threshold: 14),
+        HarvestRung(asset: strawberry,  name: String(localized: "Fraise"),    threshold: 1),
+        HarvestRung(asset: blueberries, name: String(localized: "Myrtille"),  threshold: 3),
+        HarvestRung(asset: lemon,       name: String(localized: "Citron"),    threshold: 7),
+        HarvestRung(asset: tangerine,   name: String(localized: "Mandarine"), threshold: 14),
         HarvestRung(asset: kiwi,        name: "Kiwi",      threshold: 30),
     ]
 }

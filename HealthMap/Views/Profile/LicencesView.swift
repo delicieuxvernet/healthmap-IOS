@@ -27,12 +27,12 @@ struct LicencesView: View {
     private let donnees: [Donnees] = [
         Donnees(
             nom: "Open Food Facts",
-            detail: "Données et photos produits : Open Food Facts. Base de données sous licence ODbL (Open Database License), images sous licence CC BY-SA, contributeurs Open Food Facts.",
+            detail: String(localized: "Données et photos produits : Open Food Facts. Base de données sous licence ODbL (Open Database License), images sous licence CC BY-SA, contributeurs Open Food Facts."),
             lien: URL(string: "https://world.openfoodfacts.org")!
         ),
         Donnees(
-            nom: "Ciqual 2020 et INCA 3",
-            detail: "Table de composition nutritionnelle Ciqual 2020 et étude INCA 3 de l'ANSES, sous Licence Ouverte Etalab 2.0.",
+            nom: String(localized: "Ciqual 2020 et INCA 3"),
+            detail: String(localized: "Table de composition nutritionnelle Ciqual 2020 et étude INCA 3 de l'ANSES, sous Licence Ouverte Etalab 2.0."),
             lien: URL(string: "https://www.etalab.gouv.fr/licence-ouverte-open-licence/")!
         ),
     ]
@@ -67,7 +67,7 @@ struct LicencesView: View {
                         .padding(.horizontal, 4)
                         .padding(.top, DS.marge)
 
-                    DSSectionHeader(titre: "Données")
+                    DSSectionHeader(titre: String(localized: "Données"))
                     DSGroupedList {
                         ForEach(Array(donnees.enumerated()), id: \.element.id) { index, entree in
                             if index > 0 { DSSeparator(retrait: DS.paddingCarte) }
@@ -82,11 +82,11 @@ struct LicencesView: View {
                         }
                     }
 
-                    DSSectionHeader(titre: "Logiciels")
+                    DSSectionHeader(titre: String(localized: "Logiciels"))
                     DSGroupedList {
                         ForEach(Array(logiciels.enumerated()), id: \.element.id) { index, logiciel in
                             if index > 0 { DSSeparator(retrait: DS.paddingCarte) }
-                            DSRow(titre: logiciel.nom, sousTitre: "\(logiciel.copyright) · licence MIT") {
+                            DSRow(titre: logiciel.nom, sousTitre: String(localized: "\(logiciel.copyright) · licence MIT")) {
                                 EmptyView()
                             }
                             .accessibilityElement(children: .combine)
@@ -101,7 +101,7 @@ struct LicencesView: View {
                         .padding(.horizontal, DS.paddingCarte)
                         .padding(.top, 8)
 
-                    DSSectionHeader(titre: "Licence MIT")
+                    DSSectionHeader(titre: String(localized: "Licence MIT"))
                     Text(Self.texteMIT)
                         .font(.dsLegende)
                         .foregroundStyle(Color.dsSecondaire)

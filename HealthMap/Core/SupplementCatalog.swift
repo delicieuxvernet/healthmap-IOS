@@ -41,7 +41,7 @@ extension SupplementEngine {
         // --- VITAMINE D ---
         SupplementProduct(
             id: "vitd3-k2-dynveo",
-            name: "Vitamine D3 + K2 MK-7",
+            name: String(localized: "Vitamine D3 + K2 MK-7"),
             nutrientID: .vitD,
             brand: "Dynveo",
             dosage: "2000 UI D3 + 80 µg K2",
@@ -54,11 +54,11 @@ extension SupplementEngine {
             contraindications: [.hypercalcemie],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Vitamine D3 d'origine végétale (lichen), associée à de la vitamine K2 MK-7 (K2VITAL)."
+            whyBrand: String(localized: "Vitamine D3 d'origine végétale (lichen), associée à de la vitamine K2 MK-7 (K2VITAL).")
         ),
         SupplementProduct(
             id: "vitd3-gouttes-nutrico",
-            name: "Vitamine D3 Végétale (gouttes)",
+            name: String(localized: "Vitamine D3 Végétale (gouttes)"),
             nutrientID: .vitD,
             brand: "Nutri&Co",
             dosage: "1000 UI par goutte",
@@ -71,13 +71,13 @@ extension SupplementEngine {
             contraindications: [.hypercalcemie],
             antiInteractions: [],
             tier: .value,
-            whyBrand: "Format gouttes économique (~0,13 €/jour, ~5 mois d'autonomie). D3 végétale extraite du lichen."
+            whyBrand: String(localized: "Format gouttes économique (~0,13 €/jour, ~5 mois d'autonomie). D3 végétale extraite du lichen.")
         ),
 
         // --- VITAMINE B12 ---
         SupplementProduct(
             id: "b12-methylcobalamine-nutrico",
-            name: "Vitamine B12 Méthylcobalamine",
+            name: String(localized: "Vitamine B12 Méthylcobalamine"),
             nutrientID: .vitB12,
             brand: "Nutri&Co",
             dosage: "1000 µg méthylcobalamine",
@@ -90,11 +90,11 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Méthylcobalamine en gélule concentrée, végane."
+            whyBrand: String(localized: "Méthylcobalamine en gélule concentrée, végane.")
         ),
         SupplementProduct(
             id: "b12-3-formes-dynveo",
-            name: "Vitamine B12 Active (3 formes)",
+            name: String(localized: "Vitamine B12 Active (3 formes)"),
             nutrientID: .vitB12,
             brand: "Dynveo",
             dosage: "250 µg · 3 formes actives",
@@ -107,7 +107,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [],
             tier: .value,
-            whyBrand: "Trois formes de B12 en une gélule, sans additifs, à ~0,15 €/jour."
+            whyBrand: String(localized: "Trois formes de B12 en une gélule, sans additifs, à ~0,15 €/jour.")
         ),
 
         // --- FER ---
@@ -115,7 +115,7 @@ extension SupplementEngine {
         // « valide avec ton médecin/sage-femme » côté moteur (besoins accrus).
         SupplementProduct(
             id: "fer-bisglycinate-nutrico",
-            name: "Fer Bisglycinate + Souche Lactique",
+            name: String(localized: "Fer Bisglycinate + Souche Lactique"),
             nutrientID: .iron,
             brand: "Nutri&Co",
             dosage: "14 mg fer + vitamine C + folate",
@@ -128,11 +128,11 @@ extension SupplementEngine {
             contraindications: [.hemochromatose],
             antiInteractions: ["calcium", "zinc"],
             tier: .premium,
-            whyBrand: "Fer bisglycinate Ferrochel, souche lactique, vitamine C et folate 5-MTHF, en une gélule."
+            whyBrand: String(localized: "Fer bisglycinate Ferrochel, souche lactique, vitamine C et folate 5-MTHF, en une gélule.")
         ),
         SupplementProduct(
             id: "fer-bisglycinate-aromazone",
-            name: "Fer Bisglycinate + Vitamine C",
+            name: String(localized: "Fer Bisglycinate + Vitamine C"),
             nutrientID: .iron,
             brand: "Aroma-Zone",
             dosage: "14 mg Ferrochel + vitamine C",
@@ -148,7 +148,7 @@ extension SupplementEngine {
             contraindications: [.hemochromatose],
             antiInteractions: ["calcium", "zinc"],
             tier: .value,
-            whyBrand: "Même matière première Ferrochel que le premium, en version simple. ~0,11 €/jour."
+            whyBrand: String(localized: "Même matière première Ferrochel que le premium, en version simple. ~0,11 €/jour.")
         ),
 
         // --- MAGNESIUM ---
@@ -161,7 +161,7 @@ extension SupplementEngine {
         // au mois, et un « Éco » plus cher serait mensonger.
         SupplementProduct(
             id: "magnesium-bisglycinate-dynveo",
-            name: "Magnésium Bisglycinate chélaté",
+            name: String(localized: "Magnésium Bisglycinate chélaté"),
             nutrientID: .magnesium,
             brand: "Dynveo",
             dosage: "75 mg de magnésium par gélule · TRAACS",
@@ -174,7 +174,7 @@ extension SupplementEngine {
             contraindications: [.insuffisanceRenaleSevere],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Bisglycinate TRAACS pur, sans oxyde ajouté. Fabriqué en France, sans excipient superflu."
+            whyBrand: String(localized: "Bisglycinate TRAACS pur, sans oxyde ajouté. Fabriqué en France, sans excipient superflu.")
         ),
 
         // --- OMEGA-3 ---
@@ -183,7 +183,7 @@ extension SupplementEngine {
         // d'abord, donc l'omnivore reçoit le poisson, le végétal reçoit l'algue.
         SupplementProduct(
             id: "omega3-dha-nutrico",
-            name: "Oméga-3 EPAX (DHA dominant)",
+            name: String(localized: "Oméga-3 EPAX (DHA dominant)"),
             nutrientID: .omega3,
             brand: "Nutri&Co",
             dosage: "750 mg DHA + 150 mg EPA",
@@ -196,11 +196,11 @@ extension SupplementEngine {
             contraindications: [.allergiePoisson],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Riche en DHA, forme triglycéride, en capsules Licaps."
+            whyBrand: String(localized: "Riche en DHA, forme triglycéride, en capsules Licaps.")
         ),
         SupplementProduct(
             id: "omega3-algue-dynveo",
-            name: "Oméga-3 Végétal (Algue)",
+            name: String(localized: "Oméga-3 Végétal (Algue)"),
             nutrientID: .omega3,
             brand: "Dynveo",
             dosage: "500 mg DHA + 250 mg EPA",
@@ -213,13 +213,13 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Huile d'algue Schizochytrium, végane : DHA et EPA sans poisson."
+            whyBrand: String(localized: "Huile d'algue Schizochytrium, végane : DHA et EPA sans poisson.")
         ),
 
         // --- VITAMINE C ---
         SupplementProduct(
             id: "vitc-liposomale-dynveo",
-            name: "Vitamine C Liposomale",
+            name: String(localized: "Vitamine C Liposomale"),
             nutrientID: .vitC,
             brand: "Dynveo",
             dosage: "1000 mg liposomale (2 gél.)",
@@ -232,11 +232,11 @@ extension SupplementEngine {
             contraindications: [.hemochromatose],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Vitamine C sous forme liposomale."
+            whyBrand: String(localized: "Vitamine C sous forme liposomale.")
         ),
         SupplementProduct(
             id: "vitc-qualic-nutripure",
-            name: "Vitamine C Quali-C 750 mg",
+            name: String(localized: "Vitamine C Quali-C 750 mg"),
             nutrientID: .vitC,
             brand: "Nutripure",
             dosage: "750 mg Quali-C",
@@ -252,7 +252,7 @@ extension SupplementEngine {
             contraindications: [.hemochromatose],
             antiInteractions: [],
             tier: .value,
-            whyBrand: "Vitamine C Quali-C (qualité pharmaceutique européenne), sans excipient."
+            whyBrand: String(localized: "Vitamine C Quali-C (qualité pharmaceutique européenne), sans excipient.")
         ),
 
         // --- CALCIUM ---
@@ -273,11 +273,11 @@ extension SupplementEngine {
             contraindications: [.hypercalcemie],
             antiInteractions: ["iron", "zinc"],
             tier: .premium,
-            whyBrand: "Calcium, vitamine D3 et vitamine K2, véganes, réunis en un produit."
+            whyBrand: String(localized: "Calcium, vitamine D3 et vitamine K2, véganes, réunis en un produit.")
         ),
         SupplementProduct(
             id: "calcium-lithothamne-nutrixeal",
-            name: "Lithothamne (Calcium marin)",
+            name: String(localized: "Lithothamne (Calcium marin)"),
             nutrientID: .calcium,
             brand: "Nutrixeal",
             dosage: "~380 mg calcium marin (2 gél.)",
@@ -290,7 +290,7 @@ extension SupplementEngine {
             contraindications: [.hypercalcemie],
             antiInteractions: ["iron", "zinc"],
             tier: .value,
-            whyBrand: "Calcium marin issu du lithothamne, une algue rouge. 100 % pur."
+            whyBrand: String(localized: "Calcium marin issu du lithothamne, une algue rouge. 100 % pur.")
         ),
 
         // --- ZINC ---
@@ -314,7 +314,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: ["iron", "calcium"],
             tier: .premium,
-            whyBrand: "Deux formes brevetées (bisglycinate TRAACS + Zinc Nova liposomal) + sélénium."
+            whyBrand: String(localized: "Deux formes brevetées (bisglycinate TRAACS + Zinc Nova liposomal) + sélénium.")
         ),
         // --- IODE ---
         // L'option eco (Enova, 365 comprimes a 25 EUR) est sortie le
@@ -323,7 +323,7 @@ extension SupplementEngine {
         // qu'une reference. A remettre au prochain audit si elle revient.
         SupplementProduct(
             id: "iode-puresea-nutrico",
-            name: "Iode PureSea (algue)",
+            name: String(localized: "Iode PureSea (algue)"),
             nutrientID: .iodine,
             brand: "Nutri&Co",
             dosage: "150 µg (100% AR)",
@@ -336,12 +336,12 @@ extension SupplementEngine {
             contraindications: [.hyperthyroidie],
             antiInteractions: [],
             tier: .premium,
-            whyBrand: "Iode d'algue PureSea standardisée à dosage constant (vs kelp générique variable)."
+            whyBrand: String(localized: "Iode d'algue PureSea standardisée à dosage constant (vs kelp générique variable).")
         ),
         // --- FIBRES ---
         SupplementProduct(
             id: "fibres-trio-nutrico",
-            name: "Fibres Bio (Acacia + Guar + Psyllium)",
+            name: String(localized: "Fibres Bio (Acacia + Guar + Psyllium)"),
             nutrientID: .fiber,
             brand: "Nutri&Co",
             dosage: "4,5 g de fibres par dosette",
@@ -354,11 +354,11 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [antiInteractionMedicaments],
             tier: .premium,
-            whyBrand: "Trois fibres solubles bio (acacia, guar, psyllium), certifiées Low-FODMAP."
+            whyBrand: String(localized: "Trois fibres solubles bio (acacia, guar, psyllium), certifiées Low-FODMAP.")
         ),
         SupplementProduct(
             id: "psyllium-blond-aromazone",
-            name: "Psyllium Blond Bio",
+            name: String(localized: "Psyllium Blond Bio"),
             nutrientID: .fiber,
             brand: "Aroma-Zone",
             dosage: "5 g téguments de psyllium",
@@ -373,7 +373,7 @@ extension SupplementEngine {
             contraindications: [],
             antiInteractions: [antiInteractionMedicaments],
             tier: .value,
-            whyBrand: "Téguments de psyllium blond bio, purs. À prendre avec un grand verre d'eau."
+            whyBrand: String(localized: "Téguments de psyllium blond bio, purs. À prendre avec un grand verre d'eau.")
         ),
     ]
 }

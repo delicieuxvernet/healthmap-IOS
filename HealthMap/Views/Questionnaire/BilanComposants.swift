@@ -499,7 +499,7 @@ struct BilanMolette: View {
         .verreCarte()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(titre)
-        .accessibilityValue(touchee ? "\(valeur) \(unite)" : "\(valeur) \(unite), à confirmer")
+        .accessibilityValue(touchee ? Text(verbatim: "\(valeur) \(unite)") : Text("\(valeur) \(unite), à confirmer"))
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: regler(valeur + 1)
@@ -698,7 +698,7 @@ struct BilanSegmentsDEtapes: View {
 
     private var descriptionVocale: String {
         let finies = avancements.filter { $0 >= 1 }.count
-        return "\(finies) étapes terminées sur \(EtapeBilan.allCases.count)"
+        return String(localized: "\(finies) étapes terminées sur \(EtapeBilan.allCases.count)")
     }
 }
 

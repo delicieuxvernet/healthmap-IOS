@@ -119,7 +119,7 @@ struct RecapJaugeApport: View {
             .frame(height: 14)
 
             HStack(spacing: 6) {
-                Text(masquee ? "•• %" : "\(pourcent) %")
+                Text(masquee ? String(localized: "•• %") : String(localized: "\(pourcent) %"))
                     .dsPolice(13, .semibold)
                     .monospacedDigit()
                     .foregroundStyle(Color.dsTexte)
@@ -143,8 +143,8 @@ struct RecapJaugeApport: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(masquee
-            ? "Pourcentage du besoin couvert, réservé à Premium"
-            : "\(pourcent) % du besoin couvert, zone visée 70 %")
+            ? String(localized: "Pourcentage du besoin couvert, réservé à Premium")
+            : String(localized: "\(pourcent) % du besoin couvert, zone visée 70 %"))
     }
 
     private var largeur: Double {

@@ -506,8 +506,8 @@ struct JournalView: View {
                     }
                 } message: {
                     Text(SpeechCaptureService.autorisationsRefusees
-                         ? "Le micro ou la reconnaissance vocale sont bloqués pour Kiwio. Réactive-les dans les Réglages pour dicter tes repas."
-                         : "Pour transformer ta voix en repas, Kiwio a besoin du micro et de la reconnaissance vocale. Rien ne quitte ton téléphone : l'audio est transcrit puis effacé.")
+                         ? String(localized: "Le micro ou la reconnaissance vocale sont bloqués pour Kiwio. Réactive-les dans les Réglages pour dicter tes repas.")
+                         : String(localized: "Pour transformer ta voix en repas, Kiwio a besoin du micro et de la reconnaissance vocale. Rien ne quitte ton téléphone : l'audio est transcrit puis effacé."))
                 }
                 // Ouvert par le routage (« scanner » = le Journal, saisie dépliée).
                 .onReceive(NotificationCenter.default.publisher(for: .healthmapOuvrirAjout)) { _ in
@@ -655,7 +655,7 @@ struct JournalView: View {
         // Aux tailles d'accessibilité, la capsule du jour passe sous le titre :
         // à côté, elle se réduisait à « Auj… » (AX3).
         DSLigneOuColonne(alignementLigne: .center, espacement: 8) {
-            DSLargeTitle(titre: "Journal")
+            DSLargeTitle(titre: String(localized: "Journal"))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Spacer(minLength: 8)
@@ -683,7 +683,7 @@ struct JournalView: View {
     /// (maquette), mais il répond toujours.
     private var capsuleDeJour: some View {
         HStack(spacing: 0) {
-            chevronDeJour("chevron.left", libelle: "Jour précédent", estompe: false) {
+            chevronDeJour("chevron.left", libelle: String(localized: "Jour précédent"), estompe: false) {
                 journal.goPrevDay()
             }
 
@@ -715,7 +715,7 @@ struct JournalView: View {
             .animation(reduceMotion ? Animation.easeOut(duration: 0.2) : Animation.kiwiRebond, value: journal.selectedDay)
             .accessibilityLabel("Choisir une date. Jour affiché : \(journal.dayLabel), \(journal.daySub)")
 
-            chevronDeJour("chevron.right", libelle: "Jour suivant", estompe: isTodaySelected) {
+            chevronDeJour("chevron.right", libelle: String(localized: "Jour suivant"), estompe: isTodaySelected) {
                 journal.goNextDay()
             }
         }
@@ -832,7 +832,7 @@ struct JournalView: View {
             allerA(.eau)
         } label: {
             VerrePuce(
-                libelle: "Eau",
+                libelle: String(localized: "Eau"),
                 valeur: "\(JournalEauCard.litres(gobeletsEau)) L"
             ) {
                 JournalPuceEau(fraction: Double(gobeletsEau) / Double(max(1, SuiviEau.gobeletsParJour)))
@@ -849,7 +849,7 @@ struct JournalView: View {
             allerA(.poids)
         } label: {
             VerrePuce(
-                libelle: "Poids",
+                libelle: String(localized: "Poids"),
                 valeur: "\(ObjectifPoids.affichage(profil.weightDouble)) kg"
             ) {
                 // La balance est en gris secondaire (60 %), pas dans l'encre
@@ -871,14 +871,14 @@ struct JournalView: View {
     private var puceSerie: some View {
         let jours = gamification.currentStreak
         return VerrePuce(
-            libelle: "Série",
-            valeur: "\(jours) jour\(jours > 1 ? "s" : "")"
+            libelle: String(localized: "Série"),
+            valeur: jours > 1 ? String(localized: "\(jours) jours") : String(localized: "\(jours) jour")
         ) {
             // La flamme au trait, comme la puce de Progrès et la maquette.
             VerrePastilleIcone(symbole: "flame", teinte: Color.teinteEnergie)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Série : \(jours) jour\(jours > 1 ? "s" : "")")
+        .accessibilityLabel(jours > 1 ? String(localized: "Série : \(jours) jours") : String(localized: "Série : \(jours) jour"))
     }
 
     /// « Nouveau » tant qu'aucune prise de sang n'est importée ; ensuite, la
@@ -888,8 +888,8 @@ struct JournalView: View {
             allerA(.sang)
         } label: {
             VerrePuce(
-                libelle: "Analyses",
-                valeur: dashboardVM.priseDeSang.map { $0.dateCourte() } ?? "Nouveau"
+                libelle: String(localized: "Analyses"),
+                valeur: dashboardVM.priseDeSang.map { $0.dateCourte() } ?? String(localized: "Nouveau")
             ) {
                 VerrePastilleIcone(
                     symbole: "drop.fill",
@@ -1061,7 +1061,7 @@ struct JournalView: View {
         JournalAvantQuestionnaireCard(reprise: dashboardVM.repriseBilan) { dashboardVM.demarrerBilan() }
             .padding(.top, 14)
 
-        DSSectionHeader(titre: "En attendant, en France")
+        DSSectionHeader(titre: String(localized: "En attendant, en France"))
             .padding(.top, -6)
         JournalPopulationCard()
 
@@ -1079,7 +1079,7 @@ struct JournalView: View {
     /// est confirmé par la pastille du haut de l'écran (`ConfirmationCentre`).
     private var messageSaisie: (texte: String, erreur: Bool)? {
         if let erreur = erreurDictee { return (erreur.message, true) }
-        if dicteeTropCourte { return ("Trop court. Parle un peu plus longtemps, puis touche Terminer.", true) }
+        if dicteeTropCourte { return (String(localized: "Trop court. Parle un peu plus longtemps, puis touche Terminer."), true) }
         if let addFoodConfirmation { return (addFoodConfirmation, false) }
         return nil
     }
@@ -1179,8 +1179,8 @@ struct JournalView: View {
         }
 
         DSSectionHeader(
-            titre: "Apports à suivre",
-            lien: dashboardVM.bilanAffichage == .bilan ? "Tout afficher" : nil,
+            titre: String(localized: "Apports à suivre"),
+            lien: dashboardVM.bilanAffichage == .bilan ? String(localized: "Tout afficher") : nil,
             action: { showBilanComplet = true }
         )
 
@@ -1235,7 +1235,7 @@ struct JournalView: View {
         let profil = profilRegle ?? dashboardVM.profile
         let cibles = mesures
 
-        DSSectionHeader(titre: "Poids et eau")
+        DSSectionHeader(titre: String(localized: "Poids et eau"))
             // La puce « Poids » mène ici : le titre, puis la carte. Le repère
             // est dans la marge de 30 pt du titre, pas au-dessus d'elle.
             .repereDeDefilement(.poids, retrait: DS.avantSection - AncreJournal.ecartSousLeBord)
@@ -1245,7 +1245,7 @@ struct JournalView: View {
             souhaite: profil.targetWeightDouble,
             calories: cibles.macros?.calories,
             phrase: cibles.objectifPoids?.phrase(calories: cibles.macros?.calories, tdee: cibles.tdee)
-                ?? "Règle ton poids souhaité : tes calories et tes macros s'ajustent.",
+                ?? String(localized: "Règle ton poids souhaité : tes calories et tes macros s'ajustent."),
             onActuel: { reglerPoids(actuel: $0) },
             onSouhaite: { reglerPoids(souhaite: $0) }
         )
@@ -1410,8 +1410,10 @@ struct JournalView: View {
             bilanComplete: dashboardVM.bilanComplete,
             remaining: viewModel.scansRemaining
         ), let remaining = viewModel.scansRemaining else { return nil }
-        if remaining <= 0 { return "Scans du jour épuisés, ça se recharge demain." }
-        return "\(remaining) scan\(remaining > 1 ? "s" : "") photo restant\(remaining > 1 ? "s" : "") aujourd'hui."
+        if remaining <= 0 { return String(localized: "Scans du jour épuisés, ça se recharge demain.") }
+        return remaining > 1
+            ? String(localized: "\(remaining) scans photo restants aujourd'hui.")
+            : String(localized: "\(remaining) scan photo restant aujourd'hui.")
     }
 
     /// Lie Apple Santé depuis la feuille Activité (même geste que le profil),
@@ -1664,7 +1666,7 @@ struct JournalView: View {
                     )
             }
 
-            DSCapsuleButton(titre: "Analyser ce repas") {
+            DSCapsuleButton(titre: String(localized: "Analyser ce repas")) {
                 // Le scan suit le jour affiché, comme la recherche et la dictée.
                 viewModel.jourDeSaisie = journal.selectedDay
                 // Les apports estimés, comme partout ailleurs dans l'app.
@@ -1734,7 +1736,7 @@ struct JournalView: View {
                     if ReperesGeneriquesMention.estVisible(bilanComplete: dashboardVM.bilanComplete) {
                         BilanDoorButton(
                             title: BilanDoorButton.Libelle.scan,
-                            accessibilityText: "Personnaliser mes repères, faire le bilan en 3 minutes",
+                            accessibilityText: String(localized: "Personnaliser mes repères, faire le bilan en 3 minutes"),
                             zone: .scanResultat
                         ) {
                             bilanApresFermeture = true
@@ -1840,10 +1842,10 @@ struct JournalView: View {
     private var mealSlotLabel: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<11: return "Petit-déjeuner"
-        case 11..<15: return "Déjeuner"
-        case 15..<18: return "Collation"
-        default: return "Dîner"
+        case 5..<11: return String(localized: "Petit-déjeuner")
+        case 11..<15: return String(localized: "Déjeuner")
+        case 15..<18: return String(localized: "Collation")
+        default: return String(localized: "Dîner")
         }
     }
 
@@ -1857,8 +1859,8 @@ struct JournalView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .prefix(4)
-        guard !aliments.isEmpty else { return "Photo de ton repas" }
-        return "Photo de ton repas : " + aliments.joined(separator: ", ")
+        guard !aliments.isEmpty else { return String(localized: "Photo de ton repas") }
+        return String(localized: "Photo de ton repas : \(aliments.joined(separator: ", "))")
     }
 
     private func headerTitle(_ result: MealScanViewModel.MealAnalysisResult) -> String {
@@ -1887,9 +1889,9 @@ struct JournalView: View {
     /// 3 raisons rédigées par le serveur (score_breakdown.reasons).
     private func mealScoreCard(score: Int, reasons: [String]) -> some View {
         let color = Color.scoreColor(for: score)
-        let title = score >= 70 ? "Bon repas pour toi"
-                  : score >= 45 ? "Repas correct pour toi"
-                  : "Repas à rééquilibrer"
+        let title = score >= 70 ? String(localized: "Bon repas pour toi")
+                  : score >= 45 ? String(localized: "Repas correct pour toi")
+                  : String(localized: "Repas à rééquilibrer")
         return HStack(spacing: 14) {
             ZStack {
                 Circle().stroke(Color.dsTexte.opacity(0.08), lineWidth: 8)
@@ -1958,7 +1960,7 @@ struct JournalView: View {
             // catégorie (`ScanCardHeader`) — 15 / 600 dans la teinte foncée de
             // la catégorie, précédés de son icône dans la teinte. Les apports
             // prennent le kiwi, comme la carte Micronutriments du Journal.
-            ScanCardHeader(icon: "leaf", title: "Tes besoins du jour",
+            ScanCardHeader(icon: "leaf", title: String(localized: "Tes besoins du jour"),
                            color: Color.teinteKiwiTexte, teinte: Color.teinteKiwi)
                 .padding(.horizontal, 4)
                 .accessibilityAddTraits(.isHeader)
@@ -1994,7 +1996,7 @@ struct JournalView: View {
                 (Text("ce plat en apporte ")
                     .font(Theme.chromeFont)
                     .foregroundStyle(Color.dsSecondaire)
-                 + Text("\(pct)\u{202F}%")
+                 + Text(verbatim: Langue.estFrancais ? "\(pct)\u{202F}%" : "\(pct)%")
                     .font(Theme.heroValueRowFont)
                     .foregroundStyle(besoin.statut.v7Ink))
             }
@@ -2061,7 +2063,7 @@ struct JournalView: View {
         if !shown.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline) {
-                    ScanCardHeader(icon: "leaf", title: "Ce que ton plat t'apporte",
+                    ScanCardHeader(icon: "leaf", title: String(localized: "Ce que ton plat t'apporte"),
                                    color: Color.teinteKiwiTexte, teinte: Color.teinteKiwi)
                         .accessibilityAddTraits(.isHeader)
                         // Le titre garde sa place : sur un écran étroit,
@@ -2091,7 +2093,7 @@ struct JournalView: View {
         let shown = Array(foods.prefix(6))
         if !shown.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
-                ScanCardHeader(icon: "fork.knife", title: "Les aliments de ce repas",
+                ScanCardHeader(icon: "fork.knife", title: String(localized: "Les aliments de ce repas"),
                                color: Color.teinteEnergieTexte, teinte: Color.teinteEnergie)
                     .accessibilityAddTraits(.isHeader)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
@@ -2116,9 +2118,9 @@ struct JournalView: View {
         func done(_ slot: MealJournalService.MealSlot) -> Bool { today.contains { $0.slot == slot } }
         let current = MealJournalService.MealSlot.from(date: Date())
         return [
-            JourneeSlot(title: "Matin", asset: Fluent3D.sun, done: done(.breakfast), isCurrent: current == .breakfast),
-            JourneeSlot(title: "Midi", asset: Fluent3D.spaghetti, done: done(.lunch), isCurrent: current == .lunch),
-            JourneeSlot(title: "Soir", asset: Fluent3D.moon, done: done(.dinner), isCurrent: current == .dinner),
+            JourneeSlot(title: String(localized: "Matin"), asset: Fluent3D.sun, done: done(.breakfast), isCurrent: current == .breakfast),
+            JourneeSlot(title: String(localized: "Midi"), asset: Fluent3D.spaghetti, done: done(.lunch), isCurrent: current == .lunch),
+            JourneeSlot(title: String(localized: "Soir"), asset: Fluent3D.moon, done: done(.dinner), isCurrent: current == .dinner),
         ]
     }
 
@@ -2161,9 +2163,9 @@ struct JournalView: View {
             )
             if quota.remaining == 0 && gated {
                 QuotaWall(
-                    message: "Tes scans gratuits du jour sont utilisés. Premium en débloque jusqu’à 30 par jour.",
-                    unlockTitle: "Débloquer 30 scans par jour",
-                    escapeText: "ou reviens demain, 3 nouveaux scans t’attendent",
+                    message: String(localized: "Tes scans gratuits du jour sont utilisés. Premium en débloque jusqu’à 30 par jour."),
+                    unlockTitle: String(localized: "Débloquer 30 scans par jour"),
+                    escapeText: String(localized: "ou reviens demain, 3 nouveaux scans t’attendent"),
                     zone: "scan_quota"
                 ) {
                     ouvrirLimiteScans()
@@ -2174,7 +2176,7 @@ struct JournalView: View {
                     used: quota.used,
                     total: quota.total,
                     icon: "camera",
-                    label: "Tes scans aujourd’hui",
+                    label: String(localized: "Tes scans aujourd’hui"),
                     unit: "scan"
                 )
                 .padding(.horizontal, Theme.spacingLG)
@@ -2240,7 +2242,7 @@ struct JournalView: View {
                                                         slot: MealJournalService.MealSlot.from(date: Date()))
                          if ok {
                              let kcal = Int(((detail.kcal100g ?? 0) * grams / 100).rounded())
-                             withAnimation { addFoodConfirmation = "\(detail.name) ajouté · \(kcal) kcal" }
+                             withAnimation { addFoodConfirmation = String(localized: "\(detail.name) ajouté · \(kcal) kcal") }
                              Task {
                                  try? await Task.sleep(nanoseconds: 2_500_000_000)
                                  withAnimation { addFoodConfirmation = nil }
@@ -2263,7 +2265,7 @@ struct JournalView: View {
             HapticService.shared.selection()
         } catch {
             AppLogger.analysis.report(error, context: "MealScan code-barres")
-            barcodeIntrouvable = "Aucun produit ne correspond au code \(code). Essaie la recherche par nom."
+            barcodeIntrouvable = String(localized: "Aucun produit ne correspond au code \(code). Essaie la recherche par nom.")
         }
     }
 }
@@ -2283,22 +2285,22 @@ private struct NeedImpactDetailSheet: View {
     private var def: NutrientDefinition? { NutrientData.definition(for: micro.nutrientId) }
     private var label: String { def?.label ?? micro.label }
     private var statusText: String {
-        if pct >= 60 { return "bien couvert" }
-        if pct >= 30 { return "partiellement couvert" }
-        return "à combler"
+        if pct >= 60 { return String(localized: "bien couvert") }
+        if pct >= 30 { return String(localized: "partiellement couvert") }
+        return String(localized: "à combler")
     }
     private var foods: [Fluent3D.Food] { Fluent3D.foodSources(for: micro.nutrientId) }
 
     private var why: String {
         if pct >= 60 {
-            return "Ce repas couvre déjà \(pct) % de ton besoin du jour en \(label.lowercased()). Beau geste, continue sur cette lancée."
+            return String(localized: "Ce repas couvre déjà \(pct) % de ton besoin du jour en \(label.lowercased()). Beau geste, continue sur cette lancée.")
         }
         if pct >= 30 {
-            return "Ce repas apporte \(pct) % de ton besoin du jour en \(label.lowercased()). Un peu plus dans la journée et c'est bon."
+            return String(localized: "Ce repas apporte \(pct) % de ton besoin du jour en \(label.lowercased()). Un peu plus dans la journée et c'est bon.")
         }
         // Tournure choisie pour éviter l'élision : « pas de oméga-3 » et
         // « pas de iode » étaient fautifs, le nutriment passe donc en tête.
-        return "\(label) : ce repas n'en apporte presque pas. Ajoute un des aliments ci-dessous pour mieux couvrir ce besoin du jour."
+        return String(localized: "\(label) : ce repas n'en apporte presque pas. Ajoute un des aliments ci-dessous pour mieux couvrir ce besoin du jour.")
     }
 
     var body: some View {

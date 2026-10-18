@@ -65,13 +65,13 @@ struct QuantityFamily: Identifiable {
     let aisleIds: [String]
 
     static let all: [QuantityFamily] = [
-        QuantityFamily(id: "proteines", label: "Protéines", emoji: "🍗",
+        QuantityFamily(id: "proteines", label: String(localized: "Protéines"), emoji: "🍗",
                        aisleIds: ["viandes", "poissons"]),
-        QuantityFamily(id: "fruits_legumes", label: "Fruits & légumes", emoji: "🥦",
+        QuantityFamily(id: "fruits_legumes", label: String(localized: "Fruits & légumes"), emoji: "🥦",
                        aisleIds: ["fruits", "legumes"]),
-        QuantityFamily(id: "feculents", label: "Féculents & légumineuses", emoji: "🍞",
+        QuantityFamily(id: "feculents", label: String(localized: "Féculents & légumineuses"), emoji: "🍞",
                        aisleIds: ["feculents"]),
-        QuantityFamily(id: "laitiers_gras", label: "Laitiers, œufs & matières grasses", emoji: "🧀",
+        QuantityFamily(id: "laitiers_gras", label: String(localized: "Laitiers, œufs & matières grasses"), emoji: "🧀",
                        aisleIds: ["laitiers", "gras", "secs"]),
     ]
 

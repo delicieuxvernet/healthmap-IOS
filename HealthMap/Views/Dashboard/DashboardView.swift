@@ -439,16 +439,17 @@ struct DashboardView: View {
                 BilanV7RepasLine(
                     id: "positif-\(best.id)",
                     positive: true,
-                    text: "\(best.nom) bien couvert sur tes 7 derniers jours (\(best.pct) % de ton besoin)."
+                    text: String(localized: "\(best.nom) bien couvert sur tes 7 derniers jours (\(best.pct) % de ton besoin).")
                 )
             )
         }
         if let worst, worst.pct < 60, worst.id != best?.id || lines.isEmpty {
+            let nomDansLaPhrase = planNomEnMinuscule(worst.nom)
             lines.append(
                 BilanV7RepasLine(
                     id: "manque-\(worst.id)",
                     positive: false,
-                    text: "Peu de \(worst.nom.lowercased()) ces 7 derniers jours (\(worst.pct) % de ton besoin)."
+                    text: String(localized: "Peu de \(nomDansLaPhrase) ces 7 derniers jours (\(worst.pct) % de ton besoin).")
                 )
             )
         }
@@ -525,10 +526,10 @@ struct FullAnalysisLoadingView: View {
     @State private var progress: Double = 0
 
     private let messages = [
-        "On croise tes symptômes, ton alimentation et ton mode de vie.",
-        "On cherche ce qui peut expliquer tes symptômes.",
-        "On repère tes points forts et tes vraies priorités.",
-        "On prépare des conseils personnalisés, rien que pour toi.",
+        String(localized: "On croise tes symptômes, ton alimentation et ton mode de vie."),
+        String(localized: "On cherche ce qui peut expliquer tes symptômes."),
+        String(localized: "On repère tes points forts et tes vraies priorités."),
+        String(localized: "On prépare des conseils personnalisés, rien que pour toi."),
     ]
 
     var body: some View {

@@ -50,27 +50,27 @@ enum ComparatifPremium {
     /// bilan en tire, puis le reste.
     static var lignes: [LigneComparatif] {
         [
-            LigneComparatif(id: "dictee", libelle: "Repas dictés à l'IA",
+            LigneComparatif(id: "dictee", libelle: String(localized: "Repas dictés à l'IA"),
                             standard: .parJour(VoiceMealService.QuotaStore.dictéesGratuitesParJour),
                             premium: .parJour(dicteesPremiumParJour)),
-            LigneComparatif(id: "photo", libelle: "Repas en photo",
+            LigneComparatif(id: "photo", libelle: String(localized: "Repas en photo"),
                             standard: .parJour(photosStandardParJour),
                             premium: .parJour(photosPremiumParJour)),
-            LigneComparatif(id: "recherche", libelle: "Recherche et code-barres",
+            LigneComparatif(id: "recherche", libelle: String(localized: "Recherche et code-barres"),
                             standard: .inclus, premium: .inclus),
-            LigneComparatif(id: "macros", libelle: "Calories et macros",
+            LigneComparatif(id: "macros", libelle: String(localized: "Calories et macros"),
                             standard: .inclus, premium: .inclus),
-            LigneComparatif(id: "micros", libelle: "Vitamines et minéraux en détail",
+            LigneComparatif(id: "micros", libelle: String(localized: "Vitamines et minéraux en détail"),
                             standard: .absent, premium: .inclus),
-            LigneComparatif(id: "interactions", libelle: "Solutions à tes interactions",
+            LigneComparatif(id: "interactions", libelle: String(localized: "Solutions à tes interactions"),
                             standard: .absent, premium: .inclus),
-            LigneComparatif(id: "plan", libelle: "Plan guidé pas à pas",
+            LigneComparatif(id: "plan", libelle: String(localized: "Plan guidé pas à pas"),
                             standard: .absent, premium: .inclus),
-            LigneComparatif(id: "progres", libelle: "Courbes de progression",
+            LigneComparatif(id: "progres", libelle: String(localized: "Courbes de progression"),
                             standard: .absent, premium: .inclus),
-            LigneComparatif(id: "prise_de_sang", libelle: "Prise de sang (bêta)",
+            LigneComparatif(id: "prise_de_sang", libelle: String(localized: "Prise de sang (bêta)"),
                             standard: .absent, premium: .inclus),
-            LigneComparatif(id: "widgets", libelle: "Widgets",
+            LigneComparatif(id: "widgets", libelle: String(localized: "Widgets"),
                             standard: .inclus, premium: .inclus),
         ]
     }
@@ -80,11 +80,11 @@ enum ComparatifPremium {
     static func descriptionVocale(_ ligne: LigneComparatif) -> String {
         func lire(_ offre: OffreComparee) -> String {
             switch offre {
-            case .inclus: return "inclus"
-            case .absent: return "non inclus"
-            case .parJour(let n): return "\(n) par jour"
+            case .inclus: return String(localized: "inclus")
+            case .absent: return String(localized: "non inclus")
+            case .parJour(let n): return String(localized: "\(n) par jour")
             }
         }
-        return "\(ligne.libelle). Standard : \(lire(ligne.standard)). Premium : \(lire(ligne.premium))."
+        return String(localized: "\(ligne.libelle). Standard : \(lire(ligne.standard)). Premium : \(lire(ligne.premium)).")
     }
 }

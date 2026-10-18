@@ -371,14 +371,14 @@ struct SerieW: View {
                     .foregroundStyle(TeinteW.encre())
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Série : \(serie) \(serie > 1 ? "jours" : "jour")")
+            .accessibilityLabel(serie > 1 ? String(localized: "Série : \(serie) jours") : String(localized: "Série : \(serie) jour"))
         }
     }
 }
 
 /// Personne de connecté, l'app n'a encore rien écrit, ou pas encore de bilan.
 struct InvitationW: View {
-    var message = "Ouvre Kiwio pour commencer ta journée."
+    var message = String(localized: "Ouvre Kiwio pour commencer ta journée.")
 
     var body: some View {
         VStack(spacing: 8) {
@@ -412,15 +412,15 @@ enum FormatW {
             groupes.insert(String(chiffres[debut..<fin]), at: 0)
             fin = debut
         }
-        return (valeur < 0 ? "-" : "") + groupes.joined(separator: "\u{202F}")
+        return (valeur < 0 ? "-" : "") + groupes.joined(separator: Langue.estFrancais ? "\u{202F}" : ",")
     }
 
     /// « 860 kcal restantes », « 120 kcal au-dessus », « 1 240 kcal » sans objectif.
     static func ligneCalories(_ etat: InstantaneJour) -> (nombre: String, legende: String) {
         guard let restantes = etat.kcalRestantes else {
-            return (entier(etat.kcalConsommees), "kcal aujourd'hui")
+            return (entier(etat.kcalConsommees), String(localized: "kcal aujourd'hui"))
         }
-        return (entier(abs(restantes)), restantes < 0 ? "kcal au-dessus" : "kcal restantes")
+        return (entier(abs(restantes)), restantes < 0 ? String(localized: "kcal au-dessus") : String(localized: "kcal restantes"))
     }
 
     /// Part du budget consommée, bornée à 0...1 ; 0 sans objectif.
@@ -441,9 +441,10 @@ enum FormatW {
     static func litres(centilitres: Int) -> String {
         let entiers = centilitres / 100
         let reste = centilitres % 100
+        let virgule = Langue.estFrancais ? "," : "."
         if reste == 0 { return "\(entiers)" }
-        if reste % 10 == 0 { return "\(entiers),\(reste / 10)" }
-        return "\(entiers)," + String(format: "%02d", reste)
+        if reste % 10 == 0 { return "\(entiers)\(virgule)\(reste / 10)" }
+        return "\(entiers)\(virgule)" + String(format: "%02d", reste)
     }
 
     /// Litres bus aujourd'hui et objectif du jour.

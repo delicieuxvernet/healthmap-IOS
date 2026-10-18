@@ -210,11 +210,11 @@ enum SuiviEngineV4 {
         let labelBas: String
         switch trend.dir {
         case .lowerBetter:
-            labelHaut = trend.worseLabel.lowercased()   // « plus cassants »
-            labelBas  = trend.betterLabel.lowercased()  // « moins cassants »
+            labelHaut = Langue.texte(trend.worseLabel).lowercased()   // « plus cassants »
+            labelBas  = Langue.texte(trend.betterLabel).lowercased()  // « moins cassants »
         case .higherBetter:
-            labelHaut = trend.betterLabel.lowercased()  // « plus d'énergie »
-            labelBas  = trend.worseLabel.lowercased()   // « moins d'énergie »
+            labelHaut = Langue.texte(trend.betterLabel).lowercased()  // « plus d'énergie »
+            labelBas  = Langue.texte(trend.worseLabel).lowercased()   // « moins d'énergie »
         }
 
         return SymptomEvolution(
@@ -227,8 +227,8 @@ enum SuiviEngineV4 {
             reel: reel,
             potentielMax: [],
             sansKiwio: sansKiwio,
-            labelToi: "toi",
-            labelSansKiwio: "sans Kiwio",
+            labelToi: String(localized: "toi"),
+            labelSansKiwio: String(localized: "sans Kiwio"),
             labelHaut: labelHaut,
             labelBas: labelBas
         )
@@ -411,7 +411,7 @@ enum SuiviEngineV4 {
             let cur = averageDailyCoverage(of: id, in: current, calendar: calendar) ?? 0
             let prev = averageDailyCoverage(of: id, in: previous, calendar: calendar)
             let trend = prev.map { cur - $0 } ?? 0
-            let nom = NutrientData.definition(for: id)?.label ?? id
+            let nom = Langue.texte(NutrientData.definition(for: id)?.label ?? id)
             // Pas de baseline pour cet id => socle = niveau courant (gain 0).
             let basePct = baseline[id].map { max(0, min(100, $0)) } ?? max(0, min(100, cur))
             return NutrientCoverage7d(id: id, nom: nom, pct: max(0, min(100, cur)), trendPct: trend, baselinePct: basePct)
@@ -448,11 +448,11 @@ enum SuiviEngineV4 {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .calories: return "Calories"
-            case .proteins: return "Protéines"
-            case .carbs:    return "Glucides"
-            case .fats:     return "Lipides"
-            case .fiber:    return "Fibres"
+            case .calories: return String(localized: "Calories")
+            case .proteins: return String(localized: "Protéines")
+            case .carbs:    return String(localized: "Glucides")
+            case .fats:     return String(localized: "Lipides")
+            case .fiber:    return String(localized: "Fibres")
             }
         }
         var unit: String { self == .calories ? "kcal" : "g" }
@@ -573,18 +573,27 @@ enum SuiviEngineV4 {
     /// Un id inconnu retombe sur une phrase générique nommant l'apport.
     static func tipTemplate(for id: String, nom: String) -> String {
         switch id {
-        case "iron":      return "Ajoute une source de fer les jours chargés (lentilles, viande rouge)."
-        case "calcium":   return "Cale un laitage ou une eau riche en calcium le midi."
-        case "magnesium": return "Une poignée d'oléagineux en collation couvre ton magnésium."
-        case "vitD":      return "Poisson gras 2× / semaine pour soutenir ta vitamine D."
-        case "vitB12":    return "Œufs ou produits animaux au petit-déjeuner pour la B12."
-        case "omega3":    return "Sardines ou noix pour remonter tes oméga-3."
-        case "vitC":      return "Un agrume ou du kiwi au petit-déjeuner pour la vitamine C."
-        case "zinc":      return "Fruits de mer ou viande une fois de plus pour le zinc."
-        case "iodine":    return "Poisson ou produits laitiers pour ton iode."
-        case "fiber":     return "Un légume de plus à chaque repas pour tes fibres."
-        default:          return "Renforce ton apport en \(nom.lowercased()) cette semaine."
+        case "iron":      return String(localized: "Ajoute une source de fer les jours chargés (lentilles, viande rouge).")
+        case "calcium":   return String(localized: "Cale un laitage ou une eau riche en calcium le midi.")
+        case "magnesium": return String(localized: "Une poignée d'oléagineux en collation couvre ton magnésium.")
+        case "vitD":      return String(localized: "Poisson gras 2× / semaine pour soutenir ta vitamine D.")
+        case "vitB12":    return String(localized: "Œufs ou produits animaux au petit-déjeuner pour la B12.")
+        case "omega3":    return String(localized: "Sardines ou noix pour remonter tes oméga-3.")
+        case "vitC":      return String(localized: "Un agrume ou du kiwi au petit-déjeuner pour la vitamine C.")
+        case "zinc":      return String(localized: "Fruits de mer ou viande une fois de plus pour le zinc.")
+        case "iodine":    return String(localized: "Poisson ou produits laitiers pour ton iode.")
+        case "fiber":     return String(localized: "Un légume de plus à chaque repas pour tes fibres.")
+        default:          return String(localized: "Renforce ton apport en \(nomEnMinuscules(nom)) cette semaine.")
         }
+    }
+
+    /// Le nom d'un apport au milieu d'une phrase : en minuscules, comme avant,
+    /// en français ; en anglais, seule la première lettre d'un mot ordinaire
+    /// baisse (« iron », « vitamin D », « B12 »).
+    private static func nomEnMinuscules(_ nom: String) -> String {
+        if Langue.estFrancais { return nom.lowercased() }
+        guard nom.dropFirst().first?.isLowercase == true else { return nom }
+        return nom.prefix(1).lowercased() + nom.dropFirst()
     }
 
     // MARK: - 5. Tes prochains paliers
@@ -614,7 +623,7 @@ enum SuiviEngineV4 {
         // (borné à 7). Honnête : dérive du chiffre réel, ne le dépasse pas.
         let now7 = besoinsNourrisSur7(besoinsCouvertsPct)
         let cible7 = min(7, now7 + 1)
-        let projection = "\(cible7)/7 de tes besoins couverts dans 2 semaines"
+        let projection = String(localized: "\(cible7)/7 de tes besoins couverts dans 2 semaines")
 
         return NextPaliers(fruitName: fruitName,
                            fruitAsset: fruitAsset,
@@ -658,7 +667,7 @@ enum SuiviEngineV4 {
         // Exemple = 1er aliment détecté du 1er repas aidant.
         let example = helping.first?.foods.first
 
-        let mission = "3 repas riches en \(target.nom.lowercased()) avant dimanche"
+        let mission = String(localized: "3 repas riches en \(nomEnMinuscules(target.nom)) avant dimanche")
         return PlanFocus(nutrientId: target.id,
                          nutrientNom: target.nom,
                          mission: mission,
@@ -703,13 +712,20 @@ enum SuiviEngineV4 {
         let total = items.count
         let insight: String
         if total == 0 {
-            insight = "Aucun complément à prendre aujourd'hui."
+            insight = String(localized: "Aucun complément à prendre aujourd'hui.")
         } else if doneCount >= total {
-            insight = "Rituel complet, à demain\u{00A0}!"
+            insight = String(localized: "Rituel complet, à demain\u{00A0}!")
         } else if let next = items.first(where: { !$0.done }) {
-            insight = "Il te reste ton \(next.nom.lowercased()) ce \(next.moment)."
+            let nomMin = nomEnMinuscules(next.nom)
+            switch next.moment {
+            case "matin": insight = String(localized: "Il te reste ton \(nomMin) ce matin.")
+            case "midi": insight = String(localized: "Il te reste ton \(nomMin) ce midi.")
+            case "soir": insight = String(localized: "Il te reste ton \(nomMin) ce soir.")
+            case "jour": insight = String(localized: "Il te reste ton \(nomMin) ce jour.")
+            default: insight = String(localized: "Il te reste ton \(nomMin) ce \(next.moment).")
+            }
         } else {
-            insight = "Rituel complet, à demain\u{00A0}!"
+            insight = String(localized: "Rituel complet, à demain\u{00A0}!")
         }
         return ComplementsRituel(items: items, doneCount: doneCount, total: total, insight: insight)
     }

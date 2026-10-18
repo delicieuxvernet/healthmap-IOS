@@ -83,7 +83,7 @@ enum AttentionMechanismCatalog {
     // MARK: - Titre « gratuit » d'un point d'attention
 
     /// Libellé neutre par défaut quand rien n'est reconnaissable.
-    static let neutralFreeTitle = "Un point d'attention détecté dans tes réponses"
+    static let neutralFreeTitle = String(localized: "Un point d'attention détecté dans tes réponses")
 
     /// Titre affichable en GRATUIT : nomme le PROBLÈME (le nutriment, la
     /// gêne), jamais le geste correcteur — le titre IA (`tipBold`) est un
@@ -101,10 +101,10 @@ enum AttentionMechanismCatalog {
         let labels = inferredNutrientIds(from: interaction)
             .compactMap { NutrientData.definition(for: $0)?.label }
         if labels.count >= 2 {
-            return "\(labels[0]) et \(lowercasedFirst(labels[1])) : deux de tes apports se gênent"
+            return String(localized: "\(labels[0]) et \(lowercasedFirst(labels[1])) : deux de tes apports se gênent")
         }
         if let label = labels.first {
-            return "Une de tes habitudes du quotidien influence directement ton apport en \(lowercasedFirst(label))."
+            return String(localized: "Une de tes habitudes du quotidien influence directement ton apport en \(lowercasedFirst(label)).")
         }
         return neutral
     }
@@ -152,11 +152,11 @@ enum AttentionMechanismCatalog {
         Entry(
             required: [["\\bmetformine"]],
             mechanism: AttentionMechanism(
-                teasing: "Un traitement que tu prends freine l'assimilation de ta vitamine B12.",
-                habit: .init(icon: "pills.fill", line1: "Metformine", line2: "au quotidien"),
-                mechanism: .init(icon: "link", line1: "Son absorption", line2: "est freinée"),
-                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "Jusqu'à −30 %", line2: "de B12 assimilée"),
-                solution: "Soigne tes sources de B12 (œufs, poisson, laitages) et fais le point avec ton médecin au prochain rendez-vous.",
+                teasing: String(localized: "Un traitement que tu prends freine l'assimilation de ta vitamine B12."),
+                habit: .init(icon: "pills.fill", line1: String(localized: "Metformine"), line2: String(localized: "au quotidien")),
+                mechanism: .init(icon: "link", line1: String(localized: "Son absorption"), line2: String(localized: "est freinée")),
+                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: String(localized: "Jusqu'à −30 %"), line2: String(localized: "de B12 assimilée")),
+                solution: String(localized: "Soigne tes sources de B12 (œufs, poisson, laitages) et fais le point avec ton médecin au prochain rendez-vous."),
                 nutrientId: "vitB12"
             )
         ),
@@ -164,11 +164,11 @@ enum AttentionMechanismCatalog {
         Entry(
             required: [["\\blevothyrox", "\\bthyro"], ["\\bcalcium"]],
             mechanism: AttentionMechanism(
-                teasing: "Ton calcium peut gêner l'effet d'un de tes traitements du matin.",
-                habit: .init(icon: "pills.fill", line1: "Calcium proche", line2: "du traitement"),
-                mechanism: .init(icon: "link", line1: "Ils se lient", line2: "dans l'estomac"),
-                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "Effet du", line2: "traitement réduit"),
-                solution: "Garde 4 h entre ton traitement du matin et tes laitages ou ton calcium : chacun garde son effet.",
+                teasing: String(localized: "Ton calcium peut gêner l'effet d'un de tes traitements du matin."),
+                habit: .init(icon: "pills.fill", line1: String(localized: "Calcium proche"), line2: String(localized: "du traitement")),
+                mechanism: .init(icon: "link", line1: String(localized: "Ils se lient"), line2: String(localized: "dans l'estomac")),
+                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: String(localized: "Effet du"), line2: String(localized: "traitement réduit")),
+                solution: String(localized: "Garde 4 h entre ton traitement du matin et tes laitages ou ton calcium : chacun garde son effet."),
                 nutrientId: "calcium"
             )
         ),
@@ -178,13 +178,13 @@ enum AttentionMechanismCatalog {
         Entry(
             required: [["\\bipp\\b", "\\bomeprazole", "\\bpantoprazole", "\\besomeprazole", "\\bantiacide", "anti-acide", "protecteur gastrique"]],
             mechanism: AttentionMechanism(
-                teasing: "Un de tes traitements freine l'assimilation de ta vitamine B12.",
-                habit: .init(icon: "pills.fill", line1: "Antiacide", line2: "au quotidien"),
-                mechanism: .init(icon: "drop.fill", line1: "Moins d'acidité pour", line2: "libérer la B12"),
-                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "Jusqu'à −65 %", line2: "d'absorption"),
-                solution: "Mise sur des sources régulières de B12 (œufs, poisson, laitages) et parles-en à ton médecin au prochain rendez-vous.",
+                teasing: String(localized: "Un de tes traitements freine l'assimilation de ta vitamine B12."),
+                habit: .init(icon: "pills.fill", line1: String(localized: "Antiacide"), line2: String(localized: "au quotidien")),
+                mechanism: .init(icon: "drop.fill", line1: String(localized: "Moins d'acidité pour"), line2: String(localized: "libérer la B12")),
+                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: String(localized: "Jusqu'à −65 %"), line2: String(localized: "d'absorption")),
+                solution: String(localized: "Mise sur des sources régulières de B12 (œufs, poisson, laitages) et parles-en à ton médecin au prochain rendez-vous."),
                 nutrientId: "vitB12",
-                source: "Marcuard et al., Annals of Internal Medicine, 1994"
+                source: String(localized: "Marcuard et al., Annals of Internal Medicine, 1994")
             )
         ),
         // Café / thé pendant le repas → fer (tanins, jusqu'à −60 %) : thé au
@@ -193,26 +193,26 @@ enum AttentionMechanismCatalog {
         Entry(
             required: [["\\bcafe", "\\bcafeine", "\\bthe\\b", "\\btanin", "\\btannin"], ["\\bfer\\b"]],
             mechanism: AttentionMechanism(
-                teasing: "Une de tes habitudes quotidiennes bloque l'absorption de ton fer.",
-                habit: .init(icon: "cup.and.saucer.fill", line1: "Café pendant", line2: "le repas"),
-                mechanism: .init(icon: "magnet", line1: "Les tanins", line2: "captent le fer"),
-                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "Jusqu'à −60 %", line2: "d'absorption"),
+                teasing: String(localized: "Une de tes habitudes quotidiennes bloque l'absorption de ton fer."),
+                habit: .init(icon: "cup.and.saucer.fill", line1: String(localized: "Café pendant"), line2: String(localized: "le repas")),
+                mechanism: .init(icon: "magnet", line1: String(localized: "Les tanins"), line2: String(localized: "captent le fer")),
+                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: String(localized: "Jusqu'à −60 %"), line2: String(localized: "d'absorption")),
                 // Morck et al. (1983) : pris 1 h APRÈS le repas, le café freine
                 // le fer autant qu'au repas ; 1 h avant, il ne le gêne pas.
-                solution: "Prends ton café au moins 1 h avant le repas plutôt qu'à table ou juste après : ton fer passe, ton café reste.",
+                solution: String(localized: "Prends ton café au moins 1 h avant le repas plutôt qu'à table ou juste après : ton fer passe, ton café reste."),
                 nutrientId: "iron",
-                source: "Hallberg et Rossander, Human Nutrition: Applied Nutrition, 1982"
+                source: String(localized: "Hallberg et Rossander, Human Nutrition: Applied Nutrition, 1982")
             )
         ),
         // Fer + calcium pris ensemble (liste fermée : 2 h d'écart).
         Entry(
             required: [["\\bfer\\b"], ["\\bcalcium"]],
             mechanism: AttentionMechanism(
-                teasing: "Deux de tes apports se gênent quand ils arrivent en même temps.",
-                habit: .init(icon: "pills.fill", line1: "Fer et calcium", line2: "en même temps"),
-                mechanism: .init(icon: "door.left.hand.closed", line1: "Même porte", line2: "d'absorption"),
-                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "Absorption réduite", line2: "pour les deux"),
-                solution: "Espace-les de 2 h : le fer au déjeuner, le calcium au dîner par exemple.",
+                teasing: String(localized: "Deux de tes apports se gênent quand ils arrivent en même temps."),
+                habit: .init(icon: "pills.fill", line1: String(localized: "Fer et calcium"), line2: String(localized: "en même temps")),
+                mechanism: .init(icon: "door.left.hand.closed", line1: String(localized: "Même porte"), line2: String(localized: "d'absorption")),
+                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: String(localized: "Absorption réduite"), line2: String(localized: "pour les deux")),
+                solution: String(localized: "Espace-les de 2 h : le fer au déjeuner, le calcium au dîner par exemple."),
                 nutrientId: "iron"
             )
         ),
@@ -223,11 +223,11 @@ enum AttentionMechanismCatalog {
         Entry(
             required: [["vitamine c\\b"], ["\\bcuisson", "\\bbouill", "\\bcuire", "\\bcuit"]],
             mechanism: AttentionMechanism(
-                teasing: "Une habitude en cuisine fait fondre ta vitamine C avant l'assiette.",
-                habit: .init(icon: "flame.fill", line1: "Cuisson longue", line2: "à l'eau"),
-                mechanism: .init(icon: "thermometer.high", line1: "La chaleur détruit", line2: "la vitamine C"),
-                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "Jusqu'à −50 %", line2: "dans l'assiette"),
-                solution: "Privilégie la vapeur douce ou les cuissons courtes : ta vitamine C reste dans l'assiette.",
+                teasing: String(localized: "Une habitude en cuisine fait fondre ta vitamine C avant l'assiette."),
+                habit: .init(icon: "flame.fill", line1: String(localized: "Cuisson longue"), line2: String(localized: "à l'eau")),
+                mechanism: .init(icon: "thermometer.high", line1: String(localized: "La chaleur détruit"), line2: String(localized: "la vitamine C")),
+                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: String(localized: "Jusqu'à −50 %"), line2: String(localized: "dans l'assiette")),
+                solution: String(localized: "Privilégie la vapeur douce ou les cuissons courtes : ta vitamine C reste dans l'assiette."),
                 nutrientId: "vitC"
             )
         ),
@@ -235,11 +235,11 @@ enum AttentionMechanismCatalog {
         Entry(
             required: [["\\bfibre"], ["ultra", "\\btransforme", "\\bindustriel", "\\braffine", "plats prepares"]],
             mechanism: AttentionMechanism(
-                teasing: "Une partie de tes repas arrive déjà vidée de ses fibres.",
-                habit: .init(icon: "shippingbox.fill", line1: "Plats", line2: "ultra-transformés"),
-                mechanism: .init(icon: "scissors", line1: "Le raffinage", line2: "retire les fibres"),
-                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: "2 à 3 fois moins", line2: "de fibres"),
-                solution: "Ajoute une portion de légumes ou de légumineuses par jour : tes fibres remontent vite.",
+                teasing: String(localized: "Une partie de tes repas arrive déjà vidée de ses fibres."),
+                habit: .init(icon: "shippingbox.fill", line1: String(localized: "Plats"), line2: String(localized: "ultra-transformés")),
+                mechanism: .init(icon: "scissors", line1: String(localized: "Le raffinage"), line2: String(localized: "retire les fibres")),
+                impact: .init(icon: "chart.line.downtrend.xyaxis", line1: String(localized: "2 à 3 fois moins"), line2: String(localized: "de fibres")),
+                solution: String(localized: "Ajoute une portion de légumes ou de légumineuses par jour : tes fibres remontent vite."),
                 nutrientId: "fiber"
             )
         ),

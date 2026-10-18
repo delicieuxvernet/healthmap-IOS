@@ -46,11 +46,11 @@ enum LimiteDuJour: Identifiable, Equatable {
         switch self {
         case .scans(let limite):
             return limite > 1
-                ? "Tu as utilisé tes \(limite) scans photo du jour."
-                : "Tu as utilisé ton scan photo du jour."
+                ? String(localized: "Tu as utilisé tes \(limite) scans photo du jour.")
+                : String(localized: "Tu as utilisé ton scan photo du jour.")
         case .dictees, .ecrits:
             let n = VoiceMealService.QuotaStore.dictéesGratuitesParJour
-            return "Tu as utilisé tes \(n) analyses de repas du jour (dictées et repas écrits comptent ensemble)."
+            return String(localized: "Tu as utilisé tes \(n) analyses de repas du jour (dictées et repas écrits comptent ensemble).")
         }
     }
 
@@ -132,9 +132,9 @@ struct ApercuCapturesPremium: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 14) {
-                    capture(legende: "Tous tes micronutriments, chiffrés") { EcranMicros() }
-                    capture(legende: "Ta semaine, apport par apport") { EcranSemaine() }
-                    capture(legende: "Ce qui t'en apporte vraiment") { EcranSources() }
+                    capture(legende: String(localized: "Tous tes micronutriments, chiffrés")) { EcranMicros() }
+                    capture(legende: String(localized: "Ta semaine, apport par apport")) { EcranSemaine() }
+                    capture(legende: String(localized: "Ce qui t'en apporte vraiment")) { EcranSources() }
                 }
                 .padding(.vertical, 6)
                 .scrollTargetLayout()
@@ -254,20 +254,20 @@ private struct EcranMicros: View {
     }
 
     private let lignes: [Ligne] = [
-        Ligne(nom: "Vitamine D", niveau: 38, teinte: .teinteVitamineD, bas: true),
-        Ligne(nom: "Oméga-3", niveau: 44, teinte: .teinteOmega3, bas: true),
-        Ligne(nom: "Fer", niveau: 67, teinte: .teinteFer),
-        Ligne(nom: "Magnésium", niveau: 72, teinte: .teinteMagnesium),
-        Ligne(nom: "Vitamine C", niveau: 96, teinte: .teinteVitamineC),
-        Ligne(nom: "Zinc", niveau: 81, teinte: .teinteZinc),
-        Ligne(nom: "Calcium", niveau: 64, teinte: .teinteCalcium),
-        Ligne(nom: "Vitamine B12", niveau: 100, teinte: .teinteB12),
-        Ligne(nom: "Iode", niveau: 58, teinte: .teinteIode),
+        Ligne(nom: String(localized: "Vitamine D"), niveau: 38, teinte: .teinteVitamineD, bas: true),
+        Ligne(nom: String(localized: "Oméga-3"), niveau: 44, teinte: .teinteOmega3, bas: true),
+        Ligne(nom: String(localized: "Fer"), niveau: 67, teinte: .teinteFer),
+        Ligne(nom: String(localized: "Magnésium"), niveau: 72, teinte: .teinteMagnesium),
+        Ligne(nom: String(localized: "Vitamine C"), niveau: 96, teinte: .teinteVitamineC),
+        Ligne(nom: String(localized: "Zinc"), niveau: 81, teinte: .teinteZinc),
+        Ligne(nom: String(localized: "Calcium"), niveau: 64, teinte: .teinteCalcium),
+        Ligne(nom: String(localized: "Vitamine B12"), niveau: 100, teinte: .teinteB12),
+        Ligne(nom: String(localized: "Iode"), niveau: 58, teinte: .teinteIode),
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            TitreCapture(titre: "Journal")
+            TitreCapture(titre: String(localized: "Journal"))
             CarteCapture {
                 HStack(spacing: 4) {
                     Image(systemName: "leaf").foregroundStyle(Color.teinteKiwi)
@@ -309,12 +309,12 @@ private struct EcranMicros: View {
 
 /// Capture 2 : la page d'un apport, son anneau et sa semaine.
 private struct EcranSemaine: View {
-    private let jours = ["L", "M", "M", "J", "V", "S", "D"]
+    private let jours = Langue.estFrancais ? ["L", "M", "M", "J", "V", "S", "D"] : ["M", "T", "W", "T", "F", "S", "S"]
     private let niveaux = [42, 31, 66, 38, 52, 24, 45]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TitreCapture(titre: "Vitamine D")
+            TitreCapture(titre: String(localized: "Vitamine D"))
             CarteCapture {
                 HStack(spacing: 10) {
                     ZStack {
@@ -382,12 +382,12 @@ private struct EcranSemaine: View {
 
 /// Capture 3 : ce qui a apporté un micronutriment cette semaine.
 private struct EcranSources: View {
-    private let noms = ["Lentilles", "Épinards", "Bœuf", "Pain complet", "Œufs"]
+    private let noms = [String(localized: "Lentilles"), String(localized: "Épinards"), String(localized: "Bœuf"), String(localized: "Pain complet"), String(localized: "Œufs")]
     private let parts = [31, 18, 14, 9, 7]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TitreCapture(titre: "Fer")
+            TitreCapture(titre: String(localized: "Fer"))
             CarteCapture {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("67 %")

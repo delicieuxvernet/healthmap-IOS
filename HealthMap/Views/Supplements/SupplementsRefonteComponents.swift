@@ -19,7 +19,9 @@ struct ComplementsSelectionLine: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Text("Ma sélection · \(nombre) complément\(nombre > 1 ? "s" : "") · \(totalLabel) par mois")
+                Text(nombre > 1
+                     ? String(localized: "Ma sélection · \(nombre) compléments · \(totalLabel) par mois")
+                     : String(localized: "Ma sélection · \(nombre) complément · \(totalLabel) par mois"))
                     .font(.dsSousTitre)
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsSecondaire)
@@ -81,21 +83,21 @@ struct ComplementsSelectionSheet: View {
                 VerreBascule(
                     selection: $premium,
                     options: [
-                        (valeur: false, libelle: "Économique"),
-                        (valeur: true, libelle: "Premium"),
+                        (valeur: false, libelle: String(localized: "Économique")),
+                        (valeur: true, libelle: String(localized: "Premium")),
                     ]
                 )
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Qualité")
                 .padding(.top, 18)
-                Text(premium ? "Les formes que ton corps absorbe le mieux."
-                             : "Des formes plus simples, un peu moins bien absorbées.")
+                Text(premium ? String(localized: "Les formes que ton corps absorbe le mieux.")
+                             : String(localized: "Des formes plus simples, un peu moins bien absorbées."))
                     .font(.dsLegende)
                     .tracking(DSTracking.legende)
                     .foregroundStyle(Color.dsSecondaire)
                     .padding(.top, 8)
 
-                DSSectionHeader(titre: "Produits")
+                DSSectionHeader(titre: String(localized: "Produits"))
                     .padding(.top, -6)
                 DSGroupedList {
                     ForEach(Array(produits.enumerated()), id: \.element.id) { index, produit in
@@ -132,7 +134,7 @@ struct ComplementsSelectionSheet: View {
                         }
                         .buttonStyle(.dsPress)
                         .accessibilityLabel("\(produit.nom), \(produit.apport), \(produit.prixLabel)")
-                        .accessibilityValue(produit.pris ? "dans ma sélection" : "hors sélection")
+                        .accessibilityValue(produit.pris ? String(localized: "dans ma sélection") : String(localized: "hors sélection"))
                     }
                 }
 

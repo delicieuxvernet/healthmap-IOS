@@ -37,14 +37,14 @@ final class RestaurationAchats: ObservableObject {
         do {
             try await service.restorePurchases()
             if service.isPremium {
-                message = "Achats restaurés. Bienvenue dans Premium !"
+                message = String(localized: "Achats restaurés. Bienvenue dans Premium !")
                 AnalyticsService.shared.track(.subscriptionRestored, properties: ["outcome": "success"])
             } else {
-                message = "Aucun achat à restaurer pour cet identifiant Apple. Si tu penses qu'il y a une erreur, écris au support."
+                message = String(localized: "Aucun achat à restaurer pour cet identifiant Apple. Si tu penses qu'il y a une erreur, écris au support.")
                 AnalyticsService.shared.track(.subscriptionRestored, properties: ["outcome": "no_purchase"])
             }
         } catch {
-            message = "La restauration n'a pas abouti. Vérifie ta connexion puis réessaie, ou écris au support."
+            message = String(localized: "La restauration n'a pas abouti. Vérifie ta connexion puis réessaie, ou écris au support.")
             AnalyticsService.shared.track(.subscriptionRestored, properties: ["outcome": "error"])
             AppLogger.subscription.report(error, context: "Restore purchases (\(contexte))")
         }
@@ -99,14 +99,14 @@ struct AbonnementReglagesView: View {
                     etat
                         .padding(.top, DS.marge)
 
-                    DSSectionHeader(titre: "Gérer")
+                    DSSectionHeader(titre: String(localized: "Gérer"))
                     DSGroupedList {
                         if subscriptionService.isPremium {
                             Button {
                                 showManageSubscriptions = true
                             } label: {
-                                ReglageLigne(symbole: "gearshape", titre: "Gérer mon abonnement",
-                                             sousTitre: "Modifier ou annuler dans les réglages Apple",
+                                ReglageLigne(symbole: "gearshape", titre: String(localized: "Gérer mon abonnement"),
+                                             sousTitre: String(localized: "Modifier ou annuler dans les réglages Apple"),
                                              filet: true)
                             }
                             .buttonStyle(.dsPress)
@@ -116,7 +116,7 @@ struct AbonnementReglagesView: View {
                                 HapticService.shared.tap()
                                 showPaywall = true
                             } label: {
-                                ReglageLigne(symbole: "sparkles", titre: "Découvrir Kiwio Premium", filet: true)
+                                ReglageLigne(symbole: "sparkles", titre: String(localized: "Découvrir Kiwio Premium"), filet: true)
                             }
                             .buttonStyle(.dsPress)
                         }
@@ -127,7 +127,7 @@ struct AbonnementReglagesView: View {
                                 feuilleCodePromo = true
                             } label: {
                                 ReglageLigne(symbole: "ticket",
-                                             titre: isRedeemingPromo ? "Vérification de ton code…" : "J'ai un code",
+                                             titre: isRedeemingPromo ? String(localized: "Vérification de ton code…") : String(localized: "J'ai un code"),
                                              filet: true) {
                                     if isRedeemingPromo { ProgressView() } else { DSChevron() }
                                 }
@@ -141,8 +141,8 @@ struct AbonnementReglagesView: View {
                         // l'état (audit de conformité du 9 octobre 2026).
                         Link(destination: ReglagesLiens.remboursement) {
                             ReglageLigne(symbole: "arrow.uturn.backward",
-                                         titre: "Demander un remboursement",
-                                         sousTitre: "Via Apple, sur reportaproblem.apple.com",
+                                         titre: String(localized: "Demander un remboursement"),
+                                         sousTitre: String(localized: "Via Apple, sur reportaproblem.apple.com"),
                                          filet: true) {
                                 Image(systemName: "arrow.up.right")
                                     .font(.system(size: 14, weight: .semibold))
@@ -158,7 +158,7 @@ struct AbonnementReglagesView: View {
                         Button {
                             Task { await restauration.lancer(contexte: "reglages_abonnement") }
                         } label: {
-                            ReglageLigne(symbole: "arrow.clockwise", titre: "Restaurer mes achats") {
+                            ReglageLigne(symbole: "arrow.clockwise", titre: String(localized: "Restaurer mes achats")) {
                                 if restauration.enCours { ProgressView() } else { DSChevron() }
                             }
                         }
@@ -197,7 +197,7 @@ struct AbonnementReglagesView: View {
 
     private var etat: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(subscriptionService.isPremium ? "Kiwio Premium" : "Formule gratuite")
+            Text(subscriptionService.isPremium ? String(localized: "Kiwio Premium") : String(localized: "Formule gratuite"))
                 .font(.dsSection)
                 .tracking(DSTracking.section)
                 .foregroundStyle(Color.dsTexte)
@@ -217,11 +217,11 @@ struct AbonnementReglagesView: View {
             if let ent = subscriptionService.customerInfo?.entitlements[SubscriptionService.entitlementId],
                let exp = ent.expirationDate {
                 let date = exp.formatted(date: .abbreviated, time: .omitted)
-                return ent.willRenew ? "Renouvellement le \(date)." : "Actif jusqu'au \(date)."
+                return ent.willRenew ? String(localized: "Renouvellement le \(date).") : String(localized: "Actif jusqu'au \(date).")
             }
-            return "Tout est débloqué."
+            return String(localized: "Tout est débloqué.")
         }
-        return "Scans, dictées et bilan dans la limite du gratuit."
+        return String(localized: "Scans, dictées et bilan dans la limite du gratuit.")
     }
 
     // MARK: - Code promo
@@ -236,14 +236,14 @@ struct AbonnementReglagesView: View {
         switch await subscriptionService.attendreActivation() {
         case .active:
             codeSansEffet = false
-            var message = "Ton accès Premium est ouvert. Tout est débloqué dès maintenant."
+            var message = String(localized: "Ton accès Premium est ouvert. Tout est débloqué dès maintenant.")
             if let entitlement = subscriptionService.customerInfo?
                 .entitlements[SubscriptionService.entitlementId],
                let expiration = entitlement.expirationDate {
                 let date = expiration.formatted(date: .abbreviated, time: .omitted)
-                message += entitlement.willRenew
-                    ? " Renouvellement le \(date)."
-                    : " Actif jusqu'au \(date)."
+                message += " " + (entitlement.willRenew
+                    ? String(localized: "Renouvellement le \(date).")
+                    : String(localized: "Actif jusqu'au \(date)."))
             }
             promoResultMessage = message
             AnalyticsService.shared.track(.subscriptionStarted, properties: [
@@ -251,7 +251,7 @@ struct AbonnementReglagesView: View {
             ])
         case .aucuneActivation:
             codeSansEffet = true
-            promoResultMessage = "Aucun code n'a été appliqué. Si tu viens d'en saisir un, laisse-lui quelques secondes puis touche « Restaurer mes achats ». Tu peux aussi saisir ton code directement sur l'App Store."
+            promoResultMessage = String(localized: "Aucun code n'a été appliqué. Si tu viens d'en saisir un, laisse-lui quelques secondes puis touche « Restaurer mes achats ». Tu peux aussi saisir ton code directement sur l'App Store.")
         }
         showPromoResult = true
     }
@@ -275,13 +275,13 @@ struct CompteReglagesView: View {
 
     private var prenom: String {
         let nom = dashboardVM.firstName.trimmingCharacters(in: .whitespaces)
-        return nom.isEmpty ? "Toi" : nom
+        return nom.isEmpty ? String(localized: "Toi") : nom
     }
 
     private var noteConnexion: String? {
         switch fournisseur {
-        case "apple": return "Tu te connectes avec Apple : ton mot de passe se gère dans ton identifiant Apple."
-        case "google": return "Tu te connectes avec Google : ton mot de passe se gère dans ton compte Google."
+        case "apple": return String(localized: "Tu te connectes avec Apple : ton mot de passe se gère dans ton identifiant Apple.")
+        case "google": return String(localized: "Tu te connectes avec Google : ton mot de passe se gère dans ton compte Google.")
         default: return nil
         }
     }
@@ -297,24 +297,24 @@ struct CompteReglagesView: View {
                     }
                     .padding(.top, DS.marge)
 
-                    DSSectionHeader(titre: "Identifiants")
+                    DSSectionHeader(titre: String(localized: "Identifiants"))
                     DSGroupedList {
-                        DSRow(titre: "Prénom", valeur: prenom) { EmptyView() }
+                        DSRow(titre: String(localized: "Prénom"), valeur: prenom) { EmptyView() }
                         DSSeparator()
-                        DSRow(titre: "Adresse e-mail", valeur: authViewModel.userEmail ?? "Non renseignée") { EmptyView() }
+                        DSRow(titre: String(localized: "Adresse e-mail"), valeur: authViewModel.userEmail ?? String(localized: "Non renseignée")) { EmptyView() }
                         if fournisseur == "email" {
                             DSSeparator()
                             Button {
                                 HapticService.shared.tap()
                                 montreMotDePasse = true
                             } label: {
-                                DSRow(titre: "Changer mon mot de passe")
+                                DSRow(titre: String(localized: "Changer mon mot de passe"))
                             }
                             .buttonStyle(.dsPress)
                         }
                     }
 
-                    Text(noteConnexion ?? "Ton prénom se modifie dans les informations du questionnaire, famille Profil.")
+                    Text(noteConnexion ?? String(localized: "Ton prénom se modifie dans les informations du questionnaire, famille Profil."))
                         .font(.dsLegende)
                         .tracking(DSTracking.legende)
                         .foregroundStyle(Color.dsSecondaire)
@@ -389,7 +389,7 @@ private struct MotDePasseSheet: View {
                     .padding(.horizontal, DS.paddingCarte)
                     .padding(.top, 10)
 
-                    DSCapsuleButton(titre: "Enregistrer", chargement: enCours) {
+                    DSCapsuleButton(titre: String(localized: "Enregistrer"), chargement: enCours) {
                         Task { await enregistrer() }
                     }
                     .disabled(!valide || enCours)
@@ -423,11 +423,11 @@ private struct MotDePasseSheet: View {
         do {
             try await AuthService.shared.updatePassword(newPassword: nouveau)
             HapticService.shared.success()
-            ToastService.shared.confirmer("Mot de passe mis à jour")
+            ToastService.shared.confirmer(String(localized: "Mot de passe mis à jour"))
             dismiss()
         } catch {
             HapticService.shared.error()
-            erreur = "Le changement n'a pas abouti. Vérifie ta connexion puis réessaie."
+            erreur = String(localized: "Le changement n'a pas abouti. Vérifie ta connexion puis réessaie.")
             AppLogger.app.report(error, context: "Reglages update password")
         }
         enCours = false
@@ -476,7 +476,7 @@ struct ObjectifsReglagesView: View {
                     .padding(.top, DS.interCarte)
 
                     if modifie {
-                        DSCapsuleButton(titre: "Enregistrer", chargement: enCours) {
+                        DSCapsuleButton(titre: String(localized: "Enregistrer"), chargement: enCours) {
                             Task { await enregistrer() }
                         }
                         .disabled(enCours)
@@ -526,7 +526,7 @@ struct ObjectifsReglagesView: View {
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel(libelle)
-        .accessibilityValue(choisi ? "choisi" : "non choisi")
+        .accessibilityValue(choisi ? String(localized: "choisi") : String(localized: "non choisi"))
         .accessibilityAddTraits(choisi ? [.isButton, .isSelected] : .isButton)
     }
 
@@ -540,7 +540,7 @@ struct ObjectifsReglagesView: View {
 
         guard SupabaseService.shared.safeClient != nil,
               let session = await AuthService.shared.currentSession else {
-            erreur = "Connexion indisponible. Réessaie dans un instant."
+            erreur = String(localized: "Connexion indisponible. Réessaie dans un instant.")
             HapticService.shared.error()
             return
         }
@@ -559,10 +559,10 @@ struct ObjectifsReglagesView: View {
             // Les objectifs pèsent sur les cibles du jour : on recalcule.
             dashboardVM.computeLocalScores()
             HapticService.shared.success()
-            ToastService.shared.confirmer("Objectifs mis à jour")
+            ToastService.shared.confirmer(String(localized: "Objectifs mis à jour"))
         } catch {
             dashboardVM.profile.goals = avant
-            erreur = "Impossible de sauvegarder. Vérifie ta connexion et réessaie."
+            erreur = String(localized: "Impossible de sauvegarder. Vérifie ta connexion et réessaie.")
             HapticService.shared.error()
             AppLogger.database.error("Objectifs save failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -589,9 +589,11 @@ struct SuppressionCompteView: View {
     /// le mot « SUPPRIMER ». Comparaison insensible à la casse et espaces
     /// parasites de l'autocomplétion retirés.
     private var isDeleteConfirmed: Bool {
-        deleteConfirmationText
+        let mot = deleteConfirmationText
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .uppercased() == "SUPPRIMER"
+            .uppercased()
+        // En anglais, « DELETE » vaut aussi (le français reste « SUPPRIMER » seul).
+        return mot == "SUPPRIMER" || (!Langue.estFrancais && mot == "DELETE")
     }
 
     var body: some View {
@@ -611,7 +613,7 @@ struct SuppressionCompteView: View {
                         Button(role: .destructive) {
                             showDeleteFirstConfirm = true
                         } label: {
-                            ReglageLigne(symbole: "trash", sens: .destructif, titre: "Supprimer mon compte") {
+                            ReglageLigne(symbole: "trash", sens: .destructif, titre: String(localized: "Supprimer mon compte")) {
                                 EmptyView()
                             }
                         }
@@ -676,11 +678,11 @@ struct SuppressionCompteView: View {
                     .padding(.top, Theme.spacingMD)
 
                     VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                        bulletRow("Ton profil et ton bilan seront effacés")
-                        bulletRow("Ton historique de scores sera effacé")
-                        bulletRow("Tes scans et tes rappels seront effacés")
-                        bulletRow("Ton abonnement Premium ne sera PAS annulé automatiquement (gère-le dans Réglages > Apple ID)")
-                        bulletRow("Cette action est IRRÉVERSIBLE")
+                        bulletRow(String(localized: "Ton profil et ton bilan seront effacés"))
+                        bulletRow(String(localized: "Ton historique de scores sera effacé"))
+                        bulletRow(String(localized: "Tes scans et tes rappels seront effacés"))
+                        bulletRow(String(localized: "Ton abonnement Premium ne sera PAS annulé automatiquement (gère-le dans Réglages > Apple ID)"))
+                        bulletRow(String(localized: "Cette action est IRRÉVERSIBLE"))
                     }
 
                     VStack(alignment: .leading, spacing: Theme.spacingSM) {
@@ -750,8 +752,8 @@ struct SuppressionCompteView: View {
                     .buttonStyle(.dsPress)
                     .disabled(!isDeleteConfirmed || isDeletingAccount)
                     .accessibilityHint(isDeleteConfirmed
-                        ? "Supprime ton compte tout de suite et définitivement."
-                        : "Tape d'abord le mot SUPPRIMER dans le champ de confirmation.")
+                        ? String(localized: "Supprime ton compte tout de suite et définitivement.")
+                        : String(localized: "Tape d'abord le mot SUPPRIMER dans le champ de confirmation."))
 
                     Button {
                         showDeleteSecondConfirm = false
@@ -829,7 +831,7 @@ struct SuppressionCompteView: View {
         } else {
             AnalyticsService.shared.track(.accountDeletionFailed)
             HapticService.shared.error()
-            deleteErrorMessage = authViewModel.errorMessage ?? "La suppression n'a pas abouti. Réessaie ou écris au support."
+            deleteErrorMessage = authViewModel.errorMessage ?? String(localized: "La suppression n'a pas abouti. Réessaie ou écris au support.")
         }
     }
 }

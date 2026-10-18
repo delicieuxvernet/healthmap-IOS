@@ -85,9 +85,9 @@ struct FicheApportContexte: Identifiable {
     /// Le mot du statut, calé sur le score AFFICHÉ (le même que l'anneau) :
     /// < 40 à combler, < 70 à renforcer. Partagé par toutes les fiches.
     static func statutMot(forScore score: Int) -> String {
-        if score < 40 { return "à combler" }
-        if score < 70 { return "à renforcer" }
-        return "couvre le besoin"
+        if score < 40 { return String(localized: "à combler") }
+        if score < 70 { return String(localized: "à renforcer") }
+        return String(localized: "couvre le besoin")
     }
 
     /// Le mot d'après le détail : le STATUT d'un apport estimé (audit de
@@ -95,21 +95,21 @@ struct FicheApportContexte: Identifiable {
     static func statutMot(detail: DetailApport) -> String {
         guard let statut = detail.estimation?.statut else { return statutMot(forScore: detail.score) }
         switch statut {
-        case .couvert, .sousLaLimite: return "couvre le besoin"
-        case .couvertParComplement: return "couvert par ton complément"
-        case .aSurveiller: return "à surveiller"
-        case .aRenforcer: return "à renforcer"
-        case .peuPrecise: return "à affiner"
-        case .auDessusDeLaLimite: return "au-dessus de la limite"
+        case .couvert, .sousLaLimite: return String(localized: "couvre le besoin")
+        case .couvertParComplement: return String(localized: "couvert par ton complément")
+        case .aSurveiller: return String(localized: "à surveiller")
+        case .aRenforcer: return String(localized: "à renforcer")
+        case .peuPrecise: return String(localized: "à affiner")
+        case .auDessusDeLaLimite: return String(localized: "au-dessus de la limite")
         }
     }
 
     /// « à combler · 3 causes nommées »
     static func sousTitre(statutMot: String, causes: Int) -> String {
         switch causes {
-        case 0: return "\(statutMot) · sans cause nommée"
-        case 1: return "\(statutMot) · 1 cause nommée"
-        default: return "\(statutMot) · \(causes) causes nommées"
+        case 0: return String(localized: "\(statutMot) · sans cause nommée")
+        case 1: return String(localized: "\(statutMot) · 1 cause nommée")
+        default: return String(localized: "\(statutMot) · \(causes) causes nommées")
         }
     }
 
@@ -117,7 +117,7 @@ struct FicheApportContexte: Identifiable {
     var sousTitre: String {
         switch voie {
         case .assiette:
-            return "Par l'assiette · pour \(apportAvecArticle)"
+            return String(localized: "Par l'assiette · pour \(Langue.texte(apportAvecArticle))")
         case .complements:
             return Self.sousTitre(statutMot: statutMot, causes: nombreDeCauses)
         }
@@ -244,41 +244,41 @@ struct FicheApportSheet: View {
                 enTete
 
                 if !causes.isEmpty {
-                    bloc("Ce qui pèse le plus", note: "touche pour comprendre") { causesCarte(causes) }
+                    bloc(String(localized: "Ce qui pèse le plus"), note: String(localized: "touche pour comprendre")) { causesCarte(causes) }
                 }
 
                 if !gestes.isEmpty || aUnConseil {
-                    bloc("Ce que tu peux faire, dès aujourd'hui") { gestesBloc(gestes) }
+                    bloc(String(localized: "Ce que tu peux faire, dès aujourd'hui")) { gestesBloc(gestes) }
                 }
 
                 if let eclairage = contexte.eclairage, !eclairage.isEmpty {
-                    bloc("Ce que ça peut expliquer chez toi") { texteCarte(eclairage) }
+                    bloc(String(localized: "Ce que ça peut expliquer chez toi")) { texteCarte(eclairage) }
                 }
 
                 if let role = contexte.role, !role.isEmpty {
-                    bloc("Ce que ça fait") { texteCarte(role) }
+                    bloc(String(localized: "Ce que ça fait")) { texteCarte(role) }
                 }
 
                 // Apport estimé : pas de « point de départ » ni de points à
                 // regagner ; ses sources, en part de la référence.
                 if detail.estimation != nil {
                     if !detail.appuis.isEmpty {
-                        bloc("D'où vient ton apport", note: "en part de la référence") { sourcesCarte }
+                        bloc(String(localized: "D'où vient ton apport"), note: String(localized: "en part de la référence")) { sourcesCarte }
                     }
                 } else if !detail.contributions.isEmpty {
                     calculBloc
                 }
 
                 if !contexte.specs.isEmpty || contexte.noteDePrise != nil {
-                    bloc(contexte.voie == .assiette ? "Comment l'intégrer" : "Comment le prendre") { priseCarte }
+                    bloc(contexte.voie == .assiette ? String(localized: "Comment l'intégrer") : String(localized: "Comment le prendre")) { priseCarte }
                 }
 
                 if !contexte.precautions.isEmpty {
-                    bloc("Précautions et interactions") { precautionsCarte }
+                    bloc(String(localized: "Précautions et interactions")) { precautionsCarte }
                 }
 
                 if !contexte.alternatives.isEmpty || contexte.ctaAlternative != nil {
-                    bloc(contexte.voie == .assiette ? "Ou en complément" : "Ou par l'assiette") { alternativesCarte }
+                    bloc(contexte.voie == .assiette ? String(localized: "Ou en complément") : String(localized: "Ou par l'assiette")) { alternativesCarte }
                 }
             }
             .padding(.horizontal, DS.marge)
@@ -474,7 +474,7 @@ struct FicheApportSheet: View {
             UnlockDoor(
                 icon: "lock.fill",
                 title: titreDeLaPorte(gestes.count + (aUnConseil ? 1 : 0)),
-                subtitle: "Ce que tu peux faire dès aujourd'hui. Les causes, elles, restent toujours gratuites.",
+                subtitle: String(localized: "Ce que tu peux faire dès aujourd'hui. Les causes, elles, restent toujours gratuites."),
                 zone: "fiche_apport_complements"
             )
         }
@@ -483,9 +483,13 @@ struct FicheApportSheet: View {
     /// Toujours un bénéfice propre à l'apport, jamais un « Passe Premium »
     /// générique : le compte annoncé est celui des lignes floutées.
     private func titreDeLaPorte(_ n: Int) -> String {
-        let mots = ["", "Un", "Deux", "Trois", "Quatre"]
-        let nombre = n < mots.count ? mots[n] : "\(n)"
-        return n <= 1 ? "Un geste t'attend" : "\(nombre) gestes t'attendent"
+        if n <= 1 { return String(localized: "Un geste t'attend") }
+        switch n {
+        case 2: return String(localized: "Deux gestes t'attendent")
+        case 3: return String(localized: "Trois gestes t'attendent")
+        case 4: return String(localized: "Quatre gestes t'attendent")
+        default: return String(localized: "\(n) gestes t'attendent")
+        }
     }
 
     private func gestesCarte(_ gestes: [LectureApport.Geste]) -> some View {
@@ -578,7 +582,7 @@ struct FicheApportSheet: View {
     /// rendrait, et le facteur auquel il répond.
     private func sousLigne(_ geste: LectureApport.Geste) -> String {
         let cause = geste.cause.prefix(1).lowercased() + geste.cause.dropFirst()
-        guard let regain = LectureApport.libelleRegain(geste.regain) else { return "répond à : \(cause)" }
+        guard let regain = LectureApport.libelleRegain(geste.regain) else { return String(localized: "répond à : \(cause)") }
         return "\(regain) · \(cause)"
     }
 
@@ -630,7 +634,7 @@ struct FicheApportSheet: View {
                             .font(.dsSousTitreFort)
                             .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsTexte)
-                        Text(calculDeplie ? "Touche une ligne pour allumer sa part" : "Du point de départ à ton score, ligne à ligne")
+                        Text(calculDeplie ? String(localized: "Touche une ligne pour allumer sa part") : String(localized: "Du point de départ à ton score, ligne à ligne"))
                             .font(.dsLegende)
                             .tracking(DSTracking.legende)
                             .foregroundStyle(Color.dsSecondaire)
@@ -651,7 +655,7 @@ struct FicheApportSheet: View {
             }
             .buttonStyle(.dsPress)
             .dsCard()
-            .accessibilityValue(calculDeplie ? "déplié" : "replié")
+            .accessibilityValue(calculDeplie ? String(localized: "déplié") : String(localized: "replié"))
 
             if calculDeplie {
                 cascadeCarte
@@ -694,9 +698,9 @@ struct FicheApportSheet: View {
 
     private var texteBornage: String {
         if detail.brut < 0 {
-            return "Tes réponses pèsent plus que l'échelle ne peut le montrer : le calcul descend à \(PointsApport.signe(detail.brut)), l'anneau s'arrête à 0."
+            return String(localized: "Tes réponses pèsent plus que l'échelle ne peut le montrer : le calcul descend à \(PointsApport.signe(detail.brut)), l'anneau s'arrête à 0.")
         }
-        return "Le calcul dépasse 100 : l'anneau est plein, tes réponses vont au-delà du besoin."
+        return String(localized: "Le calcul dépasse 100 : l'anneau est plein, tes réponses vont au-delà du besoin.")
     }
 
     // MARK: Comment le prendre / l'intégrer
@@ -714,7 +718,7 @@ struct FicheApportSheet: View {
                                 .accessibilityHidden(true)
                         }
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(spec.cle)
+                            Text(Langue.texte(spec.cle))
                                 .font(.system(.caption, design: .default))
                                 .foregroundStyle(Color.dsSecondaire)
                             Text(spec.valeur)
@@ -936,8 +940,8 @@ struct CascadeApport: View {
         var sortie: [Ligne] = [
             Ligne(
                 id: "depart",
-                libelle: "Point de départ",
-                sousTitre: "ce que ton profil ne dit pas",
+                libelle: String(localized: "Point de départ"),
+                sousTitre: String(localized: "ce que ton profil ne dit pas"),
                 delta: DS.entier(detail.depart),
                 teinte: AnneauTeintes.piste,
                 cible: nil
@@ -967,10 +971,11 @@ struct CascadeApport: View {
             ))
         }
         if detail.estBorne {
+            let calcul = detail.brut < 0 ? PointsApport.signe(detail.brut) : DS.entier(detail.brut)
             sortie.append(Ligne(
                 id: "bornage",
-                libelle: "Ramené dans l'échelle",
-                sousTitre: "le calcul donnait \(detail.brut < 0 ? PointsApport.signe(detail.brut) : DS.entier(detail.brut))",
+                libelle: String(localized: "Ramené dans l'échelle"),
+                sousTitre: String(localized: "le calcul donnait \(calcul)"),
                 delta: PointsApport.signe(detail.correctionBornage),
                 teinte: nil,
                 cible: nil,
@@ -1115,6 +1120,6 @@ struct CascadeApport: View {
         .disabled(ligne.cible == nil)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(ligne.cible == nil ? [] : .isButton)
-        .accessibilityHint(ligne.cible == nil ? "" : (ouvrable ? "Allume cette part sur l'anneau et ouvre le détail" : "Allume cette part sur l'anneau"))
+        .accessibilityHint(ligne.cible == nil ? "" : (ouvrable ? String(localized: "Allume cette part sur l'anneau et ouvre le détail") : String(localized: "Allume cette part sur l'anneau")))
     }
 }

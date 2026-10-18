@@ -58,7 +58,7 @@ struct SectionIntroView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, Theme.spacingMD)
 
-            Text(questionCount <= 1 ? "1 question" : "\(questionCount) questions")
+            Text(questionCount <= 1 ? String(localized: "1 question") : String(localized: "\(questionCount) questions"))
                 .font(.dsLegendeMoyenne)
                 .foregroundStyle(Color.dsSecondaire)
                 .padding(.horizontal, 12)
@@ -83,12 +83,12 @@ struct SectionIntroView: View {
     /// Ligne d'encouragement — rythme le parcours et motive à continuer.
     private var encouragement: String {
         switch section {
-        case .profil: return "Faisons connaissance !"
-        case .modeDeVie: return "Parlons de ton quotidien."
-        case .sante: return "Tu avances bien, continue !"
-        case .nutrition: return "Le cœur de ton bilan."
-        case .symptomes: return "Encore quelques instants !"
-        case .medical: return "Dernière ligne droite !"
+        case .profil: return String(localized: "Faisons connaissance !")
+        case .modeDeVie: return String(localized: "Parlons de ton quotidien.")
+        case .sante: return String(localized: "Tu avances bien, continue !")
+        case .nutrition: return String(localized: "Le cœur de ton bilan.")
+        case .symptomes: return String(localized: "Encore quelques instants !")
+        case .medical: return String(localized: "Dernière ligne droite !")
         }
     }
 
@@ -96,17 +96,17 @@ struct SectionIntroView: View {
     private var whyTheseData: String {
         switch section {
         case .profil:
-            return "Ces infos de base servent à calibrer tes besoins nutritionnels."
+            return String(localized: "Ces infos de base servent à calibrer tes besoins nutritionnels.")
         case .modeDeVie:
-            return "Ton rythme de vie influence directement tes besoins en vitamines."
+            return String(localized: "Ton rythme de vie influence directement tes besoins en vitamines.")
         case .sante:
-            return "Sommeil, stress, hydratation : ces réponses affinent ton bilan."
+            return String(localized: "Sommeil, stress, hydratation : ces réponses affinent ton bilan.")
         case .nutrition:
-            return "Tes habitudes alimentaires déterminent l'essentiel de tes apports."
+            return String(localized: "Tes habitudes alimentaires déterminent l'essentiel de tes apports.")
         case .symptomes:
-            return "Certains signes du corps orientent vers des besoins nutritionnels précis."
+            return String(localized: "Certains signes du corps orientent vers des besoins nutritionnels précis.")
         case .medical:
-            return "Ces données évitent les recommandations contre-indiquées pour toi."
+            return String(localized: "Ces données évitent les recommandations contre-indiquées pour toi.")
         }
     }
 }

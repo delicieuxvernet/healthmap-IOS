@@ -93,7 +93,7 @@ struct ComparatifPremiumView: View {
             tableau
                 .padding(.top, 16)
 
-            PremiumAction(titre: "Passer à Premium", action: onContinuer)
+            PremiumAction(titre: String(localized: "Passer à Premium"), action: onContinuer)
                 .padding(.top, 20)
                 .accessibilityIdentifier("comparatif.continuer")
 

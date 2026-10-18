@@ -31,9 +31,9 @@ struct TeaserStat {
     /// jamais de tiret cadratin — même doctrine que TypographieTests).
     var accessibilite: String {
         if let fraction {
-            return "\(fraction) : \(texte), source \(source)"
+            return String(localized: "\(fraction) : \(texte), source \(source)")
         }
-        return "\(texte), source \(source)"
+        return String(localized: "\(texte), source \(source)")
     }
 }
 
@@ -43,7 +43,7 @@ enum TeaserStatsCatalog {
     /// Source affichée : repères d'apport ANSES (actualisation 2016-2021).
     static let generique = TeaserStat(
         fraction: nil,
-        texte: "Souvent sous les repères en France",
+        texte: String(localized: "Souvent sous les repères en France"),
         source: "ANSES"
     )
 
@@ -53,36 +53,36 @@ enum TeaserStatsCatalog {
         // vitaminique : environ 7 adultes sur 10 sous le seuil d'adéquation
         // en vitamine D.
         "vitD": TeaserStat(
-            fraction: "7 sur 10",
-            texte: "Adultes sous les repères",
+            fraction: String(localized: "7 sur 10"),
+            texte: String(localized: "Adultes sous les repères"),
             source: "Esteban"
         ),
         // SU.VI.MAX (relayé par INCA3/ANSES) : environ 1 adulte sur 3 sous
         // le besoin nutritionnel moyen (BNM) en magnésium.
         "magnesium": TeaserStat(
-            fraction: "1 sur 3",
-            texte: "Adultes sous les besoins moyens",
+            fraction: String(localized: "1 sur 3"),
+            texte: String(localized: "Adultes sous les besoins moyens"),
             source: "SU.VI.MAX"
         ),
         // INCA3 (ANSES, 2017) : environ 1 femme sur 4 en âge de procréer
         // avec un apport en fer insuffisant.
         "iron": TeaserStat(
-            fraction: "1 sur 4",
-            texte: "Femmes avec un apport insuffisant",
+            fraction: String(localized: "1 sur 4"),
+            texte: String(localized: "Femmes avec un apport insuffisant"),
             source: "INCA3"
         ),
         // INCA3 (ANSES, 2017) : environ 9 adultes sur 10 sous les repères
         // ANSES en oméga-3 (EPA + DHA).
         "omega3": TeaserStat(
-            fraction: "9 sur 10",
-            texte: "Adultes sous les repères ANSES",
+            fraction: String(localized: "9 sur 10"),
+            texte: String(localized: "Adultes sous les repères ANSES"),
             source: "INCA3"
         ),
         // INCA3 (ANSES, 2017) : environ 9 adultes sur 10 sous les 25 g de
         // fibres par jour recommandés.
         "fiber": TeaserStat(
-            fraction: "9 sur 10",
-            texte: "Adultes sous les 25 g par jour",
+            fraction: String(localized: "9 sur 10"),
+            texte: String(localized: "Adultes sous les 25 g par jour"),
             source: "INCA3"
         ),
         // Pas de chiffre national robuste isolé pour ces cinq nutriments →

@@ -582,21 +582,21 @@ enum AIAnalysisError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .timeout:
-            return "L'analyse a pris trop de temps. Réessaie."
+            return String(localized: "L'analyse a pris trop de temps. Réessaie.")
         case .invalidResponse:
-            return "La réponse de l'IA est inutilisable. Réessaie."
+            return String(localized: "La réponse de l'IA est inutilisable. Réessaie.")
         case .rateLimited:
-            return "Trop de demandes d'un coup. Patiente quelques minutes avant de réessayer."
+            return String(localized: "Trop de demandes d'un coup. Patiente quelques minutes avant de réessayer.")
         case .clientError(let code):
-            return "L'analyse n'a pas abouti (code \(code)). Vérifie tes données et réessaie."
+            return String(localized: "L'analyse n'a pas abouti (code \(code)). Vérifie tes données et réessaie.")
         case .serverError(let code):
             return code > 0
-                ? "Le service d'analyse est indisponible (code \(code)). Réessaie plus tard."
-                : "Le service d'analyse est indisponible. Réessaie plus tard."
+                ? String(localized: "Le service d'analyse est indisponible (code \(code)). Réessaie plus tard.")
+                : String(localized: "Le service d'analyse est indisponible. Réessaie plus tard.")
         case .networkError:
-            return "Problème de connexion. Vérifie ton réseau et réessaie."
+            return String(localized: "Problème de connexion. Vérifie ton réseau et réessaie.")
         case .circuitOpen:
-            return "Le service d'analyse est indisponible pour le moment après plusieurs échecs. Réessaie dans quelques minutes."
+            return String(localized: "Le service d'analyse est indisponible pour le moment après plusieurs échecs. Réessaie dans quelques minutes.")
         }
     }
 

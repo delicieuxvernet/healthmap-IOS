@@ -57,14 +57,14 @@ struct RecapSlideView: View {
             KiwiSigne(taille: 52)
                 .recapApparition(0)
 
-            Text(prenom.map { "\($0)," } ?? "C'est prêt.")
+            Text(prenom.map { "\($0)," } ?? String(localized: "C'est prêt."))
                 .dsPolice(30, .bold)
                 .foregroundStyle(Color.dsTexte)
                 .recapApparition(1)
 
             Text(réponses > 0
-                 ? "on a lu tes \(réponses) réponses, une par une."
-                 : "on a lu tout ce que tu nous as dit.")
+                 ? String(localized: "on a lu tes \(réponses) réponses, une par une.")
+                 : String(localized: "on a lu tout ce que tu nous as dit."))
                 .dsPolice(22, .medium)
                 .foregroundStyle(Color.dsTexte.opacity(0.75))
                 .fixedSize(horizontal: false, vertical: true)
@@ -156,7 +156,7 @@ struct RecapSlideView: View {
 
             HStack(alignment: .lastTextBaseline, spacing: 8) {
                 RecapCompteur(valeur: nourris, taille: 72, couleur: .dsAccent)
-                Text(nourris > 1 ? "besoins déjà nourris" : "besoin déjà nourri")
+                Text(nourris > 1 ? String(localized: "besoins déjà nourris") : String(localized: "besoin déjà nourri"))
                     .dsPolice(20, .semibold)
                     .foregroundStyle(Color.dsTexte)
             }
@@ -212,7 +212,7 @@ struct RecapSlideView: View {
 
             // Le NOM est masqué quand c'est réservé ; le statut, lui, reste
             // visible — on masque le contenu, jamais l'existence.
-            Text(apport.verrouille ? "Réservé à Premium" : apport.nom)
+            Text(apport.verrouille ? String(localized: "Réservé à Premium") : apport.nom)
                 .dsPolice(30, .bold)
                 .foregroundStyle(apport.verrouille ? Color.dsSecondaire : Color.dsTexte)
                 .recapApparition(1)
@@ -233,12 +233,12 @@ struct RecapSlideView: View {
             .recapApparition(3)
 
             if apport.verrouille {
-                RecapVoile(titre: "Le nom de cet apport et ce qui l'explique sont réservés à Premium") {
+                RecapVoile(titre: String(localized: "Le nom de cet apport et ce qui l'explique sont réservés à Premium")) {
                     RecapLignesMasquees(lignes: 3)
                 }
                 .recapApparition(4)
 
-                boutonDeverrouiller("Voir cet apport")
+                boutonDeverrouiller(String(localized: "Voir cet apport"))
                     .recapApparition(5)
             } else {
                 if let pourquoi = apport.pourquoi {
@@ -276,12 +276,12 @@ struct RecapSlideView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .recapApparition(1)
 
-                RecapVoile(titre: "Une autre interaction a été repérée, réservée à Premium") {
+                RecapVoile(titre: String(localized: "Une autre interaction a été repérée, réservée à Premium")) {
                     RecapLignesMasquees(lignes: 2)
                 }
                 .recapApparition(2)
 
-                boutonDeverrouiller("Voir cette interaction")
+                boutonDeverrouiller(String(localized: "Voir cette interaction"))
                     .recapApparition(3)
             } else {
                 Text(interaction.titre)
@@ -363,7 +363,7 @@ struct RecapSlideView: View {
             }
 
             if aliments.autresVerrouilles > 0 {
-                RecapVoile(titre: "\(aliments.autresVerrouilles) autres recommandations sont réservées à Premium") {
+                RecapVoile(titre: String(localized: "\(aliments.autresVerrouilles) autres recommandations sont réservées à Premium")) {
                     Text("\(aliments.autresVerrouilles) autres recommandations")
                         .dsPolice(15, .semibold)
                         .foregroundStyle(Color.dsSecondaire)
@@ -371,7 +371,7 @@ struct RecapSlideView: View {
                 }
                 .recapApparition(3)
 
-                boutonDeverrouiller("Voir les \(aliments.autresVerrouilles) autres")
+                boutonDeverrouiller(String(localized: "Voir les \(aliments.autresVerrouilles) autres"))
                     .recapApparition(4)
             }
         }
@@ -586,8 +586,8 @@ struct RecapCartePartage: View {
             }
 
             HStack(spacing: Theme.spacingSM) {
-                chiffre(carte.besoinsNourris, "besoins nourris", .dsAccent)
-                chiffre(carte.apportsARenforcer, "à surveiller", .dsARenforcerTexte)
+                chiffre(carte.besoinsNourris, String(localized: "besoins nourris"), .dsAccent)
+                chiffre(carte.apportsARenforcer, String(localized: "à surveiller"), .dsARenforcerTexte)
             }
 
             Text("Estimation basée sur mes déclarations.\nNe remplace pas un avis médical.")

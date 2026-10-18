@@ -67,8 +67,8 @@ enum SupplementsV4 {
                     items.append(SupplementPrecaution(
                         icon: "clock.fill",
                         critique: false,
-                        title: "À distance de \(antiLabel)",
-                        note: "Sépare les prises de 2 h pour ne pas gêner l'absorption."
+                        title: String(localized: "À distance de \(Langue.texte(antiLabel))"),
+                        note: String(localized: "Sépare les prises de 2 h pour ne pas gêner l'absorption.")
                     ))
                 }
             }
@@ -91,21 +91,21 @@ enum SupplementsV4 {
         // Le « partenaire » de l'interaction (l'autre nutriment ou le médicament).
         let other = w.nutrients.first { $0 != nutrientID.rawValue } ?? ""
         if let n = NutrientID(rawValue: other) {
-            return "Avec \(SupplementEngine.nutrientLabel(for: n))"
+            return String(localized: "Avec \(Langue.texte(SupplementEngine.nutrientLabel(for: n)))")
         }
         switch other {
-        case "anticoagulant": return "Avec ton anticoagulant"
-        case "ppi": return "Avec ton IPP"
-        case "metformin": return "Avec la metformine"
-        case "grossesse": return "Grossesse"
-        default: return w.severity == .critical ? "À surveiller de près" : "Bon à savoir"
+        case "anticoagulant": return String(localized: "Avec ton anticoagulant")
+        case "ppi": return String(localized: "Avec ton IPP")
+        case "metformin": return String(localized: "Avec la metformine")
+        case "grossesse": return String(localized: "Grossesse")
+        default: return w.severity == .critical ? String(localized: "À surveiller de près") : String(localized: "Bon à savoir")
         }
     }
 
     static func tip(for items: [SupplementPrecaution]) -> String {
         if items.contains(where: \.critique) {
-            return "Parles-en à ton médecin avant de commencer cette cure."
+            return String(localized: "Parles-en à ton médecin avant de commencer cette cure.")
         }
-        return "Décale simplement les prises dans la journée, c'est suffisant."
+        return String(localized: "Décale simplement les prises dans la journée, c'est suffisant.")
     }
 }

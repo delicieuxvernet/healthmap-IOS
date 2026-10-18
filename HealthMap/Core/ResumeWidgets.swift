@@ -32,10 +32,10 @@ enum ResumeWidgets {
     /// widgets).
     static func nomCourt(_ id: String) -> String {
         switch id {
-        case "vitD": return "Vit. D"
-        case "vitB12": return "B12"
-        case "vitC": return "Vit. C"
-        case "magnesium": return "Mg"
+        case "vitD": return String(localized: "Vit. D")
+        case "vitB12": return String(localized: "B12")
+        case "vitC": return String(localized: "Vit. C")
+        case "magnesium": return String(localized: "Mg")
         default: return nom(id)
         }
     }
@@ -52,6 +52,11 @@ enum ResumeWidgets {
 
     private static func estPluriel(_ id: String) -> Bool {
         NomApport.avecArticle(id: id, repli: nom(id)).hasPrefix("les ")
+    }
+
+    /// Le mot « à affiner » (statut trop peu précis), tel que l'app l'écrit.
+    private static func estAAffiner(_ mot: String) -> Bool {
+        mot == "à affiner" || mot == String(localized: "à affiner")
     }
 
     private static func estFeminin(_ id: String) -> Bool {
@@ -123,30 +128,61 @@ enum ResumeWidgets {
     /// couvert, le fer un peu juste. » ; `nil` sans voisin.
     static func autres(principal: ApportW, secondaires: [ApportW], registre: [String: DetailApport] = [:]) -> String? {
         guard let a = secondaires.first else { return nil }
-        let aussi = { (apport: ApportW) in bande(apport, registre: registre) == bande(principal, registre: registre) ? " aussi" : "" }
+        let aussi = { (apport: ApportW) in bande(apport, registre: registre) == bande(principal, registre: registre) }
         let sujetA = NomNutriment.majusculeInitiale(NomApport.avecArticle(id: a.id, repli: a.nom))
-        let verbeA = estPluriel(a.id) ? "sont" : "est"
+        let pluriel = estPluriel(a.id)
         let motA = mot(a, registre: registre)
 
         guard secondaires.count >= 2 else {
-            return "\(sujetA) \(verbeA) \(motA)\(aussi(a))."
+            switch (pluriel, aussi(a)) {
+            case (false, false): return String(localized: "\(sujetA) est \(motA).")
+            case (false, true): return String(localized: "\(sujetA) est \(motA) aussi.")
+            case (true, false): return String(localized: "\(sujetA) sont \(motA).")
+            case (true, true): return String(localized: "\(sujetA) sont \(motA) aussi.")
+            }
         }
         let b = secondaires[1]
         let motB = mot(b, registre: registre)
-        guard bande(a, registre: registre) == bande(b, registre: registre), (motA == "à affiner") == (motB == "à affiner") else {
-            return "\(sujetA) \(verbeA) \(motA), \(NomApport.avecArticle(id: b.id, repli: b.nom)) \(motB)."
+        guard bande(a, registre: registre) == bande(b, registre: registre), estAAffiner(motA) == estAAffiner(motB) else {
+            let sujetB = NomApport.avecArticle(id: b.id, repli: b.nom)
+            return pluriel
+                ? String(localized: "\(sujetA) sont \(motA), \(sujetB) \(motB).")
+                : String(localized: "\(sujetA) est \(motA), \(sujetB) \(motB).")
         }
         // Accord du pluriel : féminin seulement si les deux le sont.
         let feminin = estFeminin(a.id) && estFeminin(b.id)
-        let motPluriel: String
-        switch (bande(a, registre: registre), motA) {
-        case (0, _): motPluriel = feminin ? "basses" : "bas"
-        case (1, "à affiner"): motPluriel = "à affiner"
-        case (1, _): motPluriel = "un peu justes"
-        default: motPluriel = feminin ? "couvertes" : "couverts"
-        }
         let enumeration = NomNutriment.majusculeInitiale(nomSansArticle(a.id))
-        return "\(enumeration) et \(nomSansArticle(b.id)) sont \(motPluriel)\(aussi(a))."
+        let seconde = nomSansArticle(b.id)
+        let aussiA = aussi(a)
+        switch bande(a, registre: registre) {
+        case 0:
+            if feminin {
+                return aussiA
+                    ? String(localized: "\(enumeration) et \(seconde) sont basses aussi.")
+                    : String(localized: "\(enumeration) et \(seconde) sont basses.")
+            }
+            return aussiA
+                ? String(localized: "\(enumeration) et \(seconde) sont bas aussi.")
+                : String(localized: "\(enumeration) et \(seconde) sont bas.")
+        case 1:
+            if estAAffiner(motA) {
+                return aussiA
+                    ? String(localized: "\(enumeration) et \(seconde) sont à affiner aussi.")
+                    : String(localized: "\(enumeration) et \(seconde) sont à affiner.")
+            }
+            return aussiA
+                ? String(localized: "\(enumeration) et \(seconde) sont un peu justes aussi.")
+                : String(localized: "\(enumeration) et \(seconde) sont un peu justes.")
+        default:
+            if feminin {
+                return aussiA
+                    ? String(localized: "\(enumeration) et \(seconde) sont couvertes aussi.")
+                    : String(localized: "\(enumeration) et \(seconde) sont couvertes.")
+            }
+            return aussiA
+                ? String(localized: "\(enumeration) et \(seconde) sont couverts aussi.")
+                : String(localized: "\(enumeration) et \(seconde) sont couverts.")
+        }
     }
 
     /// « Première cause : tes repas notés ces 14 derniers jours. » — seulement
@@ -157,13 +193,13 @@ enum ResumeWidgets {
         guard detail.score < 70,
               let premiere = detail.freins.first(where: { $0.section != .priseDeSang }),
               CauseApport.affichableHorsApp(premiere) else { return nil }
-        return "Première cause : \(LectureApport.enCoursDePhrase(premiere.libelle))."
+        return String(localized: "Première cause : \(LectureApport.enCoursDePhrase(premiere.libelle)).")
     }
 
     /// « Ce qui la remonte », « Ce qui le remonte », « Ce qui les remonte ».
     static func titreAliments(_ id: String) -> String {
-        let pronom = estPluriel(id) ? "les" : (estFeminin(id) ? "la" : "le")
-        return "Ce qui \(pronom) remonte"
+        if estPluriel(id) { return String(localized: "Ce qui les remonte") }
+        return estFeminin(id) ? String(localized: "Ce qui la remonte") : String(localized: "Ce qui le remonte")
     }
 
     /// Les aliments du bilan (rédigés pour la personne, allergies écartées),

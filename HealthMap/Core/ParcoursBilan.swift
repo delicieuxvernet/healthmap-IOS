@@ -30,10 +30,10 @@ enum EtapeBilan: Int, CaseIterable, Identifiable {
 
     var titre: String {
         switch self {
-        case .toi: return "Toi"
-        case .quotidien: return "Ton quotidien"
-        case .forme: return "Ta forme"
-        case .assiette: return "Ton assiette"
+        case .toi: return String(localized: "Toi")
+        case .quotidien: return String(localized: "Ton quotidien")
+        case .forme: return String(localized: "Ta forme")
+        case .assiette: return String(localized: "Ton assiette")
         }
     }
 
@@ -362,22 +362,26 @@ enum ParcoursBilan {
     /// « encore ~2 min 30 », à la demi-minute. Vide quand il ne reste rien.
     static func texteReste(secondes: Int) -> String {
         guard secondes > 0 else { return "" }
-        if secondes < 50 { return "encore moins d'une minute" }
+        if secondes < 50 { return String(localized: "encore moins d'une minute") }
         let demiMinutes = Int((Double(secondes) / 30).rounded())
         let minutes = demiMinutes / 2
-        return demiMinutes % 2 == 1 ? "encore ~\(minutes) min 30" : "encore ~\(minutes) min"
+        return demiMinutes % 2 == 1 ? String(localized: "encore ~\(minutes) min 30") : String(localized: "encore ~\(minutes) min")
     }
 
     /// Le même temps restant, pour VoiceOver : « ~2 min 30 » se lit mal.
     static func texteResteVocal(secondes: Int) -> String {
         guard secondes > 0 else { return "" }
-        if secondes < 50 { return "encore moins d'une minute" }
+        if secondes < 50 { return String(localized: "encore moins d'une minute") }
         let demiMinutes = Int((Double(secondes) / 30).rounded())
         let minutes = demiMinutes / 2
-        let mot = minutes > 1 ? "minutes" : "minute"
-        return demiMinutes % 2 == 1
-            ? "encore environ \(minutes) \(mot) 30"
-            : "encore environ \(minutes) \(mot)"
+        if demiMinutes % 2 == 1 {
+            return minutes > 1
+                ? String(localized: "encore environ \(minutes) minutes 30")
+                : String(localized: "encore environ \(minutes) minute 30")
+        }
+        return minutes > 1
+            ? String(localized: "encore environ \(minutes) minutes")
+            : String(localized: "encore environ \(minutes) minute")
     }
 
     /// Durée du parcours entier, arrondie à la minute : « Environ 3 minutes ».
@@ -391,11 +395,11 @@ enum ParcoursBilan {
         let secondes = ecrans(c).filter { $0.etape == etape }.reduce(0) { $0 + $1.duree }
         if secondes < 60 {
             let arrondi = max(5, Int((Double(secondes) / 5).rounded()) * 5)
-            return "\(arrondi) s"
+            return String(localized: "\(arrondi) s")
         }
         let demiMinutes = Int((Double(secondes) / 30).rounded())
         let minutes = demiMinutes / 2
-        return demiMinutes % 2 == 1 ? "\(minutes) min 30" : "\(minutes) min"
+        return demiMinutes % 2 == 1 ? String(localized: "\(minutes) min 30") : String(localized: "\(minutes) min")
     }
 
     // MARK: La carte du Journal
@@ -407,13 +411,13 @@ enum ParcoursBilan {
 
         let titre: String
         if let etape = ecran.etape {
-            titre = "Étape \(etape.numero) sur \(EtapeBilan.allCases.count) : \(etape.titre)"
+            titre = String(localized: "Étape \(etape.numero) sur \(EtapeBilan.allCases.count) : \(etape.titre)")
         } else if ecran == .accueil {
-            titre = "Prêt à reprendre"
+            titre = String(localized: "Prêt à reprendre")
         } else if ecran.estAffinage {
-            titre = "Tu étais en train de l'affiner"
+            titre = String(localized: "Tu étais en train de l'affiner")
         } else {
-            titre = "Il ne reste qu'à le lire"
+            titre = String(localized: "Il ne reste qu'à le lire")
         }
 
         let reste = texteReste(secondes: secondesRestantes(depuis: ecran, c))

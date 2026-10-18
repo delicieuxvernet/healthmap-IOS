@@ -112,24 +112,29 @@ struct BilanRepasView: View {
         if let selection, viewModel.niveau(de: selection) != nil, let aliment = GroceryCatalog.item(id: selection) {
             let apports = aliment.nutrients.compactMap { NutrientID(rawValue: $0.rawValue) }
             let nom = RepasCatalog.nomCourt(aliment)
-            guard !apports.isEmpty else { return "\(aliment.emoji) \(nom) : noté, dans ton assiette." }
+            guard !apports.isEmpty else { return String(localized: "\(aliment.emoji) \(nom) : noté, dans ton assiette.") }
             let possessifs = apports.prefix(3).map(PistesBilan.possessif)
-            return "\(aliment.emoji) \(nom) : \(Self.liste(possessifs)) en \(possessifs.count > 1 ? "profitent" : "profite")."
+            let enumeration = Self.liste(possessifs)
+            return possessifs.count > 1
+                ? String(localized: "\(aliment.emoji) \(nom) : \(enumeration) en profitent.")
+                : String(localized: "\(aliment.emoji) \(nom) : \(enumeration) en profite.")
         }
         if coches == 0 {
             return repas == .soir
-                ? "Tu n'as rien coché : ton bilan se fera sans ton assiette, il sera moins précis."
-                : "\(repas.titre) : touche ce que tu prends d'habitude, je remplis l'assiette."
+                ? String(localized: "Tu n'as rien coché : ton bilan se fera sans ton assiette, il sera moins précis.")
+                : String(localized: "\(repas.titre) : touche ce que tu prends d'habitude, je remplis l'assiette.")
         }
-        let aliments = coches == 1 ? "1 aliment" : "\(coches) aliments"
-        return "\(aliments) dans ton assiette. \(repas.titre), qu'est-ce que tu prends ?"
+        return coches == 1
+            ? String(localized: "1 aliment dans ton assiette. \(repas.titre), qu'est-ce que tu prends ?")
+            : String(localized: "\(coches) aliments dans ton assiette. \(repas.titre), qu'est-ce que tu prends ?")
     }
 
     /// « a », « a et b », « a, b et c ».
     private static func liste(_ mots: [String]) -> String {
         guard let dernier = mots.last else { return "" }
         guard mots.count > 1 else { return dernier }
-        return mots.dropLast().joined(separator: ", ") + " et " + dernier
+        let debut = mots.dropLast().joined(separator: ", ")
+        return String(localized: "\(debut) et \(dernier)")
     }
 
     // MARK: La grille
@@ -234,7 +239,7 @@ struct BilanRepasView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.dsPress)
-                .accessibilityLabel(nombre > 0 ? "\(autre.titre), \(nombre) cochés" : autre.titre)
+                .accessibilityLabel(nombre > 0 ? Text("\(autre.titre), \(nombre) cochés") : Text(autre.titre))
                 .accessibilityAddTraits(actif ? [.isSelected] : [])
             }
         }
@@ -302,7 +307,7 @@ struct BilanTuileAliment: View {
         .animation(reduceMotion ? nil : Animation.kiwiVif, value: niveau)
         .animation(reduceMotion ? nil : Animation.kiwiVif, value: enReglage)
         .accessibilityLabel(nom)
-        .accessibilityValue(niveau?.libelle ?? "Pas coché")
+        .accessibilityValue(niveau?.libelle ?? String(localized: "Pas coché"))
         .accessibilityAddTraits(coche ? [.isSelected] : [])
     }
 

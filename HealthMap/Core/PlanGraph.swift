@@ -87,24 +87,28 @@ struct PlanGraph: Equatable {
         let apports = proches.filter { $0.genre == .apport }
         switch noeud.genre {
         case .apport:
-            let etat = noeud.statut == .peuPrecise ? "À affiner" : noeud.score.map { "À \($0) %" }
-            let touche = symptomes > 0 ? "touche \(Self.compte(symptomes, "symptôme"))" : nil
+            let etat: String? = noeud.statut == .peuPrecise ? String(localized: "À affiner") : noeud.score.map { String(localized: "À \($0) %") }
+            let touche: String? = symptomes > 0
+                ? (symptomes > 1 ? String(localized: "touche \(symptomes) symptômes") : String(localized: "touche \(symptomes) symptôme"))
+                : nil
             return [etat, touche].compactMap { $0 }.joined(separator: " · ")
         case .symptome:
-            return apports.isEmpty ? "Relié à ton objectif" : "\(Self.compte(apports.count, "apport")) en cause"
+            if apports.isEmpty { return String(localized: "Relié à ton objectif") }
+            return apports.count > 1
+                ? String(localized: "\(apports.count) apports en cause")
+                : String(localized: "\(apports.count) apport en cause")
         case .objectif:
             let suivis = noeud.anneau == 0 ? noeuds.filter { $0.genre == .symptome }.count : symptomes
-            return suivis > 0 ? "\(Self.compte(suivis, "symptôme")) sur le chemin" : "Le centre de ton plan"
+            if suivis <= 0 { return String(localized: "Le centre de ton plan") }
+            return suivis > 1
+                ? String(localized: "\(suivis) symptômes sur le chemin")
+                : String(localized: "\(suivis) symptôme sur le chemin")
         case .habitude:
-            guard let premier = apports.first else { return "Pèse sur tes apports" }
+            guard let premier = apports.first else { return String(localized: "Pèse sur tes apports") }
             return apports.count > 1
-                ? "Freine \(Self.compte(apports.count, "apport"))"
-                : "Freine ton apport en \(premier.nom.lowercased())"
+                ? String(localized: "Freine \(apports.count) apports")
+                : String(localized: "Freine ton apport en \(premier.nom.lowercased())")
         }
-    }
-
-    private static func compte(_ n: Int, _ mot: String) -> String {
-        "\(n) \(mot)\(n > 1 ? "s" : "")"
     }
 }
 
@@ -174,7 +178,7 @@ extension PlanGraph {
         let suivis = Array(symptomes.prefix(symptomesAffiches))
 
         var noeuds: [Noeud] = [
-            Noeud(id: idCentre, genre: .objectif, nom: centre?.nom ?? "Ton équilibre", anneau: 0, angle: 0)
+            Noeud(id: idCentre, genre: .objectif, nom: centre?.nom ?? String(localized: "Ton équilibre"), anneau: 0, angle: 0)
         ]
         var liens: [Lien] = []
 

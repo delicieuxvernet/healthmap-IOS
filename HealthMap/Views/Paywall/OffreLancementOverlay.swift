@@ -103,7 +103,7 @@ struct OffreLancementOverlay: View {
             }
             .padding(.top, 16)
 
-            PremiumAction(titre: "Profiter de l'offre") { fermer(puis: onVoir) }
+            PremiumAction(titre: String(localized: "Profiter de l'offre")) { fermer(puis: onVoir) }
                 .padding(.top, 22)
 
             Button {

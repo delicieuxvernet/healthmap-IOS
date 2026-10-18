@@ -191,13 +191,13 @@ private struct BilanMotif: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
     var body: some View {
-        BilanPage(titre: "Qu'est-ce qui t'amène ?", pourquoi: "Coche tout ce qui te parle : ton bilan regardera ça en premier.") {
+        BilanPage(titre: String(localized: "Qu'est-ce qui t'amène ?"), pourquoi: String(localized: "Coche tout ce qui te parle : ton bilan regardera ça en premier.")) {
             VStack(alignment: .leading, spacing: 8) {
-                BilanEtiquette(texte: "Tu voudrais")
+                BilanEtiquette(texte: String(localized: "Tu voudrais"))
                 BilanPuces(choix: LibellesBilan.choix("goals"), choisies: viewModel.profile.goals) { valeur in
                     viewModel.basculer(valeur, question: "goals")
                 }
-                BilanEtiquette(texte: "Ce qui te gêne en ce moment")
+                BilanEtiquette(texte: String(localized: "Ce qui te gêne en ce moment"))
                     .padding(.top, 8)
                 BilanPuces(choix: LibellesBilan.choix("symptoms"), choisies: viewModel.profile.symptoms) { valeur in
                     viewModel.basculer(valeur, question: "symptoms")
@@ -219,8 +219,8 @@ private struct BilanPrenom: View {
 
     var body: some View {
         BilanPage(
-            titre: "Comment on t'appelle ?",
-            pourquoi: "Pour te parler comme à une personne, pas à un dossier."
+            titre: String(localized: "Comment on t'appelle ?"),
+            pourquoi: String(localized: "Pour te parler comme à une personne, pas à un dossier.")
         ) {
             VStack(spacing: 14) {
                 TextField("Prénom", text: Binding(
@@ -279,36 +279,36 @@ private struct BilanReperes: View {
     private var mesures: String? {
         let p = viewModel.profile
         guard !p.age.isEmpty, !p.height.isEmpty, !p.weight.isEmpty else { return nil }
-        return "🎂 \(p.age) ans · \(p.height) cm · \(p.weight) kg"
+        return String(localized: "🎂 \(p.age) ans · \(p.height) cm · \(p.weight) kg")
     }
 
     var body: some View {
         BilanPage(
-            pourquoi: "Tes besoins en fer, en calcium ou en magnésium en dépendent.",
+            pourquoi: String(localized: "Tes besoins en fer, en calcium ou en magnésium en dépendent."),
             carte: viewModel.carte(pour: .reperes)
         ) {
             BilanQuestions(questions: [
-                BilanQuestion("gender", titre: "Tu es…", resume: BilanResume.de("gender", sexe)) {
+                BilanQuestion("gender", titre: String(localized: "Tu es…"), resume: BilanResume.de("gender", sexe)) {
                     BilanCartes(choix: LibellesBilan.choix("gender"), valeur: sexe) { valeur in
                         viewModel.choisirSexe(valeur)
                     }
                 },
-                BilanQuestion("mesures", titre: "Ton âge, ta taille, ton poids", resume: mesures) {
+                BilanQuestion("mesures", titre: String(localized: "Ton âge, ta taille, ton poids"), resume: mesures) {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(alignment: .top, spacing: 8) {
                             // La molette descend sous 16 ans pour qu'on puisse
                             // dire son vrai âge ; en dessous, rien n'est gardé.
-                            BilanMolette(titre: "Âge", unite: "ans", plage: AgeMinimum.plageMolette, parDefaut: 30, texte: viewModel.profile.age) { valeur in
+                            BilanMolette(titre: String(localized: "Âge"), unite: String(localized: "ans"), plage: AgeMinimum.plageMolette, parDefaut: 30, texte: viewModel.profile.age) { valeur in
                                 viewModel.choisirAge(valeur)
                                 clinDOeil = AgeMinimum.estAtteint(valeur)
                                     ? (FunFactCatalog.fact(for: "age", value: Double(valeur)) ?? clinDOeil)
                                     : ""
                             }
-                            BilanMolette(titre: "Taille", unite: "cm", plage: 140...220, parDefaut: 170, texte: viewModel.profile.height) { valeur in
+                            BilanMolette(titre: String(localized: "Taille"), unite: "cm", plage: 140...220, parDefaut: 170, texte: viewModel.profile.height) { valeur in
                                 viewModel.updateAnswer(questionId: "height", value: String(valeur))
                                 clinDOeil = FunFactCatalog.fact(for: "height", value: Double(valeur)) ?? clinDOeil
                             }
-                            BilanMolette(titre: "Poids", unite: "kg", plage: 35...180, parDefaut: 70, texte: viewModel.profile.weight) { valeur in
+                            BilanMolette(titre: String(localized: "Poids"), unite: "kg", plage: 35...180, parDefaut: 70, texte: viewModel.profile.weight) { valeur in
                                 viewModel.updateAnswer(questionId: "weight", value: String(valeur))
                             }
                         }
@@ -320,7 +320,7 @@ private struct BilanReperes: View {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
-                            Text(clinDOeil.isEmpty ? "Fais glisser chaque molette, ou touche-la si le chiffre est bon." : clinDOeil)
+                            Text(clinDOeil.isEmpty ? String(localized: "Fais glisser chaque molette, ou touche-la si le chiffre est bon.") : clinDOeil)
                                 .font(.dsLegende)
                                 .tracking(DSTracking.legende)
                                 .foregroundStyle(teinte.encre)
@@ -352,16 +352,16 @@ private struct BilanFinDEtape: View {
     }
 
     private func phraseDuKiwi(pistes: Int, prenom: String) -> String {
-        let bravo = prenom.isEmpty ? "Bien joué !" : "Bien joué, \(prenom) !"
+        let bravo = prenom.isEmpty ? String(localized: "Bien joué !") : String(localized: "Bien joué, \(prenom) !")
         switch pistes {
         case 0:
             return etape == .toi
-                ? "\(bravo) Tes besoins sont calculés, à ta mesure."
-                : "\(bravo) Rien à signaler pour l'instant."
+                ? String(localized: "\(bravo) Tes besoins sont calculés, à ta mesure.")
+                : String(localized: "\(bravo) Rien à signaler pour l'instant.")
         case 1:
-            return "\(bravo) J'ai repéré 1 piste. Touche-la pour la découvrir."
+            return String(localized: "\(bravo) J'ai repéré 1 piste. Touche-la pour la découvrir.")
         default:
-            return "\(bravo) J'ai repéré \(pistes) pistes. Touche-les pour les découvrir."
+            return String(localized: "\(bravo) J'ai repéré \(pistes) pistes. Touche-les pour les découvrir.")
         }
     }
 
@@ -382,7 +382,7 @@ private struct BilanFinDEtape: View {
                 .padding(.bottom, 8)
 
                 BilanTitre(
-                    titre: "\(etape.titre) : fait ✓",
+                    titre: String(localized: "\(etape.titre) : fait ✓"),
                     pourquoi: phraseDuKiwi(pistes: pistes.count, prenom: prenom),
                     centre: true
                 )
@@ -401,13 +401,13 @@ private struct BilanFinDEtape: View {
 
                 VStack(spacing: 8) {
                     if etape == .toi {
-                        BilanLigne(emoji: "🎯", titre: "Tes besoins sont calculés", mention: "fait", teinte: .information)
+                        BilanLigne(emoji: "🎯", titre: String(localized: "Tes besoins sont calculés"), mention: String(localized: "fait"), teinte: .information)
                             .bilanCascade(2)
                         if raisons > 0 {
                             BilanLigne(
                                 emoji: "📝",
-                                titre: raisons == 1 ? "1 raison de faire ton bilan" : "\(raisons) raisons de faire ton bilan",
-                                mention: raisons == 1 ? "notée" : "notées",
+                                titre: raisons == 1 ? String(localized: "1 raison de faire ton bilan") : String(localized: "\(raisons) raisons de faire ton bilan"),
+                                mention: raisons == 1 ? String(localized: "notée") : String(localized: "notées"),
                                 teinte: .information
                             )
                             .bilanCascade(3)
@@ -416,7 +416,7 @@ private struct BilanFinDEtape: View {
                     if let suivante {
                         BilanLigne(
                             emoji: suivante.emoji,
-                            titre: "Ensuite : \(suivante.titre)",
+                            titre: String(localized: "Ensuite : \(suivante.titre)"),
                             mention: ParcoursBilan.dureeAnnoncee(suivante, contexte),
                             teinte: suivante.teinte,
                             teintee: true
@@ -439,31 +439,31 @@ private struct BilanSoleil: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
     private static let choixInterieur = OuiNon.choix(
-        oui: ("🏢", "Surtout en intérieur"),
-        non: ("🌳", "Souvent dehors")
+        oui: ("🏢", String(localized: "Surtout en intérieur")),
+        non: ("🌳", String(localized: "Souvent dehors"))
     )
 
     var body: some View {
         let p = viewModel.profile
         BilanPage(
-            pourquoi: "La vitamine D se fabrique surtout dans la peau, au soleil.",
+            pourquoi: String(localized: "La vitamine D se fabrique surtout dans la peau, au soleil."),
             carte: viewModel.carte(pour: .soleil)
         ) {
             BilanQuestions(questions: [
-                BilanQuestion("indoorWork", titre: "Tes journées, tu les passes…", resume: OuiNon.resume(Self.choixInterieur, p.indoorWork)) {
+                BilanQuestion("indoorWork", titre: String(localized: "Tes journées, tu les passes…"), resume: OuiNon.resume(Self.choixInterieur, p.indoorWork)) {
                     BilanCartes(choix: Self.choixInterieur, valeur: p.indoorWork) { valeur in
                         viewModel.updateAnswer(questionId: "indoorWork", value: valeur)
                     }
                 },
-                BilanQuestion("sunExposure", titre: "Ton exposition au soleil", resume: BilanResume.de("sunExposure", p.sunExposure)) {
+                BilanQuestion("sunExposure", titre: String(localized: "Ton exposition au soleil"), resume: BilanResume.de("sunExposure", p.sunExposure)) {
                     BilanCartes(choix: LibellesBilan.choix("sunExposure"), valeur: p.sunExposure, colonnes: 3) { valeur in
                         viewModel.updateAnswer(questionId: "sunExposure", value: valeur)
                     }
                 },
                 BilanQuestion(
                     "skinType",
-                    titre: "Ta peau",
-                    resume: p.skinType.isEmpty ? nil : "Peau " + LibellesBilan.titre("skinType", p.skinType).lowercased()
+                    titre: String(localized: "Ta peau"),
+                    resume: p.skinType.isEmpty ? nil : String(localized: "Peau \(LibellesBilan.titre("skinType", p.skinType).lowercased())")
                 ) {
                     BilanNuancier(choix: LibellesBilan.choix("skinType"), valeur: p.skinType) { valeur in
                         viewModel.updateAnswer(questionId: "skinType", value: valeur)
@@ -494,15 +494,15 @@ private struct BilanBouger: View {
     }
 
     private let choixVoulu = [
-        ChoixBilan(id: "oui", emoji: "🎯", titre: "Oui, voulu"),
-        ChoixBilan(id: "non", emoji: "🤷", titre: "Non, sans le vouloir"),
+        ChoixBilan(id: "oui", emoji: "🎯", titre: String(localized: "Oui, voulu")),
+        ChoixBilan(id: "non", emoji: "🤷", titre: String(localized: "Non, sans le vouloir")),
     ]
 
     private var questions: [BilanQuestion] {
         var liste = [
             BilanQuestion(
                 "strengthTraining",
-                titre: "Ton activité, par semaine",
+                titre: String(localized: "Ton activité, par semaine"),
                 resume: BilanResume.de("strengthTraining", viewModel.profile.strengthTraining)
             ) {
                 BilanCartes(choix: LibellesBilan.choix("strengthTraining"), valeur: viewModel.profile.strengthTraining, colonnes: 3) { valeur in
@@ -511,8 +511,8 @@ private struct BilanBouger: View {
             },
             BilanQuestion(
                 "sens",
-                titre: "Ton poids, ces derniers mois",
-                resume: sens.map { "\($0.emoji) Poids \($0.titre.lowercased())" }
+                titre: String(localized: "Ton poids, ces derniers mois"),
+                resume: sens.map { String(localized: "\($0.emoji) Poids \($0.titre.lowercased())") }
             ) {
                 BilanCartes(choix: choixDuSens, valeur: sens?.rawValue ?? "", colonnes: 3) { valeur in
                     choisirSens(valeur)
@@ -521,7 +521,7 @@ private struct BilanBouger: View {
         ]
         if let sens, sens != .stable {
             liste.append(
-                BilanQuestion("voulu", titre: "C'était voulu ?", resume: OuiNon.resume(choixVoulu, voulu)) {
+                BilanQuestion("voulu", titre: String(localized: "C'était voulu ?"), resume: OuiNon.resume(choixVoulu, voulu)) {
                     BilanCartes(choix: choixVoulu, valeur: voulu) { valeur in
                         guard let tendance = LibellesBilan.tendance(sens, voulu: valeur == "oui") else { return }
                         viewModel.updateAnswer(questionId: "weightTrend", value: tendance)
@@ -534,7 +534,7 @@ private struct BilanBouger: View {
 
     var body: some View {
         BilanPage(
-            pourquoi: "Le sport augmente tes besoins en magnésium, en fer et en zinc.",
+            pourquoi: String(localized: "Le sport augmente tes besoins en magnésium, en fer et en zinc."),
             carte: viewModel.carte(pour: .bouger)
         ) {
             BilanQuestions(questions: questions)
@@ -561,7 +561,7 @@ private struct BilanBoire: View {
     private var questions: [BilanQuestion] {
         let p = viewModel.profile
         var liste = [
-            BilanQuestion("caffeineIntake", titre: "Cafés ou thés, par jour", resume: BilanResume.de("caffeineIntake", p.caffeineIntake)) {
+            BilanQuestion("caffeineIntake", titre: String(localized: "Cafés ou thés, par jour"), resume: BilanResume.de("caffeineIntake", p.caffeineIntake)) {
                 BilanCartes(choix: LibellesBilan.choix("caffeineIntake"), valeur: p.caffeineIntake) { valeur in
                     viewModel.choisirCafe(valeur)
                 }
@@ -569,7 +569,7 @@ private struct BilanBoire: View {
         ]
         if ParcoursBilan.cafeDemandeLeMoment(p) {
             liste.append(
-                BilanQuestion("caffeineTiming", titre: "Tu les bois plutôt…", resume: BilanResume.de("caffeineTiming", p.caffeineTiming)) {
+                BilanQuestion("caffeineTiming", titre: String(localized: "Tu les bois plutôt…"), resume: BilanResume.de("caffeineTiming", p.caffeineTiming)) {
                     BilanCartes(choix: LibellesBilan.choix("caffeineTiming"), valeur: p.caffeineTiming, colonnes: 3) { valeur in
                         viewModel.updateAnswer(questionId: "caffeineTiming", value: valeur)
                     }
@@ -577,7 +577,7 @@ private struct BilanBoire: View {
             )
         }
         liste.append(
-            BilanQuestion("waterIntake", titre: "Verres d'eau, par jour", resume: BilanResume.de("waterIntake", p.waterIntake)) {
+            BilanQuestion("waterIntake", titre: String(localized: "Verres d'eau, par jour"), resume: BilanResume.de("waterIntake", p.waterIntake)) {
                 BilanCartes(choix: LibellesBilan.choix("waterIntake"), valeur: p.waterIntake, colonnes: 3) { valeur in
                     viewModel.updateAnswer(questionId: "waterIntake", value: valeur)
                 }
@@ -588,7 +588,7 @@ private struct BilanBoire: View {
 
     var body: some View {
         BilanPage(
-            pourquoi: "Le café pendant le repas freine l'absorption du fer.",
+            pourquoi: String(localized: "Le café pendant le repas freine l'absorption du fer."),
             carte: viewModel.carte(pour: .boire)
         ) {
             BilanQuestions(questions: questions)
@@ -599,7 +599,7 @@ private struct BilanBoire: View {
 private struct BilanAlcoolTabac: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
-    private static let choixTabac = OuiNon.choix(oui: ("🚬", "Oui"), non: ("🚭", "Non"))
+    private static let choixTabac = OuiNon.choix(oui: ("🚬", String(localized: "Oui")), non: ("🚭", String(localized: "Non")))
 
     /// Le tabac porte une valeur par défaut (« non ») : il ne s'affiche
     /// répondu qu'une fois touché.
@@ -611,16 +611,16 @@ private struct BilanAlcoolTabac: View {
     var body: some View {
         let p = viewModel.profile
         BilanPage(
-            pourquoi: "Les deux pèsent sur plusieurs de tes apports.",
+            pourquoi: String(localized: "Les deux pèsent sur plusieurs de tes apports."),
             carte: viewModel.carte(pour: .alcoolTabac)
         ) {
             BilanQuestions(questions: [
-                BilanQuestion("alcohol", titre: "L'alcool, pour toi", resume: BilanResume.de("alcohol", p.alcohol)) {
+                BilanQuestion("alcohol", titre: String(localized: "L'alcool, pour toi"), resume: BilanResume.de("alcohol", p.alcohol)) {
                     BilanCartes(choix: LibellesBilan.choix("alcohol"), valeur: p.alcohol, colonnes: 3) { valeur in
                         viewModel.updateAnswer(questionId: "alcohol", value: valeur)
                     }
                 },
-                BilanQuestion("smoking", titre: "Tu fumes ?", resume: OuiNon.resume(Self.choixTabac, tabac)) {
+                BilanQuestion("smoking", titre: String(localized: "Tu fumes ?"), resume: OuiNon.resume(Self.choixTabac, tabac)) {
                     BilanCartes(choix: Self.choixTabac, valeur: tabac) { valeur in
                         viewModel.updateAnswer(questionId: "smoking", value: valeur)
                     }
@@ -638,17 +638,17 @@ private struct BilanRessenti: View {
     var body: some View {
         let p = viewModel.profile
         BilanPage(
-            pourquoi: "Sous stress, le corps consomme plus de magnésium.",
+            pourquoi: String(localized: "Sous stress, le corps consomme plus de magnésium."),
             carte: viewModel.carte(pour: .ressenti)
         ) {
             BilanQuestions(questions: [
-                BilanQuestion("stressLevel", titre: "Ton stress, en ce moment", resume: BilanResume.de("stressLevel", p.stressLevel), attente: 1.1) {
-                    BilanVisage(titre: "Ton stress", choix: LibellesBilan.choix("stressLevel"), valeur: p.stressLevel) { valeur in
+                BilanQuestion("stressLevel", titre: String(localized: "Ton stress, en ce moment"), resume: BilanResume.de("stressLevel", p.stressLevel), attente: 1.1) {
+                    BilanVisage(titre: String(localized: "Ton stress"), choix: LibellesBilan.choix("stressLevel"), valeur: p.stressLevel) { valeur in
                         viewModel.updateAnswer(questionId: "stressLevel", value: valeur)
                     }
                 },
-                BilanQuestion("wakeFeeling", titre: "Au réveil, tu te sens…", resume: BilanResume.de("wakeFeeling", p.wakeFeeling), attente: 1.1) {
-                    BilanVisage(titre: "Au réveil", choix: LibellesBilan.choix("wakeFeeling"), valeur: p.wakeFeeling) { valeur in
+                BilanQuestion("wakeFeeling", titre: String(localized: "Au réveil, tu te sens…"), resume: BilanResume.de("wakeFeeling", p.wakeFeeling), attente: 1.1) {
+                    BilanVisage(titre: String(localized: "Au réveil"), choix: LibellesBilan.choix("wakeFeeling"), valeur: p.wakeFeeling) { valeur in
                         viewModel.updateAnswer(questionId: "wakeFeeling", value: valeur)
                     }
                 },
@@ -663,27 +663,27 @@ private struct BilanNuits: View {
     var body: some View {
         let p = viewModel.profile
         BilanPage(
-            pourquoi: "Des nuits courtes pèsent sur le magnésium et la vitamine D.",
+            pourquoi: String(localized: "Des nuits courtes pèsent sur le magnésium et la vitamine D."),
             carte: viewModel.carte(pour: .nuits)
         ) {
             BilanQuestions(questions: [
                 BilanQuestion(
                     "screenBeforeBed",
-                    titre: "Les écrans, avant de dormir",
+                    titre: String(localized: "Les écrans, avant de dormir"),
                     resume: BilanResume.de("screenBeforeBed", p.screenBeforeBed),
                     attente: 1.1
                 ) {
-                    BilanVisage(titre: "Écrans avant de dormir", choix: LibellesBilan.choix("screenBeforeBed"), valeur: p.screenBeforeBed) { valeur in
+                    BilanVisage(titre: String(localized: "Écrans avant de dormir"), choix: LibellesBilan.choix("screenBeforeBed"), valeur: p.screenBeforeBed) { valeur in
                         viewModel.updateAnswer(questionId: "screenBeforeBed", value: valeur)
                     }
                 },
                 BilanQuestion(
                     "sleepHours",
-                    titre: "Tu dors, par nuit…",
+                    titre: String(localized: "Tu dors, par nuit…"),
                     resume: BilanResume.de("sleepHours", p.sleepHours),
                     attente: 1.1
                 ) {
-                    BilanVisage(titre: "Tu dors", choix: LibellesBilan.choix("sleepHours"), valeur: p.sleepHours) { valeur in
+                    BilanVisage(titre: String(localized: "Tu dors"), choix: LibellesBilan.choix("sleepHours"), valeur: p.sleepHours) { valeur in
                         viewModel.updateAnswer(questionId: "sleepHours", value: valeur)
                     }
                 },
@@ -695,20 +695,20 @@ private struct BilanNuits: View {
 private struct BilanVentre: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
-    private static let choixBallonnements = OuiNon.choix(oui: ("🎈", "Oui, souvent"), non: ("🙂", "Non"))
-    private static let choixAntibiotiques = OuiNon.choix(oui: ("💊", "Oui"), non: ("🙅", "Non"))
+    private static let choixBallonnements = OuiNon.choix(oui: ("🎈", String(localized: "Oui, souvent")), non: ("🙂", String(localized: "Non")))
+    private static let choixAntibiotiques = OuiNon.choix(oui: ("💊", String(localized: "Oui")), non: ("🙅", String(localized: "Non")))
 
     var body: some View {
         let p = viewModel.profile
         BilanPage(
-            pourquoi: "Une digestion bousculée absorbe moins bien certains apports.",
+            pourquoi: String(localized: "Une digestion bousculée absorbe moins bien certains apports."),
             carte: viewModel.carte(pour: .ventre)
         ) {
             BilanQuestions(questions: [
                 BilanQuestion(
                     "bloating",
-                    titre: "Des ballonnements, souvent ?",
-                    resume: OuiNon.resume(Self.choixBallonnements, p.bloating).map { "Ballonnements : " + $0 }
+                    titre: String(localized: "Des ballonnements, souvent ?"),
+                    resume: OuiNon.resume(Self.choixBallonnements, p.bloating).map { String(localized: "Ballonnements : \($0)") }
                 ) {
                     BilanCartes(choix: Self.choixBallonnements, valeur: p.bloating) { valeur in
                         viewModel.updateAnswer(questionId: "bloating", value: valeur)
@@ -716,8 +716,8 @@ private struct BilanVentre: View {
                 },
                 BilanQuestion(
                     "antibiotics",
-                    titre: "Des antibiotiques récemment ?",
-                    resume: OuiNon.resume(Self.choixAntibiotiques, p.antibiotics).map { "Antibiotiques : " + $0 }
+                    titre: String(localized: "Des antibiotiques récemment ?"),
+                    resume: OuiNon.resume(Self.choixAntibiotiques, p.antibiotics).map { String(localized: "Antibiotiques : \($0)") }
                 ) {
                     BilanCartes(choix: Self.choixAntibiotiques, valeur: p.antibiotics) { valeur in
                         viewModel.updateAnswer(questionId: "antibiotics", value: valeur)
@@ -741,11 +741,11 @@ private struct BilanCycle: View {
         let regles = touchee("periodFlow", viewModel.profile.periodFlow)
         let grossesse = touchee("pregnancyStatus", viewModel.profile.pregnancyStatus)
         BilanPage(
-            pourquoi: "Les règles et la grossesse changent tes besoins en fer.",
+            pourquoi: String(localized: "Les règles et la grossesse changent tes besoins en fer."),
             carte: viewModel.carte(pour: .cycle)
         ) {
             BilanQuestions(questions: [
-                BilanQuestion("periodFlow", titre: "Tes règles", resume: BilanResume.de("periodFlow", regles).map { "Règles : " + $0 }) {
+                BilanQuestion("periodFlow", titre: String(localized: "Tes règles"), resume: BilanResume.de("periodFlow", regles).map { String(localized: "Règles : \($0)") }) {
                     BilanGrille(
                         choix: LibellesBilan.choix("periodFlow"),
                         choisies: regles.isEmpty ? [] : [regles],
@@ -754,7 +754,7 @@ private struct BilanCycle: View {
                         viewModel.updateAnswer(questionId: "periodFlow", value: valeur)
                     }
                 },
-                BilanQuestion("pregnancyStatus", titre: "En ce moment", resume: BilanResume.de("pregnancyStatus", grossesse)) {
+                BilanQuestion("pregnancyStatus", titre: String(localized: "En ce moment"), resume: BilanResume.de("pregnancyStatus", grossesse)) {
                     BilanGrille(
                         choix: LibellesBilan.choix("pregnancyStatus"),
                         choisies: grossesse.isEmpty ? [] : [grossesse]
@@ -778,11 +778,11 @@ private struct BilanRegime: View {
 
     var body: some View {
         BilanPage(
-            pourquoi: "Elle dit d'où viennent ton fer, ta B12 et ton zinc.",
+            pourquoi: String(localized: "Elle dit d'où viennent ton fer, ta B12 et ton zinc."),
             carte: viewModel.carte(pour: .regime)
         ) {
             BilanQuestions(questions: [
-                BilanQuestion("dietType", titre: "Ta façon de manger", resume: BilanResume.de("dietType", regime)) {
+                BilanQuestion("dietType", titre: String(localized: "Ta façon de manger"), resume: BilanResume.de("dietType", regime)) {
                     BilanGrille(
                         choix: LibellesBilan.choix("dietType"),
                         colonnes: 3,
@@ -809,8 +809,8 @@ private struct BilanProvisoire: View {
     var body: some View {
         let lecture = viewModel.lectureBilan
         BilanPage(
-            titre: "Ce qu'on voit déjà",
-            pourquoi: "Ton mode de vie a parlé. Ton assiette pèse le plus lourd : c'est elle qui tranche. À table !"
+            titre: String(localized: "Ce qu'on voit déjà"),
+            pourquoi: String(localized: "Ton mode de vie a parlé. Ton assiette pèse le plus lourd : c'est elle qui tranche. À table !")
         ) {
             LazyVGrid(columns: colonnes, spacing: 6) {
                 ForEach(NutrientData.all) { apport in
@@ -884,8 +884,8 @@ private struct BilanJamais: View {
 
     var body: some View {
         BilanPage(
-            titre: "Des aliments que tu ne manges jamais ?",
-            pourquoi: "Par goût, par choix ou parce que tu ne les supportes pas. Ton bilan en tient compte.",
+            titre: String(localized: "Des aliments que tu ne manges jamais ?"),
+            pourquoi: String(localized: "Par goût, par choix ou parce que tu ne les supportes pas. Ton bilan en tient compte."),
             carte: viewModel.carte(pour: .jamais)
         ) {
             BilanGrille(
@@ -908,21 +908,21 @@ private struct BilanATable: View {
     var body: some View {
         let p = viewModel.profile
         BilanPage(
-            pourquoi: "Le rythme et la cuisson changent ce que ton assiette te donne vraiment.",
+            pourquoi: String(localized: "Le rythme et la cuisson changent ce que ton assiette te donne vraiment."),
             carte: viewModel.carte(pour: .aTable)
         ) {
             BilanQuestions(questions: [
-                BilanQuestion("mealsPerDay", titre: "Tes repas, par jour", resume: BilanResume.de("mealsPerDay", p.mealsPerDay).map { "🍽️ " + $0 + " repas" }) {
+                BilanQuestion("mealsPerDay", titre: String(localized: "Tes repas, par jour"), resume: BilanResume.de("mealsPerDay", p.mealsPerDay).map { String(localized: "🍽️ \($0) repas") }) {
                     BilanCartes(choix: LibellesBilan.choix("mealsPerDay"), valeur: p.mealsPerDay) { valeur in
                         viewModel.updateAnswer(questionId: "mealsPerDay", value: valeur)
                     }
                 },
-                BilanQuestion("homeCookedPct", titre: "Ce qui est fait maison", resume: BilanResume.de("homeCookedPct", p.homeCookedPct).map { "🏠 " + $0 }) {
+                BilanQuestion("homeCookedPct", titre: String(localized: "Ce qui est fait maison"), resume: BilanResume.de("homeCookedPct", p.homeCookedPct).map { "🏠 " + $0 }) {
                     BilanCartes(choix: LibellesBilan.choix("homeCookedPct"), valeur: p.homeCookedPct, colonnes: 3) { valeur in
                         viewModel.updateAnswer(questionId: "homeCookedPct", value: valeur)
                     }
                 },
-                BilanQuestion("cookingMethod", titre: "Ta cuisson la plus fréquente", resume: BilanResume.de("cookingMethod", p.cookingMethod).map { "🍳 " + $0 }) {
+                BilanQuestion("cookingMethod", titre: String(localized: "Ta cuisson la plus fréquente"), resume: BilanResume.de("cookingMethod", p.cookingMethod).map { "🍳 " + $0 }) {
                     BilanCartes(choix: LibellesBilan.choix("cookingMethod"), valeur: p.cookingMethod, colonnes: 3) { valeur in
                         viewModel.updateAnswer(questionId: "cookingMethod", value: valeur)
                     }
@@ -935,37 +935,37 @@ private struct BilanATable: View {
 private struct BilanPlacard: View {
     @EnvironmentObject var viewModel: QuestionnaireViewModel
 
-    private static let choixFoie = OuiNon.choix(oui: ("🫀", "Oui"), non: ("🙅", "Non"))
-    private static let choixGlucides = OuiNon.choix(oui: ("🥩", "Oui"), non: ("🍝", "Non"))
+    private static let choixFoie = OuiNon.choix(oui: ("🫀", String(localized: "Oui")), non: ("🙅", String(localized: "Non")))
+    private static let choixGlucides = OuiNon.choix(oui: ("🥩", String(localized: "Oui")), non: ("🍝", String(localized: "Non")))
 
     var body: some View {
         let p = viewModel.profile
         BilanPage(
-            pourquoi: "Le pain complet apporte fibres et magnésium, le sel iodé de l'iode.",
+            pourquoi: String(localized: "Le pain complet apporte fibres et magnésium, le sel iodé de l'iode."),
             carte: viewModel.carte(pour: .placard)
         ) {
             BilanQuestions(questions: [
-                BilanQuestion("breadType", titre: "Ton pain", resume: BilanResume.de("breadType", p.breadType).map { "🍞 " + $0 }) {
+                BilanQuestion("breadType", titre: String(localized: "Ton pain"), resume: BilanResume.de("breadType", p.breadType).map { "🍞 " + $0 }) {
                     BilanCartes(choix: LibellesBilan.choix("breadType"), valeur: p.breadType) { valeur in
                         viewModel.updateAnswer(questionId: "breadType", value: valeur)
                     }
                 },
-                BilanQuestion("saltLevel", titre: "Le sel, dans tes plats", resume: BilanResume.de("saltLevel", p.saltLevel).map { "🧂 " + $0 }) {
+                BilanQuestion("saltLevel", titre: String(localized: "Le sel, dans tes plats"), resume: BilanResume.de("saltLevel", p.saltLevel).map { "🧂 " + $0 }) {
                     BilanCartes(choix: LibellesBilan.choix("saltLevel"), valeur: p.saltLevel) { valeur in
                         viewModel.updateAnswer(questionId: "saltLevel", value: valeur)
                     }
                 },
-                BilanQuestion("iodizedSalt", titre: "Ton sel est iodé ?", resume: BilanResume.de("iodizedSalt", p.iodizedSalt).map { "Sel iodé : " + $0 }) {
+                BilanQuestion("iodizedSalt", titre: String(localized: "Ton sel est iodé ?"), resume: BilanResume.de("iodizedSalt", p.iodizedSalt).map { String(localized: "Sel iodé : \($0)") }) {
                     BilanCartes(choix: LibellesBilan.choix("iodizedSalt"), valeur: p.iodizedSalt, colonnes: 3) { valeur in
                         viewModel.updateAnswer(questionId: "iodizedSalt", value: valeur)
                     }
                 },
-                BilanQuestion("eatLiver", titre: "Du foie ou des abats ?", resume: OuiNon.resume(Self.choixFoie, p.eatLiver).map { "Abats : " + $0 }) {
+                BilanQuestion("eatLiver", titre: String(localized: "Du foie ou des abats ?"), resume: OuiNon.resume(Self.choixFoie, p.eatLiver).map { String(localized: "Abats : \($0)") }) {
                     BilanCartes(choix: Self.choixFoie, valeur: p.eatLiver) { valeur in
                         viewModel.updateAnswer(questionId: "eatLiver", value: valeur)
                     }
                 },
-                BilanQuestion("lowCarbDiet", titre: "Très peu de glucides ?", resume: OuiNon.resume(Self.choixGlucides, p.lowCarbDiet).map { "Peu de glucides : " + $0 }) {
+                BilanQuestion("lowCarbDiet", titre: String(localized: "Très peu de glucides ?"), resume: OuiNon.resume(Self.choixGlucides, p.lowCarbDiet).map { String(localized: "Peu de glucides : \($0)") }) {
                     BilanCartes(choix: Self.choixGlucides, valeur: p.lowCarbDiet) { valeur in
                         viewModel.updateAnswer(questionId: "lowCarbDiet", value: valeur)
                     }
@@ -981,14 +981,14 @@ private struct BilanEcarts: View {
     var body: some View {
         let p = viewModel.profile
         BilanPage(
-            pourquoi: "Les produits très transformés prennent la place des fibres et du zinc.",
+            pourquoi: String(localized: "Les produits très transformés prennent la place des fibres et du zinc."),
             carte: viewModel.carte(pour: .ecarts)
         ) {
             BilanQuestions(questions: [
                 BilanQuestion(
                     "fermentedFoods",
-                    titre: "Yaourt, kéfir, choucroute…",
-                    resume: BilanResume.de("fermentedFoods", p.fermentedFoods).map { "🥛 Fermentés : " + $0.lowercased() }
+                    titre: String(localized: "Yaourt, kéfir, choucroute…"),
+                    resume: BilanResume.de("fermentedFoods", p.fermentedFoods).map { String(localized: "🥛 Fermentés : \($0.lowercased())") }
                 ) {
                     BilanCartes(choix: LibellesBilan.choix("fermentedFoods"), valeur: p.fermentedFoods) { valeur in
                         viewModel.updateAnswer(questionId: "fermentedFoods", value: valeur)
@@ -996,8 +996,8 @@ private struct BilanEcarts: View {
                 },
                 BilanQuestion(
                     "ultraProcessedFrequency",
-                    titre: "Plats tout prêts, biscuits, sodas",
-                    resume: BilanResume.de("ultraProcessedFrequency", p.ultraProcessedFrequency).map { "🍪 Tout prêt : " + $0.lowercased() }
+                    titre: String(localized: "Plats tout prêts, biscuits, sodas"),
+                    resume: BilanResume.de("ultraProcessedFrequency", p.ultraProcessedFrequency).map { String(localized: "🍪 Tout prêt : \($0.lowercased())") }
                 ) {
                     BilanCartes(choix: LibellesBilan.choix("ultraProcessedFrequency"), valeur: p.ultraProcessedFrequency, colonnes: 3) { valeur in
                         viewModel.updateAnswer(questionId: "ultraProcessedFrequency", value: valeur)
@@ -1005,8 +1005,8 @@ private struct BilanEcarts: View {
                 },
                 BilanQuestion(
                     "snacking",
-                    titre: "Le grignotage",
-                    resume: BilanResume.de("snacking", p.snacking).map { "🥨 Grignotage : " + $0.lowercased() }
+                    titre: String(localized: "Le grignotage"),
+                    resume: BilanResume.de("snacking", p.snacking).map { String(localized: "🥨 Grignotage : \($0.lowercased())") }
                 ) {
                     BilanCartes(choix: LibellesBilan.choix("snacking"), valeur: p.snacking) { valeur in
                         viewModel.updateAnswer(questionId: "snacking", value: valeur)
@@ -1027,17 +1027,17 @@ private struct BilanListe: View {
 
     private var titre: String {
         switch ecran {
-        case .complements: return "Ce que tu prends déjà"
-        case .traitements: return "Tes traitements"
-        default: return "Autre chose à savoir ?"
+        case .complements: return String(localized: "Ce que tu prends déjà")
+        case .traitements: return String(localized: "Tes traitements")
+        default: return String(localized: "Autre chose à savoir ?")
         }
     }
 
     private var pourquoi: String {
         switch ecran {
-        case .complements: return "Pour compter ce que tu prends, et ne pas te le conseiller en double."
-        case .traitements: return "Certains changent l'absorption de la B12, du magnésium ou du fer."
-        default: return "Pour que nos conseils restent prudents."
+        case .complements: return String(localized: "Pour compter ce que tu prends, et ne pas te le conseiller en double.")
+        case .traitements: return String(localized: "Certains changent l'absorption de la B12, du magnésium ou du fer.")
+        default: return String(localized: "Pour que nos conseils restent prudents.")
         }
     }
 
@@ -1059,12 +1059,12 @@ private struct BilanDigestion: View {
 
     var body: some View {
         BilanPage(
-            titre: "Ta digestion",
-            pourquoi: "Un intestin fragile ou une opération change ce que tu absorbes.",
+            titre: String(localized: "Ta digestion"),
+            pourquoi: String(localized: "Un intestin fragile ou une opération change ce que tu absorbes."),
             carte: viewModel.carte(pour: .digestion)
         ) {
             VStack(alignment: .leading, spacing: 8) {
-                BilanEtiquette(texte: "Aujourd'hui")
+                BilanEtiquette(texte: String(localized: "Aujourd'hui"))
                 BilanPuces(
                     choix: LibellesBilan.choix("digestiveConditions"),
                     choisies: viewModel.profile.digestiveConditions,
@@ -1072,7 +1072,7 @@ private struct BilanDigestion: View {
                 ) { valeur in
                     viewModel.basculer(valeur, question: "digestiveConditions")
                 }
-                BilanEtiquette(texte: "Une opération a touché ton système digestif ?")
+                BilanEtiquette(texte: String(localized: "Une opération a touché ton système digestif ?"))
                     .padding(.top, 8)
                 BilanPuces(
                     choix: LibellesBilan.choix("surgicalHistory"),
@@ -1111,7 +1111,7 @@ private struct BilanFin: View {
                 .padding(.bottom, 12)
 
                 BilanTitre(
-                    titre: prenom.isEmpty ? "Ton bilan est prêt" : "\(prenom), ton bilan est prêt",
+                    titre: prenom.isEmpty ? String(localized: "Ton bilan est prêt") : String(localized: "\(prenom), ton bilan est prêt"),
                     pourquoi: synthese.phrase,
                     centre: true
                 )
@@ -1145,8 +1145,8 @@ private struct BilanFin: View {
 
                         Text(
                             viewModel.resteAAffiner
-                                ? "Deux minutes de plus (traitements, habitudes à table) pour le compléter. Maintenant, ou plus tard depuis les Réglages."
-                                : "Tu as répondu à tout : ton bilan part sur des bases complètes."
+                                ? String(localized: "Deux minutes de plus (traitements, habitudes à table) pour le compléter. Maintenant, ou plus tard depuis les Réglages.")
+                                : String(localized: "Tu as répondu à tout : ton bilan part sur des bases complètes.")
                         )
                         .font(.dsLegende)
                         .tracking(DSTracking.legende)

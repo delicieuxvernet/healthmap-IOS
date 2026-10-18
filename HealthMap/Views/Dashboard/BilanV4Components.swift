@@ -48,7 +48,7 @@ struct RecolteDetailSheet: View {
                     VStack(alignment: .leading, spacing: 2) {
                         (Text(DS.entier(streak))
                             .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
-                            + Text(streak > 1 ? " jours d'affilée" : " jour d'affilée")
+                            + Text(streak > 1 ? String(localized: " jours d'affilée") : String(localized: " jour d'affilée"))
                                 .font(.dsHeadline))
                             .tracking(-0.4)
                             .foregroundStyle(Color.dsTexte)
@@ -114,7 +114,7 @@ struct RecolteDetailSheet: View {
                     .font(.dsSousTitreFort)
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
-                Text("Débloqué à \(rung.threshold) jour\(rung.threshold > 1 ? "s" : "") d'affilée")
+                Text(rung.threshold > 1 ? String(localized: "Débloqué à \(rung.threshold) jours d'affilée") : String(localized: "Débloqué à \(rung.threshold) jour d'affilée"))
                     .font(.dsLegende)
                     .tracking(DSTracking.legende)
                     .foregroundStyle(Color.dsSecondaire)

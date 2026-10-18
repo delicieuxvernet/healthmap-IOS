@@ -191,11 +191,11 @@ struct EditProfileView: View {
             if healthLinked {
                 DSSeparator(retrait: Self.retraitPastille)
                 VStack(spacing: 0) {
-                    healthRow(icon: "figure.walk", label: "Activité", value: stepsDisplay(healthSnapshot))
+                    healthRow(icon: "figure.walk", label: String(localized: "Activité"), value: stepsDisplay(healthSnapshot))
                     DSSeparator(retrait: Self.retraitPastille)
-                    healthRow(icon: "scalemass", label: "Poids", value: weightDisplay(healthSnapshot))
+                    healthRow(icon: "scalemass", label: String(localized: "Poids"), value: weightDisplay(healthSnapshot))
                     DSSeparator(retrait: Self.retraitPastille)
-                    healthRow(icon: "moon.fill", label: "Sommeil", value: sleepDisplay(healthSnapshot))
+                    healthRow(icon: "moon.fill", label: String(localized: "Sommeil"), value: sleepDisplay(healthSnapshot))
                 }
             } else if HealthKitService.shared.isAvailable {
                 Button { connectHealth() } label: {
@@ -205,7 +205,7 @@ struct EditProfileView: View {
                         } else {
                             Image(systemName: "link").font(.system(size: 15))
                         }
-                        Text(healthSyncing ? "Connexion…" : "Connecter Apple Santé")
+                        Text(healthSyncing ? String(localized: "Connexion…") : String(localized: "Connecter Apple Santé"))
                     }
                     .font(.dsHeadline)
                     .foregroundStyle(.white)
@@ -292,7 +292,7 @@ struct EditProfileView: View {
             let granted = await HealthKitService.shared.requestAuthorization()
             guard granted else {
                 healthSyncing = false
-                healthNote = "Autorisation refusée. Tu peux l'activer dans Réglages > Santé."
+                healthNote = String(localized: "Autorisation refusée. Tu peux l'activer dans Réglages > Santé.")
                 HapticService.shared.error()
                 return
             }
@@ -302,7 +302,7 @@ struct EditProfileView: View {
             applyHealthSnapshot(snap)
             healthSyncing = false
             if snap.isEmpty {
-                healthNote = "Connecté, mais aucune donnée partagée pour l'instant."
+                healthNote = String(localized: "Connecté, mais aucune donnée partagée pour l'instant.")
                 HapticService.shared.success()
             } else {
                 HapticService.shared.success()
@@ -330,7 +330,7 @@ struct EditProfileView: View {
 
     private func stepsDisplay(_ snap: HealthKitService.HealthSnapshot?) -> String {
         guard let steps = snap?.steps else { return "—" }
-        return "\(steps) pas"
+        return String(localized: "\(steps) pas")
     }
 
     private func weightDisplay(_ snap: HealthKitService.HealthSnapshot?) -> String {
@@ -342,7 +342,7 @@ struct EditProfileView: View {
         guard let hours = snap?.sleepHours else { return "—" }
         let whole = Int(hours)
         let mins = Int((hours - Double(whole)) * 60)
-        return "\(whole) h \(String(format: "%02d", mins))"
+        return String(localized: "\(whole) h \(String(format: "%02d", mins))")
     }
 
     // MARK: - Section Card
@@ -357,7 +357,7 @@ struct EditProfileView: View {
                 HStack(spacing: 12) {
                     ReglagePastille(symbole: section.icon, encre: section.color)
 
-                    Text(section.rawValue)
+                    Text(Langue.texte(section.rawValue))
                         .font(.dsCorps)
                         .tracking(DSTracking.corps)
                         .foregroundStyle(Color.dsTexte)
@@ -473,13 +473,13 @@ struct EditProfileView: View {
 
         guard SupabaseService.shared.safeClient != nil else {
             isSaving = false
-            saveError = "Connexion indisponible. Réessaie dans un instant."
+            saveError = String(localized: "Connexion indisponible. Réessaie dans un instant.")
             HapticService.shared.error()
             return
         }
         guard let session = await AuthService.shared.currentSession else {
             isSaving = false
-            saveError = "Ta connexion a expiré. Reconnecte-toi."
+            saveError = String(localized: "Ta connexion a expiré. Reconnecte-toi.")
             HapticService.shared.error()
             return
         }
@@ -510,7 +510,7 @@ struct EditProfileView: View {
             isSaving = false
 
             // Toast positif via ToastService (déjà branché en Vague B)
-            ToastService.shared.currentToast = "Profil mis à jour. Tes scores ont été recalculés"
+            ToastService.shared.currentToast = String(localized: "Profil mis à jour. Tes scores ont été recalculés")
             ToastService.shared.isShowing = true
             Task {
                 try? await Task.sleep(for: .seconds(3))
@@ -526,7 +526,7 @@ struct EditProfileView: View {
             }
         } catch {
             isSaving = false
-            saveError = "Impossible de sauvegarder. Vérifie ta connexion et réessaie."
+            saveError = String(localized: "Impossible de sauvegarder. Vérifie ta connexion et réessaie.")
             HapticService.shared.error()
             AppLogger.database.error("EditProfile save failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -636,34 +636,34 @@ struct EditProfileView: View {
         switch section {
         case .profil:
             return [
-                EditableField(id: "firstName", label: "Prénom", emoji: "👤", kind: .text(placeholder: "Ton prénom")),
-                EditableField(id: "age", label: "Âge", emoji: "🎂", kind: .number(unit: "ans", min: AgeMinimum.ans, max: 110)),
-                EditableField(id: "gender", label: "Genre", emoji: "⚧", kind: .pickerSingle(options: options("gender"))),
-                EditableField(id: "height", label: "Taille", emoji: "📏", kind: .number(unit: "cm", min: 120, max: 230)),
-                EditableField(id: "weight", label: "Poids", emoji: "⚖️", kind: .number(unit: "kg", min: 30, max: 250)),
-                EditableField(id: "weightTrend", label: "Tendance poids", emoji: "📈", kind: .pickerSingle(options: options("weightTrend"))),
+                EditableField(id: "firstName", label: String(localized: "Prénom"), emoji: "👤", kind: .text(placeholder: String(localized: "Ton prénom"))),
+                EditableField(id: "age", label: String(localized: "Âge"), emoji: "🎂", kind: .number(unit: String(localized: "ans"), min: AgeMinimum.ans, max: 110)),
+                EditableField(id: "gender", label: String(localized: "Genre"), emoji: "⚧", kind: .pickerSingle(options: options("gender"))),
+                EditableField(id: "height", label: String(localized: "Taille"), emoji: "📏", kind: .number(unit: "cm", min: 120, max: 230)),
+                EditableField(id: "weight", label: String(localized: "Poids"), emoji: "⚖️", kind: .number(unit: "kg", min: 30, max: 250)),
+                EditableField(id: "weightTrend", label: String(localized: "Tendance poids"), emoji: "📈", kind: .pickerSingle(options: options("weightTrend"))),
             ]
         case .modeDeVie:
             return [
-                EditableField(id: "indoorWork", label: "Travail à l'intérieur", emoji: "🏢", kind: .pickerSingle(options: options("indoorWork"))),
-                EditableField(id: "sunExposure", label: "Exposition soleil", emoji: "☀️", kind: .pickerSingle(options: options("sunExposure"))),
-                EditableField(id: "skinType", label: "Type de peau", emoji: "🖐️", kind: .pickerSingle(options: options("skinType"))),
-                EditableField(id: "strengthTraining", label: "Activité physique", emoji: "🏋️", kind: .pickerSingle(options: options("strengthTraining"))),
+                EditableField(id: "indoorWork", label: String(localized: "Travail à l'intérieur"), emoji: "🏢", kind: .pickerSingle(options: options("indoorWork"))),
+                EditableField(id: "sunExposure", label: String(localized: "Exposition soleil"), emoji: "☀️", kind: .pickerSingle(options: options("sunExposure"))),
+                EditableField(id: "skinType", label: String(localized: "Type de peau"), emoji: "🖐️", kind: .pickerSingle(options: options("skinType"))),
+                EditableField(id: "strengthTraining", label: String(localized: "Activité physique"), emoji: "🏋️", kind: .pickerSingle(options: options("strengthTraining"))),
             ]
         case .sante:
             return [
-                EditableField(id: "stressLevel", label: "Niveau de stress", emoji: "🧘", kind: .pickerSingle(options: options("stressLevel"))),
+                EditableField(id: "stressLevel", label: String(localized: "Niveau de stress"), emoji: "🧘", kind: .pickerSingle(options: options("stressLevel"))),
                 // Le sommeil est un choix, pas un nombre libre : les moteurs
                 // comparent à des paliers ("4", "5.5", "6.5"…). Saisir « 7 »
                 // ne correspondait à aucun palier et annulait le modificateur.
-                EditableField(id: "sleepHours", label: "Heures de sommeil", emoji: "😴", kind: .pickerSingle(options: options("sleepHours"))),
-                EditableField(id: "wakeFeeling", label: "Réveil", emoji: "🌅", kind: .pickerSingle(options: options("wakeFeeling"))),
-                EditableField(id: "caffeineIntake", label: "Caféine", emoji: "☕", kind: .pickerSingle(options: options("caffeineIntake"))),
-                EditableField(id: "waterIntake", label: "Eau", emoji: "💧", kind: .pickerSingle(options: options("waterIntake"))),
-                EditableField(id: "alcohol", label: "Alcool", emoji: "🍷", kind: .pickerSingle(options: options("alcohol"))),
+                EditableField(id: "sleepHours", label: String(localized: "Heures de sommeil"), emoji: "😴", kind: .pickerSingle(options: options("sleepHours"))),
+                EditableField(id: "wakeFeeling", label: String(localized: "Réveil"), emoji: "🌅", kind: .pickerSingle(options: options("wakeFeeling"))),
+                EditableField(id: "caffeineIntake", label: String(localized: "Caféine"), emoji: "☕", kind: .pickerSingle(options: options("caffeineIntake"))),
+                EditableField(id: "waterIntake", label: String(localized: "Eau"), emoji: "💧", kind: .pickerSingle(options: options("waterIntake"))),
+                EditableField(id: "alcohol", label: String(localized: "Alcool"), emoji: "🍷", kind: .pickerSingle(options: options("alcohol"))),
             ]
         case .nutrition:
-            let regime = EditableField(id: "dietType", label: "Régime", emoji: "🍽️", kind: .pickerSingle(options: options("dietType")))
+            let regime = EditableField(id: "dietType", label: String(localized: "Régime"), emoji: "🍽️", kind: .pickerSingle(options: options("dietType")))
             // Avec des courses remplies, le calcul lit le caddie : ces quantités
             // n'y changeaient rien. On ne les propose que sans caddie. Les
             // laitages se comptent par SEMAINE, comme le reste et comme le
@@ -672,24 +672,24 @@ struct EditProfileView: View {
             guard profile.groceries.isEmpty else { return [regime] }
             return [
                 regime,
-                EditableField(id: "vegetableServings", label: "Légumes/semaine", emoji: "🥦", kind: .number(unit: "portions", min: 0, max: 30)),
-                EditableField(id: "fruitServings", label: "Fruits/semaine", emoji: "🍎", kind: .number(unit: "portions", min: 0, max: 30)),
-                EditableField(id: "fattyFish", label: "Poisson gras/semaine", emoji: "🐟", kind: .number(unit: "portions", min: 0, max: 10)),
-                EditableField(id: "meatPoultry", label: "Viande/semaine", emoji: "🥩", kind: .number(unit: "portions", min: 0, max: 21)),
-                EditableField(id: "dairyServings", label: "Produits laitiers/semaine", emoji: "🥛", kind: .number(unit: "portions", min: 0, max: 30)),
-                EditableField(id: "nutsPerWeek", label: "Noix/semaine", emoji: "🥜", kind: .number(unit: "portions", min: 0, max: 14)),
+                EditableField(id: "vegetableServings", label: String(localized: "Légumes/semaine"), emoji: "🥦", kind: .number(unit: String(localized: "portions"), min: 0, max: 30)),
+                EditableField(id: "fruitServings", label: String(localized: "Fruits/semaine"), emoji: "🍎", kind: .number(unit: String(localized: "portions"), min: 0, max: 30)),
+                EditableField(id: "fattyFish", label: String(localized: "Poisson gras/semaine"), emoji: "🐟", kind: .number(unit: String(localized: "portions"), min: 0, max: 10)),
+                EditableField(id: "meatPoultry", label: String(localized: "Viande/semaine"), emoji: "🥩", kind: .number(unit: String(localized: "portions"), min: 0, max: 21)),
+                EditableField(id: "dairyServings", label: String(localized: "Produits laitiers/semaine"), emoji: "🥛", kind: .number(unit: String(localized: "portions"), min: 0, max: 30)),
+                EditableField(id: "nutsPerWeek", label: String(localized: "Noix/semaine"), emoji: "🥜", kind: .number(unit: String(localized: "portions"), min: 0, max: 14)),
             ]
         case .symptomes:
             return [
-                EditableField(id: "symptoms", label: "Symptômes ressentis", emoji: "🩺", kind: .pickerMulti(options: options("symptoms"))),
+                EditableField(id: "symptoms", label: String(localized: "Symptômes ressentis"), emoji: "🩺", kind: .pickerMulti(options: options("symptoms"))),
             ]
         case .medical:
             return [
-                EditableField(id: "medications", label: "Médicaments", emoji: "💊", kind: .pickerMulti(options: options("medications"))),
-                EditableField(id: "digestiveConditions", label: "Conditions digestives", emoji: "🫁", kind: .pickerMulti(options: options("digestiveConditions"))),
-                EditableField(id: "surgicalHistory", label: "Opérations", emoji: "🩹", kind: .pickerMulti(options: options("surgicalHistory"))),
-                EditableField(id: "medicalHistory", label: "Antécédents", emoji: "📋", kind: .pickerMulti(options: options("medicalHistory"))),
-                EditableField(id: "allergies", label: "Allergies", emoji: "⚠️", kind: .pickerMulti(options: options("allergies"))),
+                EditableField(id: "medications", label: String(localized: "Médicaments"), emoji: "💊", kind: .pickerMulti(options: options("medications"))),
+                EditableField(id: "digestiveConditions", label: String(localized: "Conditions digestives"), emoji: "🫁", kind: .pickerMulti(options: options("digestiveConditions"))),
+                EditableField(id: "surgicalHistory", label: String(localized: "Opérations"), emoji: "🩹", kind: .pickerMulti(options: options("surgicalHistory"))),
+                EditableField(id: "medicalHistory", label: String(localized: "Antécédents"), emoji: "📋", kind: .pickerMulti(options: options("medicalHistory"))),
+                EditableField(id: "allergies", label: String(localized: "Allergies"), emoji: "⚠️", kind: .pickerMulti(options: options("allergies"))),
             ]
         }
     }
@@ -699,12 +699,12 @@ struct EditProfileView: View {
         let p = profile
         switch id {
         case "firstName": return p.firstName.isEmpty ? "-" : p.firstName
-        case "age": return p.age.isEmpty ? "-" : "\(p.age) ans"
-        case "gender": return p.gender == .homme ? "Homme" : "Femme"
+        case "age": return p.age.isEmpty ? "-" : String(localized: "\(p.age) ans")
+        case "gender": return p.gender == .homme ? String(localized: "Homme") : String(localized: "Femme")
         case "height": return p.height.isEmpty ? "-" : "\(p.height) cm"
         case "weight": return p.weight.isEmpty ? "-" : "\(p.weight) kg"
         case "weightTrend": return friendlyLabel("weightTrend", p.weightTrend)
-        case "indoorWork": return p.indoorWork == "yes" ? "Oui" : (p.indoorWork == "no" ? "Non" : "-")
+        case "indoorWork": return p.indoorWork == "yes" ? String(localized: "Oui") : (p.indoorWork == "no" ? String(localized: "Non") : "-")
         case "sunExposure": return friendlyLabel("sunExposure", p.sunExposure)
         case "skinType": return friendlyLabel("skinType", p.skinType)
         case "strengthTraining": return friendlyLabel("strengthTraining", p.strengthTraining)
@@ -721,12 +721,12 @@ struct EditProfileView: View {
         case "meatPoultry": return p.meatPoultry.isEmpty ? "-" : p.meatPoultry
         case "dairyServings": return p.dairyServings.isEmpty ? "-" : p.dairyServings
         case "nutsPerWeek": return p.nutsPerWeek.isEmpty ? "-" : p.nutsPerWeek
-        case "symptoms": return p.symptoms.isEmpty ? "Aucun" : "\(p.symptoms.count) symptôme\(p.symptoms.count > 1 ? "s" : "")"
-        case "medications": return p.medications.isEmpty ? "Aucun" : "\(p.medications.count)"
-        case "digestiveConditions": return p.digestiveConditions.isEmpty ? "Aucune" : "\(p.digestiveConditions.count)"
-        case "surgicalHistory": return p.surgicalHistory.isEmpty ? "Aucune" : "\(p.surgicalHistory.count)"
-        case "medicalHistory": return p.medicalHistory.isEmpty ? "Aucun" : "\(p.medicalHistory.count)"
-        case "allergies": return p.allergies.isEmpty ? "Aucune" : "\(p.allergies.count)"
+        case "symptoms": return p.symptoms.isEmpty ? String(localized: "Aucun") : (p.symptoms.count > 1 ? String(localized: "\(p.symptoms.count) symptômes") : String(localized: "\(p.symptoms.count) symptôme"))
+        case "medications": return p.medications.isEmpty ? String(localized: "Aucun") : "\(p.medications.count)"
+        case "digestiveConditions": return p.digestiveConditions.isEmpty ? String(localized: "Aucune") : "\(p.digestiveConditions.count)"
+        case "surgicalHistory": return p.surgicalHistory.isEmpty ? String(localized: "Aucune") : "\(p.surgicalHistory.count)"
+        case "medicalHistory": return p.medicalHistory.isEmpty ? String(localized: "Aucun") : "\(p.medicalHistory.count)"
+        case "allergies": return p.allergies.isEmpty ? String(localized: "Aucune") : "\(p.allergies.count)"
         default: return "-"
         }
     }

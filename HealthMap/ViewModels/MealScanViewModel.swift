@@ -441,13 +441,13 @@ final class MealScanViewModel: ObservableObject {
         do {
             // 1. Convert Data to UIImage and compress
             guard let uiImage = UIImage(data: imageData) else {
-                errorMessage = "Impossible de lire cette image. Essaie avec une autre photo."
+                errorMessage = String(localized: "Impossible de lire cette image. Essaie avec une autre photo.")
                 isAnalyzing = false
                 return
             }
 
             guard let compressedData = compressImage(uiImage) else {
-                errorMessage = "Impossible de préparer l'image. Essaie avec une autre photo."
+                errorMessage = String(localized: "Impossible de préparer l'image. Essaie avec une autre photo.")
                 isAnalyzing = false
                 return
             }
@@ -455,7 +455,7 @@ final class MealScanViewModel: ObservableObject {
             // Check final size (reject if > 5MB after compression)
             let maxUploadBytes = 5 * 1024 * 1024
             guard compressedData.count <= maxUploadBytes else {
-                errorMessage = "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère."
+                errorMessage = String(localized: "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère.")
                 isAnalyzing = false
                 return
             }
@@ -487,14 +487,14 @@ final class MealScanViewModel: ObservableObject {
             // 5. Check for Edge Function error in response body
             if let errorMsg = response.error {
                 if errorMsg.lowercased().contains("not a food") || errorMsg.lowercased().contains("not analyzable") {
-                    errorMessage = "Cette image ne semble pas contenir un repas. Essaie avec une photo d'assiette."
+                    errorMessage = String(localized: "Cette image ne semble pas contenir un repas. Essaie avec une photo d'assiette.")
                 } else {
                     // Le texte brut de la fonction Deno n'est ni traduit ni
                     // contrôlé : il pouvait afficher un identifiant technique
                     // ou une phrase en anglais en plein écran. Il part au
                     // journal, l'utilisateur lit une phrase française.
                     AppLogger.analysis.warning("MealScan edge error: \(errorMsg, privacy: .public)")
-                    errorMessage = "L'analyse n'a pas abouti. Réessaie dans un instant."
+                    errorMessage = String(localized: "L'analyse n'a pas abouti. Réessaie dans un instant.")
                 }
                 isAnalyzing = false
                 return
@@ -611,16 +611,16 @@ final class MealScanViewModel: ObservableObject {
         } catch let error as MealScanError {
             switch error {
             case .timeout:
-                errorMessage = "L'analyse a pris trop de temps. Réessaie avec une photo plus simple."
+                errorMessage = String(localized: "L'analyse a pris trop de temps. Réessaie avec une photo plus simple.")
             case .imageTooLarge:
-                errorMessage = "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère."
+                errorMessage = String(localized: "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère.")
             case .rateLimited:
                 handleDailyQuotaReached()
             case .notAnalyzable:
-                errorMessage = "Cette image ne semble pas contenir un repas. Essaie avec une photo d'assiette."
+                errorMessage = String(localized: "Cette image ne semble pas contenir un repas. Essaie avec une photo d'assiette.")
             case .serverError(let msg):
                 AppLogger.analysis.warning("MealScan server error: \(msg, privacy: .public)")
-                errorMessage = "L'analyse n'a pas abouti. Réessaie dans un instant."
+                errorMessage = String(localized: "L'analyse n'a pas abouti. Réessaie dans un instant.")
             }
         } catch {
             // Handle HTTP / Supabase errors by inspecting the error description.
@@ -637,11 +637,11 @@ final class MealScanViewModel: ObservableObject {
             if quotaAtteint {
                 handleDailyQuotaReached()
             } else if desc.contains("413") || desc.contains("too large") || desc.contains("payload") {
-                errorMessage = "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère."
+                errorMessage = String(localized: "Image trop volumineuse (plus de 5 Mo). Essaie avec une photo plus légère.")
             } else if desc.contains("timeout") || desc.contains("timed out") {
-                errorMessage = "L'analyse a pris trop de temps. Réessaie avec une photo plus simple."
+                errorMessage = String(localized: "L'analyse a pris trop de temps. Réessaie avec une photo plus simple.")
             } else {
-                errorMessage = "L'analyse n'a pas abouti. Vérifie ta connexion et réessaie."
+                errorMessage = String(localized: "L'analyse n'a pas abouti. Vérifie ta connexion et réessaie.")
             }
             AppLogger.analysis.report(error, context: "MealScan analyzePhoto")
         }
@@ -740,7 +740,7 @@ final class MealScanViewModel: ObservableObject {
                 scanDailyLimit = limit
                 UserDefaults.standard.set(limit, forKey: "hm_scan_daily_limit")
             }
-            errorMessage = "Tu as utilisé tes \(limit) scans du jour. Ça se recharge demain."
+            errorMessage = String(localized: "Tu as utilisé tes \(limit) scans du jour. Ça se recharge demain.")
         } else {
             // Pas de message d'erreur : c'est la feuille Premium « Oups ! »
             // (`LimiteDuJour`) qui DIT ce qui se passe (« Tu as utilisé tes 3

@@ -65,8 +65,8 @@ private enum ApportsOutilsW {
     /// « Vitamine D, 58 sur 100 » : ce que VoiceOver lit d'un anneau ou d'une barre.
     static func lu(_ apport: ApportW) -> String {
         apport.alerte == nil
-            ? "\(apport.nom), \(apport.score) sur 100"
-            : "\(apport.nom), \(apport.score) pour cent de la référence"
+            ? String(localized: "\(apport.nom), \(apport.score) sur 100")
+            : String(localized: "\(apport.nom), \(apport.score) pour cent de la référence")
     }
 
     static func lus(_ apports: [ApportW]) -> String {
@@ -78,7 +78,7 @@ private enum ApportsOutilsW {
     /// apports (l'app pas rouverte depuis sa mise à jour), on invite seulement
     /// à l'ouvrir : lui promettre un bilan qu'il a déjà fait serait faux.
     static func messageSansApports(_ etat: InstantaneJour) -> String {
-        etat.bilanFait ? "Ouvre Kiwio pour voir tes apports." : "Tes apports arrivent avec ton bilan, dans Kiwio."
+        etat.bilanFait ? String(localized: "Ouvre Kiwio pour voir tes apports.") : String(localized: "Tes apports arrivent avec ton bilan, dans Kiwio.")
     }
 }
 
@@ -167,19 +167,19 @@ private struct ApportsPetitContenuW: View {
     /// Depuis le 8 oct. 2026 : « À renforcer » seulement sur une alerte que
     /// l'estimateur affirme, jamais sur un chiffre bas.
     private var titre: String {
-        if let alerte = principal.alerte { return alerte ? "À renforcer" : "Tes apports" }
-        return principal.score < 70 ? "À renforcer" : "Tes apports"
+        if let alerte = principal.alerte { return alerte ? String(localized: "À renforcer") : String(localized: "Tes apports") }
+        return principal.score < 70 ? String(localized: "À renforcer") : String(localized: "Tes apports")
     }
 
     /// « Sardines ce soir ? » : le premier aliment de la fiche, au repas qui
     /// vient (mêmes plages que le Journal). Rien sans aliment.
     private var suggestion: String? {
         guard let aliment = lecture.aliments.first else { return nil }
-        return "\(aliment.nom) \(etat.repasAVenir(maintenant).quand)\u{202F}?"
+        return String(localized: "\(aliment.nom) \(etat.repasAVenir(maintenant).quand)\u{202F}?")
     }
 
     private var lu: String {
-        var phrase = "\(titre) : \(ApportsOutilsW.lu(principal)), \(lecture.statut)."
+        var phrase = String(localized: "\(titre) : \(ApportsOutilsW.lu(principal)), \(lecture.statut).")
         if let suggestion { phrase += " " + suggestion }
         return phrase
     }
@@ -201,7 +201,7 @@ private struct ApportsPetitContenuW: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                         .contentTransition(.numericText())
-                    Text(principal.alerte == nil ? "sur 100" : "% de la réf.")
+                    (principal.alerte == nil ? Text("sur 100") : Text("% de la réf."))
                         .font(.texteW(12))
                         .foregroundStyle(TeinteW.encre(0.8))
                         .lineLimit(1)
@@ -263,7 +263,7 @@ private struct ApportsMoyenContenuW: View {
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 0) {
-                EnTeteW(icone: .signe, titre: "Tes apports")
+                EnTeteW(icone: .signe, titre: String(localized: "Tes apports"))
                 Text(lecture.verdict)
                     .font(.texteW(17, .semibold))
                     .tracking(-0.3)
@@ -377,7 +377,7 @@ private struct ApportsGrandContenuW: View {
         VStack(alignment: .leading, spacing: 0) {
             // Pas de « ce matin » à droite : l'instantané ne dit pas à quelle
             // heure le registre a été calculé, et on n'invente pas une heure.
-            EnTeteW(icone: .signe, titre: "Tes apports")
+            EnTeteW(icone: .signe, titre: String(localized: "Tes apports"))
 
             HStack(spacing: 16 * k) {
                 AnneauW(fraction: ApportsOutilsW.fraction(principal), couleur: teinte,
@@ -538,7 +538,7 @@ struct VueApportsRonde: View {
     private var principal: ApportW? { exploitableW(etat)?.apports?.principal }
 
     private var lu: String {
-        guard let apport = principal else { return "Tes apports, dans Kiwio" }
+        guard let apport = principal else { return String(localized: "Tes apports, dans Kiwio") }
         return ApportsOutilsW.lu(apport)
     }
 
@@ -580,8 +580,8 @@ struct VueApportsRectangulaire: View {
     let etat: InstantaneJour?
 
     private var messageVide: String {
-        guard let etat = exploitableW(etat) else { return "Ouvre Kiwio pour commencer." }
-        return etat.bilanFait ? "Ouvre Kiwio pour les voir." : "Ils arrivent avec ton bilan."
+        guard let etat = exploitableW(etat) else { return String(localized: "Ouvre Kiwio pour commencer.") }
+        return etat.bilanFait ? String(localized: "Ouvre Kiwio pour les voir.") : String(localized: "Ils arrivent avec ton bilan.")
     }
 
     var body: some View {
@@ -608,7 +608,7 @@ struct VueApportsRectangulaire: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Tes apports. " + ApportsOutilsW.lus(apports))
+            .accessibilityLabel(String(localized: "Tes apports. \(ApportsOutilsW.lus(apports))"))
         } else {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Tes apports")
@@ -633,12 +633,12 @@ struct VueApportsEnLigne: View {
     let etat: InstantaneJour?
 
     private var texte: String {
-        guard let etat = exploitableW(etat) else { return "Ouvre Kiwio" }
+        guard let etat = exploitableW(etat) else { return String(localized: "Ouvre Kiwio") }
         guard let apport = etat.apports?.principal else {
-            return etat.bilanFait ? "Ouvre Kiwio" : "Ton bilan, dans Kiwio"
+            return etat.bilanFait ? String(localized: "Ouvre Kiwio") : String(localized: "Ton bilan, dans Kiwio")
         }
         var ligne = "\(apport.court) \(apport.score)"
-        if let eau = etat.eau { ligne += " · Eau \(FormatW.litresBus(eau)) L" }
+        if let eau = etat.eau { ligne += String(localized: " · Eau \(FormatW.litresBus(eau)) L") }
         return ligne
     }
 

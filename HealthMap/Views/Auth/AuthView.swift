@@ -73,7 +73,7 @@ struct AuthView: View {
                         if isSignUp {
                             AuthTextField(
                                 icon: "person.fill",
-                                placeholder: "Prénom",
+                                placeholder: String(localized: "Prénom"),
                                 text: $firstName,
                                 contentType: .givenName,
                                 keyboardType: .default,
@@ -86,7 +86,7 @@ struct AuthView: View {
                         // Email
                         AuthTextField(
                             icon: "envelope.fill",
-                            placeholder: "Email",
+                            placeholder: String(localized: "Email"),
                             text: $email,
                             contentType: .emailAddress,
                             keyboardType: .emailAddress,
@@ -97,7 +97,7 @@ struct AuthView: View {
                         // Password
                         AuthSecureField(
                             icon: "lock.fill",
-                            placeholder: "Mot de passe",
+                            placeholder: String(localized: "Mot de passe"),
                             text: $password,
                             contentType: isSignUp ? .newPassword : .password,
                             focused: $focusedField,
@@ -153,7 +153,7 @@ struct AuthView: View {
                         }
                     } label: {
                         ZStack {
-                            Text(isSignUp ? "Créer mon compte" : "Se connecter")
+                            Text(isSignUp ? String(localized: "Créer mon compte") : String(localized: "Se connecter"))
                                 .font(.dsHeadline)
                                 .tracking(DSTracking.corps)
                                 .foregroundStyle(.white)
@@ -246,7 +246,7 @@ struct AuthView: View {
                     // Toggle login/signup — typo subheadline (lisible) +
                     // zone de tap >= 44pt sur le bouton.
                     HStack(spacing: Theme.spacingXS) {
-                        Text(isSignUp ? "Déjà un compte\u{202F}?" : "Pas encore de compte\u{202F}?")
+                        Text(isSignUp ? String(localized: "Déjà un compte\u{202F}?") : String(localized: "Pas encore de compte\u{202F}?"))
                             .font(.dsSousTitre)
                             .foregroundStyle(Color.dsSecondaire)
                         // frame+contentShape DANS le label (zone tappable 44pt
@@ -257,7 +257,7 @@ struct AuthView: View {
                                 authViewModel.errorMessage = nil
                             }
                         } label: {
-                            Text(isSignUp ? "Se connecter" : "Créer un compte")
+                            Text(isSignUp ? String(localized: "Se connecter") : String(localized: "Créer un compte"))
                                 .font(.dsSousTitreFort)
                                 .foregroundStyle(Color.dsAccent)
                                 .frame(minHeight: 44)
@@ -323,7 +323,7 @@ struct AuthView: View {
                 return
             }
             AppLogger.auth.report(error, context: "SignInWithApple onCompletion")
-            authViewModel.errorMessage = "Erreur de connexion avec Apple."
+            authViewModel.errorMessage = String(localized: "Erreur de connexion avec Apple.")
 
         case .success(let auth):
             guard
@@ -332,7 +332,7 @@ struct AuthView: View {
                 let idTokenString = String(data: tokenData, encoding: .utf8),
                 let nonce = authViewModel.pendingAppleNonce
             else {
-                authViewModel.errorMessage = "Apple n'a pas renvoyé tes infos de connexion. Réessaie."
+                authViewModel.errorMessage = String(localized: "Apple n'a pas renvoyé tes infos de connexion. Réessaie.")
                 authViewModel.pendingAppleNonce = nil
                 return
             }
@@ -364,8 +364,8 @@ struct AuthView: View {
             KiwiEnTete()
 
             Text(isSignUp
-                 ? "Gratuit\u{202F}: ton bilan nutritionnel t'attend."
-                 : "Connecte-toi pour retrouver ton bilan.")
+                 ? String(localized: "Gratuit\u{202F}: ton bilan nutritionnel t'attend.")
+                 : String(localized: "Connecte-toi pour retrouver ton bilan."))
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)

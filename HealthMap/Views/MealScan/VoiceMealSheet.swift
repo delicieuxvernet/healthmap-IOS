@@ -390,7 +390,7 @@ struct VoiceMealSheet: View {
                 .accessibilityHint("Vide le champ pour tout réécrire")
                 .accessibilityIdentifier("\(identifiant).effacer")
 
-                DSCapsuleButton(titre: "Lancer l'analyse") {
+                DSCapsuleButton(titre: String(localized: "Lancer l'analyse")) {
                     envoyerLeTexte()
                 }
                 .disabled(texteUtile.isEmpty)
@@ -550,12 +550,12 @@ struct VoiceMealSheet: View {
 
     /// « Ton déjeuner » : le repas choisi. Tant qu'il ne l'est pas, « Ton repas ».
     private var titreRepas: String {
-        guard let slot else { return "Ton repas" }
+        guard let slot else { return String(localized: "Ton repas") }
         switch slot {
-        case .breakfast: return "Ton petit-déjeuner"
-        case .lunch: return "Ton déjeuner"
-        case .dinner: return "Ton dîner"
-        case .snack: return "Ton encas"
+        case .breakfast: return String(localized: "Ton petit-déjeuner")
+        case .lunch: return String(localized: "Ton déjeuner")
+        case .dinner: return String(localized: "Ton dîner")
+        case .snack: return String(localized: "Ton encas")
         }
     }
 
@@ -596,7 +596,7 @@ struct VoiceMealSheet: View {
             .contentShape(Rectangle())
         }
         .accessibilityLabel(titreRepas)
-        .accessibilityValue(slotDit ? "dit dans ta dictée" : "d'après l'heure")
+        .accessibilityValue(slotDit ? String(localized: "dit dans ta dictée") : String(localized: "d'après l'heure"))
         .accessibilityHint("Touche pour changer de repas")
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("dictee.resultat.repas")
@@ -631,7 +631,7 @@ struct VoiceMealSheet: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.dsPress)
-            .accessibilityLabel(saisieAuClavier ? "Réécrire mon repas" : "Recommencer la dictée")
+            .accessibilityLabel(saisieAuClavier ? String(localized: "Réécrire mon repas") : String(localized: "Recommencer la dictée"))
             .accessibilityIdentifier("dictee.resultat.redicter")
         }
     }
@@ -702,8 +702,8 @@ struct VoiceMealSheet: View {
         if !estimatedNames.isEmpty {
             bandeau(
                 estimatedNames.count == 1
-                ? "« \(estimatedNames[0]) » n'a pas de fiche exacte : les valeurs sont estimées. C'est bien compté dans ta journée."
-                : "\(estimatedNames.count) aliments n'ont pas de fiche exacte : leurs valeurs sont estimées. Ils sont bien comptés.",
+                ? String(localized: "« \(estimatedNames[0]) » n'a pas de fiche exacte : les valeurs sont estimées. C'est bien compté dans ta journée.")
+                : String(localized: "\(estimatedNames.count) aliments n'ont pas de fiche exacte : leurs valeurs sont estimées. Ils sont bien comptés."),
                 couleur: Color.dsSecondaire,
                 fond: Color.dsRemplissage
             )
@@ -712,8 +712,8 @@ struct VoiceMealSheet: View {
         if !ignoredNames.isEmpty {
             bandeau(
                 ignoredNames.count == 1
-                ? "Je n'arrive pas à chiffrer « \(ignoredNames[0]) ». Retire-le ou reformule."
-                : "Je n'arrive pas à chiffrer \(ignoredNames.count) aliments. Retire-les ou reformule.",
+                ? String(localized: "Je n'arrive pas à chiffrer « \(ignoredNames[0]) ». Retire-le ou reformule.")
+                : String(localized: "Je n'arrive pas à chiffrer \(ignoredNames.count) aliments. Retire-les ou reformule."),
                 couleur: Kiwio.ambre,
                 fond: Kiwio.ambreFond
             )
@@ -722,8 +722,8 @@ struct VoiceMealSheet: View {
         if alimentsIgnoresServeur > 0 {
             bandeau(
                 alimentsIgnoresServeur == 1
-                ? "Ta dictée était très riche : 1 aliment n'a pas pu être analysé. Redicte-le dans un second repas."
-                : "Ta dictée était très riche : \(alimentsIgnoresServeur) aliments n'ont pas pu être analysés. Redicte-les dans un second repas.",
+                ? String(localized: "Ta dictée était très riche : 1 aliment n'a pas pu être analysé. Redicte-le dans un second repas.")
+                : String(localized: "Ta dictée était très riche : \(alimentsIgnoresServeur) aliments n'ont pas pu être analysés. Redicte-les dans un second repas."),
                 couleur: Kiwio.ambre,
                 fond: Kiwio.ambreFond
             )
@@ -820,7 +820,7 @@ struct VoiceMealSheet: View {
                     .foregroundStyle(Color.dsSecondaire)
                 // La feuille n'écoute plus (2 août 2026) : recommencer =
                 // fermer, et le Journal rouvre la bulle.
-                DSCapsuleButton(titre: saisieAuClavier ? "Réécrire mon repas" : "Recommencer la dictée") {
+                DSCapsuleButton(titre: saisieAuClavier ? String(localized: "Réécrire mon repas") : String(localized: "Recommencer la dictée")) {
                     recommencerDictee()
                 }
             }
@@ -840,7 +840,7 @@ struct VoiceMealSheet: View {
         return Button {
             Task { await save() }
         } label: {
-            Text(isSaving ? "Enregistrement…" : titre)
+            Text(isSaving ? String(localized: "Enregistrement…") : titre)
                 .font(.dsHeadline)
                 .tracking(DSTracking.corps)
                 .foregroundStyle(Color.white)
@@ -856,7 +856,9 @@ struct VoiceMealSheet: View {
         }
         .buttonStyle(.dsPress)
         .disabled(isSaving || nombre == 0)
-        .accessibilityLabel("\(titre), \(nombre) aliment\(nombre > 1 ? "s" : ""), \(totaux.kcal) kilocalories")
+        .accessibilityLabel(nombre > 1
+            ? String(localized: "\(titre), \(nombre) aliments, \(totaux.kcal) kilocalories")
+            : String(localized: "\(titre), \(nombre) aliment, \(totaux.kcal) kilocalories"))
     }
 
     // MARK: - Erreur
@@ -867,13 +869,13 @@ struct VoiceMealSheet: View {
                 .font(.system(size: 30))
                 .foregroundStyle(Kiwio.ambre)
                 .accessibilityHidden(true)
-            Text(errorMessage ?? "Je n'ai pas réussi à analyser ton repas.")
+            Text(errorMessage ?? String(localized: "Je n'ai pas réussi à analyser ton repas."))
                 .font(.dsSousTitre)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             if echecEnregistrement {
-                DSCapsuleButton(titre: "Réessayer l'enregistrement") {
+                DSCapsuleButton(titre: String(localized: "Réessayer l'enregistrement")) {
                     echecEnregistrement = false
                     phase = .results
                     Task { await save() }
@@ -895,7 +897,7 @@ struct VoiceMealSheet: View {
                 // Relancer l'ANALYSE sur ce qui a déjà été dit, sans refaire parler :
                 // l'échec vient presque toujours du serveur, pas de la dictée, et
                 // reparler était le vrai coût de l'erreur.
-                DSCapsuleButton(titre: "Relancer l'analyse") {
+                DSCapsuleButton(titre: String(localized: "Relancer l'analyse")) {
                     Task { await analyser(dernierTranscript) }
                 }
 
@@ -931,7 +933,7 @@ struct VoiceMealSheet: View {
                 .buttonStyle(.plain)
             } else {
                 // Rien à réanalyser (rien entendu) : on redicte.
-                DSCapsuleButton(titre: "Réessayer") {
+                DSCapsuleButton(titre: String(localized: "Réessayer")) {
                     recommencerDictee()
                 }
             }
@@ -1420,7 +1422,7 @@ struct VoiceMealSheet: View {
         }
 
         guard !entries.isEmpty else {
-            errorMessage = "Je n'ai pas réussi à enregistrer ces aliments."
+            errorMessage = String(localized: "Je n'ai pas réussi à enregistrer ces aliments.")
             echecEnregistrement = true
             phase = .failed
             return
@@ -1468,7 +1470,7 @@ struct VoiceMealSheet: View {
             fermer()
         } catch {
             AppLogger.database.report(error, context: "Enregistrement du repas dicté")
-            errorMessage = "L'enregistrement a échoué. Réessaie."
+            errorMessage = String(localized: "L'enregistrement a échoué. Réessaie.")
             echecEnregistrement = true
             phase = .failed
         }
@@ -1484,21 +1486,21 @@ extension VoiceMealSheet {
     /// capsule confirme seulement que c'est compté.
     static func sousLigneAjout(gratification: GratificationRepas?) -> String {
         let noms = (gratification?.gains ?? []).map(\.nom)
-        guard let premier = noms.first else { return "C'est compté dans ta journée." }
-        guard noms.count > 1 else { return "\(premier) en hausse" }
+        guard let premier = noms.first else { return String(localized: "C'est compté dans ta journée.") }
+        guard noms.count > 1 else { return String(localized: "\(premier) en hausse") }
         let second = noms[1]
         let suite = second.prefix(1).lowercased() + String(second.dropFirst())
-        return "\(premier) et \(suite) en hausse"
+        return String(localized: "\(premier) et \(suite) en hausse")
     }
 
     /// « Ajouter au déjeuner » : l'action de la feuille. Même formulation que
     /// la confirmation (`libelleAjout`), à l'infinitif.
     static func titreAjout(_ slot: MealJournalService.MealSlot) -> String {
         switch slot {
-        case .breakfast: return "Ajouter au petit-déjeuner"
-        case .lunch: return "Ajouter au déjeuner"
-        case .dinner: return "Ajouter au dîner"
-        case .snack: return "Ajouter en encas"
+        case .breakfast: return String(localized: "Ajouter au petit-déjeuner")
+        case .lunch: return String(localized: "Ajouter au déjeuner")
+        case .dinner: return String(localized: "Ajouter au dîner")
+        case .snack: return String(localized: "Ajouter en encas")
         }
     }
 
@@ -1534,7 +1536,7 @@ extension VoiceMealSheet {
         // pause au milieu de la phrase ne coûte rien.
         let texte = await speech.finishAndTranscribe()
         guard !texte.isEmpty else {
-            return .echec(message: speech.error?.message ?? "Je n'ai rien entendu. Réessaie.",
+            return .echec(message: speech.error?.message ?? String(localized: "Je n'ai rien entendu. Réessaie."),
                           transcript: "")
         }
         // La dictée a été abandonnée entre-temps : on ne relit rien (une
@@ -1621,9 +1623,9 @@ private struct VoiceItemRow: View {
     /// Ce que la ligne a estimé à la place de la personne ; `nil` = rien.
     private var estimation: String? {
         switch (typeEstime, quantiteEstimee) {
-        case (true, true): return "Type et portion estimés"
-        case (true, false): return "Type estimé · \(quantite)"
-        case (false, true): return "Portion estimée"
+        case (true, true): return String(localized: "Type et portion estimés")
+        case (true, false): return String(localized: "Type estimé · \(quantite)")
+        case (false, true): return String(localized: "Portion estimée")
         case (false, false): return nil
         }
     }
@@ -1721,7 +1723,7 @@ private struct VoiceItemRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(item.nom), \(estimation ?? quantite), \(kcal) kilocalories")
-        .accessibilityHint(deployee ? "Touche pour refermer le réglage" : "Touche pour régler la quantité")
+        .accessibilityHint(deployee ? String(localized: "Touche pour refermer le réglage") : String(localized: "Touche pour régler la quantité"))
     }
 
     /// Vignette de verre : l'illustration 3D de l'aliment, sinon un couvert
@@ -2091,9 +2093,9 @@ private struct EtiquetteApport: View {
     }
 
     private var libelleVocal: String {
-        guard let cible = ligne.cible, cible > 0 else { return "\(ligne.nom) : \(grammes) grammes." }
+        guard let cible = ligne.cible, cible > 0 else { return String(localized: "\(ligne.nom) : \(grammes) grammes.") }
         let part = Int((min(1, ligne.grammes / cible) * 100).rounded())
-        return "\(ligne.nom) : \(grammes) grammes, \(part) pour cent de ton objectif du jour."
+        return String(localized: "\(ligne.nom) : \(grammes) grammes, \(part) pour cent de ton objectif du jour.")
     }
 }
 

@@ -196,7 +196,7 @@ struct SuiviView: View {
 
     private func page(_ d: Donnees, defilement: ScrollViewProxy) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            DSLargeTitle(titre: "Progrès")
+            DSLargeTitle(titre: String(localized: "Progrès"))
                 .padding(.top, DS.hautTitreOnglet)
 
             puces(d)
@@ -315,7 +315,7 @@ struct SuiviView: View {
             puces.append(PuceEvolution(
                 id: "symptome." + evolution.id,
                 libelle: ProgresTeintes.sujetCourt(trend),
-                valeur: evolution.improving ? trend.betterLabel : "À surveiller",
+                valeur: evolution.improving ? Langue.texte(trend.betterLabel) : String(localized: "À surveiller"),
                 symbole: trend.symbole,
                 teinte: ProgresTeintes.symptome(trend).trait
             ))
@@ -326,7 +326,7 @@ struct SuiviView: View {
             puces.append(PuceEvolution(
                 id: "apport." + apport.id,
                 libelle: apport.nom,
-                valeur: hausse ? "En hausse" : "En baisse",
+                valeur: hausse ? String(localized: "En hausse") : String(localized: "En baisse"),
                 symbole: hausse ? "chart.line.uptrend.xyaxis" : "chart.line.downtrend.xyaxis",
                 teinte: Color.nutrientColor(for: apport.id)
             ))
@@ -342,8 +342,8 @@ struct SuiviView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     if d.aLaToile {
-                        VerrePuce(libelle: "Équilibre",
-                                  valeur: "\(ProgresToile.couverts(d.apports)) sur \(d.apports.count)",
+                        VerrePuce(libelle: String(localized: "Équilibre"),
+                                  valeur: String(localized: "\(ProgresToile.couverts(d.apports)) sur \(d.apports.count)"),
                                   espacement: 10) {
                             ProgresMiniToile(apports: d.apports)
                         }
@@ -354,7 +354,7 @@ struct SuiviView: View {
                         }
                     }
                     if let serie {
-                        VerrePuce(libelle: "Série", valeur: serie == 1 ? "1 jour" : "\(serie) jours", espacement: 10) {
+                        VerrePuce(libelle: String(localized: "Série"), valeur: serie == 1 ? String(localized: "1 jour") : String(localized: "\(serie) jours"), espacement: 10) {
                             VerrePastilleIcone(symbole: "flame", teinte: Color.teinteEnergie)
                         }
                     }
@@ -409,24 +409,24 @@ struct SuiviView: View {
     private func titreEquilibre(_ d: Donnees) -> String {
         guard !d.verrouille, dureeDuSuivi != nil,
               let depart = dashboardVM.baselineApports else {
-            return "Ton équilibre du jour"
+            return String(localized: "Ton équilibre du jour")
         }
         let couverts = ProgresToile.couverts(d.apports)
         // Un apport sans score de départ compte pour ce qu'il vaut aujourd'hui :
         // il ne fait pencher le verdict ni d'un côté ni de l'autre.
         let avant = d.apports.filter { (depart[$0.id] ?? $0.pct) >= ProgresToile.seuil }.count
-        if couverts > avant { return "Ton équilibre progresse" }
-        if couverts < avant { return "Ton équilibre est à surveiller" }
-        return "Ton équilibre est stable"
+        if couverts > avant { return String(localized: "Ton équilibre progresse") }
+        if couverts < avant { return String(localized: "Ton équilibre est à surveiller") }
+        return String(localized: "Ton équilibre est stable")
     }
 
     private func phraseEquilibre(_ apports: [ProgresToileApport]) -> String {
         let couverts = ProgresToile.couverts(apports)
         let total = apports.count
         switch couverts {
-        case 0: return "Aucun de tes \(total) apports n'atteint encore ton besoin aujourd'hui."
-        case 1: return "1 apport sur \(total) atteint ton besoin aujourd'hui."
-        default: return "\(couverts) apports sur \(total) atteignent ton besoin aujourd'hui."
+        case 0: return String(localized: "Aucun de tes \(total) apports n'atteint encore ton besoin aujourd'hui.")
+        case 1: return String(localized: "1 apport sur \(total) atteint ton besoin aujourd'hui.")
+        default: return String(localized: "\(couverts) apports sur \(total) atteignent ton besoin aujourd'hui.")
         }
     }
 
@@ -468,8 +468,8 @@ struct SuiviView: View {
             }
             .buttonStyle(.dsPress)
             .accessibilityLabel(d.verrouille
-                ? "Voir ta progression depuis le départ, réservé à Kiwio Premium"
-                : "Voir ta progression depuis le départ")
+                ? String(localized: "Voir ta progression depuis le départ, réservé à Kiwio Premium")
+                : String(localized: "Voir ta progression depuis le départ"))
             .premiumOrigine(Self.origineLien, dans: espaceOffre)
             .padding(.top, 4)
         }
@@ -512,19 +512,19 @@ struct SuiviView: View {
         let verdict: String
         let phrase: String
         if dashboardVM.isLoadingAnalysisV2 {
-            verdict = "Un instant"
-            phrase = "On regarde tes symptômes déclarés…"
+            verdict = String(localized: "Un instant")
+            phrase = String(localized: "On regarde tes symptômes déclarés…")
         } else if !dashboardVM.bilanComplete {
             // Découverte : pas encore de questionnaire, donc rien de déclaré.
-            verdict = "Rien à suivre pour l'instant"
-            phrase = "Les symptômes que tu déclares dans ton bilan se suivent ici, jour après jour."
+            verdict = String(localized: "Rien à suivre pour l'instant")
+            phrase = String(localized: "Les symptômes que tu déclares dans ton bilan se suivent ici, jour après jour.")
         } else {
-            verdict = "Rien à suivre pour l'instant"
-            phrase = "Tu n'as déclaré aucun symptôme dans ton questionnaire."
+            verdict = String(localized: "Rien à suivre pour l'instant")
+            phrase = String(localized: "Tu n'as déclaré aucun symptôme dans ton questionnaire.")
         }
         return VStack(alignment: .leading, spacing: 0) {
             ProgresSymptomeEntete(
-                nom: "Symptômes",
+                nom: String(localized: "Symptômes"),
                 symbole: "heart.text.square",
                 teinte: Color.teinteSymptomes,
                 teinteTexte: Color.teinteSymptomesTexte,
@@ -558,9 +558,9 @@ struct SuiviView: View {
                                  trend: SymptomTrend,
                                  mesuree: Bool,
                                  gatee: Bool) -> String {
-        if gatee { return "Ta tendance" }
-        guard mesuree else { return "Ton suivi démarre" }
-        return evolution.improving ? trend.betterLabel : evolution.verdict
+        if gatee { return String(localized: "Ta tendance") }
+        guard mesuree else { return String(localized: "Ton suivi démarre") }
+        return evolution.improving ? Langue.texte(trend.betterLabel) : Langue.texte(evolution.verdict)
     }
 
     /// La phrase sous un verdict (15, secondaire).
@@ -575,7 +575,7 @@ struct SuiviView: View {
 
     /// La porte de la tendance, posée sur le tracé flouté d'une carte.
     private func boutonCourbe(origine: String) -> some View {
-        ProgresBoutonOffre(titre: "Voir ta courbe") {
+        ProgresBoutonOffre(titre: String(localized: "Voir ta courbe")) {
             ouvrirOffre("suivi_symptomes", depuis: origine)
         }
         .premiumOrigine(origine, dans: espaceOffre)
@@ -611,7 +611,7 @@ struct SuiviView: View {
             )
 
             if !mesuree {
-                phraseSousLeVerdict("Trois réponses et la tendance apparaît.")
+                phraseSousLeVerdict(String(localized: "Trois réponses et la tendance apparaît."))
             }
 
             DSSeparator(retrait: 0)
@@ -625,8 +625,8 @@ struct SuiviView: View {
                         jours: serie,
                         axe: axe,
                         mieuxVersLeHaut: trend.dir == .higherBetter,
-                        libelleHaut: trend.betterLabel.lowercased(),
-                        libelleBas: trend.worseLabel.lowercased(),
+                        libelleHaut: Langue.texte(trend.betterLabel).lowercased(),
+                        libelleBas: Langue.texte(trend.worseLabel).lowercased(),
                         teinte: teintes.courbe,
                         apport: courbeLiee,
                         trace: traceSymptome,
@@ -657,7 +657,7 @@ struct SuiviView: View {
             valeurs: SuiviEngineV4.microDailySeries(fortnight: journal.fortnight, id: apport.id, days: axe)
                 .map(\.value),
             teinte: Color.nutrientColor(for: apport.id),
-            nom: NomNutriment.possessif(id: apport.id, nom: apport.label)
+            nom: NomNutriment.possessif(id: apport.id, nom: Langue.texte(apport.label))
         )
     }
 
@@ -677,11 +677,11 @@ struct SuiviView: View {
         let mieux = semaine?.mieux ?? 0
         let valeur: String
         if repondus == 0 {
-            valeur = "Pas de réponse"
+            valeur = String(localized: "Pas de réponse")
         } else if gatee {
-            valeur = repondus == 1 ? "1 jour répondu" : "\(repondus) jours répondus"
+            valeur = repondus == 1 ? String(localized: "1 jour répondu") : String(localized: "\(repondus) jours répondus")
         } else {
-            valeur = "\(mieux) jour\(mieux > 1 ? "s" : "") mieux"
+            valeur = mieux > 1 ? String(localized: "\(mieux) jours mieux") : String(localized: "\(mieux) jour mieux")
         }
         return VStack(alignment: .leading, spacing: 6) {
             Text("Cette semaine")
@@ -692,9 +692,9 @@ struct SuiviView: View {
                     teinte: teintes.courbe,
                     teinteTexte: teintes.texte,
                     // « Ton énergie », « Ta concentration ».
-                    libelle: ProgresVerdict.majuscule(trend.noun),
+                    libelle: ProgresVerdict.majuscule(Langue.texte(trend.noun)),
                     valeur: valeur,
-                    legende: repondus == 0 ? "ces sept derniers jours" : "sur 7"
+                    legende: repondus == 0 ? String(localized: "ces sept derniers jours") : String(localized: "sur 7")
                 )
                 if let apport {
                     ProgresChiffreSemaine(
@@ -703,9 +703,9 @@ struct SuiviView: View {
                         // « Ton fer », « Ta vitamine D », « Tes fibres » : la
                         // colonne parle à la personne, comme sa voisine.
                         libelle: NomNutriment.majusculeInitiale(
-                            NomNutriment.possessif(id: apport.id, nom: apport.label)),
+                            NomNutriment.possessif(id: apport.id, nom: Langue.texte(apport.label))),
                         valeur: DS.pourcent(max(0, min(100, scores[apport.id] ?? apport.score))),
-                        legende: "de ton besoin aujourd'hui"
+                        legende: String(localized: "de ton besoin aujourd'hui")
                     )
                 } else {
                     Color.clear
@@ -727,7 +727,7 @@ struct SuiviView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Tes réponses au check-in")
                 Spacer(minLength: 8)
-                Text("haut = \(trend.betterLabel.lowercased())")
+                Text("haut = \(Langue.texte(trend.betterLabel).lowercased())")
             }
             ProgresBarresCheckin(jours: joursCheckin(reponses, axe: axe), teinte: teinte,
                                  trace: traceSymptome, gatee: gatee)
@@ -785,12 +785,14 @@ struct SuiviView: View {
     /// sens (« Moins cassants » sous « Ta tendance » le livrerait).
     private func phraseSemaine(_ semaine: ProgresSemaineReponses?, trend: SymptomTrend,
                                mesuree: Bool, gatee: Bool) -> String {
-        guard mesuree else { return "Trois réponses et la tendance apparaît." }
-        if gatee { return "Ta tendance se dessine, réponse après réponse." }
-        guard let semaine, semaine.repondus > 0 else { return "Pas encore de réponse cette semaine." }
-        guard semaine.mieux > 0 else { return "\(trend.betterLabel) : pas encore cette semaine." }
-        let pluriel = semaine.mieux > 1 ? "s" : ""
-        return "\(trend.betterLabel) \(semaine.mieux) jour\(pluriel) sur 7 cette semaine."
+        guard mesuree else { return String(localized: "Trois réponses et la tendance apparaît.") }
+        if gatee { return String(localized: "Ta tendance se dessine, réponse après réponse.") }
+        guard let semaine, semaine.repondus > 0 else { return String(localized: "Pas encore de réponse cette semaine.") }
+        let mieux = Langue.texte(trend.betterLabel)
+        guard semaine.mieux > 0 else { return String(localized: "\(mieux) : pas encore cette semaine.") }
+        return semaine.mieux > 1
+            ? String(localized: "\(mieux) \(semaine.mieux) jours sur 7 cette semaine.")
+            : String(localized: "\(mieux) \(semaine.mieux) jour sur 7 cette semaine.")
     }
 
     // MARK: Les réponses, jour par jour et semaine par semaine
@@ -900,7 +902,7 @@ struct SuiviView: View {
         let cal = Calendar.current
         let jours = (cal.dateComponents([.day], from: cal.startOfDay(for: depart),
                                         to: cal.startOfDay(for: Date())).day ?? 0) + 1
-        return jours > 1 ? "\(jours) jours" : nil
+        return jours > 1 ? String(localized: "\(jours) jours") : nil
     }
 
     // MARK: - Le bas de page : le bilan à faire, le check-in du jour
@@ -912,7 +914,7 @@ struct SuiviView: View {
         if !dashboardVM.bilanComplete {
             BilanDoorButton(
                 title: BilanDoorButton.Libelle.suivi,
-                accessibilityText: "Suivre mes vrais chiffres, faire le bilan en 3 minutes",
+                accessibilityText: String(localized: "Suivre mes vrais chiffres, faire le bilan en 3 minutes"),
                 zone: .suivi
             ) {
                 dashboardVM.demarrerBilan()
@@ -1002,8 +1004,8 @@ struct SuiviView: View {
             guard let score = scores[id] else { return nil }
             return ProgresToileApport(
                 id: id,
-                nom: definition.label,
-                court: ProgresToile.libelleCourt(id, defaut: definition.label),
+                nom: Langue.texte(definition.label),
+                court: ProgresToile.libelleCourt(id, defaut: Langue.texte(definition.label)),
                 pct: score,
                 statut: dashboardVM.statuts[id]
             )
@@ -1055,7 +1057,7 @@ struct SymptomTrend {
 
     /// La question du check-in, TOUJOURS dans le sens du mieux (« Plus nette
     /// qu'avant ? ») : une question neutre ne dit pas ce qu'on espère voir.
-    var questionVersLeMieux: String { "\(betterLabel) qu'avant\u{00A0}?" }
+    var questionVersLeMieux: String { String(localized: "\(Langue.texte(betterLabel)) qu'avant\u{00A0}?") }
 
     /// Le symbole de l'écran de question.
     var symbole: String {

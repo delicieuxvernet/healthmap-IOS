@@ -68,35 +68,35 @@ struct MethodeView: View {
     // (Ciqual × INCA 3 × ANSES 2021), plus l'ancien score en points.
     private var stepsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader(title: "Les 4 étapes", icon: "arrow.triangle.swap")
+            sectionHeader(title: String(localized: "Les 4 étapes"), icon: "arrow.triangle.swap")
 
             VStack(spacing: 0) {
                 stepCard(
                     number: 1,
-                    title: "Questionnaire",
+                    title: String(localized: "Questionnaire"),
                     icon: "clipboard.fill",
-                    description: "Tu réponds à des questions sur ton alimentation, ton mode de vie et ta santé.",
+                    description: String(localized: "Tu réponds à des questions sur ton alimentation, ton mode de vie et ta santé."),
                     isLast: false
                 )
                 stepCard(
                     number: 2,
-                    title: "Estimation de tes apports",
+                    title: String(localized: "Estimation de tes apports"),
                     icon: "function",
-                    description: "Pour 27 vitamines, minéraux et acides gras, on estime ce que tu manges : tes aliments cochés, à leur fréquence et en portions réelles, puis, pour le reste, ce que mange en moyenne une personne de ton âge et de ton sexe en France. Le calcul est toujours le même, sans IA.",
+                    description: String(localized: "Pour 27 vitamines, minéraux et acides gras, on estime ce que tu manges : tes aliments cochés, à leur fréquence et en portions réelles, puis, pour le reste, ce que mange en moyenne une personne de ton âge et de ton sexe en France. Le calcul est toujours le même, sans IA."),
                     isLast: false
                 )
                 stepCard(
                     number: 3,
-                    title: "Comparaison aux références",
+                    title: String(localized: "Comparaison aux références"),
                     icon: "scalemass.fill",
-                    description: "Chaque apport est comparé à la référence de l'ANSES pour ton sexe, ton âge et ta situation : grossesse, allaitement, règles, alimentation végétale.",
+                    description: String(localized: "Chaque apport est comparé à la référence de l'ANSES pour ton sexe, ton âge et ta situation : grossesse, allaitement, règles, alimentation végétale."),
                     isLast: false
                 )
                 stepCard(
                     number: 4,
-                    title: "Ton bilan",
+                    title: String(localized: "Ton bilan"),
                     icon: "chart.bar.fill",
-                    description: "L'IA explique tes résultats et propose des gestes concrets ; elle ne calcule rien. Les repas que tu notes affinent l'estimation au fil des jours.",
+                    description: String(localized: "L'IA explique tes résultats et propose des gestes concrets ; elle ne calcule rien. Les repas que tu notes affinent l'estimation au fil des jours."),
                     isLast: true
                 )
             }
@@ -156,7 +156,7 @@ struct MethodeView: View {
     // points par interaction ; il part des données ci-dessous.
     private var interactionsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader(title: "Les données du calcul", icon: "books.vertical.fill")
+            sectionHeader(title: String(localized: "Les données du calcul"), icon: "books.vertical.fill")
 
             // Une seule carte de verre, des lignes séparées d'un filet.
             VStack(spacing: 0) {
@@ -164,37 +164,37 @@ struct MethodeView: View {
                     symbole: "fork.knife",
                     apport: "iron",
                     filet: false,
-                    title: "Composition des aliments",
-                    description: "La teneur en vitamines et minéraux de chaque aliment.",
-                    source: "Table Ciqual 2020, ANSES"
+                    title: String(localized: "Composition des aliments"),
+                    description: String(localized: "La teneur en vitamines et minéraux de chaque aliment."),
+                    source: String(localized: "Table Ciqual 2020, ANSES")
                 )
                 interactionCard(
                     symbole: "person.3.fill",
                     apport: "calcium",
-                    title: "Portions et habitudes",
-                    description: "Les portions réelles et ce que mangent les Français, selon l'âge et le sexe.",
-                    source: "Étude INCA 3, ANSES 2017"
+                    title: String(localized: "Portions et habitudes"),
+                    description: String(localized: "Les portions réelles et ce que mangent les Français, selon l'âge et le sexe."),
+                    source: String(localized: "Étude INCA 3, ANSES 2017")
                 )
                 interactionCard(
                     symbole: "checkmark.seal.fill",
                     apport: "vitD",
-                    title: "Besoins de référence",
-                    description: "La référence de chaque apport, selon ton profil.",
-                    source: "Références nutritionnelles, ANSES 2021"
+                    title: String(localized: "Besoins de référence"),
+                    description: String(localized: "La référence de chaque apport, selon ton profil."),
+                    source: String(localized: "Références nutritionnelles, ANSES 2021")
                 )
                 interactionCard(
                     symbole: "drop.fill",
                     apport: "omega3",
-                    title: "Acides gras",
-                    description: "Les repères pour les oméga-3 et les autres acides gras.",
-                    source: "Apports nutritionnels conseillés en acides gras, ANSES 2011"
+                    title: String(localized: "Acides gras"),
+                    description: String(localized: "Les repères pour les oméga-3 et les autres acides gras."),
+                    source: String(localized: "Apports nutritionnels conseillés en acides gras, ANSES 2011")
                 )
                 interactionCard(
                     symbole: "checkmark.circle.fill",
                     apport: "magnesium",
-                    title: "Un calcul vérifié",
-                    description: "Le calcul est testé sur les relevés alimentaires réels d'INCA 3 : « à renforcer » n'est utilisé que pour les apports où il se trompe rarement.",
-                    source: "Validation Kiwio sur INCA 3"
+                    title: String(localized: "Un calcul vérifié"),
+                    description: String(localized: "Le calcul est testé sur les relevés alimentaires réels d'INCA 3 : « à renforcer » n'est utilisé que pour les apports où il se trompe rarement."),
+                    source: String(localized: "Validation Kiwio sur INCA 3")
                 )
             }
             .dsCard()
@@ -251,7 +251,7 @@ struct MethodeView: View {
     // MARK: - Les statuts
     private var scoringSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader(title: "Les statuts", icon: "gauge.with.dots.needle.33percent")
+            sectionHeader(title: String(localized: "Les statuts"), icon: "gauge.with.dots.needle.33percent")
 
             VStack(alignment: .leading, spacing: Theme.spacingMD) {
                 HStack(alignment: .firstTextBaseline, spacing: Theme.spacingSM) {
@@ -269,10 +269,10 @@ struct MethodeView: View {
                 DSSeparator(retrait: 0)
 
                 VStack(alignment: .leading, spacing: Theme.spacingSM) {
-                    statutLigne(.couvert, detail: "Ton apport estimé atteint la référence.")
-                    statutLigne(.aSurveiller, detail: "Proche de la référence, sans certitude qu'il en manque.")
-                    statutLigne(.aRenforcer, detail: "Nettement sous la référence, sur un apport que le calcul estime de façon fiable.")
-                    statutLigne(.peuPrecise, detail: "On ne peut rien affirmer : coche plus d'aliments ou note quelques repas.")
+                    statutLigne(.couvert, detail: String(localized: "Ton apport estimé atteint la référence."))
+                    statutLigne(.aSurveiller, detail: String(localized: "Proche de la référence, sans certitude qu'il en manque."))
+                    statutLigne(.aRenforcer, detail: String(localized: "Nettement sous la référence, sur un apport que le calcul estime de façon fiable."))
+                    statutLigne(.peuPrecise, detail: String(localized: "On ne peut rien affirmer : coche plus d'aliments ou note quelques repas."))
                 }
             }
             .padding(Theme.cardPadding)
@@ -307,20 +307,20 @@ struct MethodeView: View {
     // MARK: - Limitations
     private var limitationsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader(title: "Limitations", icon: "exclamationmark.triangle")
+            sectionHeader(title: String(localized: "Limitations"), icon: "exclamationmark.triangle")
 
             VStack(alignment: .leading, spacing: Theme.spacingSM) {
                 limitationRow(
                     icon: "stethoscope",
-                    text: "Kiwio ne remplace pas un avis médical"
+                    text: String(localized: "Kiwio ne remplace pas un avis médical")
                 )
                 limitationRow(
                     icon: "chart.bar.xaxis",
-                    text: "Les statuts sont des estimations, pas des analyses sanguines. Une prise de sang récente prime sur l'estimation."
+                    text: String(localized: "Les statuts sont des estimations, pas des analyses sanguines. Une prise de sang récente prime sur l'estimation.")
                 )
                 limitationRow(
                     icon: "person.badge.shield.checkmark",
-                    text: "Consulte un professionnel de santé pour toute décision médicale"
+                    text: String(localized: "Consulte un professionnel de santé pour toute décision médicale")
                 )
             }
             .padding(Theme.cardPadding)

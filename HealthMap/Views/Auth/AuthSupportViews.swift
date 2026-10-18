@@ -119,7 +119,7 @@ struct AuthSecureField: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.dsPress)
-            .accessibilityLabel(showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe")
+            .accessibilityLabel(showPassword ? String(localized: "Masquer le mot de passe") : String(localized: "Afficher le mot de passe"))
             .accessibilityIdentifier("auth.togglePassword")
         }
         .padding(.leading, Theme.spacingMD)
@@ -262,7 +262,7 @@ struct ForgotPasswordSheet: View {
         if !newPassword.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(PasswordValidator.validate(newPassword), id: \.self) { issue in
-                    Label(issue.message, systemImage: "xmark.circle.fill")
+                    Label(Langue.texte(issue.message), systemImage: "xmark.circle.fill")
                         .font(Theme.captionFont)
                         .foregroundStyle(Color.dsAComblerTexte)
                 }
@@ -338,8 +338,8 @@ struct ForgotPasswordSheet: View {
             Text("Mot de passe réinitialisé !")
                 .font(Theme.headlineFont)
             Text(authVM.isAuthenticated
-                 ? "Connexion en cours…"
-                 : "Tu peux maintenant te connecter avec ton nouveau mot de passe.")
+                 ? String(localized: "Connexion en cours…")
+                 : String(localized: "Tu peux maintenant te connecter avec ton nouveau mot de passe."))
                 .font(Theme.bodyFont)
                 .foregroundStyle(Color.dsSecondaire)
                 .multilineTextAlignment(.center)

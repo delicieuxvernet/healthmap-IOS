@@ -68,30 +68,30 @@ struct OffrePremium: Equatable {
         guard let remise, remise.paymentMode == .freeTrial else { return nil }
         let periode = remise.subscriptionPeriod
         switch periode.unit {
-        case .day: return "\(periode.value) jours"
-        case .week: return "\(periode.value * 7) jours"
-        case .month: return periode.value == 1 ? "1 mois" : "\(periode.value) mois"
-        case .year: return periode.value == 1 ? "1 an" : "\(periode.value) ans"
+        case .day: return String(localized: "\(periode.value) jours")
+        case .week: return String(localized: "\(periode.value * 7) jours")
+        case .month: return periode.value == 1 ? String(localized: "1 mois") : String(localized: "\(periode.value) mois")
+        case .year: return periode.value == 1 ? String(localized: "1 an") : String(localized: "\(periode.value) ans")
         }
     }
 
     // MARK: Textes
 
     var titre: String {
-        if let pourcent { return "Économise \(DS.pourcent(pourcent)) avec l'annuel" }
-        if let essai { return "\(essai) d'essai gratuit pour découvrir Premium" }
-        return "Premium, à l'année"
+        if let pourcent { return String(localized: "Économise \(DS.pourcent(pourcent)) avec l'annuel") }
+        if let essai { return String(localized: "\(essai) d'essai gratuit pour découvrir Premium") }
+        return String(localized: "Premium, à l'année")
     }
 
     var detail: String {
         var texte: String
         if let prixAnnuelAuTarifCourt {
-            texte = "\(prixAnnuel) par an, au lieu de \(prixAnnuelAuTarifCourt) en payant à la semaine."
+            texte = String(localized: "\(prixAnnuel) par an, au lieu de \(prixAnnuelAuTarifCourt) en payant à la semaine.")
         } else {
-            texte = "\(prixAnnuel) par an."
+            texte = String(localized: "\(prixAnnuel) par an.")
         }
         if let essai, pourcent != nil {
-            texte += " Tu commences par \(essai) d'essai gratuit."
+            texte += " " + String(localized: "Tu commences par \(essai) d'essai gratuit.")
         }
         return texte
     }

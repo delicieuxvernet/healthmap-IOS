@@ -260,7 +260,7 @@ struct PastilleConfirmation: View {
     }
 
     private func libelleVocal(_ confirmation: ConfirmationAjout) -> String {
-        var phrase = "\(confirmation.titre), \(confirmation.kcal) kilocalories"
+        var phrase = String(localized: "\(confirmation.titre), \(confirmation.kcal) kilocalories")
         if let sousLigne = confirmation.sousLigne {
             phrase += ". \(sousLigne)"
         }

@@ -64,7 +64,7 @@ enum RecapBuilder {
         // ② Le score, en compteur animé.
         slides.append(.score(
             valeur: score,
-            mot: HealthScale.globalLabel(for: score),
+            mot: Langue.texte(HealthScale.globalLabel(for: score)),
             insight: nettoyer(bilan?.scoreInsight)
         ))
 
@@ -122,7 +122,7 @@ enum RecapBuilder {
         slides.append(.carte(CarteRecap(
             prenom: prenom,
             score: score,
-            mot: HealthScale.globalLabel(for: score),
+            mot: Langue.texte(HealthScale.globalLabel(for: score)),
             besoinsNourris: analyse.besoinsNourris ?? 0,
             apportsARenforcer: ordonnes.count
         )))
@@ -150,10 +150,10 @@ enum RecapBuilder {
     /// « À renforcer » dans le récap et « Solide » dans le Bilan.
     static func mot(statut: StatutV2, pourcent: Int) -> String {
         switch statut {
-        case .couvre: return "Couvre ton besoin"
-        case .aRenforcer: return "À surveiller"
-        case .aCombler: return "À renforcer"
-        case .neutre: return "À affiner"
+        case .couvre: return String(localized: "Couvre ton besoin")
+        case .aRenforcer: return String(localized: "À surveiller")
+        case .aCombler: return String(localized: "À renforcer")
+        case .neutre: return String(localized: "À affiner")
         }
     }
 

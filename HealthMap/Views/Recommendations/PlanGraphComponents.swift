@@ -94,12 +94,12 @@ enum PlanGraphTeintes {
 
     static func libelle(_ genre: PlanGraph.Genre, anneau: Int, score: Int?, statut: StatutApport? = nil) -> String {
         switch genre {
-        case .objectif: return anneau == 0 ? "Ton objectif" : "Objectif"
-        case .symptome: return "Symptôme suivi"
+        case .objectif: return anneau == 0 ? String(localized: "Ton objectif") : String(localized: "Objectif")
+        case .symptome: return String(localized: "Symptôme suivi")
         case .apport:
-            if let statut { return statut.estASuivre ? "Apport \(statut.libelleCourt.lowercased())" : "Apport" }
-            return (score ?? 100) < 70 ? "Apport à renforcer" : "Apport"
-        case .habitude: return "Habitude"
+            if let statut { return statut.estASuivre ? String(localized: "Apport \(statut.libelleCourt.lowercased())") : String(localized: "Apport") }
+            return (score ?? 100) < 70 ? String(localized: "Apport à renforcer") : String(localized: "Apport")
+        case .habitude: return String(localized: "Habitude")
         }
     }
 }
@@ -511,9 +511,9 @@ struct PlanGraphLegende: View {
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
             : AnyLayout(HStackLayout(spacing: 16))
         disposition {
-            pastille(PlanGraphTeintes.objectif, "objectif")
-            pastille(PlanGraphTeintes.symptome, "symptômes")
-            pastille(PlanGraphTeintes.levier, "leviers")
+            pastille(PlanGraphTeintes.objectif, String(localized: "objectif"))
+            pastille(PlanGraphTeintes.symptome, String(localized: "symptômes"))
+            pastille(PlanGraphTeintes.levier, String(localized: "leviers"))
             if !tailleTexte.isAccessibilitySize {
                 Spacer(minLength: 0)
             }
@@ -610,7 +610,7 @@ struct PlanSelectionBandeau: View {
         // porte « détail » s'enfonce (voir `PlanPorteDuDetail`).
         .buttonStyle(PlanCarteStyle())
         .disabled(!avecDetail)
-        .accessibilityHint(avecDetail ? "Ouvre le détail" : "")
+        .accessibilityHint(avecDetail ? String(localized: "Ouvre le détail") : "")
     }
 
     /// Pastille de 48 (rayon 14), catégorie en 15 / 600 dans sa teinte, nom en
@@ -745,7 +745,7 @@ struct PlanHabitudeSheet: View {
                     .kiwiEntrance(1)
 
                 PlanTitreDeBloc(symbole: "point.3.connected.trianglepath.dotted",
-                                texte: "À quoi c'est relié",
+                                texte: String(localized: "À quoi c'est relié"),
                                 teinte: Color.dsAccent,
                                 encre: Color.teinteKiwiTexte)
                 DSGroupedList {
@@ -773,7 +773,7 @@ struct PlanHabitudeSheet: View {
     }
 
     static func libelleForce(_ force: Int) -> String {
-        force >= 3 ? "lien fort" : (force == 2 ? "lien moyen" : "lien faible")
+        force >= 3 ? String(localized: "lien fort") : (force == 2 ? String(localized: "lien moyen") : String(localized: "lien faible"))
     }
 }
 
@@ -891,8 +891,8 @@ struct PlanGraphScreen: View {
         return VStack(spacing: 0) {
             // Le titre « Plan » est posé au-dessus, par `RecommendationsView`.
             Text(topics.isEmpty && apports.isEmpty
-                 ? "Ton plan s'écrit au fil de tes bilans"
-                 : "Ce qui relie tes symptômes à tes apports")
+                 ? String(localized: "Ton plan s'écrit au fil de tes bilans")
+                 : String(localized: "Ce qui relie tes symptômes à tes apports"))
                 .font(.dsCorps)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
@@ -935,7 +935,7 @@ struct PlanGraphScreen: View {
                 if let decouverte {
                     BilanDoorButton(
                         title: BilanDoorButton.Libelle.plan,
-                        accessibilityText: "Construire mon plan, faire le bilan en 3 minutes",
+                        accessibilityText: String(localized: "Construire mon plan, faire le bilan en 3 minutes"),
                         zone: .plan,
                         action: decouverte
                     )
@@ -1007,19 +1007,19 @@ struct PlanGraphScreen: View {
                 let score = voisin.score ?? 0
                 etat = DS.pourcent(score)
                 teinte = score < 40 ? Color(hex: "C0322A") : (score < 70 ? Color.dsARenforcerTexte : Color.teinteKiwiTexte)
-                comment = topic.kind == .objectif ? "un apport qui compte pour ton objectif" : "un des apports en cause"
+                comment = topic.kind == .objectif ? String(localized: "un apport qui compte pour ton objectif") : String(localized: "un des apports en cause")
             case .habitude:
-                etat = "\(PointsApport.signe(voisin.points ?? 0)) points"
+                etat = String(localized: "\(PointsApport.signe(voisin.points ?? 0)) points")
                 teinte = Color(hex: "C0322A")
-                comment = "pèse sur cet apport, d'après tes réponses"
+                comment = String(localized: "pèse sur cet apport, d'après tes réponses")
             case .symptome:
-                etat = "suivi"
+                etat = String(localized: "suivi")
                 teinte = PlanGraphTeintes.symptome
-                comment = topic.kind == .apport ? "un signe que cet apport peut expliquer" : "sur le chemin de ton objectif"
+                comment = topic.kind == .apport ? String(localized: "un signe que cet apport peut expliquer") : String(localized: "sur le chemin de ton objectif")
             case .objectif:
-                etat = "objectif"
+                etat = String(localized: "objectif")
                 teinte = Color.teinteKiwiTexte
-                comment = "ce vers quoi tout ça mène"
+                comment = String(localized: "ce vers quoi tout ça mène")
             }
             return PlanLienCarte(
                 id: voisin.id, nom: voisin.nom,

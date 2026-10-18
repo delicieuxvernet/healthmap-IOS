@@ -109,29 +109,29 @@ struct ObjectifPoids: Equatable {
     func phrase(calories: Int?, tdee: Int?, maintenant: Date = Date()) -> String {
         switch reserve {
         case .grossesse?:
-            return "Enceinte ou allaitante, on ne vise pas de perte de poids. Tes calories restent au maintien."
+            return String(localized: "Enceinte ou allaitante, on ne vise pas de perte de poids. Tes calories restent au maintien.")
         case .sousLeRepere?:
-            return "Ce poids passe sous le repère de corpulence (IMC 18,5). Tes calories restent au maintien, parles-en à un professionnel de santé."
+            return String(localized: "Ce poids passe sous le repère de corpulence (IMC 18,5). Tes calories restent au maintien, parles-en à un professionnel de santé.")
         case nil:
             break
         }
 
         guard sens != .maintenir else {
-            return "Tu es à ton poids souhaité : tes calories visent le maintien."
+            return String(localized: "Tu es à ton poids souhaité : tes calories visent le maintien.")
         }
         guard let calories, let tdee,
               let rythme = rythmeHebdo(calories: calories, tdee: tdee) else {
             return sens == .perdre
-                ? "Tes calories du jour visent une perte progressive."
-                : "Tes calories du jour visent une prise progressive."
+                ? String(localized: "Tes calories du jour visent une perte progressive.")
+                : String(localized: "Tes calories du jour visent une prise progressive.")
         }
 
         let quantite = Self.affichage(abs(rythme))
         var texte = sens == .perdre
-            ? "Environ \(quantite) kg de moins par semaine."
-            : "Environ \(quantite) kg de plus par semaine."
+            ? String(localized: "Environ \(quantite) kg de moins par semaine.")
+            : String(localized: "Environ \(quantite) kg de plus par semaine.")
         if let date = dateEstimee(calories: calories, tdee: tdee, depuis: maintenant) {
-            texte += " À ce rythme, \(Self.affichageCourt(souhaite)) kg vers le \(Self.jour(date, depuis: maintenant))."
+            texte += " " + String(localized: "À ce rythme, \(Self.affichageCourt(souhaite)) kg vers le \(Self.jour(date, depuis: maintenant)).")
         }
         return texte
     }
@@ -150,7 +150,9 @@ struct ObjectifPoids: Equatable {
 
     /// `74,0` : toujours une décimale, pour que le chiffre ne saute pas.
     static func affichage(_ kilos: Double) -> String {
-        String(format: "%.1f", arrondi(kilos)).replacingOccurrences(of: ".", with: ",")
+        Langue.estFrancais
+            ? String(format: "%.1f", arrondi(kilos)).replacingOccurrences(of: ".", with: ",")
+            : String(format: "%.1f", arrondi(kilos))
     }
 
     /// `70` ou `70,5` : sans zéro inutile, dans une phrase.
@@ -169,7 +171,7 @@ struct ObjectifPoids: Equatable {
 
     private static func jour(_ date: Date, depuis maintenant: Date) -> String {
         let formateur = DateFormatter()
-        formateur.locale = Locale(identifier: "fr_FR")
+        formateur.locale = Langue.locale
         let memeAnnee = Calendar.current.isDate(date, equalTo: maintenant, toGranularity: .year)
         formateur.dateFormat = memeAnnee ? "d MMM" : "d MMM yyyy"
         return formateur.string(from: date)

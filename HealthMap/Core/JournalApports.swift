@@ -72,7 +72,7 @@ enum JournalApports {
     static let effetMinimum = 2
     /// Le bilan rédigé se refait quand le journal déplace un score d'un palier.
     static let palierDuBilan = 10
-    static let libelle = "Tes repas notés ces 14 derniers jours"
+    static let libelle = String(localized: "Tes repas notés ces 14 derniers jours")
 
     /// La part de l'écart que le journal rattrape : elle grandit avec le nombre
     /// de journées notées, sans jamais atteindre 1.

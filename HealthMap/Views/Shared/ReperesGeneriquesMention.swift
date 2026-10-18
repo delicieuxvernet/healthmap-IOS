@@ -11,7 +11,7 @@ import SwiftUI
 // scan) ; la mention, elle, n'est qu'une étiquette d'honnêteté.
 struct ReperesGeneriquesMention: View {
     /// LA phrase canonique — testée (jamais vide, séparateurs conformes).
-    static let texte = "Repères adulte moyen. Ton bilan (3 min) les personnalise."
+    static let texte = String(localized: "Repères adulte moyen. Ton bilan (3 min) les personnalise.")
 
     /// Visibilité : uniquement sans bilan (invariant testé hors UI —
     /// « étiquette présente sans bilan, absente avec »).

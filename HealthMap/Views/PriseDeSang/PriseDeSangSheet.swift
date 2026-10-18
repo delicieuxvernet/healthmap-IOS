@@ -120,7 +120,7 @@ struct PriseDeSangSheet: View {
 
     private var titre: String {
         // Plus de « repères » : les valeurs, situées dans l'intervalle du labo.
-        etape == .resultat ? "Tes valeurs mesurées" : "Prise de sang"
+        etape == .resultat ? String(localized: "Tes valeurs mesurées") : String(localized: "Prise de sang")
     }
 
     @ViewBuilder
@@ -151,8 +151,8 @@ struct PriseDeSangSheet: View {
                 .accessibilityHidden(true)
             UnlockDoor(
                 icon: "drop",
-                title: "Tes analyses de sang, dans ton bilan",
-                subtitle: "Photographie ou dépose ton PDF de labo : Kiwio lit tes valeurs et ajuste tes apports.",
+                title: String(localized: "Tes analyses de sang, dans ton bilan"),
+                subtitle: String(localized: "Photographie ou dépose ton PDF de labo : Kiwio lit tes valeurs et ajuste tes apports."),
                 zone: "prise_de_sang"
             )
         }
@@ -253,7 +253,7 @@ struct PriseDeSangSheet: View {
             zoneDeDepot
 
             if CameraPicker.isAvailable {
-                DSCapsuleButton(titre: "Photographier la page") {
+                DSCapsuleButton(titre: String(localized: "Photographier la page")) {
                     HapticService.shared.tap()
                     montreCamera = true
                 }
@@ -262,14 +262,14 @@ struct PriseDeSangSheet: View {
 
             HStack(spacing: 10) {
                 PhotosPicker(selection: $photoChoisie, matching: .images) {
-                    optionLabel("photo.on.rectangle", "Choisir une photo")
+                    optionLabel("photo.on.rectangle", String(localized: "Choisir une photo"))
                 }
                 .buttonStyle(.dsPress)
                 Button {
                     HapticService.shared.tap()
                     montreFichiers = true
                 } label: {
-                    optionLabel("doc", "Importer un PDF")
+                    optionLabel("doc", String(localized: "Importer un PDF"))
                 }
                 .buttonStyle(.dsPress)
                 .accessibilityIdentifier("sang.pdf")
@@ -277,11 +277,11 @@ struct PriseDeSangSheet: View {
 
             ligneInfo(
                 "lock",
-                "Ton document est lu, puis oublié : Kiwio ne garde que les valeurs, et tu peux les effacer quand tu veux."
+                String(localized: "Ton document est lu, puis oublié : Kiwio ne garde que les valeurs, et tu peux les effacer quand tu veux.")
             )
             ligneInfo(
                 "list.bullet.clipboard",
-                "Kiwio lit la vitamine D, la B12, la ferritine, le fer, le magnésium, le calcium, le zinc, la vitamine C, l'iode, l'index oméga-3 et les folates."
+                String(localized: "Kiwio lit la vitamine D, la B12, la ferritine, le fer, le magnésium, le calcium, le zinc, la vitamine C, l'iode, l'index oméga-3 et les folates.")
             )
         }
     }
@@ -394,7 +394,7 @@ struct PriseDeSangSheet: View {
             .dsCard()
             .padding(.top, 12)
 
-            DSCapsuleButton(titre: "Réessayer") { etape = .depot }
+            DSCapsuleButton(titre: String(localized: "Réessayer")) { etape = .depot }
 
             carteMedecin(avisMedical)
         }
@@ -407,8 +407,8 @@ struct PriseDeSangSheet: View {
 
         return VStack(alignment: .leading, spacing: DS.interCarte) {
             Text(prise.dateLue
-                 ? "Prélèvement du \(prise.dateCourte())"
-                 : "Importée le \(prise.dateCourte()) · date du prélèvement non lue")
+                 ? String(localized: "Prélèvement du \(prise.dateCourte())")
+                 : String(localized: "Importée le \(prise.dateCourte()) · date du prélèvement non lue"))
                 .font(.dsSousTitre)
                 .foregroundStyle(Color.dsSecondaire)
                 .padding(.top, 8)
@@ -416,8 +416,8 @@ struct PriseDeSangSheet: View {
             // Ce qui a été lu et ce que ça change aux apports : deux faits,
             // une seule teinte neutre. Aucun décompte « bon / à revoir ».
             HStack(spacing: 10) {
-                compteur(prise.markers.count, prise.markers.count > 1 ? "valeurs lues" : "valeur lue")
-                compteur(effets.count, effets.count > 1 ? "apports corrigés" : "apport corrigé")
+                compteur(prise.markers.count, prise.markers.count > 1 ? String(localized: "valeurs lues") : String(localized: "valeur lue"))
+                compteur(effets.count, effets.count > 1 ? String(localized: "apports corrigés") : String(localized: "apport corrigé"))
             }
             .kiwiEntrance(0)
 
@@ -439,7 +439,7 @@ struct PriseDeSangSheet: View {
             }
 
             if !effets.isEmpty {
-                DSSectionHeader(titre: "Ton bilan en tient compte")
+                DSSectionHeader(titre: String(localized: "Ton bilan en tient compte"))
                 VStack(spacing: 0) {
                     ForEach(Array(effets.enumerated()), id: \.offset) { index, effet in
                         ligneEffet(effet)
@@ -454,7 +454,7 @@ struct PriseDeSangSheet: View {
                     .padding(.horizontal, 4)
             }
 
-            DSCapsuleButton(titre: "Importer une autre prise de sang") { etape = .depot }
+            DSCapsuleButton(titre: String(localized: "Importer une autre prise de sang")) { etape = .depot }
                 .padding(.top, 18)
 
             Button(role: .destructive) {
@@ -600,7 +600,7 @@ struct PriseDeSangSheet: View {
                 try await dashboardVM.supprimerPriseDeSang()
                 etape = dashboardVM.priseDeSang == nil ? .depot : .resultat
             } catch {
-                etape = .erreur("La suppression n'a pas abouti. Réessaie dans un instant.")
+                etape = .erreur(String(localized: "La suppression n'a pas abouti. Réessaie dans un instant."))
             }
             suppressionEnCours = false
         }
@@ -668,24 +668,26 @@ struct PriseDeSangCarte: View {
     var identifiant: String = "bilan.priseDeSang"
     let action: () -> Void
 
-    static let invitation = "Ajoute tes analyses : tes valeurs mesurées corrigent l'estimation de tes apports."
-    static let avis = "Ne remplace pas un avis médical : montre tes résultats à ton médecin."
+    static let invitation = String(localized: "Ajoute tes analyses : tes valeurs mesurées corrigent l'estimation de tes apports.")
+    static let avis = String(localized: "Ne remplace pas un avis médical : montre tes résultats à ton médecin.")
 
     /// La ligne sous le titre : l'invitation, ou ce qui a été importé et ce
     /// que ça pèse encore (`PriseDeSangApports.fraicheur`).
     static func sousTitre(_ prise: PriseDeSang?, maintenant: Date = Date()) -> String {
         guard let prise else { return invitation }
-        let quand = "\(prise.dateLue ? "Prélèvement du" : "Importée le") \(prise.dateCourte(maintenant: maintenant))"
+        let quand = prise.dateLue
+            ? String(localized: "Prélèvement du \(prise.dateCourte(maintenant: maintenant))")
+            : String(localized: "Importée le \(prise.dateCourte(maintenant: maintenant))")
         switch PriseDeSangApports.fraicheur(prise, maintenant: maintenant) {
         case 1:
             // Ce qui a été lu, sans le juger.
             let n = prise.markers.count
-            let valeurs = n == 1 ? "1 valeur lue" : "\(n) valeurs lues"
+            let valeurs = n == 1 ? String(localized: "1 valeur lue") : String(localized: "\(n) valeurs lues")
             return "\(quand) · \(valeurs)"
         case 0:
-            return "\(quand) · plus d'un an : elle ne compte plus dans tes apports"
+            return String(localized: "\(quand) · plus d'un an : elle ne compte plus dans tes apports")
         default:
-            return "\(quand) · plus de 6 mois : elle compte moitié moins"
+            return String(localized: "\(quand) · plus de 6 mois : elle compte moitié moins")
         }
     }
 
@@ -696,11 +698,11 @@ struct PriseDeSangCarte: View {
     }
 
     private var lectureVoiceOver: String {
-        var phrases = ["Prise de sang, nouveau, en bêta", Self.sousTitre(prise)]
-        if !premium { phrases.append("Réservée à Kiwio Premium") }
+        var phrases = [String(localized: "Prise de sang, nouveau, en bêta"), Self.sousTitre(prise)]
+        if !premium { phrases.append(String(localized: "Réservée à Kiwio Premium")) }
         phrases += effets.map { effet in
             let nom = NutrientData.definition(for: effet.id)?.label ?? effet.id
-            return "\(nom) : \(effet.texteAvant) avant, \(effet.texteApres) avec ta prise de sang"
+            return String(localized: "\(nom) : \(effet.texteAvant) avant, \(effet.texteApres) avec ta prise de sang")
         }
         phrases.append(Self.avis)
         return phrases.joined(separator: ". ")

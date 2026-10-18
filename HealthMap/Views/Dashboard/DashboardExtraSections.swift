@@ -65,7 +65,7 @@ extension DashboardView {
                     redFlags: viewModel.redFlags
                 )
             } label: {
-                premiumActionLabel(symbole: "doc.richtext", titre: "Exporter mon bilan PDF")
+                premiumActionLabel(symbole: "doc.richtext", titre: String(localized: "Exporter mon bilan PDF"))
             }
             .buttonStyle(.dsPress)
 
@@ -73,7 +73,7 @@ extension DashboardView {
                 HapticService.shared.primary()
                 shareScore()
             } label: {
-                premiumActionLabel(symbole: "square.and.arrow.up", titre: "Partager mon score")
+                premiumActionLabel(symbole: "square.and.arrow.up", titre: String(localized: "Partager mon score"))
             }
             .buttonStyle(.dsPress)
         }
@@ -101,11 +101,11 @@ extension DashboardView {
     // MARK: - Share Score
     func shareScore() {
         let score = viewModel.healthScore
-        let message = """
+        let message = String(localized: """
         Mon score nutritionnel Kiwio : \(score)/100
 
         Decouvre le tien sur https://healthmap.fr
-        """
+        """)
 
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = scene.windows.first,

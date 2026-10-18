@@ -46,11 +46,11 @@ struct KiwiFloatingTabBar: View {
     }
 
     private let items: [Item] = [
-        Item(tab: .journal, icon: "book.closed", label: "Journal"),
-        Item(tab: .progres, icon: "chart.xyaxis.line", label: "Progrès"),
-        Item(tab: .plan, icon: "map", label: "Plan"),
-        Item(tab: .complements, icon: "pills", label: "Compléments"),
-        Item(tab: .reglages, icon: "gearshape", label: "Réglages"),
+        Item(tab: .journal, icon: "book.closed", label: String(localized: "Journal")),
+        Item(tab: .progres, icon: "chart.xyaxis.line", label: String(localized: "Progrès")),
+        Item(tab: .plan, icon: "map", label: String(localized: "Plan")),
+        Item(tab: .complements, icon: "pills", label: String(localized: "Compléments")),
+        Item(tab: .reglages, icon: "gearshape", label: String(localized: "Réglages")),
     ]
 
     /// Onglet dont l'icône rebondit (celui qu'on vient de toucher).

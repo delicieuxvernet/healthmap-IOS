@@ -76,9 +76,9 @@ struct PrecisionPicker: View {
             .foregroundStyle(isSelected ? Color.teinteKiwiTexte : Color.dsTexte)
         }
         .buttonStyle(.dsPress)
-        .accessibilityLabel("\(option.label), \(isSelected ? "sélectionné" : "non sélectionné")")
+        .accessibilityLabel(isSelected ? Text("\(option.label), sélectionné") : Text("\(option.label), non sélectionné"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityHint("Double tape pour \(isSelected ? "désélectionner" : "sélectionner")")
+        .accessibilityHint(isSelected ? Text("Double tape pour désélectionner") : Text("Double tape pour sélectionner"))
     }
 }
 

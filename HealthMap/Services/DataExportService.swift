@@ -52,7 +52,7 @@ final class DataExportService {
     }
 
     /// Ce que dit le fichier quand une partie des données manque.
-    nonisolated static let notePartielle = "Export partiel : le serveur n'a pas renvoyé toutes tes données (repas, journal, prises de sang…). Réessaie avec une connexion stable, ou écris à contact@healthmap.fr."
+    nonisolated static let notePartielle = String(localized: "Export partiel : le serveur n'a pas renvoyé toutes tes données (repas, journal, prises de sang…). Réessaie avec une connexion stable, ou écris à contact@healthmap.fr.")
 
     /// Le serveur liste les sections qu'il n'a pas pu lire
     /// (`export_metadata.incomplete_sections`) : complet seulement si elle est vide.
@@ -280,7 +280,7 @@ final class DataExportService {
     private var dernierExportPartiel = false
 
     /// Message affiché quand l'export est partiel.
-    nonisolated static let messagePartiel = "Export partiel : une partie de tes données n'a pas pu être récupérée. Réessaie plus tard."
+    nonisolated static let messagePartiel = String(localized: "Export partiel : une partie de tes données n'a pas pu être récupérée. Réessaie plus tard.")
 
     // MARK: - Present Share Sheet
 

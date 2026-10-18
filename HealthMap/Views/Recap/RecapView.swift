@@ -181,7 +181,7 @@ struct RecapView: View {
                 Button("Slide suivant") { progression.suivant() }
                 Button("Slide précédent") { progression.precedent() }
                 if !voiceOver {
-                    Button(progression.enPause ? "Reprendre" : "Mettre en pause") {
+                    Button(progression.enPause ? String(localized: "Reprendre") : String(localized: "Mettre en pause")) {
                         progression.enPause ? progression.reprendre() : progression.mettreEnPause()
                     }
                 }

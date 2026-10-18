@@ -42,11 +42,11 @@ private extension StatutMicro {
     var phrase: String? {
         switch self {
         case .basProlonge(let jours):
-            return "Bas \(jours) jours sur les 7 derniers."
+            return String(localized: "Bas \(jours) jours sur les 7 derniers.")
         case .auDessusDeLaLimite(let jours):
-            return "Au-dessus de la limite \(jours) jours sur les 7 derniers."
+            return String(localized: "Au-dessus de la limite \(jours) jours sur les 7 derniers.")
         case .basCeJour:
-            return "Bas sur cette journée."
+            return String(localized: "Bas sur cette journée.")
         case .normal:
             return nil
         }
@@ -109,8 +109,8 @@ struct JournalMicrosAlerte: View {
 
     private var titre: String {
         alertes.count > 1
-            ? "\(alertes.count) apports bas depuis plusieurs jours"
-            : "Un apport bas depuis plusieurs jours"
+            ? String(localized: "\(alertes.count) apports bas depuis plusieurs jours")
+            : String(localized: "Un apport bas depuis plusieurs jours")
     }
 
     private var noms: String {
@@ -214,23 +214,25 @@ struct JournalMicrosCard: View {
         let basses = tableau.priorites.filter(\.estBas)
         guard let premiere = basses.first else {
             return tableau.priorites.count > 1
-                ? "Tes \(tableau.priorites.count) priorités, en part de ton besoin couverte"
-                : "Ta priorité, en part de ton besoin couverte"
+                ? String(localized: "Tes \(tableau.priorites.count) priorités, en part de ton besoin couverte")
+                : String(localized: "Ta priorité, en part de ton besoin couverte")
         }
         let noms = basses.map(Self.possessif)
         let sujet: String
         if noms.count > 1, let dernier = noms.last {
-            sujet = noms.dropLast().joined(separator: ", ") + " et " + dernier
+            sujet = noms.dropLast().joined(separator: ", ") + " \(String(localized: "et")) " + dernier
         } else {
             sujet = Self.possessif(premiere)
         }
-        let pluriel = basses.count > 1 || NomNutriment.estPluriel(id: premiere.id)
+        let pluriel = basses.count > 1 || (Langue.estFrancais && NomNutriment.estPluriel(id: premiere.id))
         // L'adjectif s'accorde : le masculin l'emporte dès qu'un apport
         // masculin est dans la liste (« ta vitamine C et ton fer sont bas »).
         let feminin = basses.allSatisfy(Self.estFeminin)
-        let verbe = pluriel ? "sont" : "est"
-        let adjectif = feminin ? (pluriel ? "basses" : "basse") : "bas"
-        return NomNutriment.majusculeInitiale(sujet) + " \(verbe) \(adjectif)."
+        let debut = NomNutriment.majusculeInitiale(sujet)
+        if pluriel {
+            return feminin ? String(localized: "\(debut) sont basses.") : String(localized: "\(debut) sont bas.")
+        }
+        return feminin ? String(localized: "\(debut) est basse.") : String(localized: "\(debut) est bas.")
     }
 
     /// « ta vitamine C », « ton fer » : le possessif des notifications. Les
@@ -238,7 +240,7 @@ struct JournalMicrosCard: View {
     /// deviendraient « ton apport en vitamine B9 ».
     private static func possessif(_ ligne: LigneMicro) -> String {
         if NutrientID(rawValue: ligne.id) == nil, ligne.nom.hasPrefix("Vitamine ") {
-            return "ta " + NomNutriment.minusculeInitiale(ligne.nom)
+            return String(localized: "ta \(NomNutriment.minusculeInitiale(ligne.nom))")
         }
         return NomNutriment.possessif(id: ligne.id, nom: ligne.nom)
     }
@@ -384,7 +386,7 @@ struct JournalMicrosCard: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(deplie ? "Masquer le détail" : "Voir les \(nombreAffiche) micronutriments")
+                Text(deplie ? String(localized: "Masquer le détail") : String(localized: "Voir les \(nombreAffiche) micronutriments"))
                     .font(.dsSousTitreMoyen)
                     .tracking(DSTracking.sousTitre)
                 Image(systemName: deplie ? "chevron.up" : "chevron.down")
@@ -401,9 +403,9 @@ struct JournalMicrosCard: View {
     private var filtres: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                pastilleDeFiltre("Tous", choix: nil)
+                pastilleDeFiltre(String(localized: "Tous"), choix: nil)
                 ForEach(FamilleMicro.allCases) { uneFamille in
-                    pastilleDeFiltre(uneFamille.rawValue, choix: uneFamille)
+                    pastilleDeFiltre(Langue.texte(uneFamille.rawValue), choix: uneFamille)
                 }
             }
             .padding(.horizontal, DS.paddingCarte)
@@ -447,8 +449,8 @@ struct JournalMicrosCard: View {
 
     private var legende: some View {
         HStack(spacing: 14) {
-            repereDeLegende(couleur: .dsACombler, texte: "bas 3 jours sur 7")
-            repereDeLegende(couleur: .dsARenforcer, texte: "bas ce jour")
+            repereDeLegende(couleur: .dsACombler, texte: String(localized: "bas 3 jours sur 7"))
+            repereDeLegende(couleur: .dsARenforcer, texte: String(localized: "bas ce jour"))
         }
         .padding(.horizontal, DS.paddingCarte)
         .padding(.top, 6)
@@ -521,20 +523,20 @@ private struct LigneMicroVue: View {
     /// Ce qui s'affiche à droite quand l'apport n'a pas de chiffre.
     private var sansChiffre: String {
         if ligne.sens == .rapport {
-            return ligne.rapport.map { MicrosDuJour.texteDuRapport($0) } ?? "À mesurer"
+            return ligne.rapport.map { MicrosDuJour.texteDuRapport($0) } ?? String(localized: "À mesurer")
         }
         if ligne.sens == .limite {
-            guard let quantite = ligne.quantiteDuJour else { return "Rien de noté" }
+            guard let quantite = ligne.quantiteDuJour else { return String(localized: "Rien de noté") }
             return "\(MicrosDuJour.quantite(quantite))\(DS.fine)\(ligne.unite)"
         }
-        return "À mesurer"
+        return String(localized: "À mesurer")
     }
 
     private var libelleVocal: String {
-        if verrouille { return "\(ligne.nom), réservé à Kiwio Premium" }
+        if verrouille { return String(localized: "\(ligne.nom), réservé à Kiwio Premium") }
         var morceaux: [String] = [ligne.nom]
         if let niveau = ligne.niveau {
-            morceaux.append("\(niveau) pour cent de ton besoin")
+            morceaux.append(String(localized: "\(niveau) pour cent de ton besoin"))
         } else {
             morceaux.append(sansChiffre)
         }
@@ -586,7 +588,7 @@ private struct LigneMicroVue: View {
         .buttonStyle(LigneMicroPressStyle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(libelleVocal)
-        .accessibilityHint(verrouille ? "Ouvre l'abonnement Premium" : "Ouvre les informations sur cet apport")
+        .accessibilityHint(verrouille ? String(localized: "Ouvre l'abonnement Premium") : String(localized: "Ouvre les informations sur cet apport"))
     }
 
     /// Le point porte la teinte de l'apport, comme la jauge.
@@ -778,12 +780,12 @@ struct MicroDuJourSheet: View {
         }
         guard ligne.sens == .besoin, let niveau = ligne.niveau else { return nil }
         if niveau >= MicrosDuJour.seuilBas {
-            return Etiquette(texte: "Couvert", encre: Color.teinteKiwiTexte, fond: Color.teinteKiwi.opacity(0.14))
+            return Etiquette(texte: String(localized: "Couvert"), encre: Color.teinteKiwiTexte, fond: Color.teinteKiwi.opacity(0.14))
         }
         if niveau >= 30 {
-            return Etiquette(texte: "À renforcer", encre: Color.dsARenforcerTexte, fond: Color.dsARenforcer.opacity(0.14))
+            return Etiquette(texte: String(localized: "À renforcer"), encre: Color.dsARenforcerTexte, fond: Color.dsARenforcer.opacity(0.14))
         }
-        return Etiquette(texte: "À combler", encre: Color.dsACombler, fond: Color.dsACombler.opacity(0.12))
+        return Etiquette(texte: String(localized: "À combler"), encre: Color.dsACombler, fond: Color.dsACombler.opacity(0.12))
     }
 
     /// Ce que le chiffre mesure, et d'où il vient. Quand l'anneau porte déjà
@@ -791,42 +793,42 @@ struct MicroDuJourSheet: View {
     private var sousTitre: String {
         if ligne.sens == .rapport {
             return ligne.rapport == nil
-                ? "Pas encore de chiffre : il faut une journée de repas assez notée. Le repère de l'ANSES : 5 pour 1 ou moins."
-                : "Pour 1 g d'oméga-3, tes repas notés apportent ce nombre de grammes d'oméga-6. Le repère de l'ANSES : 5 pour 1 ou moins."
+                ? String(localized: "Pas encore de chiffre : il faut une journée de repas assez notée. Le repère de l'ANSES : 5 pour 1 ou moins.")
+                : String(localized: "Pour 1 g d'oméga-3, tes repas notés apportent ce nombre de grammes d'oméga-6. Le repère de l'ANSES : 5 pour 1 ou moins.")
         }
         if ligne.sens == .limite {
-            return "Une limite à ne pas dépasser, suivie sur tes repas notés."
+            return String(localized: "Une limite à ne pas dépasser, suivie sur tes repas notés.")
         }
         guard ligne.niveau != nil else {
-            return "Pas encore de chiffre : il faut une journée de repas assez notée."
+            return String(localized: "Pas encore de chiffre : il faut une journée de repas assez notée.")
         }
         if ligne.statutApport != nil {
-            return "Part de la référence ANSES couverte, estimée : pas un résultat d'analyse."
+            return String(localized: "Part de la référence ANSES couverte, estimée : pas un résultat d'analyse.")
         }
         return ligne.partDuQuestionnaire
-            ? "D'après ton questionnaire, puis tes repas notés."
-            : "D'après tes repas notés."
+            ? String(localized: "D'après ton questionnaire, puis tes repas notés.")
+            : String(localized: "D'après tes repas notés.")
     }
 
     private var noteDuGraphe: String {
         switch ligne.sens {
-        case .besoin: return "pointillé : 60 % du besoin"
-        case .limite: return "pointillé : la limite"
-        case .rapport: return "pointillé : 5 pour 1"
+        case .besoin: return String(localized: "pointillé : 60 % du besoin")
+        case .limite: return String(localized: "pointillé : la limite")
+        case .rapport: return String(localized: "pointillé : 5 pour 1")
         }
     }
 
     /// Le titre nomme le constat seulement quand il est vrai : un apport
     /// couvert garde le titre neutre.
     private var titreDesFaits: String {
-        ligne.estBas ? "Pourquoi c'est bas chez toi" : "D'où vient ce chiffre"
+        ligne.estBas ? String(localized: "Pourquoi c'est bas chez toi") : String(localized: "D'où vient ce chiffre")
     }
 
     private var titreDesSources: String {
         switch ligne.sens {
-        case .besoin: return ligne.estBas ? "Quoi ajouter dans ton assiette" : "Où le trouver"
-        case .limite: return "Où il se cache"
-        case .rapport: return "Pour le rééquilibrer"
+        case .besoin: return ligne.estBas ? String(localized: "Quoi ajouter dans ton assiette") : String(localized: "Où le trouver")
+        case .limite: return String(localized: "Où il se cache")
+        case .rapport: return String(localized: "Pour le rééquilibrer")
         }
     }
 
@@ -1029,7 +1031,7 @@ struct MicroDuJourSheet: View {
 
     @ViewBuilder
     private var blocsDesRepas: some View {
-        MicroSection(titre: "Tes repas, jour par jour", note: noteDuGraphe, rang: 3) {
+        MicroSection(titre: String(localized: "Tes repas, jour par jour"), note: noteDuGraphe, rang: 3) {
             SemaineMicroGraphe(jours: ligne.semaine, sens: ligne.sens)
                 .padding(.horizontal, DS.paddingCarte)
                 .padding(.vertical, 14)
@@ -1038,14 +1040,14 @@ struct MicroDuJourSheet: View {
 
         if !ligne.contributeurs.isEmpty {
             MicroSection(
-                titre: ligne.sens == .rapport ? "Tes oméga-6 viennent surtout de" : "Dans tes repas cette semaine",
+                titre: ligne.sens == .rapport ? String(localized: "Tes oméga-6 viennent surtout de") : String(localized: "Dans tes repas cette semaine"),
                 rang: 4
             ) {
                 carteDesContributeurs
             }
         }
 
-        MicroSection(titre: ligne.sens == .rapport ? "Pourquoi le regarder" : "À quoi ça sert", rang: 5) {
+        MicroSection(titre: ligne.sens == .rapport ? String(localized: "Pourquoi le regarder") : String(localized: "À quoi ça sert"), rang: 5) {
             FicheTexteCarte(texte: ligne.role)
         }
     }
@@ -1077,7 +1079,7 @@ struct MicroDuJourSheet: View {
     @ViewBuilder
     private var piedDePage: some View {
         if apportDuBilan != nil {
-            DSLinkRow(titre: "Voir tout ce qui pèse sur cet apport") {
+            DSLinkRow(titre: String(localized: "Voir tout ce qui pèse sur cet apport")) {
                 HapticService.shared.tap()
                 montreLesCauses = true
             }
@@ -1085,7 +1087,7 @@ struct MicroDuJourSheet: View {
             .padding(.top, 24)
         }
 
-        Text(Micronutriments.mentionSources + " Si une gêne persiste, parles-en à un professionnel de santé.")
+        Text(Micronutriments.mentionSources + " " + String(localized: "Si une gêne persiste, parles-en à un professionnel de santé."))
             .font(.system(.caption, design: .default))
             .foregroundStyle(Color.dsSecondaire)
             .fixedSize(horizontal: false, vertical: true)
@@ -1116,7 +1118,7 @@ private struct SemaineMicroGraphe: View {
 
     private static let initiale: DateFormatter = {
         let format = DateFormatter()
-        format.locale = Locale(identifier: "fr_FR")
+        format.locale = Langue.locale
         format.dateFormat = "EEEEE"
         return format
     }()
@@ -1135,8 +1137,8 @@ private struct SemaineMicroGraphe: View {
 
     private var resume: String {
         let mesures = jours.compactMap(\.couverture)
-        guard !mesures.isEmpty else { return "Aucune journée assez notée sur les 7 derniers jours." }
-        return "\(mesures.count) journées assez notées sur 7."
+        guard !mesures.isEmpty else { return String(localized: "Aucune journée assez notée sur les 7 derniers jours.") }
+        return String(localized: "\(mesures.count) journées assez notées sur 7.")
     }
 
     var body: some View {
@@ -1189,8 +1191,8 @@ private struct SemaineMicroGraphe: View {
         let mesures = jours.compactMap(\.couverture)
         // Un rapport ne se lit pas en pour cent : le résumé suffit.
         guard !mesures.isEmpty, sens != .rapport else { return resume }
-        let detail = mesures.map { "\($0) pour cent" }.joined(separator: ", ")
-        return "\(resume) Jour par jour : \(detail)."
+        let detail = mesures.map { String(localized: "\($0) pour cent") }.joined(separator: ", ")
+        return String(localized: "\(resume) Jour par jour : \(detail).")
     }
 }
 

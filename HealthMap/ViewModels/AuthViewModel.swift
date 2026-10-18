@@ -278,7 +278,7 @@ final class AuthViewModel: ObservableObject {
 
     func signIn(email: String, password: String) async {
         guard !email.isEmpty, !password.isEmpty else {
-            errorMessage = "Remplis tous les champs."
+            errorMessage = String(localized: "Remplis tous les champs.")
             return
         }
 
@@ -341,7 +341,7 @@ final class AuthViewModel: ObservableObject {
 
     func signUp(email: String, password: String, firstName: String) async {
         guard !email.isEmpty, !password.isEmpty, !firstName.isEmpty else {
-            errorMessage = "Remplis tous les champs."
+            errorMessage = String(localized: "Remplis tous les champs.")
             return
         }
 
@@ -378,7 +378,7 @@ final class AuthViewModel: ObservableObject {
                 // « Confirm email » est actif côté Supabase : le compte existe,
                 // mais la session ne l'est pas. Sans ce message, le testeur
                 // voyait le spinner tourner, s'arrêter, et… rien.
-                errorMessage = "On t'a envoyé un mail de confirmation. Ouvre-le, clique sur le lien, puis reviens te connecter."
+                errorMessage = String(localized: "On t'a envoyé un mail de confirmation. Ouvre-le, clique sur le lien, puis reviens te connecter.")
             }
         } catch {
             errorMessage = Self.mapAuthError(error)
@@ -391,7 +391,7 @@ final class AuthViewModel: ObservableObject {
     /// À appeler depuis l'UI après que l'user a entré son code.
     func verifySignUpCode(_ code: String) async {
         guard !code.isEmpty else {
-            errorMessage = "Saisis le code reçu par email."
+            errorMessage = String(localized: "Saisis le code reçu par email.")
             return
         }
         isProcessing = true
@@ -428,7 +428,7 @@ final class AuthViewModel: ObservableObject {
             // un sheet où aucun code ne marchera plus jamais.
             pendingEmailVerification = false
             resendAttempts = 0
-            errorMessage = "Ta session d'inscription a expiré. Recommence l'inscription."
+            errorMessage = String(localized: "Ta session d'inscription a expiré. Recommence l'inscription.")
         } catch {
             errorMessage = Self.mapAuthError(error)
         }
@@ -449,7 +449,7 @@ final class AuthViewModel: ObservableObject {
             // A failed server sign-out still means the user wants to leave:
             // keeping stale state leads to cross-user data leaks.
             AppLogger.auth.notice("Server sign-out failed: \(error.localizedDescription, privacy: .public)")
-            errorMessage = "Déconnexion partielle. Tes données locales ont bien été effacées."
+            errorMessage = String(localized: "Déconnexion partielle. Tes données locales ont bien été effacées.")
         }
 
         // Always clear local state, even if server sign-out threw
@@ -508,7 +508,7 @@ final class AuthViewModel: ObservableObject {
             return true
         } catch {
             AppLogger.auth.report(error, context: "AuthViewModel deleteAccount")
-            errorMessage = "La suppression du compte n'a pas abouti. Réessaie ou écris au support."
+            errorMessage = String(localized: "La suppression du compte n'a pas abouti. Réessaie ou écris au support.")
             isProcessing = false
             return false
         }
@@ -536,7 +536,7 @@ final class AuthViewModel: ObservableObject {
 
     func resetPassword(email: String) async -> Bool {
         guard !email.isEmpty else {
-            errorMessage = "Saisis ton adresse email."
+            errorMessage = String(localized: "Saisis ton adresse email.")
             return false
         }
 
@@ -563,7 +563,7 @@ final class AuthViewModel: ObservableObject {
     /// Clerk n'expose pas de magic-link reset — c'est obligatoirement code + new password.
     func completeResetPassword(code: String, newPassword: String) async -> Bool {
         guard !code.isEmpty else {
-            errorMessage = "Saisis le code reçu par email."
+            errorMessage = String(localized: "Saisis le code reçu par email.")
             return false
         }
         let validationIssues = PasswordValidator.validate(newPassword)
@@ -618,7 +618,7 @@ final class AuthViewModel: ObservableObject {
     /// d'erreur clair invitant à patienter.
     func resendResetPasswordCode() async -> Bool {
         guard let email = resetPasswordEmail else {
-            errorMessage = "Aucune réinitialisation en cours. Recommence depuis l'écran email."
+            errorMessage = String(localized: "Aucune réinitialisation en cours. Recommence depuis l'écran email.")
             return false
         }
         guard resendAttempts < Self.maxResendAttempts else {
@@ -643,7 +643,7 @@ final class AuthViewModel: ObservableObject {
     /// À appeler depuis le bouton "Renvoyer le code" dans EmailCodeVerificationSheet.
     func resendSignUpCode() async -> Bool {
         guard pendingEmailVerification else {
-            errorMessage = "Aucune inscription en cours."
+            errorMessage = String(localized: "Aucune inscription en cours.")
             return false
         }
         guard resendAttempts < Self.maxResendAttempts else {
@@ -677,7 +677,7 @@ final class AuthViewModel: ObservableObject {
             AnalyticsService.shared.track(.signInCompleted, properties: ["method": "google"])
         } catch {
             AppLogger.auth.report(error, context: "AuthViewModel signInWithGoogle")
-            errorMessage = "La connexion avec Google n'a pas abouti. Réessaie."
+            errorMessage = String(localized: "La connexion avec Google n'a pas abouti. Réessaie.")
         }
 
         isProcessing = false
@@ -735,7 +735,7 @@ final class AuthViewModel: ObservableObject {
             AnalyticsService.shared.track(.signInCompleted, properties: ["method": "apple"])
         } catch {
             AppLogger.auth.report(error, context: "AuthViewModel signInWithApple")
-            errorMessage = "La connexion avec Apple n'a pas abouti. Réessaie."
+            errorMessage = String(localized: "La connexion avec Apple n'a pas abouti. Réessaie.")
         }
 
         isProcessing = false
@@ -784,39 +784,39 @@ final class AuthViewModel: ObservableObject {
         let codeMatchers: [(needles: [String], message: String)] = [
             (["form_identifier_exists", "already registered", "already_exists",
               "that email address is taken"],
-             "Un compte existe déjà avec cet email."),
+             String(localized: "Un compte existe déjà avec cet email.")),
             (["form_identifier_not_found", "user not found", "couldn't find your account"],
-             "Aucun compte trouvé avec cet email."),
+             String(localized: "Aucun compte trouvé avec cet email.")),
             (["form_password_incorrect", "invalid login", "invalid_credentials",
               "incorrect password"],
-             "Email ou mot de passe incorrect."),
+             String(localized: "Email ou mot de passe incorrect.")),
             (["form_password_pwned",
               "online data breach",
               "data breach",
               "use a different password"],
-             "Ce mot de passe figure dans une fuite de données connue. Choisis-en un autre."),
+             String(localized: "Ce mot de passe figure dans une fuite de données connue. Choisis-en un autre.")),
             (["form_password_validation_failed", "password_too_short", "weak password"],
-             "Le mot de passe ne respecte pas les règles (8 caractères min, majuscule, chiffre, spécial)."),
+             String(localized: "Le mot de passe ne respecte pas les règles (8 caractères min, majuscule, chiffre, spécial).")),
             (["form_code_incorrect", "verification_failed"],
-             "Code incorrect. Vérifie tes mails et réessaie."),
+             String(localized: "Code incorrect. Vérifie tes mails et réessaie.")),
             (["form_code_expired", "verification_expired"],
-             "Ce code a expiré. Demande un nouveau code."),
+             String(localized: "Ce code a expiré. Demande un nouveau code.")),
             (["session_token_expired", "session_expired"],
-             "Ta session a expiré. Reconnecte-toi."),
+             String(localized: "Ta session a expiré. Reconnecte-toi.")),
             (["session_exists", "you're already signed in", "already signed in"],
-             "Tu es déjà connecté. Patiente un instant…"),
+             String(localized: "Tu es déjà connecté. Patiente un instant…")),
             (["client_state_invalid"],
-             "Quelque chose s'est mal passé. Recommence depuis l'écran de connexion."),
+             String(localized: "Quelque chose s'est mal passé. Recommence depuis l'écran de connexion.")),
             (["too_many_requests", "rate limit"],
-             "Trop de tentatives. Réessaie dans quelques minutes."),
+             String(localized: "Trop de tentatives. Réessaie dans quelques minutes.")),
             (["captcha_invalid", "captcha_failed"],
-             "La vérification anti-robot n'a pas abouti. Réessaie."),
+             String(localized: "La vérification anti-robot n'a pas abouti. Réessaie.")),
             (["oauth_access_denied", "oauth_callback"],
-             "Connexion annulée ou refusée."),
+             String(localized: "Connexion annulée ou refusée.")),
             (["email not confirmed"],
-             "Vérifie ton email pour activer ton compte."),
+             String(localized: "Vérifie ton email pour activer ton compte.")),
             (["network", "timeout", "could not connect"],
-             "Erreur réseau. Vérifie ta connexion et réessaie."),
+             String(localized: "Erreur réseau. Vérifie ta connexion et réessaie.")),
         ]
 
         for matcher in codeMatchers {
@@ -829,7 +829,7 @@ final class AuthViewModel: ObservableObject {
         // pouvoir enrichir le mapping si un nouveau code apparaît, mais on
         // n'expose JAMAIS la description anglaise à l'utilisateur — confusion.
         AppLogger.auth.notice("Unmapped auth error: \(raw, privacy: .public)")
-        return "La connexion n'a pas abouti. Réessaie."
+        return String(localized: "La connexion n'a pas abouti. Réessaie.")
     }
 }
 

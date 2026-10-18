@@ -39,7 +39,7 @@ enum FunFactCatalog {
     /// EXACT — donc jamais une taille attribuée à tort.
     private static let heightRefs: [(cm: Int, who: String)] = [
         (147, "Édith Piaf"), (155, "Lady Gaga"), (157, "Kevin Hart"),
-        (165, "Daniel Radcliffe"), (168, "Napoléon"), (170, "Lionel Messi"),
+        (165, "Daniel Radcliffe"), (168, String(localized: "Napoléon")), (170, "Lionel Messi"),
         (173, "Rihanna"), (178, "Kylian Mbappé"), (185, "Zinédine Zidane"),
         (187, "Cristiano Ronaldo"), (190, "Omar Sy"), (196, "Charles de Gaulle"),
         (204, "Teddy Riner"), (216, "Shaquille O'Neal"),
@@ -50,19 +50,20 @@ enum FunFactCatalog {
         // assumé, hors échelle humaine courante. Ce n'est pas une info fausse,
         // c'est une blague explicite pour l'extrême haut du slider.
         if cm > 216 {
-            return "La tour Eiffel (330 m) garde de l'avance… pour l'instant !"
+            return String(localized: "La tour Eiffel (330 m) garde de l'avance… pour l'instant !")
         }
         // Célébrité dont la taille est la plus proche de la valeur choisie.
         let ref = heightRefs.min { abs($0.cm - cm) < abs($1.cm - cm) } ?? heightRefs[0]
         let delta = cm - ref.cm
         if delta == 0 {
-            return "Pile la taille de \(ref.who) (\(ref.cm) cm) !"
+            return String(localized: "Pile la taille de \(ref.who) (\(ref.cm) cm) !")
         }
         if abs(delta) == 1 {
-            return "À un cheveu de \(ref.who) (\(ref.cm) cm) !"
+            return String(localized: "À un cheveu de \(ref.who) (\(ref.cm) cm) !")
         }
-        let sens = delta > 0 ? "de plus que" : "de moins que"
-        return "\(cm) cm, soit \(abs(delta)) cm \(sens) \(ref.who) (\(ref.cm) cm)."
+        return delta > 0
+            ? String(localized: "\(cm) cm, soit \(abs(delta)) cm de plus que \(ref.who) (\(ref.cm) cm).")
+            : String(localized: "\(cm) cm, soit \(abs(delta)) cm de moins que \(ref.who) (\(ref.cm) cm).")
     }
 
     // MARK: - Age (14-100 ans)
@@ -71,15 +72,15 @@ enum FunFactCatalog {
     /// pas de célébrité (leur âge change avec le temps -> deviendrait faux).
     private static func ageFact(_ years: Int) -> String {
         switch years {
-        case ..<18: return "En pleine croissance : ton corps a de grands besoins !"
-        case 18..<25: return "La vingtaine qui démarre, de l'énergie à revendre !"
-        case 25..<30: return "Le moment idéal pour installer tes bons réflexes !"
-        case 30..<40: return "La trentaine, tu construis ton capital forme !"
-        case 40..<50: return "La quarantaine, expérience et vitalité au rendez-vous !"
-        case 50..<60: return "La cinquantaine, le bon moment pour chouchouter tes apports !"
-        case 60..<70: return "La soixantaine et une nouvelle liberté : autant la vivre en forme !"
-        case 70..<85: return "Les bonnes habitudes comptent plus que jamais, et tu es au bon endroit !"
-        default: return "Quelle longévité, respect total !"
+        case ..<18: return String(localized: "En pleine croissance : ton corps a de grands besoins !")
+        case 18..<25: return String(localized: "La vingtaine qui démarre, de l'énergie à revendre !")
+        case 25..<30: return String(localized: "Le moment idéal pour installer tes bons réflexes !")
+        case 30..<40: return String(localized: "La trentaine, tu construis ton capital forme !")
+        case 40..<50: return String(localized: "La quarantaine, expérience et vitalité au rendez-vous !")
+        case 50..<60: return String(localized: "La cinquantaine, le bon moment pour chouchouter tes apports !")
+        case 60..<70: return String(localized: "La soixantaine et une nouvelle liberté : autant la vivre en forme !")
+        case 70..<85: return String(localized: "Les bonnes habitudes comptent plus que jamais, et tu es au bon endroit !")
+        default: return String(localized: "Quelle longévité, respect total !")
         }
     }
 }

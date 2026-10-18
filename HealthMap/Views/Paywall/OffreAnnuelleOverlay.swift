@@ -95,7 +95,7 @@ struct OffreAnnuelleOverlay: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
 
-            PremiumAction(titre: "Voir l'offre") { fermer(puis: onVoir) }
+            PremiumAction(titre: String(localized: "Voir l'offre")) { fermer(puis: onVoir) }
                 .padding(.top, 24)
 
             Button {

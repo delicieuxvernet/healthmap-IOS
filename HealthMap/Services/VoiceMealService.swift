@@ -241,13 +241,13 @@ final class VoiceMealService {
         var errorDescription: String? {
             switch self {
             case .tooShort:
-                return "Je n'ai rien entendu. Réessaie en décrivant ton repas."
+                return String(localized: "Je n'ai rien entendu. Réessaie en décrivant ton repas.")
             case .rateLimited:
-                return "Tu as atteint ta limite de dictées pour aujourd'hui."
+                return String(localized: "Tu as atteint ta limite de dictées pour aujourd'hui.")
             case .noFood:
-                return "Je n'ai pas reconnu d'aliment. Dis par exemple : « ce midi, du poulet avec du riz »."
+                return String(localized: "Je n'ai pas reconnu d'aliment. Dis par exemple : « ce midi, du poulet avec du riz ».")
             case .unavailable:
-                return "L'analyse n'a pas abouti. Réessaie dans un instant."
+                return String(localized: "L'analyse n'a pas abouti. Réessaie dans un instant.")
             }
         }
     }

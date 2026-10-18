@@ -193,19 +193,21 @@ struct AnneauDeCause: View {
                 return false
             }
             if !sources.isEmpty {
-                phrases.append("D'où ça vient : " + sources.map(\.libelle).joined(separator: ", ") + ".")
+                let liste = sources.map(\.libelle).joined(separator: ", ")
+                phrases.append(String(localized: "D'où ça vient : \(liste)."))
             }
             return phrases.joined(separator: " ")
         }
-        var phrases = ["Score \(score) sur 100."]
+        var phrases = [String(localized: "Score \(score) sur 100.")]
         let freins = parts.filter {
             if case .cause = $0.genre { return $0.valeur > 0 }
             return false
         }
         if !freins.isEmpty {
-            phrases.append("Ce qui manque : " + freins
-                .map { "\($0.libelle), \($0.valeur) points" }
-                .joined(separator: ", ") + ".")
+            let liste = freins
+                .map { String(localized: "\($0.libelle), \($0.valeur) points") }
+                .joined(separator: ", ")
+            phrases.append(String(localized: "Ce qui manque : \(liste)."))
         }
         return phrases.joined(separator: " ")
     }
@@ -343,10 +345,15 @@ struct TuileApportHero: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            "\(nom), score \(score) sur 100, \(statutLigne). "
-            + (lignes.isEmpty ? "" : "Ce qui pèse : " + lignes.map { "\($0.libelle), \(PointsApport.signe($0.delta))" }.joined(separator: ", ") + ".")
+            String(localized: "\(nom), score \(score) sur 100, \(statutLigne). ")
+            + (lignes.isEmpty ? "" : String(localized: "Ce qui pèse : \(causesVocales)."))
         )
         .accessibilityHint(cta)
+    }
+
+    /// Les causes dites à voix haute : « Alimentation, −4, Sommeil, −2 ».
+    private var causesVocales: String {
+        lignes.map { "\($0.libelle), \(PointsApport.signe($0.delta))" }.joined(separator: ", ")
     }
 
     private var textes: some View {

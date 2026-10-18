@@ -58,24 +58,24 @@ private enum EtatConseilW {
 /// Les mots et les images du widget, rangés à part pour que les trois formats
 /// disent la même chose.
 private enum PiecesConseilW {
-    static let sansBilan = "Ton conseil du jour arrive avec ton bilan, dans Kiwio."
-    static let sansBilanCourt = "Ton conseil arrive avec ton bilan."
-    static let aRouvrir = "Ouvre Kiwio pour voir ton conseil du jour."
-    static let aRouvrirCourt = "Ouvre Kiwio pour le voir."
+    static let sansBilan = String(localized: "Ton conseil du jour arrive avec ton bilan, dans Kiwio.")
+    static let sansBilanCourt = String(localized: "Ton conseil arrive avec ton bilan.")
+    static let aRouvrir = String(localized: "Ouvre Kiwio pour voir ton conseil du jour.")
+    static let aRouvrirCourt = String(localized: "Ouvre Kiwio pour le voir.")
 
     /// Rien à cocher aujourd'hui : « se tiennent » seulement si tout est
     /// couvert ; sinon la fiche dit ce qui pèse.
     static func rien(seTiennent: Bool) -> String {
-        seTiennent ? "Tes apports se tiennent. Rien à rattraper aujourd'hui."
-                   : "Pas de geste à cocher aujourd'hui. Ta fiche dit ce qui pèse."
+        seTiennent ? String(localized: "Tes apports se tiennent. Rien à rattraper aujourd'hui.")
+                   : String(localized: "Pas de geste à cocher aujourd'hui. Ta fiche dit ce qui pèse.")
     }
 
     /// Le rectangle de l'écran verrouillé n'a que deux lignes.
     static func rienCourt(seTiennent: Bool) -> String {
-        seTiennent ? "Tes apports se tiennent." : "Pas de geste aujourd'hui."
+        seTiennent ? String(localized: "Tes apports se tiennent.") : String(localized: "Pas de geste aujourd'hui.")
     }
-    static let reserve = "Ton geste du jour t'attend dans Kiwio Premium."
-    static let reserveCourt = "Ton geste du jour, avec Premium"
+    static let reserve = String(localized: "Ton geste du jour t'attend dans Kiwio Premium.")
+    static let reserveCourt = String(localized: "Ton geste du jour, avec Premium")
 
     /// Illustration 3D d'un apport (mêmes images que la fiche).
     static func illustration(_ apport: String) -> String {
@@ -126,15 +126,17 @@ private enum PiecesConseilW {
     /// aucun score (le registre lit le questionnaire et le journal) : on ne
     /// promet pas de points ; le badge garde ce que pèse le facteur.
     static func note(_ conseil: ConseilW) -> String {
-        "Noté pour aujourd'hui."
+        String(localized: "Noté pour aujourd'hui.")
     }
 
     /// La lecture VoiceOver du conseil : l'apport, la phrase affichée, les points.
     static func lecture(_ conseil: ConseilW, texte: String) -> String {
         let phrase = texte.hasSuffix(".") ? String(texte.dropLast()) : texte
-        var lue = "Conseil du jour, \(conseil.apportNom). \(phrase)."
+        var lue = String(localized: "Conseil du jour, \(conseil.apportNom). \(phrase).")
         if conseil.points > 0 {
-            lue += " Ce facteur pèse jusqu'à \(conseil.points) \(unite(conseil.points))."
+            lue += " " + (conseil.points > 1
+                ? String(localized: "Ce facteur pèse jusqu'à \(conseil.points) points.")
+                : String(localized: "Ce facteur pèse jusqu'à \(conseil.points) point."))
         }
         return lue
     }
@@ -157,7 +159,7 @@ struct VueConseilPetite: View {
             PetitConseilW(illustration: "fluent_sparkles",
                           etiquette: nil,
                           texte: PiecesConseilW.rien(seTiennent: seTiennent),
-                          lecture: "Conseil du jour. " + PiecesConseilW.rien(seTiennent: seTiennent)) {
+                          lecture: String(localized: "Conseil du jour. \(PiecesConseilW.rien(seTiennent: seTiennent))")) {
                 PiedPetitConseilW(fin: .rien)
             }
         case .conseil(let conseil, fait: let fait, reserve: let reserve):
@@ -261,7 +263,7 @@ private struct PiedPetitConseilW: View {
                         .boutonW(Circle(), fait: fait, ombre: false)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(fait ? "Conseil fait. Toucher pour le décocher" : "C'est fait")
+                .accessibilityLabel(fait ? String(localized: "Conseil fait. Toucher pour le décocher") : String(localized: "C'est fait"))
             }
         }
     }
@@ -284,7 +286,7 @@ struct VueConseilMoyenne: View {
         case .rienARattraper(let seTiennent):
             MoyenConseilW(conseilDuBadge: nil,
                           texte: PiecesConseilW.rien(seTiennent: seTiennent),
-                          lecture: "Conseil du jour. " + PiecesConseilW.rien(seTiennent: seTiennent)) {
+                          lecture: String(localized: "Conseil du jour. \(PiecesConseilW.rien(seTiennent: seTiennent))")) {
                 EmptyView()
             }
         case .conseil(let conseil, fait: let fait, reserve: let reserve):
@@ -317,7 +319,7 @@ private struct MoyenConseilW<Pied: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             // 12 pt sous l'en-tête, comme la maquette.
             VStack(alignment: .leading, spacing: 12) {
-                EnTeteW(icone: .illustration("fluent_sparkles"), titre: "Conseil du jour") {
+                EnTeteW(icone: .illustration("fluent_sparkles"), titre: String(localized: "Conseil du jour")) {
                     if let conseil = conseilDuBadge, conseil.points > 0 {
                         BadgeConseilW(conseil: conseil)
                     }
@@ -476,7 +478,7 @@ struct VueConseilRectangulaire: View {
     var body: some View {
         switch EtatConseilW(etat) {
         case .invitation:
-            RectConseilW(symbole: nil, texte: "Ouvre Kiwio pour commencer.")
+            RectConseilW(symbole: nil, texte: String(localized: "Ouvre Kiwio pour commencer."))
         case .sansBilan(_, let court):
             RectConseilW(symbole: nil, texte: court)
         case .rienARattraper(let seTiennent):
@@ -500,7 +502,7 @@ private struct RectConseilW: View {
     var fait = false
 
     private var lectureVoix: String {
-        fait ? "Conseil du jour, fait : \(texte)" : "Conseil du jour : \(texte)"
+        fait ? String(localized: "Conseil du jour, fait : \(texte)") : String(localized: "Conseil du jour : \(texte)")
     }
 
     var body: some View {

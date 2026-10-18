@@ -27,9 +27,9 @@ enum NiveauConsommation: Int, CaseIterable, Identifiable {
     /// Le mot affiché sur le bouton.
     var libelle: String {
         switch self {
-        case .pasBeaucoup: return "Pas beaucoup"
-        case .moderement: return "Modérément"
-        case .beaucoup: return "Beaucoup"
+        case .pasBeaucoup: return String(localized: "Pas beaucoup")
+        case .moderement: return String(localized: "Modérément")
+        case .beaucoup: return String(localized: "Beaucoup")
         }
     }
 
@@ -37,9 +37,9 @@ enum NiveauConsommation: Int, CaseIterable, Identifiable {
     /// différemment.
     var precision: String {
         switch self {
-        case .pasBeaucoup: return "de temps en temps"
-        case .moderement: return "plusieurs fois par semaine"
-        case .beaucoup: return "tous les jours ou presque"
+        case .pasBeaucoup: return String(localized: "de temps en temps")
+        case .moderement: return String(localized: "plusieurs fois par semaine")
+        case .beaucoup: return String(localized: "tous les jours ou presque")
         }
     }
 

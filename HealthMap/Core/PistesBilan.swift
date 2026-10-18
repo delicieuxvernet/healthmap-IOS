@@ -44,9 +44,9 @@ enum EtatApport: Equatable {
     /// Le mot affiché sous le nom de l'apport.
     var mention: String {
         switch self {
-        case .aSurveiller: return "à surveiller"
-        case .bienParti: return "bien parti"
-        case .enAttente: return "en attente"
+        case .aSurveiller: return String(localized: "à surveiller")
+        case .bienParti: return String(localized: "bien parti")
+        case .enAttente: return String(localized: "en attente")
         }
     }
 }
@@ -104,18 +104,18 @@ struct SyntheseBilan: Equatable {
     var phrase: String {
         let surveilles: String
         switch aSurveiller {
-        case 0: surveilles = "Aucun apport à surveiller"
-        case 1: surveilles = "1 apport à surveiller"
-        default: surveilles = "\(aSurveiller) apports à surveiller"
+        case 0: surveilles = String(localized: "Aucun apport à surveiller")
+        case 1: surveilles = String(localized: "1 apport à surveiller")
+        default: surveilles = String(localized: "\(aSurveiller) apports à surveiller")
         }
         guard assietteConnue else {
-            return surveilles + ". Ton assiette n'a pas encore parlé."
+            return surveilles + ". " + String(localized: "Ton assiette n'a pas encore parlé.")
         }
         let servis: String
         switch bienServis {
-        case 0: servis = "aucun bien servi par ton assiette"
-        case 1: servis = "1 bien servi par ton assiette"
-        default: servis = "\(bienServis) bien servis par ton assiette"
+        case 0: servis = String(localized: "aucun bien servi par ton assiette")
+        case 1: servis = String(localized: "1 bien servi par ton assiette")
+        default: servis = String(localized: "\(bienServis) bien servis par ton assiette")
         }
         return surveilles + ", " + servis + "."
     }
@@ -229,24 +229,24 @@ enum PistesBilan {
     /// Ce que l'écran a déclaré, en mots de la personne.
     static func libelle(de ecran: EcranBilan, profil: UserProfile) -> String {
         switch ecran {
-        case .boire: return "Ton café, ton thé et ton eau"
-        case .alcoolTabac: return "Tes boissons alcoolisées"
-        case .aTable: return "Tes repas de la journée"
-        case .complements: return "Tes compléments"
+        case .boire: return String(localized: "Ton café, ton thé et ton eau")
+        case .alcoolTabac: return String(localized: "Tes boissons alcoolisées")
+        case .aTable: return String(localized: "Tes repas de la journée")
+        case .complements: return String(localized: "Tes compléments")
         case .regime:
             switch profil.dietType {
-            case "vegetarien", "vegetarian": return "Alimentation végétarienne"
-            case "vegan": return "Alimentation végane"
-            default: return "Ton alimentation"
+            case "vegetarien", "vegetarian": return String(localized: "Alimentation végétarienne")
+            case "vegan": return String(localized: "Alimentation végane")
+            default: return String(localized: "Ton alimentation")
             }
         case .cycle:
             switch profil.pregnancyStatus {
-            case "pregnant": return "Grossesse"
-            case "breastfeeding": return "Allaitement"
-            case "trying_to_conceive": return "Projet de grossesse"
-            default: return ["heavy", "very_heavy"].contains(profil.periodFlow) ? "Règles abondantes" : "Ton cycle"
+            case "pregnant": return String(localized: "Grossesse")
+            case "breastfeeding": return String(localized: "Allaitement")
+            case "trying_to_conceive": return String(localized: "Projet de grossesse")
+            default: return ["heavy", "very_heavy"].contains(profil.periodFlow) ? String(localized: "Règles abondantes") : String(localized: "Ton cycle")
             }
-        default: return "Tes réponses"
+        default: return String(localized: "Tes réponses")
         }
     }
 
@@ -339,10 +339,10 @@ enum PistesBilan {
             return CartePiste(
                 genre: estPiste ? .piste : .note,
                 nutriment: cible,
-                surtitre: estPiste ? "Piste repérée" : "C'est noté",
-                titre: estPiste ? "\(nom) : à surveiller" : "\(nom) : ça compte",
+                surtitre: estPiste ? String(localized: "Piste repérée") : String(localized: "C'est noté"),
+                titre: estPiste ? String(localized: "\(nom) : à surveiller") : String(localized: "\(nom) : ça compte"),
                 raisons: raisons,
-                texte: ecran.estApresLesRepas ? "Ton bilan en tient compte." : "Ton assiette dira si elle compense."
+                texte: ecran.estApresLesRepas ? String(localized: "Ton bilan en tient compte.") : String(localized: "Ton assiette dira si elle compense.")
             )
         }
 
@@ -354,8 +354,8 @@ enum PistesBilan {
         return CartePiste(
             genre: .bonPoint,
             nutriment: appui.nutriment,
-            surtitre: "Bon point",
-            titre: "\(appui.libelle) : un bon point pour \(possessif(appui.nutriment))",
+            surtitre: String(localized: "Bon point"),
+            titre: String(localized: "\(appui.libelle) : un bon point pour \(possessif(appui.nutriment))"),
             raisons: [],
             texte: nil
         )
@@ -369,8 +369,8 @@ enum PistesBilan {
         return CartePiste(
             genre: .bonPoint,
             nutriment: couvert,
-            surtitre: "Bon point",
-            titre: "Tes compléments : c'est compté",
+            surtitre: String(localized: "Bon point"),
+            titre: String(localized: "Tes compléments : c'est compté"),
             raisons: [],
             texte: nil
         )
@@ -399,10 +399,10 @@ enum PistesBilan {
         return CartePiste(
             genre: .besoins,
             nutriment: nil,
-            surtitre: "On vient de l'apprendre",
-            titre: "Tes besoins sont calculés",
+            surtitre: String(localized: "On vient de l'apprendre"),
+            titre: String(localized: "Tes besoins sont calculés"),
             raisons: [],
-            texte: "Fer \(besoin(.iron)) mg, magnésium \(besoin(.magnesium)) mg, calcium \(besoin(.calcium)) mg par jour."
+            texte: String(localized: "Fer \(besoin(.iron)) mg, magnésium \(besoin(.magnesium)) mg, calcium \(besoin(.calcium)) mg par jour.")
         )
     }
 
@@ -429,8 +429,8 @@ enum PistesBilan {
     /// « Apporte fer, magnésium, fibres. »
     static func apports(de aliment: GroceryItem) -> String {
         let noms = aliment.nutrients.compactMap { NutrientID(rawValue: $0.rawValue) }.map(nomCourant)
-        guard !noms.isEmpty else { return "Rien de notable parmi les 10 apports suivis." }
-        return "Apporte " + noms.joined(separator: ", ") + "."
+        guard !noms.isEmpty else { return String(localized: "Rien de notable parmi les 10 apports suivis.") }
+        return String(localized: "Apporte \(noms.joined(separator: ", ")).")
     }
 
     // MARK: L'écran de fin
@@ -465,14 +465,14 @@ enum PistesBilan {
 
         var lignes: [SyntheseBilan.Ligne] = []
         for id in bas.prefix(3) {
-            let mention = r?.apports[id.rawValue]?.statut == .aRenforcer ? "à renforcer" : "à surveiller"
+            let mention = r?.apports[id.rawValue]?.statut == .aRenforcer ? String(localized: "à renforcer") : String(localized: "à surveiller")
             lignes.append(SyntheseBilan.Ligne(nutriment: id, mention: mention, aSurveiller: true))
         }
         // S'il reste de la place : les pistes que l'assiette a rattrapées.
         for piste in lecture(profil: profil).pistes {
             guard lignes.count < 3 else { break }
             guard !bas.contains(piste), bienServis.contains(piste) else { continue }
-            lignes.append(SyntheseBilan.Ligne(nutriment: piste, mention: "ton assiette compense", aSurveiller: false))
+            lignes.append(SyntheseBilan.Ligne(nutriment: piste, mention: String(localized: "ton assiette compense"), aSurveiller: false))
         }
 
         return SyntheseBilan(
@@ -488,25 +488,25 @@ enum PistesBilan {
     /// Le nom de l'apport au milieu d'une phrase.
     static func nomCourant(_ id: NutrientID) -> String {
         switch id {
-        case .vitD: return "vitamine D"
-        case .vitB12: return "vitamine B12"
-        case .iron: return "fer"
-        case .magnesium: return "magnésium"
-        case .omega3: return "oméga-3"
-        case .vitC: return "vitamine C"
-        case .calcium: return "calcium"
-        case .zinc: return "zinc"
-        case .iodine: return "iode"
-        case .fiber: return "fibres"
+        case .vitD: return String(localized: "vitamine D")
+        case .vitB12: return String(localized: "vitamine B12")
+        case .iron: return String(localized: "fer")
+        case .magnesium: return String(localized: "magnésium")
+        case .omega3: return String(localized: "oméga-3")
+        case .vitC: return String(localized: "vitamine C")
+        case .calcium: return String(localized: "calcium")
+        case .zinc: return String(localized: "zinc")
+        case .iodine: return String(localized: "iode")
+        case .fiber: return String(localized: "fibres")
         }
     }
 
     /// « ta vitamine D », « ton fer », « tes fibres ».
     static func possessif(_ id: NutrientID) -> String {
         switch id {
-        case .vitD, .vitB12, .vitC: return "ta \(nomCourant(id))"
-        case .omega3, .fiber: return "tes \(nomCourant(id))"
-        case .iron, .magnesium, .calcium, .zinc, .iodine: return "ton \(nomCourant(id))"
+        case .vitD, .vitB12, .vitC: return String(localized: "ta \(nomCourant(id))")
+        case .omega3, .fiber: return String(localized: "tes \(nomCourant(id))")
+        case .iron, .magnesium, .calcium, .zinc, .iodine: return String(localized: "ton \(nomCourant(id))")
         }
     }
 }

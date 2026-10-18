@@ -90,12 +90,12 @@ enum DS {
             reste = reste.dropLast(3)
         }
         groupes.insert(String(reste), at: 0)
-        return (valeur < 0 ? "-" : "") + groupes.joined(separator: fine)
+        return (valeur < 0 ? "-" : "") + groupes.joined(separator: Langue.estFrancais ? fine : ",")
     }
 
     /// `42 %` : pourcentage avec espace fine insécable.
     static func pourcent(_ valeur: Int) -> String {
-        "\(entier(valeur))\(fine)%"
+        Langue.estFrancais ? "\(entier(valeur))\(fine)%" : "\(entier(valeur))%"
     }
 
     /// `5,9` : virgule décimale, une décimale, sans zéro inutile (`14` et non `14,0`).
@@ -105,7 +105,7 @@ enum DS {
             return entier(Int(arrondi))
         }
         let texte = String(format: "%.\(decimales)f", arrondi)
-        return texte.replacingOccurrences(of: ".", with: ",")
+        return Langue.estFrancais ? texte.replacingOccurrences(of: ".", with: ",") : texte
     }
 
     /// `+28 %` / `-12 %` : delta signé.

@@ -32,10 +32,10 @@ struct WidgetsReglagesView: View {
     private var allumee: Bool { voulue && autorisee }
 
     private var sousTitreActivite: String {
-        if !autorisee { return "Désactivée pour Kiwio dans les réglages de l'iPhone" }
+        if !autorisee { return String(localized: "Désactivée pour Kiwio dans les réglages de l'iPhone") }
         return allumee
-            ? "Tes repas, ton eau et ton rituel, sans déverrouiller"
-            : "La carte de ta journée n'apparaît plus"
+            ? String(localized: "Tes repas, ton eau et ton rituel, sans déverrouiller")
+            : String(localized: "La carte de ta journée n'apparaît plus")
     }
 
     var body: some View {
@@ -67,22 +67,22 @@ struct WidgetsReglagesView: View {
 
     @ViewBuilder
     private var sectionVerrouille: some View {
-        DSSectionHeader(titre: "Sur l'écran verrouillé")
+        DSSectionHeader(titre: String(localized: "Sur l'écran verrouillé"))
             .padding(.top, -14)
         DSGroupedList { ligneActivite }
         apercu { ecranVerrouille }
             .padding(.top, DS.interCarte)
-        legende("Ta journée en direct : les repas en une barre, les kcal restantes, la série ; un verre d'eau et la prise du moment se cochent sur place. Au-dessus, le conseil du jour, l'eau et ton apport à renforcer, posés en accessoires.")
+        legende(String(localized: "Ta journée en direct : les repas en une barre, les kcal restantes, la série ; un verre d'eau et la prise du moment se cochent sur place. Au-dessus, le conseil du jour, l'eau et ton apport à renforcer, posés en accessoires."))
     }
 
     @ViewBuilder
     private var sectionAccueil: some View {
-        DSSectionHeader(titre: "Sur l'écran d'accueil")
-        bloc("Tes apports. L'apport le plus juste en grand, les autres en anneaux : les mêmes chiffres que le Journal. « Voir le calcul » ouvre sa fiche.",
+        DSSectionHeader(titre: String(localized: "Sur l'écran d'accueil"))
+        bloc(String(localized: "Tes apports. L'apport le plus juste en grand, les autres en anneaux : les mêmes chiffres que le Journal. « Voir le calcul » ouvre sa fiche."),
              sousLeTitre: true) {
             moyen { VueApportsMoyenne(etat: etat) }
         }
-        bloc("Ajout rapide et Eau. Le micro ouvre Kiwio prêt à dicter le repas de l'heure ; le bouton de l'eau ajoute un verre sans ouvrir l'app.") {
+        bloc(String(localized: "Ajout rapide et Eau. Le micro ouvre Kiwio prêt à dicter le repas de l'heure ; le bouton de l'eau ajoute un verre sans ouvrir l'app.")) {
             HStack(spacing: Self.entrePetits) {
                 petit { VueAjoutPetite(etat: etat, maintenant: maintenant) }
                 petit { VueEauPetite(etat: etat) }
@@ -90,28 +90,28 @@ struct WidgetsReglagesView: View {
             .frame(maxWidth: Self.largeurMoyen)
             .frame(maxWidth: .infinity)
         }
-        bloc("Conseil du jour. Un geste par jour pour ton apport à renforcer, pris dans sa fiche ; avec Premium, « C'est fait » se coche sans ouvrir l'app. Demain, un autre.") {
+        bloc(String(localized: "Conseil du jour. Un geste par jour pour ton apport à renforcer, pris dans sa fiche ; avec Premium, « C'est fait » se coche sans ouvrir l'app. Demain, un autre.")) {
             moyen { VueConseilMoyenne(etat: etat) }
         }
-        bloc("Rituel du jour. Matin, midi et soir, à cocher sur place. Aucune dose, comme dans l'app.") {
+        bloc(String(localized: "Rituel du jour. Matin, midi et soir, à cocher sur place. Aucune dose, comme dans l'app.")) {
             moyen { VueRituelMoyenne(etat: etat) }
         }
-        bloc("Ta journée. Les kcal du jour et tes quatre repas ; touche un repas pour y ajouter un aliment.") {
+        bloc(String(localized: "Ta journée. Les kcal du jour et tes quatre repas ; touche un repas pour y ajouter un aliment.")) {
             moyen { VueJourneeMoyenne(etat: etat) }
         }
     }
 
     @ViewBuilder
     private var sectionAjout: some View {
-        DSSectionHeader(titre: "Ajouter un widget")
+        DSSectionHeader(titre: String(localized: "Ajouter un widget"))
         DSGroupedList {
-            etape(1, "Appuie longuement sur ton écran d'accueil")
+            etape(1, String(localized: "Appuie longuement sur ton écran d'accueil"))
             DSSeparator(retrait: Self.retraitEtape)
-            etape(2, "Touche Modifier, puis Ajouter un widget")
+            etape(2, String(localized: "Touche Modifier, puis Ajouter un widget"))
             DSSeparator(retrait: Self.retraitEtape)
-            etape(3, "Cherche Kiwio et choisis ton widget")
+            etape(3, String(localized: "Cherche Kiwio et choisis ton widget"))
         }
-        legende("Sur l'écran verrouillé : appui long, Personnaliser, puis Ajouter des widgets. À partir d'iOS 18, « Dicter un repas » se pose aussi dans le Centre de contrôle et sur le bouton Action.")
+        legende(String(localized: "Sur l'écran verrouillé : appui long, Personnaliser, puis Ajouter des widgets. À partir d'iOS 18, « Dicter un repas » se pose aussi dans le Centre de contrôle et sur le bouton Action."))
     }
 
     // MARK: Journée en direct

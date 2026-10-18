@@ -86,7 +86,7 @@ struct BarcodeScannerSheet: View {
 
     private var demande: some View {
         etat(symbole: "barcode.viewfinder", teinte: Color.teinteKiwi,
-             texte: "Kiwio a besoin de la caméra pour lire le code-barres.") {
+             texte: String(localized: "Kiwio a besoin de la caméra pour lire le code-barres.")) {
             Button {
                 AVCaptureDevice.requestAccess(for: .video) { _ in
                     Task { @MainActor in
@@ -94,7 +94,7 @@ struct BarcodeScannerSheet: View {
                     }
                 }
             } label: {
-                etiquetteAction("Autoriser la caméra")
+                etiquetteAction(String(localized: "Autoriser la caméra"))
             }
             .buttonStyle(.dsPress)
         }
@@ -102,10 +102,10 @@ struct BarcodeScannerSheet: View {
 
     private var refus: some View {
         etat(symbole: "video.slash.fill", teinte: nil,
-             texte: "L'accès à la caméra est désactivé. Tu peux l'autoriser dans les Réglages, ou taper le nom du produit dans la recherche.") {
+             texte: String(localized: "L'accès à la caméra est désactivé. Tu peux l'autoriser dans les Réglages, ou taper le nom du produit dans la recherche.")) {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 Link(destination: url) {
-                    etiquetteAction("Ouvrir les Réglages")
+                    etiquetteAction(String(localized: "Ouvrir les Réglages"))
                 }
                 .buttonStyle(.dsPress)
             }

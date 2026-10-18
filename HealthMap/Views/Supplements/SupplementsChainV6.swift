@@ -26,8 +26,8 @@ enum ComplementsVoie: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .complements: return "Compléments"
-        case .assiette: return "Par l'assiette"
+        case .complements: return String(localized: "Compléments")
+        case .assiette: return String(localized: "Par l'assiette")
         }
     }
 }
@@ -85,9 +85,9 @@ struct ComplementsRituelStrip: View {
 
     /// Lever de soleil ambre, soleil jaune, lune indigo : la palette du verre.
     private static let moments: [Moment] = [
-        Moment(id: "matin", symbole: "sunrise", libelle: "Matin", teinte: Color.teinteVitamineD),
-        Moment(id: "midi", symbole: "sun.max", libelle: "Midi", teinte: Color.teinteGlucides),
-        Moment(id: "soir", symbole: "moon", libelle: "Soir", teinte: Color.teinteIode),
+        Moment(id: "matin", symbole: "sunrise", libelle: String(localized: "Matin"), teinte: Color.teinteVitamineD),
+        Moment(id: "midi", symbole: "sun.max", libelle: String(localized: "Midi"), teinte: Color.teinteGlucides),
+        Moment(id: "soir", symbole: "moon", libelle: String(localized: "Soir"), teinte: Color.teinteIode),
     ]
 
     var body: some View {
@@ -181,7 +181,7 @@ private struct RituelCreneau: View {
     private var restantes: Int { prises.filter { !$0.done }.count }
     private var complet: Bool { !prises.isEmpty && restantes == 0 }
     private var quoi: String {
-        prises.isEmpty ? "Rien à prendre" : prises.map(\.nom).joined(separator: " + ")
+        prises.isEmpty ? String(localized: "Rien à prendre") : prises.map(\.nom).joined(separator: " + ")
     }
 
     var body: some View {
@@ -205,10 +205,10 @@ private struct RituelCreneau: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(prises.isEmpty
-            ? "\(libelle) : rien à prendre"
-            : "\(libelle) : \(quoi)")
-        .accessibilityValue(prises.isEmpty ? "" : (complet ? "fait" : "\(restantes) prise\(restantes > 1 ? "s" : "") restante\(restantes > 1 ? "s" : "")"))
-        .accessibilityHint(prises.isEmpty ? "" : "Coche ou décoche les prises de ce moment")
+            ? String(localized: "\(libelle) : rien à prendre")
+            : String(localized: "\(libelle) : \(quoi)"))
+        .accessibilityValue(prises.isEmpty ? "" : (complet ? String(localized: "fait") : (restantes > 1 ? String(localized: "\(restantes) prises restantes") : String(localized: "\(restantes) prise restante"))))
+        .accessibilityHint(prises.isEmpty ? "" : String(localized: "Coche ou décoche les prises de ce moment"))
     }
 
     private var contenu: some View {
@@ -405,7 +405,7 @@ struct ComplementsTeaserCard: View {
     /// Ids d'exemple — catalogue canonique uniquement (testés hors UI).
     static let exempleIds = ["iron", "vitB12", "magnesium"]
     /// Sous-titre générique de chaque exemple : la promesse, jamais un chiffre.
-    static let sousTitreExemple = "Quoi prendre et à quel moment, après ton bilan"
+    static let sousTitreExemple = String(localized: "Quoi prendre et à quel moment, après ton bilan")
 
     /// Lance (ou reprend) le bilan — `DashboardViewModel.demarrerBilan()`.
     let onStart: () -> Void
@@ -414,13 +414,13 @@ struct ComplementsTeaserCard: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Self.exempleIds, id: \.self) { id in
                 if let def = NutrientData.definition(for: id) {
-                    row(id: id, label: def.label)
+                    row(id: id, label: Langue.texte(def.label))
                 }
             }
 
             BilanDoorButton(
                 title: BilanDoorButton.Libelle.complements,
-                accessibilityText: "Voir mes compléments, faire le bilan en 3 minutes",
+                accessibilityText: String(localized: "Voir mes compléments, faire le bilan en 3 minutes"),
                 zone: .complements,
                 action: onStart
             )

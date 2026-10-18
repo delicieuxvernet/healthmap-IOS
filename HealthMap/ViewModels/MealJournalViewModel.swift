@@ -511,19 +511,19 @@ final class MealJournalViewModel: ObservableObject {
     /// Après-demain / date courte.
     var dayLabel: String {
         let cal = Calendar.current
-        if cal.isDateInToday(selectedDay) { return "Aujourd'hui" }
-        if cal.isDateInYesterday(selectedDay) { return "Hier" }
-        if cal.isDateInTomorrow(selectedDay) { return "Demain" }
-        if ecartEnJours == -2 { return "Avant-hier" }
-        if ecartEnJours == 2 { return "Après-demain" }
+        if cal.isDateInToday(selectedDay) { return String(localized: "Aujourd'hui") }
+        if cal.isDateInYesterday(selectedDay) { return String(localized: "Hier") }
+        if cal.isDateInTomorrow(selectedDay) { return String(localized: "Demain") }
+        if ecartEnJours == -2 { return String(localized: "Avant-hier") }
+        if ecartEnJours == 2 { return String(localized: "Après-demain") }
         return Self.shortDayFormatter.string(from: selectedDay)
     }
 
     /// Sous-libellé : « il y a N jours » / « dans N jours » quand le libellé est
     /// déjà une date, sinon la date courte (ex. « dim. 5 juil. »).
     var daySub: String {
-        if ecartEnJours <= -3 { return "il y a \(-ecartEnJours) jours" }
-        if ecartEnJours >= 3 { return "dans \(ecartEnJours) jours" }
+        if ecartEnJours <= -3 { return String(localized: "il y a \(-ecartEnJours) jours") }
+        if ecartEnJours >= 3 { return String(localized: "dans \(ecartEnJours) jours") }
         return Self.shortDayFormatter.string(from: selectedDay)
     }
 
@@ -536,7 +536,7 @@ final class MealJournalViewModel: ObservableObject {
 
     private static let shortDayFormatter: DateFormatter = {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "fr_FR")
+        f.locale = Langue.locale
         f.setLocalizedDateFormatFromTemplate("EEE d MMM")
         return f
     }()
@@ -549,20 +549,28 @@ final class MealJournalViewModel: ObservableObject {
     /// sans article de genre (« ton apport en … ») + relative au jour sélectionné.
     nonisolated static func dayMicroHeadline(_ items: [(id: String, pct: Int)], isToday: Bool) -> String {
         let low = items.filter { $0.pct < 60 }.sorted { $0.pct < $1.pct }
-        func label(_ id: String) -> String { (NutrientData.definition(for: id)?.label ?? id).lowercased() }
-        let quand = isToday ? "aujourd'hui" : "ce jour-là"
+        func label(_ id: String) -> String {
+            let nom = Langue.texte(NutrientData.definition(for: id)?.label ?? id)
+            // Français : tout en minuscules, comme avant. Autres langues : seule la
+            // première lettre (« vitamin D », « iron »).
+            return Langue.estFrancais ? nom.lowercased() : String(nom.prefix(1)).lowercased() + String(nom.dropFirst())
+        }
         switch low.count {
         case 0:
             if items.isEmpty {
                 return isToday
-                    ? "Scanne un repas pour suivre tes apports du jour."
-                    : "Aucun repas enregistré ce jour-là."
+                    ? String(localized: "Scanne un repas pour suivre tes apports du jour.")
+                    : String(localized: "Aucun repas enregistré ce jour-là.")
             }
-            return "Tes apports du jour sont bien couverts."
+            return String(localized: "Tes apports du jour sont bien couverts.")
         case 1:
-            return "Ton apport en \(label(low[0].id)) est en retard \(quand)."
+            return isToday
+                ? String(localized: "Ton apport en \(label(low[0].id)) est en retard aujourd'hui.")
+                : String(localized: "Ton apport en \(label(low[0].id)) est en retard ce jour-là.")
         default:
-            return "Tes apports en \(label(low[0].id)) et \(label(low[1].id)) sont en retard \(quand)."
+            return isToday
+                ? String(localized: "Tes apports en \(label(low[0].id)) et \(label(low[1].id)) sont en retard aujourd'hui.")
+                : String(localized: "Tes apports en \(label(low[0].id)) et \(label(low[1].id)) sont en retard ce jour-là.")
         }
     }
 
@@ -582,18 +590,18 @@ final class MealJournalViewModel: ObservableObject {
             return max(0, Double(t) - m.g)
         }
         let macros: [(name: String, gap: Double)] = [
-            ("protéines", gap(prot)),
-            ("glucides", gap(carb)),
-            ("lipides", gap(fat)),
-            ("fibres", gap(fiber)),
+            (String(localized: "protéines"), gap(prot)),
+            (String(localized: "glucides"), gap(carb)),
+            (String(localized: "lipides"), gap(fat)),
+            (String(localized: "fibres"), gap(fiber)),
         ]
         guard let worst = macros.max(by: { $0.gap < $1.gap }), worst.gap >= 1 else {
-            return isToday ? "Équilibré aujourd'hui." : "Journée équilibrée."
+            return isToday ? String(localized: "Équilibré aujourd'hui.") : String(localized: "Journée équilibrée.")
         }
         let g = Int(worst.gap.rounded())
         return isToday
-            ? "Vise \(g) g de \(worst.name) de plus aujourd'hui."
-            : "Il manquait \(g) g de \(worst.name) ce jour-là."
+            ? String(localized: "Vise \(g) g de \(worst.name) de plus aujourd'hui.")
+            : String(localized: "Il manquait \(g) g de \(worst.name) ce jour-là.")
     }
 }
 
@@ -614,7 +622,7 @@ struct MealJournalRow: Identifiable, Equatable {
             return record.items[i].name
         }
         let joined = record.foods.prefix(3).joined(separator: ", ")
-        return joined.isEmpty ? "Repas" : joined
+        return joined.isEmpty ? String(localized: "Repas") : joined
     }
 
     /// Portion en grammes — nil = inconnue (jamais inventée, pas affichée).

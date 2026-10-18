@@ -122,7 +122,7 @@ struct GroceryShoppingView: View {
                     .accessibilityLabel("Rayon précédent")
                 }
                 Button { next() } label: {
-                    Text(last ? "Terminer mes courses" : "Continuer")
+                    Text(last ? String(localized: "Terminer mes courses") : String(localized: "Continuer"))
                         .dsPolice(17, .semibold)
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
@@ -261,7 +261,7 @@ struct GroceryShoppingView: View {
                         withAnimation(reduceMotion ? .none : .healthMapSpring) { familyIndex += 1 }
                     }
                 } label: {
-                    Text(isLast ? "Valider mon caddie" : "Suivant")
+                    Text(isLast ? String(localized: "Valider mon caddie") : String(localized: "Suivant"))
                         .dsPolice(17, .semibold)
                         .foregroundStyle(families.isEmpty ? Color.dsTertiaire : Color.white)
                         .multilineTextAlignment(.center)
@@ -467,7 +467,7 @@ struct GroceryQuestionControl: View {
                         Text("Courses validées")
                             .dsPolice(16, .semibold)
                             .foregroundStyle(Color.dsTexte)
-                        Text("\(count) aliment\(count > 1 ? "s" : "") dans ton caddie")
+                        Text(count > 1 ? String(localized: "\(count) aliments dans ton caddie") : String(localized: "\(count) aliment dans ton caddie"))
                             .font(Theme.captionFont)
                             .foregroundStyle(Color.dsSecondaire)
                     }

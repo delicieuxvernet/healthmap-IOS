@@ -85,59 +85,59 @@ enum HealthMapError: LocalizedError, Equatable {
         switch self {
         case .network(let err):
             switch err {
-            case .offline: return "Pas de connexion Internet. Vérifie ta connexion et réessaie."
-            case .timeout: return "Ça a pris trop de temps. Réessaie dans quelques instants."
-            case .serverError(let code): return "Le serveur a renvoyé une erreur (\(code)). Réessaie plus tard."
-            case .decoding: return "Impossible de lire la réponse du serveur."
-            case .rateLimited: return "Trop de demandes d'un coup. Attends un instant."
-            case .unknown(let msg): return "Erreur réseau : \(msg)"
+            case .offline: return String(localized: "Pas de connexion Internet. Vérifie ta connexion et réessaie.")
+            case .timeout: return String(localized: "Ça a pris trop de temps. Réessaie dans quelques instants.")
+            case .serverError(let code): return String(localized: "Le serveur a renvoyé une erreur (\(code)). Réessaie plus tard.")
+            case .decoding: return String(localized: "Impossible de lire la réponse du serveur.")
+            case .rateLimited: return String(localized: "Trop de demandes d'un coup. Attends un instant.")
+            case .unknown(let msg): return String(localized: "Erreur réseau : \(msg)")
             }
         case .auth(let err):
             switch err {
-            case .invalidCredentials: return "Email ou mot de passe incorrect."
-            case .emailAlreadyInUse: return "Cet email est déjà utilisé."
-            case .weakPassword: return "Le mot de passe doit contenir au moins 8 caractères."
-            case .sessionExpired: return "Ta session a expiré. Reconnecte-toi."
-            case .userNotFound: return "Utilisateur introuvable."
-            case .oauthCancelled: return "Connexion annulée."
-            case .signUpNeedsEmailCode: return "Code de vérification envoyé à ton email."
-            case .signUpIncomplete: return "Vérification incomplète. Réessaie ou demande un nouveau code."
-            case .signInIncomplete: return "Connexion incomplète. Une étape supplémentaire est requise."
-            case .invalidEmailCode: return "Ce code est incorrect. Vérifie tes mails et réessaie."
-            case .emailCodeExpired: return "Ce code a expiré. Demande un nouveau code."
-            case .profileResolutionTimeout: return "Connexion lente. Impossible de charger ton profil, réessaie."
-            case .tooManyResendAttempts: return "Trop de demandes de renvoi. Patiente une minute avant de réessayer."
-            case .unknown(let msg): return "Erreur d'authentification : \(msg)"
+            case .invalidCredentials: return String(localized: "Email ou mot de passe incorrect.")
+            case .emailAlreadyInUse: return String(localized: "Cet email est déjà utilisé.")
+            case .weakPassword: return String(localized: "Le mot de passe doit contenir au moins 8 caractères.")
+            case .sessionExpired: return String(localized: "Ta session a expiré. Reconnecte-toi.")
+            case .userNotFound: return String(localized: "Utilisateur introuvable.")
+            case .oauthCancelled: return String(localized: "Connexion annulée.")
+            case .signUpNeedsEmailCode: return String(localized: "Code de vérification envoyé à ton email.")
+            case .signUpIncomplete: return String(localized: "Vérification incomplète. Réessaie ou demande un nouveau code.")
+            case .signInIncomplete: return String(localized: "Connexion incomplète. Une étape supplémentaire est requise.")
+            case .invalidEmailCode: return String(localized: "Ce code est incorrect. Vérifie tes mails et réessaie.")
+            case .emailCodeExpired: return String(localized: "Ce code a expiré. Demande un nouveau code.")
+            case .profileResolutionTimeout: return String(localized: "Connexion lente. Impossible de charger ton profil, réessaie.")
+            case .tooManyResendAttempts: return String(localized: "Trop de demandes de renvoi. Patiente une minute avant de réessayer.")
+            case .unknown(let msg): return String(localized: "Erreur d'authentification : \(msg)")
             }
         case .database(let err):
             switch err {
-            case .notFound: return "Donnée introuvable."
-            case .permissionDenied: return "Tu n'as pas les droits d'accéder à cette donnée."
-            case .conflict: return "Conflit de données. Rafraîchis et réessaie."
-            case .corruptedData: return "Les données sont corrompues."
-            case .notConfigured: return "Base de données non configurée."
-            case .insertFailed: return "Échec de l'insertion en base."
-            case .unknown(let msg): return "Erreur base de données : \(msg)"
+            case .notFound: return String(localized: "Donnée introuvable.")
+            case .permissionDenied: return String(localized: "Tu n'as pas les droits d'accéder à cette donnée.")
+            case .conflict: return String(localized: "Conflit de données. Rafraîchis et réessaie.")
+            case .corruptedData: return String(localized: "Les données sont corrompues.")
+            case .notConfigured: return String(localized: "Base de données non configurée.")
+            case .insertFailed: return String(localized: "Échec de l'insertion en base.")
+            case .unknown(let msg): return String(localized: "Erreur base de données : \(msg)")
             }
         case .analysis(let err):
             switch err {
-            case .scoreCalculationFailed: return "Impossible de calculer ton bilan. Vérifie que ton questionnaire est complet."
-            case .aiGenerationFailed(let msg): return "L'analyse IA a échoué : \(msg)"
-            case .invalidSchemaVersion: return "La version du questionnaire est obsolète. Mets l'app à jour."
-            case .missingQuestionnaire: return "Tu dois d'abord compléter le questionnaire."
+            case .scoreCalculationFailed: return String(localized: "Impossible de calculer ton bilan. Vérifie que ton questionnaire est complet.")
+            case .aiGenerationFailed(let msg): return String(localized: "L'analyse IA a échoué : \(msg)")
+            case .invalidSchemaVersion: return String(localized: "La version du questionnaire est obsolète. Mets l'app à jour.")
+            case .missingQuestionnaire: return String(localized: "Tu dois d'abord compléter le questionnaire.")
             }
         case .subscription(let err):
             switch err {
-            case .notPremium: return "Cette fonctionnalité nécessite un abonnement Premium."
-            case .purchaseCancelled: return "Achat annulé."
-            case .purchaseFailed(let msg): return "L'achat a échoué : \(msg)"
-            case .restoreFailed(let msg): return "La restauration a échoué : \(msg)"
-            case .offeringsUnavailable: return "Les offres ne sont pas disponibles pour le moment."
+            case .notPremium: return String(localized: "Cette fonctionnalité nécessite un abonnement Premium.")
+            case .purchaseCancelled: return String(localized: "Achat annulé.")
+            case .purchaseFailed(let msg): return String(localized: "L'achat a échoué : \(msg)")
+            case .restoreFailed(let msg): return String(localized: "La restauration a échoué : \(msg)")
+            case .offeringsUnavailable: return String(localized: "Les offres ne sont pas disponibles pour le moment.")
             }
         case .invalidInput(let field, let reason):
-            return "Champ \(field) invalide : \(reason)"
+            return String(localized: "Champ \(field) invalide : \(reason)")
         case .unexpected(let msg):
-            return "Erreur inattendue : \(msg)"
+            return String(localized: "Erreur inattendue : \(msg)")
         }
     }
 

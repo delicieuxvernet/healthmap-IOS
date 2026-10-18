@@ -319,10 +319,10 @@ enum CreneauWidget: String, CaseIterable, Identifiable {
     /// Libellé de la mosaïque du Journal.
     var libelle: String {
         switch self {
-        case .breakfast: return "Matin"
-        case .lunch: return "Midi"
-        case .dinner: return "Soir"
-        case .snack: return "Encas"
+        case .breakfast: return String(localized: "Matin")
+        case .lunch: return String(localized: "Midi")
+        case .dinner: return String(localized: "Soir")
+        case .snack: return String(localized: "Encas")
         }
     }
 
@@ -355,40 +355,40 @@ enum CreneauWidget: String, CaseIterable, Identifiable {
     /// fine insécable : le « ? » ne part jamais seul à la ligne).
     var question: String {
         switch self {
-        case .breakfast: return "Ton petit-déj\u{202F}?"
-        case .lunch: return "Ton midi\u{202F}?"
-        case .snack: return "Ton encas\u{202F}?"
-        case .dinner: return "Ton soir\u{202F}?"
+        case .breakfast: return String(localized: "Ton petit-déj\u{202F}?")
+        case .lunch: return String(localized: "Ton midi\u{202F}?")
+        case .snack: return String(localized: "Ton encas\u{202F}?")
+        case .dinner: return String(localized: "Ton soir\u{202F}?")
         }
     }
 
     /// « Dicter ton midi » : la grande tuile de l'Ajout rapide.
     var aDicter: String {
         switch self {
-        case .breakfast: return "Dicter ton petit-déj"
-        case .lunch: return "Dicter ton midi"
-        case .snack: return "Dicter ton encas"
-        case .dinner: return "Dicter ton soir"
+        case .breakfast: return String(localized: "Dicter ton petit-déj")
+        case .lunch: return String(localized: "Dicter ton midi")
+        case .snack: return String(localized: "Dicter ton encas")
+        case .dinner: return String(localized: "Dicter ton soir")
         }
     }
 
     /// « ton dîner » : « Prochain : ton dîner » dans la Dynamic Island.
     var prochain: String {
         switch self {
-        case .breakfast: return "ton petit-déjeuner"
-        case .lunch: return "ton déjeuner"
-        case .snack: return "ton encas"
-        case .dinner: return "ton dîner"
+        case .breakfast: return String(localized: "ton petit-déjeuner")
+        case .lunch: return String(localized: "ton déjeuner")
+        case .snack: return String(localized: "ton encas")
+        case .dinner: return String(localized: "ton dîner")
         }
     }
 
     /// « ce soir » : « Sardines ce soir ? » (même tournure que les rappels).
     var quand: String {
         switch self {
-        case .breakfast: return "ce matin"
-        case .lunch: return "ce midi"
-        case .snack: return "en encas"
-        case .dinner: return "ce soir"
+        case .breakfast: return String(localized: "ce matin")
+        case .lunch: return String(localized: "ce midi")
+        case .snack: return String(localized: "en encas")
+        case .dinner: return String(localized: "ce soir")
         }
     }
 }
@@ -401,9 +401,9 @@ enum MomentRituel: String, CaseIterable, Identifiable {
 
     var libelle: String {
         switch self {
-        case .matin: return "Matin"
-        case .midi: return "Midi"
-        case .soir: return "Soir"
+        case .matin: return String(localized: "Matin")
+        case .midi: return String(localized: "Midi")
+        case .soir: return String(localized: "Soir")
         }
     }
 
@@ -626,32 +626,32 @@ extension InstantaneJour {
         serie: 4,
         eau: Eau(verres: 3, objectif: 8, centilitres: 25),
         rituel: [
-            Prise(id: "iron", nom: "Fer", moment: "matin", fait: true),
-            Prise(id: "vitD", nom: "Vitamine D", moment: "midi", fait: true),
-            Prise(id: "magnesium", nom: "Magnésium", moment: "soir", fait: false),
+            Prise(id: "iron", nom: String(localized: "Fer"), moment: "matin", fait: true),
+            Prise(id: "vitD", nom: String(localized: "Vitamine D"), moment: "midi", fait: true),
+            Prise(id: "magnesium", nom: String(localized: "Magnésium"), moment: "soir", fait: false),
         ],
         apports: LectureApportsW(
             apports: [
-                ApportW(id: "vitD", nom: "Vitamine D", court: "Vit. D", score: 58),
-                ApportW(id: "magnesium", nom: "Magnésium", court: "Mg", score: 74),
-                ApportW(id: "iron", nom: "Fer", court: "Fer", score: 79),
+                ApportW(id: "vitD", nom: String(localized: "Vitamine D"), court: String(localized: "Vit. D"), score: 58),
+                ApportW(id: "magnesium", nom: String(localized: "Magnésium"), court: "Mg", score: 74),
+                ApportW(id: "iron", nom: String(localized: "Fer"), court: String(localized: "Fer"), score: 79),
             ],
-            verdict: "Ta vitamine D est un peu juste.",
-            autres: "Magnésium et fer sont couverts.",
-            statut: "un peu juste",
-            cause: "Première cause : tes repas notés ces 14 derniers jours.",
-            titreAliments: "Ce qui la remonte",
+            verdict: String(localized: "Ta vitamine D est un peu juste."),
+            autres: String(localized: "Magnésium et fer sont couverts."),
+            statut: String(localized: "un peu juste"),
+            cause: String(localized: "Première cause : tes repas notés ces 14 derniers jours."),
+            titreAliments: String(localized: "Ce qui la remonte"),
             aliments: [
-                AlimentW(nom: "Sardines", illustration: "fluent_fish"),
-                AlimentW(nom: "Œufs", illustration: "fluent_egg"),
-                AlimentW(nom: "Lait enrichi", illustration: "fluent_milk"),
+                AlimentW(nom: String(localized: "Sardines"), illustration: "fluent_fish"),
+                AlimentW(nom: String(localized: "Œufs"), illustration: "fluent_egg"),
+                AlimentW(nom: String(localized: "Lait enrichi"), illustration: "fluent_milk"),
             ]
         ),
         conseils: [
             ConseilW(id: "vitD-soleil",
-                     texte: "Un quart d'heure dehors, bras découverts, en milieu de journée quand c'est possible.",
-                     court: "15 min dehors, bras découverts",
-                     apport: "vitD", apportNom: "Vitamine D", apportCourt: "Vit. D", points: 5),
+                     texte: String(localized: "Un quart d'heure dehors, bras découverts, en milieu de journée quand c'est possible."),
+                     court: String(localized: "15 min dehors, bras découverts"),
+                     apport: "vitD", apportNom: String(localized: "Vitamine D"), apportCourt: String(localized: "Vit. D"), points: 5),
         ],
         conseilFait: nil,
         premium: true

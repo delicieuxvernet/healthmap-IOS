@@ -623,7 +623,7 @@ private struct EcouteScene: View {
         .task(id: centre.phase) {
             abandonPossible = false
             guard centre.phase == .calcul else { return }
-            UIAccessibility.post(notification: .announcement, argument: "Kiwio relit ta dictée")
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Kiwio relit ta dictée"))
             try? await Task.sleep(for: Self.delaiAbandon)
             guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.3)) { abandonPossible = true }
@@ -809,8 +809,8 @@ private struct CarteTranscription: View {
     private var transcrite: Bool { !centre.transcription.isEmpty }
 
     private var libelle: String {
-        if ecoute { return "Je t'écoute" }
-        return transcrite ? "Transcription terminée" : "Transcription en cours"
+        if ecoute { return String(localized: "Je t'écoute") }
+        return transcrite ? String(localized: "Transcription terminée") : String(localized: "Transcription en cours")
     }
 
     var body: some View {
@@ -832,7 +832,7 @@ private struct CarteTranscription: View {
             if transcrite {
                 MotsQuiArrivent(texte: centre.transcription, grand: true)
             } else {
-                Text(ecoute ? "Je t'écoute…" : "Je relis ce que tu as dit…")
+                Text(ecoute ? String(localized: "Je t'écoute…") : String(localized: "Je relis ce que tu as dit…"))
                     .font(MotsQuiArrivent.policeGrande)
                     .tracking(-0.5)
                     .foregroundStyle(Color(red: 60 / 255, green: 60 / 255, blue: 67 / 255).opacity(0.35))

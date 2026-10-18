@@ -24,15 +24,15 @@ struct SourceReference: Identifiable {
 enum ScientificSources {
     // Autorités officielles fondant les valeurs nutritionnelles de référence.
     static let all: [SourceReference] = [
-        SourceReference("ANSES", "Références nutritionnelles (vitamines et minéraux)",
+        SourceReference("ANSES", String(localized: "Références nutritionnelles (vitamines et minéraux)"),
                         "https://www.anses.fr/fr/content/les-references-nutritionnelles-en-vitamines-et-mineraux"),
         SourceReference("EFSA", "Dietary Reference Values (Europe)",
                         "https://www.efsa.europa.eu/en/topics/topic/dietary-reference-values"),
-        SourceReference("OMS", "Alimentation et micronutriments",
+        SourceReference(String(localized: "OMS"), String(localized: "Alimentation et micronutriments"),
                         "https://www.who.int/health-topics/nutrition"),
-        SourceReference("Ciqual (ANSES)", "Table de composition des aliments",
+        SourceReference("Ciqual (ANSES)", String(localized: "Table de composition des aliments"),
                         "https://ciqual.anses.fr/"),
-        SourceReference("INCA 3 (ANSES)", "Consommations alimentaires des Français",
+        SourceReference("INCA 3 (ANSES)", String(localized: "Consommations alimentaires des Français"),
                         "https://www.data.gouv.fr/datasets/donnees-de-consommations-et-habitudes-alimentaires-de-letude-inca-3"),
     ]
 }

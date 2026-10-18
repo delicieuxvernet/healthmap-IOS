@@ -17,7 +17,7 @@ struct RedFlagsCardView: View {
             // « plus rien de design, aucune icône »).
             BilanV7SectionLabel(
                 icon: "exclamationmark.triangle",
-                text: "Important pour toi",
+                text: String(localized: "Important pour toi"),
                 color: BilanV7.alertInk,
                 teinte: teinteCarte
             )
@@ -109,9 +109,9 @@ struct RedFlagsCardView: View {
 
     private func urgencyLabel(_ urgency: RedFlag.Urgency) -> String {
         switch urgency {
-        case .immediate: return "Urgent"
-        case .soon: return "À surveiller"
-        case .routine: return "Information"
+        case .immediate: return String(localized: "Urgent")
+        case .soon: return String(localized: "À surveiller")
+        case .routine: return String(localized: "Information")
         }
     }
 }

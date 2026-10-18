@@ -488,7 +488,7 @@ struct TutorielOverlayPrincipal: View {
                 TutorielVoile(trou: cadre(.boutonDicter), forme: .arrondi(36), marge: 6)
                 TutorielBulle(
                     etape: etape,
-                    titre: "Parle-lui comme à un ami",
+                    titre: String(localized: "Parle-lui comme à un ami"),
                     texte: Text("Touche Dicter et dis simplement : « ce midi, 150 g de poulet rôti, une assiette de pâtes et un yaourt ». Donne les quantités si tu les connais, sinon on te les demandera."),
                     onPasser: { service.passer() }
                 )
@@ -502,7 +502,7 @@ struct TutorielOverlayPrincipal: View {
                 TutorielVoile(trou: cadre(.carteApports), forme: .arrondi(DS.rayonCarte + 4), marge: 4)
                 TutorielBulle(
                     etape: etape,
-                    titre: "Voilà pourquoi tu es là",
+                    titre: String(localized: "Voilà pourquoi tu es là"),
                     texte: Text("Pas seulement des calories : ce que ton repas couvre de tes besoins. Touche un apport pour savoir pourquoi il est bas et comment le remonter."),
                     onPasser: { service.passer() }
                 )
@@ -522,13 +522,13 @@ struct TutorielOverlayPrincipal: View {
                 )
                 TutorielBulle(
                     etape: etape,
-                    titre: "Reviens demain",
+                    titre: String(localized: "Reviens demain"),
                     texte: Text("Deux repas suivis et ")
                         + Text("Progrès").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.dsTexte)
                         + Text(" trace tes courbes. ")
                         + Text("Plan").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.dsTexte)
                         + Text(" te dira quoi changer, symptôme par symptôme."),
-                    actionTitre: "J'ai compris",
+                    actionTitre: String(localized: "J'ai compris"),
                     action: { service.terminer() }
                 )
                 .padding(.horizontal, 20)
@@ -563,7 +563,7 @@ struct TutorielBulleVerifier: View {
         if service.etape == .verifier {
             TutorielBulle(
                 etape: .verifier,
-                titre: "Tout est déjà compté",
+                titre: String(localized: "Tout est déjà compté"),
                 texte: Text("Un point orange signale ce que Kiwio a estimé à ta place : un appui sur le bon choix suffit pour corriger. Sinon, ajoute directement."),
                 onPasser: { service.passer() }
             )

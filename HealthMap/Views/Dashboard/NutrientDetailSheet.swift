@@ -219,7 +219,7 @@ struct NutrientDetailSheet: View {
 
     private var pourquoiSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            titreDeBloc("Pourquoi ce score")
+            titreDeBloc(String(localized: "Pourquoi ce score"))
 
             VStack(alignment: .leading, spacing: 10) {
                 if let pourquoi = nutrient.pourquoiCeScore, !pourquoi.isEmpty {
@@ -288,9 +288,9 @@ struct NutrientDetailSheet: View {
     /// contrôlé — loi 8). Valeur inconnue ou absente → pas de badge.
     private var reliabilityBadge: String? {
         switch nutrient.confidence {
-        case "high": return "Fiabilité élevée"
-        case "moderate": return "Fiabilité moyenne"
-        case "low": return "À confirmer"
+        case "high": return String(localized: "Fiabilité élevée")
+        case "moderate": return String(localized: "Fiabilité moyenne")
+        case "low": return String(localized: "À confirmer")
         default: return nil
         }
     }
@@ -411,14 +411,14 @@ struct NutrientDetailSheet: View {
     private var collapsibleGroup: some View {
         VStack(spacing: DS.interCarte) {
             if hasMechanism, let mecanisme = nutrient.mecanisme {
-                FicheCollapsible(title: "Comprendre le mécanisme", icon: "gearshape.2") {
+                FicheCollapsible(title: String(localized: "Comprendre le mécanisme"), icon: "gearshape.2") {
                     collapsibleBody(mecanisme)
                 }
             }
 
             if hasSymptoms, let signe = nutrient.signeManque {
-                FicheCollapsible(title: "Symptômes possibles", icon: "exclamationmark.triangle") {
-                    collapsibleBody("Tu ressens peut-être\u{202F}: \(signe)")
+                FicheCollapsible(title: String(localized: "Symptômes possibles"), icon: "exclamationmark.triangle") {
+                    collapsibleBody(String(localized: "Tu ressens peut-être\u{202F}: \(signe)"))
                 }
             }
         }
@@ -458,7 +458,7 @@ struct NutrientDetailSheet: View {
         // Premium → rendu net, sans porte.
         let rows = VStack(alignment: .leading, spacing: 0) {
             if let hack {
-                premiumRow(icon: "lightbulb", label: "Astuce", text: hack)
+                premiumRow(icon: "lightbulb", label: String(localized: "Astuce"), text: hack)
             }
 
             if hack != nil && synergie != nil {
@@ -466,7 +466,7 @@ struct NutrientDetailSheet: View {
             }
 
             if let synergie {
-                premiumRow(icon: "arrow.triangle.merge", label: "Synergie", text: synergie)
+                premiumRow(icon: "arrow.triangle.merge", label: String(localized: "Synergie"), text: synergie)
             }
         }
         .padding(.horizontal, DS.paddingCarte)
@@ -488,19 +488,19 @@ struct NutrientDetailSheet: View {
         }
 
         let doorTitle = solution != nil
-            ? "Débloque ta solution \(nutrient.label)"
+            ? String(localized: "Débloque ta solution \(nutrient.label)")
             : (hack != nil
-                ? "Débloque le hack \(nutrient.label)"
-                : "Débloque la synergie \(nutrient.label)")
+                ? String(localized: "Débloque le hack \(nutrient.label)")
+                : String(localized: "Débloque la synergie \(nutrient.label)"))
         let doorSubtitle: String
         if solution != nil && (hack != nil || synergie != nil) {
-            doorSubtitle = "Le geste précis + l'astuce d'absorption"
+            doorSubtitle = String(localized: "Le geste précis + l'astuce d'absorption")
         } else if solution != nil {
-            doorSubtitle = "Le geste précis, la dose et le bon moment"
+            doorSubtitle = String(localized: "Le geste précis, la dose et le bon moment")
         } else if hack != nil && synergie != nil {
-            doorSubtitle = "L'astuce d'absorption + la synergie entre nutriments"
+            doorSubtitle = String(localized: "L'astuce d'absorption + la synergie entre nutriments")
         } else {
-            doorSubtitle = hack != nil ? "L'astuce d'absorption qui change tout" : "La synergie entre tes nutriments"
+            doorSubtitle = hack != nil ? String(localized: "L'astuce d'absorption qui change tout") : String(localized: "La synergie entre tes nutriments")
         }
 
         return AnyView(
@@ -550,8 +550,8 @@ struct NutrientDetailSheet: View {
             case .idle:
                 // L'action principale de la fiche : une capsule de verre vert,
                 // seule, sans carte autour.
-                deepSearchButton(title: "Recherche approfondie",
-                                 subtitle: "Croise tes données avec des articles scientifiques")
+                deepSearchButton(title: String(localized: "Recherche approfondie"),
+                                 subtitle: String(localized: "Croise tes données avec des articles scientifiques"))
             case .loading:
                 HStack(spacing: 10) {
                     ProgressView()
@@ -576,7 +576,7 @@ struct NutrientDetailSheet: View {
                         .foregroundStyle(Color.dsSecondaire)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 4)
-                    deepSearchButton(title: "Réessayer", subtitle: nil)
+                    deepSearchButton(title: String(localized: "Réessayer"), subtitle: nil)
                 }
             }
         }
@@ -743,7 +743,7 @@ struct NutrientDetailSheet: View {
                 )
                 deepState = .loaded(result)
             } catch {
-                deepState = .failed("La recherche n'a pas abouti. Vérifie ta connexion et réessaie.")
+                deepState = .failed(String(localized: "La recherche n'a pas abouti. Vérifie ta connexion et réessaie."))
             }
         }
     }
@@ -804,8 +804,8 @@ private struct FicheCollapsible<Content: View>: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.dsPress)
-            .accessibilityValue(isExpanded ? "déplié" : "replié")
-            .accessibilityHint("Touche deux fois pour \(isExpanded ? "replier" : "déplier") la section.")
+            .accessibilityValue(isExpanded ? String(localized: "déplié") : String(localized: "replié"))
+            .accessibilityHint(isExpanded ? String(localized: "Touche deux fois pour replier la section.") : String(localized: "Touche deux fois pour déplier la section."))
 
             if isExpanded {
                 content()

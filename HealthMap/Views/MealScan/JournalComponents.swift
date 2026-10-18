@@ -22,10 +22,10 @@ extension MealJournalService.MealSlot {
     /// reste celui des feuilles d'édition.
     var titreJournal: String {
         switch self {
-        case .breakfast: return "Petit-déjeuner"
-        case .lunch:     return "Déjeuner"
-        case .dinner:    return "Dîner"
-        case .snack:     return "Collation"
+        case .breakfast: return String(localized: "Petit-déjeuner")
+        case .lunch:     return String(localized: "Déjeuner")
+        case .dinner:    return String(localized: "Dîner")
+        case .snack:     return String(localized: "Collation")
         }
     }
 
@@ -55,13 +55,15 @@ extension MealJournalService.MealSlot {
     func phraseAjout(aliments: Int) -> String {
         let tete: String
         switch self {
-        case .breakfast: tete = "Petit-déjeuner ajouté"
-        case .lunch:     tete = "Déjeuner ajouté"
-        case .dinner:    tete = "Dîner ajouté"
-        case .snack:     tete = "Collation ajoutée"
+        case .breakfast: tete = String(localized: "Petit-déjeuner ajouté")
+        case .lunch:     tete = String(localized: "Déjeuner ajouté")
+        case .dinner:    tete = String(localized: "Dîner ajouté")
+        case .snack:     tete = String(localized: "Collation ajoutée")
         }
         guard aliments > 0 else { return tete }
-        return "\(tete) · \(aliments) aliment\(aliments > 1 ? "s" : "")"
+        return aliments > 1
+            ? String(localized: "\(tete) · \(aliments) aliments")
+            : String(localized: "\(tete) · \(aliments) aliment")
     }
 }
 
@@ -199,26 +201,26 @@ struct JournalEnergieCard: View {
 
     private var legende: String {
         guard objectif != nil else { return "kcal" }
-        if !isToday { return "kcal sur \(DS.entier(budget))" }
-        return depasse ? "kcal au-dessus" : "kcal restantes"
+        if !isToday { return String(localized: "kcal sur \(DS.entier(budget))") }
+        return depasse ? String(localized: "kcal au-dessus") : String(localized: "kcal restantes")
     }
 
     private var ligneDepense: String {
-        if let depensees, depensees > 0 { return "\(DS.entier(depensees)) kcal dépensées" }
-        return santeLiee ? "Rien de dépensé pour l'instant" : "Relier pour compter tes dépenses"
+        if let depensees, depensees > 0 { return String(localized: "\(DS.entier(depensees)) kcal dépensées") }
+        return santeLiee ? String(localized: "Rien de dépensé pour l'instant") : String(localized: "Relier pour compter tes dépenses")
     }
 
     /// Ce que la pastille affiche : la dépense du jour quand il y en a une.
     private var etiquetteSante: String {
         if let depensees, depensees > 0 { return "+\(DS.entier(depensees)) kcal" }
-        return santeLiee ? "Santé" : "Relier"
+        return santeLiee ? String(localized: "Santé") : String(localized: "Relier")
     }
 
     /// Sous le chiffre : le repas qui vient d'entrer, sinon l'objectif du jour.
     private var sousLigne: String? {
         if isToday, let ajoutRecent { return ajoutRecent }
         guard let objectif else { return nil }
-        return "Objectif \(DS.entier(objectif)) kcal"
+        return String(localized: "Objectif \(DS.entier(objectif)) kcal")
     }
 
     var body: some View {
@@ -256,7 +258,7 @@ struct JournalEnergieCard: View {
         DSLigneOuColonne(alignementLigne: .center, espacement: 6) {
             ScanCardHeader(
                 icon: "flame",
-                title: "Énergie",
+                title: String(localized: "Énergie"),
                 color: Color.teinteEnergieTexte,
                 teinte: Color.teinteEnergie
             )
@@ -352,10 +354,10 @@ struct JournalEnergieCard: View {
     }
 
     private var libelleVocal: String {
-        guard objectif != nil else { return "\(consommees) kilocalories aujourd'hui." }
-        if !isToday { return "\(consommees) kilocalories sur \(budget)." }
-        let reste = depasse ? "\(abs(restantes)) kilocalories au-dessus du budget" : "\(restantes) kilocalories restantes"
-        let base = "\(reste), \(pourcent) pour cent du budget consommé."
+        guard objectif != nil else { return String(localized: "\(consommees) kilocalories aujourd'hui.") }
+        if !isToday { return String(localized: "\(consommees) kilocalories sur \(budget).") }
+        let reste = depasse ? String(localized: "\(abs(restantes)) kilocalories au-dessus du budget") : String(localized: "\(restantes) kilocalories restantes")
+        let base = String(localized: "\(reste), \(pourcent) pour cent du budget consommé.")
         guard let ajoutRecent else { return base }
         return "\(base) \(ajoutRecent)."
     }
@@ -402,16 +404,16 @@ struct JournalMacrosCard: View {
         veutDuMuscle: Bool
     ) -> [Ligne] {
         [
-            Ligne(id: "proteines", nom: "Protéines", grammes: proteines,
+            Ligne(id: "proteines", nom: String(localized: "Protéines"), grammes: proteines,
                   cible: cibleProteines.map(Double.init),
                   teintes: [Color.teinteProteines, Color.teinteProteines], surplusFavorable: veutDuMuscle),
-            Ligne(id: "glucides", nom: "Glucides", grammes: glucides,
+            Ligne(id: "glucides", nom: String(localized: "Glucides"), grammes: glucides,
                   cible: cibleGlucides.map(Double.init),
                   teintes: [Color.teinteGlucides, Color.teinteGlucides], surplusFavorable: false),
-            Ligne(id: "lipides", nom: "Lipides", grammes: lipides,
+            Ligne(id: "lipides", nom: String(localized: "Lipides"), grammes: lipides,
                   cible: cibleLipides.map(Double.init),
                   teintes: [Color.teinteLipides, Color.teinteLipides], surplusFavorable: false),
-            Ligne(id: "fibres", nom: "Fibres", grammes: fibres,
+            Ligne(id: "fibres", nom: String(localized: "Fibres"), grammes: fibres,
                   cible: NutrientData.definition(for: "fiber")?.rda,
                   teintes: [Color.teinteFibres, Color.teinteFibres], surplusFavorable: true),
         ]
@@ -487,10 +489,10 @@ struct JournalMacrosCard: View {
     }
 
     private func libelleVocal(_ ligne: Ligne, grammes: Int, surplus: Double) -> String {
-        guard let cible = ligne.cible else { return "\(ligne.nom) : \(grammes) grammes." }
-        let base = "\(ligne.nom) : \(grammes) grammes sur \(Int(cible.rounded()))."
+        guard let cible = ligne.cible else { return String(localized: "\(ligne.nom) : \(grammes) grammes.") }
+        let base = String(localized: "\(ligne.nom) : \(grammes) grammes sur \(Int(cible.rounded())).")
         guard surplus > 0 else { return base }
-        return base + (ligne.surplusFavorable ? " Au-dessus de l'objectif, dans le bon sens." : " Au-dessus de l'objectif.")
+        return base + " " + (ligne.surplusFavorable ? String(localized: "Au-dessus de l'objectif, dans le bon sens.") : String(localized: "Au-dessus de l'objectif."))
     }
 }
 
@@ -601,7 +603,7 @@ struct JournalApportsCard: View {
         if let premier = apports.first, let nom = premier.nom, !nom.isEmpty {
             return BilanV7Nutrient.prioritySentence(id: premier.id, nom: nom)
         }
-        return "Tes apports sont au vert aujourd'hui."
+        return String(localized: "Tes apports sont au vert aujourd'hui.")
     }
 
     var body: some View {
@@ -627,14 +629,14 @@ struct JournalApportsCard: View {
             }
 
             DSSeparator()
-            DSLinkRow(titre: "Renforcer mes apports", action: onRemonter)
+            DSLinkRow(titre: String(localized: "Renforcer mes apports"), action: onRemonter)
         }
         .dsCard()
     }
 
     private func anneau(_ apport: ApportV2, delai: Double) -> some View {
         let pct = max(0, min(100, apport.id.flatMap { scores[$0] } ?? apport.pctBesoin ?? 0))
-        let nom = apport.nom ?? apport.id.flatMap { NutrientData.definition(for: $0)?.label } ?? "Apport"
+        let nom = apport.nom ?? apport.id.flatMap { NutrientData.definition(for: $0)?.label } ?? String(localized: "Apport")
         let couleur = apport.id.map { Color.nutrientColor(for: $0) } ?? Color.dsSecondaire
         return Button {
             onApport(apport)
@@ -765,7 +767,7 @@ struct JournalAvantQuestionnaireCard: View {
                 .padding(.top, 8)
             BilanDoorButton(
                 title: BilanDoorButton.Libelle.journal,
-                accessibilityText: "Répondre au questionnaire, trois minutes",
+                accessibilityText: String(localized: "Répondre au questionnaire, trois minutes"),
                 zone: .bilanApports,
                 action: onStart
             )
@@ -795,7 +797,7 @@ struct JournalAvantQuestionnaireCard: View {
                 .padding(.top, 3)
             BilanSegmentsDEtapes(avancements: reprise.avancements)
                 .padding(.top, 12)
-            Text(reprise.reste.isEmpty ? "Tes réponses sont gardées." : "Tes réponses sont gardées. \(reprise.reste)")
+            Text(reprise.reste.isEmpty ? String(localized: "Tes réponses sont gardées.") : String(localized: "Tes réponses sont gardées. \(reprise.reste)"))
                 .font(.dsSousTitre)
                 .tracking(DSTracking.sousTitre)
                 .foregroundStyle(Color.dsSecondaire)
@@ -803,7 +805,7 @@ struct JournalAvantQuestionnaireCard: View {
                 .padding(.top, 10)
             BilanDoorButton(
                 title: BilanDoorButton.Libelle.journalReprise,
-                accessibilityText: "Reprendre mon bilan là où je me suis arrêté",
+                accessibilityText: String(localized: "Reprendre mon bilan là où je me suis arrêté"),
                 zone: .bilanApports,
                 action: onStart
             )
@@ -825,8 +827,8 @@ struct JournalPopulationCard: View {
     /// Deux nutriments dont le catalogue porte un chiffre national robuste.
     private var lignes: [Ligne] {
         let phrases: [(id: String, texte: String)] = [
-            ("vitD", "adultes ont un apport en vitamine D sous les repères"),
-            ("iron", "femmes en âge d'avoir des enfants ont un apport en fer insuffisant"),
+            ("vitD", String(localized: "adultes ont un apport en vitamine D sous les repères")),
+            ("iron", String(localized: "femmes en âge d'avoir des enfants ont un apport en fer insuffisant")),
         ]
         return phrases.compactMap { item in
             guard let fraction = TeaserStatsCatalog.stat(for: item.id).fraction else { return nil }
@@ -837,7 +839,8 @@ struct JournalPopulationCard: View {
     private var sources: String {
         let noms = lignes.map { TeaserStatsCatalog.stat(for: $0.id).source }
         let uniques = noms.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
-        return "Études \(uniques.joined(separator: " et ")) · repères ANSES. Ces chiffres portent sur la population, pas sur toi."
+        let liste = uniques.joined(separator: " \(String(localized: "et")) ")
+        return String(localized: "Études \(liste) · repères ANSES. Ces chiffres portent sur la population, pas sur toi.")
     }
 
     var body: some View {
@@ -883,11 +886,11 @@ struct JournalFinQuestionnaireCard: View {
                 .font(.dsHeadline)
                 .tracking(DSTracking.corps)
                 .foregroundStyle(Color.dsTexte)
-            promesse("testtube.2", "Tes dix apports, classés par priorité")
+            promesse("testtube.2", String(localized: "Tes dix apports, classés par priorité"))
                 .padding(.top, 11)
-            promesse("arrow.triangle.swap", "Les interactions de tes habitudes")
+            promesse("arrow.triangle.swap", String(localized: "Les interactions de tes habitudes"))
                 .padding(.top, 9)
-            promesse("map", "Ton plan, avec les gains chiffrés")
+            promesse("map", String(localized: "Ton plan, avec les gains chiffrés"))
                 .padding(.top, 9)
         }
         .padding(DS.paddingCarte)
@@ -1006,9 +1009,9 @@ struct JournalSaisieBloc: View {
 
             if deplie {
                 DSLigneOuColonne(alignementLigne: .top, alignementColonne: .center, espacement: 8) {
-                    option("pencil", "Écrire", action: onEcrire)
-                    option("magnifyingglass", "Rechercher", action: onRechercher)
-                    option("barcode.viewfinder", "Code-barres", action: onCodeBarres)
+                    option("pencil", String(localized: "Écrire"), action: onEcrire)
+                    option("magnifyingglass", String(localized: "Rechercher"), action: onRechercher)
+                    option("barcode.viewfinder", String(localized: "Code-barres"), action: onCodeBarres)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
@@ -1170,7 +1173,7 @@ struct JournalSaisieBloc: View {
         .buttonStyle(.dsPress)
         .accessibilityLabel("Autres façons d'ajouter")
         .accessibilityIdentifier("journal.autres")
-        .accessibilityValue(deplie ? "déplié" : "replié")
+        .accessibilityValue(deplie ? String(localized: "déplié") : String(localized: "replié"))
     }
 
     private func option(_ symbole: String, _ titre: String, action: @escaping () -> Void) -> some View {
@@ -1313,7 +1316,7 @@ struct JournalRepasMosaique: View {
                     .tracking(DSTracking.sousTitre)
                     .foregroundStyle(Color.dsTexte)
                     .padding(.top, 8)
-                Text(item.vide ? "Rien pour l'instant" : "\(DS.entier(item.kcal)) kcal")
+                Text(item.vide ? String(localized: "Rien pour l'instant") : "\(DS.entier(item.kcal)) kcal")
                     .font(.dsValeurLigne)
                     .foregroundStyle(Color.dsSecondaire)
                     .opacity(item.vide ? 0.67 : 1)
@@ -1336,8 +1339,8 @@ struct JournalRepasMosaique: View {
         }
         .buttonStyle(.dsPress)
         .accessibilityLabel(item.vide
-            ? "\(item.slot.label), rien pour l'instant"
-            : "\(item.slot.label), \(item.kcal) kilocalories")
+            ? String(localized: "\(item.slot.label), rien pour l'instant")
+            : String(localized: "\(item.slot.label), \(item.kcal) kilocalories"))
         .accessibilityHint("Ouvre le journal du jour")
     }
 }
@@ -1397,7 +1400,7 @@ struct ActiviteSheet: View {
                 }
                 .padding(.top, 20)
             } else if HealthKitService.shared.isAvailable {
-                DSCapsuleButton(titre: "Lier Apple Santé", chargement: liaisonEnCours) {
+                DSCapsuleButton(titre: String(localized: "Lier Apple Santé"), chargement: liaisonEnCours) {
                     guard !liaisonEnCours else { return }
                     liaisonEnCours = true
                     Task {

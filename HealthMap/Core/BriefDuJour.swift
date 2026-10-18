@@ -73,16 +73,16 @@ enum NomNutriment {
     static func possessif(id: String, nom: String) -> String {
         let bas = minusculeInitiale(nom)
         switch id {
-        case "vitD", "vitB12", "vitC": return "ta \(bas)"
-        case "omega3", "fiber": return "tes \(bas)"
-        case "iron", "magnesium", "calcium", "zinc", "iodine": return "ton \(bas)"
-        default: return "ton apport en \(bas)"
+        case "vitD", "vitB12", "vitC": return String(localized: "ta \(bas)")
+        case "omega3", "fiber": return String(localized: "tes \(bas)")
+        case "iron", "magnesium", "calcium", "zinc", "iodine": return String(localized: "ton \(bas)")
+        default: return String(localized: "ton apport en \(bas)")
         }
     }
 
     /// « de ton fer », « de ta vitamine D », « de tes fibres ».
     static func complement(id: String, nom: String) -> String {
-        "de \(possessif(id: id, nom: nom))"
+        String(localized: "de \(possessif(id: id, nom: nom))")
     }
 
     /// Première lettre en minuscule, le reste intact : « Vitamine D » →
@@ -110,7 +110,7 @@ enum NomNutriment {
             let tete = propres.dropLast().enumerated().map { index, element in
                 index == 0 ? majusculeInitiale(element) : minusculeInitiale(element)
             }
-            return tete.joined(separator: ", ") + " ou " + minusculeInitiale(propres.last!)
+            return String(localized: "\(tete.joined(separator: ", ")) ou \(minusculeInitiale(propres.last!))")
         }
     }
 }
@@ -519,8 +519,9 @@ struct PrioriteDuJour: Equatable {
     /// « Ta vitamine D a manqué », « Tes oméga-3 ont manqué ».
     var titre: String {
         let sujet = NomNutriment.majusculeInitiale(NomNutriment.possessif(id: id, nom: nom))
-        let verbe = NomNutriment.accord(id: id, singulier: "a", pluriel: "ont")
-        return "\(sujet) \(verbe) manqué"
+        return NomNutriment.estPluriel(id: id)
+            ? String(localized: "\(sujet) ont manqué")
+            : String(localized: "\(sujet) a manqué")
     }
 }
 

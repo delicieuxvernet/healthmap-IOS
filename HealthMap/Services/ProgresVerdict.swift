@@ -52,21 +52,21 @@ enum ProgresVerdict {
     static func ligneSymptome(_ evolutions: [SuiviEngineV4.SymptomEvolution], verrouille: Bool) -> Ligne? {
         guard let evolution = symptomeRetenu(evolutions) else { return nil }
         let trend = SymptomTrend.make(from: evolution.nom)
-        let sujet = majuscule(trend.noun)
+        let sujet = majuscule(Langue.texte(trend.noun))
 
         guard aUneTendance(evolution) else {
-            return Ligne(genre: .symptome, gras: sujet, suite: " : ton suivi démarre, tes réponses vont le dessiner.")
+            return Ligne(genre: .symptome, gras: sujet, suite: String(localized: " : ton suivi démarre, tes réponses vont le dessiner."))
         }
         if verrouille {
-            return Ligne(genre: .symptome, gras: sujet, suite: " : ta tendance se dessine, réponse après réponse.")
+            return Ligne(genre: .symptome, gras: sujet, suite: String(localized: " : ta tendance se dessine, réponse après réponse."))
         }
         switch evolution.verdict {
         case "En amélioration":
-            return Ligne(genre: .symptome, gras: "\(sujet) \(vaMieux(trend))", suite: " depuis tes premières réponses.")
+            return Ligne(genre: .symptome, gras: "\(sujet) \(vaMieux(trend))", suite: String(localized: " depuis tes premières réponses."))
         case "À surveiller":
-            return Ligne(genre: .symptome, gras: "\(sujet) : à surveiller", suite: " ces jours-ci.")
+            return Ligne(genre: .symptome, gras: String(localized: "\(sujet) : à surveiller"), suite: String(localized: " ces jours-ci."))
         default:
-            return Ligne(genre: .symptome, gras: "\(sujet) : stable", suite: " depuis tes premières réponses.")
+            return Ligne(genre: .symptome, gras: String(localized: "\(sujet) : stable"), suite: String(localized: " depuis tes premières réponses."))
         }
     }
 
@@ -74,8 +74,8 @@ enum ProgresVerdict {
     /// problème (on ne dit pas d'une fatigue qu'elle va mieux).
     static func vaMieux(_ trend: SymptomTrend) -> String {
         switch trend.noun {
-        case "ta fatigue", "ton stress": return "recule"
-        default: return trend.noun.hasPrefix("tes ") ? "vont mieux" : "va mieux"
+        case "ta fatigue", "ton stress": return String(localized: "recule")
+        default: return trend.noun.hasPrefix("tes ") ? String(localized: "vont mieux") : String(localized: "va mieux")
         }
     }
 
@@ -94,10 +94,10 @@ enum ProgresVerdict {
     /// « +2 niveaux », « −1 niveau », « stable ». Le signe moins est le vrai
     /// (U+2212), comme partout dans l'app.
     static func libelleNiveaux(_ niveaux: Int) -> String {
-        guard niveaux != 0 else { return "stable" }
+        guard niveaux != 0 else { return String(localized: "stable") }
         let signe = niveaux > 0 ? "+" : "\u{2212}"
         let valeur = abs(niveaux)
-        return "\(signe)\(valeur) niveau\(valeur > 1 ? "x" : "")"
+        return valeur > 1 ? String(localized: "\(signe)\(valeur) niveaux") : String(localized: "\(signe)\(valeur) niveau")
     }
 
     // MARK: Apport
@@ -123,23 +123,28 @@ enum ProgresVerdict {
         guard joursSuivis >= joursMinimumPourComparer else { return nil }
         if verrouille {
             guard let premier = couverture.first else { return nil }
-            return Ligne(genre: .apport(id: premier.id), gras: premier.nom,
-                         suite: " : ta tendance se mesure, repas après repas.")
+            return Ligne(genre: .apport(id: premier.id), gras: Langue.texte(premier.nom),
+                         suite: String(localized: " : ta tendance se mesure, repas après repas."))
         }
         guard let apport = apportRetenu(couverture) else { return nil }
-        let sens = apport.pct > apport.baselinePct ? "en hausse" : "en baisse"
-        return Ligne(genre: .apport(id: apport.id), gras: "\(apport.nom) \(sens)",
-                     suite: " : \(apport.baselinePct) → \(apport.pct) %.")
+        let nom = Langue.texte(apport.nom)
+        let gras = apport.pct > apport.baselinePct
+            ? String(localized: "\(nom) en hausse")
+            : String(localized: "\(nom) en baisse")
+        return Ligne(genre: .apport(id: apport.id), gras: gras,
+                     suite: String(localized: " : \(apport.baselinePct) → \(apport.pct) %."))
     }
 
     // MARK: Calories
 
     static func ligneCalories(joursSuivis: Int, joursDansLaCible: Int, besoinConnu: Bool) -> Ligne? {
         guard besoinConnu, joursSuivis > 0 else { return nil }
-        let pluriel = joursDansLaCible > 1 ? "s" : ""
+        let gras = joursDansLaCible > 1
+            ? String(localized: "Calories : \(joursDansLaCible) jours sur \(joursSuivis)")
+            : String(localized: "Calories : \(joursDansLaCible) jour sur \(joursSuivis)")
         return Ligne(genre: .calories,
-                     gras: "Calories : \(joursDansLaCible) jour\(pluriel) sur \(joursSuivis)",
-                     suite: " dans ta cible.")
+                     gras: gras,
+                     suite: String(localized: " dans ta cible."))
     }
 
     // MARK: Outils

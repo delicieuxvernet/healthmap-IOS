@@ -38,16 +38,16 @@ struct VueAjoutPetite: View {
     /// l'app, qui fera le reste.
     private var textes: (titre: String, sousTitre: String, annonce: String) {
         guard let etat = exploitableW(etat) else {
-            return ("Dicter un repas", "Ouvre Kiwio, micro prêt", "Dicter un repas")
+            return (String(localized: "Dicter un repas"), String(localized: "Ouvre Kiwio, micro prêt"), String(localized: "Dicter un repas"))
         }
         let creneau = etat.repasAVenir(maintenant)
         // « Il te reste » n'a de sens qu'une fois la journée commencée : à zéro
         // kcal, le budget entier n'apprend rien à personne.
         if let restantes = etat.kcalRestantes, restantes > 0, etat.kcalConsommees > 0 {
-            let reste = "Il te reste \(FormatW.entier(restantes)) kcal"
+            let reste = String(localized: "Il te reste \(FormatW.entier(restantes)) kcal")
             return (creneau.question, reste, "\(creneau.aDicter). \(reste).")
         }
-        return (creneau.question, "Dicte-le en 5 secondes", creneau.aDicter)
+        return (creneau.question, String(localized: "Dicte-le en 5 secondes"), creneau.aDicter)
     }
 
     var body: some View {
@@ -168,28 +168,28 @@ struct VueAjoutMoyenne: View {
 
     private var tuilePhoto: some View {
         Link(destination: LienKiwio.photo.url) {
-            GestesTuile(icone: .symbole("camera"), titre: "Photo")
+            GestesTuile(icone: .symbole("camera"), titre: String(localized: "Photo"))
         }
         .accessibilityLabel("Photographier un repas")
     }
 
     private var tuileChercher: some View {
         Link(destination: LienKiwio.rechercher.url) {
-            GestesTuile(icone: .symbole("magnifyingglass"), titre: "Chercher")
+            GestesTuile(icone: .symbole("magnifyingglass"), titre: String(localized: "Chercher"))
         }
         .accessibilityLabel("Rechercher un aliment")
     }
 
     private var tuileJournal: some View {
         Link(destination: LienKiwio.journal.url) {
-            GestesTuile(icone: .symbole("book"), titre: "Journal")
+            GestesTuile(icone: .symbole("book"), titre: String(localized: "Journal"))
         }
         .accessibilityLabel("Ouvrir le Journal")
     }
 
     private func tuileRepas(_ creneau: CreneauWidget) -> some View {
         Link(destination: LienKiwio.repas(creneau.rawValue).url) {
-            GestesTuile(icone: .symbole(creneau.symbole), titre: creneau.libelle, detail: "Ajouter")
+            GestesTuile(icone: .symbole(creneau.symbole), titre: creneau.libelle, detail: String(localized: "Ajouter"))
         }
         .accessibilityLabel("Ajouter un aliment à \(creneau.prochain)")
     }
@@ -203,7 +203,7 @@ struct VueAjoutMoyenne: View {
         let objectif = "\(FormatW.litresObjectif(eau)) L"
         if eau.atteint {
             Link(destination: LienKiwio.journal.url) {
-                GestesTuile(icone: .illustration("fluent_droplet"), titre: litres, detail: "Atteint")
+                GestesTuile(icone: .illustration("fluent_droplet"), titre: litres, detail: String(localized: "Atteint"))
             }
             .accessibilityLabel("Eau : \(litres) sur \(objectif), objectif atteint")
         } else {
@@ -224,11 +224,11 @@ struct VueAjoutMoyenne: View {
         let pris = !prises.isEmpty && prises.allSatisfy(\.fait)
         return Button(intent: CocherMomentIntent(moment: moment)) {
             GestesTuile(icone: .illustration("fluent_pill"), titre: moment.libelle,
-                        detail: pris ? "Pris" : "À prendre")
+                        detail: pris ? String(localized: "Pris") : String(localized: "À prendre"))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Compléments du \(moment.libelle.lowercased()) : \(FormatW.noms(prises))")
-        .accessibilityValue(pris ? "pris" : "à prendre")
+        .accessibilityValue(pris ? String(localized: "pris") : String(localized: "à prendre"))
     }
 }
 
@@ -318,7 +318,7 @@ private struct GestesOnde: View {
 
 /// « 1 verre », « 3 verres » : pour VoiceOver.
 private func gestesVerres(_ nombre: Int) -> String {
-    "\(nombre) \(nombre > 1 ? "verres" : "verre")"
+    nombre > 1 ? String(localized: "\(nombre) verres") : String(localized: "\(nombre) verre")
 }
 
 /// Part de l'objectif d'eau bue, bornée à 0...1 (l'objectif sert aussi de
@@ -339,7 +339,7 @@ struct VueEauPetite: View {
             if let eau = etat.eau {
                 contenu(eau)
             } else {
-                InvitationW(message: "Ouvre Kiwio pour suivre ton eau.")
+                InvitationW(message: String(localized: "Ouvre Kiwio pour suivre ton eau."))
             }
         } else {
             InvitationW()
@@ -352,7 +352,7 @@ struct VueEauPetite: View {
                 .frame(width: 50)
                 .frame(maxHeight: .infinity)
             VStack(alignment: .leading, spacing: 0) {
-                EnTeteW(icone: .illustration("fluent_droplet"), titre: "Eau")
+                EnTeteW(icone: .illustration("fluent_droplet"), titre: String(localized: "Eau"))
                 VStack(alignment: .leading, spacing: 3) {
                     Text("\(FormatW.litresBus(eau)) L")
                         .font(.chiffreW(30))
@@ -511,8 +511,9 @@ struct VueEauRonde: View {
     }
 
     private func annonce(_ eau: InstantaneJour.Eau) -> String {
-        let compte = "Eau : \(gestesVerres(eau.verres)) sur \(eau.objectif)"
-        return eau.atteint ? compte + ", objectif atteint" : compte + ". Ajouter un verre"
+        return eau.atteint
+            ? String(localized: "Eau : \(gestesVerres(eau.verres)) sur \(eau.objectif), objectif atteint")
+            : String(localized: "Eau : \(gestesVerres(eau.verres)) sur \(eau.objectif). Ajouter un verre")
     }
 }
 
@@ -544,8 +545,8 @@ private struct GestesAnneauRond: View {
 /// qu'aucun complément n'est retenu pour aujourd'hui.
 private func gestesRituelVide(_ etat: InstantaneJour) -> String {
     etat.bilanFait
-        ? "Aucun complément à prendre aujourd'hui."
-        : "Ton rituel arrive avec ton bilan, dans Kiwio."
+        ? String(localized: "Aucun complément à prendre aujourd'hui.")
+        : String(localized: "Ton rituel arrive avec ton bilan, dans Kiwio.")
 }
 
 /// « 1 / 3 » : prises cochées sur prises du jour, en tête des deux formats.
@@ -557,7 +558,7 @@ private struct GestesCompteurRituel: View {
         Text("\(faites) / \(total)")
             .font(.chiffreW(13))
             .foregroundStyle(TeinteW.encre())
-            .accessibilityLabel("\(faites) \(faites > 1 ? "prises" : "prise") sur \(total)")
+            .accessibilityLabel(faites > 1 ? String(localized: "\(faites) prises sur \(total)") : String(localized: "\(faites) prise sur \(total)"))
     }
 }
 
@@ -572,7 +573,7 @@ struct VueRituelPetite: View {
             let prises = etat.prises(du: moment)
             let pris = !prises.isEmpty && prises.allSatisfy(\.fait)
             VStack(alignment: .leading, spacing: 0) {
-                EnTeteW(icone: .illustration("fluent_pill"), titre: "Rituel") {
+                EnTeteW(icone: .illustration("fluent_pill"), titre: String(localized: "Rituel")) {
                     GestesCompteurRituel(faites: etat.prisesFaites, total: etat.rituel.count)
                 }
                 HStack(spacing: 10) {
@@ -598,7 +599,7 @@ struct VueRituelPetite: View {
                             .font(.system(size: 15, weight: .semibold))
                         // « Je les ai pris » quand le moment compte plusieurs
                         // compléments : la phrase parle de ce qu'on coche.
-                        Text(pris ? "Pris" : (prises.count > 1 ? "Je les ai pris" : "Je l'ai pris"))
+                        (pris ? Text("Pris") : (prises.count > 1 ? Text("Je les ai pris") : Text("Je l'ai pris")))
                             .font(.texteW(14, .semibold))
                     }
                     .foregroundStyle(TeinteW.encre())
@@ -611,7 +612,7 @@ struct VueRituelPetite: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Compléments du \(moment.libelle.lowercased()) : \(FormatW.noms(prises))")
-                .accessibilityValue(pris ? "pris" : "à prendre")
+                .accessibilityValue(pris ? String(localized: "pris") : String(localized: "à prendre"))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else if let etat = exploitableW(etat) {
@@ -631,7 +632,7 @@ struct VueRituelMoyenne: View {
     var body: some View {
         if let etat = exploitableW(etat), etat.momentEnAvant != nil {
             VStack(alignment: .leading, spacing: 10) {
-                EnTeteW(icone: .illustration("fluent_pill"), titre: "Rituel du jour") {
+                EnTeteW(icone: .illustration("fluent_pill"), titre: String(localized: "Rituel du jour")) {
                     GestesCompteurRituel(faites: etat.prisesFaites, total: etat.rituel.count)
                 }
                 HStack(spacing: 8) {
@@ -671,7 +672,7 @@ private struct GestesTuileMoment: View {
                 .foregroundStyle(TeinteW.encre())
                 .lineLimit(1)
                 .padding(.top, 3)
-            Text(prises.isEmpty ? "Rien à prendre" : FormatW.noms(prises))
+            (prises.isEmpty ? Text("Rien à prendre") : Text(FormatW.noms(prises)))
                 .font(.texteW(11))
                 .foregroundStyle(TeinteW.encre(0.85))
                 .lineLimit(1)
@@ -707,7 +708,7 @@ private struct GestesTuileMoment: View {
             Button(intent: CocherMomentIntent(moment: moment)) { contenu }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Compléments du \(moment.libelle.lowercased()) : \(FormatW.noms(prises))")
-                .accessibilityValue(pris ? "pris" : "à prendre")
+                .accessibilityValue(pris ? String(localized: "pris") : String(localized: "à prendre"))
         }
     }
 }

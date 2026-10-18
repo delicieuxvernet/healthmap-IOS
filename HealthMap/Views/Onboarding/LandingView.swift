@@ -128,10 +128,10 @@ struct LandingView: View {
 
             // Pastilles nutriments aux 4 coins : une teinte par catégorie, celle
             // de la palette du verre (la même que dans le Journal et le Plan).
-            nutrientPill("Vitamine C", dot: Color.teinteVitamineC, delay: 0).offset(x: -116, y: -82)
-            nutrientPill("Fer", dot: Color.teinteFer, delay: 0.9).offset(x: 116, y: -82)
-            nutrientPill("B12", dot: Color.teinteB12, delay: 1.8).offset(x: -120, y: 82)
-            nutrientPill("Oméga-3", dot: Color.teinteOmega3, delay: 2.6).offset(x: 112, y: 82)
+            nutrientPill(String(localized: "Vitamine C"), dot: Color.teinteVitamineC, delay: 0).offset(x: -116, y: -82)
+            nutrientPill(String(localized: "Fer"), dot: Color.teinteFer, delay: 0.9).offset(x: 116, y: -82)
+            nutrientPill(String(localized: "B12"), dot: Color.teinteB12, delay: 1.8).offset(x: -120, y: 82)
+            nutrientPill(String(localized: "Oméga-3"), dot: Color.teinteOmega3, delay: 2.6).offset(x: 112, y: 82)
         }
         .frame(width: 358, height: 208)
         .accessibilityHidden(true)
@@ -162,7 +162,7 @@ struct LandingView: View {
 
     private var ctaSection: some View {
         VStack(spacing: Theme.spacingSM) {
-            DSCapsuleButton(titre: "C'est parti") {
+            DSCapsuleButton(titre: String(localized: "C'est parti")) {
                 authMode = .signUp
             }
             .accessibilityHint("Ouvre la création de compte.")

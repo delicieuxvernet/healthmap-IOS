@@ -54,20 +54,20 @@ extension BilanDoorButton {
     /// Même idiome que « · Esteban » sur le Bilan (décision typo 1er août).
     enum Libelle {
         /// Bilan, zone apports (libellé historique de #217, inchangé).
-        static let bilanApports = "Voir MES apports · bilan 3 min"
+        static let bilanApports = String(localized: "Voir MES apports · bilan 3 min")
         /// Journal avant questionnaire (refonte 23 août 2026) : la porte de
         /// la carte « On ne connaît pas encore tes besoins ».
-        static let journal = "Répondre au questionnaire"
+        static let journal = String(localized: "Répondre au questionnaire")
         /// Journal, bilan commencé et pas terminé : on reprend où on en était.
-        static let journalReprise = "Reprendre"
+        static let journalReprise = String(localized: "Reprendre")
         /// Plan (couronne radiale en mode découverte).
-        static let plan = "Construire MON plan · bilan 3 min"
+        static let plan = String(localized: "Construire MON plan · bilan 3 min")
         /// Suivi (sous les carrousels d'exemple).
-        static let suivi = "Suivre MES vrais chiffres · bilan 3 min"
+        static let suivi = String(localized: "Suivre MES vrais chiffres · bilan 3 min")
         /// Compléments (sous les exemples de chaînes).
-        static let complements = "Voir MES compléments · bilan 3 min"
+        static let complements = String(localized: "Voir MES compléments · bilan 3 min")
         /// Résultat de scan (V12e : sous les repères adulte moyen).
-        static let scan = "Personnaliser MES repères · bilan 3 min"
+        static let scan = String(localized: "Personnaliser MES repères · bilan 3 min")
     }
 }
 

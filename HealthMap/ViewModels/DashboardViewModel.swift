@@ -245,11 +245,11 @@ final class DashboardViewModel: ObservableObject {
     var actionDuJour: (titre: String, description: String?)? {
         // Priority 1: AI action_du_jour (not in current model, use priority_actions)
         if let actions = aiAnalysis?.priorityActions, let first = actions.sorted(by: { ($0.rank ?? 0) < ($1.rank ?? 0) }).first {
-            return (titre: first.action ?? "Consulte ton plan", description: first.expectedImpact)
+            return (titre: first.action ?? String(localized: "Consulte ton plan"), description: first.expectedImpact)
         }
         // Priority 2: First deficiency solution
         if let def = deficiencies.first, let sol = def.solution?.action {
-            return (titre: sol, description: "Pour ameliorer ton \(def.label)")
+            return (titre: sol, description: String(localized: "Pour ameliorer ton \(Langue.texte(def.label))"))
         }
         return nil
     }
@@ -391,7 +391,7 @@ final class DashboardViewModel: ObservableObject {
                 self.profile.baselineNutrientScores = profileRow.baselineNutrientScores
             }
         } catch {
-            errorMessage = "Impossible de charger ton profil pour le moment."
+            errorMessage = String(localized: "Impossible de charger ton profil pour le moment.")
             AppLogger.database.report(error, context: "Dashboard load profile")
         }
 
@@ -876,7 +876,7 @@ final class DashboardViewModel: ObservableObject {
                 // ce n'est PAS un succès. Les scores locaux restent affichés,
                 // mais le bandeau de retry doit apparaître — jamais d'état
                 // silencieux sans analyse ni erreur (incident TestFlight 28).
-                errorMessage = "L'analyse n'a pas pu être générée. Tes scores restent disponibles, réessaie dans un instant."
+                errorMessage = String(localized: "L'analyse n'a pas pu être générée. Tes scores restent disponibles, réessaie dans un instant.")
                 analyticsService.track(.analysisFailed, properties: [
                     "error": "nil_analysis_after_validation",
                 ])
@@ -908,13 +908,13 @@ final class DashboardViewModel: ObservableObject {
                             self.nutrientScores = registre.mapValues(\.score)
                             AppLogger.analysis.info("Loaded cached analysis as fallback after AI failure")
                         } else {
-                            errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
+                            errorMessage = String(localized: "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie.")
                         }
                     } else {
-                        errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
+                        errorMessage = String(localized: "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie.")
                     }
                 } catch {
-                    errorMessage = "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie."
+                    errorMessage = String(localized: "Impossible de charger ton analyse pour le moment. Vérifie ta connexion puis réessaie.")
                     AppLogger.analysis.report(error, context: "Dashboard fallback cache load")
                 }
             }
@@ -985,7 +985,7 @@ final class DashboardViewModel: ObservableObject {
             // déjà affiché ne doit pas être remplacé par un bandeau d'erreur.
             if analysisV2 == nil {
                 errorMessageV2 = (error as? AIAnalysisError)?.errorDescription
-                    ?? "Impossible de charger ton bilan pour le moment. Réessaie dans un instant."
+                    ?? String(localized: "Impossible de charger ton bilan pour le moment. Réessaie dans un instant.")
             }
         }
     }
@@ -1053,7 +1053,7 @@ final class DashboardViewModel: ObservableObject {
             guard !Task.isCancelled else { return }
             profile.weight = avant.actuel
             profile.targetWeight = avant.souhaite
-            ToastService.shared.confirmer("Poids non enregistré. Vérifie ta connexion et réessaie.")
+            ToastService.shared.confirmer(String(localized: "Poids non enregistré. Vérifie ta connexion et réessaie."))
             AppLogger.database.report(error, context: "Save weight")
         }
     }

@@ -51,7 +51,10 @@ enum UnitPortionCatalog {
 
         /// « 1 œuf », « 2 œufs », « 1,5 banane » — le pluriel commence à 2.
         func libelle(nombre: Double) -> String {
-            "\(UnitPortionCatalog.formater(nombre)) \(nombre >= 2 ? pluriel : singulier)"
+            // Français : le pluriel commence à 2 (« 1,5 banane »). Anglais : tout
+            // ce qui n'est pas 1 (« 1.5 bananas »).
+            let auPluriel = Langue.estFrancais ? nombre >= 2 : nombre != 1
+            return "\(UnitPortionCatalog.formater(nombre)) \(auPluriel ? pluriel : singulier)"
         }
 
         /// « Combien d'œufs ? », « Combien de tranches ? »
@@ -60,11 +63,11 @@ enum UnitPortionCatalog {
             // « hot-dogs » garde son h aspiré.
             let initiale = pluriel.first.map { String($0).lowercased() } ?? ""
             let elision = !initiale.isEmpty && "aeiouyhœ".contains(initiale) && !pluriel.hasPrefix("hot")
-            return elision ? "Combien d'\(pluriel) ?" : "Combien de \(pluriel) ?"
+            return elision ? String(localized: "Combien d'\(pluriel) ?") : String(localized: "Combien de \(pluriel) ?")
         }
 
         /// « Compter en œufs » — lien pour revenir aux unités depuis les grammes.
-        var lienCompter: String { "Compter en \(pluriel)" }
+        var lienCompter: String { String(localized: "Compter en \(pluriel)") }
     }
 
     // MARK: - Résolution
@@ -115,7 +118,7 @@ enum UnitPortionCatalog {
             dite = Unite(singulier: u.singulier, pluriel: u.pluriel,
                          grammes: poidsUnite, tailles: [], code: u.code)
         } else {
-            dite = Unite(singulier: singulier, pluriel: pluriel,
+            dite = Unite(singulier: Langue.texte(singulier), pluriel: Langue.texte(pluriel),
                          grammes: poidsUnite, tailles: [], code: code)
         }
         return [dite] + liste
@@ -159,7 +162,7 @@ enum UnitPortionCatalog {
 
     private static let formateur: NumberFormatter = {
         let f = NumberFormatter()
-        f.locale = Locale(identifier: "fr_FR")
+        f.locale = Langue.locale
         f.numberStyle = .decimal
         f.minimumFractionDigits = 0
         f.maximumFractionDigits = 1
@@ -180,8 +183,8 @@ enum UnitPortionCatalog {
             nomUnite = nomUnite.trimmingCharacters(in: .whitespaces).lowercased()
             // « 1 g », « 1 ml » : ce n'est pas une unité humaine.
             guard nomUnite.count > 2, !["g", "ml", "cl", "kg"].contains(nomUnite) else { continue }
-            return Unite(singulier: nomUnite,
-                         pluriel: pluriel(de: nomUnite),
+            return Unite(singulier: Langue.texte(nomUnite),
+                         pluriel: Langue.texte(pluriel(de: nomUnite)),
                          grammes: p.grammes,
                          tailles: [],
                          code: code(pourSingulier: nomUnite))
@@ -232,15 +235,15 @@ enum UnitPortionCatalog {
 
     /// Unité proposée en plus de celle d'office (« poignée » après « pièce »).
     private static func autre(_ singulier: String, _ pluriel: String, _ grammes: Double) -> Unite {
-        Unite(singulier: singulier, pluriel: pluriel, grammes: grammes, tailles: [],
+        Unite(singulier: Langue.texte(singulier), pluriel: Langue.texte(pluriel), grammes: grammes, tailles: [],
               code: code(pourSingulier: singulier))
     }
 
     private static func tailles(_ libelles: (String, String, String),
                                 _ petite: Double, _ moyenne: Double, _ grande: Double) -> [Taille] {
-        [Taille(libelle: libelles.0, grammes: petite),
-         Taille(libelle: libelles.1, grammes: moyenne),
-         Taille(libelle: libelles.2, grammes: grande)]
+        [Taille(libelle: Langue.texte(libelles.0), grammes: petite),
+         Taille(libelle: Langue.texte(libelles.1), grammes: moyenne),
+         Taille(libelle: Langue.texte(libelles.2), grammes: grande)]
     }
 
     // Accords : une pièce est petite/moyenne/grosse, un contenant petit/moyen/grand.
@@ -262,7 +265,7 @@ enum UnitPortionCatalog {
             return nil
         }
         let sauf = d.sauf.flatMap { try? Regex($0) }
-        let principale = Unite(singulier: d.singulier, pluriel: d.pluriel,
+        let principale = Unite(singulier: Langue.texte(d.singulier), pluriel: Langue.texte(d.pluriel),
                                grammes: d.grammes, tailles: d.tailles,
                                code: code(pourSingulier: d.singulier))
         return Entree(motif: motif, sauf: sauf, generique: d.generique,

@@ -261,7 +261,7 @@ struct PremiumTeasePromise: Identifiable {
 /// En-tête de l'écrin, version calme (refonte 23 août 2026) : un kicker en
 /// légende secondaire, sans emoji ni badge dégradé.
 struct PremiumTeaseHeader: View {
-    var kicker: String = "Analyse personnelle"
+    var kicker: String = String(localized: "Analyse personnelle")
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
@@ -347,8 +347,8 @@ private struct PremiumTeaseButton: View {
 struct PremiumTeaseCard: View {
     let title: String
     let promises: [PremiumTeasePromise]
-    var kicker: String = "Analyse personnelle"
-    var ctaTitle: String = "S'ouvre avec Kiwio Premium"
+    var kicker: String = String(localized: "Analyse personnelle")
+    var ctaTitle: String = String(localized: "S'ouvre avec Kiwio Premium")
     /// Identifiant de zone (tracking paywall contextualisé).
     var zone: String = ""
     /// Navigation custom ; si nil → présente `PaywallView`.
@@ -509,7 +509,7 @@ struct QuotaMeter: View {
     let used: Int
     let total: Int
     var icon: String = "camera"
-    var label: String = "Tes scans aujourd’hui"
+    var label: String = String(localized: "Tes scans aujourd’hui")
     /// Nom de l'unité au singulier (« scan », « dictée »).
     var unit: String = "scan"
 
@@ -544,7 +544,7 @@ struct QuotaMeter: View {
             (Text("Il te reste ")
                 + Text("\(remaining) \(unit)\(remaining > 1 ? "s" : "")")
                     .font(.system(size: 12.5, weight: .bold)).foregroundColor(Color.dsTexte)
-                + Text(remaining > 1 ? ", encore de quoi avancer aujourd’hui." : ". Ton quota revient demain."))
+                + (remaining > 1 ? Text(", encore de quoi avancer aujourd’hui.") : Text(". Ton quota revient demain.")))
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundColor(Color(hex: "3A3833"))
                 .padding(.top, 11)
@@ -554,7 +554,9 @@ struct QuotaMeter: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dsCard()
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label) : \(used) sur \(total). Il te reste \(remaining) \(unit)\(remaining > 1 ? "s" : "").")
+        .accessibilityLabel(remaining > 1
+            ? String(localized: "\(label) : \(used) sur \(total). Il te reste \(remaining) \(unit)s.")
+            : String(localized: "\(label) : \(used) sur \(total). Il te reste \(remaining) \(unit)."))
     }
 }
 
@@ -563,11 +565,11 @@ struct QuotaMeter: View {
 /// et bénéfice Premium honnête. Jamais punitif.
 struct QuotaWall: View {
     var icon: String = "infinity"
-    var title: String = "Tu es à fond aujourd’hui"
+    var title: String = String(localized: "Tu es à fond aujourd’hui")
     var message: String
     var unlockIcon: String = "bolt.fill"
-    var unlockTitle: String = "Débloquer 30 scans par jour"
-    var escapeText: String = "ou reviens demain : 3 nouveaux scans t’attendent"
+    var unlockTitle: String = String(localized: "Débloquer 30 scans par jour")
+    var escapeText: String = String(localized: "ou reviens demain : 3 nouveaux scans t’attendent")
     var zone: String = ""
     var onUnlock: (() -> Void)? = nil
 

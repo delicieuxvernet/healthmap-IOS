@@ -40,14 +40,14 @@ struct PlanOption: Identifiable, Equatable {
 /// le prix réel, jamais le mot « gratuit ».
 enum TexteAchat {
     static func titre(essai: String?) -> String {
-        guard let essai else { return "Continuer" }
-        let accord = essai.hasPrefix("1 ") ? "gratuit" : "gratuits"
-        return "Essayer \(essai) \(accord)"
+        guard let essai else { return String(localized: "Continuer") }
+        if essai.hasPrefix("1 ") { return String(localized: "Essayer \(essai) gratuit") }
+        return String(localized: "Essayer \(essai) gratuits")
     }
 
     static func prix(_ prix: String, periode: String, essai: String?) -> String {
-        guard let essai else { return "\(prix) / \(periode)." }
-        return "Gratuit \(essai), puis \(prix) / \(periode)."
+        guard let essai else { return String(localized: "\(prix) / \(periode).") }
+        return String(localized: "Gratuit \(essai), puis \(prix) / \(periode).")
     }
 }
 
@@ -412,17 +412,17 @@ struct PaywallView: View {
                 // serveur : 30 scans (`analyze-meal-photo`), 200 analyses de
                 // repas (`parse-meal-voice`, RATE_LIMIT_PREMIUM) — on ne dit
                 // donc pas « illimité ».
-                featureRow(0, "camera", Color.teinteSymptomes, "30 scans repas par jour", "3 par jour en gratuit")
-                featureRow(1, "mic", Color.teinteEau, "Dicte et écris tous tes repas", "2 analyses par jour en gratuit")
-                featureRow(2, "chart.bar.xaxis", Color.teinteKiwi, "Tes \(LimiteDuJour.nombreDeMicros) micronutriments chiffrés", "vitamines, minéraux, acides gras")
-                featureRow(3, "chart.xyaxis.line", Color.teinteVitamineD, "Tes tendances détaillées", "semaine après semaine")
-                featureRow(4, "testtube.2", Color.teinteProteines, "Le pourquoi de chaque apport", "et le geste qui le comble")
-                featureRow(5, "map", Color.teinteIode, "Ton plan complet, pas à pas", "compléments et solutions")
+                featureRow(0, "camera", Color.teinteSymptomes, String(localized: "30 scans repas par jour"), String(localized: "3 par jour en gratuit"))
+                featureRow(1, "mic", Color.teinteEau, String(localized: "Dicte et écris tous tes repas"), String(localized: "2 analyses par jour en gratuit"))
+                featureRow(2, "chart.bar.xaxis", Color.teinteKiwi, String(localized: "Tes \(LimiteDuJour.nombreDeMicros) micronutriments chiffrés"), String(localized: "vitamines, minéraux, acides gras"))
+                featureRow(3, "chart.xyaxis.line", Color.teinteVitamineD, String(localized: "Tes tendances détaillées"), String(localized: "semaine après semaine"))
+                featureRow(4, "testtube.2", Color.teinteProteines, String(localized: "Le pourquoi de chaque apport"), String(localized: "et le geste qui le comble"))
+                featureRow(5, "map", Color.teinteIode, String(localized: "Ton plan complet, pas à pas"), String(localized: "compléments et solutions"))
             } else {
-                featureRow(0, "camera", Color.teinteSymptomes, "30 scans repas par jour", "3 par jour en gratuit")
-                featureRow(1, "chart.xyaxis.line", Color.teinteVitamineD, "Tes tendances détaillées", "semaine après semaine")
-                featureRow(2, "testtube.2", Color.teinteProteines, "Le pourquoi de chaque apport", "et le geste qui le comble")
-                featureRow(3, "map", Color.teinteIode, "Ton plan complet, pas à pas", "compléments et solutions")
+                featureRow(0, "camera", Color.teinteSymptomes, String(localized: "30 scans repas par jour"), String(localized: "3 par jour en gratuit"))
+                featureRow(1, "chart.xyaxis.line", Color.teinteVitamineD, String(localized: "Tes tendances détaillées"), String(localized: "semaine après semaine"))
+                featureRow(2, "testtube.2", Color.teinteProteines, String(localized: "Le pourquoi de chaque apport"), String(localized: "et le geste qui le comble"))
+                featureRow(3, "map", Color.teinteIode, String(localized: "Ton plan complet, pas à pas"), String(localized: "compléments et solutions"))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -507,7 +507,7 @@ struct PaywallView: View {
                 if let lancement = offreLancement {
                     planCard(
                         plan: annual,
-                        title: "Annuel",
+                        title: String(localized: "Annuel"),
                         detail: lancement.detailCarte,
                         badge: lancement.badgeCarte,
                         prix: lancement.prixCarte
@@ -515,8 +515,8 @@ struct PaywallView: View {
                 } else {
                     planCard(
                         plan: annual,
-                        title: "Annuel",
-                        detail: perMonthLabel(for: annual).map { "soit \($0) par mois" },
+                        title: String(localized: "Annuel"),
+                        detail: perMonthLabel(for: annual).map { String(localized: "soit \($0) par mois") },
                         badge: annualBadge(annual)
                     )
                 }
@@ -527,9 +527,9 @@ struct PaywallView: View {
             if let weekly = weeklyPlan {
                 planCard(
                     plan: weekly,
-                    title: "Hebdomadaire",
+                    title: String(localized: "Hebdomadaire"),
                     detail: shortDetail(weekly),
-                    badge: trialLabel(for: weekly).map { "\($0) gratuits" }
+                    badge: trialLabel(for: weekly).map { String(localized: "\($0) gratuits") }
                 )
             }
         }
@@ -722,14 +722,14 @@ struct PaywallView: View {
               let expiration = entitlement.expirationDate else { return nil }
         let date = expiration.formatted(date: .abbreviated, time: .omitted)
         return entitlement.willRenew
-            ? "Renouvellement le \(date)"
-            : "Premium actif jusqu'au \(date)"
+            ? String(localized: "Renouvellement le \(date)")
+            : String(localized: "Premium actif jusqu'au \(date)")
     }
 
     /// « Essayer 7 jours gratuits » (maquette), la durée lue chez Apple ;
     /// « Continuer » quand la formule choisie n'a pas d'essai.
     private var ctaTitle: String {
-        if lancementChoisi != nil { return "Profiter de l'offre" }
+        if lancementChoisi != nil { return String(localized: "Profiter de l'offre") }
         return TexteAchat.titre(essai: trialLabel(for: selectedPlan))
     }
 
@@ -749,17 +749,17 @@ struct PaywallView: View {
         let price = plan.localizedPriceString
         let period: String
         switch plan.periodUnit {
-        case .year: period = "an"
-        case .week: period = "semaine"
-        case .day: period = "jour"
-        default: period = "mois"
+        case .year: period = String(localized: "an")
+        case .week: period = String(localized: "semaine")
+        case .day: period = String(localized: "jour")
+        default: period = String(localized: "mois")
         }
         let base = lancementChoisi?.noteAchat
             ?? TexteAchat.prix(price, periode: period, essai: trialLabel(for: plan))
         // Divulgation d'auto-renouvellement exigée par App Store 3.1.2 : montant,
         // durée, renouvellement automatique, et où/quand résilier. Affichée au
         // point d'achat, sous le bouton, en plus du titre/durée/prix des cartes.
-        return base + " Abonnement à renouvellement automatique : reconduit pour la même durée sauf résiliation au moins 24 h avant la fin de la période en cours, dans les Réglages de ton compte Apple."
+        return base + " " + String(localized: "Abonnement à renouvellement automatique : reconduit pour la même durée sauf résiliation au moins 24 h avant la fin de la période en cours, dans les Réglages de ton compte Apple.")
     }
 
     /// « 30,00 € / an », « 0,99 € / semaine » — le prix ET sa durée, dans
@@ -767,19 +767,19 @@ struct PaywallView: View {
     private func priceLabel(for plan: PlanOption) -> String {
         let periode: String
         switch plan.periodUnit {
-        case .year: periode = "an"
-        case .week: periode = "semaine"
-        case .day: periode = "jour"
-        default: periode = "mois"
+        case .year: periode = String(localized: "an")
+        case .week: periode = String(localized: "semaine")
+        case .day: periode = String(localized: "jour")
+        default: periode = String(localized: "mois")
         }
-        return "\(plan.localizedPriceString) / \(periode)"
+        return String(localized: "\(plan.localizedPriceString) / \(periode)")
     }
 
     /// Détail de la formule courte : équivalent mensuel (pour se comparer à
     /// l'annuel sans calcul mental) et absence d'engagement, son vrai argument.
     private func shortDetail(_ plan: PlanOption) -> String {
-        guard let parMois = perMonthLabel(for: plan) else { return "sans engagement" }
-        return "soit \(parMois) par mois, sans engagement"
+        guard let parMois = perMonthLabel(for: plan) else { return String(localized: "sans engagement") }
+        return String(localized: "soit \(parMois) par mois, sans engagement")
     }
 
     /// Badge de la carte annuelle : essai + économie vs 1 an de la formule courte
@@ -787,7 +787,7 @@ struct PaywallView: View {
     private func annualBadge(_ annual: PlanOption) -> String? {
         var parts: [String] = []
         if let trial = trialLabel(for: annual) {
-            parts.append("\(trial) gratuits")
+            parts.append(String(localized: "\(trial) gratuits"))
         }
         if let short = shortPlan {
             // `shortPlan` est l'hebdo par construction : 52 périodes par an.
@@ -796,7 +796,7 @@ struct PaywallView: View {
             if let percent = OffrePremium.economie(
                 annuel: annual.price, court: short.price, periodesParAn: periodsPerYear
             ) {
-                parts.append("−\(percent) %")
+                parts.append(String(localized: "−\(percent) %"))
             }
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
@@ -944,12 +944,12 @@ struct PaywallView: View {
                     "source": source,
                     "outcome": "purchase_deferred",
                 ])
-                alertMessage = "Achat en attente d’approbation. L’accès s’activera automatiquement."
+                alertMessage = String(localized: "Achat en attente d’approbation. L’accès s’activera automatiquement.")
                 showAlert = true
             case .entitlementPending:
                 // Le service résout toujours cet état intermédiaire en
                 // .activated / .activatedSyncPending ; ce cas reste défensif.
-                alertMessage = "Ton achat est en cours d’activation. Réessaie dans un instant."
+                alertMessage = String(localized: "Ton achat est en cours d’activation. Réessaie dans un instant.")
                 showAlert = true
             }
         } catch {
@@ -957,7 +957,7 @@ struct PaywallView: View {
             // StoreKit indisponible…) : aucun achat n'a eu lieu, le message
             // d'échec est honnête. Un achat abouti ne throw jamais (V10 #3).
             AppLogger.subscription.report(error, context: "paywall/purchase")
-            alertMessage = "L’achat n’a pas abouti. Réessaie dans un instant."
+            alertMessage = String(localized: "L’achat n’a pas abouti. Réessaie dans un instant.")
             showAlert = true
         }
     }
@@ -977,12 +977,12 @@ struct PaywallView: View {
                 ])
                 showPurchaseSuccess = true
             } else {
-                alertMessage = "Aucun abonnement actif trouvé pour cet identifiant Apple."
+                alertMessage = String(localized: "Aucun abonnement actif trouvé pour cet identifiant Apple.")
                 showAlert = true
             }
         } catch {
             AppLogger.subscription.report(error, context: "paywall/restore")
-            alertMessage = "La restauration n'a pas abouti. Réessaie dans un instant."
+            alertMessage = String(localized: "La restauration n'a pas abouti. Réessaie dans un instant.")
             showAlert = true
         }
     }
@@ -1021,17 +1021,17 @@ private struct PremiumPurchaseSuccessView: View {
 
     private var titre: String {
         switch kind {
-        case .achat: return "Bienvenue dans Kiwio Premium"
-        case .codePromo: return "Ton code est accepté"
+        case .achat: return String(localized: "Bienvenue dans Kiwio Premium")
+        case .codePromo: return String(localized: "Ton code est accepté")
         }
     }
 
     private var sousTitre: String {
         switch kind {
         case .achat:
-            return "Merci pour ta confiance. Ton abonnement est actif et tes avantages sont disponibles maintenant."
+            return String(localized: "Merci pour ta confiance. Ton abonnement est actif et tes avantages sont disponibles maintenant.")
         case .codePromo:
-            return "Ton accès Premium est ouvert. Tout est débloqué dès maintenant."
+            return String(localized: "Ton accès Premium est ouvert. Tout est débloqué dès maintenant.")
         }
     }
 
@@ -1070,18 +1070,18 @@ private struct PremiumPurchaseSuccessView: View {
                 }
 
                 VStack(spacing: 0) {
-                    benefitRow(icon: "camera.fill", title: "Jusqu’à 30 scans par jour")
+                    benefitRow(icon: "camera.fill", title: String(localized: "Jusqu’à 30 scans par jour"))
                     DSSeparator(retrait: 36)
-                    benefitRow(icon: "chart.xyaxis.line", title: "Tendances détaillées de tes apports")
+                    benefitRow(icon: "chart.xyaxis.line", title: String(localized: "Tendances détaillées de tes apports"))
                     DSSeparator(retrait: 36)
-                    benefitRow(icon: "list.bullet.clipboard.fill", title: "Rituels et solutions détaillés")
+                    benefitRow(icon: "list.bullet.clipboard.fill", title: String(localized: "Rituels et solutions détaillés"))
                 }
                 .padding(.horizontal, Theme.spacingMD)
                 .dsCard()
 
                 // Verre liquide : l'action principale en verre vert de 54 pt,
                 // la sortie secondaire en verre clair.
-                PremiumAction(titre: "Découvrir mes avantages", action: onExplore)
+                PremiumAction(titre: String(localized: "Découvrir mes avantages"), action: onExplore)
 
                 Button(action: onBilan) {
                     Text("Continuer sur mon bilan")
