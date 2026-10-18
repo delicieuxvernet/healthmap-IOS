@@ -117,7 +117,7 @@ enum LectureEstimation {
         case .aSurveiller: return "Ton apport en \(x) semble proche de ton besoin."
         case .aRenforcer: return "Ton apport en \(x) semble bas."
         case .peuPrecise: return "Ton apport en \(x) reste à préciser : on ne peut rien t'affirmer pour l'instant."
-        case .couvertParComplement: return "Ton complément couvre ton besoin en \(x)."
+        case .couvertParComplement: return "Avec ton complément, ton apport en \(x) couvre ton besoin."
         case .auDessusDeLaLimite: return "Ton apport en \(x) semble dépasser la limite conseillée."
         case .sousLaLimite: return "Ton apport en \(x) reste sous la limite conseillée."
         }

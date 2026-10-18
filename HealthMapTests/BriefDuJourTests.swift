@@ -585,7 +585,7 @@ final class BriefDuJourTests: XCTestCase {
         let rappels = RappelsPersonnalises.planifier(
             contexte: ContexteRappels(cibles: cibles), maintenant: maintenant, calendar: cal
         )
-        XCTAssertEqual(rappel("brief", 1, dans: rappels)?.titre, "Ton brief du jour est prêt")
+        XCTAssertEqual(rappel("brief", 1, dans: rappels)?.titre, "Ton récap du jour est prêt")
         for type in ["encas", "appel", "semaine"] {
             XCTAssertTrue(rappels.allSatisfy { $0.type != type }, "\(type) affirme un fait du journal")
         }

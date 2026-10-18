@@ -122,7 +122,7 @@ struct GratificationRepas: Identifiable, Equatable {
         guard repas.items.count > 1, let premier = parts.max(by: { $0.pct < $1.pct }) else { return nil }
         let total = parts.reduce(0) { $0 + $1.pct }
         guard total > 0, Double(premier.pct) / Double(total) >= partPourNommer else { return nil }
-        return "\(NomNutriment.minusculeInitiale(premier.nom)), surtout"
+        return "\(premier.nom.lowercased()), surtout"
     }
 
     /// Jours d'affilée, aujourd'hui compris, avec au moins un repas.
