@@ -57,6 +57,19 @@ extension StatutApport {
 
     /// L'apport semble sous sa référence, avec ou sans certitude.
     var estSousLaReference: Bool { self == .aSurveiller || self == .aRenforcer || self == .peuPrecise }
+
+    /// Le statut tel que l'app le MONTRE à côté de son chiffre : un apport
+    /// affiché à 100 % de son besoin est « à ton besoin », jamais « à
+    /// surveiller » ni « à affiner ». Le 14 oct. 2026, Progrès disait « 1 apport
+    /// sur 10 atteint ton besoin » sous une toile où B12, iode et calcium
+    /// étaient à 100 % : l'estimateur garde une marge de prudence au-dessus de
+    /// la référence (ex. iode couvert à 1,2 × la référence), que personne ne
+    /// peut lire dans un chiffre plafonné à 100. Une alerte franche (« à
+    /// renforcer »), une limite et un complément ne bougent pas.
+    func coherent(avecCouverture couverture: Int) -> StatutApport {
+        guard couverture >= 100, self == .aSurveiller || self == .peuPrecise else { return self }
+        return .couvert
+    }
 }
 
 enum LectureEstimation {

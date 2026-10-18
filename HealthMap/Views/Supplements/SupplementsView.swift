@@ -599,7 +599,16 @@ struct SupplementsView: View {
 
     /// Les trois freins les plus lourds, puis le premier appui : au-delà, la
     /// carte deviendrait la fiche. Le compte exact reste dans la ligne de statut.
+    /// Un apport estimé n'a que des sources : on en montre jusqu'à trois, aux
+    /// couleurs de l'anneau. « 2 sources » avec une seule ligne « +16 » sous un
+    /// anneau à 29 ne tombait pas juste (Arthur, 14 oct. 2026).
     private func lignesHeros(_ item: Tuile) -> [LigneCauseTuile] {
+        if item.detail.estimation != nil {
+            return item.detail.appuis.prefix(3).enumerated().map { rang, source in
+                LigneCauseTuile(id: source.id, libelle: source.libelle, delta: source.delta,
+                                teinte: AnneauTeintes.source(rang: rang, couleur: item.chain.tint))
+            }
+        }
         let freins = item.detail.freins.prefix(3).enumerated().map { rang, frein in
             LigneCauseTuile(id: frein.id, libelle: frein.libelle, delta: frein.delta, teinte: AnneauTeintes.cause(rang: rang))
         }

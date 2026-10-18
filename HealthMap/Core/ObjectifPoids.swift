@@ -167,11 +167,14 @@ struct ObjectifPoids: Equatable {
         return String(format: "%.1f", valeur)
     }
 
+    /// « 30 octobre », « 3 janvier 2027 » : le mois en toutes lettres. L'abrégé
+    /// (« 30 oct. ») finissait par un point, et la phrase en ajoutait un second
+    /// (« vers le 30 oct.. », vu par Arthur le 14 oct. 2026).
     private static func jour(_ date: Date, depuis maintenant: Date) -> String {
         let formateur = DateFormatter()
         formateur.locale = Locale(identifier: "fr_FR")
         let memeAnnee = Calendar.current.isDate(date, equalTo: maintenant, toGranularity: .year)
-        formateur.dateFormat = memeAnnee ? "d MMM" : "d MMM yyyy"
+        formateur.dateFormat = memeAnnee ? "d MMMM" : "d MMMM yyyy"
         return formateur.string(from: date)
     }
 }
