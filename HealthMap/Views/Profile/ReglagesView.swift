@@ -396,6 +396,21 @@ struct ReglagesView: View {
             .accessibilityIdentifier("reglages.widgets")
             .verreCascade(lignesVisibles, delai: delai(7), decalage: 10)
 
+            // La langue suit celle de l'iPhone ; iOS la change par app dans
+            // ses propres Réglages (Kiwio > Langue). La ligne y mène.
+            Button {
+                HapticService.shared.tap()
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                ReglageLigne(symbole: "globe", titre: String(localized: "Langue"),
+                             valeur: Langue.estFrancais ? "Français" : "English", filet: true)
+            }
+            .buttonStyle(.dsPress)
+            .accessibilityIdentifier("reglages.langue")
+            .verreCascade(lignesVisibles, delai: delai(7), decalage: 10)
+
             Button {
                 HapticService.shared.tap()
                 TutorielService.partage.relancer()

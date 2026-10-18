@@ -677,7 +677,7 @@ struct BilanV7SymptomesCard: View {
                                         .font(.system(size: 12, weight: .bold))
                                         .foregroundStyle(row.improving ? Color.dsTexte : BilanV7.warnInk)
                                         .accessibilityHidden(true)
-                                    Text(row.verdict)
+                                    Text(Langue.texte(row.verdict))
                                         .font(.dsSousTitreFort)
                                         .tracking(DSTracking.sousTitre)
                                         .foregroundStyle(BilanV7.ink)
