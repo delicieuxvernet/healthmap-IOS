@@ -311,6 +311,11 @@ struct MainTabView: View {
     /// Brief du jour : première ouverture de chaque journée (11 sept. 2026).
     @State private var slidesBrief: [BriefSlide] = []
     @State private var afficheBrief = false
+    /// Le récap du jour (sphères de verre, maquette v5.1) : quand il est là,
+    /// la couverture du brief le montre à la place des anciens écrans.
+    @State private var recapDuJour: RecapDuJour?
+    @State private var recapAvecInvitation = false
+    @State private var cibleDuRecap: CibleNutritionnelle?
     /// Ouverture par une notification ou un lien : on respecte l'intention
     /// (scanner, check-in…) et on garde le brief pour la prochaine ouverture.
     @State private var briefReporte = false
@@ -417,17 +422,31 @@ struct MainTabView: View {
         // La couverture est posée au même niveau, sinon elle ne s'ouvrirait
         // qu'une fois l'écran de lancement passé — le retard qu'on corrige.
         .task { proposerBrief() }
-        .fullScreenCover(isPresented: $afficheBrief) {
-            BriefDuJourView(
-                slides: slidesBrief,
+        .fullScreenCover(isPresented: $afficheBrief) { couvertureDuBrief }
+    }
+
+    /// La couverture du matin : le récap du jour (sphères de verre) quand il
+    /// a quelque chose à dire, sinon l'ancien écran du brief. Hors de la chaîne
+    /// de `body` : le vérificateur de types y a déjà abandonné (CI #244).
+    @ViewBuilder
+    private var couvertureDuBrief: some View {
+        if let recap = recapDuJour {
+            RecapDuJourView(
+                recap: recap,
+                proposerInvitation: recapAvecInvitation,
+                cibleInvitation: cibleDuRecap,
                 onAjouterHier: ajouterRepasDHier,
-                onTerminer: {
-                    afficheBrief = false
-                    // Le brief refermé, l'écran est libre pour l'offre de lancement.
-                    proposerLancement()
-                }
+                onTerminer: finDuBrief
             )
+        } else {
+            BriefDuJourView(slides: slidesBrief, onAjouterHier: ajouterRepasDHier, onTerminer: finDuBrief)
         }
+    }
+
+    private func finDuBrief() {
+        afficheBrief = false
+        // Le brief refermé, l'écran est libre pour l'offre de lancement.
+        proposerLancement()
     }
 
     /// Conteneur d'onglets maison (remplace `TabView` depuis le 28 juillet).
@@ -829,6 +848,16 @@ struct MainTabView: View {
         // Le prénom sert au tout premier écran du brief, qui s'affiche avant
         // même que le profil soit rechargé : on le garde sous la main.
         BriefDuJourStore.memoriserPrenom(dashboardVM.firstName)
+        // Régime et allergies : le récap du matin les respecte avant même que
+        // le profil soit rechargé (aucun aliment exclu ne doit y apparaître).
+        if dashboardVM.hasCompletedQuestionnaire {
+            let profil = dashboardVM.profile
+            BriefDuJourStore.memoriserProfilAlimentaire(ProfilAlimentaire(
+                regime: profil.dietType,
+                allergies: profil.allergies,
+                enceinte: profil.pregnancyStatus == "pregnant"
+            ))
+        }
         proposerBrief()
         replanifierRappels()
         proposerLancement()
@@ -963,6 +992,18 @@ struct MainTabView: View {
     /// (notification, lien). Appelé à l'apparition, à l'arrivée du bilan et à
     /// chaque retour au premier plan ; les appels en trop sont sans effet.
     private func proposerBrief() {
+        #if DEBUG
+        // Captures : `-captureRecapDuJour note|vide|ok` montre un récap
+        // d'exemple, même en mode captures (qui bloque le vrai brief).
+        if !afficheBrief, !RecapDuJourExemple.dejaMontre, let exemple = RecapDuJourExemple.depuisLesArguments() {
+            RecapDuJourExemple.dejaMontre = true
+            recapDuJour = exemple
+            recapAvecInvitation = false
+            cibleDuRecap = nil
+            afficheBrief = true
+            return
+        }
+        #endif
         guard momentOpportun else { return }
 
         // 1) Le chemin normal : tout est déjà sur le téléphone, le brief
@@ -1023,15 +1064,34 @@ struct MainTabView: View {
     private func presenter(_ brief: BriefDuJour) {
         let jamaisDemande = BriefDuJourStore.statutNotificationsMemorise()
             == UNAuthorizationStatus.notDetermined.rawValue
+        let invitation = jamaisDemande && BriefDuJourStore.invitationAProposer()
+        // La composition des aliments proposés, déjà sur le téléphone : la
+        // priorité du jour se chiffre sans attendre la base.
+        let compositions = CompositionsStore.shared.connuesSansReseau()
+
+        // Le récap du jour (maquette v5.1) d'abord ; l'ancien écran ne sert
+        // plus que quand le récap n'a rien d'honnête à montrer.
+        if let recap = RecapDuJourBuilder.construire(
+            brief: brief,
+            compositions: compositions,
+            profil: BriefDuJourStore.profilAlimentaireMemorise()
+        ) {
+            BriefDuJourStore.marquerVu()
+            recapDuJour = recap
+            recapAvecInvitation = invitation
+            cibleDuRecap = brief.cible
+            afficheBrief = true
+            return
+        }
+
         let slides = BriefDuJourBuilder.slides(
             brief: brief,
-            proposerInvitation: jamaisDemande && BriefDuJourStore.invitationAProposer(),
-            // La composition des aliments proposés, déjà sur le téléphone : la
-            // priorité du jour se chiffre sans attendre la base.
-            compositions: CompositionsStore.shared.connuesSansReseau()
+            proposerInvitation: invitation,
+            compositions: compositions
         )
         guard !slides.isEmpty else { return }
         BriefDuJourStore.marquerVu()
+        recapDuJour = nil
         slidesBrief = slides
         afficheBrief = true
     }
