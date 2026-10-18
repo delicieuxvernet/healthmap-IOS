@@ -34,9 +34,15 @@ struct RecapDuJourView: View {
     @State private var choregraphieFinie = false
     @State private var enInvitation = false
     @State private var demandeEnCours = false
+    /// Les capteurs comptent leurs lecteurs : on ne s'inscrit qu'une fois.
+    @State private var litLInclinaison = false
 
-    /// L'horloge s'arrête sous « Réduire les animations » et hors premier plan.
-    private var fige: Bool { reduceMotion || scenePhase != .active }
+    /// Sous « Réduire les animations », tout est posé à sa valeur finale.
+    private var fige: Bool { reduceMotion }
+    /// En arrière-plan, l'horloge s'arrête. Pas pendant la phase « inactive »
+    /// du lancement : le récap s'ouvre souvent à ce moment-là, et montrer
+    /// l'état final avant de rejouer l'animation ferait clignoter l'écran.
+    private var enPause: Bool { fige || scenePhase == .background }
 
     var body: some View {
         ZStack {
@@ -61,7 +67,7 @@ struct RecapDuJourView: View {
             } else {
                 // Après la chorégraphie, il ne reste que le flottement, la
                 // vague et la parallaxe : 30 images par seconde suffisent.
-                TimelineView(.animation(minimumInterval: choregraphieFinie ? 1.0 / 30 : 1.0 / 60, paused: fige)) { horloge in
+                TimelineView(.animation(minimumInterval: choregraphieFinie ? 1.0 / 30 : 1.0 / 60, paused: enPause)) { horloge in
                     let t = fige ? RecapChoregraphie.final : horloge.date.timeIntervalSince(debut)
                     let inclinaison = fige ? CGPoint.zero : InclinaisonTelephone.partage.lire()
                     ecran(t: t, inclinaison: inclinaison)
@@ -80,7 +86,7 @@ struct RecapDuJourView: View {
         .dynamicTypeSize(.large ... .accessibility3)
         .onAppear {
             debut = Date()
-            if !reduceMotion { InclinaisonTelephone.partage.demarrer() }
+            suivreInclinaison(!reduceMotion)
             AnalyticsService.shared.track(.screenViewed, properties: [
                 "screen": "brief_du_jour",
                 "slides": 1,
@@ -88,10 +94,25 @@ struct RecapDuJourView: View {
                 "colonnes": nombreDeColonnes,
             ])
         }
-        .onDisappear { InclinaisonTelephone.partage.arreter() }
+        .onDisappear { suivreInclinaison(false) }
+        // En arrière-plan, les capteurs s'arrêtent ; au retour, le zéro se
+        // recale sur la tenue du téléphone à ce moment-là.
+        .onChange(of: scenePhase) { _, phase in
+            suivreInclinaison(!reduceMotion && phase != .background)
+        }
         .task {
             try? await Task.sleep(for: .seconds(RecapChoregraphie.final))
             choregraphieFinie = true
+        }
+    }
+
+    private func suivreInclinaison(_ lire: Bool) {
+        guard lire != litLInclinaison else { return }
+        litLInclinaison = lire
+        if lire {
+            InclinaisonTelephone.partage.demarrer()
+        } else {
+            InclinaisonTelephone.partage.arreter()
         }
     }
 
