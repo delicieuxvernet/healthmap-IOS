@@ -15,10 +15,10 @@ enum HealthCalculator {
 
     static func getBMICategory(_ bmi: Double?) -> (label: String, color: String) {
         guard let bmi else { return ("-", "text-ink-muted") }
-        if bmi < 18.5 { return ("Insuffisance pondérale", "text-accent-blue") }
-        if bmi < 25 { return ("Poids normal", "text-brand-500") }
-        if bmi < 30 { return ("Surpoids", "text-amber-500") }
-        return ("Obésité", "text-red-500")
+        if bmi < 18.5 { return (String(localized: "Insuffisance pondérale"), "text-accent-blue") }
+        if bmi < 25 { return (String(localized: "Poids normal"), "text-brand-500") }
+        if bmi < 30 { return (String(localized: "Surpoids"), "text-amber-500") }
+        return (String(localized: "Obésité"), "text-red-500")
     }
 
     // MARK: - BMR (Mifflin-St Jeor)

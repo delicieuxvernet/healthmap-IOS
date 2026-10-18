@@ -30,23 +30,33 @@ enum LectureApport {
     /// accordé à l'apport.
     private static func mot(_ score: Int, _ accord: Accord) -> String {
         switch (score, accord) {
-        case (..<40, .masculin): return "bas"
-        case (..<40, .feminin): return "basse"
-        case (..<40, .masculinPluriel): return "bas"
-        case (..<40, .femininPluriel): return "basses"
-        case (..<70, .masculin), (..<70, .feminin): return "un peu juste"
-        case (..<70, _): return "un peu justes"
-        case (_, .masculin): return "couvert"
-        case (_, .feminin): return "couverte"
-        case (_, .masculinPluriel): return "couverts"
-        case (_, .femininPluriel): return "couvertes"
+        case (..<40, .masculin): return String(localized: "bas")
+        case (..<40, .feminin): return String(localized: "basse")
+        case (..<40, .masculinPluriel): return String(localized: "bas")
+        case (..<40, .femininPluriel): return String(localized: "basses")
+        case (..<70, .masculin), (..<70, .feminin): return String(localized: "un peu juste")
+        case (..<70, _): return String(localized: "un peu justes")
+        case (_, .masculin): return String(localized: "couvert")
+        case (_, .feminin): return String(localized: "couverte")
+        case (_, .masculinPluriel): return String(localized: "couverts")
+        case (_, .femininPluriel): return String(localized: "couvertes")
         }
     }
 
     /// « est bas », « est basse », « sont bas », « sont basses »…
     private static func etat(_ score: Int, _ accord: Accord) -> String {
-        let pluriel = accord == .masculinPluriel || accord == .femininPluriel
-        return "\(pluriel ? "sont" : "est") \(mot(score, accord))"
+        switch (score, accord) {
+        case (..<40, .masculin): return String(localized: "est bas")
+        case (..<40, .feminin): return String(localized: "est basse")
+        case (..<40, .masculinPluriel): return String(localized: "sont bas")
+        case (..<40, .femininPluriel): return String(localized: "sont basses")
+        case (..<70, .masculin), (..<70, .feminin): return String(localized: "est un peu juste")
+        case (..<70, _): return String(localized: "sont un peu justes")
+        case (_, .masculin): return String(localized: "est couvert")
+        case (_, .feminin): return String(localized: "est couverte")
+        case (_, .masculinPluriel): return String(localized: "sont couverts")
+        case (_, .femininPluriel): return String(localized: "sont couvertes")
+        }
     }
 
     /// Le mot du statut d'un apport (« un peu juste »), pour les widgets.
@@ -61,22 +71,22 @@ enum LectureApport {
         switch statut {
         case .couvert, .couvertParComplement:
             switch a {
-            case .masculin: return "couvert"
-            case .feminin: return "couverte"
-            case .masculinPluriel: return "couverts"
-            case .femininPluriel: return "couvertes"
+            case .masculin: return String(localized: "couvert")
+            case .feminin: return String(localized: "couverte")
+            case .masculinPluriel: return String(localized: "couverts")
+            case .femininPluriel: return String(localized: "couvertes")
             }
         case .aSurveiller:
-            return (a == .masculin || a == .feminin) ? "un peu juste" : "un peu justes"
+            return (a == .masculin || a == .feminin) ? String(localized: "un peu juste") : String(localized: "un peu justes")
         case .aRenforcer:
             switch a {
-            case .masculin, .masculinPluriel: return "bas"
-            case .feminin: return "basse"
-            case .femininPluriel: return "basses"
+            case .masculin, .masculinPluriel: return String(localized: "bas")
+            case .feminin: return String(localized: "basse")
+            case .femininPluriel: return String(localized: "basses")
             }
-        case .peuPrecise: return "à affiner"
-        case .auDessusDeLaLimite: return "au-dessus de la limite"
-        case .sousLaLimite: return "sous la limite"
+        case .peuPrecise: return String(localized: "à affiner")
+        case .auDessusDeLaLimite: return String(localized: "au-dessus de la limite")
+        case .sousLaLimite: return String(localized: "sous la limite")
         }
     }
 
@@ -115,11 +125,11 @@ enum LectureApport {
         // Une prise de sang n'est pas une cause : elle confirme le constat, et
         // la première cause reste à chercher parmi les autres freins.
         let mesure = detail.freins.first { $0.section == .priseDeSang }
-        let confirmation = mesure.map { " \($0.libelle) va dans ce sens." } ?? ""
+        let confirmation = mesure.map { " " + String(localized: "\($0.libelle) va dans ce sens.") } ?? ""
         guard let premiere = detail.freins.first(where: { $0.section != .priseDeSang }) else {
             return phrase + confirmation
         }
-        return "\(phrase)\(confirmation) Première cause : \(enCoursDePhrase(premiere.libelle))."
+        return String(localized: "\(phrase)\(confirmation) Première cause : \(enCoursDePhrase(premiere.libelle)).")
     }
 
     /// Un libellé du registre, au milieu d'une phrase : la majuscule initiale
@@ -184,6 +194,7 @@ enum LectureApport {
 
     /// « jusqu'à +12 points » ; rien quand il n'y a pas de point à annoncer.
     static func libelleRegain(_ regain: Int) -> String? {
-        regain > 0 ? "jusqu'à +\(regain) point\(regain > 1 ? "s" : "")" : nil
+        guard regain > 0 else { return nil }
+        return regain > 1 ? String(localized: "jusqu'à +\(regain) points") : String(localized: "jusqu'à +\(regain) point")
     }
 }

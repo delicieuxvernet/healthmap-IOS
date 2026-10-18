@@ -5,16 +5,16 @@ import SwiftUI
 
 enum NutrientData {
     static let all: [NutrientDefinition] = [
-        NutrientDefinition(id: .vitD, label: "Vitamine D", emoji: "☀️", unit: "UI", rda: 1000, color: .nutrientVitD),
-        NutrientDefinition(id: .vitB12, label: "Vitamine B12", emoji: "🔴", unit: "µg", rda: 2.4, color: .nutrientVitB12),
-        NutrientDefinition(id: .iron, label: "Fer", emoji: "🩸", unit: "mg", rda: 18, color: .nutrientIron),
-        NutrientDefinition(id: .magnesium, label: "Magnésium", emoji: "⚡", unit: "mg", rda: 400, color: .nutrientMagnesium),
-        NutrientDefinition(id: .omega3, label: "Oméga-3", emoji: "🐟", unit: "g", rda: 1.6, color: .nutrientOmega3),
-        NutrientDefinition(id: .vitC, label: "Vitamine C", emoji: "🍊", unit: "mg", rda: 90, color: .nutrientVitC),
-        NutrientDefinition(id: .calcium, label: "Calcium", emoji: "🦴", unit: "mg", rda: 1000, color: .nutrientCalcium),
-        NutrientDefinition(id: .zinc, label: "Zinc", emoji: "🛡️", unit: "mg", rda: 11, color: .nutrientZinc),
-        NutrientDefinition(id: .iodine, label: "Iode", emoji: "🌊", unit: "µg", rda: 150, color: .nutrientIodine),
-        NutrientDefinition(id: .fiber, label: "Fibres", emoji: "🌾", unit: "g", rda: 30, color: .nutrientFiber),
+        NutrientDefinition(id: .vitD, label: String(localized: "Vitamine D"), emoji: "☀️", unit: String(localized: "UI"), rda: 1000, color: .nutrientVitD),
+        NutrientDefinition(id: .vitB12, label: String(localized: "Vitamine B12"), emoji: "🔴", unit: "µg", rda: 2.4, color: .nutrientVitB12),
+        NutrientDefinition(id: .iron, label: String(localized: "Fer"), emoji: "🩸", unit: "mg", rda: 18, color: .nutrientIron),
+        NutrientDefinition(id: .magnesium, label: String(localized: "Magnésium"), emoji: "⚡", unit: "mg", rda: 400, color: .nutrientMagnesium),
+        NutrientDefinition(id: .omega3, label: String(localized: "Oméga-3"), emoji: "🐟", unit: "g", rda: 1.6, color: .nutrientOmega3),
+        NutrientDefinition(id: .vitC, label: String(localized: "Vitamine C"), emoji: "🍊", unit: "mg", rda: 90, color: .nutrientVitC),
+        NutrientDefinition(id: .calcium, label: String(localized: "Calcium"), emoji: "🦴", unit: "mg", rda: 1000, color: .nutrientCalcium),
+        NutrientDefinition(id: .zinc, label: String(localized: "Zinc"), emoji: "🛡️", unit: "mg", rda: 11, color: .nutrientZinc),
+        NutrientDefinition(id: .iodine, label: String(localized: "Iode"), emoji: "🌊", unit: "µg", rda: 150, color: .nutrientIodine),
+        NutrientDefinition(id: .fiber, label: String(localized: "Fibres"), emoji: "🌾", unit: "g", rda: 30, color: .nutrientFiber),
     ]
 
     static func definition(for id: NutrientID) -> NutrientDefinition {

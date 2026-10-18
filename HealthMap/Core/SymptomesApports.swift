@@ -58,49 +58,49 @@ enum SymptomesApports {
     static let liens: [LienSymptome] = [
         // — Liens forts : spécifiques, bien établis.
         LienSymptome(symptome: "tingling", nutriment: .vitB12, niveau: .fort,
-                     formulation: "des fourmillements"),
+                     formulation: String(localized: "des fourmillements")),
         LienSymptome(symptome: "bleeding_gums", nutriment: .vitC, niveau: .fort,
-                     formulation: "des saignements des gencives"),
+                     formulation: String(localized: "des saignements des gencives")),
 
         // — Liens modérés : établis, peu spécifiques.
         LienSymptome(symptome: "mouth_ulcers", nutriment: .vitB12, niveau: .modere,
-                     formulation: "des aphtes fréquents"),
+                     formulation: String(localized: "des aphtes fréquents")),
         LienSymptome(symptome: "mouth_ulcers", nutriment: .iron, niveau: .modere,
-                     formulation: "des aphtes fréquents"),
+                     formulation: String(localized: "des aphtes fréquents")),
         LienSymptome(symptome: "mouth_ulcers", nutriment: .zinc, niveau: .modere,
-                     formulation: "des aphtes fréquents"),
+                     formulation: String(localized: "des aphtes fréquents")),
         LienSymptome(symptome: "hair_loss", nutriment: .iron, niveau: .modere,
-                     formulation: "une perte de cheveux"),
+                     formulation: String(localized: "une perte de cheveux")),
         LienSymptome(symptome: "fatigue_chronic", nutriment: .iron, niveau: .modere,
-                     formulation: "une fatigue qui dure"),
+                     formulation: String(localized: "une fatigue qui dure")),
         LienSymptome(symptome: "fatigue_chronic", nutriment: .vitB12, niveau: .modere,
-                     formulation: "une fatigue qui dure"),
+                     formulation: String(localized: "une fatigue qui dure")),
         LienSymptome(symptome: "feeling_cold", nutriment: .iron, niveau: .modere,
-                     formulation: "une frilosité"),
+                     formulation: String(localized: "une frilosité")),
         // L'iode n'a pas besoin de condition supplémentaire : son score tient
         // déjà compte du sel iodé et du poisson. On ne parle jamais de thyroïde.
         LienSymptome(symptome: "feeling_cold", nutriment: .iodine, niveau: .modere,
-                     formulation: "une frilosité"),
+                     formulation: String(localized: "une frilosité")),
         LienSymptome(symptome: "skin_breakouts", nutriment: .zinc, niveau: .modere,
-                     formulation: "des poussées d'acné"),
+                     formulation: String(localized: "des poussées d'acné")),
         LienSymptome(symptome: "brain_fog", nutriment: .vitB12, niveau: .modere,
-                     formulation: "un brouillard mental"),
+                     formulation: String(localized: "un brouillard mental")),
 
         // — Liens faibles : croyance répandue, preuve mince. Jamais seuls.
         LienSymptome(symptome: "muscle_cramps", nutriment: .magnesium, niveau: .faible,
-                     formulation: "des crampes"),
+                     formulation: String(localized: "des crampes")),
         LienSymptome(symptome: "brittle_nails", nutriment: .iron, niveau: .faible,
-                     formulation: "des ongles cassants"),
+                     formulation: String(localized: "des ongles cassants")),
         LienSymptome(symptome: "brittle_nails", nutriment: .zinc, niveau: .faible,
-                     formulation: "des ongles cassants"),
+                     formulation: String(localized: "des ongles cassants")),
         LienSymptome(symptome: "dry_skin", nutriment: .omega3, niveau: .faible,
-                     formulation: "une peau sèche"),
+                     formulation: String(localized: "une peau sèche")),
         LienSymptome(symptome: "dry_skin", nutriment: .zinc, niveau: .faible,
-                     formulation: "une peau sèche"),
+                     formulation: String(localized: "une peau sèche")),
         LienSymptome(symptome: "brain_fog", nutriment: .iron, niveau: .faible,
-                     formulation: "un brouillard mental"),
+                     formulation: String(localized: "un brouillard mental")),
         LienSymptome(symptome: "hair_loss", nutriment: .zinc, niveau: .faible,
-                     formulation: "une perte de cheveux"),
+                     formulation: String(localized: "une perte de cheveux")),
     ]
 
     /// Ce que les symptômes déclarés permettent de dire sur un apport bas —
@@ -127,12 +127,14 @@ enum SymptomesApports {
 
         let enumeration: String
         if formulations.count > 1 {
-            enumeration = formulations.dropLast().joined(separator: ", ") + " et " + formulations[formulations.count - 1]
+            let debut = formulations.dropLast().joined(separator: ", ")
+            let derniere = formulations[formulations.count - 1]
+            enumeration = String(localized: "\(debut) et \(derniere)")
         } else {
             enumeration = formulations[0]
         }
 
         let label = SupplementEngine.nutrientLabel(for: nutriment)
-        return "Tu as signalé \(enumeration) — cela fait partie de ce qu'un apport bas en \(label) peut expliquer."
+        return String(localized: "Tu as signalé \(enumeration) — cela fait partie de ce qu'un apport bas en \(label) peut expliquer.")
     }
 }

@@ -80,20 +80,20 @@ enum RaisonNutriment {
     static let longueurMax = 60
 
     static let parNutriment: [String: String] = [
-        "vitD": "La vitamine D se fabrique au soleil, rare en hiver.",
-        "vitB12": "La B12 ne vient que des produits animaux ou enrichis.",
+        "vitD": String(localized: "La vitamine D se fabrique au soleil, rare en hiver."),
+        "vitB12": String(localized: "La B12 ne vient que des produits animaux ou enrichis."),
         // Mots exacts du règlement (UE) 432/2012 : une allégation de santé ne
         // se reformule pas (audit de conformité du 9 octobre 2026).
-        "iron": "Le fer contribue à réduire la fatigue.",
-        "magnesium": "Le magnésium part vite quand la semaine est chargée.",
-        "omega3": "Les oméga-3 viennent surtout des poissons gras.",
-        "vitC": "La vitamine C ne se stocke pas, elle se refait chaque jour.",
-        "calcium": "Le calcium se joue sur la régularité, pas sur un à-coup.",
-        "zinc": "Le zinc se trouve côté viandes, graines et légumineuses.",
-        "iodine": "L'iode vient de la mer, et du sel iodé.",
+        "iron": String(localized: "Le fer contribue à réduire la fatigue."),
+        "magnesium": String(localized: "Le magnésium part vite quand la semaine est chargée."),
+        "omega3": String(localized: "Les oméga-3 viennent surtout des poissons gras."),
+        "vitC": String(localized: "La vitamine C ne se stocke pas, elle se refait chaque jour."),
+        "calcium": String(localized: "Le calcium se joue sur la régularité, pas sur un à-coup."),
+        "zinc": String(localized: "Le zinc se trouve côté viandes, graines et légumineuses."),
+        "iodine": String(localized: "L'iode vient de la mer, et du sel iodé."),
         // Le règlement n'autorise aucune allégation pour « les fibres » en
         // général (seulement pour certaines, nommées) : on dit d'où elles viennent.
-        "fiber": "Les fibres se trouvent surtout dans les végétaux.",
+        "fiber": String(localized: "Les fibres se trouvent surtout dans les végétaux."),
     ]
 
     static func pour(_ id: String) -> String? { parNutriment[id] }
@@ -125,7 +125,7 @@ enum FormulationsRappel {
     /// Les aliments d'une cible, prêts à être dits et taillés pour tenir dans
     /// une notification. Vide seulement pour un nutriment hors catalogue.
     static func aliments(de cible: CibleNutritionnelle) -> String {
-        NomNutriment.enumeration(SourcesAlimentaires.ajustes(cible.alimentsAffichables))
+        NomNutriment.enumeration(SourcesAlimentaires.ajustes(cible.alimentsAffichables).map { Langue.texte($0) })
     }
 
     /// Une phrase se termine. Le conseil vient du bilan, rédigé par le
@@ -154,18 +154,19 @@ enum FormulationsRappel {
 
     /// « ton fer est à », « tes fibres sont à ».
     static func estA(_ cible: CibleNutritionnelle) -> String {
-        let verbe = NomNutriment.accord(id: cible.id, singulier: "est", pluriel: "sont")
-        return "\(cible.avecPossessif) \(verbe) à"
+        return NomNutriment.estPluriel(id: cible.id)
+            ? String(localized: "\(cible.avecPossessif) sont à")
+            : String(localized: "\(cible.avecPossessif) est à")
     }
 
     /// « 1 repas noté », « 3 repas notés ».
     static func repasNotes(_ nombre: Int) -> String {
-        nombre <= 1 ? "\(nombre) repas noté" : "\(nombre) repas notés"
+        nombre <= 1 ? String(localized: "\(nombre) repas noté") : String(localized: "\(nombre) repas notés")
     }
 
     /// « 1 besoin sur 10 couvert », « 6 besoins sur 10 couverts ».
     static func besoinsCouverts(_ nombre: Int) -> String {
-        nombre <= 1 ? "\(nombre) besoin sur 10 couvert" : "\(nombre) besoins sur 10 couverts"
+        nombre <= 1 ? String(localized: "\(nombre) besoin sur 10 couvert") : String(localized: "\(nombre) besoins sur 10 couverts")
     }
 
     // MARK: Brief du matin
@@ -178,11 +179,11 @@ enum FormulationsRappel {
     /// illisible au moment de planifier) : aucune affirmation, aucun chiffre.
     static func briefDuMatin(jour: Int) -> (titre: String, corps: String) {
         let variantes = [
-            "Ce qui t'a manqué hier, et ce sur quoi miser aujourd'hui.",
-            "Ta veille en un coup d'œil, et ta priorité du jour.",
-            "Deux chiffres sur hier, une idée pour aujourd'hui.",
+            String(localized: "Ce qui t'a manqué hier, et ce sur quoi miser aujourd'hui."),
+            String(localized: "Ta veille en un coup d'œil, et ta priorité du jour."),
+            String(localized: "Deux chiffres sur hier, une idée pour aujourd'hui."),
         ]
-        return ("Ton brief du jour est prêt", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+        return (String(localized: "Ton brief du jour est prêt"), variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
 
     /// Le brief chiffré.
@@ -203,32 +204,32 @@ enum FormulationsRappel {
     ) -> (titre: String, corps: String) {
         guard let couvertsHier else {
             if repasHier == 1 {
-                return ("Ton brief du jour est prêt",
-                        "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain il parle.")
+                return (String(localized: "Ton brief du jour est prêt"),
+                        String(localized: "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain il parle."))
             }
             let variantes = [
-                "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton brief aura quelque chose à dire.",
-                "Pas de repas noté hier. Une photo de ton petit-déjeuner, et ton brief repart demain.",
-                "Ton brief n'a rien à te dire ce matin : hier est resté vide. Note ton petit-déjeuner pour le relancer.",
+                String(localized: "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton brief aura quelque chose à dire."),
+                String(localized: "Pas de repas noté hier. Une photo de ton petit-déjeuner, et ton brief repart demain."),
+                String(localized: "Ton brief n'a rien à te dire ce matin : hier est resté vide. Note ton petit-déjeuner pour le relancer."),
             ]
-            return ("Ton brief attend tes repas", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+            return (String(localized: "Ton brief attend tes repas"), variantes[indexVariante(jour: jour, parmi: variantes.count)])
         }
 
-        let chiffre = "Hier : \(besoinsCouverts(couvertsHier))"
+        let chiffre = String(localized: "Hier : \(besoinsCouverts(couvertsHier))")
         let suite: String
         if let plusBas {
-            suite = "Le plus bas : \(plusBas.cible.avecPossessif), à \(plusBas.pourcent) %. Ton brief te dit sur quoi miser aujourd'hui."
+            suite = String(localized: "Le plus bas : \(plusBas.cible.avecPossessif), à \(plusBas.pourcent) %. Ton brief te dit sur quoi miser aujourd'hui.")
         } else {
-            suite = "Ton brief te montre ta veille, apport par apport."
+            suite = String(localized: "Ton brief te montre ta veille, apport par apport.")
         }
         // « 0 besoin sur 10 » ne donne envie de rien ouvrir : on le tait.
         let corpsChiffre = couvertsHier >= 1 ? "\(chiffre). \(suite)" : suite
 
         // Une série se fête : elle prend le titre, le chiffre passe dessous.
         if serie >= serieMin {
-            return ("\(serie) jours d'affilée 🔥", corpsChiffre)
+            return (String(localized: "\(serie) jours d'affilée 🔥"), corpsChiffre)
         }
-        guard couvertsHier >= 1 else { return ("Ton brief du jour est prêt", suite) }
+        guard couvertsHier >= 1 else { return (String(localized: "Ton brief du jour est prêt"), suite) }
         return ("\(chiffre) 📊", suite)
     }
 
@@ -241,13 +242,13 @@ enum FormulationsRappel {
         guard !libelle.isEmpty, frein.points > 1 else { return nil }
         let enMinuscule = NomNutriment.minusculeInitiale(libelle)
         let variantes = [
-            "D'après tes réponses : « \(enMinuscule) », c'est \(frein.points) points en moins. Ton plan te montre comment les reprendre.",
-            "« \(libelle) » : \(frein.points) points en moins dans ton bilan. Touche pour voir par où les reprendre.",
-            "\(frein.points) points partent avec « \(enMinuscule) ». Ton plan te dit par quoi commencer.",
+            String(localized: "D'après tes réponses : « \(enMinuscule) », c'est \(frein.points) points en moins. Ton plan te montre comment les reprendre."),
+            String(localized: "« \(libelle) » : \(frein.points) points en moins dans ton bilan. Touche pour voir par où les reprendre."),
+            String(localized: "\(frein.points) points partent avec « \(enMinuscule) ». Ton plan te dit par quoi commencer."),
         ]
         let corps = variantes[indexVariante(jour: jour, parmi: variantes.count)]
         guard corps.count <= corpsMax else { return nil }
-        return (avecEmoji("Ce qui freine \(cible.avecPossessif)", cible), corps)
+        return (avecEmoji(String(localized: "Ce qui freine \(cible.avecPossessif)"), cible), corps)
     }
 
     // MARK: Midi
@@ -263,28 +264,28 @@ enum FormulationsRappel {
 
         guard let hier else {
             let variantes = [
-                "\(aliments) ce midi ? Scanne ton assiette, tu sauras ce qu'elle t'apporte.",
-                "\(aliments) au déjeuner, et ça remonte. Scanne ton assiette.",
-                "Au menu du midi : \(enMinuscule). Une photo, et tu vois ce que ça change.",
+                String(localized: "\(aliments) ce midi ? Scanne ton assiette, tu sauras ce qu'elle t'apporte."),
+                String(localized: "\(aliments) au déjeuner, et ça remonte. Scanne ton assiette."),
+                String(localized: "Au menu du midi : \(enMinuscule). Une photo, et tu vois ce que ça change."),
             ]
-            return (avecEmoji("Ce midi, mise sur \(cible.avecPossessif)", cible),
+            return (avecEmoji(String(localized: "Ce midi, mise sur \(cible.avecPossessif)"), cible),
                     variantes[indexVariante(jour: jour, parmi: variantes.count)])
         }
 
-        let titre = avecEmoji("\(sujet(cible)) : \(hier) % hier", cible)
+        let titre = avecEmoji(String(localized: "\(sujet(cible)) : \(hier) % hier"), cible)
         // Besoin couvert la veille : rien à rattraper, on garde le cap.
         if hier >= BriefDuJourBuilder.seuilCouvert {
             let variantes = [
-                "Besoin couvert hier. \(aliments) ce midi pour tenir le cap ? Scanne ton assiette.",
-                "Hier, le compte y était. \(aliments) au déjeuner, et tu gardes le rythme.",
-                "Besoin couvert hier : on garde le cap. Au menu du midi : \(enMinuscule).",
+                String(localized: "Besoin couvert hier. \(aliments) ce midi pour tenir le cap ? Scanne ton assiette."),
+                String(localized: "Hier, le compte y était. \(aliments) au déjeuner, et tu gardes le rythme."),
+                String(localized: "Besoin couvert hier : on garde le cap. Au menu du midi : \(enMinuscule)."),
             ]
             return (titre, variantes[indexVariante(jour: jour, parmi: variantes.count)])
         }
         let variantes = [
-            "Il t'en a manqué \(100 - hier) %. \(aliments) ce midi ? Scanne ton assiette.",
-            "\(aliments) au déjeuner, et le chiffre remonte. Scanne ton assiette pour le voir.",
-            "Pour faire mieux qu'hier : \(enMinuscule) ce midi. Une photo, et tu vois où tu en es.",
+            String(localized: "Il t'en a manqué \(100 - hier) %. \(aliments) ce midi ? Scanne ton assiette."),
+            String(localized: "\(aliments) au déjeuner, et le chiffre remonte. Scanne ton assiette pour le voir."),
+            String(localized: "Pour faire mieux qu'hier : \(enMinuscule) ce midi. Une photo, et tu vois où tu en es."),
         ]
         return (titre, variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
@@ -299,22 +300,23 @@ enum FormulationsRappel {
         aujourdhui: (pourcent: Int, repas: Int)?
     ) -> (titre: String, corps: String) {
         guard let aujourdhui else {
-            let ouEn = NomNutriment.accord(id: cible.id, singulier: "où en est", pluriel: "où en sont")
             let variantes = [
-                "Commence par ton encas : une photo ou quelques mots à voix haute. Demain, ton brief aura de vrais chiffres.",
-                "Un encas noté, et tu sais \(ouEn) \(cible.avecPossessif) aujourd'hui. Une photo ou quelques mots suffisent.",
-                "Sans repas noté, pas de chiffre : ton encas peut être le premier. Dis-le à voix haute ou prends-le en photo.",
+                String(localized: "Commence par ton encas : une photo ou quelques mots à voix haute. Demain, ton brief aura de vrais chiffres."),
+                NomNutriment.estPluriel(id: cible.id)
+                    ? String(localized: "Un encas noté, et tu sais où en sont \(cible.avecPossessif) aujourd'hui. Une photo ou quelques mots suffisent.")
+                    : String(localized: "Un encas noté, et tu sais où en est \(cible.avecPossessif) aujourd'hui. Une photo ou quelques mots suffisent."),
+                String(localized: "Sans repas noté, pas de chiffre : ton encas peut être le premier. Dis-le à voix haute ou prends-le en photo."),
             ]
-            return ("Rien de noté pour l'instant 🍎", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+            return (String(localized: "Rien de noté pour l'instant 🍎"), variantes[indexVariante(jour: jour, parmi: variantes.count)])
         }
         let reste = max(0, 100 - aujourdhui.pourcent)
         let variantes = [
-            "Compté sur \(repasNotes(aujourdhui.repas)) aujourd'hui. Ce que tu grignotes compte aussi : note-le.",
-            "C'est ton chiffre du jour, pour l'instant. Note ton encas et regarde-le bouger.",
-            "Il reste \(reste) % à aller chercher d'ici ce soir. Ton encas en fait partie : note-le.",
+            String(localized: "Compté sur \(repasNotes(aujourdhui.repas)) aujourd'hui. Ce que tu grignotes compte aussi : note-le."),
+            String(localized: "C'est ton chiffre du jour, pour l'instant. Note ton encas et regarde-le bouger."),
+            String(localized: "Il reste \(reste) % à aller chercher d'ici ce soir. Ton encas en fait partie : note-le."),
         ]
         let fait = NomNutriment.majusculeInitiale(estA(cible))
-        return (avecEmoji("Un encas ? \(fait) \(aujourdhui.pourcent) %", cible),
+        return (avecEmoji(String(localized: "Un encas ? \(fait) \(aujourdhui.pourcent) %"), cible),
                 variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
 
@@ -335,8 +337,8 @@ enum FormulationsRappel {
 
         // Déjà à 100 % avant le dîner : on le dit, et on ne pousse rien.
         if let aujourdhui, aujourdhui >= 100 {
-            return ("\(sujet(cible)) : besoin du jour couvert ✅",
-                    "100 % d'après tes repas notés. Ajoute ton dîner pour boucler la journée.")
+            return (String(localized: "\(sujet(cible)) : besoin du jour couvert ✅"),
+                    String(localized: "100 % d'après tes repas notés. Ajoute ton dîner pour boucler la journée."))
         }
 
         // Le conseil vient du serveur (contrat : 55 caractères). Au-delà de
@@ -349,26 +351,26 @@ enum FormulationsRappel {
             variantes.append(
                 conseil.count >= conseilAutoportantMin
                     ? conseil
-                    : "\(aliments) au dîner ? \(conseil)"
+                    : String(localized: "\(aliments) au dîner ? \(conseil)")
             )
         }
         if aujourdhui == nil {
-            variantes.append("\(aliments) au dîner ? Ta journée se complète.")
+            variantes.append(String(localized: "\(aliments) au dîner ? Ta journée se complète."))
         } else {
-            variantes.append("\(aliments) au dîner, et tu finis la journée plus haut. Scanne ton assiette.")
+            variantes.append(String(localized: "\(aliments) au dîner, et tu finis la journée plus haut. Scanne ton assiette."))
         }
         if let raison = RaisonNutriment.pour(cible.id) {
             // Deux phrases : l'énumération reprend donc la majuscule.
-            variantes.append("\(raison) \(aliments) ce soir ?")
+            variantes.append(String(localized: "\(raison) \(aliments) ce soir ?"))
         } else {
-            variantes.append("Un dîner avec \(NomNutriment.minusculeInitiale(aliments)), et la journée est complète.")
+            variantes.append(String(localized: "Un dîner avec \(NomNutriment.minusculeInitiale(aliments)), et la journée est complète."))
         }
 
         let titre: String
         if let aujourdhui {
-            titre = avecEmoji("Ce soir : \(estA(cible)) \(aujourdhui) %", cible)
+            titre = avecEmoji(String(localized: "Ce soir : \(estA(cible)) \(aujourdhui) %"), cible)
         } else {
-            titre = avecEmoji("Ce soir, pense à \(cible.avecPossessif)", cible)
+            titre = avecEmoji(String(localized: "Ce soir, pense à \(cible.avecPossessif)"), cible)
         }
         return (titre, variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
@@ -380,11 +382,11 @@ enum FormulationsRappel {
     ///   - couverts: besoins couverts aujourd'hui ; `nil` = pas assez noté
     ///     pour un chiffre.
     static func dernierAppel(repas: Int, couverts: Int?) -> (titre: String, corps: String) {
-        let titre = "Il manque ton dîner 🌙"
+        let titre = String(localized: "Il manque ton dîner 🌙")
         if let couverts, couverts >= 1 {
-            return (titre, "\(repasNotes(repas)) et \(besoinsCouverts(couverts)) aujourd'hui. Ajoute ton dîner : ton brief de demain sera complet.")
+            return (titre, String(localized: "\(repasNotes(repas)) et \(besoinsCouverts(couverts)) aujourd'hui. Ajoute ton dîner : ton brief de demain sera complet."))
         }
-        return (titre, "\(repasNotes(repas)) aujourd'hui. Ajoute ton dîner, à la voix ou en photo : ton brief de demain aura de vrais chiffres.")
+        return (titre, String(localized: "\(repasNotes(repas)) aujourd'hui. Ajoute ton dîner, à la voix ou en photo : ton brief de demain aura de vrais chiffres."))
     }
 
     // MARK: Dimanche (la semaine en chiffres)
@@ -394,27 +396,29 @@ enum FormulationsRappel {
     ///   - jours: jours de la semaine avec au moins un repas noté.
     ///   - effort: l'apport qui a le plus progressé sur la semaine précédente.
     static func semaine(repas: Int, jours: Int, effort: BriefDuJour.Effort?) -> (titre: String, corps: String) {
-        let titre = "Ta semaine en chiffres 📈"
-        let surJours = jours <= 1 ? "\(jours) jour" : "\(jours) jours"
+        let titre = String(localized: "Ta semaine en chiffres 📈")
+        let surJours = jours <= 1 ? String(localized: "\(jours) jour") : String(localized: "\(jours) jours")
         guard let effort else {
-            return (titre, "\(repasNotes(repas)) sur \(surJours) cette semaine. Ton point de la semaine t'attend dans Progrès.")
+            return (titre, String(localized: "\(repasNotes(repas)) sur \(surJours) cette semaine. Ton point de la semaine t'attend dans Progrès."))
         }
         let nomSujet = NomNutriment.majusculeInitiale(NomNutriment.possessif(id: effort.id, nom: effort.nom))
-        let verbe = NomNutriment.accord(id: effort.id, singulier: "a gagné", pluriel: "ont gagné")
-        return (titre, "\(repasNotes(repas)) sur \(surJours). \(nomSujet) \(verbe) \(effort.points) points par rapport à la semaine dernière. Le détail t'attend dans Progrès.")
+        return (titre, NomNutriment.estPluriel(id: effort.id)
+            ? String(localized: "\(repasNotes(repas)) sur \(surJours). \(nomSujet) ont gagné \(effort.points) points par rapport à la semaine dernière. Le détail t'attend dans Progrès.")
+            : String(localized: "\(repasNotes(repas)) sur \(surJours). \(nomSujet) a gagné \(effort.points) points par rapport à la semaine dernière. Le détail t'attend dans Progrès."))
     }
 
     // MARK: Retour après une semaine sans ouvrir
 
     static func retour(cible: CibleNutritionnelle?) -> (titre: String, corps: String) {
         guard let cible else {
-            return ("Ton suivi t'attend",
-                    "Une semaine sans nouvelles : un repas noté suffit à le relancer.")
+            return (String(localized: "Ton suivi t'attend"),
+                    String(localized: "Une semaine sans nouvelles : un repas noté suffit à le relancer."))
         }
-        let verbe = NomNutriment.accord(id: cible.id, singulier: "t'attend", pluriel: "t'attendent")
         return (
-            avecEmoji("\(sujet(cible)) \(verbe)", cible),
-            "Une semaine sans nouvelles : un repas noté suffit à relancer ton suivi."
+            avecEmoji(NomNutriment.estPluriel(id: cible.id)
+                ? String(localized: "\(sujet(cible)) t'attendent")
+                : String(localized: "\(sujet(cible)) t'attend"), cible),
+            String(localized: "Une semaine sans nouvelles : un repas noté suffit à relancer ton suivi.")
         )
     }
 
@@ -425,8 +429,8 @@ enum FormulationsRappel {
     /// verrouillé : seulement son âge, et ce que ça change au calcul.
     static func priseDeSangSixMois() -> (titre: String, corps: String) {
         (
-            "Ta prise de sang a 6 mois 🩸",
-            "Elle compte désormais moitié moins dans tes apports. Une analyse plus récente ? Importe-la pour garder des chiffres justes."
+            String(localized: "Ta prise de sang a 6 mois 🩸"),
+            String(localized: "Elle compte désormais moitié moins dans tes apports. Une analyse plus récente ? Importe-la pour garder des chiffres justes.")
         )
     }
 
@@ -434,19 +438,19 @@ enum FormulationsRappel {
 
     static func midiSansBilan(jour: Int) -> (titre: String, corps: String) {
         let variantes = [
-            "Scanne ton assiette, Kiwio s'occupe de l'analyse.",
-            "Une photo de ton déjeuner, et tu sais ce qu'il t'apporte.",
-            "Ton déjeuner en une photo : Kiwio fait le reste.",
+            String(localized: "Scanne ton assiette, Kiwio s'occupe de l'analyse."),
+            String(localized: "Une photo de ton déjeuner, et tu sais ce qu'il t'apporte."),
+            String(localized: "Ton déjeuner en une photo : Kiwio fait le reste."),
         ]
-        return ("Photographie ton repas", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+        return (String(localized: "Photographie ton repas"), variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
 
     static func soirSansBilan(jour: Int) -> (titre: String, corps: String) {
         let variantes = [
-            "Note ton dîner : ta journée se complète.",
-            "Un dîner noté, et ta journée est complète.",
-            "Ton dîner en une photo, et la journée est bouclée.",
+            String(localized: "Note ton dîner : ta journée se complète."),
+            String(localized: "Un dîner noté, et ta journée est complète."),
+            String(localized: "Ton dîner en une photo, et la journée est bouclée."),
         ]
-        return ("Et ce soir, qu'y a-t-il au menu ?", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+        return (String(localized: "Et ce soir, qu'y a-t-il au menu ?"), variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
 }

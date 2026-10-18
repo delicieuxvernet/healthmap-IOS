@@ -14,13 +14,13 @@ extension StatutApport {
     /// Le mot de la pastille.
     var libelleCourt: String {
         switch self {
-        case .couvert: return "Couvert"
-        case .aSurveiller: return "À surveiller"
-        case .aRenforcer: return "À renforcer"
-        case .peuPrecise: return "À affiner"
-        case .auDessusDeLaLimite: return "Au-dessus de la limite"
-        case .sousLaLimite: return "Sous la limite"
-        case .couvertParComplement: return "Couvert par ton complément"
+        case .couvert: return String(localized: "Couvert")
+        case .aSurveiller: return String(localized: "À surveiller")
+        case .aRenforcer: return String(localized: "À renforcer")
+        case .peuPrecise: return String(localized: "À affiner")
+        case .auDessusDeLaLimite: return String(localized: "Au-dessus de la limite")
+        case .sousLaLimite: return String(localized: "Sous la limite")
+        case .couvertParComplement: return String(localized: "Couvert par ton complément")
         }
     }
 
@@ -67,7 +67,7 @@ enum LectureEstimation {
     static func facteurAffichage(_ id: String) -> Double { id == "vitD" ? 40 : 1 }
 
     static func uniteAffichage(_ id: String, estimation: EstimationApport) -> String {
-        if id == "vitD" { return "UI" }
+        if id == "vitD" { return String(localized: "UI") }
         switch estimation.unite {
         case "µg ER", "µg (K1)": return "µg"
         default: return estimation.unite
@@ -100,13 +100,13 @@ enum LectureEstimation {
     static func verdict(nom: String, estimation e: EstimationApport, statut: StatutApport? = nil) -> String {
         let x = enMinuscule(nom)
         switch statut ?? e.statut {
-        case .couvert: return "Ton apport en \(x) semble couvrir la référence."
-        case .aSurveiller: return "Ton apport en \(x) semble proche de la référence."
-        case .aRenforcer: return "Ton apport en \(x) semble bas."
-        case .peuPrecise: return "Ton apport en \(x) reste à préciser : on ne peut rien t'affirmer pour l'instant."
-        case .couvertParComplement: return "Ton complément couvre ton apport en \(x)."
-        case .auDessusDeLaLimite: return "Ton apport en \(x) semble dépasser la limite conseillée."
-        case .sousLaLimite: return "Ton apport en \(x) reste sous la limite conseillée."
+        case .couvert: return String(localized: "Ton apport en \(x) semble couvrir la référence.")
+        case .aSurveiller: return String(localized: "Ton apport en \(x) semble proche de la référence.")
+        case .aRenforcer: return String(localized: "Ton apport en \(x) semble bas.")
+        case .peuPrecise: return String(localized: "Ton apport en \(x) reste à préciser : on ne peut rien t'affirmer pour l'instant.")
+        case .couvertParComplement: return String(localized: "Ton complément couvre ton apport en \(x).")
+        case .auDessusDeLaLimite: return String(localized: "Ton apport en \(x) semble dépasser la limite conseillée.")
+        case .sousLaLimite: return String(localized: "Ton apport en \(x) reste sous la limite conseillée.")
         }
     }
 
@@ -116,12 +116,12 @@ enum LectureEstimation {
         let unite = uniteAffichage(id, estimation: e)
         let valeur = DS.decimal(arrondiLisible(e.apportEstime * facteur))
         if e.reference.type != "LSS", let repere = e.reference.valeurRepere, repere > 0 {
-            return "≈ \(valeur) sur \(DS.decimal(arrondiLisible(repere * facteur)))\(DS.fine)\(unite) par jour"
+            return String(localized: "≈ \(valeur) sur \(DS.decimal(arrondiLisible(repere * facteur)))\(DS.fine)\(unite) par jour")
         }
         if e.reference.type == "LSS", let limite = e.reference.limite {
-            return "≈ \(valeur)\(DS.fine)\(unite) par jour, limite \(DS.decimal(arrondiLisible(limite)))\(DS.fine)\(unite)"
+            return String(localized: "≈ \(valeur)\(DS.fine)\(unite) par jour, limite \(DS.decimal(arrondiLisible(limite)))\(DS.fine)\(unite)")
         }
-        return "≈ \(valeur)\(DS.fine)\(unite) par jour"
+        return String(localized: "≈ \(valeur)\(DS.fine)\(unite) par jour")
     }
 
     /// Pas de fausse précision : trois chiffres significatifs au plus.
@@ -135,10 +135,13 @@ enum LectureEstimation {
     /// La ligne sous le verdict : ce que le chiffre est, et ce qu'il n'est pas.
     static func provenance(_ e: EstimationApport) -> String {
         let jours = e.joursJournalRetenus
-        let base = jours > 0
-            ? "Apport estimé d'après ton questionnaire et \(jours == 1 ? "ta journée notée" : "tes \(jours) journées notées")"
-            : "Apport estimé d'après ton questionnaire"
-        return base + ", pas un résultat d'analyse."
+        if jours > 1 {
+            return String(localized: "Apport estimé d'après ton questionnaire et tes \(jours) journées notées, pas un résultat d'analyse.")
+        }
+        if jours == 1 {
+            return String(localized: "Apport estimé d'après ton questionnaire et ta journée notée, pas un résultat d'analyse.")
+        }
+        return String(localized: "Apport estimé d'après ton questionnaire, pas un résultat d'analyse.")
     }
 
     /// Les journées de repas qu'il reste à noter avant que l'app puisse
@@ -161,8 +164,10 @@ enum LectureEstimation {
 
     static func notePriseDeSang(_ id: String) -> String? {
         guard marqueursRegules.contains(id) else { return nil }
-        let x = id == "calcium" ? "calcium" : "magnésium"
-        return "Le corps garde le \(x) du sang dans une fourchette serrée, quoi que tu manges : une prise de sang en dit peu sur tes apports en \(x)."
+        if id == "calcium" {
+            return String(localized: "Le corps garde le calcium du sang dans une fourchette serrée, quoi que tu manges : une prise de sang en dit peu sur tes apports en calcium.")
+        }
+        return String(localized: "Le corps garde le magnésium du sang dans une fourchette serrée, quoi que tu manges : une prise de sang en dit peu sur tes apports en magnésium.")
     }
 
     // MARK: D'où vient l'apport
@@ -178,17 +183,17 @@ enum LectureEstimation {
 
     static func libelleCafe(_ reponse: String) -> String? {
         switch reponse {
-        case "none": return "Pas de café ni de thé"
-        case "light": return "1 à 2 tasses par jour"
-        case "moderate": return "3 à 4 tasses par jour"
-        case "heavy": return "5 tasses ou plus par jour"
+        case "none": return String(localized: "Pas de café ni de thé")
+        case "light": return String(localized: "1 à 2 tasses par jour")
+        case "moderate": return String(localized: "3 à 4 tasses par jour")
+        case "heavy": return String(localized: "5 tasses ou plus par jour")
         default: return nil
         }
     }
 
     static func libelleEau(_ reponse: String) -> String? {
         guard let litres = Double(reponse) else { return nil }
-        return "\(DS.decimal(litres))\(DS.fine)L par jour"
+        return String(localized: "\(DS.decimal(litres))\(DS.fine)L par jour")
     }
 
     /// Les sources de l'apport, de la plus grosse à la plus petite. Une source
@@ -198,23 +203,23 @@ enum LectureEstimation {
         let d = e.decomposition
         let courses = e.topCourses.map { enMinuscule($0.libelle) }
         var liste: [Source] = [
-            Source(id: "reste", libelle: "Le reste de ton alimentation",
-                   detail: "moyenne des Français de ton âge", valeur: d.reste * f, section: .profil),
-            Source(id: "cafe", libelle: "Ton café et ton thé",
-                   detail: libelleCafe(profil.caffeineIntake) ?? "moyenne des Français", valeur: d.cafeThe * f, section: .modeDeVie),
-            Source(id: "courses", libelle: "Tes courses",
+            Source(id: "reste", libelle: String(localized: "Le reste de ton alimentation"),
+                   detail: String(localized: "moyenne des Français de ton âge"), valeur: d.reste * f, section: .profil),
+            Source(id: "cafe", libelle: String(localized: "Ton café et ton thé"),
+                   detail: libelleCafe(profil.caffeineIntake) ?? String(localized: "moyenne des Français"), valeur: d.cafeThe * f, section: .modeDeVie),
+            Source(id: "courses", libelle: String(localized: "Tes courses"),
                    detail: courses.isEmpty ? nil : courses.joined(separator: ", "), valeur: d.courses * f, section: .nutrition),
-            Source(id: "non_coches", libelle: "Les aliments que tu n'as pas cochés",
-                   detail: "moyenne des Français", valeur: d.caddieNonRenseigne * f, section: .profil),
-            Source(id: "eau", libelle: "Ton eau",
-                   detail: libelleEau(profil.waterIntake) ?? "moyenne des Français", valeur: d.eau * f, section: .modeDeVie),
-            Source(id: "alcool", libelle: "Tes boissons alcoolisées",
+            Source(id: "non_coches", libelle: String(localized: "Les aliments que tu n'as pas cochés"),
+                   detail: String(localized: "moyenne des Français"), valeur: d.caddieNonRenseigne * f, section: .profil),
+            Source(id: "eau", libelle: String(localized: "Ton eau"),
+                   detail: libelleEau(profil.waterIntake) ?? String(localized: "moyenne des Français"), valeur: d.eau * f, section: .modeDeVie),
+            Source(id: "alcool", libelle: String(localized: "Tes boissons alcoolisées"),
                    detail: nil, valeur: d.alcool * f, section: .modeDeVie),
         ]
         if e.joursJournalRetenus > 0 {
             let n = e.joursJournalRetenus
-            liste.append(Source(id: "repas", libelle: "Tes repas notés",
-                                detail: n == 1 ? "1 journée notée" : "\(n) journées notées",
+            liste.append(Source(id: "repas", libelle: String(localized: "Tes repas notés"),
+                                detail: n == 1 ? String(localized: "1 journée notée") : String(localized: "\(n) journées notées"),
                                 valeur: d.repasNotes * f, section: .journal))
         }
         let total = liste.reduce(0) { $0 + max(0, $1.valeur) }

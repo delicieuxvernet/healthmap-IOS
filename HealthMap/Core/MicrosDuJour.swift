@@ -324,8 +324,8 @@ enum MicrosDuJour {
     /// « 4,2 pour 1 », « 12 pour 1 », « plus de 50 pour 1 ».
     static func texteDuRapport(_ valeur: Double) -> String {
         valeur > rapportMaximal
-            ? "plus de \(Int(rapportMaximal)) pour 1"
-            : "\(quantite(valeur)) pour 1"
+            ? String(localized: "plus de \(Int(rapportMaximal)) pour 1")
+            : String(localized: "\(quantite(valeur)) pour 1")
     }
 
     private static func ligneDuRapport(
@@ -369,15 +369,18 @@ enum MicrosDuJour {
 
         var raisons: [FaitMicro] = []
         if ensemble != nil {
-            raisons.append(FaitMicro(genre: .repas, texte: "Calculé sur tes repas notés : \(Self.journees(mesures))."))
+            raisons.append(FaitMicro(genre: .repas, texte: String(localized: "Calculé sur tes repas notés : \(Self.journees(mesures)).")))
         } else {
-            raisons.append(FaitMicro(genre: .repas, texte: "Pas encore de journée assez notée pour le calculer."))
+            raisons.append(FaitMicro(genre: .repas, texte: String(localized: "Pas encore de journée assez notée pour le calculer.")))
         }
-        let moment = jourEstAujourdhui ? "Aujourd'hui" : "Ce jour-là"
         if let duJourAffiche {
-            raisons.append(FaitMicro(genre: .jour, texte: "\(moment) : \(texteDuRapport(duJourAffiche))."))
+            raisons.append(FaitMicro(genre: .jour, texte: jourEstAujourdhui
+                ? String(localized: "Aujourd'hui : \(texteDuRapport(duJourAffiche)).")
+                : String(localized: "Ce jour-là : \(texteDuRapport(duJourAffiche)).")))
         } else {
-            raisons.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+            raisons.append(FaitMicro(genre: .jour, texte: jourEstAujourdhui
+                ? String(localized: "Aujourd'hui : aucun aliment noté ne le renseigne.")
+                : String(localized: "Ce jour-là : aucun aliment noté ne le renseigne.")))
         }
 
         return LigneMicro(
@@ -479,31 +482,35 @@ enum MicrosDuJour {
             let valeur = DS.decimal(LectureEstimation.arrondiLisible(premiere.valeur))
             faits.append(FaitMicro(
                 genre: premiere.section == .journal ? .repas : .questionnaire,
-                texte: "Ta plus grosse source : \(LectureEstimation.enMinuscule(premiere.libelle)), \(valeur)\(DS.fine)\(unite) par jour."
+                texte: String(localized: "Ta plus grosse source : \(LectureEstimation.enMinuscule(premiere.libelle)), \(valeur)\(DS.fine)\(unite) par jour.")
             ))
         }
         if let restant = LectureEstimation.journeesAvantFiabilite(e) {
             let n = restant.conseillees - restant.notees
             faits.append(FaitMicro(genre: .repas, texte: n > 1
-                ? "Encore \(n) journées notées pour pouvoir l'affirmer."
-                : "Encore 1 journée notée pour pouvoir l'affirmer."))
+                ? String(localized: "Encore \(n) journées notées pour pouvoir l'affirmer.")
+                : String(localized: "Encore 1 journée notée pour pouvoir l'affirmer.")))
         }
         if statut.estSousLaReference, let lien = liensSolides(micro.id, symptomes: symptomes).first {
-            faits.append(FaitMicro(genre: .symptome, texte: "Tu as signalé \(lien.formulation)."))
+            faits.append(FaitMicro(genre: .symptome, texte: String(localized: "Tu as signalé \(lien.formulation).")))
         } else if micro.id == "vitD", [10, 11, 12, 1, 2, 3].contains(mois) {
             faits.append(FaitMicro(
                 genre: .saison,
-                texte: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes."
+                texte: String(localized: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes.")
             ))
         }
-        let moment = jourEstAujourdhui ? "Aujourd'hui" : "Ce jour-là"
         if let quantiteDuJour, besoin > 0 {
+            let notee = quantite(quantiteDuJour)
             faits.append(FaitMicro(
                 genre: .jour,
-                texte: "\(moment) : \(quantite(quantiteDuJour)) noté\(DS.fine)\(micro.unite)."
+                texte: jourEstAujourdhui
+                    ? String(localized: "Aujourd'hui : \(notee) noté\(DS.fine)\(micro.unite).")
+                    : String(localized: "Ce jour-là : \(notee) noté\(DS.fine)\(micro.unite).")
             ))
         } else {
-            faits.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+            faits.append(FaitMicro(genre: .jour, texte: jourEstAujourdhui
+                ? String(localized: "Aujourd'hui : aucun aliment noté ne le renseigne.")
+                : String(localized: "Ce jour-là : aucun aliment noté ne le renseigne.")))
         }
         return faits
     }
@@ -511,12 +518,14 @@ enum MicrosDuJour {
     private static func points(_ delta: Int) -> String {
         let signe = delta >= 0 ? "+" : "\u{2212}"
         let valeur = abs(delta)
-        return "\(signe)\(valeur) \(valeur > 1 ? "points" : "point")"
+        return valeur > 1
+            ? String(localized: "\(signe)\(valeur) points")
+            : String(localized: "\(signe)\(valeur) point")
     }
 
     /// « 1 journée », « 6 journées ».
     private static func journees(_ nombre: Int) -> String {
-        nombre > 1 ? "\(nombre) journées" : "\(nombre) journée"
+        nombre > 1 ? String(localized: "\(nombre) journées") : String(localized: "\(nombre) journée")
     }
 
     static func faits(
@@ -536,7 +545,7 @@ enum MicrosDuJour {
         var faits: [FaitMicro] = []
 
         if micro.sens == .limite {
-            faits.append(FaitMicro(genre: .repas, texte: "Suivi sur tes repas notés, sans chiffre de départ."))
+            faits.append(FaitMicro(genre: .repas, texte: String(localized: "Suivi sur tes repas notés, sans chiffre de départ.")))
         } else if partDuQuestionnaire {
             // 1. Ce que la personne a répondu : le facteur le plus lourd.
             let declares = (detail?.contributions ?? []).filter { $0.section != .journal && $0.section != .priseDeSang }
@@ -545,10 +554,10 @@ enum MicrosDuJour {
             if let retenu = frein ?? appui {
                 faits.append(FaitMicro(
                     genre: .questionnaire,
-                    texte: "Ton questionnaire : « \(retenu.libelle) » (\(points(retenu.delta)))."
+                    texte: String(localized: "Ton questionnaire : « \(retenu.libelle) » (\(points(retenu.delta))).")
                 ))
             } else {
-                faits.append(FaitMicro(genre: .questionnaire, texte: "Ton questionnaire ne signale rien qui pèse sur cet apport."))
+                faits.append(FaitMicro(genre: .questionnaire, texte: String(localized: "Ton questionnaire ne signale rien qui pèse sur cet apport.")))
             }
 
             // 2. Ce que les repas notés ont changé au chiffre.
@@ -557,54 +566,64 @@ enum MicrosDuJour {
             if let couvertureJournal, let correction {
                 faits.append(FaitMicro(
                     genre: .repas,
-                    texte: "Tes repas notés\(notes) couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : \(points(correction.delta))."
+                    texte: String(localized: "Tes repas notés\(notes) couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : \(points(correction.delta)).")
                 ))
             } else if let couvertureJournal {
                 faits.append(FaitMicro(
                     genre: .repas,
-                    texte: "Tes repas notés\(notes) couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : ils confirment ce chiffre."
+                    texte: String(localized: "Tes repas notés\(notes) couvrent \(DS.pourcent(couvertureJournal)) de ton besoin : ils confirment ce chiffre.")
                 ))
             } else {
                 faits.append(FaitMicro(
                     genre: .repas,
-                    texte: "Pas encore de journée assez notée pour l'ajuster."
+                    texte: String(localized: "Pas encore de journée assez notée pour l'ajuster.")
                 ))
             }
 
             // 3. Un fait de plus, le plus solide disponible.
             if let sang = detail?.contributions.first(where: { $0.section == .priseDeSang }) {
-                faits.append(FaitMicro(genre: .priseDeSang, texte: "Ta prise de sang : \(points(sang.delta))."))
+                faits.append(FaitMicro(genre: .priseDeSang, texte: String(localized: "Ta prise de sang : \(points(sang.delta)).")))
             } else if let niveau, niveau < seuilBas,
                       let lien = liensSolides(micro.id, symptomes: symptomes).first {
-                faits.append(FaitMicro(genre: .symptome, texte: "Tu as signalé \(lien.formulation)."))
+                faits.append(FaitMicro(genre: .symptome, texte: String(localized: "Tu as signalé \(lien.formulation).")))
             } else if micro.id == "vitD", [10, 11, 12, 1, 2, 3].contains(mois) {
                 faits.append(FaitMicro(
                     genre: .saison,
-                    texte: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes."
+                    texte: String(localized: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes.")
                 ))
             }
         } else if niveau != nil {
             faits.append(FaitMicro(
                 genre: .repas,
-                texte: "Calculé sur tes repas notés : \(journees(joursMesures))."
+                texte: String(localized: "Calculé sur tes repas notés : \(journees(joursMesures)).")
             ))
         } else {
             faits.append(FaitMicro(
                 genre: .repas,
-                texte: "Pas encore de journée assez notée pour le calculer."
+                texte: String(localized: "Pas encore de journée assez notée pour le calculer.")
             ))
         }
 
         // Toujours : ce que la journée affichée a apporté.
-        let moment = jourEstAujourdhui ? "Aujourd'hui" : "Ce jour-là"
         if let quantiteDuJour, besoin > 0 {
-            let suffixe = micro.sens == .limite ? " au plus" : ""
-            faits.append(FaitMicro(
-                genre: .jour,
-                texte: "\(moment) : \(quantite(quantiteDuJour)) sur \(quantite(besoin))\(DS.fine)\(micro.unite)\(suffixe)."
-            ))
+            let notee = quantite(quantiteDuJour)
+            let attendue = quantite(besoin)
+            let texte: String
+            switch (jourEstAujourdhui, micro.sens == .limite) {
+            case (true, true):
+                texte = String(localized: "Aujourd'hui : \(notee) sur \(attendue)\(DS.fine)\(micro.unite) au plus.")
+            case (true, false):
+                texte = String(localized: "Aujourd'hui : \(notee) sur \(attendue)\(DS.fine)\(micro.unite).")
+            case (false, true):
+                texte = String(localized: "Ce jour-là : \(notee) sur \(attendue)\(DS.fine)\(micro.unite) au plus.")
+            case (false, false):
+                texte = String(localized: "Ce jour-là : \(notee) sur \(attendue)\(DS.fine)\(micro.unite).")
+            }
+            faits.append(FaitMicro(genre: .jour, texte: texte))
         } else {
-            faits.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+            faits.append(FaitMicro(genre: .jour, texte: jourEstAujourdhui
+                ? String(localized: "Aujourd'hui : aucun aliment noté ne le renseigne.")
+                : String(localized: "Ce jour-là : aucun aliment noté ne le renseigne.")))
         }
         return faits
     }
