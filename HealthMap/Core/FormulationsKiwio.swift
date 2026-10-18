@@ -182,7 +182,7 @@ enum FormulationsRappel {
             "Ta veille en un coup d'œil, et ta priorité du jour.",
             "Deux chiffres sur hier, une idée pour aujourd'hui.",
         ]
-        return ("Ton brief du jour est prêt", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+        return ("Ton récap du jour est prêt", variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
 
     /// Le brief chiffré.
@@ -203,23 +203,23 @@ enum FormulationsRappel {
     ) -> (titre: String, corps: String) {
         guard let couvertsHier else {
             if repasHier == 1 {
-                return ("Ton brief du jour est prêt",
-                        "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain ton brief aura de quoi parler.")
+                return ("Ton récap du jour est prêt",
+                        "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain ton récap aura de quoi parler.")
             }
             let variantes = [
-                "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton brief aura quelque chose à dire.",
-                "Pas de repas noté hier. Une photo de ton petit-déjeuner, et ton brief repart demain.",
-                "Ton brief n'a rien à te dire ce matin : hier est resté vide. Note ton petit-déjeuner pour le relancer.",
+                "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton récap aura quelque chose à dire.",
+                "Pas de repas noté hier. Une photo de ton petit-déjeuner, et ton récap repart demain.",
+                "Ton récap n'a rien à te dire ce matin : hier est resté vide. Note ton petit-déjeuner pour le relancer.",
             ]
-            return ("Ton brief attend tes repas", variantes[indexVariante(jour: jour, parmi: variantes.count)])
+            return ("Ton récap attend tes repas", variantes[indexVariante(jour: jour, parmi: variantes.count)])
         }
 
         let chiffre = "Hier : \(besoinsCouverts(couvertsHier))"
         let suite: String
         if let plusBas {
-            suite = "Le plus bas : \(plusBas.cible.avecPossessif), à \(plusBas.pourcent) %. Ton brief te dit sur quoi miser aujourd'hui."
+            suite = "Le plus bas : \(plusBas.cible.avecPossessif), à \(plusBas.pourcent) %. Ton récap te dit quoi ajouter aujourd'hui."
         } else {
-            suite = "Ton brief te montre ta veille, apport par apport."
+            suite = "Ton récap te montre ta veille en un coup d'œil."
         }
         // « 0 besoin sur 10 » ne donne envie de rien ouvrir : on le tait.
         let corpsChiffre = couvertsHier >= 1 ? "\(chiffre). \(suite)" : suite
@@ -228,7 +228,7 @@ enum FormulationsRappel {
         if serie >= serieMin {
             return ("\(serie) jours d'affilée 🔥", corpsChiffre)
         }
-        guard couvertsHier >= 1 else { return ("Ton brief du jour est prêt", suite) }
+        guard couvertsHier >= 1 else { return ("Ton récap du jour est prêt", suite) }
         return ("\(chiffre) 📊", suite)
     }
 
@@ -301,7 +301,7 @@ enum FormulationsRappel {
         guard let aujourdhui else {
             let ouEn = NomNutriment.accord(id: cible.id, singulier: "où en est", pluriel: "où en sont")
             let variantes = [
-                "Commence par ton encas : une photo ou quelques mots à voix haute. Demain, ton brief aura de vrais chiffres.",
+                "Commence par ton encas : une photo ou quelques mots à voix haute. Demain, ton récap aura de vrais chiffres.",
                 "Un encas noté, et tu sais \(ouEn) \(cible.avecPossessif) aujourd'hui. Une photo ou quelques mots suffisent.",
                 "Sans repas noté, pas de chiffre : ton encas peut être le premier. Dis-le à voix haute ou prends-le en photo.",
             ]
@@ -382,9 +382,9 @@ enum FormulationsRappel {
     static func dernierAppel(repas: Int, couverts: Int?) -> (titre: String, corps: String) {
         let titre = "Il manque ton dîner 🌙"
         if let couverts, couverts >= 1 {
-            return (titre, "\(repasNotes(repas)) et \(besoinsCouverts(couverts)) aujourd'hui. Ajoute ton dîner : ton brief de demain sera complet.")
+            return (titre, "\(repasNotes(repas)) et \(besoinsCouverts(couverts)) aujourd'hui. Ajoute ton dîner : ton récap de demain sera complet.")
         }
-        return (titre, "\(repasNotes(repas)) aujourd'hui. Ajoute ton dîner, à la voix ou en photo : ton brief de demain aura de vrais chiffres.")
+        return (titre, "\(repasNotes(repas)) aujourd'hui. Ajoute ton dîner, à la voix ou en photo : ton récap de demain aura de vrais chiffres.")
     }
 
     // MARK: Dimanche (la semaine en chiffres)

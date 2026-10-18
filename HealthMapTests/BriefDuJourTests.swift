@@ -454,7 +454,7 @@ final class BriefDuJourTests: XCTestCase {
 
         // Et le brief de demain le dit tel quel, en ouvrant sur l'ajout d'un repas.
         let brief1 = rappel("brief", 1, dans: rappels)
-        XCTAssertEqual(brief1?.titre, "Ton brief attend tes repas")
+        XCTAssertEqual(brief1?.titre, "Ton récap attend tes repas")
         XCTAssertEqual(brief1?.ecran, "meal_scan")
     }
 
