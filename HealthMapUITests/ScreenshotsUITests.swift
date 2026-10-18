@@ -313,6 +313,30 @@ final class ScreenshotsUITests: XCTestCase {
         }
     }
 
+    // MARK: - 10. Récap du jour (sphères de verre, hook DEBUG `-captureRecapDuJour`)
+    //
+    // Les trois cas de la maquette v5.1, sans réseau ni écriture : deux
+    // apports manqués hier, rien de noté hier, rien n'a manqué. Le workflow
+    // active « Réduire les animations » : chaque capture montre l'état final.
+
+    func test10_RecapDuJour() throws {
+        for (cas, nom) in [("note", "95-recap-du-jour"), ("vide", "96-recap-rien-de-note"), ("ok", "97-recap-rien-n-a-manque")] {
+            app = XCUIApplication()
+            app.launchArguments += ["-hasSeenOnboarding", "YES", "-hasSeenTabTour", "YES", "-hasSeenScanTour", "YES",
+                                    "-kiwioCaptures", "YES", "-captureRecapDuJour", cas]
+            let env = ProcessInfo.processInfo.environment
+            app.launchEnvironment["SCREENSHOT_EMAIL"] = env["SCREENSHOT_EMAIL"] ?? ""
+            app.launchEnvironment["SCREENSHOT_PASSWORD"] = env["SCREENSHOT_PASSWORD"] ?? ""
+            app.launch()
+            connecterSiBesoin()
+            let fermer = app.buttons["Fermer le récap du jour"]
+            XCTAssertTrue(fermer.waitForExistence(timeout: 120), "le récap \(cas) ne s'est pas ouvert")
+            sleep(2)
+            snap(nom)
+            app.terminate()
+        }
+    }
+
     // MARK: - 7. Conformité (9 octobre 2026) : avant / après
     //
     // Les écrans touchés par le lot 1 de l'audit de conformité, photographiés
