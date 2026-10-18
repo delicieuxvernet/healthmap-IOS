@@ -208,7 +208,7 @@ final class PistesBilanTests: XCTestCase {
     }
 
     func testCeQuUnAlimentApporte() {
-        XCTAssertEqual(PistesBilan.apports(de: GroceryCatalog.item(id: "saumon")!), "Apporte oméga-3, vitamine D, vitamine B12.")
+        XCTAssertEqual(PistesBilan.apports(de: GroceryCatalog.item(id: "saumon")!), "Apporte des oméga-3, de la vitamine D et de la vitamine B12.")
         XCTAssertEqual(PistesBilan.apports(de: GroceryCatalog.item(id: "pates")!), "Rien de notable parmi les 10 apports suivis.")
     }
 
@@ -265,7 +265,7 @@ final class PistesBilanTests: XCTestCase {
 
     func testLesMentionsDesEtats() {
         XCTAssertEqual(EtatApport.aSurveiller.mention, "à surveiller")
-        XCTAssertEqual(EtatApport.bienParti.mention, "bien parti")
+        XCTAssertEqual(EtatApport.bienParti.mention, "en bonne voie")
         XCTAssertEqual(EtatApport.enAttente.mention, "en attente")
     }
 }

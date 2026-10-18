@@ -140,7 +140,7 @@ struct BriefDuJourView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.dsPress)
-                .accessibilityLabel("Fermer le brief du jour")
+                .accessibilityLabel("Fermer le récap du jour")
                 Spacer()
             }
             .padding(.horizontal, Theme.spacingSM)

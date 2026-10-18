@@ -45,7 +45,7 @@ enum EtatApport: Equatable {
     var mention: String {
         switch self {
         case .aSurveiller: return "à surveiller"
-        case .bienParti: return "bien parti"
+        case .bienParti: return "en bonne voie"
         case .enAttente: return "en attente"
         }
     }
@@ -426,11 +426,12 @@ enum PistesBilan {
         return sortie
     }
 
-    /// « Apporte fer, magnésium, fibres. »
+    /// « Apporte du fer, du magnésium et des fibres. »
     static func apports(de aliment: GroceryItem) -> String {
-        let noms = aliment.nutrients.compactMap { NutrientID(rawValue: $0.rawValue) }.map(nomCourant)
-        guard !noms.isEmpty else { return "Rien de notable parmi les 10 apports suivis." }
-        return "Apporte " + noms.joined(separator: ", ") + "."
+        let noms = aliment.nutrients.compactMap { NutrientID(rawValue: $0.rawValue) }.map(partitif)
+        guard let dernier = noms.last else { return "Rien de notable parmi les 10 apports suivis." }
+        let liste = noms.count > 1 ? noms.dropLast().joined(separator: ", ") + " et " + dernier : dernier
+        return "Apporte \(liste)."
     }
 
     // MARK: L'écran de fin
@@ -498,6 +499,16 @@ enum PistesBilan {
         case .zinc: return "zinc"
         case .iodine: return "iode"
         case .fiber: return "fibres"
+        }
+    }
+
+    /// « du fer », « de la vitamine D », « de l'iode », « des fibres ».
+    static func partitif(_ id: NutrientID) -> String {
+        switch id {
+        case .vitD, .vitB12, .vitC: return "de la \(nomCourant(id))"
+        case .iodine: return "de l'iode"
+        case .omega3, .fiber: return "des \(nomCourant(id))"
+        case .iron, .magnesium, .calcium, .zinc: return "du \(nomCourant(id))"
         }
     }
 

@@ -21,7 +21,7 @@ final class LectureEstimationTests: XCTestCase {
     func testLeVerdictParleDUnApportJamaisDUnTaux() throws {
         let mg = try XCTUnwrap(try estimation(casDeLAudit).apports["magnesium"])
         XCTAssertEqual(LectureEstimation.verdict(nom: "Magnésium", estimation: mg, statut: .aSurveiller),
-                       "Ton apport en magnésium semble proche de la référence.")
+                       "Ton apport en magnésium semble proche de ton besoin.")
         let phrase = LectureEstimation.verdict(nom: "Magnésium", estimation: mg)
         XCTAssertEqual(mg.statut, .peuPrecise, "neuf aliments cochés : rien d'affirmé")
         XCTAssertTrue(phrase.contains("reste à préciser"), phrase)

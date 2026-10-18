@@ -209,9 +209,9 @@ final class ScoreHistoryService {
 
         let text: String
         if delta > 0 {
-            text = "+\(delta) points en \(weeks) semaine\(weeks > 1 ? "s" : "")"
+            text = "+\(delta) point\(delta > 1 ? "s" : "") en \(weeks) semaine\(weeks > 1 ? "s" : "")"
         } else if delta < 0 {
-            text = "\(delta) points en \(weeks) semaine\(weeks > 1 ? "s" : "")"
+            text = "\(delta) point\(delta < -1 ? "s" : "") en \(weeks) semaine\(weeks > 1 ? "s" : "")"
         } else {
             text = "Stable sur \(weeks) semaine\(weeks > 1 ? "s" : "")"
         }

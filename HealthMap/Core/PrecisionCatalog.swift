@@ -18,7 +18,7 @@ enum PrecisionCatalog {
         .init(id: "raw_salads",    emoji: "🥗", label: "Crudités / salades"),
         .init(id: "cooked_veg",    emoji: "🥦", label: "Légumes cuits"),
         .init(id: "leafy_greens",  emoji: "🥬", label: "Feuilles vertes"),
-        .init(id: "cruciferous",   emoji: "🥦", label: "Crucifères"),
+        .init(id: "cruciferous",   emoji: "🥦", label: "Choux, brocolis"),
         .init(id: "root_veg",      emoji: "🥕", label: "Racines"),
         .init(id: "nightshades",   emoji: "🍅", label: "Tomates, poivrons"),
         .init(id: "starchy_veg",   emoji: "🥔", label: "Féculents"),
@@ -77,7 +77,7 @@ enum PrecisionCatalog {
         case "vegetableServings":  return "Coche les légumes que tu manges"
         case "fruitServings":      return "Coche les fruits que tu manges"
         case "meatPoultry":        return "Coche tes protéines"
-        case "dairyServings":      return "Coche tes laitiers"
+        case "dairyServings":      return "Coche tes produits laitiers"
         case "wholegrainPerWeek":  return "Coche tes céréales"
         default:                   return ""
         }

@@ -36,6 +36,18 @@ struct CauseApportSheet: View {
     private var estUnFrein: Bool { contribution.delta < 0 }
     private var scoreSans: Int { detail.scoreSans(contribution) }
     private var possessif: String { NomApport.possessif(apportAvecArticle) }
+    /// Un repas noté ou une prise de sang ne sont pas des réponses au
+    /// questionnaire : ni « tu nous as mesuré », ni « modifie ta réponse ».
+    private var estUneReponse: Bool {
+        contribution.section != .journal && contribution.section != .priseDeSang
+    }
+    private var phraseDOrigine: String {
+        switch contribution.section {
+        case .priseDeSang: return "C'est ce que montre ta prise de sang."
+        case .journal: return "C'est ce que montrent tes repas notés."
+        default: return "C'est ce que tu nous as \(contribution.provenance)."
+        }
+    }
 
     /// « Sans ce facteur, ton fer passerait de 47 à 62. »
     private var phraseSimulation: String {
@@ -64,19 +76,21 @@ struct CauseApportSheet: View {
 
                 FicheBloc(titre: "D'où ça vient", rang: 3) {
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("C'est ce que tu nous as \(contribution.provenance).")
+                        Text(phraseDOrigine)
                             .font(.dsSousTitre)
                             .tracking(DSTracking.sousTitre)
                             .foregroundStyle(Color.dsTexte)
                             .fixedSize(horizontal: false, vertical: true)
                         // Cette feuille s'ouvre par-dessus une autre : on dit où
                         // aller, on n'y emmène pas (l'onglet changerait derrière).
-                        Text("Elle a changé ? Réglages, puis « Modifier mes informations du questionnaire » : le calcul se refait aussitôt.")
-                            .font(.dsLegende)
-                            .tracking(DSTracking.legende)
-                            .foregroundStyle(Color.dsSecondaire)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 6)
+                        if estUneReponse {
+                            Text("Ta réponse a changé ? Réglages, puis « Modifier mes informations du questionnaire » : le calcul se refait aussitôt.")
+                                .font(.dsLegende)
+                                .tracking(DSTracking.legende)
+                                .foregroundStyle(Color.dsSecondaire)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 6)
+                        }
                     }
                     .padding(.horizontal, DS.paddingCarte)
                     .padding(.vertical, 14)

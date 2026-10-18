@@ -168,7 +168,7 @@ enum Micronutriments {
         // alpha-linolénique (oméga-3) : l'ANSES (2011) le veut inférieur à 5.
         // Ses « sources » sont les aliments qui le font baisser.
         MicroDefinition("rapportOmega", "Rapport oméga-6 / oméga-3", "", .acidesGras,
-                        role: "Les oméga-6 et les oméga-3 empruntent les mêmes voies dans l'organisme. L'ANSES recommande un rapport entre l'acide linoléique (oméga-6) et l'acide alpha-linolénique (oméga-3) inférieur à 5.",
+                        role: "Les oméga-6 et les oméga-3 empruntent les mêmes voies dans l'organisme. Le repère conseillé : au plus 5 fois plus d'oméga-6 que d'oméga-3.",
                         sources: ["Huile de colza", "Noix", "Graines de lin"],
                         sens: .rapport),
     ]
