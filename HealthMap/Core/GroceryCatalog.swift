@@ -256,7 +256,7 @@ enum GroceryCatalog {
             gi("confiture", "Confiture de fraise", "🍓", []),
             gi("vinaigrette", "Vinaigrette", "🥗", []),
             gi("huile_noix", "Huile de noix", "🌰", [.omega3]),
-            gi("tahini", "Tahini (purée sésame)", "🥣", [.calcium, .magnesium, .iron]),
+            gi("tahini", "Tahini (purée de sésame)", "🥣", [.calcium, .magnesium, .iron]),
             gi("ketchup", "Ketchup", "🍅", []),
             gi("moutarde", "Moutarde", "🌭", []),
             gi("sauce_soja", "Sauce soja", "🥢", []),

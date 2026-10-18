@@ -100,7 +100,7 @@ enum HealthMapError: LocalizedError, Equatable {
             case .sessionExpired: return String(localized: "Ta session a expiré. Reconnecte-toi.")
             case .userNotFound: return String(localized: "Utilisateur introuvable.")
             case .oauthCancelled: return String(localized: "Connexion annulée.")
-            case .signUpNeedsEmailCode: return String(localized: "Code de vérification envoyé à ton email.")
+            case .signUpNeedsEmailCode: return String(localized: "Code de vérification envoyé par e-mail.")
             case .signUpIncomplete: return String(localized: "Vérification incomplète. Réessaie ou demande un nouveau code.")
             case .signInIncomplete: return String(localized: "Connexion incomplète. Une étape supplémentaire est requise.")
             case .invalidEmailCode: return String(localized: "Ce code est incorrect. Vérifie tes mails et réessaie.")
@@ -115,8 +115,8 @@ enum HealthMapError: LocalizedError, Equatable {
             case .permissionDenied: return String(localized: "Tu n'as pas les droits d'accéder à cette donnée.")
             case .conflict: return String(localized: "Conflit de données. Rafraîchis et réessaie.")
             case .corruptedData: return String(localized: "Les données sont corrompues.")
-            case .notConfigured: return String(localized: "Base de données non configurée.")
-            case .insertFailed: return String(localized: "Échec de l'insertion en base.")
+            case .notConfigured: return String(localized: "Service indisponible pour le moment. Réessaie plus tard.")
+            case .insertFailed: return String(localized: "Impossible d'enregistrer ton profil. Réessaie dans quelques instants.")
             case .unknown(let msg): return String(localized: "Erreur base de données : \(msg)")
             }
         case .analysis(let err):

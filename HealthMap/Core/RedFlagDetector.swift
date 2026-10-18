@@ -131,7 +131,7 @@ enum RedFlagDetector {
         if age >= 65 && medications.filter({ $0 != "none" }).count >= 3 {
             flags.append(RedFlag(
                 id: .elderlyPolypharmacy, urgency: .routine,
-                message: String(localized: "Plusieurs médicaments en même temps, certains peuvent gêner l'absorption de tes nutriments. Ton pharmacien peut vérifier ça avec toi.")
+                message: String(localized: "Tu prends plusieurs médicaments en même temps : certains peuvent gêner l'absorption de tes nutriments. Ton pharmacien peut vérifier ça avec toi.")
             ))
         }
 

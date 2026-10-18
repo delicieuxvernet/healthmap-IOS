@@ -515,10 +515,11 @@ final class DashboardViewModel: ObservableObject {
 
     /// Le statut de chaque apport estimé : ce que l'app peut affirmer. Une
     /// prise de sang récente prime sur l'estimation, sauf pour le calcium et
-    /// le magnésium, que le corps tient serrés dans le sang.
+    /// le magnésium, que le corps tient serrés dans le sang. Un apport affiché
+    /// à 100 % est « à ton besoin » sur tous les écrans (`coherent`).
     var statuts: [String: StatutApport] {
         guard let estimation else { return [:] }
-        var sortie = estimation.apports.mapValues(\.statut)
+        var sortie = estimation.apports.mapValues { $0.statut.coherent(avecCouverture: LectureEstimation.couverture($0)) }
         guard let priseDeSang, PriseDeSangApports.fraicheur(priseDeSang) > 0 else { return sortie }
         for (id, statut) in sortie where statut != .couvertParComplement {
             guard let m = PriseDeSangApports.marqueur(pour: id, dans: priseDeSang) else { continue }

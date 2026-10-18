@@ -249,7 +249,7 @@ extension NutrientEngine {
         if prises.contains("probiotics") { c.note("fiber", 5, String(localized: "Tu prends déjà des probiotiques"), .medical) }
         if prises.contains("multivitamin") {
             c.note([("vitD", 10), ("vitB12", 15), ("iron", 8), ("zinc", 8), ("vitC", 10), ("iodine", 10)],
-                   String(localized: "Tu prends déjà un multivitamines"), .medical)
+                   String(localized: "Tu prends déjà des multivitamines"), .medical)
         }
 
         // Régime

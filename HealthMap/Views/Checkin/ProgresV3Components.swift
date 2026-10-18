@@ -931,7 +931,7 @@ struct ProgresRecapRow: View {
         ProgresLigneAction(
             symbole: "sunrise",
             titre: String(localized: "Voir mon récap du jour"),
-            sousTitre: String(localized: "Le brief de ce matin, à nouveau"),
+            sousTitre: String(localized: "Celui de ce matin, à nouveau"),
             action: action
         )
     }

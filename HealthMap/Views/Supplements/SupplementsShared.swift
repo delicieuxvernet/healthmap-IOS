@@ -67,7 +67,7 @@ enum SupplementsV4 {
                     items.append(SupplementPrecaution(
                         icon: "clock.fill",
                         critique: false,
-                        title: String(localized: "À distance de \(Langue.texte(antiLabel))"),
+                        title: String(localized: "Pas en même temps que \(NomApport.avecArticle(id: anti, repli: antiLabel))"),
                         note: String(localized: "Sépare les prises de 2 h pour ne pas gêner l'absorption.")
                     ))
                 }

@@ -378,9 +378,7 @@ enum MicrosDuJour {
                 ? String(localized: "Aujourd'hui : \(texteDuRapport(duJourAffiche)).")
                 : String(localized: "Ce jour-là : \(texteDuRapport(duJourAffiche)).")))
         } else {
-            raisons.append(FaitMicro(genre: .jour, texte: jourEstAujourdhui
-                ? String(localized: "Aujourd'hui : aucun aliment noté ne le renseigne.")
-                : String(localized: "Ce jour-là : aucun aliment noté ne le renseigne.")))
+            raisons.append(FaitMicro(genre: .jour, texte: phraseDuJourSansDonnee(aujourdhui: jourEstAujourdhui)))
         }
 
         return LigneMicro(
@@ -477,12 +475,12 @@ enum MicrosDuJour {
         mois: Int
     ) -> [FaitMicro] {
         var faits: [FaitMicro] = [FaitMicro(genre: .questionnaire, texte: LectureEstimation.provenance(e))]
-        let unite = LectureEstimation.uniteAffichage(micro.id, estimation: e)
+        // Sans quantité ni unité : « 63,9 UI par jour » ne parlait à personne
+        // (Arthur, 14 oct. 2026). Le détail chiffré reste dans « Voir le calcul ».
         if let premiere = LectureEstimation.sources(micro.id, e, profil: profil ?? ProfilEstimation()).first {
-            let valeur = DS.decimal(LectureEstimation.arrondiLisible(premiere.valeur))
             faits.append(FaitMicro(
                 genre: premiere.section == .journal ? .repas : .questionnaire,
-                texte: String(localized: "Ta plus grosse source : \(LectureEstimation.enMinuscule(premiere.libelle)), \(valeur)\(DS.fine)\(unite) par jour.")
+                texte: String(localized: "Ce qui t'en apporte le plus : \(LectureEstimation.enMinuscule(premiere.libelle)).")
             ))
         }
         if let restant = LectureEstimation.journeesAvantFiabilite(e) {
@@ -496,23 +494,51 @@ enum MicrosDuJour {
         } else if micro.id == "vitD", [10, 11, 12, 1, 2, 3].contains(mois) {
             faits.append(FaitMicro(
                 genre: .saison,
-                texte: String(localized: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes.")
+                texte: String(localized: "D'octobre à mars, le soleil est trop faible en France pour que ta peau en fabrique assez.")
             ))
         }
         if let quantiteDuJour, besoin > 0 {
-            let notee = quantite(quantiteDuJour)
-            faits.append(FaitMicro(
-                genre: .jour,
-                texte: jourEstAujourdhui
-                    ? String(localized: "Aujourd'hui : \(notee) noté\(DS.fine)\(micro.unite).")
-                    : String(localized: "Ce jour-là : \(notee) noté\(DS.fine)\(micro.unite).")
-            ))
+            faits.append(FaitMicro(genre: .jour, texte: phraseDuJour(quantite: quantiteDuJour, besoin: besoin, aujourdhui: jourEstAujourdhui)))
         } else {
-            faits.append(FaitMicro(genre: .jour, texte: jourEstAujourdhui
-                ? String(localized: "Aujourd'hui : aucun aliment noté ne le renseigne.")
-                : String(localized: "Ce jour-là : aucun aliment noté ne le renseigne.")))
+            faits.append(FaitMicro(genre: .jour, texte: phraseDuJourSansDonnee(aujourdhui: jourEstAujourdhui)))
         }
         return faits
+    }
+
+    /// La journée affichée, dite en mots : « Aujourd'hui, tes repas notés
+    /// couvrent environ un tiers de ton besoin. » Ni unité (UI, µg) ni second
+    /// pourcentage à côté du chiffre de l'apport : « Aujourd'hui : 217 noté
+    /// UI. » n'était pas lisible (Arthur, 14 oct. 2026).
+    static func phraseDuJour(quantite: Double, besoin: Double, aujourdhui: Bool) -> String {
+        let part = besoin > 0 ? quantite / besoin : 0
+        if aujourdhui {
+            switch part {
+            case ..<0.05: return String(localized: "Aujourd'hui, tes repas notés n'en apportent presque pas.")
+            case ..<0.15: return String(localized: "Aujourd'hui, tes repas notés couvrent environ un dixième de ton besoin.")
+            case ..<0.30: return String(localized: "Aujourd'hui, tes repas notés couvrent environ un quart de ton besoin.")
+            case ..<0.42: return String(localized: "Aujourd'hui, tes repas notés couvrent environ un tiers de ton besoin.")
+            case ..<0.60: return String(localized: "Aujourd'hui, tes repas notés couvrent environ la moitié de ton besoin.")
+            case ..<0.85: return String(localized: "Aujourd'hui, tes repas notés couvrent environ les trois quarts de ton besoin.")
+            case ..<1: return String(localized: "Aujourd'hui, tes repas notés couvrent presque tout ton besoin.")
+            default: return String(localized: "Aujourd'hui, tes repas notés couvrent tout ton besoin.")
+            }
+        }
+        switch part {
+        case ..<0.05: return String(localized: "Ce jour-là, tes repas notés n'en apportaient presque pas.")
+        case ..<0.15: return String(localized: "Ce jour-là, tes repas notés couvraient environ un dixième de ton besoin.")
+        case ..<0.30: return String(localized: "Ce jour-là, tes repas notés couvraient environ un quart de ton besoin.")
+        case ..<0.42: return String(localized: "Ce jour-là, tes repas notés couvraient environ un tiers de ton besoin.")
+        case ..<0.60: return String(localized: "Ce jour-là, tes repas notés couvraient environ la moitié de ton besoin.")
+        case ..<0.85: return String(localized: "Ce jour-là, tes repas notés couvraient environ les trois quarts de ton besoin.")
+        case ..<1: return String(localized: "Ce jour-là, tes repas notés couvraient presque tout ton besoin.")
+        default: return String(localized: "Ce jour-là, tes repas notés couvraient tout ton besoin.")
+        }
+    }
+
+    static func phraseDuJourSansDonnee(aujourdhui: Bool) -> String {
+        aujourdhui
+            ? String(localized: "Aujourd'hui, tes repas notés ne permettent pas encore de le calculer.")
+            : String(localized: "Ce jour-là, tes repas notés ne permettaient pas de le calculer.")
     }
 
     private static func points(_ delta: Int) -> String {
@@ -589,7 +615,7 @@ enum MicrosDuJour {
             } else if micro.id == "vitD", [10, 11, 12, 1, 2, 3].contains(mois) {
                 faits.append(FaitMicro(
                     genre: .saison,
-                    texte: String(localized: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes.")
+                    texte: String(localized: "D'octobre à mars, le soleil est trop faible en France pour que ta peau en fabrique assez.")
                 ))
             }
         } else if niveau != nil {
@@ -604,26 +630,21 @@ enum MicrosDuJour {
             ))
         }
 
-        // Toujours : ce que la journée affichée a apporté.
-        if let quantiteDuJour, besoin > 0 {
+        // Toujours : ce que la journée affichée a apporté. Une limite (sodium)
+        // garde ses chiffres : « au plus » n'a pas d'équivalent en mots.
+        if let quantiteDuJour, besoin > 0, micro.sens == .limite {
             let notee = quantite(quantiteDuJour)
             let attendue = quantite(besoin)
-            let texte: String
-            switch (jourEstAujourdhui, micro.sens == .limite) {
-            case (true, true):
-                texte = String(localized: "Aujourd'hui : \(notee) sur \(attendue)\(DS.fine)\(micro.unite) au plus.")
-            case (true, false):
-                texte = String(localized: "Aujourd'hui : \(notee) sur \(attendue)\(DS.fine)\(micro.unite).")
-            case (false, true):
-                texte = String(localized: "Ce jour-là : \(notee) sur \(attendue)\(DS.fine)\(micro.unite) au plus.")
-            case (false, false):
-                texte = String(localized: "Ce jour-là : \(notee) sur \(attendue)\(DS.fine)\(micro.unite).")
-            }
-            faits.append(FaitMicro(genre: .jour, texte: texte))
+            faits.append(FaitMicro(
+                genre: .jour,
+                texte: jourEstAujourdhui
+                    ? String(localized: "Aujourd'hui : \(notee) sur \(attendue)\(DS.fine)\(micro.unite) au plus.")
+                    : String(localized: "Ce jour-là : \(notee) sur \(attendue)\(DS.fine)\(micro.unite) au plus.")
+            ))
+        } else if let quantiteDuJour, besoin > 0 {
+            faits.append(FaitMicro(genre: .jour, texte: phraseDuJour(quantite: quantiteDuJour, besoin: besoin, aujourdhui: jourEstAujourdhui)))
         } else {
-            faits.append(FaitMicro(genre: .jour, texte: jourEstAujourdhui
-                ? String(localized: "Aujourd'hui : aucun aliment noté ne le renseigne.")
-                : String(localized: "Ce jour-là : aucun aliment noté ne le renseigne.")))
+            faits.append(FaitMicro(genre: .jour, texte: phraseDuJourSansDonnee(aujourdhui: jourEstAujourdhui)))
         }
         return faits
     }

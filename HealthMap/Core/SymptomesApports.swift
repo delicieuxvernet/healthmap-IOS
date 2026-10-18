@@ -134,7 +134,7 @@ enum SymptomesApports {
             enumeration = formulations[0]
         }
 
-        let label = SupplementEngine.nutrientLabel(for: nutriment)
-        return String(localized: "Tu as signalé \(enumeration) — cela fait partie de ce qu'un apport bas en \(label) peut expliquer.")
+        let nom = PistesBilan.nomCourant(nutriment)
+        return String(localized: "Tu as signalé \(enumeration) : cela fait partie de ce qu'un apport bas en \(nom) peut expliquer.")
     }
 }

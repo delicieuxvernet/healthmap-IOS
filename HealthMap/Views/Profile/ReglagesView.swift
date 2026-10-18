@@ -431,7 +431,7 @@ struct ReglagesView: View {
                     HapticService.shared.tap()
                     NotificationCenter.default.post(name: .healthmapRevoirBrief, object: nil)
                 } label: {
-                    ReglageLigne(symbole: "sunrise", titre: String(localized: "Revoir le brief du jour"), filet: true)
+                    ReglageLigne(symbole: "sunrise", titre: String(localized: "Revoir le récap du jour"), filet: true)
                 }
                 .buttonStyle(.dsPress)
                 .verreCascade(lignesVisibles, delai: delai(8), decalage: 10)

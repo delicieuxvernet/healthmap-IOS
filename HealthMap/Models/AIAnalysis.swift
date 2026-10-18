@@ -206,7 +206,7 @@ struct SupplementEntry: Codable, Hashable {
     var displayText: String {
         if let name, !name.isEmpty { return name }
         if let rawString, !rawString.isEmpty { return rawString }
-        return String(localized: "Complement")
+        return String(localized: "Complément")
     }
 }
 

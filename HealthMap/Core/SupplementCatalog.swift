@@ -148,7 +148,7 @@ extension SupplementEngine {
             contraindications: [.hemochromatose],
             antiInteractions: ["calcium", "zinc"],
             tier: .value,
-            whyBrand: String(localized: "Même matière première Ferrochel que le premium, en version simple. ~0,11 €/jour.")
+            whyBrand: String(localized: "Même matière première Ferrochel que le fer haut de gamme, en version simple. ~0,11 €/jour.")
         ),
 
         // --- MAGNESIUM ---

@@ -107,7 +107,7 @@ struct PlanGraph: Equatable {
             guard let premier = apports.first else { return String(localized: "Pèse sur tes apports") }
             return apports.count > 1
                 ? String(localized: "Freine \(apports.count) apports")
-                : String(localized: "Freine ton apport en \(premier.nom.lowercased())")
+                : String(localized: "Freine ton apport en \(NomNutriment.minusculeInitiale(premier.nom))")
         }
     }
 }

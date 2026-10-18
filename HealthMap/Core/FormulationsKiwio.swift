@@ -87,7 +87,7 @@ enum RaisonNutriment {
         "iron": String(localized: "Le fer contribue à réduire la fatigue."),
         "magnesium": String(localized: "Le magnésium part vite quand la semaine est chargée."),
         "omega3": String(localized: "Les oméga-3 viennent surtout des poissons gras."),
-        "vitC": String(localized: "La vitamine C ne se stocke pas, elle se refait chaque jour."),
+        "vitC": String(localized: "La vitamine C ne se stocke pas : il en faut chaque jour."),
         "calcium": String(localized: "Le calcium se joue sur la régularité, pas sur un à-coup."),
         "zinc": String(localized: "Le zinc se trouve côté viandes, graines et légumineuses."),
         "iodine": String(localized: "L'iode vient de la mer, et du sel iodé."),
@@ -183,7 +183,7 @@ enum FormulationsRappel {
             String(localized: "Ta veille en un coup d'œil, et ta priorité du jour."),
             String(localized: "Deux chiffres sur hier, une idée pour aujourd'hui."),
         ]
-        return (String(localized: "Ton brief du jour est prêt"), variantes[indexVariante(jour: jour, parmi: variantes.count)])
+        return (String(localized: "Ton récap du jour est prêt"), variantes[indexVariante(jour: jour, parmi: variantes.count)])
     }
 
     /// Le brief chiffré.
@@ -204,23 +204,23 @@ enum FormulationsRappel {
     ) -> (titre: String, corps: String) {
         guard let couvertsHier else {
             if repasHier == 1 {
-                return (String(localized: "Ton brief du jour est prêt"),
-                        String(localized: "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain il parle."))
+                return (String(localized: "Ton récap du jour est prêt"),
+                        String(localized: "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain ton récap aura de quoi parler."))
             }
             let variantes = [
-                String(localized: "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton brief aura quelque chose à dire."),
-                String(localized: "Pas de repas noté hier. Une photo de ton petit-déjeuner, et ton brief repart demain."),
-                String(localized: "Ton brief n'a rien à te dire ce matin : hier est resté vide. Note ton petit-déjeuner pour le relancer."),
+                String(localized: "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton récap aura quelque chose à dire."),
+                String(localized: "Pas de repas noté hier. Une photo de ton petit-déjeuner, et ton récap repart demain."),
+                String(localized: "Ton récap n'a rien à te dire ce matin : hier est resté vide. Note ton petit-déjeuner pour le relancer."),
             ]
-            return (String(localized: "Ton brief attend tes repas"), variantes[indexVariante(jour: jour, parmi: variantes.count)])
+            return (String(localized: "Ton récap attend tes repas"), variantes[indexVariante(jour: jour, parmi: variantes.count)])
         }
 
         let chiffre = String(localized: "Hier : \(besoinsCouverts(couvertsHier))")
         let suite: String
         if let plusBas {
-            suite = String(localized: "Le plus bas : \(plusBas.cible.avecPossessif), à \(plusBas.pourcent) %. Ton brief te dit sur quoi miser aujourd'hui.")
+            suite = String(localized: "Le plus bas : \(plusBas.cible.avecPossessif), à \(plusBas.pourcent) %. Ton récap te dit quoi ajouter aujourd'hui.")
         } else {
-            suite = String(localized: "Ton brief te montre ta veille, apport par apport.")
+            suite = String(localized: "Ton récap te montre ta veille en un coup d'œil.")
         }
         // « 0 besoin sur 10 » ne donne envie de rien ouvrir : on le tait.
         let corpsChiffre = couvertsHier >= 1 ? "\(chiffre). \(suite)" : suite
@@ -229,7 +229,7 @@ enum FormulationsRappel {
         if serie >= serieMin {
             return (String(localized: "\(serie) jours d'affilée 🔥"), corpsChiffre)
         }
-        guard couvertsHier >= 1 else { return (String(localized: "Ton brief du jour est prêt"), suite) }
+        guard couvertsHier >= 1 else { return (String(localized: "Ton récap du jour est prêt"), suite) }
         return ("\(chiffre) 📊", suite)
     }
 
@@ -301,7 +301,7 @@ enum FormulationsRappel {
     ) -> (titre: String, corps: String) {
         guard let aujourdhui else {
             let variantes = [
-                String(localized: "Commence par ton encas : une photo ou quelques mots à voix haute. Demain, ton brief aura de vrais chiffres."),
+                String(localized: "Commence par ton encas : une photo ou quelques mots à voix haute. Demain, ton récap aura de vrais chiffres."),
                 NomNutriment.estPluriel(id: cible.id)
                     ? String(localized: "Un encas noté, et tu sais où en sont \(cible.avecPossessif) aujourd'hui. Une photo ou quelques mots suffisent.")
                     : String(localized: "Un encas noté, et tu sais où en est \(cible.avecPossessif) aujourd'hui. Une photo ou quelques mots suffisent."),
@@ -384,9 +384,9 @@ enum FormulationsRappel {
     static func dernierAppel(repas: Int, couverts: Int?) -> (titre: String, corps: String) {
         let titre = String(localized: "Il manque ton dîner 🌙")
         if let couverts, couverts >= 1 {
-            return (titre, String(localized: "\(repasNotes(repas)) et \(besoinsCouverts(couverts)) aujourd'hui. Ajoute ton dîner : ton brief de demain sera complet."))
+            return (titre, String(localized: "\(repasNotes(repas)) et \(besoinsCouverts(couverts)) aujourd'hui. Ajoute ton dîner : ton récap de demain sera complet."))
         }
-        return (titre, String(localized: "\(repasNotes(repas)) aujourd'hui. Ajoute ton dîner, à la voix ou en photo : ton brief de demain aura de vrais chiffres."))
+        return (titre, String(localized: "\(repasNotes(repas)) aujourd'hui. Ajoute ton dîner, à la voix ou en photo : ton récap de demain aura de vrais chiffres."))
     }
 
     // MARK: Dimanche (la semaine en chiffres)

@@ -209,13 +209,19 @@ final class ScoreHistoryService {
 
         let text: String
         if delta > 0 {
-            text = weeks > 1
-                ? String(localized: "+\(delta) points en \(weeks) semaines")
-                : String(localized: "+\(delta) points en \(weeks) semaine")
+            switch (delta > 1, weeks > 1) {
+            case (true, true): text = String(localized: "+\(delta) points en \(weeks) semaines")
+            case (true, false): text = String(localized: "+\(delta) points en \(weeks) semaine")
+            case (false, true): text = String(localized: "+\(delta) point en \(weeks) semaines")
+            case (false, false): text = String(localized: "+\(delta) point en \(weeks) semaine")
+            }
         } else if delta < 0 {
-            text = weeks > 1
-                ? String(localized: "\(delta) points en \(weeks) semaines")
-                : String(localized: "\(delta) points en \(weeks) semaine")
+            switch (delta < -1, weeks > 1) {
+            case (true, true): text = String(localized: "\(delta) points en \(weeks) semaines")
+            case (true, false): text = String(localized: "\(delta) points en \(weeks) semaine")
+            case (false, true): text = String(localized: "\(delta) point en \(weeks) semaines")
+            case (false, false): text = String(localized: "\(delta) point en \(weeks) semaine")
+            }
         } else {
             text = weeks > 1
                 ? String(localized: "Stable sur \(weeks) semaines")

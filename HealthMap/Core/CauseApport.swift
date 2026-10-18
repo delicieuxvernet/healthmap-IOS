@@ -107,7 +107,7 @@ enum CauseApport {
     /// Les familles de facteurs, dans l'ordre où on les reconnaît.
     private static let familles: [(mots: [String], pourquoi: String, geste: String, court: String)] = [
         (["courses", "groceries"],
-         String(localized: "Tes courses habituelles contiennent peu d'aliments qui apportent cet apport. C'est la première source, avant tout le reste : c'est souvent là qu'il y a le plus de points à regagner."),
+         String(localized: "Tes courses habituelles contiennent peu d'aliments riches en cet apport. C'est la première source, avant tout le reste : c'est souvent là qu'il y a le plus de points à regagner."),
          String(localized: "Ajoute à tes courses deux ou trois aliments qui en sont riches, et garde-les d'une semaine sur l'autre."),
          String(localized: "Ses sources dans tes courses")),
         (["cafe", "the pendant", "coffee", "tea with"],
@@ -123,7 +123,7 @@ enum CauseApport {
          String(localized: "Vapeur douce, cuisson courte, ou cru quand c'est possible."),
          String(localized: "Vapeur douce, ou cru")),
         (["poisson", "fish"],
-         String(localized: "Les oméga-3 à longue chaîne viennent surtout des poissons gras, qui apportent aussi de la vitamine D et de l'iode."),
+         String(localized: "Certains oméga-3 (EPA, DHA) viennent surtout des poissons gras, qui apportent aussi de la vitamine D et de l'iode."),
          String(localized: "Sardines, maquereau ou hareng, deux fois par semaine : en boîte, c'est très bien."),
          String(localized: "Poisson gras deux fois par semaine")),
         (["laitier", "dairy"],
@@ -227,7 +227,7 @@ enum CauseApport {
             return Explication(
                 pourquoi: String(localized: "Cette période ou cet état augmente ton besoin, ou tes pertes, pour cet apport. C'est attendu, et ça se compense."),
                 geste: nil,
-                avis: String(localized: "Si ça te fatigue ou que ça dure, parles-en à ton médecin ou à ta sage-femme."))
+                avis: String(localized: "Si ça te fatigue ou que ça dure, parles-en à ton médecin, ou à ta sage-femme si tu es enceinte."))
         case .medical:
             return Explication(
                 pourquoi: String(localized: "Certains traitements et antécédents diminuent l'absorption de cet apport, ou augmentent ses pertes. C'est connu, et ça se surveille."),

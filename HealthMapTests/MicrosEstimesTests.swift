@@ -37,9 +37,40 @@ final class MicrosEstimesTests: XCTestCase {
         let t = MicrosDuJour.tableau(repas: [], jourAffiche: Date(), compositions: [:], contexte: c, registre: [:])
         let mg = try XCTUnwrap(t.toutes.first { $0.id == "magnesium" })
         let textes = mg.faits.map(\.texte)
-        XCTAssertTrue(textes.contains { $0.hasPrefix("Ta plus grosse source") }, textes.joined(separator: " | "))
+        XCTAssertTrue(textes.contains { $0.hasPrefix("Ce qui t'en apporte le plus : ") }, textes.joined(separator: " | "))
         XCTAssertFalse(textes.contains { $0.contains("point") }, textes.joined(separator: " | "))
         XCTAssertTrue(textes.contains { $0.contains("pas un résultat d'analyse") })
+        // Plus d'unité ni de décimale dans les faits (« 63,9 UI par jour »,
+        // « 217 noté UI », vus par Arthur le 14 oct. 2026).
+        XCTAssertFalse(textes.contains { $0.contains(" mg") || $0.contains("UI") || $0.contains("µg") }, textes.joined(separator: " | "))
+    }
+
+    /// Un apport affiché à 100 % est « à ton besoin » partout : Progrès disait
+    /// « 1 apport sur 10 » sous une toile où trois apports étaient à 100 %.
+    func testUnApportAfficheACentPourCentEstATonBesoin() {
+        XCTAssertEqual(StatutApport.aSurveiller.coherent(avecCouverture: 100), .couvert)
+        XCTAssertEqual(StatutApport.peuPrecise.coherent(avecCouverture: 100), .couvert)
+        XCTAssertEqual(StatutApport.aSurveiller.coherent(avecCouverture: 99), .aSurveiller)
+        XCTAssertEqual(StatutApport.peuPrecise.coherent(avecCouverture: 20), .peuPrecise)
+        XCTAssertEqual(StatutApport.aRenforcer.coherent(avecCouverture: 100), .aRenforcer)
+        XCTAssertEqual(StatutApport.couvertParComplement.coherent(avecCouverture: 100), .couvertParComplement)
+        XCTAssertEqual(StatutApport.auDessusDeLaLimite.coherent(avecCouverture: 100), .auDessusDeLaLimite)
+    }
+
+    /// La journée affichée se dit en mots, jamais avec une unité.
+    func testLaJourneeSeDitEnMots() {
+        XCTAssertEqual(MicrosDuJour.phraseDuJour(quantite: 217, besoin: 600, aujourdhui: true),
+                       "Aujourd'hui, tes repas notés couvrent environ un tiers de ton besoin.")
+        XCTAssertEqual(MicrosDuJour.phraseDuJour(quantite: 10, besoin: 600, aujourdhui: true),
+                       "Aujourd'hui, tes repas notés n'en apportent presque pas.")
+        XCTAssertEqual(MicrosDuJour.phraseDuJour(quantite: 300, besoin: 600, aujourdhui: false),
+                       "Ce jour-là, tes repas notés couvraient environ la moitié de ton besoin.")
+        XCTAssertEqual(MicrosDuJour.phraseDuJour(quantite: 700, besoin: 600, aujourdhui: true),
+                       "Aujourd'hui, tes repas notés couvrent tout ton besoin.")
+        for q in stride(from: 0.0, through: 900, by: 37) {
+            let phrase = MicrosDuJour.phraseDuJour(quantite: q, besoin: 600, aujourdhui: true)
+            XCTAssertFalse(phrase.contains("UI") || phrase.contains("..") || phrase.contains("  "), phrase)
+        }
     }
 
     func testUnApportCouvertNePasseJamaisDevantDansLesPriorites() throws {

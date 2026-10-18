@@ -18,7 +18,7 @@ enum PrecisionCatalog {
         .init(id: "raw_salads",    emoji: "🥗", label: String(localized: "Crudités / salades")),
         .init(id: "cooked_veg",    emoji: "🥦", label: String(localized: "Légumes cuits")),
         .init(id: "leafy_greens",  emoji: "🥬", label: String(localized: "Feuilles vertes")),
-        .init(id: "cruciferous",   emoji: "🥦", label: String(localized: "Crucifères")),
+        .init(id: "cruciferous",   emoji: "🥦", label: String(localized: "Choux, brocolis")),
         .init(id: "root_veg",      emoji: "🥕", label: String(localized: "Racines")),
         .init(id: "nightshades",   emoji: "🍅", label: String(localized: "Tomates, poivrons")),
         .init(id: "starchy_veg",   emoji: "🥔", label: String(localized: "Féculents")),
@@ -77,7 +77,7 @@ enum PrecisionCatalog {
         case "vegetableServings":  return String(localized: "Coche les légumes que tu manges")
         case "fruitServings":      return String(localized: "Coche les fruits que tu manges")
         case "meatPoultry":        return String(localized: "Coche tes protéines")
-        case "dairyServings":      return String(localized: "Coche tes laitiers")
+        case "dairyServings":      return String(localized: "Coche tes produits laitiers")
         case "wholegrainPerWeek":  return String(localized: "Coche tes céréales")
         default:                   return ""
         }

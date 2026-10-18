@@ -32,7 +32,7 @@ enum PasswordValidationIssue: Equatable {
     var message: String {
         switch self {
         case .tooShort:
-            return String(localized: "Le mot de passe doit contenir au moins 8 caracteres.")
+            return String(localized: "Le mot de passe doit contenir au moins 8 caractères.")
         case .noUppercase:
             return String(localized: "Le mot de passe doit contenir au moins une lettre majuscule.")
         case .noDigit:
@@ -40,7 +40,7 @@ enum PasswordValidationIssue: Equatable {
         case .noSpecialCharacter:
             return String(localized: "Le mot de passe doit contenir au moins un caractère spécial (!@#$%…).")
         case .commonPassword:
-            return String(localized: "Ce mot de passe est trop courant. Choisissez-en un plus unique.")
+            return String(localized: "Ce mot de passe est trop courant. Choisis-en un autre, moins répandu.")
         }
     }
 }

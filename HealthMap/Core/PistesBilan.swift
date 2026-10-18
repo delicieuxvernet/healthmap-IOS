@@ -45,7 +45,7 @@ enum EtatApport: Equatable {
     var mention: String {
         switch self {
         case .aSurveiller: return String(localized: "à surveiller")
-        case .bienParti: return String(localized: "bien parti")
+        case .bienParti: return String(localized: "en bonne voie")
         case .enAttente: return String(localized: "en attente")
         }
     }
@@ -426,11 +426,15 @@ enum PistesBilan {
         return sortie
     }
 
-    /// « Apporte fer, magnésium, fibres. »
+    /// « Apporte du fer, du magnésium et des fibres. »
     static func apports(de aliment: GroceryItem) -> String {
-        let noms = aliment.nutrients.compactMap { NutrientID(rawValue: $0.rawValue) }.map(nomCourant)
-        guard !noms.isEmpty else { return String(localized: "Rien de notable parmi les 10 apports suivis.") }
-        return String(localized: "Apporte \(noms.joined(separator: ", ")).")
+        let noms = aliment.nutrients.compactMap { NutrientID(rawValue: $0.rawValue) }.map(partitif)
+        guard let dernier = noms.last else { return String(localized: "Rien de notable parmi les 10 apports suivis.") }
+        if noms.count > 1 {
+            let debut = noms.dropLast().joined(separator: ", ")
+            return String(localized: "Apporte \(debut) et \(dernier).")
+        }
+        return String(localized: "Apporte \(dernier).")
     }
 
     // MARK: L'écran de fin
@@ -498,6 +502,16 @@ enum PistesBilan {
         case .zinc: return String(localized: "zinc")
         case .iodine: return String(localized: "iode")
         case .fiber: return String(localized: "fibres")
+        }
+    }
+
+    /// « du fer », « de la vitamine D », « de l'iode », « des fibres ».
+    static func partitif(_ id: NutrientID) -> String {
+        switch id {
+        case .vitD, .vitB12, .vitC: return String(localized: "de la \(nomCourant(id))")
+        case .iodine: return String(localized: "de l'iode")
+        case .omega3, .fiber: return String(localized: "des \(nomCourant(id))")
+        case .iron, .magnesium, .calcium, .zinc: return String(localized: "du \(nomCourant(id))")
         }
     }
 

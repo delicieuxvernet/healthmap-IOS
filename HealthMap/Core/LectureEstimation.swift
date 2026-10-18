@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Lire un apport ESTIMÉ (audit de fiabilité, 8 oct. 2026)
 //
 // Fiche validée par Arthur le 8 oct. 2026 : le verdict parle d'un APPORT
-// (« Ton apport en magnésium semble proche de la référence »), jamais d'un
+// (« Ton apport en magnésium semble proche de ton besoin »), jamais d'un
 // taux ; la quantité est une vraie quantité (« ≈ 332 sur 380 mg par jour ») ;
 // l'anneau et la liste disent d'où elle vient (courses, café et thé, eau,
 // reste de l'alimentation, repas notés) ; une ligne rappelle que c'est une
@@ -57,6 +57,19 @@ extension StatutApport {
 
     /// L'apport semble sous sa référence, avec ou sans certitude.
     var estSousLaReference: Bool { self == .aSurveiller || self == .aRenforcer || self == .peuPrecise }
+
+    /// Le statut tel que l'app le MONTRE à côté de son chiffre : un apport
+    /// affiché à 100 % de son besoin est « à ton besoin », jamais « à
+    /// surveiller » ni « à affiner ». Le 14 oct. 2026, Progrès disait « 1 apport
+    /// sur 10 atteint ton besoin » sous une toile où B12, iode et calcium
+    /// étaient à 100 % : l'estimateur garde une marge de prudence au-dessus de
+    /// la référence (ex. iode couvert à 1,2 × la référence), que personne ne
+    /// peut lire dans un chiffre plafonné à 100. Une alerte franche (« à
+    /// renforcer »), une limite et un complément ne bougent pas.
+    func coherent(avecCouverture couverture: Int) -> StatutApport {
+        guard couverture >= 100, self == .aSurveiller || self == .peuPrecise else { return self }
+        return .couvert
+    }
 }
 
 enum LectureEstimation {
@@ -100,11 +113,11 @@ enum LectureEstimation {
     static func verdict(nom: String, estimation e: EstimationApport, statut: StatutApport? = nil) -> String {
         let x = enMinuscule(nom)
         switch statut ?? e.statut {
-        case .couvert: return String(localized: "Ton apport en \(x) semble couvrir la référence.")
-        case .aSurveiller: return String(localized: "Ton apport en \(x) semble proche de la référence.")
+        case .couvert: return String(localized: "Ton apport en \(x) semble couvrir ton besoin.")
+        case .aSurveiller: return String(localized: "Ton apport en \(x) semble proche de ton besoin.")
         case .aRenforcer: return String(localized: "Ton apport en \(x) semble bas.")
         case .peuPrecise: return String(localized: "Ton apport en \(x) reste à préciser : on ne peut rien t'affirmer pour l'instant.")
-        case .couvertParComplement: return String(localized: "Ton complément couvre ton apport en \(x).")
+        case .couvertParComplement: return String(localized: "Avec ton complément, ton apport en \(x) couvre ton besoin.")
         case .auDessusDeLaLimite: return String(localized: "Ton apport en \(x) semble dépasser la limite conseillée.")
         case .sousLaLimite: return String(localized: "Ton apport en \(x) reste sous la limite conseillée.")
         }
