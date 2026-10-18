@@ -377,7 +377,7 @@ enum MicrosDuJour {
         if let duJourAffiche {
             raisons.append(FaitMicro(genre: .jour, texte: "\(moment) : \(texteDuRapport(duJourAffiche))."))
         } else {
-            raisons.append(FaitMicro(genre: .jour, texte: "\(moment) : aucun aliment noté ne le renseigne."))
+            raisons.append(FaitMicro(genre: .jour, texte: phraseDuJourSansDonnee(aujourdhui: jourEstAujourdhui)))
         }
 
         return LigneMicro(
@@ -602,7 +602,7 @@ enum MicrosDuJour {
             } else if micro.id == "vitD", [10, 11, 12, 1, 2, 3].contains(mois) {
                 faits.append(FaitMicro(
                     genre: .saison,
-                    texte: "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes."
+                    texte: "D'octobre à mars, le soleil est trop faible en France pour que ta peau en fabrique assez."
                 ))
             }
         } else if niveau != nil {

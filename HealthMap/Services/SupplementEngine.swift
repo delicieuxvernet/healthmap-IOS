@@ -436,7 +436,7 @@ enum SupplementEngine {
                         let antiLabel = NutrientID(rawValue: anti).map { nutrientLabel(for: $0) } ?? anti
                         warnings.append(InteractionWarning(
                             emoji: "⚠️",
-                            message: "\(product.name) : à ne pas prendre avec \(antiLabel). Espace les prises de 2h minimum.",
+                            message: "\(product.name) : pas en même temps que \(NomApport.avecArticle(id: anti, repli: antiLabel)). Espace les prises d'au moins 2 h.",
                             nutrients: Array(pair),
                             severity: .moderate
                         ))

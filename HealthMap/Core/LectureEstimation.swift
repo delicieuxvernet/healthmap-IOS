@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Lire un apport ESTIMÉ (audit de fiabilité, 8 oct. 2026)
 //
 // Fiche validée par Arthur le 8 oct. 2026 : le verdict parle d'un APPORT
-// (« Ton apport en magnésium semble proche de la référence »), jamais d'un
+// (« Ton apport en magnésium semble proche de ton besoin »), jamais d'un
 // taux ; la quantité est une vraie quantité (« ≈ 332 sur 380 mg par jour ») ;
 // l'anneau et la liste disent d'où elle vient (courses, café et thé, eau,
 // reste de l'alimentation, repas notés) ; une ligne rappelle que c'est une
@@ -113,11 +113,11 @@ enum LectureEstimation {
     static func verdict(nom: String, estimation e: EstimationApport, statut: StatutApport? = nil) -> String {
         let x = enMinuscule(nom)
         switch statut ?? e.statut {
-        case .couvert: return "Ton apport en \(x) semble couvrir la référence."
-        case .aSurveiller: return "Ton apport en \(x) semble proche de la référence."
+        case .couvert: return "Ton apport en \(x) semble couvrir ton besoin."
+        case .aSurveiller: return "Ton apport en \(x) semble proche de ton besoin."
         case .aRenforcer: return "Ton apport en \(x) semble bas."
         case .peuPrecise: return "Ton apport en \(x) reste à préciser : on ne peut rien t'affirmer pour l'instant."
-        case .couvertParComplement: return "Ton complément couvre ton apport en \(x)."
+        case .couvertParComplement: return "Ton complément couvre ton besoin en \(x)."
         case .auDessusDeLaLimite: return "Ton apport en \(x) semble dépasser la limite conseillée."
         case .sousLaLimite: return "Ton apport en \(x) reste sous la limite conseillée."
         }

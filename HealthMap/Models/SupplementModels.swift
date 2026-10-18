@@ -104,11 +104,11 @@ enum Contraindication: String, CaseIterable, Equatable {
     /// Message affiché à l'utilisateur.
     var warningLabel: String {
         switch self {
-        case .grossesse: return "Demande l'avis de ton médecin ou ta sage-femme avant de te supplémenter."
-        case .allaitement: return "Demande l'avis de ton médecin avant de te supplémenter pendant l'allaitement."
+        case .grossesse: return "Demande l'avis de ton médecin ou de ta sage-femme avant de prendre un complément."
+        case .allaitement: return "Demande l'avis de ton médecin avant de prendre un complément pendant l'allaitement."
         case .hemochromatose: return "Déconseillé en cas d'hémochromatose (surcharge en fer)."
         case .hyperthyroidie: return "Déconseillé en cas d'hyperthyroïdie. Demande l'avis de ton médecin."
-        case .hypercalcemie: return "Déconseillé en cas d'hypercalcémie."
+        case .hypercalcemie: return "Déconseillé en cas d'hypercalcémie (trop de calcium dans le sang)."
         case .insuffisanceRenaleSevere: return "Prudence en cas d'insuffisance rénale sévère. Demande l'avis de ton médecin."
         case .allergiePoisson: return "Contient de l'huile de poisson. À éviter en cas d'allergie, préfère la version à base d'algues."
         }

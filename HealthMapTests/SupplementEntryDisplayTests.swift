@@ -52,13 +52,13 @@ final class SupplementEntryDisplayTests: XCTestCase {
 
     /// Ni nom ni chaîne : un repli neutre, jamais une ligne vide.
     func testSansNom_repliNeutre() {
-        XCTAssertEqual(SupplementEntry().displayText, "Complement")
+        XCTAssertEqual(SupplementEntry().displayText, "Complément")
     }
 
     /// Un nom vide ne doit pas produire une ligne vide.
     func testNomVide_repliNeutre() {
         var entree = SupplementEntry()
         entree.name = ""
-        XCTAssertEqual(entree.displayText, "Complement")
+        XCTAssertEqual(entree.displayText, "Complément")
     }
 }

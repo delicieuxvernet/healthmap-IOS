@@ -15,7 +15,7 @@ final class SymptomesApportsTests: XCTestCase {
         let phrase = SymptomesApports.explication(pour: .vitB12, symptomes: ["tingling"])
         XCTAssertNotNil(phrase)
         XCTAssertTrue(phrase!.contains("fourmillements"))
-        XCTAssertTrue(phrase!.contains("Vitamine B12"))
+        XCTAssertTrue(phrase!.contains("vitamine B12"))
     }
 
     /// Lien modéré : il se dit aussi, l'apport étant déjà établi comme bas.

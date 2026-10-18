@@ -100,7 +100,7 @@ enum HealthMapError: LocalizedError, Equatable {
             case .sessionExpired: return "Ta session a expiré. Reconnecte-toi."
             case .userNotFound: return "Utilisateur introuvable."
             case .oauthCancelled: return "Connexion annulée."
-            case .signUpNeedsEmailCode: return "Code de vérification envoyé à ton email."
+            case .signUpNeedsEmailCode: return "Code de vérification envoyé par e-mail."
             case .signUpIncomplete: return "Vérification incomplète. Réessaie ou demande un nouveau code."
             case .signInIncomplete: return "Connexion incomplète. Une étape supplémentaire est requise."
             case .invalidEmailCode: return "Ce code est incorrect. Vérifie tes mails et réessaie."
@@ -115,8 +115,8 @@ enum HealthMapError: LocalizedError, Equatable {
             case .permissionDenied: return "Tu n'as pas les droits d'accéder à cette donnée."
             case .conflict: return "Conflit de données. Rafraîchis et réessaie."
             case .corruptedData: return "Les données sont corrompues."
-            case .notConfigured: return "Base de données non configurée."
-            case .insertFailed: return "Échec de l'insertion en base."
+            case .notConfigured: return "Service indisponible pour le moment. Réessaie plus tard."
+            case .insertFailed: return "Impossible d'enregistrer ton profil. Réessaie dans quelques instants."
             case .unknown(let msg): return "Erreur base de données : \(msg)"
             }
         case .analysis(let err):

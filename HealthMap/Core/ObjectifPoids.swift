@@ -109,9 +109,9 @@ struct ObjectifPoids: Equatable {
     func phrase(calories: Int?, tdee: Int?, maintenant: Date = Date()) -> String {
         switch reserve {
         case .grossesse?:
-            return "Enceinte ou allaitante, on ne vise pas de perte de poids. Tes calories restent au maintien."
+            return "Pendant la grossesse ou l'allaitement, on ne vise pas de perte de poids. Tes calories restent au maintien."
         case .sousLeRepere?:
-            return "Ce poids passe sous le repère de corpulence (IMC 18,5). Tes calories restent au maintien, parles-en à un professionnel de santé."
+            return "Ce poids passe sous le seuil conseillé pour ta taille (IMC 18,5). Tes calories restent au maintien : parles-en à un professionnel de santé."
         case nil:
             break
         }

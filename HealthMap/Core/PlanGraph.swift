@@ -99,7 +99,7 @@ struct PlanGraph: Equatable {
             guard let premier = apports.first else { return "Pèse sur tes apports" }
             return apports.count > 1
                 ? "Freine \(Self.compte(apports.count, "apport"))"
-                : "Freine ton apport en \(premier.nom.lowercased())"
+                : "Freine ton apport en \(NomNutriment.minusculeInitiale(premier.nom))"
         }
     }
 

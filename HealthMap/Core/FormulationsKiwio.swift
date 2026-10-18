@@ -87,7 +87,7 @@ enum RaisonNutriment {
         "iron": "Le fer contribue à réduire la fatigue.",
         "magnesium": "Le magnésium part vite quand la semaine est chargée.",
         "omega3": "Les oméga-3 viennent surtout des poissons gras.",
-        "vitC": "La vitamine C ne se stocke pas, elle se refait chaque jour.",
+        "vitC": "La vitamine C ne se stocke pas : il en faut chaque jour.",
         "calcium": "Le calcium se joue sur la régularité, pas sur un à-coup.",
         "zinc": "Le zinc se trouve côté viandes, graines et légumineuses.",
         "iodine": "L'iode vient de la mer, et du sel iodé.",
@@ -204,7 +204,7 @@ enum FormulationsRappel {
         guard let couvertsHier else {
             if repasHier == 1 {
                 return ("Ton brief du jour est prêt",
-                        "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain il parle.")
+                        "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain ton brief aura de quoi parler.")
             }
             let variantes = [
                 "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton brief aura quelque chose à dire.",
