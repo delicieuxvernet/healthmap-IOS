@@ -94,6 +94,9 @@ struct SuiviView: View {
     @State private var bilanSemaine: BilanSemaine? = BilanSemaineStore.dernier()
     @State private var bilanEnPreparation = false
     @State private var bilanErreur: String?
+    /// La fonction du bilan ne répond pas encore (pas en ligne) : la carte se
+    /// tait plutôt que d'afficher une erreur. Nouvel essai au prochain lancement.
+    @State private var bilanAbsent = false
     private static let origineBilan = "progres.offre.bilan_semaine"
 
     /// Ce d'où part la feuille Premium. Une carte de symptôme ajoute son rang
@@ -967,6 +970,7 @@ struct SuiviView: View {
             return repas == 0 ? nil : .enCours(repas: repas)
         case .aPreparer(let repas):
             if !SubscriptionService.shared.isPremium { return .verrouille(repas: repas) }
+            if bilanAbsent { return nil }
             if bilanEnPreparation { return .enPreparation }
             if let bilanErreur { return .erreur(bilanErreur) }
             return .enPreparation
@@ -1024,7 +1028,7 @@ struct SuiviView: View {
         }
         #endif
         guard dashboardVM.hasCompletedQuestionnaire, SubscriptionService.shared.isPremium,
-              !bilanEnPreparation, bilanErreur == nil else { return }
+              !bilanEnPreparation, bilanErreur == nil, !bilanAbsent else { return }
         let saisie = saisieDeLaSemaine
         guard case .aPreparer = BilanSemaineRegle.etat(repas: saisie.repas, jours: saisie.jours, dernier: bilanSemaine) else { return }
         let profil = dashboardVM.profile
@@ -1045,6 +1049,8 @@ struct SuiviView: View {
             BilanSemaineStore.enregistrer(bilan)
             bilanSemaine = bilan
             AnalyticsService.shared.track(.screenViewed, properties: ["screen": "bilan_semaine_pret", "repas": bilan.repasNotes])
+        } catch BilanSemaineService.Erreur.absente {
+            bilanAbsent = true
         } catch {
             bilanErreur = (error as? BilanSemaineService.Erreur)?.errorDescription
                 ?? BilanSemaineService.Erreur.indisponible.errorDescription

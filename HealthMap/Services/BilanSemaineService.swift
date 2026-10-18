@@ -19,6 +19,8 @@ final class BilanSemaineService {
         case trop
         case pasAssezDeRepas
         case indisponible
+        /// 404 : la fonction n'est pas (encore) en ligne. La carte se tait.
+        case absente
 
         var errorDescription: String? {
             switch self {
@@ -28,7 +30,7 @@ final class BilanSemaineService {
                 return "Tu as demandé beaucoup de bilans aujourd'hui. Réessaie demain."
             case .pasAssezDeRepas:
                 return "Note encore quelques repas cette semaine pour avoir ton bilan."
-            case .indisponible:
+            case .indisponible, .absente:
                 return "Ton bilan n'a pas pu être préparé. Réessaie dans un moment."
             }
         }
@@ -57,6 +59,7 @@ final class BilanSemaineService {
                 AppLogger.analysis.error("weekly-review \(code, privacy: .public) \(motif ?? "", privacy: .public)")
                 switch code {
                 case 403: throw Erreur.premiumRequis
+                case 404: throw Erreur.absente
                 case 429: throw Erreur.trop
                 case 400 where motif == "pas_assez_de_repas": throw Erreur.pasAssezDeRepas
                 default: throw Erreur.indisponible
