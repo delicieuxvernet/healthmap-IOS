@@ -1016,6 +1016,13 @@ struct SuiviView: View {
     /// d'IA en gratuit), une fois par semaine : la carte dit « prêt » sans
     /// attente quand on revient.
     private func preparerBilanSemaine() async {
+        #if DEBUG
+        // Captures : un bilan d'exemple, et aucun appel au serveur.
+        if let exemple = BilanSemaineExemple.depuisLesArguments() {
+            bilanSemaine = exemple
+            return
+        }
+        #endif
         guard dashboardVM.hasCompletedQuestionnaire, SubscriptionService.shared.isPremium,
               !bilanEnPreparation, bilanErreur == nil else { return }
         let saisie = saisieDeLaSemaine

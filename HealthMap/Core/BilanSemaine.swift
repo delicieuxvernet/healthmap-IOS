@@ -178,3 +178,67 @@ enum BilanSemaineStore {
         defaults.set(data, forKey: cle)
     }
 }
+
+#if DEBUG
+// MARK: - Captures d'écran
+
+/// `-captureBilanSemaine YES` : la carte de Progrès porte un bilan d'exemple,
+/// sans appel au serveur ni enregistrement. Les chiffres sont ceux d'un profil
+/// fictif, comme le récap d'exemple (`RecapDuJourExemple`).
+enum BilanSemaineExemple {
+    static func depuisLesArguments(_ arguments: [String] = ProcessInfo.processInfo.arguments,
+                                   maintenant: Date = Date()) -> BilanSemaine? {
+        guard arguments.contains("-captureBilanSemaine") else { return nil }
+        return exemple(maintenant: maintenant)
+    }
+
+    static func exemple(maintenant: Date = Date(), calendrier: Calendar = .current) -> BilanSemaine {
+        let fin = calendrier.startOfDay(for: maintenant)
+        let debut = calendrier.date(byAdding: .day, value: -(BilanSemaineRegle.joursRelus - 1), to: fin) ?? fin
+        return BilanSemaine(
+            version: 1,
+            periode: .init(debut: BilanSemaineRegle.texte(debut), fin: BilanSemaineRegle.texte(fin)),
+            repasNotes: 14,
+            joursNotes: 6,
+            titre: "Une semaine régulière, il manque le poisson",
+            resume: "14 repas notés sur 6 jours. Tes protéines suivent, mais la vitamine D et les oméga-3 restent bas : aucun poisson gras cette semaine.",
+            manques: [
+                .init(id: "vitD", nom: "Vitamine D", moyennePct: 24, joursBas: 6, joursMesures: 6,
+                      explication: "Ni poisson gras ni œufs cette semaine : tes repas en apportent très peu, et le soleil d'octobre ne compense plus.",
+                      type: "apport"),
+                .init(id: "omega3", nom: "Oméga-3", moyennePct: 31, joursBas: 5, joursMesures: 6,
+                      explication: "Tes matières grasses viennent surtout du beurre et de l'huile de tournesol, pauvres en oméga-3.",
+                      type: "apport"),
+                .init(id: "fiber", nom: "Fibres", moyennePct: 58, joursBas: 4, joursMesures: 6,
+                      explication: "Pain blanc et pâtes le midi : les versions complètes apportent deux à trois fois plus de fibres.",
+                      type: "apport"),
+            ],
+            habitudes: [
+                .init(type: "frein", titre: "Des pâtes blanches 5 midis sur 6",
+                      constat: "Le même plat revient presque chaque midi : c'est là que tes fibres se perdent.",
+                      apports: ["fiber", "magnesium"], illustration: "pates"),
+                .init(type: "atout", titre: "Un fruit chaque matin",
+                      constat: "L'orange du petit-déjeuner couvre ta vitamine C presque tous les jours.",
+                      apports: ["vitC"], illustration: "agrume"),
+            ],
+            recommandations: [
+                .init(action: "ajouter", titre: "Des sardines deux fois par semaine",
+                      detail: "En boîte, sur du pain complet ou dans une salade : c'est ce qui remonte le plus ta vitamine D et tes oméga-3.",
+                      apports: ["vitD", "omega3"], aliment: "Sardines", portion: "1 boîte", gainPct: 33,
+                      illustration: "poisson"),
+                .init(action: "remplacer", titre: "Les pâtes blanches par des complètes",
+                      detail: "Même plat, même cuisson : deux fois plus de fibres, et du magnésium en plus.",
+                      apports: ["fiber", "magnesium"], aliment: "", portion: "", gainPct: nil,
+                      illustration: "pates"),
+                .init(action: "garder", titre: "Ton fruit du matin",
+                      detail: "Il couvre ta vitamine C chaque jour : garde-le.",
+                      apports: ["vitC"], aliment: "", portion: "", gainPct: nil,
+                      illustration: "agrume"),
+            ],
+            objectif: .init(titre: "Deux repas de poisson gras",
+                            detail: "Note-les : ton prochain bilan montrera ce qu'ils changent pour ta vitamine D."),
+            meta: .init(modele: "exemple", genere_le: nil)
+        )
+    }
+}
+#endif

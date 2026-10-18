@@ -156,6 +156,17 @@ final class BilanSemaineTests: XCTestCase {
         XCTAssertFalse(json.contains("eau"), "l'eau ne quitte pas le téléphone")
     }
 
+    #if DEBUG
+    /// Le bilan d'exemple des captures se termine aujourd'hui : la carte de
+    /// Progrès le montre « prêt », jamais un ancien bilan périmé.
+    func testLExempleDesCapturesEstPret() {
+        let exemple = BilanSemaineExemple.exemple()
+        XCTAssertEqual(BilanSemaineRegle.etat(repas: 0, jours: 0, dernier: exemple), .pret(exemple))
+        XCTAssertEqual(exemple.recommandations.count, 3)
+        XCTAssertNil(BilanSemaineExemple.depuisLesArguments(["HealthMap"]))
+    }
+    #endif
+
     private static let reponse = """
     {"version":1,"periode":{"debut":"2026-10-08","fin":"2026-10-14"},"repasNotes":12,"joursNotes":4,
      "titre":"Tu manges varié, mais le poisson a disparu","resume":"Tes repas montrent de bonnes bases.",
