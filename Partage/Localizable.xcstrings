@@ -510,6 +510,26 @@
         }
       }
     },
+    "%@ : %lld %% de ton besoin, %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: %lld%% of what you need, %@. %@"
+          }
+        }
+      }
+    },
+    "%@ : %lld %% de ton objectif, %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: %lld%% of your goal, %@. %@"
+          }
+        }
+      }
+    },
     "%@ : %lld %% hier" : {
       "localizations" : {
         "en" : {
@@ -616,6 +636,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@: fibre slows the absorption of medication taken at the same time. Space them 2 hours apart."
+          }
+        }
+      }
+    },
+    "%@ : pas en même temps que %@. Espace les prises d'au moins 2 h." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: not at the same time as %@. Leave at least 2 h between doses."
           }
         }
       }
@@ -880,6 +910,16 @@
         }
       }
     },
+    "%@ aujourd'hui. Ajoute ton dîner, à la voix ou en photo : ton récap de demain aura de vrais chiffres." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ today. Add your dinner, by voice or photo: tomorrow's recap will have real numbers."
+          }
+        }
+      }
+    },
     "%@ bien couvert sur tes 7 derniers jours (%lld %% de ton besoin)." : {
       "localizations" : {
         "en" : {
@@ -1046,6 +1086,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ and %@ today. Add your dinner: tomorrow's brief will be complete."
+          }
+        }
+      }
+    },
+    "%@ et %@ aujourd'hui. Ajoute ton dîner : ton récap de demain sera complet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ and %@ today. Add your dinner: tomorrow's recap will be complete."
           }
         }
       }
@@ -2728,6 +2778,26 @@
         }
       }
     },
+    "%lld point en %lld semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld point in %lld week"
+          }
+        }
+      }
+    },
+    "%lld point en %lld semaines" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld point in %lld weeks"
+          }
+        }
+      }
+    },
     "%lld points en %lld semaine" : {
       "localizations" : {
         "en" : {
@@ -2898,6 +2968,36 @@
         }
       }
     },
+    "%lld repas notés cette semaine : de quoi faire ton bilan." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld meals logged this week: enough for your report."
+          }
+        }
+      }
+    },
+    "%lld repas relus · %lld changement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld meals reviewed · %lld change"
+          }
+        }
+      }
+    },
+    "%lld repas relus · %lld changements" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld meals reviewed · %lld changes"
+          }
+        }
+      }
+    },
     "%lld s" : {
       "localizations" : {
         "en" : {
@@ -2954,6 +3054,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld out of 100"
+          }
+        }
+      }
+    },
+    "%lld sur 7" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld of 7"
           }
         }
       }
@@ -3093,6 +3203,56 @@
         }
       }
     },
+    "+%@ d'%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%@ %@"
+          }
+        }
+      }
+    },
+    "+%@ d'%@ avec %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%@ %@ with %@"
+          }
+        }
+      }
+    },
+    "+%@ de %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%@ %@"
+          }
+        }
+      }
+    },
+    "+%@ de %@ avec %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%@ %@ with %@"
+          }
+        }
+      }
+    },
+    "+%@ de ton besoin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%@ of what you need"
+          }
+        }
+      }
+    },
     "+%@ g" : {
       "localizations" : {
         "en" : {
@@ -3109,6 +3269,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "+%@ kcal"
+          }
+        }
+      }
+    },
+    "+%lld point en %lld semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld point in %lld week"
+          }
+        }
+      }
+    },
+    "+%lld point en %lld semaines" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld point in %lld weeks"
           }
         }
       }
@@ -3508,6 +3688,16 @@
         }
       }
     },
+    "1 seul repas noté hier : trop peu pour un vrai chiffre. Note ton petit-déjeuner, et demain ton récap aura de quoi parler." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only 1 meal logged yesterday: too few for a real number. Log your breakfast, and tomorrow your recap will have plenty to say."
+          }
+        }
+      }
+    },
     "1 source" : {
       "localizations" : {
         "en" : {
@@ -3678,6 +3868,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "100% based on your logged meals. Add your dinner to round off the day."
+          }
+        }
+      }
+    },
+    "14 repas notés sur 6 jours. Tes protéines suivent, mais la vitamine D et les oméga-3 restent bas : aucun poisson gras cette semaine." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "14 meals logged over 6 days. Your protein is on track, but vitamin D and omega-3 stay low: no oily fish this week."
           }
         }
       }
@@ -4184,6 +4384,16 @@
         }
       }
     },
+    "AJOUTE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ADD"
+          }
+        }
+      }
+    },
     "APPORT COUVERT" : {
       "localizations" : {
         "en" : {
@@ -4588,12 +4798,32 @@
         }
       }
     },
+    "Ajoute aujourd'hui" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add today"
+          }
+        }
+      }
+    },
     "Ajoute tes analyses : tes valeurs mesurées corrigent l'estimation de tes apports." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add your tests: your measured values correct the estimate of your intake."
+          }
+        }
+      }
+    },
+    "Ajoute tes repas d'hier pour voir ce qui t'a manqué." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add yesterday's meals to see what you were missing."
           }
         }
       }
@@ -5587,6 +5817,16 @@
         }
       }
     },
+    "Apporte %@ et %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provides %@ and %@."
+          }
+        }
+      }
+    },
     "Apporte %@." : {
       "localizations" : {
         "en" : {
@@ -6112,6 +6352,16 @@
         }
       }
     },
+    "Aucune réinitialisation en cours. Recommence depuis l'écran où tu saisis ton e-mail." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No reset in progress. Start again from the screen where you enter your email."
+          }
+        }
+      }
+    },
     "Aucune source dans tes courses" : {
       "localizations" : {
         "en" : {
@@ -6208,6 +6458,96 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Today, go for"
+          }
+        }
+      }
+    },
+    "Aujourd'hui, tes repas notés couvrent environ la moitié de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today, your logged meals cover about half of what you need."
+          }
+        }
+      }
+    },
+    "Aujourd'hui, tes repas notés couvrent environ les trois quarts de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today, your logged meals cover about three quarters of what you need."
+          }
+        }
+      }
+    },
+    "Aujourd'hui, tes repas notés couvrent environ un dixième de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today, your logged meals cover about a tenth of what you need."
+          }
+        }
+      }
+    },
+    "Aujourd'hui, tes repas notés couvrent environ un quart de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today, your logged meals cover about a quarter of what you need."
+          }
+        }
+      }
+    },
+    "Aujourd'hui, tes repas notés couvrent environ un tiers de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today, your logged meals cover about a third of what you need."
+          }
+        }
+      }
+    },
+    "Aujourd'hui, tes repas notés couvrent presque tout ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today, your logged meals cover almost everything you need."
+          }
+        }
+      }
+    },
+    "Aujourd'hui, tes repas notés couvrent tout ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today, your logged meals cover everything you need."
+          }
+        }
+      }
+    },
+    "Aujourd'hui, tes repas notés n'en apportent presque pas." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today, your logged meals provide almost none of it."
+          }
+        }
+      }
+    },
+    "Aujourd'hui, tes repas notés ne permettent pas encore de le calculer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today, your logged meals don't allow this to be worked out yet."
           }
         }
       }
@@ -6414,6 +6754,16 @@
         }
       }
     },
+    "Avec ton complément, ton apport en %@ couvre ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With your supplement, your %@ intake meets what you need."
+          }
+        }
+      }
+    },
     "Avec un intestin fragile, le fer, la B12, le calcium, le zinc, la vitamine D et les folates peuvent moins bien passer. Parles-en à un professionnel de santé." : {
       "localizations" : {
         "en" : {
@@ -6470,6 +6820,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "B12"
+          }
+        }
+      }
+    },
+    "BILAN DE LA SEMAINE · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WEEKLY REPORT · %@"
           }
         }
       }
@@ -7113,6 +7473,26 @@
         }
       }
     },
+    "C'est ce que montre ta prise de sang." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That's what your blood test shows."
+          }
+        }
+      }
+    },
+    "C'est ce que montrent tes repas notés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That's what your logged meals show."
+          }
+        }
+      }
+    },
     "C'est ce que tu nous as %@." : {
       "localizations" : {
         "en" : {
@@ -7395,6 +7775,16 @@
         }
       }
     },
+    "Calculé à partir de tes %lld repas notés. Ce bilan ne remplace pas l'avis d'un médecin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Based on your %lld logged meals. This report doesn't replace a doctor's advice."
+          }
+        }
+      }
+    },
     "Cale un laitage ou une eau riche en calcium le midi." : {
       "localizations" : {
         "en" : {
@@ -7658,12 +8048,112 @@
         }
       }
     },
+    "Ce jour-là, tes repas notés couvraient environ la moitié de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That day, your logged meals covered about half of what you need."
+          }
+        }
+      }
+    },
+    "Ce jour-là, tes repas notés couvraient environ les trois quarts de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That day, your logged meals covered about three quarters of what you need."
+          }
+        }
+      }
+    },
+    "Ce jour-là, tes repas notés couvraient environ un dixième de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That day, your logged meals covered about a tenth of what you need."
+          }
+        }
+      }
+    },
+    "Ce jour-là, tes repas notés couvraient environ un quart de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That day, your logged meals covered about a quarter of what you need."
+          }
+        }
+      }
+    },
+    "Ce jour-là, tes repas notés couvraient environ un tiers de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That day, your logged meals covered about a third of what you need."
+          }
+        }
+      }
+    },
+    "Ce jour-là, tes repas notés couvraient presque tout ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That day, your logged meals covered almost everything you need."
+          }
+        }
+      }
+    },
+    "Ce jour-là, tes repas notés couvraient tout ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That day, your logged meals covered everything you need."
+          }
+        }
+      }
+    },
+    "Ce jour-là, tes repas notés n'en apportaient presque pas." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That day, your logged meals provided almost none of it."
+          }
+        }
+      }
+    },
+    "Ce jour-là, tes repas notés ne permettaient pas de le calculer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That day, your logged meals didn't allow this to be worked out."
+          }
+        }
+      }
+    },
     "Ce midi, mise sur %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "At lunch, focus on %@"
+          }
+        }
+      }
+    },
+    "Ce mot de passe est trop courant. Choisis-en un autre, moins répandu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This password is too common. Choose a less common one."
           }
         }
       }
@@ -7748,6 +8238,16 @@
         }
       }
     },
+    "Ce poids passe sous le seuil conseillé pour ta taille (IMC 18,5). Tes calories restent au maintien : parles-en à un professionnel de santé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This weight is below the recommended threshold for your height (BMI 18.5). Your calories stay at maintenance: talk to a health professional."
+          }
+        }
+      }
+    },
     "Ce point est affiché en entier, et il le restera : on ne réserve jamais un signal de sécurité. Parles-en à un professionnel de santé." : {
       "localizations" : {
         "en" : {
@@ -7774,6 +8274,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "What it gave you"
+          }
+        }
+      }
+    },
+    "Ce qu'on a remarqué" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What we noticed"
           }
         }
       }
@@ -8068,6 +8578,16 @@
         }
       }
     },
+    "Ce qui t'a manqué" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What was missing"
+          }
+        }
+      }
+    },
     "Ce qui t'a manqué hier, et ce sur quoi miser aujourd'hui." : {
       "localizations" : {
         "en" : {
@@ -8094,6 +8614,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Where it came from"
+          }
+        }
+      }
+    },
+    "Ce qui t'en apporte le plus : %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your biggest source: %@."
           }
         }
       }
@@ -8188,6 +8718,16 @@
         }
       }
     },
+    "Celui de ce matin, à nouveau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This morning's, once more"
+          }
+        }
+      }
+    },
     "Cerises" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8225,6 +8765,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Some interact with your vitamins and minerals."
+          }
+        }
+      }
+    },
+    "Certains oméga-3 (EPA, DHA) viennent surtout des poissons gras, qui apportent aussi de la vitamine D et de l'iode." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some omega-3s (EPA, DHA) come mainly from oily fish, which also provide vitamin D and iodine."
           }
         }
       }
@@ -8755,6 +9305,16 @@
         }
       }
     },
+    "Choux, brocolis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabbage, broccoli"
+          }
+        }
+      }
+    },
     "Chute de cheveux" : {
       "localizations" : {
         "en" : {
@@ -8909,6 +9469,16 @@
         }
       }
     },
+    "Coche tes produits laitiers" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tick your dairy products"
+          }
+        }
+      }
+    },
     "Coche tes protéines" : {
       "localizations" : {
         "en" : {
@@ -8965,6 +9535,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tick off a time in your routine"
+          }
+        }
+      }
+    },
+    "Code de vérification envoyé par e-mail." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verification code sent by email."
           }
         }
       }
@@ -9129,6 +9709,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Start with your snack: a photo or a few words out loud. Tomorrow, your brief will have real numbers."
+          }
+        }
+      }
+    },
+    "Commence par ton encas : une photo ou quelques mots à voix haute. Demain, ton récap aura de vrais chiffres." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start with your snack: a photo or a few words out loud. Tomorrow, your recap will have real numbers."
           }
         }
       }
@@ -10408,6 +10998,16 @@
         }
       }
     },
+    "D'octobre à mars, le soleil est trop faible en France pour que ta peau en fabrique assez." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In winter, the sun is too weak for your skin to make enough."
+          }
+        }
+      }
+    },
     "D'octobre à mars, le soleil ne suffit pas à en fabriquer sous nos latitudes." : {
       "localizations" : {
         "en" : {
@@ -10559,12 +11159,32 @@
         }
       }
     },
+    "Demande l'avis de ton médecin avant de prendre un complément pendant l'allaitement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask your doctor for advice before taking a supplement while breastfeeding."
+          }
+        }
+      }
+    },
     "Demande l'avis de ton médecin avant de te supplémenter pendant l'allaitement." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ask your doctor for advice before taking supplements while breastfeeding."
+          }
+        }
+      }
+    },
+    "Demande l'avis de ton médecin ou de ta sage-femme avant de prendre un complément." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask your doctor or midwife for advice before taking a supplement."
           }
         }
       }
@@ -10710,6 +11330,16 @@
         }
       }
     },
+    "Des pâtes blanches 5 midis sur 6" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "White pasta at 5 lunches out of 6"
+          }
+        }
+      }
+    },
     "Des reins fragiles" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10717,6 +11347,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Delicate kidneys"
+          }
+        }
+      }
+    },
+    "Des sardines deux fois par semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sardines twice a week"
           }
         }
       }
@@ -10767,6 +11407,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Two more minutes (medication, eating habits) to complete it. Now, or later from Settings."
+          }
+        }
+      }
+    },
+    "Deux repas de poisson gras" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Two meals with oily fish"
           }
         }
       }
@@ -11123,6 +11773,16 @@
         }
       }
     },
+    "DÉPLACE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOVE"
+          }
+        }
+      }
+    },
     "Débloque la synergie %@" : {
       "localizations" : {
         "en" : {
@@ -11249,6 +11909,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Partial sign-out. Your local data has been cleared."
+          }
+        }
+      }
+    },
+    "Déconseillé en cas d'hypercalcémie (trop de calcium dans le sang)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not recommended with hypercalcaemia (too much calcium in the blood)."
           }
         }
       }
@@ -11809,6 +12479,16 @@
         }
       }
     },
+    "En boîte, sur du pain complet ou dans une salade : c'est ce qui remonte le plus ta vitamine D et tes oméga-3." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tinned, on wholegrain bread or in a salad: it's what lifts your vitamin D and omega-3 the most."
+          }
+        }
+      }
+    },
     "En ce moment" : {
       "localizations" : {
         "en" : {
@@ -12002,12 +12682,32 @@
         }
       }
     },
+    "Encore %lld repas à noter pour le débloquer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld more meals to log to unlock it"
+          }
+        }
+      }
+    },
     "Encore 1 journée notée pour pouvoir l'affirmer." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Log 1 more day to be able to say for sure."
+          }
+        }
+      }
+    },
+    "Encore 1 repas à noter pour le débloquer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 more meal to log to unlock it"
           }
         }
       }
@@ -12790,6 +13490,16 @@
         }
       }
     },
+    "Fermer le récap du jour" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close today's recap"
+          }
+        }
+      }
+    },
     "Feta" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12922,6 +13632,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Folate"
+          }
+        }
+      }
+    },
+    "Folates (B9)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folate (B9)"
           }
         }
       }
@@ -13228,6 +13949,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Starches & legumes"
+          }
+        }
+      }
+    },
+    "GARDE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KEEP"
           }
         }
       }
@@ -13735,6 +14466,16 @@
         }
       }
     },
+    "Hier, il te manquait" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yesterday, you were missing"
+          }
+        }
+      }
+    },
     "Hier, le compte y était. %@ au déjeuner, et tu gardes le rythme." : {
       "localizations" : {
         "en" : {
@@ -14008,6 +14749,16 @@
         }
       }
     },
+    "Il couvre ta vitamine C chaque jour : garde-le." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It covers your vitamin C every day: keep it."
+          }
+        }
+      }
+    },
     "Il en reste" : {
       "localizations" : {
         "en" : {
@@ -14265,6 +15016,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Imported on %@ · draw date not read"
+          }
+        }
+      }
+    },
+    "Impossible d'enregistrer ton profil. Réessaie dans quelques instants." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save your profile. Try again in a few moments."
           }
         }
       }
@@ -14812,6 +15573,16 @@
         }
       }
     },
+    "Jours notés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Days logged"
+          }
+        }
+      }
+    },
     "Jus 100%" : {
       "localizations" : {
         "en" : {
@@ -15150,6 +15921,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kiwio is reading back what you said…"
+          }
+        }
+      }
+    },
+    "Kiwio relit tes repas de la semaine." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiwio is going over your meals from this week."
           }
         }
       }
@@ -15512,6 +16293,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Iodine comes from the sea, and from iodised salt."
+          }
+        }
+      }
+    },
+    "L'orange du petit-déjeuner couvre ta vitamine C presque tous les jours." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The orange at breakfast covers your vitamin C almost every day."
           }
         }
       }
@@ -16006,6 +16797,16 @@
         }
       }
     },
+    "La vitamine C ne se stocke pas : il en faut chaque jour." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vitamin C isn't stored: you need some every day."
+          }
+        }
+      }
+    },
     "La vitamine C ne se stocke pas, elle se refait chaque jour." : {
       "localizations" : {
         "en" : {
@@ -16249,6 +17050,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@'s report"
+          }
+        }
+      }
+    },
+    "Le bilan de la semaine fait partie de Kiwio Premium." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The weekly report is part of Kiwio Premium."
           }
         }
       }
@@ -16623,12 +17434,32 @@
         }
       }
     },
+    "Le mot de passe ne respecte pas les règles : 8 caractères minimum, dont une majuscule, un chiffre et un caractère spécial." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The password doesn't meet the rules: 8 characters minimum, including a capital letter, a number and a special character."
+          }
+        }
+      }
+    },
     "Le mécanisme" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The mechanism"
+          }
+        }
+      }
+    },
+    "Le même plat revient presque chaque midi : c'est là que tes fibres se perdent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The same dish comes up almost every lunch: that's where your fibre gets lost."
           }
         }
       }
@@ -16689,6 +17520,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lowest: %@, at %lld%%. Your brief tells you what to focus on today."
+          }
+        }
+      }
+    },
+    "Le plus bas : %@, à %lld %%. Ton récap te dit quoi ajouter aujourd'hui." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lowest: %@, at %lld%%. Your recap tells you what to add today."
           }
         }
       }
@@ -17164,6 +18005,16 @@
         }
       }
     },
+    "Les oméga-6 et les oméga-3 empruntent les mêmes voies dans l'organisme. Le repère conseillé : au plus 5 fois plus d'oméga-6 que d'oméga-3." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omega-6 and omega-3 fats use the same pathways in the body. The recommended guide: no more than 5 times as much omega-6 as omega-3."
+          }
+        }
+      }
+    },
     "Les portions réelles et ce que mangent les Français, selon l'âge et le sexe." : {
       "localizations" : {
         "en" : {
@@ -17190,6 +18041,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Highly processed foods take the place of fibre and zinc."
+          }
+        }
+      }
+    },
+    "Les pâtes blanches par des complètes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "White pasta for wholegrain pasta"
           }
         }
       }
@@ -18720,12 +19581,32 @@
         }
       }
     },
+    "Même matière première Ferrochel que le fer haut de gamme, en version simple. ~0,11 €/jour." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same Ferrochel raw material as the top-of-the-range iron, in a simpler version. ~€0.11/day."
+          }
+        }
+      }
+    },
     "Même matière première Ferrochel que le premium, en version simple. ~0,11 €/jour." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Same Ferrochel raw material as the premium version, in a simpler formula. ~€0.11/day."
+          }
+        }
+      }
+    },
+    "Même plat, même cuisson : deux fois plus de fibres, et du magnésium en plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same dish, same cooking: twice the fibre, plus extra magnesium."
           }
         }
       }
@@ -18848,6 +19729,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Neutral"
+          }
+        }
+      }
+    },
+    "Ni poisson gras ni œufs cette semaine : tes repas en apportent très peu, et le soleil d'octobre ne compense plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No oily fish or eggs this week: your meals provide very little, and the sun isn't enough to make up for it."
           }
         }
       }
@@ -19046,12 +19937,32 @@
         }
       }
     },
+    "Note encore quelques repas cette semaine pour avoir ton bilan." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log a few more meals this week to get your report."
+          }
+        }
+      }
+    },
     "Note ton dîner : ta journée se complète." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Log your dinner: your day comes together."
+          }
+        }
+      }
+    },
+    "Note-les : ton prochain bilan montrera ce qu'ils changent pour ta vitamine D." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log them: your next report will show what they change for your vitamin D."
           }
         }
       }
@@ -20224,6 +21135,16 @@
         }
       }
     },
+    "Ouvre ton bilan de la semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens your weekly report"
+          }
+        }
+      }
+    },
     "Ouvrir le Journal" : {
       "localizations" : {
         "en" : {
@@ -20320,6 +21241,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "White bread"
+          }
+        }
+      }
+    },
+    "Pain blanc et pâtes le midi : les versions complètes apportent deux à trois fois plus de fibres." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "White bread and pasta at lunch: the wholegrain versions provide two to three times more fibre."
           }
         }
       }
@@ -20620,6 +21551,16 @@
         }
       }
     },
+    "Pas de repas noté hier. Une photo de ton petit-déjeuner, et ton récap repart demain." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No meals logged yesterday. A photo of your breakfast, and your recap is back tomorrow."
+          }
+        }
+      }
+    },
     "Pas de réponse" : {
       "localizations" : {
         "en" : {
@@ -20640,6 +21581,16 @@
         }
       }
     },
+    "Pas en même temps que %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not at the same time as %@"
+          }
+        }
+      }
+    },
     "Pas encore assez de données" : {
       "localizations" : {
         "en" : {
@@ -20656,6 +21607,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No number yet: you need one day of well-logged meals."
+          }
+        }
+      }
+    },
+    "Pas encore de chiffre : il faut une journée de repas assez notée. Le repère conseillé : 5 pour 1 ou moins." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No number yet: you need one day of well-logged meals. The recommended guide: 5 to 1 or less."
           }
         }
       }
@@ -20868,6 +21829,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Very fair skin"
+          }
+        }
+      }
+    },
+    "Pendant la grossesse ou l'allaitement, on ne vise pas de perte de poids. Tes calories restent au maintien." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During pregnancy or breastfeeding, we don't aim for weight loss. Your calories stay at maintenance."
           }
         }
       }
@@ -21986,6 +22957,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chicken"
+          }
+        }
+      }
+    },
+    "Pour 1 g d'oméga-3, tes repas notés apportent ce nombre de grammes d'oméga-6. Le repère conseillé : 5 pour 1 ou moins." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For every 1 g of omega-3, your logged meals provide this many grams of omega-6. The recommended guide: 5 to 1 or less."
           }
         }
       }
@@ -23272,6 +24253,16 @@
         }
       }
     },
+    "REMPLACE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SWAP"
+          }
+        }
+      }
+    },
     "Racines" : {
       "localizations" : {
         "en" : {
@@ -23507,6 +24498,16 @@
         }
       }
     },
+    "Relance la préparation du bilan" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tries preparing the report again"
+          }
+        }
+      }
+    },
     "Relance le chargement de ton analyse nutritionnelle." : {
       "localizations" : {
         "en" : {
@@ -23694,6 +24695,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Light meal\nand regular bedtime"
+          }
+        }
+      }
+    },
+    "Repas notés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meals logged"
           }
         }
       }
@@ -23968,6 +24979,16 @@
         }
       }
     },
+    "Revoir le récap du jour" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replay today's recap"
+          }
+        }
+      }
+    },
     "Revoir le tutoriel" : {
       "localizations" : {
         "en" : {
@@ -24069,12 +25090,32 @@
         }
       }
     },
+    "Rien de noté hier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing logged yesterday"
+          }
+        }
+      }
+    },
     "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton brief aura quelque chose à dire." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nothing logged yesterday, so no number this morning. Log your breakfast: tomorrow, your brief will have something to say."
+          }
+        }
+      }
+    },
+    "Rien de noté hier, donc pas de chiffre ce matin. Note ton petit-déjeuner : demain, ton récap aura quelque chose à dire." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing logged yesterday, so no number this morning. Log your breakfast: tomorrow, your recap will have something to say."
           }
         }
       }
@@ -24105,6 +25146,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "None of these"
+          }
+        }
+      }
+    },
+    "Rien n'a manqué hier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing was missing yesterday"
           }
         }
       }
@@ -24238,6 +25289,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Roquefort"
+          }
+        }
+      }
+    },
+    "RÉCAP DU JOUR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TODAY'S RECAP"
           }
         }
       }
@@ -25184,6 +26245,16 @@
         }
       }
     },
+    "Service indisponible pour le moment. Réessaie plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Service unavailable right now. Try again later."
+          }
+        }
+      }
+    },
     "Ses autres forces" : {
       "localizations" : {
         "en" : {
@@ -25240,6 +26311,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "If it tires you out or goes on, talk to your doctor or midwife."
+          }
+        }
+      }
+    },
+    "Si ça te fatigue ou que ça dure, parles-en à ton médecin, ou à ta sage-femme si tu es enceinte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If it tires you out or goes on, talk to your doctor, or to your midwife if you're pregnant."
           }
         }
       }
@@ -25914,6 +26995,17 @@
         }
       }
     },
+    "Surtout à l'extérieur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostly eating out"
+          }
+        }
+      }
+    },
     "Symptôme suivi" : {
       "localizations" : {
         "en" : {
@@ -26046,6 +27138,16 @@
         }
       }
     },
+    "TON OBJECTIF DE LA SEMAINE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "YOUR GOAL FOR THE WEEK"
+          }
+        }
+      }
+    },
     "Ta connexion a expiré. Reconnecte-toi." : {
       "localizations" : {
         "en" : {
@@ -26074,6 +27176,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "How much caffeine do you have?"
+          }
+        }
+      }
+    },
+    "Ta consommation de sel ?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How much salt do you eat?"
           }
         }
       }
@@ -26309,6 +27422,16 @@
         }
       }
     },
+    "Ta réponse a changé ? Réglages, puis « Modifier mes informations du questionnaire » : le calcul se refait aussitôt." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Has your answer changed? Settings, then “Edit my questionnaire information”: the calculation updates straight away."
+          }
+        }
+      }
+    },
     "Ta réponse ajoute un point à ta courbe. Trois réponses et la tendance apparaît." : {
       "localizations" : {
         "en" : {
@@ -26520,6 +27643,17 @@
         }
       }
     },
+    "Tahini (purée de sésame)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tahini (sesame paste)"
+          }
+        }
+      }
+    },
     "Tahini (purée sésame)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -26632,6 +27766,16 @@
         }
       }
     },
+    "Tes %lld apports les plus bas, en %% de ton besoin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your %lld lowest intakes, as a %% of what you need"
+          }
+        }
+      }
+    },
     "Tes %lld micronutriments chiffrés" : {
       "localizations" : {
         "en" : {
@@ -26718,6 +27862,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Your %@ and %@ intake was behind that day."
+          }
+        }
+      }
+    },
+    "Tes apports ont tous passé 70 %. Refais pareil aujourd'hui." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All your intakes passed 70%. Do the same today."
           }
         }
       }
@@ -26982,6 +28136,16 @@
         }
       }
     },
+    "Tes courses habituelles contiennent peu d'aliments riches en cet apport. C'est la première source, avant tout le reste : c'est souvent là qu'il y a le plus de points à regagner." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your usual groceries contain few foods rich in this nutrient. They're the first source, ahead of everything else: that's often where the most points can be won back."
+          }
+        }
+      }
+    },
     "Tes derniers repas" : {
       "localizations" : {
         "en" : {
@@ -27048,6 +28212,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "You spend your days…"
+          }
+        }
+      }
+    },
+    "Tes matières grasses viennent surtout du beurre et de l'huile de tournesol, pauvres en oméga-3." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most of your fats come from butter and sunflower oil, which are low in omega-3."
           }
         }
       }
@@ -27687,6 +28861,16 @@
         }
       }
     },
+    "Ton apport en %@ semble couvrir ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your %@ intake seems to meet what you need."
+          }
+        }
+      }
+    },
     "Ton apport en %@ semble dépasser la limite conseillée." : {
       "localizations" : {
         "en" : {
@@ -27707,12 +28891,32 @@
         }
       }
     },
+    "Ton apport en %@ semble proche de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your %@ intake seems close to what you need."
+          }
+        }
+      }
+    },
     "Ton apport estimé atteint la référence." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Your estimated intake reaches the reference."
+          }
+        }
+      }
+    },
+    "Ton apport le plus bas, en % de ton besoin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your lowest intake, as a % of what you need"
           }
         }
       }
@@ -27847,6 +29051,36 @@
         }
       }
     },
+    "Ton bilan de la semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your weekly report"
+          }
+        }
+      }
+    },
+    "Ton bilan de la semaine est prêt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your weekly report is ready"
+          }
+        }
+      }
+    },
+    "Ton bilan de la semaine se prépare" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your weekly report is getting ready"
+          }
+        }
+      }
+    },
     "Ton bilan en tient compte" : {
       "localizations" : {
         "en" : {
@@ -27883,6 +29117,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Your report couldn't be prepared."
+          }
+        }
+      }
+    },
+    "Ton bilan n'a pas pu être préparé. Réessaie dans un moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your report couldn't be prepared. Try again in a moment."
           }
         }
       }
@@ -28164,6 +29408,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "How much sun do you get?"
+          }
+        }
+      }
+    },
+    "Ton fruit du matin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your morning fruit"
           }
         }
       }
@@ -28569,6 +29823,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Your daily rhythm directly shapes your vitamin needs."
+          }
+        }
+      }
+    },
+    "Ton récap attend tes repas" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your recap is waiting for your meals"
+          }
+        }
+      }
+    },
+    "Ton récap du jour est prêt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today's recap is ready"
+          }
+        }
+      }
+    },
+    "Ton récap n'a rien à te dire ce matin : hier est resté vide. Note ton petit-déjeuner pour le relancer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your recap has nothing to say this morning: yesterday was empty. Log your breakfast to get it going again."
+          }
+        }
+      }
+    },
+    "Ton récap te montre ta veille en un coup d'œil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your recap shows yesterday at a glance."
           }
         }
       }
@@ -29147,12 +30441,33 @@
         }
       }
     },
+    "Tout ton besoin du jour" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All you need for today"
+          }
+        }
+      }
+    },
     "Traitement contre les remontées acides" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Medication for acid reflux"
+          }
+        }
+      }
+    },
+    "Traitement thyroïdien" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thyroid medication"
           }
         }
       }
@@ -29367,6 +30682,46 @@
         }
       }
     },
+    "Trop de tentatives. Réessaie dans %lld minute." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many attempts. Try again in %lld minute."
+          }
+        }
+      }
+    },
+    "Trop de tentatives. Réessaie dans %lld minutes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many attempts. Try again in %lld minutes."
+          }
+        }
+      }
+    },
+    "Trop de tentatives. Réessaie dans %lld seconde." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many attempts. Try again in %lld second."
+          }
+        }
+      }
+    },
+    "Trop de tentatives. Réessaie dans %lld secondes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many attempts. Try again in %lld seconds."
+          }
+        }
+      }
+    },
     "Trop de tentatives. Réessaie dans quelques minutes." : {
       "localizations" : {
         "en" : {
@@ -29383,6 +30738,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tropical fruit"
+          }
+        }
+      }
+    },
+    "Trouble digestif déclaré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digestive issue reported"
           }
         }
       }
@@ -29520,6 +30885,16 @@
         }
       }
     },
+    "Tu as demandé beaucoup de bilans aujourd'hui. Réessaie demain." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've asked for a lot of reports today. Try again tomorrow."
+          }
+        }
+      }
+    },
     "Tu as des ballonnements ?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -29547,6 +30922,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "You've answered everything: your report starts from a complete picture."
+          }
+        }
+      }
+    },
+    "Tu as signalé %@ : cela fait partie de ce qu'un apport bas en %@ peut expliquer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You reported %@: that's part of what a low %@ intake can explain."
           }
         }
       }
@@ -29895,6 +31280,16 @@
         }
       }
     },
+    "Tu prends déjà des multivitamines" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You already take multivitamins"
+          }
+        }
+      }
+    },
     "Tu prends déjà des oméga-3" : {
       "localizations" : {
         "en" : {
@@ -29951,6 +31346,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "You already take a multivitamin"
+          }
+        }
+      }
+    },
+    "Tu prends plusieurs médicaments en même temps : certains peuvent gêner l'absorption de tes nutriments. Ton pharmacien peut vérifier ça avec toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're taking several medicines at once: some can get in the way of absorbing your nutrients. Your pharmacist can check this with you."
           }
         }
       }
@@ -30249,6 +31654,16 @@
         }
       }
     },
+    "Un fruit chaque matin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A piece of fruit every morning"
+          }
+        }
+      }
+    },
     "Un fruit riche en vitamine C" : {
       "localizations" : {
         "en" : {
@@ -30370,6 +31785,16 @@
         }
       }
     },
+    "Un problème est survenu. Recommence depuis l'écran de connexion." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something went wrong. Start again from the sign-in screen."
+          }
+        }
+      }
+    },
     "Un quart d'heure dehors, bras découverts, en milieu de journée quand c'est possible." : {
       "localizations" : {
         "en" : {
@@ -30396,6 +31821,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "One more home-cooked meal a week already shifts the average."
+          }
+        }
+      }
+    },
+    "Un seul repas noté hier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only one meal logged yesterday"
           }
         }
       }
@@ -30563,6 +31998,16 @@
         }
       }
     },
+    "Une estimation d'après tes réponses et tes repas, pas une prise de sang." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An estimate based on your answers and your meals, not a blood test."
+          }
+        }
+      }
+    },
     "Une estimation de notre calcul, pas une mesure." : {
       "localizations" : {
         "en" : {
@@ -30661,6 +32106,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "A handful of nuts as a snack helps cover your magnesium."
+          }
+        }
+      }
+    },
+    "Une semaine régulière, il manque le poisson" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A regular week, but no fish"
           }
         }
       }
@@ -32014,6 +33469,16 @@
         }
       }
     },
+    "août" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aug"
+          }
+        }
+      }
+    },
     "apport corrigé" : {
       "localizations" : {
         "en" : {
@@ -32179,6 +33644,16 @@
         }
       }
     },
+    "avr." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apr"
+          }
+        }
+      }
+    },
     "baguette" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -32251,6 +33726,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "low"
+          }
+        }
+      }
+    },
+    "bas %lld jours sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "low on %lld of %lld days"
           }
         }
       }
@@ -33342,6 +34827,26 @@
         }
       }
     },
+    "de l'iode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iodine"
+          }
+        }
+      }
+    },
+    "de la %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
+          }
+        }
+      }
+    },
     "de temps en temps" : {
       "localizations" : {
         "en" : {
@@ -33378,6 +34883,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "of your need covered yesterday"
+          }
+        }
+      }
+    },
+    "des %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
           }
         }
       }
@@ -33473,6 +34988,16 @@
         }
       }
     },
+    "du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
+          }
+        }
+      }
+    },
     "du besoin couvert" : {
       "localizations" : {
         "en" : {
@@ -33489,6 +35014,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "to your medication"
+          }
+        }
+      }
+    },
+    "déc." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dec"
           }
         }
       }
@@ -33579,6 +35114,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "pending"
+          }
+        }
+      }
+    },
+    "en bonne voie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "on track"
           }
         }
       }
@@ -33945,6 +35490,16 @@
         }
       }
     },
+    "févr." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feb"
+          }
+        }
+      }
+    },
     "g" : {
       "localizations" : {
         "en" : {
@@ -34122,6 +35677,26 @@
         }
       }
     },
+    "jamais à ton objectif cette semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "never at your goal this week"
+          }
+        }
+      }
+    },
+    "janv." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jan"
+          }
+        }
+      }
+    },
     "jaune d'œuf" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -34150,6 +35725,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : " day"
+          }
+        }
+      }
+    },
+    "juil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jul"
+          }
+        }
+      }
+    },
+    "juin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jun"
           }
         }
       }
@@ -34712,6 +36307,16 @@
         }
       }
     },
+    "mai" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "May"
+          }
+        }
+      }
+    },
     "mangue" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -34730,6 +36335,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "mangoes"
+          }
+        }
+      }
+    },
+    "mars" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mar"
           }
         }
       }
@@ -34922,6 +36537,16 @@
         }
       }
     },
+    "nov." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nov"
+          }
+        }
+      }
+    },
     "nugget" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -34950,6 +36575,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "goal"
+          }
+        }
+      }
+    },
+    "oct." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oct"
           }
         }
       }
@@ -35933,6 +37568,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "week after week"
+          }
+        }
+      }
+    },
+    "sept." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sep"
           }
         }
       }
@@ -37169,6 +38814,26 @@
         }
       }
     },
+    "À ajouter aujourd'hui pour %@ : %@, %@. Tu passerais à %lld %% de ton besoin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To add today for %@: %@, %@. You'd reach %lld%% of what you need."
+          }
+        }
+      }
+    },
+    "À ajouter aujourd'hui pour %@ : %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To add today for %@: %@."
+          }
+        }
+      }
+    },
     "À associer à une source de vitamine C" : {
       "localizations" : {
         "en" : {
@@ -37185,6 +38850,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "At this pace, %@ kg around %@."
+          }
+        }
+      }
+    },
+    "À changer cette semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To change this week"
           }
         }
       }
@@ -37415,6 +39090,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Age: %@ years  |  Gender: %@  |  Diet: %@  |  Questionnaire: %@"
+          }
+        }
+      }
+    },
+    "ÇA FREINE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HOLDING YOU BACK"
+          }
+        }
+      }
+    },
+    "ÇA PAIE" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PAYING OFF"
           }
         }
       }
@@ -37793,6 +39488,16 @@
         }
       }
     },
+    "à suivre cette semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "worth watching this week"
+          }
+        }
+      }
+    },
     "à surveiller" : {
       "localizations" : {
         "en" : {
@@ -37809,6 +39514,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "on target"
+          }
+        }
+      }
+    },
+    "à ton objectif %lld jours sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "at your goal on %lld of %lld days"
           }
         }
       }
