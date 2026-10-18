@@ -41,18 +41,18 @@ final class ScreenshotsUITests: XCTestCase {
         fermerAlerteApple()
 
         // Onboarding : page de garde + première page feature.
-        if app.buttons["Passer"].waitForExistence(timeout: 15) {
+        if app.buttons[l("Passer")].waitForExistence(timeout: 15) {
             snap("01-onboarding-garde")
-            app.buttons["C'est parti"].firstMatch.tap()
+            app.buttons[l("C'est parti")].firstMatch.tap()
             sleep(1)
             snap("02-onboarding-page")
-            app.buttons["Passer"].firstMatch.tap()
+            app.buttons[l("Passer")].firstMatch.tap()
         }
 
         // Page de garde non connecté.
-        if app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 30) {
+        if app.buttons[l("J'ai déjà un compte")].waitForExistence(timeout: 30) {
             snap("03-page-de-garde")
-            app.buttons["J'ai déjà un compte"].tap()
+            app.buttons[l("J'ai déjà un compte")].tap()
             sleep(1)
             snap("04-connexion")
             // On ne se connecte pas ici : la feuille se referme, test suivant.
@@ -89,7 +89,7 @@ final class ScreenshotsUITests: XCTestCase {
 
         // Saisie dépliée : Écrire · Rechercher · Code-barres.
         if app.buttons["journal.autres"].waitForExistence(timeout: 5) {
-            if !app.buttons["Rechercher"].exists { taper(app.buttons["journal.autres"]) }
+            if !app.buttons[l("Rechercher")].exists { taper(app.buttons["journal.autres"]) }
             sleep(1)
             snap("12-ajout")
         }
@@ -97,9 +97,9 @@ final class ScreenshotsUITests: XCTestCase {
         // Recherche → fiche portion d'un aliment qui se compte (œuf) : la
         // quantité se saisit en unités (Petit / Moyen / Gros, « 1 œuf »).
         if app.buttons["journal.autres"].waitForExistence(timeout: 5) {
-            if !app.buttons["Rechercher"].exists { app.buttons["journal.autres"].tap() }
-            if app.buttons["Rechercher"].waitForExistence(timeout: 5) {
-                app.buttons["Rechercher"].tap()
+            if !app.buttons[l("Rechercher")].exists { app.buttons["journal.autres"].tap() }
+            if app.buttons[l("Rechercher")].waitForExistence(timeout: 5) {
+                app.buttons[l("Rechercher")].tap()
                 let champ = app.textFields["recherche.champ"]
                 if champ.waitForExistence(timeout: 8) {
                     champ.tap()
@@ -148,8 +148,8 @@ final class ScreenshotsUITests: XCTestCase {
         }
 
         // Bilan complet (« Tout afficher »).
-        if app.buttons["Tout afficher"].waitForExistence(timeout: 5) {
-            app.buttons["Tout afficher"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        if app.buttons[l("Tout afficher")].waitForExistence(timeout: 5) {
+            app.buttons[l("Tout afficher")].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             sleep(2)
             snap("14-bilan-complet")
             fermerFeuille()
@@ -158,7 +158,7 @@ final class ScreenshotsUITests: XCTestCase {
         // Progrès (le check-in du jour s'ouvre à la première visite : plus tard).
         app.buttons["tab.progres"].tap()
         sleep(2)
-        let passer = app.buttons["Passer pour aujourd'hui"]
+        let passer = app.buttons[l("Passer pour aujourd'hui")]
         if passer.waitForExistence(timeout: 4) {
             snap("19-checkin-popup")
             taper(passer)
@@ -256,14 +256,14 @@ final class ScreenshotsUITests: XCTestCase {
             sleep(2)
             snap("70-questionnaire-intro")
             // Refonte du 1er octobre 2026 : l'accueil du parcours, puis ses écrans.
-            if app.buttons["Commencer"].firstMatch.waitForExistence(timeout: 5) {
-                app.buttons["Commencer"].firstMatch.tap()
+            if app.buttons[l("Commencer")].firstMatch.waitForExistence(timeout: 5) {
+                app.buttons[l("Commencer")].firstMatch.tap()
                 sleep(1)
                 snap("71-questionnaire-question")
                 // « Qu'est-ce qui t'amène ? » ne bloque pas : un écran de plus.
                 // Les suivants attendent une réponse, le bouton y reste éteint.
                 for i in 0..<3 {
-                    let continuer = app.buttons["Continuer"].firstMatch
+                    let continuer = app.buttons[l("Continuer")].firstMatch
                     if continuer.waitForExistence(timeout: 3), continuer.isEnabled {
                         continuer.tap()
                         sleep(1)
@@ -274,9 +274,9 @@ final class ScreenshotsUITests: XCTestCase {
                 }
             }
             // La feuille ne se ferme plus en glissant : la croix, puis sa confirmation.
-            if app.buttons["Fermer"].firstMatch.exists {
-                app.buttons["Fermer"].firstMatch.tap()
-                let plusTard = app.buttons["Reprendre plus tard"].firstMatch
+            if app.buttons[l("Fermer")].firstMatch.exists {
+                app.buttons[l("Fermer")].firstMatch.tap()
+                let plusTard = app.buttons[l("Reprendre plus tard")].firstMatch
                 if plusTard.waitForExistence(timeout: 3) { plusTard.tap() }
                 sleep(1)
             }
@@ -297,17 +297,17 @@ final class ScreenshotsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["tab.progres"].waitForExistence(timeout: 120))
 
         // Étape 1 : la carte de bienvenue.
-        if app.buttons["Commencer"].waitForExistence(timeout: 15) {
+        if app.buttons[l("Commencer")].waitForExistence(timeout: 15) {
             snap("80-tutoriel-bienvenue")
-            taper(app.buttons["Commencer"])
+            taper(app.buttons[l("Commencer")])
             sleep(1)
             // Étape 2 : découpe sur le bouton « Dicter » du Journal. On ne le
             // touche pas (la dictée demanderait le micro du simulateur) : la
             // capture faite, on passe.
             _ = app.buttons["journal.dicter"].waitForExistence(timeout: 6)
             snap("81-tutoriel-bouton")
-            if app.buttons["Passer"].firstMatch.exists {
-                taper(app.buttons["Passer"].firstMatch)
+            if app.buttons[l("Passer")].firstMatch.exists {
+                taper(app.buttons[l("Passer")].firstMatch)
                 sleep(1)
             }
         }
@@ -405,7 +405,7 @@ final class ScreenshotsUITests: XCTestCase {
             taper(carte)
             sleep(3)
             snap("10-paywall-1re-ouverture")
-            let passer = app.buttons["Passer à Premium"].firstMatch
+            let passer = app.buttons[l("Passer à Premium")].firstMatch
             if passer.waitForExistence(timeout: 4) {
                 taper(passer)
                 sleep(2)
@@ -442,7 +442,7 @@ final class ScreenshotsUITests: XCTestCase {
         guard bilanSuite("Commencer") else { return quitterLeBilan() }
         bilanToucher("Fatigue")
         guard bilanSuite() else { return quitterLeBilan() }
-        let prenom = app.textFields["Ton prénom"]
+        let prenom = app.textFields[l("Ton prénom")]
         if prenom.waitForExistence(timeout: 2) {
             prenom.tap()
             prenom.typeText("Léa")
@@ -484,7 +484,7 @@ final class ScreenshotsUITests: XCTestCase {
             app.buttons[onglet].tap()
             sleep(2)
             // Le check-in du jour peut s'ouvrir sur Progrès : on le passe.
-            let passer = app.buttons["Passer pour aujourd'hui"]
+            let passer = app.buttons[l("Passer pour aujourd'hui")]
             if passer.waitForExistence(timeout: 2) {
                 taper(passer)
                 sleep(1)
@@ -521,7 +521,7 @@ final class ScreenshotsUITests: XCTestCase {
             snap("31-paywall-bas")
             // Les formules, derrière le comparatif : on les regarde, on
             // n'achète rien (aucun bouton d'achat n'est touché).
-            let passer = app.buttons["Passer à Premium"].firstMatch
+            let passer = app.buttons[l("Passer à Premium")].firstMatch
             if passer.waitForExistence(timeout: 3) {
                 passer.tap()
                 sleep(3)
@@ -548,11 +548,11 @@ final class ScreenshotsUITests: XCTestCase {
             taper(rejouer)
             sleep(3)
             snap("40-recap")
-            let fermer = app.buttons["Fermer le bilan animé"]
+            let fermer = app.buttons[l("Fermer le bilan animé")]
             if fermer.waitForExistence(timeout: 3) {
                 fermer.tap()
                 sleep(1)
-                let sortie = app.buttons["Aller à mon bilan"]
+                let sortie = app.buttons[l("Aller à mon bilan")]
                 if sortie.waitForExistence(timeout: 3) { sortie.tap() }
             }
         }
@@ -563,7 +563,7 @@ final class ScreenshotsUITests: XCTestCase {
     /// Le tutoriel du premier repas peut s'ouvrir en cours de parcours : on
     /// le referme (« Plus tard ») sans rien commencer.
     private func fermerTutorielSiOuvert() {
-        let plusTard = app.buttons["Plus tard"]
+        let plusTard = app.buttons[l("Plus tard")]
         if plusTard.waitForExistence(timeout: 2) {
             plusTard.tap()
             sleep(1)
@@ -581,8 +581,8 @@ final class ScreenshotsUITests: XCTestCase {
         NSLog("captures: identifiants transmis à l'app — email %d caractères, mot de passe %d caractères", identifiant.count, motDePasse.count)
         fermerAlerteApple()
         if app.buttons["tab.progres"].waitForExistence(timeout: 45) { autoriserSante(); return }
-        guard app.buttons["J'ai déjà un compte"].waitForExistence(timeout: 10) else { return }
-        app.buttons["J'ai déjà un compte"].tap()
+        guard app.buttons[l("J'ai déjà un compte")].waitForExistence(timeout: 10) else { return }
+        app.buttons[l("J'ai déjà un compte")].tap()
         let email = app.textFields["auth.email"]
         XCTAssertTrue(email.waitForExistence(timeout: 10), "Champ email introuvable")
         email.tap()
@@ -594,7 +594,7 @@ final class ScreenshotsUITests: XCTestCase {
         password.tap()
         password.typeText(motDePasse)
         sleep(1)
-        app.buttons["Se connecter"].firstMatch.tap()
+        app.buttons[l("Se connecter")].firstMatch.tap()
     }
 
     // MARK: - 5. Le questionnaire en quatre étapes, écran par écran (hook DEBUG `-captureDecouverte`)
@@ -637,7 +637,7 @@ final class ScreenshotsUITests: XCTestCase {
         guard bilanSuite() else { return quitterLeBilan() }
 
         // Le prénom n'est demandé que si le compte ne le connaît pas.
-        let prenom = app.textFields["Ton prénom"]
+        let prenom = app.textFields[l("Ton prénom")]
         if prenom.waitForExistence(timeout: 2) {
             prenom.tap()
             prenom.typeText("Léa")
@@ -812,10 +812,10 @@ final class ScreenshotsUITests: XCTestCase {
 
     /// Referme le questionnaire par sa croix, sans rien envoyer.
     private func quitterLeBilan() {
-        let croix = app.buttons["Fermer"].firstMatch
+        let croix = app.buttons[l("Fermer")].firstMatch
         guard croix.waitForExistence(timeout: 3) else { return }
         croix.tap()
-        let plusTard = app.buttons["Reprendre plus tard"].firstMatch
+        let plusTard = app.buttons[l("Reprendre plus tard")].firstMatch
         if plusTard.waitForExistence(timeout: 3) { plusTard.tap() }
         sleep(1)
     }
@@ -864,7 +864,7 @@ final class ScreenshotsUITests: XCTestCase {
             sleep(1)
             snap("04-micros-deplie-suite")
         }
-        let mineraux = app.buttons["Minéraux"].firstMatch
+        let mineraux = app.buttons[l("Minéraux")].firstMatch
         if mineraux.exists {
             for _ in 0..<4 where !mineraux.isHittable { app.swipeDown(velocity: .slow); sleep(1) }
             taper(mineraux)
@@ -876,8 +876,8 @@ final class ScreenshotsUITests: XCTestCase {
         for _ in 0..<8 { app.swipeDown(velocity: .fast) }
         sleep(1)
         if app.buttons["journal.autres"].waitForExistence(timeout: 5) {
-            if !app.buttons["Écrire"].exists { taper(app.buttons["journal.autres"]) }
-            let ecrire = app.buttons["Écrire"].firstMatch
+            if !app.buttons[l("Écrire")].exists { taper(app.buttons["journal.autres"]) }
+            let ecrire = app.buttons[l("Écrire")].firstMatch
             if ecrire.waitForExistence(timeout: 5) {
                 taper(ecrire)
                 sleep(2)
@@ -922,8 +922,8 @@ final class ScreenshotsUITests: XCTestCase {
         sleep(2)
 
         guard app.buttons["journal.autres"].waitForExistence(timeout: 5) else { return }
-        if !app.buttons["Écrire"].exists { taper(app.buttons["journal.autres"]) }
-        let ecrire = app.buttons["Écrire"].firstMatch
+        if !app.buttons[l("Écrire")].exists { taper(app.buttons["journal.autres"]) }
+        let ecrire = app.buttons[l("Écrire")].firstMatch
         guard ecrire.waitForExistence(timeout: 5) else { return }
         taper(ecrire)
         sleep(2)
@@ -1099,8 +1099,8 @@ final class ScreenshotsUITests: XCTestCase {
     }
 
     private func fermerFeuille() {
-        if app.buttons["Fermer"].firstMatch.exists {
-            app.buttons["Fermer"].firstMatch.tap()
+        if app.buttons[l("Fermer")].firstMatch.exists {
+            app.buttons[l("Fermer")].firstMatch.tap()
         } else {
             app.swipeDown(velocity: .fast)
         }
@@ -1130,6 +1130,34 @@ final class ScreenshotsUITests: XCTestCase {
         app.launchArguments += ["-AppleLanguages", "(\(langue))", "-AppleLocale", langue == "en" ? "en_AU" : "fr_FR"]
         return app
     }
+
+    /// Un libellé que le test touche, dans la langue des captures (les
+    /// identifiants `tab.…`, `journal.…` ne changent pas, eux).
+    private func l(_ francais: String) -> String {
+        guard ProcessInfo.processInfo.environment["LANGUE_CAPTURES"] == "en" else { return francais }
+        return Self.libellesAnglais[francais] ?? francais
+    }
+
+    private static let libellesAnglais: [String: String] = [
+        "Aller à mon bilan": "Go to my report",
+        "C'est parti": "Let's go",
+        "Commencer": "Get started",
+        "Continuer": "Continue",
+        "Fermer le bilan animé": "Close the animated report",
+        "Fermer": "Close",
+        "J'ai déjà un compte": "I already have an account",
+        "Minéraux": "Minerals",
+        "Passer pour aujourd'hui": "Skip for today",
+        "Passer à Premium": "Upgrade to Premium",
+        "Passer": "Skip",
+        "Plus tard": "Later",
+        "Rechercher": "Search",
+        "Reprendre plus tard": "Continue later",
+        "Se connecter": "Sign in",
+        "Ton prénom": "Your first name",
+        "Tout afficher": "Show all",
+        "Écrire": "Type",
+    ]
 
     private func snap(_ name: String) {
         NSLog("captures: %@", name)
