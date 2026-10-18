@@ -878,6 +878,12 @@ if MODE == "apply-app"
       ("17,99 EUR la 1re annee - Puis 30,00 EUR / an"), with the renewal
       price stated before purchase. Ineligible accounts see 30 EUR.
 
+      NEW IN 2.0.4: a "Recap du jour" screen opens once a day on launch (what
+      was lowest the day before, and one simple food to add today). Premium
+      users also get a weekly review card in the Progres tab once 10 meals
+      are logged over at least 3 days in the last 7 days. Like the rest of the
+      app, both are general wellness information, never medical advice.
+
       HEALTHKIT (2.5.1): Apple Health is read-only. Path: Reglages tab >
       "Apple Sante" row (section "Compte") > "Apple Sante" card (imports
       weight, steps and sleep). The Journal tab also reads active energy
@@ -1249,7 +1255,9 @@ if MODE == "new-version"
   # scientifiques, bilan personnalisé). Ton et plan validés par Arthur le
   # 12 oct. 2026. VERSION_STRING / WHATS_NEW restent des surcharges possibles.
   # Version 2.0.3 (13 oct. 2026) : correctifs Premium, fiche de la 2.0.2 gardée.
-  vs = ENV["VERSION_STRING"].to_s.empty? ? "2.0.3" : ENV["VERSION_STRING"]
+  # Version 2.0.4 (18 oct. 2026) : récap du jour, bilan de la semaine (Premium),
+  # chiffres et textes relus ; la fiche dit « récap » et liste le bilan.
+  vs = ENV["VERSION_STRING"].to_s.empty? ? "2.0.4" : ENV["VERSION_STRING"]
 
   existing = get_all("/v1/apps/#{app_id}/appStoreVersions?limit=50")
     .find { |v| v.dig("attributes", "versionString") == vs }
@@ -1266,12 +1274,12 @@ if MODE == "new-version"
   end
 
   notes_fiche = <<~FICHE.strip
-    Kiwio 2.0.3
+    Kiwio 2.0.4
 
-    - Tu as un code promo ? « J'ai un code promo » est maintenant en haut de l'écran Premium.
-    - Tu supprimes ton compte puis tu en recrées un ? Ton abonnement Premium te suit, sans rien faire.
-    - Le bilan et le scan photo reconnaissent mieux ton abonnement : plus de limite du gratuit par erreur.
-    - Corrections et améliorations.
+    - Nouveau : ton récap du jour. Chaque matin, ce qui t'a manqué hier, et un aliment simple pour le combler aujourd'hui.
+    - Nouveau dans Premium : ton bilan de la semaine. Au bout de 10 repas notés, Kiwio relit ta semaine : ce qui a manqué, les habitudes qui pèsent, et trois changements concrets.
+    - Des chiffres plus cohérents : un apport à 100 % est compté comme atteint, partout.
+    - Des phrases plus claires dans toute l'app.
   FICHE
 
   description_fiche = <<~FICHE.strip
@@ -1289,7 +1297,7 @@ if MODE == "new-version"
     Sommeil, soleil, sport, régime, ressentis, journée type : en quatre petites étapes, une question à la fois, Kiwio fait ton portrait. Il en tire tes dix apports clés (vitamines D, B12 et C, fer, magnésium, calcium, zinc, iode, oméga-3 et fibres) et, pour chacun, ce qui pèse dessus chez toi : le thé pendant le repas, le peu de soleil, le poisson qui manque. Deux profils, deux bilans différents.
 
     QUOI FAIRE, DÈS AUJOURD'HUI
-    - Ton brief du jour : ta priorité, en un geste concret.
+    - Ton récap du jour : ce qui t'a manqué hier, et un aliment simple pour le combler.
     - Ton Plan relie ce que tu ressens, tes objectifs et ton assiette.
     - Des rappels qui partent de ta vraie journée, jamais de messages génériques.
 
@@ -1312,6 +1320,7 @@ if MODE == "new-version"
     - le détail de tes vitamines et minéraux dans le Journal, avec le rapport oméga-6 / oméga-3 ;
     - les solutions à tes interactions et ton plan guidé pas à pas ;
     - tes courbes de progression depuis le départ ;
+    - ton bilan de la semaine : ce qui t'a manqué, tes habitudes, et trois changements concrets ;
     - le conseil du jour, à cocher depuis son widget ;
     - la prise de sang, en bêta : photographie tes résultats ou dépose le PDF du laboratoire, les valeurs mesurées comptent dans tes apports, et ton document est lu, puis oublié.
 
@@ -2101,6 +2110,12 @@ if MODE == "fix-meta"
     Weekly (0.99 EUR). Both subscriptions are already approved and on sale;
     this submission contains the app version only. The Monthly subscription
     is not displayed in the app.
+
+    NEW IN 2.0.4: a "Recap du jour" screen opens once a day on launch (what
+    was lowest the day before, and one simple food to add today). Premium
+    users also get a weekly review card in the Progres tab once 10 meals
+    are logged over at least 3 days in the last 7 days. Like the rest of the
+    app, both are general wellness information, never medical advice.
 
     HEALTHKIT (2.5.1): Apple Health is read-only. Path: Reglages tab >
     "Apple Sante" row (section "Compte") > "Apple Sante" card (imports
