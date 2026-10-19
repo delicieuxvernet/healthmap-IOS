@@ -40,8 +40,7 @@ enum VocabulaireDictee {
         // Marques qu'on cite en mangeant
         "Alpro", "Danone", "Activia", "Yoplait", "Siggi's", "Bjorg", "Gerblé", "Sojasun",
         "Nutella", "Kinder", "Bonne Maman", "Président", "Babybel", "Kiri", "Philadelphia",
-        "Herta", "Fleury Michon", "Panzani", "Barilla", "Lu", "Prince", "Oreo", "Kellogg's",
-        "Special K", "Chocapic", "Trésor", "Coca-Cola", "Coca zéro", "Oasis", "Lipton",
-        "Red Bull", "Ricoré", "Nesquik", "Picard",
+        "Herta", "Fleury Michon", "Oreo", "Kellogg's",
+        "Chocapic", "Trésor", "Coca-Cola", "Coca zéro",
     ]
 }
