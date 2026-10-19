@@ -1377,6 +1377,23 @@ struct VoiceMealSheet: View {
         isSaving = true
         defer { isSaving = false }
 
+        // Aliments de la base : on repasse par get_food, le MÊME chemin que
+        // l'ajout depuis la recherche (micros et arrondis identiques). Toutes
+        // les fiches en même temps : une par une, cinq aliments faisaient cinq
+        // allers-retours à la suite, longs quand la base sature (19 oct. 2026).
+        let journal = self.journal
+        let ids = Set(savableItems.compactMap(\.foodId))
+        let details = await withTaskGroup(of: (String, MealJournalService.FoodDetail?).self) { groupe in
+            for id in ids {
+                groupe.addTask { (id, try? await journal.foodDetail(id: id)) }
+            }
+            var sortie: [String: MealJournalService.FoodDetail] = [:]
+            for await (id, detail) in groupe {
+                if let detail { sortie[id] = detail }
+            }
+            return sortie
+        }
+
         // On enregistre le grammage choisi à l'écran, qui peut différer de celui
         // résolu par le serveur.
         var entries: [MealJournalService.FoodEntry] = []
@@ -1384,17 +1401,11 @@ struct VoiceMealSheet: View {
             guard let g = grams[item.index], g > 0 else { continue }
 
             if let foodId = item.foodId {
-                // Aliment de la base : on repasse par get_food, le MÊME chemin
-                // que l'ajout depuis la recherche (micros et arrondis identiques).
-                do {
-                    let detail = try await journal.foodDetail(id: foodId)
-                    if let entry = MealJournalService.entry(for: detail, grams: g) {
-                        entries.append(entry)
-                        continue
-                    }
-                } catch {
-                    AppLogger.analysis.error("get_food(\(foodId, privacy: .public)) indisponible")
+                if let detail = details[foodId], let entry = MealJournalService.entry(for: detail, grams: g) {
+                    entries.append(entry)
+                    continue
                 }
+                AppLogger.analysis.error("get_food(\(foodId, privacy: .public)) indisponible")
             }
 
             // Aliment absent de la base (« cœurs de canard ») : on l'enregistre
