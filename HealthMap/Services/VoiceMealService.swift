@@ -332,10 +332,12 @@ final class VoiceMealService {
     /// (429) ni une demande refusée (autre 4xx). Un raté unique affichait
     /// directement « L'analyse n'a pas abouti » (incident du 7 oct. 2026).
     private func envoyerAvecUneRelance(_ corps: Body) async throws -> Analysis {
+        let debut = Date()
         do {
             return try await client.functions.invoke("parse-meal-voice", options: .init(body: corps))
         } catch {
-            guard Self.estPassager(error) else { throw error }
+            guard Self.estPassager(error),
+                  Self.relanceUtile(apres: Date().timeIntervalSince(debut)) else { throw error }
             AppLogger.analysis.warning("parse-meal-voice : raté passager, seconde tentative (\(String(describing: error), privacy: .public))")
             if let erreur = error as? FunctionsError, case .httpError(let code, _) = erreur, code == 401 {
                 try? await AuthService.shared.refreshSession()
@@ -343,6 +345,18 @@ final class VoiceMealService {
             try await Task.sleep(for: .milliseconds(1500))
             return try await client.functions.invoke("parse-meal-voice", options: .init(body: corps))
         }
+    }
+
+    /// Au-delà, le raté n'est plus « passager » : le serveur a déjà travaillé
+    /// longtemps (base saturée, délai dépassé). Le 19 oct. 2026, une analyse
+    /// échouée au bout de 102 s a été relancée d'office : 50 s de plus, soit
+    /// 2 min 30 d'attente et deux dictées décomptées pour un seul repas.
+    static let relanceAvant: TimeInterval = 15
+
+    /// Une seconde tentative a-t-elle un sens après un raté survenu au bout de
+    /// `duree` secondes ?
+    static func relanceUtile(apres duree: TimeInterval) -> Bool {
+        duree < relanceAvant
     }
 
     /// Un raté qui a des chances de passer à la seconde tentative.

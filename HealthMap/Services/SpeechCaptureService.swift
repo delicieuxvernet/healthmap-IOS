@@ -74,6 +74,9 @@ final class SpeechCaptureService: ObservableObject {
     private var recorder: AVAudioRecorder?
     private var horloge: Timer?
     private var fichier: URL?
+    /// Gardé en vie le temps de la transcription : la tâche de reconnaissance
+    /// ne retient pas forcément son délégué.
+    private var relaisReconnaissance: SuiviReconnaissance?
 
     // MARK: - Autorisations
 
@@ -203,6 +206,12 @@ final class SpeechCaptureService: ObservableObject {
         // quand la transcription redémarre, et on recolle le tout à la fin
         // (`TranscriptionCumul`, testé unitairement).
         requete.shouldReportPartialResults = true
+        // Les mots de l'assiette que la dictée rate (« ski » pour skyr,
+        // « quéfir » pour kéfir, marques déformées), donnés d'avance.
+        requete.contextualStrings = VocabulaireDictee.termes
+        // Virgules et points : le serveur découpe mieux « un café, deux
+        // tartines et un yaourt » qu'une seule phrase sans ponctuation.
+        requete.addsPunctuation = true
         // Sur appareil quand c'est possible : ce qu'on mange reste privé, et ça
         // marche sans réseau. iOS retombe sur le service Apple si le modèle
         // français n'est pas installé localement.
@@ -211,6 +220,7 @@ final class SpeechCaptureService: ObservableObject {
         }
 
         let dureeAudio = max(10, duree)
+        defer { relaisReconnaissance = nil }
         let texte: String = await withCheckedContinuation { suite in
             let cumul = TranscriptionCumul()
             let file = DispatchQueue(label: "kiwio.dictee.cumul")
@@ -238,28 +248,32 @@ final class SpeechCaptureService: ObservableObject {
             // Garde-fou global : quoi qu'il arrive, on rend la main.
             armerFenetre(min(90, dureeAudio * 2))
 
-            recognizer.recognitionTask(with: requete) { resultat, erreur in
-                file.async {
-                    guard !repris else { return }
-                    if let resultat {
-                        cumul.integrer(resultat.bestTranscription.formattedString,
-                                       final: resultat.isFinal)
-                    }
-                    if erreur != nil {
-                        // La tâche s'arrête (fin de fichier comprise) : ce
-                        // qu'on a cumulé EST la transcription.
-                        conclure()
-                    } else if resultat?.isFinal == true {
-                        // Peut-être le dernier segment, mais un autre peut
-                        // suivre après un silence : courte fenêtre avant de
-                        // conclure.
-                        armerFenetre(1.2)
-                    } else {
+            let relais = SuiviReconnaissance(
+                partiel: { texte in
+                    file.async {
+                        guard !repris else { return }
+                        cumul.integrer(texte, final: false)
                         // Un partiel : tant que ça avance, on attend.
                         armerFenetre(4.0)
                     }
+                },
+                segment: { texte in
+                    file.async {
+                        guard !repris else { return }
+                        cumul.integrer(texte, final: true)
+                        // Fin d'une phrase. La fin du FICHIER est signalée à
+                        // part (`fin`) : cette fenêtre n'est qu'un garde-fou.
+                        armerFenetre(1.2)
+                    }
+                },
+                fin: {
+                    // Tout le fichier est lu (ou la tâche s'arrête) : ce qu'on
+                    // a cumulé EST la transcription, sans attente fixe.
+                    conclure()
                 }
-            }
+            )
+            relaisReconnaissance = relais
+            recognizer.recognitionTask(with: requete, delegate: relais)
         }
 
         nettoyerFichier()
@@ -311,6 +325,47 @@ final class SpeechCaptureService: ObservableObject {
     }
 }
 
+
+// MARK: - Fin de la reconnaissance
+
+/// Relais des événements de la reconnaissance d'un fichier.
+///
+/// La version à fermeture (`recognitionTask(with:resultHandler:)`) ne dit pas
+/// quand TOUT le fichier est lu : après chaque phrase, on attendait 1,2 s (4 s
+/// après un partiel) « au cas où » une autre suivrait — autant de temps perdu
+/// à chaque dictée (audit du 19 oct. 2026). `didFinishSuccessfully` le dit :
+/// on conclut aussitôt, les fenêtres restent comme garde-fou.
+final class SuiviReconnaissance: NSObject, SFSpeechRecognitionTaskDelegate {
+    private let partiel: (String) -> Void
+    private let segment: (String) -> Void
+    private let fin: () -> Void
+
+    init(partiel: @escaping (String) -> Void,
+         segment: @escaping (String) -> Void,
+         fin: @escaping () -> Void) {
+        self.partiel = partiel
+        self.segment = segment
+        self.fin = fin
+    }
+
+    func speechRecognitionTask(_ task: SFSpeechRecognitionTask,
+                               didHypothesizeTranscription transcription: SFTranscription) {
+        partiel(transcription.formattedString)
+    }
+
+    func speechRecognitionTask(_ task: SFSpeechRecognitionTask,
+                               didFinishRecognition recognitionResult: SFSpeechRecognitionResult) {
+        segment(recognitionResult.bestTranscription.formattedString)
+    }
+
+    func speechRecognitionTask(_ task: SFSpeechRecognitionTask, didFinishSuccessfully successfully: Bool) {
+        fin()
+    }
+
+    func speechRecognitionTaskWasCancelled(_ task: SFSpeechRecognitionTask) {
+        fin()
+    }
+}
 
 // MARK: - Recollage des segments de transcription
 
